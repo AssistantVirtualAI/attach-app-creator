@@ -14,7 +14,198 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      agent_config: {
+        Row: {
+          created_at: string
+          first_message: string | null
+          id: string
+          is_active: boolean | null
+          max_tokens: number | null
+          name: string
+          system_prompt: string
+          temperature: number | null
+          updated_at: string
+          user_id: string
+          voice_id: string | null
+          voice_similarity: number | null
+          voice_stability: number | null
+          voice_style: number | null
+        }
+        Insert: {
+          created_at?: string
+          first_message?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_tokens?: number | null
+          name: string
+          system_prompt: string
+          temperature?: number | null
+          updated_at?: string
+          user_id: string
+          voice_id?: string | null
+          voice_similarity?: number | null
+          voice_stability?: number | null
+          voice_style?: number | null
+        }
+        Update: {
+          created_at?: string
+          first_message?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_tokens?: number | null
+          name?: string
+          system_prompt?: string
+          temperature?: number | null
+          updated_at?: string
+          user_id?: string
+          voice_id?: string | null
+          voice_similarity?: number | null
+          voice_stability?: number | null
+          voice_style?: number | null
+        }
+        Relationships: []
+      }
+      analytics: {
+        Row: {
+          avg_satisfaction: number | null
+          created_at: string
+          date: string
+          id: string
+          platform: string | null
+          total_conversations: number | null
+          total_duration: number | null
+          user_id: string
+        }
+        Insert: {
+          avg_satisfaction?: number | null
+          created_at?: string
+          date: string
+          id?: string
+          platform?: string | null
+          total_conversations?: number | null
+          total_duration?: number | null
+          user_id: string
+        }
+        Update: {
+          avg_satisfaction?: number | null
+          created_at?: string
+          date?: string
+          id?: string
+          platform?: string | null
+          total_conversations?: number | null
+          total_duration?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      conversations: {
+        Row: {
+          audio_url: string | null
+          created_at: string
+          duration: number | null
+          id: string
+          keywords: string[] | null
+          platform: string | null
+          satisfaction_score: number | null
+          sentiment: string | null
+          status: string | null
+          title: string
+          transcript: string | null
+          user_id: string
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string
+          duration?: number | null
+          id?: string
+          keywords?: string[] | null
+          platform?: string | null
+          satisfaction_score?: number | null
+          sentiment?: string | null
+          status?: string | null
+          title: string
+          transcript?: string | null
+          user_id: string
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string
+          duration?: number | null
+          id?: string
+          keywords?: string[] | null
+          platform?: string | null
+          satisfaction_score?: number | null
+          sentiment?: string | null
+          status?: string | null
+          title?: string
+          transcript?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      knowledge_base: {
+        Row: {
+          category: string | null
+          content: string
+          created_at: string
+          id: string
+          synced_to_elevenlabs: boolean | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          synced_to_elevenlabs?: boolean | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          synced_to_elevenlabs?: boolean | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
