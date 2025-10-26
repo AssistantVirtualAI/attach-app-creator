@@ -1,3 +1,4 @@
+import { AppLayout } from "@/components/layout/AppLayout";
 import { StatCard } from "@/components/StatCard";
 import { ChartCard } from "@/components/ChartCard";
 import { Users, TrendingUp, Activity, Award } from "lucide-react";
@@ -60,26 +61,8 @@ const Index = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[var(--gradient-hero)]">
-      {/* Header */}
-      <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                <Activity className="w-6 h-6 text-white" />
-              </div>
-              <h1 className="text-2xl font-bold gradient-text">AVA Statistics</h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">Last updated: 2 minutes ago</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-6 py-8">
+    <AppLayout>
+      <div className="container mx-auto px-6 py-8">
         {/* Hero Section */}
         <div className="mb-12">
           <h2 className="text-4xl font-bold mb-3">Dashboard Overview</h2>
@@ -112,8 +95,8 @@ const Index = () => {
             xAxisKey="month"
           />
         </div>
-      </main>
-    </div>
+      </div>
+    </AppLayout>
   );
 };
 
