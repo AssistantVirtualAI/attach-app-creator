@@ -164,18 +164,13 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
               <SelectTrigger id="integration">
                 <SelectValue placeholder="Choisir une intégration..." />
               </SelectTrigger>
-              <SelectContent>
-                {integrations.map((integration) => (
-                  <SelectItem key={integration.id} value={integration.id}>
-                    <div className="flex items-center gap-2">
-                      <PlatformBadge platform={integration.platform} />
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(integration.created_at).toLocaleDateString('fr-FR')}
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
+                  <SelectContent>
+                    {integrations.map((integration) => (
+                      <SelectItem key={integration.id} value={integration.id}>
+                        {integration.platform.toUpperCase()} - {new Date(integration.created_at).toLocaleDateString('fr-FR')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
             </Select>
           </div>
         )}

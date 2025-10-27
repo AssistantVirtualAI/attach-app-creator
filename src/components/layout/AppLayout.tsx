@@ -14,19 +14,35 @@ interface AppLayoutProps {
 }
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
-  const { role, isSuperAdmin } = usePermissions();
+  const { role, isSuperAdmin, isRole } = usePermissions();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
 
-  const navigation = [
+  // Base navigation for all users
+  const baseNavigation = [
     { name: 'Maison', href: '/', icon: Home },
+  ];
+
+  // Admin-only navigation
+  const adminNavigation = [
     { name: 'Clientèle', href: '/clients', icon: Users },
-    { name: 'Agents', href: '/agent-config', icon: Bot },
+    { name: 'Agents', href: '/agents', icon: Bot },
     { name: 'Intégrations', href: '/integrations', icon: Sliders },
     { name: 'Journaux Webhook', href: '/webhook-logs', icon: Webhook },
     { name: 'Facturation par Stripe', href: '/stripe-billing', icon: CreditCard },
     { name: 'Configurateur SaaS', href: '/saas-config', icon: Settings },
+  ];
+
+  // Settings available for all
+  const settingsNavigation = [
     { name: 'Paramètres', href: '/settings', icon: Settings },
+  ];
+
+  // Combine navigation based on role
+  const navigation = [
+    ...baseNavigation,
+    ...(!isRole('agent') ? adminNavigation : []),
+    ...settingsNavigation,
   ];
 
   const isActive = (href: string) => location.pathname === href;

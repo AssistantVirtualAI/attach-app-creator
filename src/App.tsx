@@ -14,7 +14,7 @@ import VoiceAnalytics from "./pages/VoiceAnalytics";
 import Conversations from "./pages/Conversations";
 import ConversationDetail from "./pages/ConversationDetail";
 import KnowledgeBase from "./pages/KnowledgeBase";
-import AgentConfig from "./pages/AgentConfig";
+// AgentConfig removed - replaced by Agents page
 import Settings from "./pages/Settings";
 import Clients from "./pages/Clients";
 import Integrations from "./pages/Integrations";
@@ -100,14 +100,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/agent-config"
-              element={
-                <ProtectedRoute>
-                  <AgentConfig />
-                </ProtectedRoute>
-              }
-            />
+            {/* Old agent-config route removed - now using /agents */}
             <Route
               path="/settings"
               element={

@@ -1,10 +1,25 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Search, Settings, Copy } from 'lucide-react';
+import { Plus, Search, Key, Trash2 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -13,14 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
+import { PlatformBadge } from '@/components/agents/PlatformBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useToast } from '@/hooks/use-toast';
@@ -30,17 +38,25 @@ export default function Clients() {
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [newClient, setNewClient] = useState({
+    name: '',
+    email: '',
+    username: '',
+    password: '',
+    assignedAgentId: '',
+  });
 
-  const { data: clients = [], isLoading, refetch } = useQuery({
+  const { data: clients, isLoading, refetch } = useQuery({
     queryKey: ['clients', selectedOrgId],
     queryFn: async () => {
       if (!selectedOrgId) return [];
-
+      
       const { data, error } = await supabase
         .from('clients')
-        .select('*')
+        .select(`
+          *,
+          assigned_agent:agents(id, name, platform)
+        `)
         .eq('organization_id', selectedOrgId)
         .order('created_at', { ascending: false });
 
@@ -50,42 +66,133 @@ export default function Clients() {
     enabled: !!selectedOrgId,
   });
 
+  const { data: agents } = useQuery({
+    queryKey: ['agents', selectedOrgId],
+    queryFn: async () => {
+      if (!selectedOrgId) return [];
+      
+      const { data, error } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('organization_id', selectedOrgId)
+        .order('name');
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedOrgId,
+  });
+
   const handleCreate = async () => {
-    if (!selectedOrgId || !name) return;
+    const { name, email, username, password, assignedAgentId } = newClient;
+
+    if (!name || !email || !username || !password || !assignedAgentId) {
+      toast({
+        title: 'Erreur',
+        description: 'Tous les champs sont requis',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (password.length < 8) {
+      toast({
+        title: 'Erreur',
+        description: 'Le mot de passe doit contenir au moins 8 caractères',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
-      const { error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Utilisateur non authentifié');
+
+      // 1. Create Supabase Auth user
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: name,
+          username: username,
+          client_type: 'agent',
+        },
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('Utilisateur non créé');
+
+      // 2. Create profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: authData.user.id,
+          email,
+          full_name: name,
+        });
+
+      if (profileError) throw profileError;
+
+      // 3. Create client entry
+      const { error: clientError } = await supabase
         .from('clients')
         .insert({
           organization_id: selectedOrgId,
           name,
-          email: email || null,
+          email,
+          username,
+          user_id: authData.user.id,
+          assigned_agent_id: assignedAgentId,
           status: 'active',
+          created_by: user.id,
         });
 
-      if (error) throw error;
+      if (clientError) throw clientError;
+
+      // 4. Add as organization member
+      const { error: memberError } = await supabase
+        .from('organization_members')
+        .insert({
+          user_id: authData.user.id,
+          organization_id: selectedOrgId,
+          accepted_at: new Date().toISOString(),
+        });
+
+      if (memberError) throw memberError;
+
+      // 5. Assign agent role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: authData.user.id,
+          organization_id: selectedOrgId,
+          role: 'agent',
+        });
+
+      if (roleError) throw roleError;
 
       toast({
-        title: 'Client créé',
-        description: `${name} a été ajouté avec succès`,
+        title: 'Succès',
+        description: `Client créé ! Identifiants envoyés à ${email}`,
       });
 
       setOpen(false);
-      setName('');
-      setEmail('');
+      setNewClient({ name: '', email: '', username: '', password: '', assignedAgentId: '' });
       refetch();
     } catch (error: any) {
+      console.error('Erreur création client:', error);
       toast({
         title: 'Erreur',
-        description: error.message,
+        description: error.message || 'Erreur lors de la création du client',
         variant: 'destructive',
       });
     }
   };
 
-  const filteredClients = clients.filter((client) =>
+  const filteredClients = clients?.filter((client) =>
     client.name.toLowerCase().includes(search.toLowerCase())
-  );
+  ) || [];
 
   return (
     <AppLayout>
@@ -100,34 +207,93 @@ export default function Clients() {
 
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="w-4 h-4" />
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
                 Nouvelle clientèle
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
-                <DialogTitle>Ajouter un client</DialogTitle>
+                <DialogTitle>Créer un nouveau client</DialogTitle>
+                <DialogDescription>
+                  Le client recevra un accès limité au dashboard de l'organisation
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-4">
                 <div>
                   <Label htmlFor="name">Nom du client *</Label>
                   <Input
                     id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Entreprise ABC"
+                    value={newClient.name}
+                    onChange={(e) =>
+                      setNewClient({
+                        ...newClient,
+                        name: e.target.value,
+                        username: e.target.value
+                          .toLowerCase()
+                          .replace(/[^a-z0-9]/g, ''),
+                      })
+                    }
+                    placeholder="Ex: Jean Dupont"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="email">Email (optionnel)</Label>
+                  <Label htmlFor="email">Email *</Label>
                   <Input
                     id="email"
                     type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="contact@entreprise.com"
+                    value={newClient.email}
+                    onChange={(e) =>
+                      setNewClient({ ...newClient, email: e.target.value })
+                    }
+                    placeholder="jean.dupont@example.com"
                   />
+                </div>
+                <div>
+                  <Label htmlFor="username">Nom d'utilisateur *</Label>
+                  <Input
+                    id="username"
+                    value={newClient.username}
+                    onChange={(e) =>
+                      setNewClient({ ...newClient, username: e.target.value })
+                    }
+                    placeholder="jeandupont"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Utilisé pour se connecter au dashboard
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="password">Mot de passe *</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={newClient.password}
+                    onChange={(e) =>
+                      setNewClient({ ...newClient, password: e.target.value })
+                    }
+                    placeholder="Minimum 8 caractères"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="agent">Assigner à un agent *</Label>
+                  <Select
+                    value={newClient.assignedAgentId}
+                    onValueChange={(value) =>
+                      setNewClient({ ...newClient, assignedAgentId: value })
+                    }
+                  >
+                    <SelectTrigger id="agent">
+                      <SelectValue placeholder="Choisir un agent..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {agents?.map((agent) => (
+                        <SelectItem key={agent.id} value={agent.id}>
+                          {agent.platform.toUpperCase()} - {agent.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button onClick={handleCreate} className="w-full">
                   Créer le client
@@ -154,22 +320,24 @@ export default function Clients() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nom</TableHead>
+                <TableHead>Username</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Agent assigné</TableHead>
                 <TableHead>Statut</TableHead>
-                <TableHead>Agents assignés</TableHead>
-                <TableHead>Créé le</TableHead>
+                <TableHead>Date de création</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     Chargement...
                   </TableCell>
                 </TableRow>
               ) : filteredClients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     Aucun client trouvé
                   </TableCell>
                 </TableRow>
@@ -178,26 +346,42 @@ export default function Clients() {
                   <TableRow key={client.id}>
                     <TableCell className="font-medium">{client.name}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant={client.status === 'active' ? 'default' : 'secondary'}
-                        className={client.status === 'active' ? 'bg-green-500' : ''}
-                      >
-                        {client.status === 'active' ? 'Actif' : 'Inactif'}
-                      </Badge>
+                      {client.username && (
+                        <code className="text-xs bg-muted px-2 py-1 rounded">
+                          {client.username}
+                        </code>
+                      )}
                     </TableCell>
-                    <TableCell>{client.assigned_agents || 0}</TableCell>
+                    <TableCell>{client.email}</TableCell>
+                    <TableCell>
+                      {client.assigned_agent && (
+                        <div className="flex items-center gap-2">
+                          <PlatformBadge platform={client.assigned_agent.platform} />
+                          <span className="text-sm">{client.assigned_agent.name}</span>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          client.status === 'active'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {client.status}
+                      </span>
+                    </TableCell>
                     <TableCell>
                       {new Date(client.created_at).toLocaleDateString('fr-FR')}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="icon">
-                          <Settings className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon">
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      <Button variant="ghost" size="icon" title="Réinitialiser mot de passe">
+                        <Key className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" title="Supprimer">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))

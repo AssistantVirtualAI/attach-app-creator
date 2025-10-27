@@ -217,6 +217,7 @@ export type Database = {
       }
       clients: {
         Row: {
+          assigned_agent_id: string | null
           assigned_agents: number | null
           created_at: string
           created_by: string | null
@@ -226,8 +227,11 @@ export type Database = {
           organization_id: string
           status: string | null
           updated_at: string
+          user_id: string | null
+          username: string | null
         }
         Insert: {
+          assigned_agent_id?: string | null
           assigned_agents?: number | null
           created_at?: string
           created_by?: string | null
@@ -237,8 +241,11 @@ export type Database = {
           organization_id: string
           status?: string | null
           updated_at?: string
+          user_id?: string | null
+          username?: string | null
         }
         Update: {
+          assigned_agent_id?: string | null
           assigned_agents?: number | null
           created_at?: string
           created_by?: string | null
@@ -248,8 +255,17 @@ export type Database = {
           organization_id?: string
           status?: string | null
           updated_at?: string
+          user_id?: string | null
+          username?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "clients_assigned_agent_id_fkey"
+            columns: ["assigned_agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "clients_organization_id_fkey"
             columns: ["organization_id"]
@@ -704,6 +720,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_unique_username: { Args: { base_name: string }; Returns: string }
       get_user_role: {
         Args: { _org_id: string; _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
