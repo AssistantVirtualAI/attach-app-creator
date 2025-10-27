@@ -191,6 +191,54 @@ export type Database = {
         }
         Relationships: []
       }
+      knowledge_base_items: {
+        Row: {
+          category: string
+          content: string
+          created_at: string | null
+          elevenlabs_id: string | null
+          id: string
+          is_synced: boolean | null
+          last_synced_at: string | null
+          search_vector: unknown
+          tags: string[] | null
+          title: string
+          updated_at: string | null
+          usage_count: number | null
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          content: string
+          created_at?: string | null
+          elevenlabs_id?: string | null
+          id?: string
+          is_synced?: boolean | null
+          last_synced_at?: string | null
+          search_vector?: unknown
+          tags?: string[] | null
+          title: string
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string | null
+          elevenlabs_id?: string | null
+          id?: string
+          is_synced?: boolean | null
+          last_synced_at?: string | null
+          search_vector?: unknown
+          tags?: string[] | null
+          title?: string
+          updated_at?: string | null
+          usage_count?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       organization_integrations: {
         Row: {
           additional_config: Json | null
