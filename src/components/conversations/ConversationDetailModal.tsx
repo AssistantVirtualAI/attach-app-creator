@@ -1,0 +1,317 @@
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { AdvancedAudioPlayer } from '@/components/audio/AdvancedAudioPlayer';
+import { ConversationMetrics } from './ConversationMetrics';
+import { useConversationDetails } from '@/hooks/useConversationDetails';
+import { useConversationAnalysis } from '@/hooks/useConversationAnalysis';
+import { ConversationCardSkeleton } from '@/components/LoadingSkeleton';
+import { Brain, Sparkles, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { motion } from 'framer-motion';
+
+interface ConversationDetailModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  conversationId: string;
+}
+
+export function ConversationDetailModal({ 
+  isOpen, 
+  onClose, 
+  conversationId 
+}: ConversationDetailModalProps) {
+  const [activeTab, setActiveTab] = useState('overview');
+  const { data: conversation, isLoading, error } = useConversationDetails(conversationId);
+  const { analysis, isAnalyzing, generateAnalysis } = useConversationAnalysis(conversationId);
+
+  // Générer l'analyse automatiquement si elle n'existe pas
+  useEffect(() => {
+    if (conversation && !analysis && !isAnalyzing && activeTab === 'analysis') {
+      generateAnalysis();
+    }
+  }, [conversation, analysis, isAnalyzing, activeTab, generateAnalysis]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  const getSentimentIcon = (sentiment: string) => {
+    switch (sentiment) {
+      case 'positive':
+        return <TrendingUp className="w-4 h-4 text-success" />;
+      case 'negative':
+        return <TrendingDown className="w-4 h-4 text-destructive" />;
+      default:
+        return <Minus className="w-4 h-4 text-muted-foreground" />;
+    }
+  };
+
+  const getSentimentEmoji = (sentiment: string) => {
+    switch (sentiment) {
+      case 'positive': return '😊';
+      case 'negative': return '😞';
+      default: return '😐';
+    }
+  };
+
+  const getSentimentColor = (sentiment: string) => {
+    switch (sentiment) {
+      case 'positive': return 'text-green-400';
+      case 'negative': return 'text-red-400';
+      default: return 'text-yellow-400';
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <ConversationCardSkeleton />
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (error || !conversation) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Erreur</DialogTitle>
+          </DialogHeader>
+          <p className="text-destructive">Impossible de charger la conversation.</p>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden glass-card animate-in fade-in-0 zoom-in-95">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold gradient-text">
+            {conversation.title}
+          </DialogTitle>
+        </DialogHeader>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden">
+          <TabsList className="grid w-full grid-cols-4 glass-card">
+            <TabsTrigger value="overview">
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="audio">
+              Audio
+            </TabsTrigger>
+            <TabsTrigger value="transcript">
+              Transcript
+            </TabsTrigger>
+            <TabsTrigger value="analysis">
+              <Sparkles className="w-4 h-4 mr-2" />
+              AI Analysis
+            </TabsTrigger>
+          </TabsList>
+
+          <div className="mt-4 overflow-y-auto max-h-[calc(90vh-200px)]">
+            <TabsContent value="overview" className="space-y-4">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+              >
+                <ConversationMetrics conversation={conversation} analysis={analysis} />
+              </motion.div>
+
+              {/* Résumé IA */}
+              {analysis && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 0.2 }}
+                >
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Brain className="w-5 h-5 text-primary" />
+                        Résumé IA
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-muted-foreground">{analysis.summary}</p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="audio">
+              {conversation.audio_url ? (
+                <AdvancedAudioPlayer
+                  audioUrl={conversation.audio_url}
+                  conversation={{
+                    conversation_id: conversation.id,
+                    caller_number: '',
+                    duration_seconds: conversation.duration,
+                    satisfaction_score: conversation.satisfaction_score,
+                  }}
+                  transcript={
+                    typeof conversation.transcript === 'string'
+                      ? []
+                      : (conversation.transcript as any)?.segments || []
+                  }
+                />
+              ) : (
+                <Card className="p-8 text-center glass-card">
+                  <p className="text-muted-foreground">Aucun enregistrement audio disponible</p>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="transcript" className="space-y-4">
+              {conversation.user_messages && conversation.user_messages.length > 0 ? (
+                <div className="space-y-3">
+                  {conversation.user_messages.map((message: any, index: number) => {
+                    const isAgent = index % 2 === 1;
+                    return (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, x: isAgent ? 20 : -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                        className={`p-4 rounded-lg glass-card ${
+                          isAgent ? 'ml-8' : 'mr-8'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline">
+                            {isAgent ? '🤖 Agent' : '👤 Client'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm">{message}</p>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Card className="p-8 text-center glass-card">
+                  <p className="text-muted-foreground">Aucune transcription disponible</p>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="analysis" className="space-y-4">
+              {!analysis && !isAnalyzing && (
+                <Card className="p-8 text-center glass-card">
+                  <Brain className="w-12 h-12 mx-auto mb-4 text-primary" />
+                  <p className="text-muted-foreground mb-4">
+                    Générez une analyse IA complète de cette conversation
+                  </p>
+                  <Button onClick={generateAnalysis} className="gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    Générer l'Analyse
+                  </Button>
+                </Card>
+              )}
+
+              {isAnalyzing && (
+                <Card className="p-8 text-center glass-card">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+                  <p className="text-muted-foreground">Analyse en cours...</p>
+                </Card>
+              )}
+
+              {analysis && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4 }}
+                  className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                >
+                  {/* Analyse de sentiment */}
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="text-primary">Analyse de Sentiment</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{getSentimentEmoji(analysis.sentiment)}</span>
+                        <div>
+                          <p className={`font-medium ${getSentimentColor(analysis.sentiment)}`}>
+                            {analysis.sentiment.charAt(0).toUpperCase() + analysis.sentiment.slice(1)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Confiance: {(analysis.confidence * 100).toFixed(1)}%
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Topics détectés */}
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="text-secondary">Topics Détectés</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-2">
+                        {analysis.topics.map((topic, index) => (
+                          <Badge key={index} variant="outline">
+                            {topic}
+                          </Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Intentions */}
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="text-accent">Intentions</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-2">
+                        {analysis.intentions.map((intention, index) => (
+                          <Badge key={index} variant="outline">
+                            {intention}
+                          </Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Action Items */}
+                  {analysis.actionItems.length > 0 && (
+                    <Card className="glass-card">
+                      <CardHeader>
+                        <CardTitle className="text-yellow-500">Action Items</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ul className="space-y-2">
+                          {analysis.actionItems.map((item, index) => (
+                            <li key={index} className="flex items-center gap-2 text-sm">
+                              <span className="w-2 h-2 bg-yellow-500 rounded-full" />
+                              {item}
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  )}
+                </motion.div>
+              )}
+            </TabsContent>
+          </div>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+}

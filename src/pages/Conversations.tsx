@@ -4,8 +4,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Filter, Clock, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Search, Filter, Clock, TrendingUp, TrendingDown, Minus, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { ConversationDetailModal } from '@/components/conversations/ConversationDetailModal';
 
 // Mock data
 const mockConversations = [
@@ -43,6 +44,7 @@ const mockConversations = [
 
 const Conversations = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
   const getPlatformColor = (platform: string) => {
     switch (platform) {
@@ -114,40 +116,60 @@ const Conversations = () => {
         {/* Conversations List */}
         <div className="space-y-4">
           {mockConversations.map((conversation) => (
-            <Link key={conversation.id} to={`/conversations/${conversation.id}`}>
-              <Card className="glass-card hover:neon-border transition-all duration-200 cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold">{conversation.title}</h3>
-                        <Badge className={getPlatformColor(conversation.platform)}>
-                          {conversation.platform}
-                        </Badge>
-                        {getSentimentIcon(conversation.sentiment)}
-                      </div>
-
-                      <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
-                          {formatDuration(conversation.duration)}
-                        </div>
-                        <div>Satisfaction: {conversation.satisfaction_score}/5</div>
-                        <div>{formatDate(conversation.created_at)}</div>
-                      </div>
+            <Card 
+              key={conversation.id} 
+              className="glass-card hover:neon-border transition-all duration-200 cursor-pointer"
+              onClick={() => setSelectedConversationId(conversation.id)}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-semibold">{conversation.title}</h3>
+                      <Badge className={getPlatformColor(conversation.platform)}>
+                        {conversation.platform}
+                      </Badge>
+                      {getSentimentIcon(conversation.sentiment)}
                     </div>
 
-                    <div className="text-right">
-                      <Badge variant="outline" className="mb-2">
-                        {conversation.status}
-                      </Badge>
+                    <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        {formatDuration(conversation.duration)}
+                      </div>
+                      <div>Satisfaction: {conversation.satisfaction_score}/5</div>
+                      <div>{formatDate(conversation.created_at)}</div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
+
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="mb-2">
+                      {conversation.status}
+                    </Badge>
+                    <Link 
+                      to={`/conversations/${conversation.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Button variant="ghost" size="sm" className="gap-2">
+                        <ExternalLink className="w-4 h-4" />
+                        Page complète
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
+
+        {/* Modal de détails */}
+        {selectedConversationId && (
+          <ConversationDetailModal
+            isOpen={!!selectedConversationId}
+            onClose={() => setSelectedConversationId(null)}
+            conversationId={selectedConversationId}
+          />
+        )}
       </div>
     </AppLayout>
   );
