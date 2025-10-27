@@ -44,3 +44,12 @@ verify_jwt = true
 
 [functions.analyze-conversation]
 verify_jwt = true
+
+[functions.connector-test]
+verify_jwt = true
+
+[functions.connector-proxy]
+verify_jwt = true
+
+[functions.webhooks-router]
+verify_jwt = false
