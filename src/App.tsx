@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { OrganizationProvider } from "@/context/OrganizationContext";
 
 import Index from "./pages/Index";
 import AuthPage from "./pages/Auth";
@@ -47,8 +48,9 @@ const App = () => (
           v7_relativeSplatPath: true,
         }}
       >
-        <Suspense fallback={<div>Loading...</div>}>
-          <Routes>
+        <OrganizationProvider>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Routes>
             <Route path="/auth" element={<AuthPage />} />
             <Route
               path="/"
@@ -109,6 +111,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
+        </OrganizationProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

@@ -3,6 +3,10 @@ import { Link, useLocation } from 'react-router-dom';
 import { Activity, Home, TrendingUp, MessageSquare, BookOpen, Settings, Bot, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { OrganizationSelector } from '@/components/organization/OrganizationSelector';
+import { Badge } from '@/components/ui/badge';
+import { useOrganization } from '@/context/OrganizationContext';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -10,6 +14,8 @@ interface AppLayoutProps {
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
   const { signOut } = useAuth();
+  const { selectedOrg, userRole } = useOrganization();
+  const { role, isSuperAdmin } = usePermissions();
   const location = useLocation();
 
   const navigation = [
@@ -36,6 +42,21 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
               </div>
               <h1 className="text-xl font-bold gradient-text">AVA Statistics</h1>
             </Link>
+          </div>
+
+          {/* Organization Selector */}
+          <div className="border-b border-border/50 pb-4">
+            <OrganizationSelector />
+            {role && (
+              <div className="px-4 mt-2">
+                <Badge variant="outline" className="text-xs">
+                  {isSuperAdmin ? '👑 Super Admin' : 
+                   role === 'org_admin' ? '🔑 Admin' :
+                   role === 'manager' ? '👨‍💼 Manager' :
+                   role === 'agent' ? '👤 Agent' : '👁️ Viewer'}
+                </Badge>
+              </div>
+            )}
           </div>
 
           {/* Navigation */}
