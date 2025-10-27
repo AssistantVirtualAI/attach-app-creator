@@ -1,61 +1,64 @@
+import { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/StatCard';
 import { ChartCard } from '@/components/ChartCard';
 import { Users, Clock, Star, Phone } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useElevenLabsAnalytics } from '@/hooks/useElevenLabsAnalytics';
+import { SetupIntegrationCard } from '@/components/SetupIntegrationCard';
+import { StatCardSkeleton, ChartCardSkeleton } from '@/components/LoadingSkeleton';
 
 const VoiceAnalytics = () => {
-  const stats = [
+  const [timeframe, setTimeframe] = useState('7days');
+  const { data: analytics, isLoading, error } = useElevenLabsAnalytics(timeframe);
+
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}m ${secs}s`;
+  };
+
+  const stats = analytics ? [
     {
       title: 'Total Conversations',
-      value: '1,234',
-      change: '+15.3%',
-      changeType: 'positive' as const,
+      value: analytics.metrics.total_conversations.toString(),
+      change: `${analytics.trends.conversations_change > 0 ? '+' : ''}${analytics.trends.conversations_change.toFixed(1)}%`,
+      changeType: analytics.trends.conversations_change >= 0 ? 'positive' as const : 'negative' as const,
       icon: Phone,
       trend: [45, 52, 48, 65, 58, 72, 68],
     },
     {
       title: 'Durée Moyenne',
-      value: '4m 32s',
-      change: '+8.1%',
-      changeType: 'positive' as const,
+      value: formatDuration(Math.floor(analytics.metrics.avg_conversation_duration)),
+      change: `${analytics.trends.duration_change > 0 ? '+' : ''}${analytics.trends.duration_change.toFixed(1)}%`,
+      changeType: analytics.trends.duration_change >= 0 ? 'positive' as const : 'negative' as const,
       icon: Clock,
       trend: [30, 42, 38, 55, 48, 62, 58],
     },
     {
       title: 'Satisfaction',
-      value: '4.7/5',
-      change: '+0.3',
-      changeType: 'positive' as const,
+      value: `${analytics.metrics.satisfaction_score.toFixed(1)}/5`,
+      change: `${analytics.trends.satisfaction_change > 0 ? '+' : ''}${analytics.trends.satisfaction_change.toFixed(1)}`,
+      changeType: analytics.trends.satisfaction_change >= 0 ? 'positive' as const : 'negative' as const,
       icon: Star,
       trend: [75, 78, 80, 82, 81, 85, 87],
     },
     {
-      title: 'Utilisateurs Actifs',
-      value: '892',
-      change: '+12%',
-      changeType: 'positive' as const,
+      title: 'Taux de Succès',
+      value: `${analytics.metrics.success_rate.toFixed(1)}%`,
+      change: `${analytics.trends.success_rate_change > 0 ? '+' : ''}${analytics.trends.success_rate_change.toFixed(1)}%`,
+      changeType: analytics.trends.success_rate_change >= 0 ? 'positive' as const : 'negative' as const,
       icon: Users,
       trend: [40, 48, 45, 58, 52, 65, 70],
     },
-  ];
+  ] : [];
 
   const platformData = [
-    { platform: 'ElevenLabs', value: 450 },
-    { platform: 'Vapi', value: 380 },
-    { platform: 'Retell AI', value: 404 },
+    { platform: 'ElevenLabs', value: analytics?.metrics.total_conversations || 0 },
   ];
 
-  const sentimentData = [
-    { day: 'Lun', positive: 85, neutral: 12, negative: 3 },
-    { day: 'Mar', positive: 78, neutral: 18, negative: 4 },
-    { day: 'Mer', positive: 92, neutral: 6, negative: 2 },
-    { day: 'Jeu', positive: 88, neutral: 10, negative: 2 },
-    { day: 'Ven', positive: 95, neutral: 4, negative: 1 },
-    { day: 'Sam', positive: 90, neutral: 8, negative: 2 },
-    { day: 'Dim', positive: 87, neutral: 11, negative: 2 },
-  ];
+  const sentimentData = analytics?.charts?.satisfaction_trend || [];
 
   return (
     <AppLayout>
@@ -68,7 +71,7 @@ const VoiceAnalytics = () => {
               Analyse détaillée des performances vocales IA
             </p>
           </div>
-          <Select defaultValue="7days">
+          <Select value={timeframe} onValueChange={setTimeframe}>
             <SelectTrigger className="w-[180px] glass-card">
               <SelectValue />
             </SelectTrigger>
@@ -82,29 +85,59 @@ const VoiceAnalytics = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat, index) => (
-            <StatCard key={index} {...stat} />
-          ))}
-        </div>
+        {analytics?.requiresSetup ? (
+          <SetupIntegrationCard 
+            title="Configuration Requise" 
+            message={analytics.message} 
+          />
+        ) : isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <StatCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : error ? (
+          <Card className="glass-card border-destructive/50">
+            <CardContent className="pt-6">
+              <p className="text-destructive">Erreur lors du chargement des analytics</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {stats.map((stat, index) => (
+              <StatCard key={index} {...stat} />
+            ))}
+          </div>
+        )}
 
         {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <ChartCard
-            title="Conversations par Plateforme"
-            data={platformData}
-            type="bar"
-            dataKey="value"
-            xAxisKey="platform"
-          />
-          <ChartCard
-            title="Analyse de Sentiment"
-            data={sentimentData}
-            type="area"
-            dataKey="positive"
-            xAxisKey="day"
-          />
-        </div>
+        {!analytics?.requiresSetup && (
+          isLoading ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <ChartCardSkeleton />
+              <ChartCardSkeleton />
+            </div>
+          ) : !error && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <ChartCard
+                title="Conversations par Plateforme"
+                data={platformData}
+                type="bar"
+                dataKey="value"
+                xAxisKey="platform"
+              />
+              {sentimentData.length > 0 && (
+                <ChartCard
+                  title="Tendance de Satisfaction"
+                  data={sentimentData}
+                  type="area"
+                  dataKey="positive"
+                  xAxisKey="day"
+                />
+              )}
+            </div>
+          )
+        )}
 
         {/* Top Keywords */}
         <Card className="glass-card">

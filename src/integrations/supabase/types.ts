@@ -100,11 +100,14 @@ export type Database = {
       }
       conversations: {
         Row: {
+          agent_messages: Json | null
           audio_url: string | null
           created_at: string
           duration: number | null
+          external_id: string | null
           id: string
           keywords: string[] | null
+          metadata: Json | null
           platform: string | null
           satisfaction_score: number | null
           sentiment: string | null
@@ -112,13 +115,17 @@ export type Database = {
           title: string
           transcript: string | null
           user_id: string
+          user_messages: Json | null
         }
         Insert: {
+          agent_messages?: Json | null
           audio_url?: string | null
           created_at?: string
           duration?: number | null
+          external_id?: string | null
           id?: string
           keywords?: string[] | null
+          metadata?: Json | null
           platform?: string | null
           satisfaction_score?: number | null
           sentiment?: string | null
@@ -126,13 +133,17 @@ export type Database = {
           title: string
           transcript?: string | null
           user_id: string
+          user_messages?: Json | null
         }
         Update: {
+          agent_messages?: Json | null
           audio_url?: string | null
           created_at?: string
           duration?: number | null
+          external_id?: string | null
           id?: string
           keywords?: string[] | null
+          metadata?: Json | null
           platform?: string | null
           satisfaction_score?: number | null
           sentiment?: string | null
@@ -140,6 +151,7 @@ export type Database = {
           title?: string
           transcript?: string | null
           user_id?: string
+          user_messages?: Json | null
         }
         Relationships: []
       }
@@ -174,6 +186,42 @@ export type Database = {
           synced_to_elevenlabs?: boolean | null
           tags?: string[] | null
           title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      organization_integrations: {
+        Row: {
+          additional_config: Json | null
+          agent_id: string | null
+          api_key: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          platform: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          additional_config?: Json | null
+          agent_id?: string | null
+          api_key: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          platform: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          additional_config?: Json | null
+          agent_id?: string | null
+          api_key?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          platform?: string
           updated_at?: string
           user_id?: string
         }

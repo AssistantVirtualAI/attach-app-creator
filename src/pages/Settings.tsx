@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,9 +7,104 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { User, Key, Bell, Shield, HelpCircle } from 'lucide-react';
+import { User, Key, Bell, Shield, HelpCircle, CheckCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 
 const Settings = () => {
+  const { user } = useAuth();
+  const [apiKey, setApiKey] = useState('');
+  const [agentId, setAgentId] = useState('');
+  const [platform, setPlatform] = useState('elevenlabs');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasIntegration, setHasIntegration] = useState(false);
+
+  useEffect(() => {
+    loadIntegration();
+  }, []);
+
+  const loadIntegration = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('organization_integrations')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('platform', platform)
+        .single();
+
+      if (!error && data) {
+        setApiKey('••••••••••••••••'); // Mask API key for security
+        setAgentId(data.agent_id || '');
+        setHasIntegration(true);
+      }
+    } catch (error) {
+      console.error('Error loading integration:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveIntegration = async () => {
+    if (!user) return;
+    if (!apiKey || apiKey === '••••••••••••••••') {
+      toast.error('Veuillez saisir une API Key valide');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('organization_integrations')
+        .upsert({
+          user_id: user.id,
+          platform,
+          api_key: apiKey,
+          agent_id: agentId || null,
+          is_active: true,
+        }, {
+          onConflict: 'user_id,platform'
+        });
+
+      if (error) throw error;
+
+      toast.success('Intégration configurée avec succès');
+      setHasIntegration(true);
+      loadIntegration(); // Reload to mask the API key
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la configuration');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const testConnection = async () => {
+    if (!apiKey || apiKey === '••••••••••••••••') {
+      toast.error('Veuillez sauvegarder l\'intégration d\'abord');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('elevenlabs-convai-analytics', {
+        body: { timeframe: '24h' }
+      });
+
+      if (error) throw error;
+      
+      if (data?.requiresSetup) {
+        toast.error(data.message || 'Configuration invalide');
+      } else {
+        toast.success('Connexion réussie !');
+      }
+    } catch (error: any) {
+      toast.error('Erreur de connexion : ' + error.message);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="container mx-auto px-6 py-8">
@@ -87,41 +183,92 @@ const Settings = () => {
                     <Key className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <CardTitle>Clés API</CardTitle>
-                    <CardDescription>Gérez vos intégrations API</CardDescription>
+                    <CardTitle>Configuration ElevenLabs ConvAI</CardTitle>
+                    <CardDescription>Configurez votre intégration ElevenLabs pour accéder aux analytics et conversations</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
+                {hasIntegration && (
+                  <div className="flex items-center gap-2 p-3 bg-success/10 border border-success/30 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-success" />
+                    <p className="text-sm text-success">Intégration active</p>
+                  </div>
+                )}
+
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border border-border/50 rounded-lg">
-                    <div>
-                      <h4 className="font-semibold">ElevenLabs API</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Clé API pour l'intégration ElevenLabs ConvAI
-                      </p>
-                    </div>
-                    <Button variant="outline">Configurer</Button>
+                  <div className="space-y-2">
+                    <Label htmlFor="apiKey">API Key ElevenLabs *</Label>
+                    <Input
+                      id="apiKey"
+                      type="password"
+                      placeholder="sk_..."
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      className="bg-background/50"
+                      disabled={isLoading}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Vous pouvez trouver votre API Key dans votre{' '}
+                      <a 
+                        href="https://elevenlabs.io/app/settings/api-keys" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        compte ElevenLabs
+                      </a>
+                    </p>
                   </div>
 
-                  <div className="flex items-center justify-between p-4 border border-border/50 rounded-lg">
-                    <div>
-                      <h4 className="font-semibold">Vapi API</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Clé API pour l'intégration Vapi
-                      </p>
-                    </div>
-                    <Button variant="outline">Configurer</Button>
+                  <div className="space-y-2">
+                    <Label htmlFor="agentId">Agent ID (optionnel)</Label>
+                    <Input
+                      id="agentId"
+                      placeholder="agent_..."
+                      value={agentId}
+                      onChange={(e) => setAgentId(e.target.value)}
+                      className="bg-background/50"
+                      disabled={isLoading}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      L'ID de votre agent ConvAI. Laissez vide pour utiliser l'agent par défaut.
+                    </p>
                   </div>
+                </div>
 
-                  <div className="flex items-center justify-between p-4 border border-border/50 rounded-lg">
-                    <div>
-                      <h4 className="font-semibold">Retell AI</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Clé API pour l'intégration Retell AI
-                      </p>
+                <Separator />
+
+                <div className="flex gap-3">
+                  <Button 
+                    onClick={saveIntegration}
+                    disabled={isSaving || isLoading}
+                    className="flex-1 bg-gradient-to-r from-primary to-accent"
+                  >
+                    {isSaving ? 'Enregistrement...' : 'Enregistrer la Configuration'}
+                  </Button>
+                  {hasIntegration && (
+                    <Button 
+                      onClick={testConnection}
+                      variant="outline"
+                      disabled={isLoading}
+                    >
+                      Tester la Connexion
+                    </Button>
+                  )}
+                </div>
+
+                <div className="mt-6 p-4 bg-muted/30 rounded-lg">
+                  <h4 className="font-semibold mb-2">Autres Intégrations (Bientôt disponibles)</h4>
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between">
+                      <span>• Vapi</span>
+                      <span className="text-xs">Prochainement</span>
                     </div>
-                    <Button variant="outline">Configurer</Button>
+                    <div className="flex items-center justify-between">
+                      <span>• Retell AI</span>
+                      <span className="text-xs">Prochainement</span>
+                    </div>
                   </div>
                 </div>
               </CardContent>
