@@ -1,29 +1,31 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, Home, TrendingUp, MessageSquare, BookOpen, Settings, Bot, LogOut } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
+import { Activity, Home, TrendingUp, MessageSquare, BookOpen, Settings, Bot, Webhook, CreditCard, Sliders, Moon, Sun, Users } from 'lucide-react';
 import { OrganizationSelector } from '@/components/organization/OrganizationSelector';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useOrganization } from '@/context/OrganizationContext';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useTheme } from '@/context/ThemeContext';
+import { SidebarFooter } from '@/components/sidebar/SidebarFooter';
 
 interface AppLayoutProps {
   children: ReactNode;
 }
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
-  const { signOut } = useAuth();
-  const { selectedOrg, userRole } = useOrganization();
   const { role, isSuperAdmin } = usePermissions();
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: Home },
-    { name: 'Analytics', href: '/analytics', icon: TrendingUp },
-    { name: 'Conversations', href: '/conversations', icon: MessageSquare },
-    { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen },
-    { name: 'Agent Config', href: '/agent-config', icon: Bot },
+    { name: 'Maison', href: '/', icon: Home },
+    { name: 'Clientèle', href: '/clients', icon: Users },
+    { name: 'Agents', href: '/agent-config', icon: Bot },
+    { name: 'Intégrations', href: '/integrations', icon: Sliders },
+    { name: 'Journaux Webhook', href: '/webhook-logs', icon: Webhook },
+    { name: 'Facturation par Stripe', href: '/stripe-billing', icon: CreditCard },
+    { name: 'Configurateur SaaS', href: '/saas-config', icon: Settings },
     { name: 'Paramètres', href: '/settings', icon: Settings },
   ];
 
@@ -40,7 +42,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-neon">
                 <Activity className="w-6 h-6 text-white" />
               </div>
-              <h1 className="text-xl font-bold gradient-text">AVA Statistics</h1>
+              <h1 className="text-xl font-bold gradient-text">AVA Dashboard</h1>
             </Link>
           </div>
 
@@ -48,13 +50,25 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           <div className="border-b border-border/50 pb-4">
             <OrganizationSelector />
             {role && (
-              <div className="px-4 mt-2">
+              <div className="px-4 mt-2 flex items-center justify-between">
                 <Badge variant="outline" className="text-xs">
                   {isSuperAdmin ? '👑 Super Admin' : 
                    role === 'org_admin' ? '🔑 Admin' :
                    role === 'manager' ? '👨‍💼 Manager' :
                    role === 'agent' ? '👤 Agent' : '👁️ Viewer'}
                 </Badge>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleTheme}
+                  className="h-8 w-8"
+                >
+                  {theme === 'dark' ? (
+                    <Sun className="w-4 h-4" />
+                  ) : (
+                    <Moon className="w-4 h-4" />
+                  )}
+                </Button>
               </div>
             )}
           </div>
@@ -80,17 +94,8 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             })}
           </nav>
 
-          {/* Logout */}
-          <div className="p-4 border-t border-border/50">
-            <Button
-              onClick={() => signOut()}
-              variant="ghost"
-              className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-            >
-              <LogOut className="w-5 h-5" />
-              <span>Déconnexion</span>
-            </Button>
-          </div>
+          {/* Footer */}
+          <SidebarFooter />
         </div>
       </aside>
 
