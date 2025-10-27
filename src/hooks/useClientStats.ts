@@ -3,25 +3,25 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 
 export const useClientStats = () => {
-  const { selectedOrg } = useOrganization();
+  const { selectedOrgId } = useOrganization();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['client-stats', selectedOrg],
+    queryKey: ['client-stats', selectedOrgId],
     queryFn: async () => {
-      if (!selectedOrg) return { activeClients: 0, clientLimit: 5 };
+      if (!selectedOrgId) return { activeClients: 0, clientLimit: 5 };
 
       // Get organization billing config
       const { data: billingData } = await supabase
         .from('billing_config')
         .select('credits_limit')
-        .eq('organization_id', selectedOrg)
-        .single();
+        .eq('organization_id', selectedOrgId)
+        .maybeSingle();
 
-      // Count active clients (we'll create this table later)
+      // Count active clients
       const { count } = await supabase
         .from('clients')
         .select('*', { count: 'exact', head: true })
-        .eq('organization_id', selectedOrg)
+        .eq('organization_id', selectedOrgId)
         .eq('status', 'active');
 
       return {
@@ -29,7 +29,7 @@ export const useClientStats = () => {
         clientLimit: billingData?.credits_limit || 5,
       };
     },
-    enabled: !!selectedOrg,
+    enabled: !!selectedOrgId,
   });
 
   return {

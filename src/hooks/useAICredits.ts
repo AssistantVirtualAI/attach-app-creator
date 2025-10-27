@@ -3,25 +3,25 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 
 export const useAICredits = () => {
-  const { selectedOrg } = useOrganization();
+  const { selectedOrgId } = useOrganization();
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['ai-credits', selectedOrg],
+    queryKey: ['ai-credits', selectedOrgId],
     queryFn: async () => {
-      if (!selectedOrg) return { credits: 825, creditsUsed: 0 };
+      if (!selectedOrgId) return { credits: 825, creditsUsed: 0 };
 
       const { data: billingData } = await supabase
         .from('billing_config')
         .select('ai_credits, credits_used')
-        .eq('organization_id', selectedOrg)
-        .single();
+        .eq('organization_id', selectedOrgId)
+        .maybeSingle();
 
       return {
         credits: billingData?.ai_credits || 825,
         creditsUsed: billingData?.credits_used || 0,
       };
     },
-    enabled: !!selectedOrg,
+    enabled: !!selectedOrgId,
   });
 
   return {

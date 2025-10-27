@@ -120,6 +120,94 @@ export type Database = {
           },
         ]
       }
+      billing_config: {
+        Row: {
+          ai_credits: number | null
+          created_at: string
+          credits_limit: number | null
+          credits_used: number | null
+          organization_id: string
+          plan_tier: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_credits?: number | null
+          created_at?: string
+          credits_limit?: number | null
+          credits_used?: number | null
+          organization_id: string
+          plan_tier?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_credits?: number | null
+          created_at?: string
+          credits_limit?: number | null
+          credits_used?: number | null
+          organization_id?: string
+          plan_tier?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_config_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          assigned_agents: number | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          name: string
+          organization_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_agents?: number | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_agents?: number | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           agent_messages: Json | null
