@@ -1,237 +1,288 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Play, Pause, Clock, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, Phone, Clock, Star, MessageSquare } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { AdvancedAudioPlayer } from '@/components/audio/AdvancedAudioPlayer';
+import { useConversationDetails } from '@/hooks/useConversationDetails';
+import { ConversationCardSkeleton } from '@/components/LoadingSkeleton';
 
 const ConversationDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  // Mock data
-  const conversation = {
-    id,
-    title: 'Support Client - Problème de connexion',
-    duration: 245,
-    platform: 'elevenlabs',
-    status: 'completed',
-    sentiment: 'positive',
-    satisfaction_score: 4.5,
-    created_at: new Date('2025-10-26T14:30:00'),
-    transcript: `Agent: Bonjour, comment puis-je vous aider aujourd'hui?
-
-Client: Bonjour, j'ai un problème avec ma connexion.
-
-Agent: Je comprends. Pouvez-vous me donner plus de détails sur le problème?
-
-Client: Je n'arrive pas à me connecter à mon compte depuis ce matin.
-
-Agent: D'accord, je vais vérifier ça tout de suite. Pouvez-vous me confirmer votre adresse email?
-
-Client: Oui, c'est jean.dupont@example.com
-
-Agent: Merci. Je vois que votre compte est actif. Essayez de réinitialiser votre mot de passe.
-
-Client: D'accord, je vais essayer. Merci beaucoup!
-
-Agent: De rien! N'hésitez pas si vous avez d'autres questions.`,
-    keywords: ['Connexion', 'Support', 'Problème technique', 'Compte utilisateur'],
-    analysis: {
-      summary: 'Demande de support pour un problème de connexion résolu par une réinitialisation de mot de passe.',
-      emotions: [
-        { emotion: 'Frustration', level: 40 },
-        { emotion: 'Satisfaction', level: 85 },
-        { emotion: 'Confiance', level: 75 },
-      ],
-      resolution: 'Résolu avec succès',
-    },
-  };
+  const { data: conversation, isLoading, error } = useConversationDetails(id || '');
 
   const getSentimentIcon = (sentiment: string) => {
-    switch (sentiment) {
-      case 'positive':
-        return <TrendingUp className="w-5 h-5 text-success" />;
-      case 'negative':
-        return <TrendingDown className="w-5 h-5 text-destructive" />;
-      default:
-        return <Minus className="w-5 h-5 text-muted-foreground" />;
-    }
+    if (sentiment === 'positive') return '😊';
+    if (sentiment === 'negative') return '😟';
+    return '😐';
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="container mx-auto p-6">
+          <div className="space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <ConversationCardSkeleton key={i} />
+            ))}
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (error || !conversation) {
+    return (
+      <AppLayout>
+        <div className="container mx-auto p-6">
+          <Card className="glass-card">
+            <CardContent className="pt-6">
+              <p className="text-center text-muted-foreground">
+                Conversation not found or error loading data.
+              </p>
+              <div className="flex justify-center mt-4">
+                <Button onClick={() => navigate('/conversations')}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Conversations
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // Parse transcript into segments
+  const transcriptSegments = conversation.transcript ? 
+    conversation.transcript.split('\n').map((line, index) => {
+      const [speaker, ...textParts] = line.split(':');
+      return {
+        speaker: speaker.toLowerCase().includes('agent') ? 'agent' as const : 'caller' as const,
+        text: textParts.join(':').trim(),
+        timestamp: index * 10000, // Mock timestamps
+        confidence: 0.95
+      };
+    }).filter(seg => seg.text) : [];
+
+  // Mock analysis data
+  const analysis = {
+    summary: conversation.metadata?.summary || 'Conversation analysis not available.',
+    emotions: {
+      positive: conversation.sentiment === 'positive' ? 60 : conversation.sentiment === 'negative' ? 20 : 40,
+      neutral: 30,
+      negative: conversation.sentiment === 'negative' ? 50 : 10
+    },
+    keyTopics: conversation.keywords || [],
+    resolution: conversation.status === 'completed' ? 'Resolved' : 'In Progress',
+    nextSteps: conversation.metadata?.next_steps || 'No next steps defined'
   };
 
   return (
     <AppLayout>
-      <div className="container mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/conversations')}
-            className="mb-4 gap-2"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Retour aux conversations
-          </Button>
-
-          <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" onClick={() => navigate('/conversations')}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
             <div>
-              <h1 className="text-4xl font-bold mb-2 gradient-text">{conversation.title}</h1>
-              <div className="flex items-center gap-4 text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  {Math.floor(conversation.duration / 60)}m {conversation.duration % 60}s
-                </div>
-                <Badge className="bg-primary/20 text-primary border-primary/30">
-                  {conversation.platform}
+              <h1 className="text-3xl font-bold">{conversation.title}</h1>
+              <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  {new Date(conversation.created_at).toLocaleString()}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Phone className="h-4 w-4" />
+                  {conversation.platform || 'Phone'}
+                </span>
+                <Badge variant="outline">
+                  {getSentimentIcon(conversation.sentiment)} {conversation.sentiment}
                 </Badge>
-                {getSentimentIcon(conversation.sentiment)}
-                <span>Satisfaction: {conversation.satisfaction_score}/5</span>
+                {conversation.satisfaction_score && (
+                  <Badge variant="outline">
+                    <Star className="h-3 w-3 mr-1" />
+                    {(conversation.satisfaction_score * 100).toFixed(0)}%
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="glass-card">
-            <TabsTrigger value="overview">Aperçu</TabsTrigger>
+        {/* Main Content */}
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="audio">Audio</TabsTrigger>
-            <TabsTrigger value="transcript">Transcription</TabsTrigger>
-            <TabsTrigger value="analysis">Analyse IA</TabsTrigger>
+            <TabsTrigger value="transcript">Transcript</TabsTrigger>
+            <TabsTrigger value="analysis">Analysis</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card className="glass-card">
                 <CardHeader>
-                  <CardTitle>Informations</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    Key Information
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Plateforme</span>
-                    <Badge className="bg-primary/20 text-primary border-primary/30">
-                      {conversation.platform}
+                    <span className="text-muted-foreground">Duration:</span>
+                    <span className="font-semibold">{formatDuration(conversation.duration || 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Status:</span>
+                    <Badge variant="outline">
+                      {conversation.status}
                     </Badge>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Statut</span>
-                    <Badge variant="outline">{conversation.status}</Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Sentiment</span>
-                    <div className="flex items-center gap-2">
-                      {getSentimentIcon(conversation.sentiment)}
-                      <span className="capitalize">{conversation.sentiment}</span>
+                  {conversation.satisfaction_score && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Satisfaction:</span>
+                      <div className="flex items-center gap-2">
+                        <Progress value={conversation.satisfaction_score * 100} className="w-20" />
+                        <span className="font-semibold">{(conversation.satisfaction_score * 100).toFixed(0)}%</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Satisfaction</span>
-                    <span className="font-semibold">{conversation.satisfaction_score}/5</span>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
 
               <Card className="glass-card">
                 <CardHeader>
-                  <CardTitle>Mots-clés</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <Star className="h-5 w-5" />
+                    Sentiment
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {conversation.keywords.map((keyword, i) => (
-                      <Badge key={i} variant="outline">{keyword}</Badge>
-                    ))}
+                  <div className="flex items-center justify-center text-6xl">
+                    {getSentimentIcon(conversation.sentiment)}
                   </div>
+                  <p className="text-center mt-2 text-muted-foreground capitalize">
+                    {conversation.sentiment}
+                  </p>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
+          {/* Audio Tab */}
           <TabsContent value="audio">
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle>Lecteur Audio</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-center gap-4">
-                  <Button
-                    size="lg"
-                    className="w-16 h-16 rounded-full"
-                    onClick={() => setIsPlaying(!isPlaying)}
-                  >
-                    {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full w-1/3 bg-primary"></div>
-                  </div>
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>1:20</span>
-                    <span>4:05</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {conversation.audio_url ? (
+              <AdvancedAudioPlayer
+                audioUrl={conversation.audio_url}
+                conversation={{
+                  conversation_id: conversation.id,
+                  duration_seconds: conversation.duration,
+                  satisfaction_score: conversation.satisfaction_score,
+                }}
+                transcript={transcriptSegments}
+              />
+            ) : (
+              <Card className="glass-card">
+                <CardContent className="pt-6">
+                  <p className="text-center text-muted-foreground">
+                    No audio recording available for this conversation.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
+          {/* Transcript Tab */}
           <TabsContent value="transcript">
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle>Transcription Complète</CardTitle>
+                <CardTitle>Complete Transcript</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="prose prose-invert max-w-none">
-                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                    {conversation.transcript}
-                  </pre>
-                </div>
+                {conversation.transcript ? (
+                  <div className="space-y-3">
+                    {conversation.transcript.split('\n').map((line, index) => (
+                      <div key={index} className="p-3 rounded-lg bg-accent/10">
+                        <p className="text-foreground whitespace-pre-wrap">{line}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground">
+                    No transcript available for this conversation.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
 
-          <TabsContent value="analysis" className="space-y-6">
+          {/* Analysis Tab */}
+          <TabsContent value="analysis" className="space-y-4">
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle>Résumé IA</CardTitle>
+                <CardTitle>Analysis Summary</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">{conversation.analysis.summary}</p>
+                <p className="text-muted-foreground">{analysis.summary}</p>
               </CardContent>
             </Card>
 
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle>Analyse des Émotions</CardTitle>
+                <CardTitle>Emotion Distribution</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {conversation.analysis.emotions.map((emotion, i) => (
-                  <div key={i} className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>{emotion.emotion}</span>
-                      <span>{emotion.level}%</span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-primary to-accent"
-                        style={{ width: `${emotion.level}%` }}
-                      ></div>
-                    </div>
+              <CardContent className="space-y-3">
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-green-500">Positive</span>
+                    <span>{analysis.emotions.positive}%</span>
                   </div>
-                ))}
+                  <Progress value={analysis.emotions.positive} className="h-2" />
+                </div>
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-muted-foreground">Neutral</span>
+                    <span>{analysis.emotions.neutral}%</span>
+                  </div>
+                  <Progress value={analysis.emotions.neutral} className="h-2" />
+                </div>
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-red-500">Negative</span>
+                    <span>{analysis.emotions.negative}%</span>
+                  </div>
+                  <Progress value={analysis.emotions.negative} className="h-2" />
+                </div>
               </CardContent>
             </Card>
 
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle>Résolution</CardTitle>
+                <CardTitle>Resolution</CardTitle>
               </CardHeader>
               <CardContent>
-                <Badge className="bg-success/20 text-success border-success/30">
-                  {conversation.analysis.resolution}
-                </Badge>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{analysis.resolution}</Badge>
+                  </div>
+                  <p className="text-muted-foreground mt-2">
+                    Next steps: {analysis.nextSteps}
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

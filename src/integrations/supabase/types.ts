@@ -199,7 +199,10 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean | null
+          last_tested_at: string | null
           platform: string
+          test_error: string | null
+          test_status: string | null
           updated_at: string
           user_id: string
         }
@@ -210,7 +213,10 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean | null
+          last_tested_at?: string | null
           platform: string
+          test_error?: string | null
+          test_status?: string | null
           updated_at?: string
           user_id: string
         }
@@ -221,7 +227,10 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean | null
+          last_tested_at?: string | null
           platform?: string
+          test_error?: string | null
+          test_status?: string | null
           updated_at?: string
           user_id?: string
         }
