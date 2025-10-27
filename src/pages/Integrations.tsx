@@ -12,9 +12,12 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Info, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useToast } from '@/hooks/use-toast';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const platforms = [
   {
@@ -46,10 +49,15 @@ const platforms = [
 export default function Integrations() {
   const { selectedOrgId } = useOrganization();
   const { toast } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [agentId, setAgentId] = useState('');
   const [testing, setTesting] = useState(false);
+
+  const searchParams = new URLSearchParams(location.search);
+  const fromAgents = searchParams.get('from') === 'agents';
 
   const { data: integrations = [], refetch } = useQuery({
     queryKey: ['integrations', selectedOrgId],
@@ -115,8 +123,25 @@ export default function Integrations() {
 
   return (
     <AppLayout>
-      <div className="p-8">
-        <div className="mb-8">
+      <div className="p-8 space-y-6">
+        {fromAgents && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>Configurez une intégration pour pouvoir créer un agent</span>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate('/agents')}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Retour aux agents
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div>
           <h1 className="text-3xl font-bold gradient-text mb-2">Intégrations</h1>
           <p className="text-muted-foreground">
             Connectez vos plateformes d'IA préférées

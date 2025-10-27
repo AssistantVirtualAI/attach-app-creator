@@ -21,6 +21,7 @@ import Integrations from "./pages/Integrations";
 import WebhookLogs from "./pages/WebhookLogs";
 import StripeBilling from "./pages/StripeBilling";
 import SaaSConfigurator from "./pages/SaaSConfigurator";
+import Agents from "./pages/Agents";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -152,6 +153,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <SaaSConfigurator />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/agents"
+              element={
+                <ProtectedRoute>
+                  <Agents />
                 </ProtectedRoute>
               }
             />
