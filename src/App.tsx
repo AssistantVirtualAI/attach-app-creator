@@ -16,6 +16,11 @@ import ConversationDetail from "./pages/ConversationDetail";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import AgentConfig from "./pages/AgentConfig";
 import Settings from "./pages/Settings";
+import Clients from "./pages/Clients";
+import Integrations from "./pages/Integrations";
+import WebhookLogs from "./pages/WebhookLogs";
+import StripeBilling from "./pages/StripeBilling";
+import SaaSConfigurator from "./pages/SaaSConfigurator";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -110,7 +115,47 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-              <Route path="*" element={<NotFound />} />
+            <Route
+              path="/clients"
+              element={
+                <ProtectedRoute>
+                  <Clients />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/integrations"
+              element={
+                <ProtectedRoute>
+                  <Integrations />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/webhook-logs"
+              element={
+                <ProtectedRoute>
+                  <WebhookLogs />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/stripe-billing"
+              element={
+                <ProtectedRoute>
+                  <StripeBilling />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/saas-config"
+              element={
+                <ProtectedRoute>
+                  <SaaSConfigurator />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
           </OrganizationProvider>
