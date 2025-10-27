@@ -19,7 +19,7 @@ const VoiceAnalytics = () => {
     return `${minutes}m ${secs}s`;
   };
 
-  const stats = analytics ? [
+  const stats = (analytics && !analytics.requiresSetup) ? [
     {
       title: 'Total Conversations',
       value: analytics.metrics.total_conversations.toString(),
@@ -54,11 +54,13 @@ const VoiceAnalytics = () => {
     },
   ] : [];
 
-  const platformData = [
-    { platform: 'ElevenLabs', value: analytics?.metrics.total_conversations || 0 },
-  ];
+  const platformData = (analytics && !analytics.requiresSetup) 
+    ? [{ platform: 'ElevenLabs', value: analytics.metrics.total_conversations }]
+    : [];
 
-  const sentimentData = analytics?.charts?.satisfaction_trend || [];
+  const sentimentData = (analytics && !analytics.requiresSetup) 
+    ? (analytics.charts?.satisfaction_trend || [])
+    : [];
 
   return (
     <AppLayout>

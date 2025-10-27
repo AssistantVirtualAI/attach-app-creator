@@ -43,10 +43,23 @@ export const useElevenLabsAnalytics = (timeframe: string = '7days', enabled: boo
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Analytics fetch error:', error);
+        throw error;
+      }
+      
+      // Return data even if requiresSetup is true
+      // This allows the component to display the setup message
       return data as AnalyticsData;
     },
-    refetchInterval: 30000, // Refresh every 30 seconds for realtime data
+    refetchInterval: (query) => {
+      // Don't refetch if setup is required
+      return query.state.data?.requiresSetup ? false : 30000;
+    },
     enabled,
+    retry: (failureCount) => {
+      // Retry max 2 times for transient errors
+      return failureCount < 2;
+    }
   });
 };
