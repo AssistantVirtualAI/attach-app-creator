@@ -76,6 +76,57 @@ export type Database = {
           },
         ]
       }
+      agents: {
+        Row: {
+          assigned_to: string | null
+          config: Json | null
+          created_at: string
+          id: string
+          is_external: boolean | null
+          name: string
+          organization_id: string
+          platform: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          config?: Json | null
+          created_at?: string
+          id?: string
+          is_external?: boolean | null
+          name: string
+          organization_id: string
+          platform: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          config?: Json | null
+          created_at?: string
+          id?: string
+          is_external?: boolean | null
+          name?: string
+          organization_id?: string
+          platform?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agents_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       analytics: {
         Row: {
           avg_satisfaction: number | null
