@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, agentId, content, category, title } = await req.json();
+    const { action, agentId, content, category, title, items } = await req.json();
     
     const authHeader = req.headers.get('Authorization')!;
     const token = authHeader.replace('Bearer ', '');
@@ -116,6 +116,66 @@ serve(async (req) => {
         
         return new Response(
           JSON.stringify({ success: true, data: updateData }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'sync': {
+        console.log(`Syncing ${items?.length || 0} items to ElevenLabs`);
+        
+        if (!items || items.length === 0) {
+          return new Response(
+            JSON.stringify({ synced: 0, total: 0, errors: [] }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        let syncedCount = 0;
+        const errors = [];
+
+        for (const item of items) {
+          try {
+            const response = await fetch(
+              `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}/knowledge-base`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${apiKey}`,
+                  'xi-api-key': apiKey,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  title: item.title,
+                  content: item.content,
+                  metadata: {
+                    category: item.category,
+                    source: 'dashboard'
+                  }
+                }),
+              }
+            );
+
+            if (response.ok) {
+              syncedCount++;
+              console.log(`Successfully synced item: ${item.title}`);
+            } else {
+              const errorText = await response.text();
+              console.error(`Failed to sync item ${item.id}:`, errorText);
+              errors.push({ id: item.id, error: errorText });
+            }
+          } catch (error) {
+            console.error(`Exception syncing item ${item.id}:`, error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            errors.push({ id: item.id, error: errorMessage });
+          }
+        }
+
+        return new Response(
+          JSON.stringify({ 
+            synced: syncedCount, 
+            total: items.length,
+            errors 
+          }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
