@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
+import { useConversation } from '@11labs/react';
 import { supabase } from '@/integrations/supabase/client';
 import { Mic, MicOff, Volume2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ interface AgentData {
   avatar_url: string | null;
   branding_url: string | null;
   platform_agent_id: string | null;
+  platform: string;
   theme_config: {
     primaryColor?: string;
     secondaryColor?: string;
@@ -20,16 +22,46 @@ interface AgentData {
   } | null;
 }
 
-type ConversationStatus = 'idle' | 'connecting' | 'listening' | 'speaking';
+interface TranscriptMessage {
+  role: 'agent' | 'user';
+  text: string;
+  timestamp: Date;
+}
 
 const WidgetPrototype = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const [agent, setAgent] = useState<AgentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<ConversationStatus>('idle');
-  const [transcript, setTranscript] = useState<string[]>([]);
-  const [isConnected, setIsConnected] = useState(false);
+  const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  // ElevenLabs useConversation hook
+  const conversation = useConversation({
+    onConnect: () => {
+      console.log('Connected to ElevenLabs');
+      setIsConnecting(false);
+    },
+    onDisconnect: () => {
+      console.log('Disconnected from ElevenLabs');
+    },
+    onMessage: (message) => {
+      console.log('Message received:', message);
+      if (message.message) {
+        const role = message.source === 'ai' ? 'agent' : 'user';
+        setTranscript(prev => [...prev, {
+          role,
+          text: message.message,
+          timestamp: new Date(),
+        }]);
+      }
+    },
+    onError: (error) => {
+      console.error('Conversation error:', error);
+      setError('Erreur de connexion: ' + (error.message || 'Inconnue'));
+      setIsConnecting(false);
+    },
+  });
 
   useEffect(() => {
     const fetchAgent = async () => {
@@ -41,7 +73,7 @@ const WidgetPrototype = () => {
 
       const { data, error: fetchError } = await supabase
         .from('agents')
-        .select('id, name, description, avatar_url, branding_url, platform_agent_id, theme_config')
+        .select('id, name, description, avatar_url, branding_url, platform_agent_id, platform, theme_config')
         .eq('id', agentId)
         .single();
 
@@ -61,9 +93,16 @@ const WidgetPrototype = () => {
     fetchAgent();
   }, [agentId]);
 
-  const handleStartConversation = async () => {
-    if (!agent?.platform_agent_id) {
-      setError('Configuration agent ElevenLabs manquante');
+  const handleStartConversation = useCallback(async () => {
+    if (!agent) return;
+
+    if (agent.platform !== 'elevenlabs') {
+      setError('Cet agent n\'est pas configuré avec ElevenLabs');
+      return;
+    }
+
+    if (!agent.platform_agent_id) {
+      setError('Agent ID ElevenLabs non configuré');
       return;
     }
 
@@ -71,30 +110,59 @@ const WidgetPrototype = () => {
       // Request microphone permission
       await navigator.mediaDevices.getUserMedia({ audio: true });
       
-      setStatus('connecting');
+      setIsConnecting(true);
+      setError(null);
       
-      // Simulate connection for demo (replace with actual ElevenLabs integration)
-      setTimeout(() => {
-        setIsConnected(true);
-        setStatus('listening');
-        setTranscript(prev => [...prev, `${agent.name}: Bonjour ! Comment puis-je vous aider aujourd'hui ?`]);
-      }, 1500);
-      
-    } catch (err) {
-      setError('Permission microphone refusée');
-      setStatus('idle');
-    }
-  };
+      // Get signed URL from edge function
+      const { data, error: urlError } = await supabase.functions.invoke('elevenlabs-signed-url', {
+        body: { agentId: agent.id }
+      });
 
-  const handleEndConversation = () => {
-    setIsConnected(false);
-    setStatus('idle');
-    setTranscript(prev => [...prev, '--- Conversation terminée ---']);
-  };
+      if (urlError || !data?.signedUrl) {
+        throw new Error(urlError?.message || 'Impossible d\'obtenir l\'URL de connexion');
+      }
+
+      // Start conversation with signed URL
+      await conversation.startSession({
+        signedUrl: data.signedUrl,
+      });
+
+    } catch (err: any) {
+      console.error('Error starting conversation:', err);
+      setError(err.message || 'Erreur lors du démarrage de la conversation');
+      setIsConnecting(false);
+    }
+  }, [agent, conversation]);
+
+  const handleEndConversation = useCallback(async () => {
+    try {
+      await conversation.endSession();
+      setTranscript(prev => [...prev, {
+        role: 'agent',
+        text: '--- Conversation terminée ---',
+        timestamp: new Date(),
+      }]);
+    } catch (err) {
+      console.error('Error ending conversation:', err);
+    }
+  }, [conversation]);
 
   const themeConfig = agent?.theme_config || {};
   const primaryColor = themeConfig.primaryColor || '#8B5CF6';
   const borderRadius = themeConfig.borderRadius || '12px';
+
+  const isConnected = conversation.status === 'connected';
+  const isSpeaking = conversation.isSpeaking;
+
+  // Determine current status
+  const getStatusInfo = () => {
+    if (isConnecting) return { text: 'Connexion...', color: 'bg-yellow-500' };
+    if (!isConnected) return { text: 'Prêt à démarrer', color: 'bg-muted-foreground' };
+    if (isSpeaking) return { text: 'En train de parler...', color: 'bg-primary' };
+    return { text: 'En écoute...', color: 'bg-green-500' };
+  };
+
+  const statusInfo = getStatusInfo();
 
   if (loading) {
     return (
@@ -104,16 +172,18 @@ const WidgetPrototype = () => {
     );
   }
 
-  if (error || !agent) {
+  if (error && !agent) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-destructive mb-2">Erreur</h1>
-          <p className="text-muted-foreground">{error || 'Agent non trouvé'}</p>
+          <p className="text-muted-foreground">{error}</p>
         </div>
       </div>
     );
   }
+
+  if (!agent) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted flex flex-col">
@@ -143,10 +213,16 @@ const WidgetPrototype = () => {
               <img 
                 src={agent.avatar_url} 
                 alt={agent.name}
-                className="w-20 h-20 rounded-full mx-auto mb-4 border-4 border-white/30 object-cover"
+                className={cn(
+                  "w-20 h-20 rounded-full mx-auto mb-4 border-4 border-white/30 object-cover transition-all",
+                  isSpeaking && "ring-4 ring-white/50 animate-pulse"
+                )}
               />
             ) : (
-              <div className="w-20 h-20 rounded-full mx-auto mb-4 border-4 border-white/30 bg-white/20 flex items-center justify-center">
+              <div className={cn(
+                "w-20 h-20 rounded-full mx-auto mb-4 border-4 border-white/30 bg-white/20 flex items-center justify-center transition-all",
+                isSpeaking && "ring-4 ring-white/50 animate-pulse"
+              )}>
                 <Volume2 className="h-10 w-10" />
               </div>
             )}
@@ -160,20 +236,21 @@ const WidgetPrototype = () => {
           <div className="p-4 border-b border-border">
             <div className="flex items-center justify-center gap-2">
               <div className={cn(
-                "w-3 h-3 rounded-full",
-                status === 'idle' && "bg-muted-foreground",
-                status === 'connecting' && "bg-yellow-500 animate-pulse",
-                status === 'listening' && "bg-green-500 animate-pulse",
-                status === 'speaking' && "bg-primary animate-pulse"
+                "w-3 h-3 rounded-full animate-pulse",
+                statusInfo.color
               )} />
               <span className="text-sm text-muted-foreground">
-                {status === 'idle' && 'Prêt à démarrer'}
-                {status === 'connecting' && 'Connexion...'}
-                {status === 'listening' && 'En écoute...'}
-                {status === 'speaking' && 'En train de parler...'}
+                {statusInfo.text}
               </span>
             </div>
           </div>
+
+          {/* Error message */}
+          {error && (
+            <div className="p-3 bg-destructive/10 border-b border-destructive/20">
+              <p className="text-sm text-destructive text-center">{error}</p>
+            </div>
+          )}
 
           {/* Transcript area */}
           <div className="h-48 overflow-y-auto p-4 space-y-2 bg-muted/30">
@@ -182,23 +259,45 @@ const WidgetPrototype = () => {
                 Cliquez sur le microphone pour démarrer la conversation
               </p>
             ) : (
-              transcript.map((line, index) => (
-                <p 
+              transcript.map((msg, index) => (
+                <div 
                   key={index} 
                   className={cn(
                     "text-sm p-2 rounded-lg",
-                    line.startsWith(agent.name) 
+                    msg.role === 'agent' 
                       ? "bg-primary/10 text-foreground" 
-                      : line.startsWith('Vous:')
-                      ? "bg-muted text-foreground ml-auto max-w-[80%]"
-                      : "text-center text-muted-foreground text-xs"
+                      : "bg-muted text-foreground ml-auto max-w-[80%]"
                   )}
                 >
-                  {line}
-                </p>
+                  <span className="font-medium">
+                    {msg.role === 'agent' ? agent.name : 'Vous'}:
+                  </span>{' '}
+                  {msg.text}
+                </div>
               ))
             )}
           </div>
+
+          {/* Voice visualization when speaking */}
+          {isConnected && (
+            <div className="h-12 flex items-center justify-center gap-1 bg-muted/20 border-t border-border">
+              {[...Array(5)].map((_, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "w-1 rounded-full transition-all duration-150",
+                    isSpeaking 
+                      ? "bg-primary animate-pulse" 
+                      : "bg-muted-foreground/30"
+                  )}
+                  style={{
+                    height: isSpeaking ? `${Math.random() * 24 + 8}px` : '8px',
+                    animationDelay: `${i * 100}ms`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Controls */}
           <div className="p-6 flex justify-center">
@@ -208,9 +307,9 @@ const WidgetPrototype = () => {
                 className="w-16 h-16 rounded-full"
                 style={{ backgroundColor: primaryColor }}
                 onClick={handleStartConversation}
-                disabled={status === 'connecting'}
+                disabled={isConnecting}
               >
-                {status === 'connecting' ? (
+                {isConnecting ? (
                   <Loader2 className="h-8 w-8 animate-spin" />
                 ) : (
                   <Mic className="h-8 w-8" />

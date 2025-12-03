@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
+import { useConversation } from '@11labs/react';
 import { supabase } from '@/integrations/supabase/client';
 import { Mic, MicOff, Volume2, Loader2, X, Minimize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ interface AgentData {
   description: string | null;
   avatar_url: string | null;
   platform_agent_id: string | null;
+  platform: string;
   theme_config: {
     primaryColor?: string;
     secondaryColor?: string;
@@ -19,17 +21,44 @@ interface AgentData {
   } | null;
 }
 
-type ConversationStatus = 'idle' | 'connecting' | 'listening' | 'speaking';
+interface TranscriptMessage {
+  role: 'agent' | 'user';
+  text: string;
+}
 
 const WidgetIframe = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const [agent, setAgent] = useState<AgentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<ConversationStatus>('idle');
-  const [transcript, setTranscript] = useState<string[]>([]);
-  const [isConnected, setIsConnected] = useState(false);
+  const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  // ElevenLabs useConversation hook
+  const conversation = useConversation({
+    onConnect: () => {
+      console.log('Connected to ElevenLabs');
+      setIsConnecting(false);
+      window.parent.postMessage({ type: 'widget-connected' }, '*');
+    },
+    onDisconnect: () => {
+      console.log('Disconnected from ElevenLabs');
+      window.parent.postMessage({ type: 'widget-disconnected' }, '*');
+    },
+    onMessage: (message) => {
+      console.log('Message received:', message);
+      if (message.message) {
+        const role = message.source === 'ai' ? 'agent' : 'user';
+        setTranscript(prev => [...prev, { role, text: message.message }]);
+      }
+    },
+    onError: (error) => {
+      console.error('Conversation error:', error);
+      setError('Erreur: ' + (error.message || 'Inconnue'));
+      setIsConnecting(false);
+    },
+  });
 
   useEffect(() => {
     const fetchAgent = async () => {
@@ -41,7 +70,7 @@ const WidgetIframe = () => {
 
       const { data, error: fetchError } = await supabase
         .from('agents')
-        .select('id, name, description, avatar_url, platform_agent_id, theme_config')
+        .select('id, name, description, avatar_url, platform_agent_id, platform, theme_config')
         .eq('id', agentId)
         .single();
 
@@ -61,41 +90,68 @@ const WidgetIframe = () => {
     fetchAgent();
   }, [agentId]);
 
-  // Send status to parent window
-  useEffect(() => {
-    window.parent.postMessage({ type: 'widget-status', status, isConnected }, '*');
-  }, [status, isConnected]);
+  // Send status updates to parent
+  const isConnected = conversation.status === 'connected';
+  const isSpeaking = conversation.isSpeaking;
 
-  const handleStartConversation = async () => {
-    if (!agent?.platform_agent_id) {
-      setError('Configuration agent ElevenLabs manquante');
+  useEffect(() => {
+    window.parent.postMessage({ 
+      type: 'widget-status', 
+      status: isConnected ? (isSpeaking ? 'speaking' : 'listening') : 'idle',
+      isConnected 
+    }, '*');
+  }, [isConnected, isSpeaking]);
+
+  const handleStartConversation = useCallback(async () => {
+    if (!agent) return;
+
+    if (agent.platform !== 'elevenlabs') {
+      setError('Agent non configuré avec ElevenLabs');
+      return;
+    }
+
+    if (!agent.platform_agent_id) {
+      setError('Agent ID ElevenLabs manquant');
       return;
     }
 
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
       
-      setStatus('connecting');
+      setIsConnecting(true);
+      setError(null);
       
-      // Simulate connection (replace with actual ElevenLabs integration)
-      setTimeout(() => {
-        setIsConnected(true);
-        setStatus('listening');
-        setTranscript(prev => [...prev, `${agent.name}: Bonjour ! Comment puis-je vous aider ?`]);
-      }, 1500);
-      
-    } catch (err) {
-      setError('Permission microphone refusée');
-      setStatus('idle');
-    }
-  };
+      const { data, error: urlError } = await supabase.functions.invoke('elevenlabs-signed-url', {
+        body: { agentId: agent.id }
+      });
 
-  const handleEndConversation = () => {
-    setIsConnected(false);
-    setStatus('idle');
-  };
+      if (urlError || !data?.signedUrl) {
+        throw new Error(urlError?.message || 'URL de connexion non disponible');
+      }
+
+      await conversation.startSession({
+        signedUrl: data.signedUrl,
+      });
+
+    } catch (err: any) {
+      console.error('Error starting conversation:', err);
+      setError(err.message || 'Erreur de connexion');
+      setIsConnecting(false);
+    }
+  }, [agent, conversation]);
+
+  const handleEndConversation = useCallback(async () => {
+    try {
+      await conversation.endSession();
+    } catch (err) {
+      console.error('Error ending conversation:', err);
+    }
+  }, [conversation]);
 
   const handleClose = () => {
+    if (isConnected) {
+      handleEndConversation();
+    }
     window.parent.postMessage({ type: 'widget-close' }, '*');
   };
 
@@ -107,6 +163,14 @@ const WidgetIframe = () => {
   const themeConfig = agent?.theme_config || {};
   const primaryColor = themeConfig.primaryColor || '#8B5CF6';
 
+  // Get status display
+  const getStatusText = () => {
+    if (isConnecting) return 'Connexion...';
+    if (!isConnected) return 'En ligne';
+    if (isSpeaking) return 'Parle...';
+    return 'Écoute...';
+  };
+
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-card">
@@ -115,19 +179,24 @@ const WidgetIframe = () => {
     );
   }
 
-  if (error || !agent) {
+  if (error && !agent) {
     return (
       <div className="h-screen flex items-center justify-center bg-card p-4">
-        <p className="text-sm text-destructive text-center">{error || 'Agent non trouvé'}</p>
+        <p className="text-sm text-destructive text-center">{error}</p>
       </div>
     );
   }
+
+  if (!agent) return null;
 
   if (isMinimized) {
     return (
       <button
         onClick={() => setIsMinimized(false)}
-        className="w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-110"
+        className={cn(
+          "w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-110",
+          isConnected && "ring-2 ring-green-400 ring-offset-2"
+        )}
         style={{ backgroundColor: primaryColor }}
       >
         {agent.avatar_url ? (
@@ -150,10 +219,16 @@ const WidgetIframe = () => {
           <img 
             src={agent.avatar_url} 
             alt={agent.name}
-            className="w-10 h-10 rounded-full border-2 border-white/30 object-cover"
+            className={cn(
+              "w-10 h-10 rounded-full border-2 border-white/30 object-cover",
+              isSpeaking && "ring-2 ring-white animate-pulse"
+            )}
           />
         ) : (
-          <div className="w-10 h-10 rounded-full border-2 border-white/30 bg-white/20 flex items-center justify-center">
+          <div className={cn(
+            "w-10 h-10 rounded-full border-2 border-white/30 bg-white/20 flex items-center justify-center",
+            isSpeaking && "ring-2 ring-white animate-pulse"
+          )}>
             <Volume2 className="h-5 w-5" />
           </div>
         )}
@@ -162,17 +237,12 @@ const WidgetIframe = () => {
           <div className="flex items-center gap-1">
             <div className={cn(
               "w-2 h-2 rounded-full",
-              status === 'idle' && "bg-white/50",
-              status === 'connecting' && "bg-yellow-400 animate-pulse",
-              status === 'listening' && "bg-green-400 animate-pulse",
-              status === 'speaking' && "bg-white animate-pulse"
+              !isConnected && !isConnecting && "bg-white/50",
+              isConnecting && "bg-yellow-400 animate-pulse",
+              isConnected && !isSpeaking && "bg-green-400 animate-pulse",
+              isSpeaking && "bg-white animate-pulse"
             )} />
-            <span className="text-xs opacity-80">
-              {status === 'idle' && 'En ligne'}
-              {status === 'connecting' && 'Connexion...'}
-              {status === 'listening' && 'Écoute...'}
-              {status === 'speaking' && 'Parle...'}
-            </span>
+            <span className="text-xs opacity-80">{getStatusText()}</span>
           </div>
         </div>
         <button 
@@ -189,6 +259,31 @@ const WidgetIframe = () => {
         </button>
       </div>
 
+      {/* Error display */}
+      {error && (
+        <div className="p-2 bg-destructive/10 text-destructive text-xs text-center">
+          {error}
+        </div>
+      )}
+
+      {/* Voice visualization */}
+      {isConnected && (
+        <div className="h-8 flex items-center justify-center gap-1 bg-muted/30 border-b border-border">
+          {[...Array(7)].map((_, i) => (
+            <div
+              key={i}
+              className={cn(
+                "w-1 rounded-full transition-all duration-100",
+                isSpeaking ? "bg-primary" : "bg-muted-foreground/30"
+              )}
+              style={{
+                height: isSpeaking ? `${Math.random() * 16 + 4}px` : '4px',
+              }}
+            />
+          ))}
+        </div>
+      )}
+
       {/* Transcript */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-muted/20">
         {transcript.length === 0 ? (
@@ -198,17 +293,17 @@ const WidgetIframe = () => {
             </p>
           </div>
         ) : (
-          transcript.map((line, index) => (
+          transcript.map((msg, index) => (
             <div 
               key={index} 
               className={cn(
                 "text-xs p-2 rounded-lg max-w-[85%]",
-                line.startsWith(agent.name) 
+                msg.role === 'agent' 
                   ? "bg-muted text-foreground" 
                   : "bg-primary/10 text-foreground ml-auto"
               )}
             >
-              {line}
+              {msg.text}
             </div>
           ))
         )}
@@ -222,9 +317,9 @@ const WidgetIframe = () => {
             className="w-12 h-12 rounded-full"
             style={{ backgroundColor: primaryColor }}
             onClick={handleStartConversation}
-            disabled={status === 'connecting'}
+            disabled={isConnecting}
           >
-            {status === 'connecting' ? (
+            {isConnecting ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
               <Mic className="h-5 w-5" />

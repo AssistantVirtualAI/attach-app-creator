@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 
@@ -16,71 +16,123 @@ export interface BillingConfig {
   updated_at: string;
 }
 
-export const PLANS = [
+export interface Plan {
+  id: string;
+  name: string;
+  price: number; // Monthly price
+  priceAnnual: number; // Annual price
+  priceId: string | null;
+  priceIdAnnual: string | null;
+  clientsIncluded: number;
+  additionalClientPrice: number | null;
+  features: string[];
+  popular?: boolean;
+}
+
+export interface Addon {
+  id: string;
+  name: string;
+  price: number;
+  priceId: string;
+  availableFor: string[];
+  description: string;
+}
+
+export const PLANS: Plan[] = [
   {
     id: 'free',
-    name: 'Free',
+    name: 'Free Trial',
     price: 0,
+    priceAnnual: 0,
     priceId: null,
+    priceIdAnnual: null,
+    clientsIncluded: 1,
+    additionalClientPrice: null,
     features: [
-      '3 clients max',
-      '100 conversations/mois',
+      '1 client inclus',
+      'Agents illimités',
       'Analytics basiques',
-      'Support email',
+      'Support communauté',
     ],
   },
   {
     id: 'starter',
     name: 'Starter',
-    price: 19,
-    priceId: 'price_starter',
+    price: 100,
+    priceAnnual: 1200,
+    priceId: 'price_starter_monthly',
+    priceIdAnnual: 'price_starter_annual',
+    clientsIncluded: 3,
+    additionalClientPrice: 15,
     features: [
-      '10 clients',
-      '1 000 conversations/mois',
-      'Analytics avancés',
-      'Templates email',
-      'Support prioritaire',
+      '3 clients inclus ($15/client additionnel)',
+      'Agents illimités',
+      'Domaine personnalisé',
+      'Facturation Stripe',
+      'Support standard',
     ],
-    popular: false,
   },
   {
     id: 'growth',
     name: 'Growth',
-    price: 49,
-    priceId: 'price_growth',
-    features: [
-      '50 clients',
-      '5 000 conversations/mois',
-      'Analytics complets',
-      'Templates email illimités',
-      'Webhooks personnalisés',
-      'Support dédié',
-    ],
+    price: 250,
+    priceAnnual: 3000,
+    priceId: 'price_growth_monthly',
+    priceIdAnnual: 'price_growth_annual',
+    clientsIncluded: 5,
+    additionalClientPrice: 12,
     popular: true,
+    features: [
+      '5 clients inclus ($12/client additionnel)',
+      'Toutes fonctionnalités Starter',
+      'Métriques KPI personnalisées',
+      'Campagnes appels sortants',
+      'Email white-label',
+      'Support prioritaire',
+    ],
   },
   {
     id: 'ultimate',
     name: 'Ultimate',
-    price: 149,
-    priceId: 'price_ultimate',
+    price: 500,
+    priceAnnual: 6000,
+    priceId: 'price_ultimate_monthly',
+    priceIdAnnual: 'price_ultimate_annual',
+    clientsIncluded: 10,
+    additionalClientPrice: 10,
     features: [
-      'Clients illimités',
-      'Conversations illimitées',
-      'Toutes les fonctionnalités',
-      'API complète',
-      'Domaine personnalisé',
-      'SLA garanti',
-      'Account manager',
+      '10 clients inclus ($10/client additionnel)',
+      'Toutes fonctionnalités Growth',
+      'Backend white-label',
+      'Accès API complet',
+      'Support dédié 24/7',
     ],
-    popular: false,
+  },
+];
+
+export const ADDONS: Addon[] = [
+  {
+    id: 'hipaa',
+    name: 'HIPAA Compliance',
+    price: 200,
+    priceId: 'price_hipaa_addon',
+    availableFor: ['starter', 'growth', 'ultimate'],
+    description: 'Conformité HIPAA pour données de santé',
+  },
+  {
+    id: 'saas_configurator',
+    name: 'SaaS Configurator',
+    price: 200,
+    priceId: 'price_saas_addon',
+    availableFor: ['growth'],
+    description: 'Configuration avancée SaaS (Growth uniquement)',
   },
 ];
 
 export function useBillingConfig() {
   const { selectedOrg: selectedOrganization } = useOrganization();
-  const queryClient = useQueryClient();
 
-  const { data: billingConfig, isLoading } = useQuery({
+  const { data: billingConfig, isLoading, refetch } = useQuery({
     queryKey: ['billing-config', selectedOrganization?.id],
     queryFn: async () => {
       if (!selectedOrganization?.id) return null;
@@ -99,10 +151,17 @@ export function useBillingConfig() {
 
   const currentPlan = PLANS.find(p => p.id === billingConfig?.plan_tier) || PLANS[0];
 
+  // Calculate savings for annual plans
+  const getAnnualSavings = (plan: Plan): number => {
+    if (!plan.priceAnnual || !plan.price) return 0;
+    return (plan.price * 12) - plan.priceAnnual;
+  };
+
   return {
     billingConfig,
     currentPlan,
     isLoading,
-    refetch: () => queryClient.invalidateQueries({ queryKey: ['billing-config'] }),
+    refetch,
+    getAnnualSavings,
   };
 }
