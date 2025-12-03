@@ -26,6 +26,7 @@ import SaaSConfigurator from "./pages/SaaSConfigurator";
 import EmailTemplates from "./pages/EmailTemplates";
 import Agents from "./pages/Agents";
 import AgentSettings from "./pages/AgentSettings";
+import Workflows from "./pages/Workflows";
 import Team from "./pages/Team";
 import ApiKeys from "./pages/ApiKeys";
 import ClientDetail from "./pages/ClientDetail";
@@ -212,6 +213,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <ApiKeys />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/workflows"
+                  element={
+                    <ProtectedRoute>
+                      <Workflows />
                     </ProtectedRoute>
                   }
                 />
