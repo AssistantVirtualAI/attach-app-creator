@@ -1,0 +1,213 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import { BarChart3, MessageSquare, Zap, HardDrive, Download } from 'lucide-react';
+import { useBillingConfig } from '@/hooks/useBillingConfig';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/context/OrganizationContext';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+
+export function UsageTab() {
+  const { billingConfig, currentPlan } = useBillingConfig();
+  const { selectedOrgId } = useOrganization();
+
+  // Fetch conversation count for current month
+  const { data: conversationStats } = useQuery({
+    queryKey: ['conversation-stats', selectedOrgId],
+    queryFn: async () => {
+      if (!selectedOrgId) return { count: 0, data: [] };
+
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const { count, error } = await supabase
+        .from('conversations')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', selectedOrgId)
+        .gte('created_at', startOfMonth.toISOString());
+
+      // Get daily breakdown for chart
+      const { data: dailyData } = await supabase
+        .from('conversations')
+        .select('created_at')
+        .eq('organization_id', selectedOrgId)
+        .gte('created_at', startOfMonth.toISOString())
+        .order('created_at');
+
+      // Group by day
+      const dailyCounts: { [key: string]: number } = {};
+      dailyData?.forEach((conv) => {
+        const day = new Date(conv.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+        dailyCounts[day] = (dailyCounts[day] || 0) + 1;
+      });
+
+      const chartData = Object.entries(dailyCounts).map(([day, count]) => ({
+        day,
+        conversations: count,
+      }));
+
+      if (error) throw error;
+      return { count: count || 0, data: chartData };
+    },
+    enabled: !!selectedOrgId,
+  });
+
+  // Fetch client count
+  const { data: clientCount } = useQuery({
+    queryKey: ['client-count', selectedOrgId],
+    queryFn: async () => {
+      if (!selectedOrgId) return 0;
+      const { count, error } = await supabase
+        .from('clients')
+        .select('*', { count: 'exact', head: true })
+        .eq('organization_id', selectedOrgId);
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: !!selectedOrgId,
+  });
+
+  const conversationsUsed = conversationStats?.count || 0;
+  const conversationsLimit = getConversationLimit(currentPlan?.id || 'free');
+  const conversationPercentage = Math.min((conversationsUsed / conversationsLimit) * 100, 100);
+
+  const clientsUsed = clientCount || 0;
+  const clientsLimit = getClientLimit(currentPlan?.id || 'free');
+  const clientPercentage = Math.min((clientsUsed / clientsLimit) * 100, 100);
+
+  const aiCreditsUsed = billingConfig?.credits_used || 0;
+  const aiCreditsLimit = billingConfig?.ai_credits || 100;
+  const aiPercentage = Math.min((aiCreditsUsed / aiCreditsLimit) * 100, 100);
+
+  return (
+    <div className="space-y-6">
+      {/* Usage Cards */}
+      <div className="grid md:grid-cols-3 gap-6">
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-primary" />
+              <CardTitle className="text-sm">Conversations</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mb-2">
+              {conversationsUsed.toLocaleString()} / {conversationsLimit.toLocaleString()}
+            </div>
+            <Progress value={conversationPercentage} className="h-2 mb-2" />
+            <p className="text-xs text-muted-foreground">Ce mois-ci</p>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-yellow-500" />
+              <CardTitle className="text-sm">Crédits IA</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mb-2">
+              {aiCreditsUsed.toLocaleString()} / {aiCreditsLimit.toLocaleString()}
+            </div>
+            <Progress value={aiPercentage} className="h-2 mb-2" />
+            <p className="text-xs text-muted-foreground">Utilisés</p>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <HardDrive className="w-5 h-5 text-blue-500" />
+              <CardTitle className="text-sm">Clients</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold mb-2">
+              {clientsUsed} / {clientsLimit === Infinity ? '∞' : clientsLimit}
+            </div>
+            <Progress value={clientPercentage} className="h-2 mb-2" />
+            <p className="text-xs text-muted-foreground">Actifs</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Usage Chart */}
+      <Card className="glass-card">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <BarChart3 className="w-6 h-6 text-primary" />
+              <div>
+                <CardTitle>Tendance d'utilisation</CardTitle>
+                <CardDescription>Conversations par jour ce mois-ci</CardDescription>
+              </div>
+            </div>
+            <Button variant="outline" size="sm">
+              <Download className="w-4 h-4 mr-2" />
+              Exporter
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[300px]">
+            {conversationStats?.data && conversationStats.data.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={conversationStats.data}>
+                  <defs>
+                    <linearGradient id="colorConversations" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="conversations"
+                    stroke="hsl(var(--primary))"
+                    fillOpacity={1}
+                    fill="url(#colorConversations)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                Aucune donnée disponible
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function getConversationLimit(planId: string): number {
+  switch (planId) {
+    case 'free': return 100;
+    case 'starter': return 1000;
+    case 'growth': return 5000;
+    case 'ultimate': return Infinity;
+    default: return 100;
+  }
+}
+
+function getClientLimit(planId: string): number {
+  switch (planId) {
+    case 'free': return 3;
+    case 'starter': return 10;
+    case 'growth': return 50;
+    case 'ultimate': return Infinity;
+    default: return 3;
+  }
+}
