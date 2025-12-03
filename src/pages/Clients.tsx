@@ -40,6 +40,7 @@ import { PlatformBadge } from '@/components/agents/PlatformBadge';
 import { ClientAvatar } from '@/components/clients/ClientAvatar';
 import { ClientFilters, StatusFilter, SortField, SortOrder } from '@/components/clients/ClientFilters';
 import { ClientMembersModal } from '@/components/clients/ClientMembersModal';
+import { ClientLimitBanner, useClientLimit } from '@/components/billing/ClientLimitBanner';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useToast } from '@/hooks/use-toast';
@@ -49,6 +50,7 @@ export default function Clients() {
   const { selectedOrgId } = useOrganization();
   const { toast: toastHook } = useToast();
   const queryClient = useQueryClient();
+  const { canCreateClient, clientCount, clientsIncluded } = useClientLimit();
   
   // Filters state
   const [search, setSearch] = useState('');
@@ -253,19 +255,24 @@ export default function Clients() {
   return (
     <AppLayout>
       <div className="p-8">
+        {/* Client limit banner */}
+        <div className="mb-6">
+          <ClientLimitBanner />
+        </div>
+
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold gradient-text mb-2">Clientèle</h1>
             <p className="text-muted-foreground">
-              Gérez vos clients et leurs agents assignés
+              Gérez vos clients et leurs agents assignés ({clientCount}/{clientsIncluded} utilisés)
             </p>
           </div>
 
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2" disabled={!canCreateClient}>
                 <Plus className="h-4 w-4" />
-                Nouvelle clientèle
+                {canCreateClient ? 'Nouvelle clientèle' : 'Limite atteinte'}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
