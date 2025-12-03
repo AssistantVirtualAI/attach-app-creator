@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ExternalLink, QrCode, Copy, Check, Smartphone, Monitor } from 'lucide-react';
+import { ExternalLink, QrCode, Copy, Check, Smartphone, Monitor, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { AgentSettings } from '@/hooks/useAgentSettings';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface AgentPrototypeTabProps {
   agent: AgentSettings;
@@ -13,6 +14,7 @@ interface AgentPrototypeTabProps {
 
 export const AgentPrototypeTab = ({ agent }: AgentPrototypeTabProps) => {
   const [copied, setCopied] = useState(false);
+  const qrRef = useRef<HTMLDivElement>(null);
   
   const baseUrl = window.location.origin;
   const prototypeUrl = `${baseUrl}/prototype/${agent.id}`;
@@ -31,6 +33,30 @@ export const AgentPrototypeTab = ({ agent }: AgentPrototypeTabProps) => {
     setCopied(true);
     toast.success('Lien copié !');
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const downloadQRCode = () => {
+    const svg = qrRef.current?.querySelector('svg');
+    if (!svg) return;
+
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx?.drawImage(img, 0, 0);
+      const pngUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = pngUrl;
+      link.download = `qrcode-agent-${agent.id}.png`;
+      link.click();
+      toast.success('QR Code téléchargé !');
+    };
+
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
   };
 
   return (
@@ -86,15 +112,19 @@ export const AgentPrototypeTab = ({ agent }: AgentPrototypeTabProps) => {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center gap-4">
-            <div className="w-48 h-48 bg-muted rounded-lg flex items-center justify-center border-2 border-dashed">
-              <div className="text-center">
-                <QrCode className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  QR Code<br />disponible prochainement
-                </p>
-              </div>
+            <div 
+              ref={qrRef}
+              className="w-48 h-48 bg-white rounded-lg flex items-center justify-center p-4"
+            >
+              <QRCodeSVG 
+                value={prototypeUrl}
+                size={160}
+                level="H"
+                includeMargin={true}
+              />
             </div>
-            <Button variant="outline" disabled>
+            <Button variant="outline" onClick={downloadQRCode}>
+              <Download className="h-4 w-4 mr-2" />
               Télécharger le QR Code
             </Button>
           </div>

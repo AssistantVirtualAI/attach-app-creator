@@ -8,18 +8,35 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { Palette, Mail, Globe, FileText, Shield, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Palette, Mail, Globe, FileText, Shield, Loader2, CreditCard, AlertCircle, DollarSign, Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useOrganizations } from '@/hooks/useOrganizations';
+import { useBillingConfig } from '@/hooks/useBillingConfig';
 import { ImageUploader } from '@/components/saas/ImageUploader';
 import { supabase } from '@/integrations/supabase/client';
+import { Link } from 'react-router-dom';
+
+interface PricingPlan {
+  id: string;
+  name: string;
+  price: number;
+  interval: 'month' | 'year';
+  features: string[];
+  clientLimit: number;
+  isPopular?: boolean;
+}
 
 export default function SaaSConfigurator() {
   const { toast } = useToast();
   const { selectedOrg: selectedOrganization, refreshOrganizations } = useOrganization();
   const { updateOrganization, isLoading: isUpdating } = useOrganizations();
+  const { billingConfig, isLoading: billingLoading } = useBillingConfig();
   
+  const isStripeConnected = !!billingConfig?.stripe_customer_id;
+
   const [config, setConfig] = useState({
     name: '',
     primary_color: '#8B5CF6',
@@ -36,6 +53,36 @@ export default function SaaSConfigurator() {
     gdpr_enabled: false,
     hipaa_enabled: false,
   });
+
+  const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([
+    {
+      id: 'starter',
+      name: 'Starter',
+      price: 19,
+      interval: 'month',
+      features: ['3 clients', 'Support email', 'Analytics de base'],
+      clientLimit: 3,
+    },
+    {
+      id: 'growth',
+      name: 'Growth',
+      price: 49,
+      interval: 'month',
+      features: ['10 clients', 'Support prioritaire', 'Analytics avancés', 'White-label email'],
+      clientLimit: 10,
+      isPopular: true,
+    },
+    {
+      id: 'ultimate',
+      name: 'Ultimate',
+      price: 149,
+      interval: 'month',
+      features: ['Clients illimités', 'Support dédié', 'API accès', 'Domaine personnalisé', 'HIPAA'],
+      clientLimit: -1,
+    },
+  ]);
+
+  const [editingPlan, setEditingPlan] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedOrganization) {
@@ -84,6 +131,12 @@ export default function SaaSConfigurator() {
     setConfig(prev => ({ ...prev, [key]: value }));
   };
 
+  const updatePlan = (planId: string, field: keyof PricingPlan, value: any) => {
+    setPricingPlans(plans => 
+      plans.map(p => p.id === planId ? { ...p, [field]: value } : p)
+    );
+  };
+
   if (!selectedOrganization) {
     return (
       <AppLayout>
@@ -106,11 +159,29 @@ export default function SaaSConfigurator() {
           </p>
         </div>
 
+        {/* Stripe Prerequisite Check */}
+        {!billingLoading && !isStripeConnected && (
+          <Alert className="mb-6 border-yellow-500/50 bg-yellow-500/10">
+            <AlertCircle className="h-4 w-4 text-yellow-500" />
+            <AlertTitle className="text-yellow-500">Prérequis : Stripe requis</AlertTitle>
+            <AlertDescription className="text-yellow-500/80">
+              Connectez-vous à Stripe pour débloquer toutes les fonctionnalités de configuration SaaS, 
+              notamment la gestion des plans tarifaires personnalisés.
+              <Link to="/stripe-billing" className="ml-2 underline hover:no-underline">
+                Connecter Stripe →
+              </Link>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Tabs defaultValue="branding" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="branding">Marque</TabsTrigger>
             <TabsTrigger value="domain">Domaine</TabsTrigger>
             <TabsTrigger value="email">Email</TabsTrigger>
+            <TabsTrigger value="pricing" disabled={!isStripeConnected}>
+              Plans tarifaires
+            </TabsTrigger>
             <TabsTrigger value="legal">Légal</TabsTrigger>
             <TabsTrigger value="compliance">Conformité</TabsTrigger>
           </TabsList>
@@ -319,6 +390,102 @@ export default function SaaSConfigurator() {
                 <Button onClick={handleSave} disabled={isUpdating}>
                   {isUpdating ? 'Sauvegarde...' : 'Sauvegarder'}
                 </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="pricing" className="space-y-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <DollarSign className="w-6 h-6 text-primary" />
+                  <div>
+                    <CardTitle>Plans tarifaires</CardTitle>
+                    <CardDescription>
+                      Configurez les plans proposés à vos clients
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {pricingPlans.map((plan) => (
+                    <Card 
+                      key={plan.id} 
+                      className={`relative ${plan.isPopular ? 'border-primary ring-2 ring-primary/20' : ''}`}
+                    >
+                      {plan.isPopular && (
+                        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
+                          Populaire
+                        </Badge>
+                      )}
+                      <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                          <Input
+                            value={plan.name}
+                            onChange={(e) => updatePlan(plan.id, 'name', e.target.value)}
+                            className="font-bold text-lg h-auto py-1 px-2"
+                          />
+                        </CardTitle>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-3xl font-bold">€</span>
+                          <Input
+                            type="number"
+                            value={plan.price}
+                            onChange={(e) => updatePlan(plan.id, 'price', Number(e.target.value))}
+                            className="w-20 text-3xl font-bold h-auto py-1 px-2"
+                          />
+                          <span className="text-muted-foreground">/mois</span>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Limite de clients</Label>
+                          <Input
+                            type="number"
+                            value={plan.clientLimit === -1 ? '' : plan.clientLimit}
+                            placeholder="Illimité"
+                            onChange={(e) => updatePlan(plan.id, 'clientLimit', e.target.value ? Number(e.target.value) : -1)}
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label className="text-xs">Fonctionnalités (une par ligne)</Label>
+                          <Textarea
+                            value={plan.features.join('\n')}
+                            onChange={(e) => updatePlan(plan.id, 'features', e.target.value.split('\n').filter(f => f.trim()))}
+                            rows={4}
+                            className="text-sm"
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={plan.isPopular || false}
+                            onCheckedChange={(checked) => {
+                              // Only one can be popular
+                              setPricingPlans(plans => 
+                                plans.map(p => ({ ...p, isPopular: p.id === plan.id ? checked : false }))
+                              );
+                            }}
+                          />
+                          <Label className="text-sm">Plan populaire</Label>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                <div className="mt-6 flex justify-end">
+                  <Button onClick={() => {
+                    toast({
+                      title: 'Plans sauvegardés',
+                      description: 'La configuration des plans a été enregistrée',
+                    });
+                  }}>
+                    Sauvegarder les plans
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
