@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Building, Copy, Shield, Trash2, Lock, Eye, EyeOff, Brain } from 'lucide-react';
+import { Building, Copy, Shield, Trash2, Lock, Eye, EyeOff, Brain, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { ImageUploader } from '@/components/saas/ImageUploader';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useBillingConfig } from '@/hooks/useBillingConfig';
@@ -28,6 +28,8 @@ export function AgencyTab() {
   const { currentPlan } = useBillingConfig();
   const [isSaving, setIsSaving] = useState(false);
   const [showOpenAIKey, setShowOpenAIKey] = useState(false);
+  const [isTestingKey, setIsTestingKey] = useState(false);
+  const [keyValidation, setKeyValidation] = useState<'idle' | 'valid' | 'invalid'>('idle');
   const [config, setConfig] = useState<OrgConfig>({
     name: '',
     logo_dashboard_url: '',
@@ -67,6 +69,48 @@ export function AgencyTab() {
   };
 
   const isUltimatePlan = currentPlan?.id === 'ultimate';
+
+  const validateOpenAIKeyFormat = (key: string): boolean => {
+    if (!key) return true;
+    return key.startsWith('sk-') && key.length >= 20;
+  };
+
+  const testOpenAIConnection = async () => {
+    if (!config.openai_api_key) {
+      toast.error('Veuillez entrer une clé API');
+      return;
+    }
+
+    if (!validateOpenAIKeyFormat(config.openai_api_key)) {
+      toast.error('Format de clé invalide. La clé doit commencer par "sk-"');
+      setKeyValidation('invalid');
+      return;
+    }
+
+    setIsTestingKey(true);
+    try {
+      const response = await fetch('https://api.openai.com/v1/models', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${config.openai_api_key}`,
+        },
+      });
+
+      if (response.ok) {
+        setKeyValidation('valid');
+        toast.success('Connexion OpenAI réussie !');
+      } else {
+        setKeyValidation('invalid');
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.error?.message || 'Clé API invalide');
+      }
+    } catch (error) {
+      setKeyValidation('invalid');
+      toast.error('Erreur de connexion à OpenAI');
+    } finally {
+      setIsTestingKey(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!selectedOrgId) return;
@@ -206,6 +250,18 @@ export function AgencyTab() {
               <Badge variant="outline" className="text-xs bg-green-500/10 text-green-500 border-green-500/30">
                 Optionnel
               </Badge>
+              {keyValidation === 'valid' && (
+                <Badge className="bg-green-500/20 text-green-500 border-green-500/30">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Validée
+                </Badge>
+              )}
+              {keyValidation === 'invalid' && (
+                <Badge variant="destructive">
+                  <XCircle className="w-3 h-3 mr-1" />
+                  Invalide
+                </Badge>
+              )}
             </div>
             <p className="text-sm text-muted-foreground mb-2">
               Utilisez votre propre clé OpenAI pour des fonctionnalités IA avancées
@@ -215,9 +271,16 @@ export function AgencyTab() {
                 <Input
                   type={showOpenAIKey ? 'text' : 'password'}
                   value={config.openai_api_key}
-                  onChange={(e) => setConfig({ ...config, openai_api_key: e.target.value })}
+                  onChange={(e) => {
+                    setConfig({ ...config, openai_api_key: e.target.value });
+                    setKeyValidation('idle');
+                  }}
                   placeholder="sk-..."
-                  className="bg-background/50 pr-10 font-mono text-sm"
+                  className={`bg-background/50 pr-10 font-mono text-sm ${
+                    config.openai_api_key && !validateOpenAIKeyFormat(config.openai_api_key)
+                      ? 'border-destructive'
+                      : ''
+                  }`}
                 />
                 <Button
                   type="button"
@@ -229,6 +292,17 @@ export function AgencyTab() {
                   {showOpenAIKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
               </div>
+              <Button
+                variant="outline"
+                onClick={testOpenAIConnection}
+                disabled={isTestingKey || !config.openai_api_key}
+              >
+                {isTestingKey ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  'Tester'
+                )}
+              </Button>
               {config.openai_api_key && (
                 <Button
                   variant="outline"
@@ -239,6 +313,11 @@ export function AgencyTab() {
                 </Button>
               )}
             </div>
+            {config.openai_api_key && !validateOpenAIKeyFormat(config.openai_api_key) && (
+              <p className="text-xs text-destructive">
+                La clé doit commencer par "sk-" et contenir au moins 20 caractères
+              </p>
+            )}
           </div>
 
           <Separator />

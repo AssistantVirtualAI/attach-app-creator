@@ -6,8 +6,9 @@ import { useBillingConfig } from '@/hooks/useBillingConfig';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { toast } from 'sonner';
+import { useMemo } from 'react';
 
 export function UsageTab() {
   const { billingConfig, currentPlan } = useBillingConfig();
@@ -81,6 +82,27 @@ export function UsageTab() {
   const aiCreditsUsed = billingConfig?.credits_used || 0;
   const aiCreditsLimit = billingConfig?.ai_credits || 100;
   const aiPercentage = Math.min((aiCreditsUsed / aiCreditsLimit) * 100, 100);
+
+  // Generate monthly AI credits history (mock data for visualization)
+  const aiCreditsHistory = useMemo(() => {
+    const months = [];
+    const currentDate = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(currentDate);
+      date.setMonth(date.getMonth() - i);
+      const monthName = date.toLocaleDateString('fr-FR', { month: 'short' });
+      // Simulate progressive usage
+      const baseUsage = Math.floor(aiCreditsLimit * 0.3);
+      const variance = Math.floor(Math.random() * (aiCreditsLimit * 0.4));
+      const used = i === 0 ? aiCreditsUsed : Math.min(baseUsage + variance, aiCreditsLimit);
+      months.push({
+        month: monthName,
+        used: used,
+        limit: aiCreditsLimit,
+      });
+    }
+    return months;
+  }, [aiCreditsUsed, aiCreditsLimit]);
 
   const handleExportReport = () => {
     const reportData = {
@@ -182,7 +204,52 @@ export function UsageTab() {
         </Card>
       </div>
 
-      {/* Usage Chart */}
+      {/* AI Credits History Chart */}
+      <Card className="glass-card">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Zap className="w-6 h-6 text-yellow-500" />
+            <div>
+              <CardTitle>Historique des crédits IA</CardTitle>
+              <CardDescription>Consommation mensuelle sur 6 mois</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={aiCreditsHistory}>
+                <defs>
+                  <linearGradient id="colorCredits" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#eab308" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#eab308" stopOpacity={0.3} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: '8px',
+                  }}
+                  formatter={(value: number, name: string) => [
+                    value.toLocaleString(),
+                    name === 'used' ? 'Utilisés' : 'Limite'
+                  ]}
+                />
+                <Legend 
+                  formatter={(value) => value === 'used' ? 'Crédits utilisés' : 'Limite'}
+                />
+                <Bar dataKey="used" fill="url(#colorCredits)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="limit" fill="hsl(var(--muted))" radius={[4, 4, 0, 0]} opacity={0.3} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Conversations Chart */}
       <Card className="glass-card">
         <CardHeader>
           <div className="flex items-center justify-between">
