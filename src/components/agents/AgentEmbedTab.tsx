@@ -15,40 +15,37 @@ export const AgentEmbedTab = ({ agent }: AgentEmbedTabProps) => {
   
   const baseUrl = window.location.origin;
   const prototypeUrl = `${baseUrl}/prototype/${agent.id}`;
+  const iframeUrl = `${baseUrl}/iframe/${agent.id}`;
   
   const themeConfig = (agent.theme_config || {}) as Record<string, string>;
   
   const popupCode = `<!-- AVA Statistics Widget -->
+<div id="cd-widget"></div>
 <script>
-  (function() {
-    var script = document.createElement('script');
-    script.src = '${baseUrl}/widget.js';
-    script.async = true;
-    script.onload = function() {
-      AVAWidget.init({
-        agentId: '${agent.id}',
-        platform: '${agent.platform}',
-        platformAgentId: '${agent.platform_agent_id || ''}',
-        position: 'bottom-right',
-        theme: {
-          primaryColor: '${themeConfig.primaryColor || '#8B5CF6'}',
-          textColor: '${themeConfig.textColor || '#ffffff'}',
-          borderRadius: '${themeConfig.borderRadius || '8'}px'
-        }
-      });
-    };
-    document.head.appendChild(script);
-  })();
+(function() {
+  if (window.chatWidgetScriptLoaded) return;
+  window.ChatWidgetConfig = {
+    agentId: "${agent.id}",
+    position: "bottom-right",
+    primaryColor: "${themeConfig.primaryColor || '#8B5CF6'}",
+    baseUrl: "${baseUrl}"
+  };
+  var s = document.createElement("script");
+  s.type = "text/javascript";
+  s.src = "${baseUrl}/widget.js";
+  document.body.appendChild(s);
+  window.chatWidgetScriptLoaded = true;
+})();
 </script>`;
 
   const iframeCode = `<!-- AVA Statistics Embedded Agent -->
 <iframe
-  src="${prototypeUrl}?embed=true"
-  width="400"
-  height="600"
+  src="${iframeUrl}"
+  width="380"
+  height="520"
   frameborder="0"
-  allow="microphone; camera"
-  style="border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);"
+  allow="microphone"
+  style="border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);"
 ></iframe>`;
 
   const directLink = prototypeUrl;
