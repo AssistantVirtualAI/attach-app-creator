@@ -27,6 +27,7 @@ import EmailTemplates from "./pages/EmailTemplates";
 import Agents from "./pages/Agents";
 import Team from "./pages/Team";
 import ApiKeys from "./pages/ApiKeys";
+import ClientDetail from "./pages/ClientDetail";
 import ClientLogin from "./pages/ClientLogin";
 import ClientPortal from "./pages/ClientPortal";
 import ClientConversations from "./pages/ClientConversations";
@@ -130,6 +131,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <Clients />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/clients/:clientId"
+                  element={
+                    <ProtectedRoute>
+                      <ClientDetail />
                     </ProtectedRoute>
                   }
                 />
