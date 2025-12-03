@@ -158,6 +158,14 @@ const App = () => (
               }
             />
             <Route
+              path="/email-templates"
+              element={
+                <ProtectedRoute>
+                  <EmailTemplates />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/agents"
               element={
                 <ProtectedRoute>

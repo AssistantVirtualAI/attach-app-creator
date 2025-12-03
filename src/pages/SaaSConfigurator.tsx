@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,23 +6,93 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Upload, Palette, Mail, Globe, FileText } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Palette, Mail, Globe, FileText, Shield, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useOrganization } from '@/context/OrganizationContext';
+import { useOrganizations } from '@/hooks/useOrganizations';
+import { ImageUploader } from '@/components/saas/ImageUploader';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function SaaSConfigurator() {
   const { toast } = useToast();
-  const [saving, setSaving] = useState(false);
+  const { selectedOrg: selectedOrganization, refreshOrganizations } = useOrganization();
+  const { updateOrganization, isLoading: isUpdating } = useOrganizations();
+  
+  const [config, setConfig] = useState({
+    name: '',
+    primary_color: '#8B5CF6',
+    domain: '',
+    backend_domain: '',
+    logo_dashboard_url: '',
+    logo_login_url: '',
+    favicon_url: '',
+    email_logo_url: '',
+    website_title: '',
+    email_domain: '',
+    email_sender: '',
+    email_sender_name: '',
+    gdpr_enabled: false,
+    hipaa_enabled: false,
+  });
 
-  const handleSave = () => {
-    setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
+  useEffect(() => {
+    if (selectedOrganization) {
+      setConfig({
+        name: selectedOrganization.name || '',
+        primary_color: (selectedOrganization as any).primary_color || '#8B5CF6',
+        domain: (selectedOrganization as any).domain || '',
+        backend_domain: (selectedOrganization as any).backend_domain || '',
+        logo_dashboard_url: (selectedOrganization as any).logo_dashboard_url || '',
+        logo_login_url: (selectedOrganization as any).logo_login_url || '',
+        favicon_url: (selectedOrganization as any).favicon_url || '',
+        email_logo_url: (selectedOrganization as any).email_logo_url || '',
+        website_title: (selectedOrganization as any).website_title || '',
+        email_domain: (selectedOrganization as any).email_domain || '',
+        email_sender: (selectedOrganization as any).email_sender || '',
+        email_sender_name: (selectedOrganization as any).email_sender_name || '',
+        gdpr_enabled: (selectedOrganization as any).gdpr_enabled || false,
+        hipaa_enabled: (selectedOrganization as any).hipaa_enabled || false,
+      });
+    }
+  }, [selectedOrganization]);
+
+  const handleSave = async () => {
+    if (!selectedOrganization?.id) return;
+
+    try {
+      await updateOrganization({
+        organizationId: selectedOrganization.id,
+        data: config,
+      });
+      await refreshOrganizations();
       toast({
         title: 'Configuration sauvegardée',
         description: 'Les paramètres ont été mis à jour avec succès',
       });
-    }, 1000);
+    } catch (error: any) {
+      toast({
+        title: 'Erreur',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
   };
+
+  const updateConfig = (key: string, value: any) => {
+    setConfig(prev => ({ ...prev, [key]: value }));
+  };
+
+  if (!selectedOrganization) {
+    return (
+      <AppLayout>
+        <div className="p-8 flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Sélectionnez une organisation</p>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -41,8 +111,8 @@ export default function SaaSConfigurator() {
             <TabsTrigger value="branding">Marque</TabsTrigger>
             <TabsTrigger value="domain">Domaine</TabsTrigger>
             <TabsTrigger value="email">Email</TabsTrigger>
-            <TabsTrigger value="footer">Footer</TabsTrigger>
             <TabsTrigger value="legal">Légal</TabsTrigger>
+            <TabsTrigger value="compliance">Conformité</TabsTrigger>
           </TabsList>
 
           <TabsContent value="branding" className="space-y-6">
@@ -59,45 +129,87 @@ export default function SaaSConfigurator() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div>
-                  <Label>Logo du tableau de bord</Label>
-                  <div className="mt-2 flex items-center gap-4">
-                    <div className="w-32 h-32 border-2 border-dashed rounded-lg flex items-center justify-center">
-                      <Upload className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                    <Button variant="outline">Télécharger</Button>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="orgName">Nom de l'organisation</Label>
+                  <Input
+                    id="orgName"
+                    value={config.name}
+                    onChange={(e) => updateConfig('name', e.target.value)}
+                    placeholder="Mon Entreprise"
+                  />
                 </div>
 
-                <div>
-                  <Label>Logo de la page de connexion</Label>
-                  <div className="mt-2 flex items-center gap-4">
-                    <div className="w-32 h-32 border-2 border-dashed rounded-lg flex items-center justify-center">
-                      <Upload className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                    <Button variant="outline">Télécharger</Button>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="websiteTitle">Titre du site</Label>
+                  <Input
+                    id="websiteTitle"
+                    value={config.website_title}
+                    onChange={(e) => updateConfig('website_title', e.target.value)}
+                    placeholder="Mon Dashboard - Gestion des agents IA"
+                  />
                 </div>
 
-                <div>
+                <Separator />
+
+                <ImageUploader
+                  label="Logo du tableau de bord"
+                  currentUrl={config.logo_dashboard_url}
+                  organizationId={selectedOrganization.id}
+                  folder="logos"
+                  onUpload={(url) => updateConfig('logo_dashboard_url', url)}
+                  onRemove={() => updateConfig('logo_dashboard_url', '')}
+                  aspectRatio="wide"
+                />
+
+                <ImageUploader
+                  label="Logo de la page de connexion"
+                  currentUrl={config.logo_login_url}
+                  organizationId={selectedOrganization.id}
+                  folder="logos"
+                  onUpload={(url) => updateConfig('logo_login_url', url)}
+                  onRemove={() => updateConfig('logo_login_url', '')}
+                />
+
+                <ImageUploader
+                  label="Favicon"
+                  currentUrl={config.favicon_url}
+                  organizationId={selectedOrganization.id}
+                  folder="favicons"
+                  onUpload={(url) => updateConfig('favicon_url', url)}
+                  onRemove={() => updateConfig('favicon_url', '')}
+                  aspectRatio="favicon"
+                />
+
+                <Separator />
+
+                <div className="space-y-2">
                   <Label htmlFor="primaryColor">Couleur primaire</Label>
-                  <div className="flex gap-4 mt-2">
+                  <div className="flex gap-4">
                     <Input
                       id="primaryColor"
                       type="color"
-                      defaultValue="#8B5CF6"
-                      className="w-20 h-10"
+                      value={config.primary_color}
+                      onChange={(e) => updateConfig('primary_color', e.target.value)}
+                      className="w-20 h-10 p-1"
                     />
                     <Input
-                      defaultValue="#8B5CF6"
+                      value={config.primary_color}
+                      onChange={(e) => updateConfig('primary_color', e.target.value)}
                       placeholder="#8B5CF6"
                       className="flex-1"
                     />
                   </div>
                 </div>
 
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? 'Sauvegarde...' : 'Sauvegarder'}
+                <Button onClick={handleSave} disabled={isUpdating}>
+                  {isUpdating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Sauvegarde...
+                    </>
+                  ) : (
+                    'Sauvegarder'
+                  )}
                 </Button>
               </CardContent>
             </Card>
@@ -111,26 +223,37 @@ export default function SaaSConfigurator() {
                   <div>
                     <CardTitle>Domaine personnalisé</CardTitle>
                     <CardDescription>
-                      Configurez votre nom de domaine
+                      Configurez vos noms de domaine
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="domain">Nom de domaine</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="domain">Domaine frontend</Label>
                   <Input
                     id="domain"
+                    value={config.domain}
+                    onChange={(e) => updateConfig('domain', e.target.value)}
                     placeholder="app.votre-domaine.com"
-                    className="mt-2"
                   />
-                  <p className="text-xs text-muted-foreground mt-2">
+                  <p className="text-xs text-muted-foreground">
                     Pointez un enregistrement CNAME vers: app.avastatistic.lovable.app
                   </p>
                 </div>
 
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? 'Sauvegarde...' : 'Sauvegarder'}
+                <div className="space-y-2">
+                  <Label htmlFor="backendDomain">Domaine backend (API)</Label>
+                  <Input
+                    id="backendDomain"
+                    value={config.backend_domain}
+                    onChange={(e) => updateConfig('backend_domain', e.target.value)}
+                    placeholder="api.votre-domaine.com"
+                  />
+                </div>
+
+                <Button onClick={handleSave} disabled={isUpdating}>
+                  {isUpdating ? 'Sauvegarde...' : 'Sauvegarder'}
                 </Button>
               </CardContent>
             </Card>
@@ -142,67 +265,59 @@ export default function SaaSConfigurator() {
                 <div className="flex items-center gap-3">
                   <Mail className="w-6 h-6 text-primary" />
                   <div>
-                    <CardTitle>Configuration SMTP</CardTitle>
+                    <CardTitle>Configuration Email</CardTitle>
                     <CardDescription>
-                      Configurez l'envoi d'emails
+                      Paramètres d'envoi d'emails
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="smtpHost">Serveur SMTP</Label>
-                  <Input id="smtpHost" placeholder="smtp.gmail.com" className="mt-2" />
+                <ImageUploader
+                  label="Logo pour les emails"
+                  currentUrl={config.email_logo_url}
+                  organizationId={selectedOrganization.id}
+                  folder="email"
+                  onUpload={(url) => updateConfig('email_logo_url', url)}
+                  onRemove={() => updateConfig('email_logo_url', '')}
+                  aspectRatio="wide"
+                />
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <Label htmlFor="emailDomain">Domaine email</Label>
+                  <Input
+                    id="emailDomain"
+                    value={config.email_domain}
+                    onChange={(e) => updateConfig('email_domain', e.target.value)}
+                    placeholder="mail.votre-domaine.com"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="smtpPort">Port</Label>
-                    <Input id="smtpPort" placeholder="587" className="mt-2" />
+                  <div className="space-y-2">
+                    <Label htmlFor="emailSender">Email expéditeur</Label>
+                    <Input
+                      id="emailSender"
+                      value={config.email_sender}
+                      onChange={(e) => updateConfig('email_sender', e.target.value)}
+                      placeholder="noreply@votre-domaine.com"
+                    />
                   </div>
-                  <div>
-                    <Label htmlFor="smtpUser">Utilisateur</Label>
-                    <Input id="smtpUser" placeholder="user@email.com" className="mt-2" />
+                  <div className="space-y-2">
+                    <Label htmlFor="emailSenderName">Nom expéditeur</Label>
+                    <Input
+                      id="emailSenderName"
+                      value={config.email_sender_name}
+                      onChange={(e) => updateConfig('email_sender_name', e.target.value)}
+                      placeholder="Mon Entreprise"
+                    />
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="smtpPassword">Mot de passe</Label>
-                  <Input
-                    id="smtpPassword"
-                    type="password"
-                    placeholder="••••••••"
-                    className="mt-2"
-                  />
-                </div>
-
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? 'Sauvegarde...' : 'Sauvegarder'}
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="footer" className="space-y-6">
-            <Card className="glass-card">
-              <CardHeader>
-                <CardTitle>Footer personnalisé</CardTitle>
-                <CardDescription>
-                  Personnalisez le pied de page
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="footerText">Texte du footer</Label>
-                  <Textarea
-                    id="footerText"
-                    placeholder="© 2025 Votre Entreprise. Tous droits réservés."
-                    className="mt-2"
-                  />
-                </div>
-
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? 'Sauvegarde...' : 'Sauvegarder'}
+                <Button onClick={handleSave} disabled={isUpdating}>
+                  {isUpdating ? 'Sauvegarde...' : 'Sauvegarder'}
                 </Button>
               </CardContent>
             </Card>
@@ -222,26 +337,79 @@ export default function SaaSConfigurator() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="privacy">Politique de confidentialité (URL)</Label>
                   <Input
                     id="privacy"
                     placeholder="https://votre-site.com/privacy"
-                    className="mt-2"
                   />
                 </div>
 
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="terms">Conditions d'utilisation (URL)</Label>
                   <Input
                     id="terms"
                     placeholder="https://votre-site.com/terms"
-                    className="mt-2"
                   />
                 </div>
 
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? 'Sauvegarde...' : 'Sauvegarder'}
+                <div className="space-y-2">
+                  <Label htmlFor="footerText">Texte du footer</Label>
+                  <Textarea
+                    id="footerText"
+                    placeholder="© 2025 Votre Entreprise. Tous droits réservés."
+                  />
+                </div>
+
+                <Button onClick={handleSave} disabled={isUpdating}>
+                  {isUpdating ? 'Sauvegarde...' : 'Sauvegarder'}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="compliance" className="space-y-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Shield className="w-6 h-6 text-primary" />
+                  <div>
+                    <CardTitle>Conformité</CardTitle>
+                    <CardDescription>
+                      Activez les fonctionnalités de conformité
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between p-4 rounded-lg border">
+                  <div className="space-y-1">
+                    <Label>RGPD / GDPR</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Activer les fonctionnalités de conformité RGPD (consentement, droit à l'oubli, export de données)
+                    </p>
+                  </div>
+                  <Switch
+                    checked={config.gdpr_enabled}
+                    onCheckedChange={(checked) => updateConfig('gdpr_enabled', checked)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-lg border">
+                  <div className="space-y-1">
+                    <Label>HIPAA</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Activer les fonctionnalités de conformité HIPAA (chiffrement renforcé, audit logs)
+                    </p>
+                  </div>
+                  <Switch
+                    checked={config.hipaa_enabled}
+                    onCheckedChange={(checked) => updateConfig('hipaa_enabled', checked)}
+                  />
+                </div>
+
+                <Button onClick={handleSave} disabled={isUpdating}>
+                  {isUpdating ? 'Sauvegarde...' : 'Sauvegarder'}
                 </Button>
               </CardContent>
             </Card>
