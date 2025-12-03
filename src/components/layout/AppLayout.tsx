@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, Home, TrendingUp, MessageSquare, BookOpen, Settings, Bot, Webhook, CreditCard, Sliders, Moon, Sun, Users } from 'lucide-react';
+import { Activity, Home, TrendingUp, MessageSquare, BookOpen, Settings, Bot, Webhook, CreditCard, Sliders, Moon, Sun, Users, BarChart3, GitBranch } from 'lucide-react';
 import { OrganizationSelector } from '@/components/organization/OrganizationSelector';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,12 +22,16 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const baseNavigation = [
     { name: 'Maison', href: '/', icon: Home },
     { name: 'Dashboard', href: '/dashboard', icon: TrendingUp },
+    { name: 'Conversations', href: '/conversations', icon: MessageSquare },
+    { name: 'Voice Analytics', href: '/voice-analytics', icon: BarChart3 },
+    { name: 'Base de connaissances', href: '/knowledge-base', icon: BookOpen },
   ];
 
   // Admin-only navigation
   const adminNavigation = [
     { name: 'Clientèle', href: '/clients', icon: Users },
     { name: 'Agents', href: '/agents', icon: Bot },
+    { name: 'Workflows', href: '/workflows', icon: GitBranch },
     { name: 'Intégrations', href: '/integrations', icon: Sliders },
     { name: 'Journaux Webhook', href: '/webhook-logs', icon: Webhook },
     { name: 'Facturation Stripe', href: '/stripe-billing', icon: CreditCard },

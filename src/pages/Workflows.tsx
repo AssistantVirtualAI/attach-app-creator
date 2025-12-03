@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
@@ -22,7 +23,8 @@ import {
   Plus,
   Trash2,
   Settings,
-  ExternalLink
+  ExternalLink,
+  Search
 } from "lucide-react";
 
 interface MarketplaceApp {
@@ -116,6 +118,13 @@ export default function Workflows() {
   const [hipaaModalOpen, setHipaaModalOpen] = useState(false);
   const [selectedApp, setSelectedApp] = useState<MarketplaceApp | null>(null);
   const [hipaaAccepted, setHipaaAccepted] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredMarketplaceApps = marketplaceApps.filter(app =>
+    app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    app.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    app.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const { data: installedWorkflows, isLoading } = useQuery({
     queryKey: ['workflows', selectedOrg?.id],
@@ -298,14 +307,27 @@ export default function Workflows() {
         {/* Marketplace */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Marketplace</CardTitle>
-            <CardDescription>
-              Découvrez et installez de nouvelles intégrations
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg">Marketplace</CardTitle>
+                <CardDescription>
+                  Découvrez et installez de nouvelles intégrations
+                </CardDescription>
+              </div>
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher des applications..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {marketplaceApps.map((app) => (
+              {filteredMarketplaceApps.map((app) => (
                 <Card key={app.id} className="relative overflow-hidden">
                   {app.requiresHipaa && (
                     <div className="absolute top-2 right-2">

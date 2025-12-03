@@ -31,7 +31,23 @@ export default function Agents() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      
+      // Fetch client names separately due to multiple FK relationships
+      const agentsWithClients = await Promise.all(
+        (data || []).map(async (agent) => {
+          if (agent.client_id) {
+            const { data: clientData } = await supabase
+              .from('clients')
+              .select('id, name')
+              .eq('id', agent.client_id)
+              .maybeSingle();
+            return { ...agent, client: clientData };
+          }
+          return { ...agent, client: null };
+        })
+      );
+      
+      return agentsWithClients;
     },
     enabled: !!selectedOrgId,
   });
