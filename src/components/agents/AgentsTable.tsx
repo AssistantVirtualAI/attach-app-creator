@@ -15,6 +15,8 @@ interface Agent {
   config: any;
   created_at: string;
   organization_id: string;
+  client_id?: string | null;
+  client?: { id: string; name: string } | null;
 }
 
 interface AgentsTableProps {
@@ -46,6 +48,7 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
           <TableRow>
             <TableHead>Nom</TableHead>
             <TableHead>Plateforme</TableHead>
+            <TableHead>Client assigné</TableHead>
             <TableHead>Agent ID</TableHead>
             <TableHead>Date de création</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -57,6 +60,13 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
               <TableCell className="font-medium">{agent.name}</TableCell>
               <TableCell>
                 <PlatformBadge platform={agent.platform} />
+              </TableCell>
+              <TableCell>
+                {agent.client ? (
+                  <span className="text-foreground">{agent.client.name}</span>
+                ) : (
+                  <span className="text-muted-foreground">Non assigné</span>
+                )}
               </TableCell>
               <TableCell className="font-mono text-sm">
                 {agent.config?.agent_id || 'N/A'}
