@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Palette, Mail, Globe, FileText, Shield, Loader2, CreditCard, AlertCircle, DollarSign, Check, X } from 'lucide-react';
+import { Palette, Mail, Globe, FileText, Shield, Loader2, CreditCard, AlertCircle, DollarSign, Check, X, Bot, Phone, MessageSquare, Headphones, ShoppingCart, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useOrganizations } from '@/hooks/useOrganizations';
@@ -27,6 +27,17 @@ interface PricingPlan {
   features: string[];
   clientLimit: number;
   isPopular?: boolean;
+}
+
+interface AgentTemplate {
+  id: string;
+  name: string;
+  description: string;
+  icon: React.ReactNode;
+  category: string;
+  systemPrompt: string;
+  features: string[];
+  isActive: boolean;
 }
 
 export default function SaaSConfigurator() {
@@ -83,6 +94,65 @@ export default function SaaSConfigurator() {
   ]);
 
   const [editingPlan, setEditingPlan] = useState<string | null>(null);
+
+  const [agentTemplates, setAgentTemplates] = useState<AgentTemplate[]>([
+    {
+      id: 'customer-support',
+      name: 'Support Client',
+      description: 'Agent spécialisé dans le support client et la résolution de problèmes',
+      icon: <Headphones className="w-6 h-6" />,
+      category: 'Support',
+      systemPrompt: 'Tu es un agent de support client professionnel et empathique. Aide les utilisateurs à résoudre leurs problèmes de manière efficace et courtoise.',
+      features: ['FAQ automatique', 'Escalade tickets', 'Historique client'],
+      isActive: true,
+    },
+    {
+      id: 'sales-assistant',
+      name: 'Assistant Commercial',
+      description: 'Agent conçu pour qualifier les leads et accompagner le processus de vente',
+      icon: <ShoppingCart className="w-6 h-6" />,
+      category: 'Ventes',
+      systemPrompt: 'Tu es un assistant commercial expert. Qualifie les prospects, présente les produits et guide vers l\'achat.',
+      features: ['Qualification leads', 'Présentation produits', 'Suivi devis'],
+      isActive: true,
+    },
+    {
+      id: 'appointment-scheduler',
+      name: 'Planificateur RDV',
+      description: 'Agent spécialisé dans la prise et gestion de rendez-vous',
+      icon: <Calendar className="w-6 h-6" />,
+      category: 'Planification',
+      systemPrompt: 'Tu es un assistant de planification. Aide les utilisateurs à trouver et réserver des créneaux de rendez-vous disponibles.',
+      features: ['Calendrier intégré', 'Rappels automatiques', 'Gestion conflits'],
+      isActive: false,
+    },
+    {
+      id: 'general-assistant',
+      name: 'Assistant Général',
+      description: 'Agent polyvalent pour répondre aux questions générales',
+      icon: <MessageSquare className="w-6 h-6" />,
+      category: 'Général',
+      systemPrompt: 'Tu es un assistant virtuel polyvalent. Réponds aux questions des utilisateurs de manière claire et utile.',
+      features: ['Multi-langues', 'Base de connaissances', 'Personnalisable'],
+      isActive: true,
+    },
+    {
+      id: 'phone-receptionist',
+      name: 'Réceptionniste Téléphonique',
+      description: 'Agent vocal pour gérer les appels entrants',
+      icon: <Phone className="w-6 h-6" />,
+      category: 'Téléphonie',
+      systemPrompt: 'Tu es un réceptionniste téléphonique professionnel. Accueille les appelants, dirige les appels et prends les messages.',
+      features: ['Transfert d\'appels', 'Prise de messages', 'IVR intelligent'],
+      isActive: false,
+    },
+  ]);
+
+  const toggleTemplate = (templateId: string) => {
+    setAgentTemplates(templates =>
+      templates.map(t => t.id === templateId ? { ...t, isActive: !t.isActive } : t)
+    );
+  };
 
   useEffect(() => {
     if (selectedOrganization) {
@@ -175,13 +245,14 @@ export default function SaaSConfigurator() {
         )}
 
         <Tabs defaultValue="branding" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="branding">Marque</TabsTrigger>
             <TabsTrigger value="domain">Domaine</TabsTrigger>
             <TabsTrigger value="email">Email</TabsTrigger>
             <TabsTrigger value="pricing" disabled={!isStripeConnected}>
-              Plans tarifaires
+              Plans
             </TabsTrigger>
+            <TabsTrigger value="templates">Templates</TabsTrigger>
             <TabsTrigger value="legal">Légal</TabsTrigger>
             <TabsTrigger value="compliance">Conformité</TabsTrigger>
           </TabsList>
@@ -484,6 +555,89 @@ export default function SaaSConfigurator() {
                     });
                   }}>
                     Sauvegarder les plans
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="templates" className="space-y-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <Bot className="w-6 h-6 text-primary" />
+                  <div>
+                    <CardTitle>Templates d'agents</CardTitle>
+                    <CardDescription>
+                      Activez les templates prédéfinis pour vos clients
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {agentTemplates.map((template) => (
+                    <Card 
+                      key={template.id}
+                      className={`relative transition-all duration-200 ${
+                        template.isActive 
+                          ? 'border-primary/50 bg-primary/5' 
+                          : 'border-border/50 opacity-60'
+                      }`}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                            template.isActive 
+                              ? 'bg-primary/20 text-primary' 
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {template.icon}
+                          </div>
+                          <Switch
+                            checked={template.isActive}
+                            onCheckedChange={() => toggleTemplate(template.id)}
+                          />
+                        </div>
+                        <CardTitle className="text-base mt-3">{template.name}</CardTitle>
+                        <Badge variant="outline" className="w-fit text-xs">
+                          {template.category}
+                        </Badge>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          {template.description}
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {template.features.map((feature, idx) => (
+                            <Badge key={idx} variant="secondary" className="text-xs">
+                              {feature}
+                            </Badge>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                <Separator className="my-6" />
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {agentTemplates.filter(t => t.isActive).length} template(s) actif(s)
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Les clients pourront utiliser ces templates pour créer leurs agents
+                    </p>
+                  </div>
+                  <Button onClick={() => {
+                    toast({
+                      title: 'Templates sauvegardés',
+                      description: 'La configuration des templates a été enregistrée',
+                    });
+                  }}>
+                    Sauvegarder les templates
                   </Button>
                 </div>
               </CardContent>
