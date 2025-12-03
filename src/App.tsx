@@ -21,6 +21,7 @@ import Integrations from "./pages/Integrations";
 import WebhookLogs from "./pages/WebhookLogs";
 import StripeBilling from "./pages/StripeBilling";
 import SaaSConfigurator from "./pages/SaaSConfigurator";
+import EmailTemplates from "./pages/EmailTemplates";
 import Agents from "./pages/Agents";
 import NotFound from "./pages/NotFound";
 
