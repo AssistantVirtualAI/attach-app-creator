@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { toast } from 'sonner';
 
 export function UsageTab() {
   const { billingConfig, currentPlan } = useBillingConfig();
@@ -81,6 +82,53 @@ export function UsageTab() {
   const aiCreditsLimit = billingConfig?.ai_credits || 100;
   const aiPercentage = Math.min((aiCreditsUsed / aiCreditsLimit) * 100, 100);
 
+  const handleExportReport = () => {
+    const reportData = {
+      period: new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+      conversations: {
+        used: conversationsUsed,
+        limit: conversationsLimit,
+        percentage: conversationPercentage.toFixed(1),
+      },
+      aiCredits: {
+        used: aiCreditsUsed,
+        limit: aiCreditsLimit,
+        percentage: aiPercentage.toFixed(1),
+      },
+      clients: {
+        used: clientsUsed,
+        limit: clientsLimit === Infinity ? 'Illimité' : clientsLimit,
+        percentage: clientPercentage.toFixed(1),
+      },
+      dailyBreakdown: conversationStats?.data || [],
+    };
+
+    // Generate CSV content
+    let csvContent = 'Rapport d\'utilisation - ' + reportData.period + '\n\n';
+    csvContent += 'Métrique,Utilisé,Limite,Pourcentage\n';
+    csvContent += `Conversations,${reportData.conversations.used},${reportData.conversations.limit},${reportData.conversations.percentage}%\n`;
+    csvContent += `Crédits IA,${reportData.aiCredits.used},${reportData.aiCredits.limit},${reportData.aiCredits.percentage}%\n`;
+    csvContent += `Clients,${reportData.clients.used},${reportData.clients.limit},${reportData.clients.percentage}%\n`;
+    csvContent += '\nDétail journalier des conversations\n';
+    csvContent += 'Jour,Conversations\n';
+    reportData.dailyBreakdown.forEach((day: any) => {
+      csvContent += `${day.day},${day.conversations}\n`;
+    });
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `rapport-usage-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast.success('Rapport exporté avec succès');
+  };
+
   return (
     <div className="space-y-6">
       {/* Usage Cards */}
@@ -145,9 +193,9 @@ export function UsageTab() {
                 <CardDescription>Conversations par jour ce mois-ci</CardDescription>
               </div>
             </div>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={handleExportReport}>
               <Download className="w-4 h-4 mr-2" />
-              Exporter
+              Exporter le rapport
             </Button>
           </div>
         </CardHeader>

@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Building, Copy, Shield, Trash2, Lock } from 'lucide-react';
+import { Building, Copy, Shield, Trash2, Lock, Eye, EyeOff, Brain } from 'lucide-react';
 import { ImageUploader } from '@/components/saas/ImageUploader';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useBillingConfig } from '@/hooks/useBillingConfig';
@@ -20,12 +20,14 @@ interface OrgConfig {
   gdpr_enabled: boolean;
   hipaa_enabled: boolean;
   api_key: string;
+  openai_api_key: string;
 }
 
 export function AgencyTab() {
   const { selectedOrg, selectedOrgId, refreshOrganizations } = useOrganization();
   const { currentPlan } = useBillingConfig();
   const [isSaving, setIsSaving] = useState(false);
+  const [showOpenAIKey, setShowOpenAIKey] = useState(false);
   const [config, setConfig] = useState<OrgConfig>({
     name: '',
     logo_dashboard_url: '',
@@ -33,6 +35,7 @@ export function AgencyTab() {
     gdpr_enabled: false,
     hipaa_enabled: false,
     api_key: '',
+    openai_api_key: '',
   });
 
   // Load full organization data
@@ -58,6 +61,7 @@ export function AgencyTab() {
         gdpr_enabled: data.gdpr_enabled || false,
         hipaa_enabled: data.hipaa_enabled || false,
         api_key: data.api_key || '',
+        openai_api_key: (data as any).openai_api_key || '',
       });
     }
   };
@@ -185,6 +189,51 @@ export function AgencyTab() {
                   variant="outline"
                   size="icon"
                   onClick={() => copyToClipboard(config.api_key)}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* OpenAI API Key */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Brain className="w-4 h-4 text-green-500" />
+              <Label>Clé API OpenAI</Label>
+              <Badge variant="outline" className="text-xs bg-green-500/10 text-green-500 border-green-500/30">
+                Optionnel
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mb-2">
+              Utilisez votre propre clé OpenAI pour des fonctionnalités IA avancées
+            </p>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input
+                  type={showOpenAIKey ? 'text' : 'password'}
+                  value={config.openai_api_key}
+                  onChange={(e) => setConfig({ ...config, openai_api_key: e.target.value })}
+                  placeholder="sk-..."
+                  className="bg-background/50 pr-10 font-mono text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0 h-full"
+                  onClick={() => setShowOpenAIKey(!showOpenAIKey)}
+                >
+                  {showOpenAIKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+              </div>
+              {config.openai_api_key && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => copyToClipboard(config.openai_api_key)}
                 >
                   <Copy className="w-4 h-4" />
                 </Button>
