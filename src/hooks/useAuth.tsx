@@ -81,6 +81,73 @@ export const useAuth = () => {
     }
   };
 
+  const signInWithGoogle = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/`,
+        },
+      });
+
+      if (error) throw error;
+      return { error: null };
+    } catch (error: any) {
+      toast({
+        title: "Erreur de connexion Google",
+        description: error.message,
+        variant: "destructive",
+      });
+      return { error };
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth?mode=reset`,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Email envoyé",
+        description: "Vérifiez votre boîte mail pour réinitialiser votre mot de passe",
+      });
+      return { error: null };
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message,
+        variant: "destructive",
+      });
+      return { error };
+    }
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Mot de passe mis à jour",
+        description: "Votre mot de passe a été changé avec succès",
+      });
+      return { error: null };
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message,
+        variant: "destructive",
+      });
+      return { error };
+    }
+  };
+
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -107,6 +174,9 @@ export const useAuth = () => {
     loading,
     signUp,
     signIn,
+    signInWithGoogle,
+    resetPassword,
+    updatePassword,
     signOut,
   };
 };
