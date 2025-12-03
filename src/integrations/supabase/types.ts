@@ -79,41 +79,72 @@ export type Database = {
       agents: {
         Row: {
           assigned_to: string | null
+          avatar_url: string | null
+          branding_url: string | null
+          client_id: string | null
           config: Json | null
           created_at: string
+          description: string | null
           id: string
           is_external: boolean | null
           name: string
           organization_id: string
           platform: string
+          platform_agent_id: string | null
+          platform_api_key: string | null
+          theme_config: Json | null
           updated_at: string
+          widget_layout: string | null
         }
         Insert: {
           assigned_to?: string | null
+          avatar_url?: string | null
+          branding_url?: string | null
+          client_id?: string | null
           config?: Json | null
           created_at?: string
+          description?: string | null
           id?: string
           is_external?: boolean | null
           name: string
           organization_id: string
           platform: string
+          platform_agent_id?: string | null
+          platform_api_key?: string | null
+          theme_config?: Json | null
           updated_at?: string
+          widget_layout?: string | null
         }
         Update: {
           assigned_to?: string | null
+          avatar_url?: string | null
+          branding_url?: string | null
+          client_id?: string | null
           config?: Json | null
           created_at?: string
+          description?: string | null
           id?: string
           is_external?: boolean | null
           name?: string
           organization_id?: string
           platform?: string
+          platform_agent_id?: string | null
+          platform_api_key?: string | null
+          theme_config?: Json | null
           updated_at?: string
+          widget_layout?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "agents_assigned_to_fkey"
             columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agents_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
@@ -181,6 +212,8 @@ export type Database = {
           plan_tier: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
+          subscription_ends_at: string | null
+          subscription_status: string | null
           updated_at: string
         }
         Insert: {
@@ -192,6 +225,8 @@ export type Database = {
           plan_tier?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          subscription_ends_at?: string | null
+          subscription_status?: string | null
           updated_at?: string
         }
         Update: {
@@ -203,6 +238,8 @@ export type Database = {
           plan_tier?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          subscription_ends_at?: string | null
+          subscription_status?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -215,45 +252,95 @@ export type Database = {
           },
         ]
       }
+      client_members: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          email: string
+          id: string
+          name: string | null
+          role: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          email: string
+          id?: string
+          name?: string | null
+          role?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          email?: string
+          id?: string
+          name?: string | null
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_members_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
+          access_controls: Json | null
           assigned_agent_id: string | null
           assigned_agents: number | null
           created_at: string
           created_by: string | null
+          custom_css: string | null
           email: string | null
           id: string
+          language: string | null
+          login_id: string | null
           name: string
           organization_id: string
           status: string | null
+          theme: string | null
           updated_at: string
           user_id: string | null
           username: string | null
         }
         Insert: {
+          access_controls?: Json | null
           assigned_agent_id?: string | null
           assigned_agents?: number | null
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
           email?: string | null
           id?: string
+          language?: string | null
+          login_id?: string | null
           name: string
           organization_id: string
           status?: string | null
+          theme?: string | null
           updated_at?: string
           user_id?: string | null
           username?: string | null
         }
         Update: {
+          access_controls?: Json | null
           assigned_agent_id?: string | null
           assigned_agents?: number | null
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
           email?: string | null
           id?: string
+          language?: string | null
+          login_id?: string | null
           name?: string
           organization_id?: string
           status?: string | null
+          theme?: string | null
           updated_at?: string
           user_id?: string | null
           username?: string | null
@@ -277,13 +364,17 @@ export type Database = {
       }
       conversations: {
         Row: {
+          agent_id: string | null
           agent_messages: Json | null
           audio_url: string | null
+          client_id: string | null
           created_at: string
+          default_label: string | null
           duration: number | null
           external_id: string | null
           id: string
           keywords: string[] | null
+          label_variable: string | null
           metadata: Json | null
           organization_id: string | null
           platform: string | null
@@ -296,13 +387,17 @@ export type Database = {
           user_messages: Json | null
         }
         Insert: {
+          agent_id?: string | null
           agent_messages?: Json | null
           audio_url?: string | null
+          client_id?: string | null
           created_at?: string
+          default_label?: string | null
           duration?: number | null
           external_id?: string | null
           id?: string
           keywords?: string[] | null
+          label_variable?: string | null
           metadata?: Json | null
           organization_id?: string | null
           platform?: string | null
@@ -315,13 +410,17 @@ export type Database = {
           user_messages?: Json | null
         }
         Update: {
+          agent_id?: string | null
           agent_messages?: Json | null
           audio_url?: string | null
+          client_id?: string | null
           created_at?: string
+          default_label?: string | null
           duration?: number | null
           external_id?: string | null
           id?: string
           keywords?: string[] | null
+          label_variable?: string | null
           metadata?: Json | null
           organization_id?: string | null
           platform?: string | null
@@ -335,7 +434,62 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "conversations_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "conversations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_templates: {
+        Row: {
+          body: string | null
+          created_at: string | null
+          greeting: string | null
+          id: string
+          organization_id: string
+          subject: string | null
+          template_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string | null
+          greeting?: string | null
+          id?: string
+          organization_id: string
+          subject?: string | null
+          template_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          body?: string | null
+          created_at?: string | null
+          greeting?: string | null
+          id?: string
+          organization_id?: string
+          subject?: string | null
+          template_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_templates_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -581,37 +735,82 @@ export type Database = {
       }
       organizations: {
         Row: {
+          api_key: string | null
+          backend_domain: string | null
+          client_limit: number | null
           created_at: string
           domain: string | null
+          email_domain: string | null
+          email_logo_url: string | null
+          email_sender: string | null
+          email_sender_name: string | null
+          favicon_url: string | null
+          gdpr_enabled: boolean | null
+          hipaa_enabled: boolean | null
           id: string
           is_active: boolean | null
+          loading_icon: string | null
+          loading_icon_size: string | null
+          logo_dashboard_url: string | null
+          logo_login_url: string | null
           logo_url: string | null
           name: string
           primary_color: string | null
           slug: string
           updated_at: string
+          website_title: string | null
         }
         Insert: {
+          api_key?: string | null
+          backend_domain?: string | null
+          client_limit?: number | null
           created_at?: string
           domain?: string | null
+          email_domain?: string | null
+          email_logo_url?: string | null
+          email_sender?: string | null
+          email_sender_name?: string | null
+          favicon_url?: string | null
+          gdpr_enabled?: boolean | null
+          hipaa_enabled?: boolean | null
           id?: string
           is_active?: boolean | null
+          loading_icon?: string | null
+          loading_icon_size?: string | null
+          logo_dashboard_url?: string | null
+          logo_login_url?: string | null
           logo_url?: string | null
           name: string
           primary_color?: string | null
           slug: string
           updated_at?: string
+          website_title?: string | null
         }
         Update: {
+          api_key?: string | null
+          backend_domain?: string | null
+          client_limit?: number | null
           created_at?: string
           domain?: string | null
+          email_domain?: string | null
+          email_logo_url?: string | null
+          email_sender?: string | null
+          email_sender_name?: string | null
+          favicon_url?: string | null
+          gdpr_enabled?: boolean | null
+          hipaa_enabled?: boolean | null
           id?: string
           is_active?: boolean | null
+          loading_icon?: string | null
+          loading_icon_size?: string | null
+          logo_dashboard_url?: string | null
+          logo_login_url?: string | null
           logo_url?: string | null
           name?: string
           primary_color?: string | null
           slug?: string
           updated_at?: string
+          website_title?: string | null
         }
         Relationships: []
       }
@@ -622,6 +821,7 @@ export type Database = {
           email: string
           full_name: string | null
           id: string
+          locale: string | null
           updated_at: string
         }
         Insert: {
@@ -630,6 +830,7 @@ export type Database = {
           email: string
           full_name?: string | null
           id: string
+          locale?: string | null
           updated_at?: string
         }
         Update: {
@@ -638,6 +839,7 @@ export type Database = {
           email?: string
           full_name?: string | null
           id?: string
+          locale?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -715,11 +917,50 @@ export type Database = {
           },
         ]
       }
+      workflows: {
+        Row: {
+          app_name: string
+          config: Json | null
+          id: string
+          installed_at: string | null
+          is_active: boolean | null
+          organization_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          app_name: string
+          config?: Json | null
+          id?: string
+          installed_at?: string | null
+          is_active?: boolean | null
+          organization_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          app_name?: string
+          config?: Json | null
+          id?: string
+          installed_at?: string | null
+          is_active?: boolean | null
+          organization_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflows_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      generate_api_key: { Args: never; Returns: string }
       generate_unique_username: { Args: { base_name: string }; Returns: string }
       get_user_role: {
         Args: { _org_id: string; _user_id: string }
