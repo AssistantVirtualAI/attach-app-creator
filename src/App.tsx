@@ -7,10 +7,12 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { OrganizationProvider } from "@/context/OrganizationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { ClientProvider } from "@/context/ClientContext";
 
 import Index from "./pages/Index";
 import AuthPage from "./pages/Auth";
 import AgencyHome from "./pages/AgencyHome";
+import Dashboard from "./pages/Dashboard";
 import VoiceAnalytics from "./pages/VoiceAnalytics";
 import Conversations from "./pages/Conversations";
 import ConversationDetail from "./pages/ConversationDetail";
@@ -23,6 +25,12 @@ import StripeBilling from "./pages/StripeBilling";
 import SaaSConfigurator from "./pages/SaaSConfigurator";
 import EmailTemplates from "./pages/EmailTemplates";
 import Agents from "./pages/Agents";
+import Team from "./pages/Team";
+import ApiKeys from "./pages/ApiKeys";
+import ClientLogin from "./pages/ClientLogin";
+import ClientPortal from "./pages/ClientPortal";
+import ClientConversations from "./pages/ClientConversations";
+import ClientAnalytics from "./pages/ClientAnalytics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -60,123 +68,153 @@ const App = () => (
           <OrganizationProvider>
             <Suspense fallback={<div>Loading...</div>}>
               <Routes>
-            <Route path="/auth" element={<AuthPage />} />
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <AgencyHome />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/analytics"
-              element={
-                <ProtectedRoute>
-                  <VoiceAnalytics />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/conversations"
-              element={
-                <ProtectedRoute>
-                  <Conversations />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/conversations/:id"
-              element={
-                <ProtectedRoute>
-                  <ConversationDetail />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/knowledge-base"
-              element={
-                <ProtectedRoute>
-                  <KnowledgeBase />
-                </ProtectedRoute>
-              }
-            />
-            {/* Old agent-config route removed - now using /agents */}
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/clients"
-              element={
-                <ProtectedRoute>
-                  <Clients />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/integrations"
-              element={
-                <ProtectedRoute>
-                  <Integrations />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/webhook-logs"
-              element={
-                <ProtectedRoute>
-                  <WebhookLogs />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/stripe-billing"
-              element={
-                <ProtectedRoute>
-                  <StripeBilling />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/saas-config"
-              element={
-                <ProtectedRoute>
-                  <SaaSConfigurator />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/email-templates"
-              element={
-                <ProtectedRoute>
-                  <EmailTemplates />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/agents"
-              element={
-                <ProtectedRoute>
-                  <Agents />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
+                <Route path="/auth" element={<AuthPage />} />
+                <Route
+                  path="/"
+                  element={
+                    <ProtectedRoute>
+                      <AgencyHome />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/analytics"
+                  element={
+                    <ProtectedRoute>
+                      <VoiceAnalytics />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/conversations"
+                  element={
+                    <ProtectedRoute>
+                      <Conversations />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/conversations/:id"
+                  element={
+                    <ProtectedRoute>
+                      <ConversationDetail />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/knowledge-base"
+                  element={
+                    <ProtectedRoute>
+                      <KnowledgeBase />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/settings"
+                  element={
+                    <ProtectedRoute>
+                      <Settings />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/clients"
+                  element={
+                    <ProtectedRoute>
+                      <Clients />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/integrations"
+                  element={
+                    <ProtectedRoute>
+                      <Integrations />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/webhook-logs"
+                  element={
+                    <ProtectedRoute>
+                      <WebhookLogs />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/stripe-billing"
+                  element={
+                    <ProtectedRoute>
+                      <StripeBilling />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/saas-config"
+                  element={
+                    <ProtectedRoute>
+                      <SaaSConfigurator />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/email-templates"
+                  element={
+                    <ProtectedRoute>
+                      <EmailTemplates />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/agents"
+                  element={
+                    <ProtectedRoute>
+                      <Agents />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/team"
+                  element={
+                    <ProtectedRoute>
+                      <Team />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/api-keys"
+                  element={
+                    <ProtectedRoute>
+                      <ApiKeys />
+                    </ProtectedRoute>
+                  }
+                />
+                
+                {/* Client Portal Routes - Separate authentication */}
+                <Route
+                  path="/client/login"
+                  element={
+                    <ClientProvider>
+                      <ClientLogin />
+                    </ClientProvider>
+                  }
+                />
+                <Route path="/client/:clientId" element={<ClientPortal />}>
+                  <Route path="conversations" element={<ClientConversations />} />
+                  <Route path="analytics" element={<ClientAnalytics />} />
+                </Route>
+
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </OrganizationProvider>
         </BrowserRouter>
       </TooltipProvider>
