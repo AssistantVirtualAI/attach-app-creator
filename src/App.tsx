@@ -34,6 +34,8 @@ import ClientLogin from "./pages/ClientLogin";
 import ClientPortal from "./pages/ClientPortal";
 import ClientConversations from "./pages/ClientConversations";
 import ClientAnalytics from "./pages/ClientAnalytics";
+import WidgetPrototype from "./pages/WidgetPrototype";
+import WidgetIframe from "./pages/WidgetIframe";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -238,6 +240,10 @@ const App = () => (
                   <Route path="conversations" element={<ClientConversations />} />
                   <Route path="analytics" element={<ClientAnalytics />} />
                 </Route>
+
+                {/* Public Widget Routes - No authentication */}
+                <Route path="/prototype/:agentId" element={<WidgetPrototype />} />
+                <Route path="/iframe/:agentId" element={<WidgetIframe />} />
 
                 <Route path="*" element={<NotFound />} />
               </Routes>
