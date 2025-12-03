@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Plus, Search, Key, Trash2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, Key, Trash2, Users, Edit, MoreHorizontal } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,16 +28,40 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 import { PlatformBadge } from '@/components/agents/PlatformBadge';
+import { ClientAvatar } from '@/components/clients/ClientAvatar';
+import { ClientFilters, StatusFilter, SortField, SortOrder } from '@/components/clients/ClientFilters';
+import { ClientMembersModal } from '@/components/clients/ClientMembersModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 export default function Clients() {
   const { selectedOrgId } = useOrganization();
-  const { toast } = useToast();
+  const { toast: toastHook } = useToast();
+  const queryClient = useQueryClient();
+  
+  // Filters state
   const [search, setSearch] = useState('');
-  const [open, setOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  
+  // Modal states
+  const [createOpen, setCreateOpen] = useState(false);
+  const [membersModalOpen, setMembersModalOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
+  
+  // New client form
   const [newClient, setNewClient] = useState({
     name: '',
     email: '',
@@ -46,7 +70,7 @@ export default function Clients() {
     assignedAgentId: '',
   });
 
-  const { data: clients, isLoading, refetch } = useQuery({
+  const { data: clients, isLoading } = useQuery({
     queryKey: ['clients', selectedOrgId],
     queryFn: async () => {
       if (!selectedOrgId) return [];
@@ -57,8 +81,7 @@ export default function Clients() {
           *,
           assigned_agent:agents(id, name, platform)
         `)
-        .eq('organization_id', selectedOrgId)
-        .order('created_at', { ascending: false });
+        .eq('organization_id', selectedOrgId);
 
       if (error) throw error;
       return data || [];
@@ -83,11 +106,86 @@ export default function Clients() {
     enabled: !!selectedOrgId,
   });
 
+  // Filter and sort clients
+  const filteredClients = useMemo(() => {
+    if (!clients) return [];
+
+    let result = [...clients];
+
+    // Apply search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      result = result.filter(
+        (client) =>
+          client.name.toLowerCase().includes(searchLower) ||
+          client.email?.toLowerCase().includes(searchLower) ||
+          client.username?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      result = result.filter((client) => client.status === statusFilter);
+    }
+
+    // Apply sorting
+    result.sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'created_at':
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
+        case 'status':
+          comparison = (a.status || '').localeCompare(b.status || '');
+          break;
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return result;
+  }, [clients, search, statusFilter, sortField, sortOrder]);
+
+  const deleteClientMutation = useMutation({
+    mutationFn: async (clientId: string) => {
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      toast.success('Client supprimé');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur lors de la suppression');
+    },
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: async ({ clientId, newStatus }: { clientId: string; newStatus: string }) => {
+      const { error } = await supabase
+        .from('clients')
+        .update({ status: newStatus })
+        .eq('id', clientId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      toast.success('Statut mis à jour');
+    },
+  });
+
   const handleCreate = async () => {
     const { name, email, username, password, assignedAgentId } = newClient;
 
     if (!name || !email || !username || !password || !assignedAgentId) {
-      toast({
+      toastHook({
         title: 'Erreur',
         description: 'Tous les champs sont requis',
         variant: 'destructive',
@@ -96,7 +194,7 @@ export default function Clients() {
     }
 
     if (password.length < 8) {
-      toast({
+      toastHook({
         title: 'Erreur',
         description: 'Le mot de passe doit contenir au moins 8 caractères',
         variant: 'destructive',
@@ -108,33 +206,7 @@ export default function Clients() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Utilisateur non authentifié');
 
-      // 1. Create Supabase Auth user
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: {
-          full_name: name,
-          username: username,
-          client_type: 'agent',
-        },
-      });
-
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Utilisateur non créé');
-
-      // 2. Create profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          email,
-          full_name: name,
-        });
-
-      if (profileError) throw profileError;
-
-      // 3. Create client entry
+      // Create client entry (simplified - without auth.admin which requires service role)
       const { error: clientError } = await supabase
         .from('clients')
         .insert({
@@ -142,7 +214,7 @@ export default function Clients() {
           name,
           email,
           username,
-          user_id: authData.user.id,
+          login_id: username,
           assigned_agent_id: assignedAgentId,
           status: 'active',
           created_by: user.id,
@@ -150,39 +222,17 @@ export default function Clients() {
 
       if (clientError) throw clientError;
 
-      // 4. Add as organization member
-      const { error: memberError } = await supabase
-        .from('organization_members')
-        .insert({
-          user_id: authData.user.id,
-          organization_id: selectedOrgId,
-          accepted_at: new Date().toISOString(),
-        });
-
-      if (memberError) throw memberError;
-
-      // 5. Assign agent role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: authData.user.id,
-          organization_id: selectedOrgId,
-          role: 'agent',
-        });
-
-      if (roleError) throw roleError;
-
-      toast({
+      toastHook({
         title: 'Succès',
-        description: `Client créé ! Identifiants envoyés à ${email}`,
+        description: `Client ${name} créé avec succès`,
       });
 
-      setOpen(false);
+      setCreateOpen(false);
       setNewClient({ name: '', email: '', username: '', password: '', assignedAgentId: '' });
-      refetch();
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
     } catch (error: any) {
       console.error('Erreur création client:', error);
-      toast({
+      toastHook({
         title: 'Erreur',
         description: error.message || 'Erreur lors de la création du client',
         variant: 'destructive',
@@ -190,9 +240,15 @@ export default function Clients() {
     }
   };
 
-  const filteredClients = clients?.filter((client) =>
-    client.name.toLowerCase().includes(search.toLowerCase())
-  ) || [];
+  const handleOpenMembers = (client: { id: string; name: string }) => {
+    setSelectedClient(client);
+    setMembersModalOpen(true);
+  };
+
+  const handleSortChange = (field: SortField, order: SortOrder) => {
+    setSortField(field);
+    setSortOrder(order);
+  };
 
   return (
     <AppLayout>
@@ -205,10 +261,10 @@ export default function Clients() {
             </p>
           </div>
 
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
                 Nouvelle clientèle
               </Button>
             </DialogTrigger>
@@ -303,93 +359,166 @@ export default function Clients() {
           </Dialog>
         </div>
 
-        <div className="glass-card p-6">
-          <div className="mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher un client..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
+        <div className="glass-card p-6 space-y-6">
+          {/* Filters */}
+          <ClientFilters
+            search={search}
+            onSearchChange={setSearch}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            sortField={sortField}
+            sortOrder={sortOrder}
+            onSortChange={handleSortChange}
+            totalCount={clients?.length || 0}
+            filteredCount={filteredClients.length}
+          />
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nom</TableHead>
-                <TableHead>Username</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Agent assigné</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Date de création</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
+          {/* Table */}
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    Chargement...
-                  </TableCell>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Login ID</TableHead>
+                  <TableHead>Agent assigné</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Date de création</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : filteredClients.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    Aucun client trouvé
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredClients.map((client) => (
-                  <TableRow key={client.id}>
-                    <TableCell className="font-medium">{client.name}</TableCell>
-                    <TableCell>
-                      {client.username && (
-                        <code className="text-xs bg-muted px-2 py-1 rounded">
-                          {client.username}
-                        </code>
-                      )}
-                    </TableCell>
-                    <TableCell>{client.email}</TableCell>
-                    <TableCell>
-                      {client.assigned_agent && (
-                        <div className="flex items-center gap-2">
-                          <PlatformBadge platform={client.assigned_agent.platform} />
-                          <span className="text-sm">{client.assigned_agent.name}</span>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          client.status === 'active'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {client.status}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {new Date(client.created_at).toLocaleDateString('fr-FR')}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" title="Réinitialiser mot de passe">
-                        <Key className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" title="Supprimer">
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-12">
+                      <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                        Chargement...
+                      </div>
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : filteredClients.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-12">
+                      <div className="text-muted-foreground">
+                        {clients?.length === 0
+                          ? 'Aucun client. Créez votre premier client !'
+                          : 'Aucun client ne correspond à vos critères'}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredClients.map((client) => (
+                    <TableRow key={client.id} className="group">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <ClientAvatar name={client.name} />
+                          <div>
+                            <div className="font-medium">{client.name}</div>
+                            <div className="text-sm text-muted-foreground">{client.email}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {client.login_id || client.username ? (
+                          <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                            {client.login_id || client.username}
+                          </code>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {client.assigned_agent ? (
+                          <div className="flex items-center gap-2">
+                            <PlatformBadge platform={client.assigned_agent.platform} />
+                            <span className="text-sm">{client.assigned_agent.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">Non assigné</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={client.status === 'active' ? 'default' : 'secondary'}
+                          className={
+                            client.status === 'active'
+                              ? 'bg-green-500/10 text-green-600 hover:bg-green-500/20 border-green-500/30'
+                              : 'bg-gray-500/10 text-gray-600 hover:bg-gray-500/20'
+                          }
+                        >
+                          {client.status === 'active' ? 'Actif' : 'Inactif'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(client.created_at).toLocaleDateString('fr-FR', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleOpenMembers(client)}>
+                              <Users className="mr-2 h-4 w-4" />
+                              Gérer les membres
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Modifier
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Key className="mr-2 h-4 w-4" />
+                              Réinitialiser mot de passe
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                toggleStatusMutation.mutate({
+                                  clientId: client.id,
+                                  newStatus: client.status === 'active' ? 'inactive' : 'active',
+                                })
+                              }
+                            >
+                              {client.status === 'active' ? 'Désactiver' : 'Activer'}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => deleteClientMutation.mutate(client.id)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Supprimer
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </div>
+
+      {/* Client Members Modal */}
+      {selectedClient && (
+        <ClientMembersModal
+          open={membersModalOpen}
+          onOpenChange={setMembersModalOpen}
+          clientId={selectedClient.id}
+          clientName={selectedClient.name}
+        />
+      )}
     </AppLayout>
   );
 }
