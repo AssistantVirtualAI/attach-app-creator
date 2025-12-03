@@ -21,6 +21,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Base navigation for all users
   const baseNavigation = [
     { name: 'Maison', href: '/', icon: Home },
+    { name: 'Dashboard', href: '/dashboard', icon: TrendingUp },
   ];
 
   // Admin-only navigation
@@ -29,8 +30,8 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     { name: 'Agents', href: '/agents', icon: Bot },
     { name: 'Intégrations', href: '/integrations', icon: Sliders },
     { name: 'Journaux Webhook', href: '/webhook-logs', icon: Webhook },
-    { name: 'Facturation par Stripe', href: '/stripe-billing', icon: CreditCard },
-    { name: 'Configurateur SaaS', href: '/saas-config', icon: Settings },
+    { name: 'Facturation Stripe', href: '/stripe-billing', icon: CreditCard },
+    { name: 'Config SaaS', href: '/saas-config', icon: Settings },
   ];
 
   // Settings available for all

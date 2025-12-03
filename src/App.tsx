@@ -10,11 +10,11 @@ import { ThemeProvider } from "@/context/ThemeContext";
 
 import Index from "./pages/Index";
 import AuthPage from "./pages/Auth";
+import AgencyHome from "./pages/AgencyHome";
 import VoiceAnalytics from "./pages/VoiceAnalytics";
 import Conversations from "./pages/Conversations";
 import ConversationDetail from "./pages/ConversationDetail";
 import KnowledgeBase from "./pages/KnowledgeBase";
-// AgentConfig removed - replaced by Agents page
 import Settings from "./pages/Settings";
 import Clients from "./pages/Clients";
 import Integrations from "./pages/Integrations";
@@ -62,6 +62,14 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route
               path="/"
+              element={
+                <ProtectedRoute>
+                  <AgencyHome />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
               element={
                 <ProtectedRoute>
                   <Index />
