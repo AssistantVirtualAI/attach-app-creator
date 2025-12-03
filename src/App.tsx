@@ -25,6 +25,7 @@ import StripeBilling from "./pages/StripeBilling";
 import SaaSConfigurator from "./pages/SaaSConfigurator";
 import EmailTemplates from "./pages/EmailTemplates";
 import Agents from "./pages/Agents";
+import AgentSettings from "./pages/AgentSettings";
 import Team from "./pages/Team";
 import ApiKeys from "./pages/ApiKeys";
 import ClientDetail from "./pages/ClientDetail";
@@ -187,6 +188,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <Agents />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/agent-settings/:agentId"
+                  element={
+                    <ProtectedRoute>
+                      <AgentSettings />
                     </ProtectedRoute>
                   }
                 />
