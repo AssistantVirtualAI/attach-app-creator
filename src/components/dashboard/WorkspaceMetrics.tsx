@@ -1,4 +1,3 @@
-import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useWorkspaceMetrics } from '@/hooks/useWorkspaceMetrics';
 import { Users, Bot, MessageSquare, Clock, CheckCircle, TrendingUp } from 'lucide-react';
@@ -8,7 +7,6 @@ interface WorkspaceMetricsProps {
 }
 
 export const WorkspaceMetrics = ({ dateRange }: WorkspaceMetricsProps) => {
-  const { t } = useTranslation();
   const { data: metrics, isLoading } = useWorkspaceMetrics(dateRange || undefined);
 
   if (isLoading) {
@@ -25,42 +23,42 @@ export const WorkspaceMetrics = ({ dateRange }: WorkspaceMetricsProps) => {
 
   const metricsData = [
     {
-      title: t('dashboard.activeClients'),
+      title: "Clients actifs",
       value: metrics?.activeClients || 0,
       icon: Users,
       color: 'text-blue-500',
       bg: 'bg-blue-500/10',
     },
     {
-      title: t('dashboard.totalAgents'),
+      title: "Agents",
       value: metrics?.activeAgents || 0,
       icon: Bot,
       color: 'text-purple-500',
       bg: 'bg-purple-500/10',
     },
     {
-      title: t('dashboard.totalConversations'),
+      title: "Conversations",
       value: metrics?.totalConversations || 0,
       icon: MessageSquare,
       color: 'text-green-500',
       bg: 'bg-green-500/10',
     },
     {
-      title: t('dashboard.totalMinutes'),
+      title: "Minutes totales",
       value: metrics?.totalMinutes || 0,
       icon: Clock,
       color: 'text-orange-500',
       bg: 'bg-orange-500/10',
     },
     {
-      title: t('dashboard.resolutionRate'),
+      title: "Taux de résolution",
       value: `${metrics?.resolutionRate || 0}%`,
       icon: CheckCircle,
       color: 'text-emerald-500',
       bg: 'bg-emerald-500/10',
     },
     {
-      title: t('dashboard.avgInteractions'),
+      title: "Interactions moy.",
       value: metrics?.avgInteractions || 0,
       icon: TrendingUp,
       color: 'text-cyan-500',
@@ -71,7 +69,7 @@ export const WorkspaceMetrics = ({ dateRange }: WorkspaceMetricsProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">{t('analytics.workspaceMetrics')}</CardTitle>
+        <CardTitle className="text-lg">Métriques Workspace</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

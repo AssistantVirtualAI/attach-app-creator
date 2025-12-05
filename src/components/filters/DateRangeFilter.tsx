@@ -5,8 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarIcon } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
-import { fr, en, es, de } from 'date-fns/locale';
-import { useTranslation } from 'react-i18next';
+import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
 export type DateRangePreset = 'today' | '7days' | '30days' | 'thisMonth' | 'lastMonth' | 'custom';
@@ -17,20 +16,9 @@ interface DateRangeFilterProps {
   className?: string;
 }
 
-const getLocale = (lang: string) => {
-  switch (lang) {
-    case 'en': return en;
-    case 'es': return es;
-    case 'de': return de;
-    default: return fr;
-  }
-};
-
 export const DateRangeFilter = ({ value, onChange, className }: DateRangeFilterProps) => {
-  const { t, i18n } = useTranslation();
   const [preset, setPreset] = useState<DateRangePreset>('7days');
   const [isCustomOpen, setIsCustomOpen] = useState(false);
-  const locale = getLocale(i18n.language);
 
   const handlePresetChange = (newPreset: DateRangePreset) => {
     setPreset(newPreset);
@@ -64,15 +52,15 @@ export const DateRangeFilter = ({ value, onChange, className }: DateRangeFilterP
       <Select value={preset} onValueChange={(v) => handlePresetChange(v as DateRangePreset)}>
         <SelectTrigger className="w-[180px]">
           <CalendarIcon className="h-4 w-4 mr-2" />
-          <SelectValue placeholder={t('filters.dateRange')} />
+          <SelectValue placeholder="Période" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="today">{t('filters.today')}</SelectItem>
-          <SelectItem value="7days">{t('filters.last7Days')}</SelectItem>
-          <SelectItem value="30days">{t('filters.last30Days')}</SelectItem>
-          <SelectItem value="thisMonth">{t('filters.thisMonth')}</SelectItem>
-          <SelectItem value="lastMonth">{t('filters.lastMonth')}</SelectItem>
-          <SelectItem value="custom">{t('filters.custom')}</SelectItem>
+          <SelectItem value="today">Aujourd'hui</SelectItem>
+          <SelectItem value="7days">7 derniers jours</SelectItem>
+          <SelectItem value="30days">30 derniers jours</SelectItem>
+          <SelectItem value="thisMonth">Ce mois</SelectItem>
+          <SelectItem value="lastMonth">Mois dernier</SelectItem>
+          <SelectItem value="custom">Personnalisé</SelectItem>
         </SelectContent>
       </Select>
 
@@ -82,17 +70,17 @@ export const DateRangeFilter = ({ value, onChange, className }: DateRangeFilterP
             <Button variant="outline" size="sm">
               {value ? (
                 <>
-                  {format(value.start, 'dd/MM/yyyy', { locale })} - {format(value.end, 'dd/MM/yyyy', { locale })}
+                  {format(value.start, 'dd/MM/yyyy', { locale: fr })} - {format(value.end, 'dd/MM/yyyy', { locale: fr })}
                 </>
               ) : (
-                t('filters.custom')
+                "Personnalisé"
               )}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
             <div className="flex gap-2 p-4">
               <div>
-                <p className="text-sm font-medium mb-2">{t('filters.from')}</p>
+                <p className="text-sm font-medium mb-2">Du</p>
                 <Calendar
                   mode="single"
                   selected={value?.start}
@@ -104,11 +92,11 @@ export const DateRangeFilter = ({ value, onChange, className }: DateRangeFilterP
                       });
                     }
                   }}
-                  locale={locale}
+                  locale={fr}
                 />
               </div>
               <div>
-                <p className="text-sm font-medium mb-2">{t('filters.to')}</p>
+                <p className="text-sm font-medium mb-2">Au</p>
                 <Calendar
                   mode="single"
                   selected={value?.end}
@@ -120,13 +108,13 @@ export const DateRangeFilter = ({ value, onChange, className }: DateRangeFilterP
                       });
                     }
                   }}
-                  locale={locale}
+                  locale={fr}
                 />
               </div>
             </div>
             <div className="border-t p-2 flex justify-end">
               <Button size="sm" onClick={() => setIsCustomOpen(false)}>
-                {t('filters.apply')}
+                Appliquer
               </Button>
             </div>
           </PopoverContent>

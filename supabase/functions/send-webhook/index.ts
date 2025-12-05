@@ -60,9 +60,9 @@ serve(async (req) => {
 
     // Retry logic with exponential backoff
     const maxRetries = 3;
-    let lastError = null;
-    let responseStatus = null;
-    let responseBody = null;
+    let lastError: string | null = null;
+    let responseStatus: number | null = null;
+    let responseBody: string | null = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -101,9 +101,9 @@ serve(async (req) => {
         }
 
         lastError = `HTTP ${responseStatus}: ${responseBody}`;
-      } catch (error) {
-        lastError = error.message;
-        console.error(`Webhook attempt ${attempt} failed:`, error);
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+        console.error(`Webhook attempt ${attempt} failed:`, lastError);
       }
 
       // Exponential backoff
@@ -127,9 +127,10 @@ serve(async (req) => {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-  } catch (error) {
-    console.error('Send webhook error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error('Send webhook error:', errorMessage);
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
