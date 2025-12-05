@@ -36,6 +36,8 @@ import ClientConversations from "./pages/ClientConversations";
 import ClientAnalytics from "./pages/ClientAnalytics";
 import WidgetPrototype from "./pages/WidgetPrototype";
 import WidgetIframe from "./pages/WidgetIframe";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import BAAgreement from "./pages/BAAgreement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -226,6 +228,15 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
+                <Route
+                  path="/settings/baa"
+                  element={
+                    <ProtectedRoute>
+                      <BAAgreement />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
                 
                 {/* Client Portal Routes - Separate authentication */}
                 <Route

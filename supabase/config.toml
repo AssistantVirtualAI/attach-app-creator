@@ -65,3 +65,12 @@ verify_jwt = true
 
 [functions.send-webhook]
 verify_jwt = true
+
+[functions.export-user-data]
+verify_jwt = true
+
+[functions.delete-user-data]
+verify_jwt = true
+
+[functions.log-audit-event]
+verify_jwt = true
