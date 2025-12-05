@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,13 +10,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useWebhookEndpoints, WEBHOOK_EVENT_TYPES, WebhookEndpoint } from '@/hooks/useWebhookEndpoints';
+import { useWebhookEndpoints, WEBHOOK_EVENT_TYPES } from '@/hooks/useWebhookEndpoints';
 import { Plus, Trash2, Copy, RefreshCw, Eye, EyeOff, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
+const EVENT_LABELS: Record<string, string> = {
+  'conversation.created': 'Conversation créée',
+  'conversation.completed': 'Conversation terminée',
+  'agent.created': 'Agent créé',
+  'agent.updated': 'Agent mis à jour',
+  'client.created': 'Client créé',
+  'subscription.updated': 'Abonnement mis à jour',
+};
+
 export const WebhookConfigTab = () => {
-  const { t } = useTranslation();
   const { 
     endpoints, 
     deliveryLogs,
@@ -75,31 +82,31 @@ export const WebhookConfigTab = () => {
     <div className="space-y-6">
       <Tabs defaultValue="endpoints">
         <TabsList>
-          <TabsTrigger value="endpoints">{t('webhooks.title')}</TabsTrigger>
-          <TabsTrigger value="logs">{t('webhooks.deliveryLogs')}</TabsTrigger>
+          <TabsTrigger value="endpoints">Webhooks</TabsTrigger>
+          <TabsTrigger value="logs">Logs de livraison</TabsTrigger>
         </TabsList>
 
         <TabsContent value="endpoints" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>{t('webhooks.title')}</CardTitle>
-                <CardDescription>{t('webhooks.subtitle')}</CardDescription>
+                <CardTitle>Webhooks</CardTitle>
+                <CardDescription>Configurez vos webhooks sortants</CardDescription>
               </div>
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
                   <Button>
                     <Plus className="h-4 w-4 mr-2" />
-                    {t('webhooks.addEndpoint')}
+                    Ajouter un endpoint
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-lg">
                   <DialogHeader>
-                    <DialogTitle>{t('webhooks.addEndpoint')}</DialogTitle>
+                    <DialogTitle>Ajouter un endpoint</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label>{t('webhooks.url')}</Label>
+                      <Label>URL</Label>
                       <Input
                         value={newUrl}
                         onChange={(e) => setNewUrl(e.target.value)}
@@ -107,7 +114,7 @@ export const WebhookConfigTab = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>{t('webhooks.events')}</Label>
+                      <Label>Événements</Label>
                       <div className="grid grid-cols-2 gap-2">
                         {WEBHOOK_EVENT_TYPES.map((event) => (
                           <div key={event} className="flex items-center space-x-2">
@@ -117,7 +124,7 @@ export const WebhookConfigTab = () => {
                               onCheckedChange={() => toggleEvent(event)}
                             />
                             <label htmlFor={event} className="text-sm cursor-pointer">
-                              {t(`webhooks.eventTypes.${event}`)}
+                              {EVENT_LABELS[event] || event}
                             </label>
                           </div>
                         ))}
@@ -126,10 +133,10 @@ export const WebhookConfigTab = () => {
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                      {t('common.cancel')}
+                      Annuler
                     </Button>
                     <Button onClick={handleCreate} disabled={createEndpoint.isPending}>
-                      {t('common.create')}
+                      Créer
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -137,9 +144,9 @@ export const WebhookConfigTab = () => {
             </CardHeader>
             <CardContent>
               {isLoading ? (
-                <div className="text-center py-8 text-muted-foreground">{t('common.loading')}</div>
+                <div className="text-center py-8 text-muted-foreground">Chargement...</div>
               ) : endpoints.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">{t('webhooks.noEndpoints')}</div>
+                <div className="text-center py-8 text-muted-foreground">Aucun endpoint configuré</div>
               ) : (
                 <div className="space-y-4">
                   {endpoints.map((endpoint) => (
@@ -158,12 +165,12 @@ export const WebhookConfigTab = () => {
                                 }
                               />
                               <Badge variant={endpoint.is_active ? 'default' : 'secondary'}>
-                                {endpoint.is_active ? t('webhooks.active') : t('webhooks.inactive')}
+                                {endpoint.is_active ? 'Actif' : 'Inactif'}
                               </Badge>
                             </div>
                             
                             <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">{t('webhooks.secret')}:</span>
+                              <span className="text-sm text-muted-foreground">Secret:</span>
                               <code className="text-xs bg-background px-2 py-1 rounded font-mono">
                                 {showSecrets[endpoint.id] ? endpoint.secret : '••••••••••••••••'}
                               </code>
@@ -196,7 +203,7 @@ export const WebhookConfigTab = () => {
                             <div className="flex flex-wrap gap-1">
                               {endpoint.events.map((event) => (
                                 <Badge key={event} variant="outline" className="text-xs">
-                                  {t(`webhooks.eventTypes.${event}`)}
+                                  {EVENT_LABELS[event] || event}
                                 </Badge>
                               ))}
                             </div>
@@ -223,15 +230,15 @@ export const WebhookConfigTab = () => {
         <TabsContent value="logs">
           <Card>
             <CardHeader>
-              <CardTitle>{t('webhooks.deliveryLogs')}</CardTitle>
+              <CardTitle>Logs de livraison</CardTitle>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[500px]">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>{t('webhooks.status')}</TableHead>
-                      <TableHead>{t('webhooks.events')}</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Événement</TableHead>
                       <TableHead>Tentatives</TableHead>
                       <TableHead>Date</TableHead>
                     </TableRow>
@@ -246,7 +253,7 @@ export const WebhookConfigTab = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{log.event_type}</Badge>
+                          <Badge variant="outline">{EVENT_LABELS[log.event_type] || log.event_type}</Badge>
                         </TableCell>
                         <TableCell>{log.attempt_count}/3</TableCell>
                         <TableCell className="text-muted-foreground">
