@@ -17,6 +17,7 @@ export interface EmailTemplate {
 export const TEMPLATE_TYPES = [
   { value: 'welcome', label: 'Bienvenue', description: 'Email envoyé aux nouveaux utilisateurs' },
   { value: 'password_reset', label: 'Réinitialisation mot de passe', description: 'Email de réinitialisation' },
+  { value: '2fa', label: 'Authentification 2FA', description: 'Code OTP pour authentification à deux facteurs' },
   { value: 'invitation', label: 'Invitation', description: 'Invitation à rejoindre l\'organisation' },
   { value: 'notification', label: 'Notification', description: 'Notifications générales' },
   { value: 'report', label: 'Rapport', description: 'Rapports périodiques' },
@@ -28,6 +29,8 @@ export const TEMPLATE_VARIABLES = [
   { variable: '{{company}}', description: 'Nom de l\'entreprise' },
   { variable: '{{link}}', description: 'Lien d\'action' },
   { variable: '{{date}}', description: 'Date actuelle' },
+  { variable: '{{otp_code}}', description: 'Code OTP à 6 chiffres' },
+  { variable: '{{token}}', description: 'Token de validation' },
 ];
 
 export function useEmailTemplates() {

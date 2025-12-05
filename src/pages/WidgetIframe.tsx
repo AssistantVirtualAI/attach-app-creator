@@ -144,10 +144,39 @@ const WidgetIframe = () => {
   const handleEndConversation = useCallback(async () => {
     try {
       await conversation.endSession();
+      
+      // Save transcript to database (only if user is authenticated)
+      if (agent && transcript.length > 0) {
+        const transcriptText = transcript.map(m => `${m.role === 'agent' ? agent.name : 'User'}: ${m.text}`).join('\n');
+        const userMessages = transcript.filter(m => m.role === 'user').map(m => ({ text: m.text }));
+        const agentMessages = transcript.filter(m => m.role === 'agent').map(m => ({ text: m.text }));
+        
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData.user) {
+          const { error: saveError } = await supabase
+            .from('conversations')
+            .insert([{
+              title: `Conversation avec ${agent.name}`,
+              agent_id: agent.id,
+              platform: 'elevenlabs',
+              status: 'completed',
+              transcript: transcriptText,
+              user_messages: userMessages,
+              agent_messages: agentMessages,
+              user_id: userData.user.id,
+            }]);
+          
+          if (saveError) {
+            console.error('Error saving conversation:', saveError);
+          } else {
+            console.log('Conversation saved successfully');
+          }
+        }
+      }
     } catch (err) {
       console.error('Error ending conversation:', err);
     }
-  }, [conversation]);
+  }, [conversation, agent, transcript]);
 
   const handleClose = () => {
     if (isConnected) {

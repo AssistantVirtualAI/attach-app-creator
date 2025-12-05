@@ -138,6 +138,37 @@ const WidgetPrototype = () => {
   const handleEndConversation = useCallback(async () => {
     try {
       await conversation.endSession();
+      
+      // Save transcript to database
+      if (agent && transcript.length > 0) {
+        const transcriptText = transcript.map(m => `${m.role === 'agent' ? agent.name : 'User'}: ${m.text}`).join('\n');
+        const userMessages = transcript.filter(m => m.role === 'user').map(m => ({ text: m.text, timestamp: m.timestamp.toISOString() }));
+        const agentMessages = transcript.filter(m => m.role === 'agent').map(m => ({ text: m.text, timestamp: m.timestamp.toISOString() }));
+        
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData.user) {
+          const { error: saveError } = await supabase
+            .from('conversations')
+            .insert([{
+              title: `Conversation avec ${agent.name}`,
+              agent_id: agent.id,
+              platform: 'elevenlabs',
+              status: 'completed',
+              transcript: transcriptText,
+              user_messages: userMessages,
+              agent_messages: agentMessages,
+              duration: Math.floor((new Date().getTime() - (transcript[0]?.timestamp?.getTime() || Date.now())) / 1000),
+              user_id: userData.user.id,
+            }]);
+          
+          if (saveError) {
+            console.error('Error saving conversation:', saveError);
+          } else {
+            console.log('Conversation saved successfully');
+          }
+        }
+      }
+      
       setTranscript(prev => [...prev, {
         role: 'agent',
         text: '--- Conversation terminée ---',
@@ -146,7 +177,7 @@ const WidgetPrototype = () => {
     } catch (err) {
       console.error('Error ending conversation:', err);
     }
-  }, [conversation]);
+  }, [conversation, agent, transcript]);
 
   const themeConfig = agent?.theme_config || {};
   const primaryColor = themeConfig.primaryColor || '#8B5CF6';

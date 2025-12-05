@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useBillingConfig } from '@/hooks/useBillingConfig';
+import { useBillingConfig, ADDONS } from '@/hooks/useBillingConfig';
 import { useStripeSubscription } from '@/hooks/useStripeSubscription';
 import { PricingCards } from '@/components/billing/PricingCards';
 import { SubscriptionStatus } from '@/components/billing/SubscriptionStatus';
@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 interface Invoice {
   id: string;
@@ -176,6 +177,7 @@ export default function StripeBilling() {
           <TabsList>
             <TabsTrigger value="subscription">Abonnement</TabsTrigger>
             <TabsTrigger value="plans">Plans</TabsTrigger>
+            <TabsTrigger value="addons">Add-ons</TabsTrigger>
             <TabsTrigger value="history">Historique</TabsTrigger>
             <TabsTrigger value="payment-methods">Moyens de paiement</TabsTrigger>
             <TabsTrigger value="tutorial">Tutoriel</TabsTrigger>
@@ -215,6 +217,85 @@ export default function StripeBilling() {
                 isLoading={isActionLoading}
               />
             )}
+          </TabsContent>
+
+          <TabsContent value="addons" className="space-y-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <CreditCard className="w-6 h-6 text-primary" />
+                  <div>
+                    <CardTitle>Add-ons disponibles</CardTitle>
+                    <CardDescription>
+                      Ajoutez des fonctionnalités supplémentaires à votre abonnement
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {!isStripeConnected ? (
+                  <div className="text-center py-8">
+                    <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">
+                      Souscrivez à un plan pour accéder aux add-ons
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {ADDONS.map((addon) => {
+                      const isAvailable = addon.availableFor.includes(billingConfig?.plan_tier || 'free');
+                      return (
+                        <Card key={addon.id} className={cn(
+                          "relative",
+                          !isAvailable && "opacity-60"
+                        )}>
+                          <CardHeader>
+                            <CardTitle className="text-lg">{addon.name}</CardTitle>
+                            <CardDescription>{addon.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-2xl font-bold">${addon.price}</span>
+                                <span className="text-muted-foreground">/mois</span>
+                              </div>
+                              {isAvailable ? (
+                                <Button 
+                                  onClick={async () => {
+                                    if (!selectedOrg?.id) return;
+                                    try {
+                                      const { data, error } = await supabase.functions.invoke('stripe-addon-checkout', {
+                                        body: {
+                                          organizationId: selectedOrg.id,
+                                          addonId: addon.id,
+                                          successUrl: `${window.location.origin}/billing?success=true&addon=${addon.id}`,
+                                          cancelUrl: `${window.location.origin}/billing?canceled=true`,
+                                        },
+                                      });
+                                      if (error) throw error;
+                                      if (data?.url) window.location.href = data.url;
+                                    } catch (err: any) {
+                                      toast.error(err.message || 'Erreur lors de l\'achat');
+                                    }
+                                  }}
+                                  disabled={isActionLoading}
+                                >
+                                  Ajouter
+                                </Button>
+                              ) : (
+                                <Badge variant="secondary">
+                                  {addon.availableFor.join(', ')} uniquement
+                                </Badge>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="history" className="space-y-6">
