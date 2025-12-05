@@ -26,6 +26,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
+import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
 
 const AgencyHome = () => {
   const { selectedOrg } = useOrganization();
@@ -110,6 +111,7 @@ const AgencyHome = () => {
 
   return (
     <AppLayout>
+      <WelcomeModal />
       <div className="container mx-auto px-6 py-8 space-y-8">
         {/* Header */}
         <div className="mb-8">

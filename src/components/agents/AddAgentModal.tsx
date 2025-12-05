@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,10 +34,12 @@ interface AddAgentModalProps {
 }
 
 export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalProps) {
+  const navigate = useNavigate();
   const { selectedOrgId } = useOrganization();
   const [step, setStep] = useState(1);
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [selectedIntegration, setSelectedIntegration] = useState('');
+  const [selectedClientId, setSelectedClientId] = useState('');
   const [agentName, setAgentName] = useState('');
   const [agentId, setAgentId] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -59,10 +62,29 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
     enabled: !!selectedOrgId && !!selectedPlatform && step === 2,
   });
 
+  const { data: clients } = useQuery({
+    queryKey: ['clients', selectedOrgId],
+    queryFn: async () => {
+      if (!selectedOrgId) return [];
+      
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id, name')
+        .eq('organization_id', selectedOrgId)
+        .eq('status', 'active')
+        .order('name');
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedOrgId && step === 3,
+  });
+
   const resetModal = () => {
     setStep(1);
     setSelectedPlatform('');
     setSelectedIntegration('');
+    setSelectedClientId('');
     setAgentName('');
     setAgentId('');
     setIsCreating(false);
@@ -83,24 +105,32 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
     try {
       const finalName = agentName.trim() || `Agent ${selectedPlatform} ${Date.now()}`;
 
-      const { error } = await supabase
+      const { data: newAgent, error } = await supabase
         .from('agents')
         .insert({
           organization_id: selectedOrgId,
           name: finalName,
           platform: selectedPlatform,
           is_external: true,
+          client_id: selectedClientId || null,
           config: {
             integration_id: selectedIntegration,
             agent_id: agentId.trim(),
           },
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
 
       toast.success('Agent créé avec succès !');
       handleClose();
       onSuccess();
+      
+      // Redirect to agent settings page
+      if (newAgent?.id) {
+        navigate(`/agents/${newAgent.id}/settings`);
+      }
     } catch (error: any) {
       toast.error(error.message || 'Erreur lors de la création de l\'agent');
     } finally {
@@ -225,6 +255,23 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
         <p className="text-xs text-muted-foreground">
           Trouvez cet ID dans le dashboard de {PLATFORMS.find(p => p.value === selectedPlatform)?.label}
         </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="clientId">Assigner à un client (optionnel)</Label>
+        <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+          <SelectTrigger id="clientId">
+            <SelectValue placeholder="Aucun client assigné" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Aucun</SelectItem>
+            {clients?.map((client) => (
+              <SelectItem key={client.id} value={client.id}>
+                {client.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="flex gap-2">
