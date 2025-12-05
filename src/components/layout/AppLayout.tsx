@@ -8,6 +8,7 @@ import { useOrganization } from '@/context/OrganizationContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useTheme } from '@/context/ThemeContext';
 import { SidebarFooter } from '@/components/sidebar/SidebarFooter';
+import { CookieConsentBanner } from '@/components/gdpr/CookieConsentBanner';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -15,6 +16,7 @@ interface AppLayoutProps {
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
   const { role, isSuperAdmin, isRole } = usePermissions();
+  const { selectedOrg } = useOrganization();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
 
@@ -124,6 +126,14 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       <main className="ml-64 min-h-screen">
         {children}
       </main>
+
+      {/* Cookie Consent Banner */}
+      {selectedOrg?.gdpr_enabled && (
+        <CookieConsentBanner 
+          organizationId={selectedOrg.id} 
+          gdprEnabled={selectedOrg.gdpr_enabled} 
+        />
+      )}
     </div>
   );
 };

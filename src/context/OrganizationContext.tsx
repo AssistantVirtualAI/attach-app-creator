@@ -13,6 +13,8 @@ interface Organization {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  gdpr_enabled?: boolean;
+  hipaa_enabled?: boolean;
 }
 
 interface OrganizationMember {
