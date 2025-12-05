@@ -35,14 +35,11 @@ interface UserRole {
 }
 
 interface OrganizationContextType {
-  organizations: Organization[];
   selectedOrg: Organization | null;
   selectedOrgId: string | null;
   userRole: UserRole | null;
   isLoading: boolean;
-  selectOrganization: (orgId: string) => void;
-  refreshOrganizations: () => Promise<void>;
-  createOrganization: (data: Partial<Organization>) => Promise<Organization | null>;
+  refreshOrganization: () => Promise<void>;
   isSuperAdmin: boolean;
 }
 
@@ -51,20 +48,18 @@ const OrganizationContext = createContext<OrganizationContextType | undefined>(u
 export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // Load organizations and user role
+  // Load organization and user role
   useEffect(() => {
     if (user) {
-      loadOrganizations();
+      loadOrganization();
       checkSuperAdmin();
     } else {
-      setOrganizations([]);
       setSelectedOrg(null);
       setSelectedOrgId(null);
       setUserRole(null);
@@ -73,17 +68,12 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [user]);
 
-  // Update selected organization when selectedOrgId changes
+  // Load user role when organization changes
   useEffect(() => {
-    if (selectedOrgId && organizations.length > 0) {
-      const org = organizations.find(o => o.id === selectedOrgId);
-      setSelectedOrg(org || null);
+    if (selectedOrgId) {
       loadUserRole(selectedOrgId);
-      
-      // Save to localStorage for persistence
-      localStorage.setItem('selectedOrgId', selectedOrgId);
     }
-  }, [selectedOrgId, organizations]);
+  }, [selectedOrgId]);
 
   const checkSuperAdmin = async () => {
     if (!user) return;
@@ -104,48 +94,44 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  const loadOrganizations = async () => {
+  const loadOrganization = async () => {
     if (!user) return;
 
     try {
       setIsLoading(true);
 
-      // Get organizations where user is a member
+      // Get the user's organization membership
       const { data: memberships, error: membershipError } = await supabase
         .from('organization_members')
         .select('organization_id')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .limit(1);
 
       if (membershipError) throw membershipError;
 
-      const orgIds = memberships?.map(m => m.organization_id) || [];
+      if (memberships && memberships.length > 0) {
+        const orgId = memberships[0].organization_id;
 
-      if (orgIds.length > 0) {
-        const { data: orgs, error: orgsError } = await supabase
+        const { data: org, error: orgError } = await supabase
           .from('organizations')
           .select('*')
-          .in('id', orgIds)
+          .eq('id', orgId)
           .eq('is_active', true)
-          .order('created_at', { ascending: false });
+          .single();
 
-        if (orgsError) throw orgsError;
+        if (orgError) throw orgError;
 
-        setOrganizations(orgs || []);
-
-        // Auto-select first org or restore from localStorage
-        if (orgs && orgs.length > 0) {
-          const savedOrgId = localStorage.getItem('selectedOrgId');
-          const orgToSelect = orgs.find(o => o.id === savedOrgId) || orgs[0];
-          setSelectedOrgId(orgToSelect.id);
-        }
+        setSelectedOrg(org);
+        setSelectedOrgId(org.id);
       } else {
-        setOrganizations([]);
+        setSelectedOrg(null);
+        setSelectedOrgId(null);
       }
     } catch (error: any) {
-      console.error('Error loading organizations:', error);
+      console.error('Error loading organization:', error);
       toast({
         title: 'Erreur',
-        description: 'Impossible de charger les organisations',
+        description: 'Impossible de charger l\'organisation',
         variant: 'destructive',
       });
     } finally {
@@ -172,86 +158,18 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  const selectOrganization = (orgId: string) => {
-    setSelectedOrgId(orgId);
-  };
-
-  const refreshOrganizations = async () => {
-    await loadOrganizations();
-  };
-
-  const createOrganization = async (data: Partial<Organization>): Promise<Organization | null> => {
-    if (!user) return null;
-
-    try {
-      // Generate slug from name
-      const slug = data.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || '';
-
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: data.name,
-          slug,
-          logo_url: data.logo_url,
-          primary_color: data.primary_color || '#8B5CF6',
-          domain: data.domain,
-        })
-        .select()
-        .single();
-
-      if (orgError) throw orgError;
-
-      // Add creator as member
-      const { error: memberError } = await supabase
-        .from('organization_members')
-        .insert({
-          user_id: user.id,
-          organization_id: org.id,
-          accepted_at: new Date().toISOString(),
-        });
-
-      if (memberError) throw memberError;
-
-      // Assign org_admin role to creator
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: user.id,
-          organization_id: org.id,
-          role: 'org_admin',
-        });
-
-      if (roleError) throw roleError;
-
-      toast({
-        title: 'Organisation créée',
-        description: `${org.name} a été créée avec succès`,
-      });
-
-      await refreshOrganizations();
-      return org;
-    } catch (error: any) {
-      console.error('Error creating organization:', error);
-      toast({
-        title: 'Erreur',
-        description: error.message || 'Impossible de créer l\'organisation',
-        variant: 'destructive',
-      });
-      return null;
-    }
+  const refreshOrganization = async () => {
+    await loadOrganization();
   };
 
   return (
     <OrganizationContext.Provider
       value={{
-        organizations,
         selectedOrg,
         selectedOrgId,
         userRole,
         isLoading,
-        selectOrganization,
-        refreshOrganizations,
-        createOrganization,
+        refreshOrganization,
         isSuperAdmin,
       }}
     >

@@ -1,7 +1,6 @@
 import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Activity, Home, TrendingUp, MessageSquare, BookOpen, Settings, Bot, Webhook, CreditCard, Sliders, Moon, Sun, Users, BarChart3, GitBranch } from 'lucide-react';
-import { OrganizationSelector } from '@/components/organization/OrganizationSelector';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useOrganization } from '@/context/OrganizationContext';
@@ -69,31 +68,28 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             </Link>
           </div>
 
-          {/* Organization Selector */}
-          <div className="border-b border-border/50 pb-4">
-            <OrganizationSelector />
+          {/* Role Badge & Theme Toggle */}
+          <div className="px-4 py-3 border-b border-border/50 flex items-center justify-between">
             {role && (
-              <div className="px-4 mt-2 flex items-center justify-between">
-                <Badge variant="outline" className="text-xs">
-                  {isSuperAdmin ? '👑 Super Admin' : 
-                   role === 'org_admin' ? '🔑 Admin' :
-                   role === 'manager' ? '👨‍💼 Manager' :
-                   role === 'agent' ? '👤 Agent' : '👁️ Viewer'}
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={toggleTheme}
-                  className="h-8 w-8"
-                >
-                  {theme === 'dark' ? (
-                    <Sun className="w-4 h-4" />
-                  ) : (
-                    <Moon className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
+              <Badge variant="outline" className="text-xs">
+                {isSuperAdmin ? '👑 Super Admin' : 
+                 role === 'org_admin' ? '🔑 Admin' :
+                 role === 'manager' ? '👨‍💼 Manager' :
+                 role === 'agent' ? '👤 Agent' : '👁️ Viewer'}
+              </Badge>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="h-8 w-8"
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
+            </Button>
           </div>
 
           {/* Navigation */}

@@ -42,7 +42,7 @@ interface AgentTemplate {
 
 export default function SaaSConfigurator() {
   const { toast } = useToast();
-  const { selectedOrg: selectedOrganization, refreshOrganizations } = useOrganization();
+  const { selectedOrg: selectedOrganization, refreshOrganization } = useOrganization();
   const { updateOrganization, isLoading: isUpdating } = useOrganizations();
   const { billingConfig, isLoading: billingLoading } = useBillingConfig();
   
@@ -183,7 +183,7 @@ export default function SaaSConfigurator() {
         organizationId: selectedOrganization.id,
         data: config,
       });
-      await refreshOrganizations();
+      await refreshOrganization();
       toast({
         title: 'Configuration sauvegardée',
         description: 'Les paramètres ont été mis à jour avec succès',

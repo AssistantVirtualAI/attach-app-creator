@@ -24,7 +24,7 @@ interface OrgConfig {
 }
 
 export function AgencyTab() {
-  const { selectedOrg, selectedOrgId, refreshOrganizations } = useOrganization();
+  const { selectedOrg, selectedOrgId, refreshOrganization } = useOrganization();
   const { currentPlan } = useBillingConfig();
   const [isSaving, setIsSaving] = useState(false);
   const [showOpenAIKey, setShowOpenAIKey] = useState(false);
@@ -129,7 +129,7 @@ export function AgencyTab() {
 
       if (error) throw error;
       toast.success('Configuration sauvegardée');
-      refreshOrganizations();
+      refreshOrganization();
     } catch (error: any) {
       toast.error(error.message || 'Erreur lors de la sauvegarde');
     } finally {
