@@ -58,7 +58,8 @@ const WidgetPrototype = () => {
     },
     onError: (error) => {
       console.error('Conversation error:', error);
-      setError('Erreur de connexion: ' + (error.message || 'Inconnue'));
+      const errorMessage = typeof error === 'string' ? error : (error as any)?.message || 'Inconnue';
+      setError('Erreur de connexion: ' + errorMessage);
       setIsConnecting(false);
     },
   });

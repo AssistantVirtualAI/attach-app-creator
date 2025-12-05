@@ -55,7 +55,8 @@ const WidgetIframe = () => {
     },
     onError: (error) => {
       console.error('Conversation error:', error);
-      setError('Erreur: ' + (error.message || 'Inconnue'));
+      const errorMessage = typeof error === 'string' ? error : (error as any)?.message || 'Inconnue';
+      setError('Erreur: ' + errorMessage);
       setIsConnecting(false);
     },
   });
