@@ -45,7 +45,7 @@ interface WhiteLabelConfig {
 }
 
 export function WhiteLabelTab() {
-  const { selectedOrgId, refreshOrganizations } = useOrganization();
+  const { selectedOrgId, refreshOrganization } = useOrganization();
   const { currentPlan } = useBillingConfig();
   const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
@@ -108,7 +108,7 @@ export function WhiteLabelTab() {
 
       if (error) throw error;
       toast.success('Configuration sauvegardée');
-      refreshOrganizations();
+      refreshOrganization();
     } catch (error: any) {
       toast.error(error.message || 'Erreur lors de la sauvegarde');
     } finally {

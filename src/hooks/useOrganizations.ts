@@ -24,7 +24,7 @@ interface UpdateOrganizationParams {
 export const useOrganizations = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { refreshOrganizations, selectedOrgId } = useOrganization();
+  const { refreshOrganization, selectedOrgId } = useOrganization();
   const [isLoading, setIsLoading] = useState(false);
 
   const inviteMember = async ({ email, organizationId, role }: InviteMemberParams) => {
@@ -211,7 +211,7 @@ export const useOrganizations = () => {
         description: 'Les modifications ont été enregistrées',
       });
 
-      await refreshOrganizations();
+      await refreshOrganization();
       return { success: true };
     } catch (error: any) {
       console.error('Error updating organization:', error);
