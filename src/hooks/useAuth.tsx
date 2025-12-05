@@ -29,9 +29,72 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const createOrganizationForNewUser = async (userId: string, email: string, fullName?: string) => {
+    try {
+      // Create organization
+      const orgName = fullName ? `${fullName}'s Agency` : `Agency ${email.split('@')[0]}`;
+      const orgSlug = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + Date.now();
+
+      const { data: org, error: orgError } = await supabase
+        .from('organizations')
+        .insert({
+          name: orgName,
+          slug: orgSlug,
+          onboarding_completed: false,
+        })
+        .select('id')
+        .single();
+
+      if (orgError) throw orgError;
+
+      // Add user as org member
+      const { error: memberError } = await supabase
+        .from('organization_members')
+        .insert({
+          user_id: userId,
+          organization_id: org.id,
+          accepted_at: new Date().toISOString(),
+        });
+
+      if (memberError) throw memberError;
+
+      // Assign org_admin role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: userId,
+          organization_id: org.id,
+          role: 'org_admin',
+        });
+
+      if (roleError) throw roleError;
+
+      // Create billing config with 7-day trial
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+
+      const { error: billingError } = await supabase
+        .from('billing_config')
+        .insert({
+          organization_id: org.id,
+          plan_tier: 'trial',
+          trial_ends_at: trialEndsAt.toISOString(),
+          subscription_status: 'trialing',
+          client_limit: 1,
+        });
+
+      if (billingError) throw billingError;
+
+      return { error: null };
+    } catch (error: any) {
+      console.error('Error creating organization:', error);
+      return { error };
+    }
+  };
+
   const signUp = async (email: string, password: string, fullName?: string) => {
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -42,9 +105,17 @@ export const useAuth = () => {
 
       if (error) throw error;
 
+      // Create organization for new user after signup
+      if (data.user) {
+        // Use setTimeout to defer to avoid auth deadlock
+        setTimeout(async () => {
+          await createOrganizationForNewUser(data.user!.id, email, fullName);
+        }, 0);
+      }
+
       toast({
         title: "Inscription réussie",
-        description: "Vous pouvez maintenant vous connecter",
+        description: "Bienvenue ! Votre essai gratuit de 7 jours est activé.",
       });
       return { error: null };
     } catch (error: any) {

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Key, Trash2, Users, Edit, MoreHorizontal } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ import { useToast } from '@/hooks/use-toast';
 import { toast } from 'sonner';
 
 export default function Clients() {
+  const navigate = useNavigate();
   const { selectedOrgId } = useOrganization();
   const { toast: toastHook } = useToast();
   const queryClient = useQueryClient();
@@ -70,6 +72,8 @@ export default function Clients() {
     username: '',
     password: '',
     assignedAgentId: '',
+    language: 'fr',
+    theme: 'light',
   });
 
   const { data: clients, isLoading } = useQuery({
@@ -184,12 +188,12 @@ export default function Clients() {
   });
 
   const handleCreate = async () => {
-    const { name, email, username, password, assignedAgentId } = newClient;
+    const { name, email, username, password, assignedAgentId, language, theme } = newClient;
 
-    if (!name || !email || !username || !password || !assignedAgentId) {
+    if (!name || !email || !username || !password) {
       toastHook({
         title: 'Erreur',
-        description: 'Tous les champs sont requis',
+        description: 'Nom, email, nom d\'utilisateur et mot de passe sont requis',
         variant: 'destructive',
       });
       return;
@@ -208,8 +212,8 @@ export default function Clients() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Utilisateur non authentifié');
 
-      // Create client entry (simplified - without auth.admin which requires service role)
-      const { error: clientError } = await supabase
+      // Create client entry
+      const { data: newClientData, error: clientError } = await supabase
         .from('clients')
         .insert({
           organization_id: selectedOrgId,
@@ -217,10 +221,14 @@ export default function Clients() {
           email,
           username,
           login_id: username,
-          assigned_agent_id: assignedAgentId,
+          assigned_agent_id: assignedAgentId || null,
+          language,
+          theme,
           status: 'active',
           created_by: user.id,
-        });
+        })
+        .select('id')
+        .single();
 
       if (clientError) throw clientError;
 
@@ -230,8 +238,13 @@ export default function Clients() {
       });
 
       setCreateOpen(false);
-      setNewClient({ name: '', email: '', username: '', password: '', assignedAgentId: '' });
+      setNewClient({ name: '', email: '', username: '', password: '', assignedAgentId: '', language: 'fr', theme: 'light' });
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      
+      // Redirect to client details page
+      if (newClientData?.id) {
+        navigate(`/clients/${newClientData.id}`);
+      }
     } catch (error: any) {
       console.error('Erreur création client:', error);
       toastHook({
@@ -338,8 +351,46 @@ export default function Clients() {
                     placeholder="Minimum 8 caractères"
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="language">Langue</Label>
+                    <Select
+                      value={newClient.language}
+                      onValueChange={(value) =>
+                        setNewClient({ ...newClient, language: value })
+                      }
+                    >
+                      <SelectTrigger id="language">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fr">Français</SelectItem>
+                        <SelectItem value="en">English</SelectItem>
+                        <SelectItem value="es">Español</SelectItem>
+                        <SelectItem value="de">Deutsch</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="theme">Thème</Label>
+                    <Select
+                      value={newClient.theme}
+                      onValueChange={(value) =>
+                        setNewClient({ ...newClient, theme: value })
+                      }
+                    >
+                      <SelectTrigger id="theme">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="light">Clair</SelectItem>
+                        <SelectItem value="dark">Sombre</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <div>
-                  <Label htmlFor="agent">Assigner à un agent *</Label>
+                  <Label htmlFor="agent">Assigner à un agent (optionnel)</Label>
                   <Select
                     value={newClient.assignedAgentId}
                     onValueChange={(value) =>
