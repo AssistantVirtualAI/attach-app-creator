@@ -1,6 +1,6 @@
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building, Palette, Users, Plug, Webhook, CreditCard, BarChart3, Languages } from 'lucide-react';
+import { Building, Palette, Users, Plug, Webhook, CreditCard, BarChart3, Languages, Shield, FileText } from 'lucide-react';
 import { AgencyTab } from '@/components/settings/AgencyTab';
 import { WhiteLabelTab } from '@/components/settings/WhiteLabelTab';
 import { MembersTab } from '@/components/settings/MembersTab';
@@ -9,6 +9,9 @@ import { WebhooksTab } from '@/components/settings/WebhooksTab';
 import { SubscriptionTab } from '@/components/settings/SubscriptionTab';
 import { UsageTab } from '@/components/settings/UsageTab';
 import { TranslationTab } from '@/components/settings/TranslationTab';
+import { PrivacyTab } from '@/components/settings/PrivacyTab';
+import { AuditLogsTab } from '@/components/settings/AuditLogsTab';
+import { SecurityStatus } from '@/components/settings/SecurityStatus';
 
 const Settings = () => {
   return (
@@ -55,6 +58,14 @@ const Settings = () => {
               <Languages className="w-4 h-4" />
               <span className="hidden sm:inline">Traduction</span>
             </TabsTrigger>
+            <TabsTrigger value="privacy" className="gap-2">
+              <Shield className="w-4 h-4" />
+              <span className="hidden sm:inline">Confidentialité</span>
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-2">
+              <FileText className="w-4 h-4" />
+              <span className="hidden sm:inline">Audit</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="agency"><AgencyTab /></TabsContent>
@@ -65,6 +76,13 @@ const Settings = () => {
           <TabsContent value="subscription"><SubscriptionTab /></TabsContent>
           <TabsContent value="usage"><UsageTab /></TabsContent>
           <TabsContent value="translation"><TranslationTab /></TabsContent>
+          <TabsContent value="privacy">
+            <div className="space-y-6">
+              <SecurityStatus />
+              <PrivacyTab />
+            </div>
+          </TabsContent>
+          <TabsContent value="audit"><AuditLogsTab /></TabsContent>
         </Tabs>
       </div>
     </AppLayout>

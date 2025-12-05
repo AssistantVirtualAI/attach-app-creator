@@ -202,6 +202,53 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          organization_id: string | null
+          resource_id: string | null
+          resource_type: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          organization_id?: string | null
+          resource_id?: string | null
+          resource_type: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          organization_id?: string | null
+          resource_id?: string | null
+          resource_type?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_config: {
         Row: {
           ai_credits: number | null
@@ -739,6 +786,8 @@ export type Database = {
       organizations: {
         Row: {
           api_key: string | null
+          baa_signed_at: string | null
+          baa_signed_by: string | null
           backend_domain: string | null
           client_limit: number | null
           created_at: string
@@ -759,12 +808,16 @@ export type Database = {
           logo_url: string | null
           name: string
           primary_color: string | null
+          privacy_policy_url: string | null
           slug: string
+          terms_url: string | null
           updated_at: string
           website_title: string | null
         }
         Insert: {
           api_key?: string | null
+          baa_signed_at?: string | null
+          baa_signed_by?: string | null
           backend_domain?: string | null
           client_limit?: number | null
           created_at?: string
@@ -785,12 +838,16 @@ export type Database = {
           logo_url?: string | null
           name: string
           primary_color?: string | null
+          privacy_policy_url?: string | null
           slug: string
+          terms_url?: string | null
           updated_at?: string
           website_title?: string | null
         }
         Update: {
           api_key?: string | null
+          baa_signed_at?: string | null
+          baa_signed_by?: string | null
           backend_domain?: string | null
           client_limit?: number | null
           created_at?: string
@@ -811,7 +868,9 @@ export type Database = {
           logo_url?: string | null
           name?: string
           primary_color?: string | null
+          privacy_policy_url?: string | null
           slug?: string
+          terms_url?: string | null
           updated_at?: string
           website_title?: string | null
         }
@@ -821,6 +880,8 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          deleted_at: string | null
+          deletion_requested_at: string | null
           email: string
           full_name: string | null
           id: string
@@ -830,6 +891,8 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deletion_requested_at?: string | null
           email: string
           full_name?: string | null
           id: string
@@ -839,6 +902,8 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deletion_requested_at?: string | null
           email?: string
           full_name?: string | null
           id?: string
@@ -846,6 +911,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      user_consents: {
+        Row: {
+          consent_type: string
+          consented: boolean | null
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          organization_id: string | null
+          updated_at: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          consent_type: string
+          consented?: boolean | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          organization_id?: string | null
+          updated_at?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          consent_type?: string
+          consented?: boolean | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          organization_id?: string | null
+          updated_at?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_consents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
