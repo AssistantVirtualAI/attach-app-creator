@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, DragEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface ImageUploaderProps {
   label: string;
@@ -24,6 +25,7 @@ export const ImageUploader = ({
   aspectRatio = 'square'
 }: ImageUploaderProps) => {
   const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const sizeClasses = {
@@ -32,10 +34,7 @@ export const ImageUploader = ({
     favicon: 'w-16 h-16'
   };
 
-  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const processFile = async (file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Veuillez sélectionner une image');
@@ -73,14 +72,55 @@ export const ImageUploader = ({
     }
   };
 
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      await processFile(file);
+    }
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      await processFile(file);
+    }
+  };
+
   return (
     <div className="space-y-2">
       <label className="text-sm font-medium">{label}</label>
       <div className="flex items-center gap-4">
         <div 
-          className={`${sizeClasses[aspectRatio]} border-2 border-dashed rounded-lg flex items-center justify-center overflow-hidden bg-muted/30 relative group`}
+          className={cn(
+            sizeClasses[aspectRatio],
+            "border-2 border-dashed rounded-lg flex items-center justify-center overflow-hidden bg-muted/30 relative group cursor-pointer transition-all duration-150 ease-in-out",
+            isDragging && "border-primary bg-primary/10 scale-105",
+            !isDragging && "hover:border-primary/50 hover:bg-muted/50"
+          )}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
         >
-          {currentUrl ? (
+          {uploading ? (
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+          ) : currentUrl ? (
             <>
               <img 
                 src={currentUrl} 
@@ -88,14 +128,20 @@ export const ImageUploader = ({
                 className="w-full h-full object-contain"
               />
               <button
-                onClick={onRemove}
-                className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove();
+                }}
+                className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150"
               >
                 <X className="w-3 h-3" />
               </button>
             </>
           ) : (
-            <Upload className="w-8 h-8 text-muted-foreground" />
+            <div className="flex flex-col items-center gap-1 text-muted-foreground">
+              <Upload className={cn("w-6 h-6", isDragging && "text-primary")} />
+              {isDragging && <span className="text-xs text-primary">Déposer</span>}
+            </div>
           )}
         </div>
         <div className="space-y-2">
@@ -105,15 +151,11 @@ export const ImageUploader = ({
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
           >
-            {uploading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Téléchargement...
-              </>
-            ) : (
-              'Télécharger'
-            )}
+            {uploading ? 'Téléchargement...' : 'Télécharger'}
           </Button>
+          <p className="text-xs text-muted-foreground">
+            Glisser-déposer ou cliquer
+          </p>
           <input
             ref={fileInputRef}
             type="file"
