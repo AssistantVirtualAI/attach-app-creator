@@ -43,6 +43,7 @@ import Legal from "./pages/Legal";
 import Docs from "./pages/Docs";
 import Topics from "./pages/Topics";
 import Campaigns from "./pages/Campaigns";
+import Appointments from "./pages/Appointments";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -254,6 +255,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <Campaigns />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/appointments"
+                  element={
+                    <ProtectedRoute>
+                      <Appointments />
                     </ProtectedRoute>
                   }
                 />

@@ -80,3 +80,9 @@ verify_jwt = true
 
 [functions.start-outbound-campaign]
 verify_jwt = true
+
+[functions.google-calendar-auth]
+verify_jwt = true
+
+[functions.book-appointment]
+verify_jwt = false
