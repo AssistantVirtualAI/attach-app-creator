@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, Home, TrendingUp, MessageSquare, BookOpen, Settings, Bot, Webhook, CreditCard, Sliders, Moon, Sun, Users, BarChart3, GitBranch, Menu, X, Tag, Phone, Calendar, FileQuestion } from 'lucide-react';
+import { Activity, Home, TrendingUp, MessageSquare, BookOpen, Settings, Bot, Webhook, CreditCard, Sliders, Moon, Sun, Users, BarChart3, GitBranch, Menu, X, Tag, Phone, Calendar, FileQuestion, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useOrganization } from '@/context/OrganizationContext';
@@ -33,6 +33,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const adminNavigation = [
     { name: 'Clientèle', href: '/clients', icon: Users },
     { name: 'Agents', href: '/agents', icon: Bot },
+    { name: 'Agent Builder', href: '/agent-builder', icon: Sparkles },
     { name: 'Topics', href: '/topics', icon: Tag },
     { name: 'Campagnes', href: '/campaigns', icon: Phone },
     { name: 'Rendez-vous', href: '/appointments', icon: Calendar },
