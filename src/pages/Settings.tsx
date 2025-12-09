@@ -1,6 +1,6 @@
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building, Palette, Users, Plug, Webhook, CreditCard, BarChart3, Languages, Shield, FileText } from 'lucide-react';
+import { Building, Palette, Users, Plug, Webhook, CreditCard, BarChart3, Languages, Shield, FileText, BookOpen } from 'lucide-react';
 import { AgencyTab } from '@/components/settings/AgencyTab';
 import { WhiteLabelTab } from '@/components/settings/WhiteLabelTab';
 import { MembersTab } from '@/components/settings/MembersTab';
@@ -12,6 +12,7 @@ import { TranslationTab } from '@/components/settings/TranslationTab';
 import { PrivacyTab } from '@/components/settings/PrivacyTab';
 import { AuditLogsTab } from '@/components/settings/AuditLogsTab';
 import { SecurityStatus } from '@/components/settings/SecurityStatus';
+import { DocumentationTab } from '@/components/settings/DocumentationTab';
 
 const Settings = () => {
   return (
@@ -66,6 +67,10 @@ const Settings = () => {
               <FileText className="w-4 h-4" />
               <span className="hidden sm:inline">Audit</span>
             </TabsTrigger>
+            <TabsTrigger value="documentation" className="gap-2">
+              <BookOpen className="w-4 h-4" />
+              <span className="hidden sm:inline">Documentation</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="agency"><AgencyTab /></TabsContent>
@@ -83,6 +88,7 @@ const Settings = () => {
             </div>
           </TabsContent>
           <TabsContent value="audit"><AuditLogsTab /></TabsContent>
+          <TabsContent value="documentation"><DocumentationTab /></TabsContent>
         </Tabs>
       </div>
     </AppLayout>

@@ -1,7 +1,10 @@
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   BookOpen, 
@@ -17,15 +20,62 @@ import {
   CreditCard,
   Mail,
   Globe,
-  FileText
+  FileText,
+  Search,
+  X,
+  ArrowLeft
 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Docs = () => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("installation");
+
+  // Search content mapping for filtering
+  const searchableContent = useMemo(() => ({
+    installation: [
+      "installation", "guide", "prérequis", "node", "bun", "lovable", "stripe", "elevenlabs",
+      "cloner", "repository", "npm", "variables", "environnement", "supabase", "smtp", "sentry",
+      "démarrer", "serveur", "développement", "build", "production", "base de données", "postgresql",
+      "migrations", "tables", "organizations", "clients", "agents", "conversations"
+    ],
+    integrations: [
+      "elevenlabs", "agents vocaux", "api", "widget", "popup", "iframe", "transcription",
+      "stripe", "paiements", "abonnements", "checkout", "webhook", "portal", "plans",
+      "email", "smtp", "templates", "welcome", "password", "invitation", "2fa",
+      "webhooks", "événements", "payload", "signature", "domaine", "dns", "cname"
+    ],
+    api: [
+      "api", "authentification", "clé", "bearer", "token", "scopes", "endpoints",
+      "conversations", "agents", "clients", "analytics", "webhooks", "rate limit"
+    ]
+  }), []);
+
+  // Filter sections based on search
+  const matchedSections = useMemo(() => {
+    if (!searchQuery.trim()) return ["installation", "integrations", "api"];
+    
+    const query = searchQuery.toLowerCase();
+    return Object.entries(searchableContent)
+      .filter(([_, keywords]) => keywords.some(k => k.includes(query)))
+      .map(([section]) => section);
+  }, [searchQuery, searchableContent]);
+
+  const hasResults = matchedSections.length > 0;
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container max-w-6xl py-12 px-4">
+        {/* Header with back link */}
+        <div className="mb-6">
+          <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+            Retour à l'accueil
+          </Link>
+        </div>
+
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <BookOpen className="h-10 w-10 text-primary" />
             <h1 className="text-4xl font-bold">Documentation AVA Statistics</h1>
@@ -36,17 +86,78 @@ const Docs = () => {
           <Badge variant="secondary" className="mt-4">v1.0.0</Badge>
         </div>
 
-        <Tabs defaultValue="installation" className="space-y-8">
+        {/* Search Bar */}
+        <div className="max-w-xl mx-auto mb-8">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Rechercher dans la documentation..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-10"
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                onClick={() => setSearchQuery("")}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          {searchQuery && (
+            <p className="text-sm text-muted-foreground mt-2 text-center">
+              {hasResults 
+                ? `${matchedSections.length} section(s) trouvée(s)` 
+                : "Aucun résultat trouvé"}
+            </p>
+          )}
+        </div>
+
+        {/* Section Filters */}
+        {searchQuery && hasResults && (
+          <div className="flex justify-center gap-2 mb-6">
+            {matchedSections.map((section) => (
+              <Badge 
+                key={section} 
+                variant={activeTab === section ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => setActiveTab(section)}
+              >
+                {section === "installation" && "Installation"}
+                {section === "integrations" && "Intégrations"}
+                {section === "api" && "API Reference"}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
           <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
-            <TabsTrigger value="installation" className="gap-2">
+            <TabsTrigger 
+              value="installation" 
+              className="gap-2"
+              disabled={searchQuery && !matchedSections.includes("installation")}
+            >
               <Download className="h-4 w-4" />
               Installation
             </TabsTrigger>
-            <TabsTrigger value="integrations" className="gap-2">
+            <TabsTrigger 
+              value="integrations" 
+              className="gap-2"
+              disabled={searchQuery && !matchedSections.includes("integrations")}
+            >
               <Settings className="h-4 w-4" />
               Intégrations
             </TabsTrigger>
-            <TabsTrigger value="api" className="gap-2">
+            <TabsTrigger 
+              value="api" 
+              className="gap-2"
+              disabled={searchQuery && !matchedSections.includes("api")}
+            >
               <Code className="h-4 w-4" />
               API Reference
             </TabsTrigger>

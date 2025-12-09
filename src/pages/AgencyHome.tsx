@@ -17,8 +17,10 @@ import {
   Calendar,
   HelpCircle,
   Copy,
-  CheckCircle2
+  CheckCircle2,
+  ArrowRight
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -31,6 +33,7 @@ import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
 const AgencyHome = () => {
   const { selectedOrg } = useOrganization();
   const [copiedDomain, setCopiedDomain] = useState(false);
+  const navigate = useNavigate();
 
   const customDomain = selectedOrg?.domain;
   const hasCustomDomain = !!customDomain;
@@ -66,8 +69,9 @@ const AgencyHome = () => {
       title: "Centre d'aide",
       description: "Documentation et guides d'utilisation",
       icon: BookOpen,
-      href: "https://docs.lovable.dev",
-      color: "from-purple-500 to-pink-500"
+      href: "/docs",
+      color: "from-purple-500 to-pink-500",
+      internal: true
     },
     {
       title: "Communauté Discord",
@@ -201,13 +205,16 @@ const AgencyHome = () => {
                 <Card 
                   key={resource.title} 
                   className="glass-card hover:border-primary/50 transition-all cursor-pointer group"
-                  onClick={() => window.open(resource.href, '_blank')}
+                  onClick={() => resource.internal ? navigate(resource.href) : window.open(resource.href, '_blank')}
                 >
                   <CardContent className="p-6">
                     <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${resource.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
                       <Icon className="w-6 h-6 text-white" />
                     </div>
-                    <h4 className="font-semibold mb-1">{resource.title}</h4>
+                    <h4 className="font-semibold mb-1 flex items-center gap-2">
+                      {resource.title}
+                      {resource.internal && <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                    </h4>
                     <p className="text-sm text-muted-foreground">{resource.description}</p>
                   </CardContent>
                 </Card>
