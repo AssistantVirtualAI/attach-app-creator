@@ -1,4 +1,4 @@
-import { Wallet, Zap } from 'lucide-react';
+import { Wallet, Zap, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useClientStats } from '@/hooks/useClientStats';
@@ -40,6 +40,13 @@ export const SidebarFooter = () => {
       {/* Social Icons */}
       <div className="flex items-center justify-between pt-2">
         <div className="flex gap-2">
+          <Link
+            to="/docs"
+            className="w-8 h-8 rounded-lg bg-card hover:bg-accent flex items-center justify-center transition-colors"
+            title="Documentation"
+          >
+            <BookOpen className="w-4 h-4" />
+          </Link>
           <a
             href="https://discord.gg/lovable"
             target="_blank"
