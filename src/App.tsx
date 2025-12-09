@@ -40,6 +40,8 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import BAAgreement from "./pages/BAAgreement";
 import Legal from "./pages/Legal";
 import Docs from "./pages/Docs";
+import Topics from "./pages/Topics";
+import Campaigns from "./pages/Campaigns";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -227,6 +229,22 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <Workflows />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/topics"
+                  element={
+                    <ProtectedRoute>
+                      <Topics />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/campaigns"
+                  element={
+                    <ProtectedRoute>
+                      <Campaigns />
                     </ProtectedRoute>
                   }
                 />

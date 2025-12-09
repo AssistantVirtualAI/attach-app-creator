@@ -66,6 +66,7 @@ export const useOutboundCampaigns = () => {
         schedule: (c.schedule as Record<string, any>) || {},
         status: c.status as OutboundCampaign['status']
       })) as OutboundCampaign[];
+    },
     enabled: !!selectedOrgId,
   });
 
