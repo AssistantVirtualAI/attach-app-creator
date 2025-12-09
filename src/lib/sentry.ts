@@ -1,52 +1,49 @@
-import * as Sentry from "@sentry/react";
-
-const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
-
+// Sentry initialization - only activates when VITE_SENTRY_DSN is configured
 export const initSentry = () => {
-  if (!SENTRY_DSN) {
-    console.log("Sentry DSN not configured, skipping initialization");
+  const dsn = import.meta.env.VITE_SENTRY_DSN;
+  
+  if (!dsn) {
+    console.info("Sentry DSN not configured, skipping initialization");
     return;
   }
 
-  Sentry.init({
-    dsn: SENTRY_DSN,
-    integrations: [
-      Sentry.browserTracingIntegration(),
-      Sentry.replayIntegration({
-        maskAllText: false,
-        blockAllMedia: false,
-      }),
-    ],
-    // Performance Monitoring
-    tracesSampleRate: 1.0,
-    // Session Replay
-    replaysSessionSampleRate: 0.1,
-    replaysOnErrorSampleRate: 1.0,
-    // Environment
-    environment: import.meta.env.MODE,
+  // Dynamically import Sentry only when DSN is configured
+  import("@sentry/react").then((Sentry) => {
+    Sentry.init({
+      dsn,
+      integrations: [
+        Sentry.browserTracingIntegration(),
+        Sentry.replayIntegration({
+          maskAllText: false,
+          blockAllMedia: false,
+        }),
+      ],
+      tracesSampleRate: 1.0,
+      replaysSessionSampleRate: 0.1,
+      replaysOnErrorSampleRate: 1.0,
+      environment: import.meta.env.MODE,
+    });
+  }).catch((err) => {
+    console.warn("Failed to initialize Sentry:", err);
   });
 };
 
 export const captureException = (error: Error, context?: Record<string, unknown>) => {
-  if (SENTRY_DSN) {
-    Sentry.captureException(error, { extra: context });
+  if (import.meta.env.VITE_SENTRY_DSN) {
+    import("@sentry/react").then((Sentry) => {
+      Sentry.captureException(error, { extra: context });
+    });
   } else {
-    console.error("Error captured (Sentry not configured):", error, context);
+    console.error("Error captured:", error, context);
   }
 };
 
-export const captureMessage = (message: string, level: Sentry.SeverityLevel = "info") => {
-  if (SENTRY_DSN) {
-    Sentry.captureMessage(message, level);
+export const captureMessage = (message: string, level: "info" | "warning" | "error" = "info") => {
+  if (import.meta.env.VITE_SENTRY_DSN) {
+    import("@sentry/react").then((Sentry) => {
+      Sentry.captureMessage(message, level);
+    });
   } else {
     console.log(`[${level}] ${message}`);
   }
 };
-
-export const setUser = (user: { id: string; email?: string; username?: string } | null) => {
-  if (SENTRY_DSN) {
-    Sentry.setUser(user);
-  }
-};
-
-export { Sentry };
