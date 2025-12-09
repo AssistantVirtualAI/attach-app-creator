@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { 
   CreditCard, CheckCircle, XCircle, Play, Link2, 
-  Receipt, Wallet, AlertCircle, ExternalLink, Calendar
+  Receipt, Wallet, AlertCircle, ExternalLink, Calendar, TrendingUp
 } from 'lucide-react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ import { useBillingConfig, ADDONS } from '@/hooks/useBillingConfig';
 import { useStripeSubscription } from '@/hooks/useStripeSubscription';
 import { PricingCards } from '@/components/billing/PricingCards';
 import { SubscriptionStatus } from '@/components/billing/SubscriptionStatus';
+import { PerformanceBillingTab } from '@/components/billing/PerformanceBillingTab';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { format } from 'date-fns';
@@ -174,9 +175,10 @@ export default function StripeBilling() {
         )}
 
         <Tabs defaultValue="subscription" className="space-y-6">
-          <TabsList>
+          <TabsList className="flex-wrap">
             <TabsTrigger value="subscription">Abonnement</TabsTrigger>
             <TabsTrigger value="plans">Plans</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="addons">Add-ons</TabsTrigger>
             <TabsTrigger value="history">Historique</TabsTrigger>
             <TabsTrigger value="payment-methods">Moyens de paiement</TabsTrigger>
@@ -194,6 +196,10 @@ export default function StripeBilling() {
                 isLoading={isActionLoading}
               />
             )}
+          </TabsContent>
+
+          <TabsContent value="performance" className="space-y-6">
+            <PerformanceBillingTab />
           </TabsContent>
 
           <TabsContent value="plans" className="space-y-6">
