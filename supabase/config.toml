@@ -101,3 +101,6 @@ verify_jwt = true
 
 [functions.request-handoff]
 verify_jwt = false
+
+[functions.notify-handoff]
+verify_jwt = false

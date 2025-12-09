@@ -49,6 +49,7 @@ import AgentBuilder from "./pages/AgentBuilder";
 import Leads from "./pages/Leads";
 import PhoneNumbers from "./pages/PhoneNumbers";
 import Handoffs from "./pages/Handoffs";
+import SmsTemplates from "./pages/SmsTemplates";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -316,6 +317,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <Handoffs />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/sms-templates"
+                  element={
+                    <ProtectedRoute>
+                      <SmsTemplates />
                     </ProtectedRoute>
                   }
                 />
