@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, ChevronDown, Settings, Sparkles } from 'lucide-react';
 import { AgentsTable } from '@/components/agents/AgentsTable';
 import { AddAgentModal } from '@/components/agents/AddAgentModal';
 import { EmptyState } from '@/components/agents/EmptyState';
@@ -10,8 +11,15 @@ import { useOrganization } from '@/context/OrganizationContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function Agents() {
+  const navigate = useNavigate();
   const { selectedOrgId } = useOrganization();
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -83,10 +91,25 @@ export default function Agents() {
               Gérez vos agents conversationnels
             </p>
           </div>
-          <Button onClick={() => setIsModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nouvel agent
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Nouvel agent
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setIsModalOpen(true)}>
+                <Settings className="mr-2 h-4 w-4" />
+                Via intégration
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/agent-builder')}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Créer avec Builder (No-Code)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {agents && agents.length > 0 ? (
@@ -106,7 +129,10 @@ export default function Agents() {
             <AgentsTable agents={filteredAgents} onRefetch={refetch} />
           </>
         ) : (
-          <EmptyState onCreateAgent={() => setIsModalOpen(true)} />
+          <EmptyState 
+            onCreateAgent={() => setIsModalOpen(true)} 
+            onCreateWithBuilder={() => navigate('/agent-builder')}
+          />
         )}
 
         <AddAgentModal
