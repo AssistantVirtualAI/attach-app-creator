@@ -44,6 +44,7 @@ import Docs from "./pages/Docs";
 import Topics from "./pages/Topics";
 import Campaigns from "./pages/Campaigns";
 import Appointments from "./pages/Appointments";
+import AgentReports from "./pages/AgentReports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -263,6 +264,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <Appointments />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/agent-reports"
+                  element={
+                    <ProtectedRoute>
+                      <AgentReports />
                     </ProtectedRoute>
                   }
                 />
