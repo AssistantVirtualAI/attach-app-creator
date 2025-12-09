@@ -302,6 +302,53 @@ export type Database = {
           },
         ]
       }
+      campaign_calls: {
+        Row: {
+          called_at: string | null
+          campaign_id: string
+          created_at: string
+          duration: number | null
+          id: string
+          metadata: Json | null
+          outcome: string | null
+          phone_number: string
+          status: string
+          transcript: string | null
+        }
+        Insert: {
+          called_at?: string | null
+          campaign_id: string
+          created_at?: string
+          duration?: number | null
+          id?: string
+          metadata?: Json | null
+          outcome?: string | null
+          phone_number: string
+          status?: string
+          transcript?: string | null
+        }
+        Update: {
+          called_at?: string | null
+          campaign_id?: string
+          created_at?: string
+          duration?: number | null
+          id?: string
+          metadata?: Json | null
+          outcome?: string | null
+          phone_number?: string
+          status?: string
+          transcript?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_calls_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "outbound_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_members: {
         Row: {
           client_id: string
@@ -405,6 +452,60 @@ export type Database = {
           },
           {
             foreignKeyName: "clients_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_topics: {
+        Row: {
+          analyzed_at: string
+          category: string | null
+          confidence: number | null
+          conversation_id: string | null
+          created_at: string
+          frequency: number | null
+          id: string
+          organization_id: string
+          sentiment: string | null
+          topic: string
+        }
+        Insert: {
+          analyzed_at?: string
+          category?: string | null
+          confidence?: number | null
+          conversation_id?: string | null
+          created_at?: string
+          frequency?: number | null
+          id?: string
+          organization_id: string
+          sentiment?: string | null
+          topic: string
+        }
+        Update: {
+          analyzed_at?: string
+          category?: string | null
+          confidence?: number | null
+          conversation_id?: string | null
+          created_at?: string
+          frequency?: number | null
+          id?: string
+          organization_id?: string
+          sentiment?: string | null
+          topic?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_topics_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_topics_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -882,6 +983,78 @@ export type Database = {
         }
         Relationships: []
       }
+      outbound_campaigns: {
+        Row: {
+          agent_id: string | null
+          completed_at: string | null
+          completed_calls: number | null
+          created_at: string
+          description: string | null
+          failed_calls: number | null
+          id: string
+          name: string
+          organization_id: string
+          phone_numbers: Json
+          schedule: Json | null
+          started_at: string | null
+          status: string
+          successful_calls: number | null
+          total_calls: number | null
+          updated_at: string
+        }
+        Insert: {
+          agent_id?: string | null
+          completed_at?: string | null
+          completed_calls?: number | null
+          created_at?: string
+          description?: string | null
+          failed_calls?: number | null
+          id?: string
+          name: string
+          organization_id: string
+          phone_numbers?: Json
+          schedule?: Json | null
+          started_at?: string | null
+          status?: string
+          successful_calls?: number | null
+          total_calls?: number | null
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string | null
+          completed_at?: string | null
+          completed_calls?: number | null
+          created_at?: string
+          description?: string | null
+          failed_calls?: number | null
+          id?: string
+          name?: string
+          organization_id?: string
+          phone_numbers?: Json
+          schedule?: Json | null
+          started_at?: string | null
+          status?: string
+          successful_calls?: number | null
+          total_calls?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "outbound_campaigns_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbound_campaigns_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -917,6 +1090,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      topic_aggregates: {
+        Row: {
+          avg_sentiment: number | null
+          category: string | null
+          created_at: string
+          id: string
+          last_mentioned_at: string
+          organization_id: string
+          topic: string
+          total_mentions: number | null
+          updated_at: string
+        }
+        Insert: {
+          avg_sentiment?: number | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          last_mentioned_at?: string
+          organization_id: string
+          topic: string
+          total_mentions?: number | null
+          updated_at?: string
+        }
+        Update: {
+          avg_sentiment?: number | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          last_mentioned_at?: string
+          organization_id?: string
+          topic?: string
+          total_mentions?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "topic_aggregates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_consents: {
         Row: {
