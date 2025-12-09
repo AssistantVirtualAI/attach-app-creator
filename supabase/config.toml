@@ -92,3 +92,6 @@ verify_jwt = true
 
 [functions.calculate-performance-billing]
 verify_jwt = true
+
+[functions.simulate-agent]
+verify_jwt = true
