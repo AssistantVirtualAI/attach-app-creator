@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/context/OrganizationContext";
@@ -11,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Shield, 
   Zap, 
@@ -24,7 +26,11 @@ import {
   Trash2,
   Settings,
   ExternalLink,
-  Search
+  Search,
+  GitBranch,
+  Play,
+  Pause,
+  Edit
 } from "lucide-react";
 
 interface MarketplaceApp {
@@ -113,12 +119,14 @@ const marketplaceApps: MarketplaceApp[] = [
 ];
 
 export default function Workflows() {
+  const navigate = useNavigate();
   const { selectedOrg } = useOrganization();
   const queryClient = useQueryClient();
   const [hipaaModalOpen, setHipaaModalOpen] = useState(false);
   const [selectedApp, setSelectedApp] = useState<MarketplaceApp | null>(null);
   const [hipaaAccepted, setHipaaAccepted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("visual");
 
   const filteredMarketplaceApps = marketplaceApps.filter(app =>
     app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -237,147 +245,254 @@ export default function Workflows() {
     return marketplaceApps.find(a => a.id === appName);
   };
 
+  // Filter visual workflows (have config.type === 'visual-workflow')
+  const visualWorkflows = installedWorkflows?.filter(w => {
+    const config = w.config as { type?: string } | null;
+    return config?.type === 'visual-workflow';
+  }) || [];
+
+  // Filter marketplace integrations (not visual workflows)
+  const marketplaceWorkflows = installedWorkflows?.filter(w => {
+    const config = w.config as { type?: string } | null;
+    return config?.type !== 'visual-workflow';
+  }) || [];
+
   return (
     <AppLayout>
       <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Workflows & Intégrations</h1>
-          <p className="text-muted-foreground">
-            Connectez vos agents à des applications tierces
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Workflows & Automatisations</h1>
+            <p className="text-muted-foreground">
+              Créez des automatisations visuelles ou connectez des applications tierces
+            </p>
+          </div>
+          <Button onClick={() => navigate('/workflow-builder/new')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nouveau Workflow
+          </Button>
         </div>
 
-        {/* Installed Workflows */}
-        {installedWorkflows && installedWorkflows.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Applications installées</CardTitle>
-              <CardDescription>
-                Gérez vos intégrations actives
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {installedWorkflows.map((workflow) => {
-                  const app = getAppDetails(workflow.app_name);
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="visual" className="flex items-center gap-2">
+              <GitBranch className="h-4 w-4" />
+              Visual Builder
+            </TabsTrigger>
+            <TabsTrigger value="marketplace" className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Marketplace
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Visual Workflows Tab */}
+          <TabsContent value="visual" className="space-y-6">
+            {visualWorkflows.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <GitBranch className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Aucun workflow créé</h3>
+                  <p className="text-sm text-muted-foreground mb-4 text-center max-w-md">
+                    Créez des automatisations drag-and-drop avec des triggers natifs comme "Appel terminé" ou "Message reçu"
+                  </p>
+                  <Button onClick={() => navigate('/workflow-builder/new')}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Créer mon premier workflow
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {visualWorkflows.map((workflow) => {
+                  const config = workflow.config as { name?: string; nodes?: unknown[] } | null;
+                  const nodeCount = config?.nodes?.length || 0;
                   return (
-                    <div
-                      key={workflow.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                          {app?.icon || <Zap className="h-6 w-6" />}
+                    <Card key={workflow.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                              <GitBranch className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{config?.name || 'Workflow sans nom'}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {nodeCount} node{nodeCount > 1 ? 's' : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <Badge variant={workflow.is_active ? "default" : "secondary"}>
+                            {workflow.is_active ? 'Actif' : 'Inactif'}
+                          </Badge>
                         </div>
-                        <div>
-                          <p className="font-medium">{app?.name || workflow.app_name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {app?.category || "Application"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">
-                            {workflow.is_active ? "Actif" : "Inactif"}
-                          </span>
-                          <Switch
-                            checked={workflow.is_active || false}
-                            onCheckedChange={(checked) => 
-                              toggleMutation.mutate({ id: workflow.id, isActive: checked })
-                            }
-                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => navigate(`/workflow-builder/${workflow.id}`)}
+                          >
+                            <Edit className="h-3 w-3 mr-1" />
+                            Éditer
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleMutation.mutate({ id: workflow.id, isActive: !workflow.is_active })}
+                          >
+                            {workflow.is_active ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => uninstallMutation.mutate(workflow.id)}
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => uninstallMutation.mutate(workflow.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
+                      </CardContent>
+                    </Card>
                   );
                 })}
               </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </TabsContent>
 
-        {/* Marketplace */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg">Marketplace</CardTitle>
-                <CardDescription>
-                  Découvrez et installez de nouvelles intégrations
-                </CardDescription>
-              </div>
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher des applications..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredMarketplaceApps.map((app) => (
-                <Card key={app.id} className="relative overflow-hidden">
-                  {app.requiresHipaa && (
-                    <div className="absolute top-2 right-2">
-                      <Badge variant="outline" className="text-xs">
-                        <Shield className="h-3 w-3 mr-1" />
-                        HIPAA
-                      </Badge>
-                    </div>
-                  )}
-                  <CardContent className="p-4 space-y-4">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                        {app.icon}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{app.name}</p>
-                        <p className="text-xs text-muted-foreground">{app.category}</p>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {app.description}
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {app.features.slice(0, 2).map((feature) => (
-                        <Badge key={feature} variant="secondary" className="text-xs">
-                          {feature}
-                        </Badge>
-                      ))}
-                    </div>
-                    <Button
-                      className="w-full"
-                      variant={isInstalled(app.id) ? "secondary" : "default"}
-                      disabled={isInstalled(app.id)}
-                      onClick={() => handleInstall(app)}
-                    >
-                      {isInstalled(app.id) ? (
-                        "Installée"
-                      ) : (
-                        <>
-                          <Plus className="h-4 w-4 mr-1" />
-                          Installer
-                        </>
+          {/* Marketplace Tab */}
+          <TabsContent value="marketplace" className="space-y-6">
+            {/* Installed Marketplace Apps */}
+            {marketplaceWorkflows.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Applications installées</CardTitle>
+                  <CardDescription>
+                    Gérez vos intégrations actives
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {marketplaceWorkflows.map((workflow) => {
+                      const app = getAppDetails(workflow.app_name);
+                      return (
+                        <div
+                          key={workflow.id}
+                          className="flex items-center justify-between p-4 border rounded-lg"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                              {app?.icon || <Zap className="h-6 w-6" />}
+                            </div>
+                            <div>
+                              <p className="font-medium">{app?.name || workflow.app_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {app?.category || "Application"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-muted-foreground">
+                                {workflow.is_active ? "Actif" : "Inactif"}
+                              </span>
+                              <Switch
+                                checked={workflow.is_active || false}
+                                onCheckedChange={(checked) => 
+                                  toggleMutation.mutate({ id: workflow.id, isActive: checked })
+                                }
+                              />
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => uninstallMutation.mutate(workflow.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Marketplace Grid */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">Marketplace</CardTitle>
+                    <CardDescription>
+                      Découvrez et installez de nouvelles intégrations
+                    </CardDescription>
+                  </div>
+                  <div className="relative w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Rechercher des applications..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filteredMarketplaceApps.map((app) => (
+                    <Card key={app.id} className="relative overflow-hidden">
+                      {app.requiresHipaa && (
+                        <div className="absolute top-2 right-2">
+                          <Badge variant="outline" className="text-xs">
+                            <Shield className="h-3 w-3 mr-1" />
+                            HIPAA
+                          </Badge>
+                        </div>
                       )}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                      <CardContent className="p-4 space-y-4">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                            {app.icon}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{app.name}</p>
+                            <p className="text-xs text-muted-foreground">{app.category}</p>
+                          </div>
+                        </div>
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {app.description}
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {app.features.slice(0, 2).map((feature) => (
+                            <Badge key={feature} variant="secondary" className="text-xs">
+                              {feature}
+                            </Badge>
+                          ))}
+                        </div>
+                        <Button
+                          className="w-full"
+                          variant={isInstalled(app.id) ? "secondary" : "default"}
+                          disabled={isInstalled(app.id)}
+                          onClick={() => handleInstall(app)}
+                        >
+                          {isInstalled(app.id) ? (
+                            "Installée"
+                          ) : (
+                            <>
+                              <Plus className="h-4 w-4 mr-1" />
+                              Installer
+                            </>
+                          )}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* HIPAA Modal */}
         <Dialog open={hipaaModalOpen} onOpenChange={setHipaaModalOpen}>

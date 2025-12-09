@@ -27,6 +27,7 @@ import EmailTemplates from "./pages/EmailTemplates";
 import Agents from "./pages/Agents";
 import AgentSettings from "./pages/AgentSettings";
 import Workflows from "./pages/Workflows";
+import WorkflowBuilder from "./pages/WorkflowBuilder";
 import Team from "./pages/Team";
 import ApiKeys from "./pages/ApiKeys";
 import ClientDetail from "./pages/ClientDetail";
@@ -229,6 +230,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <Workflows />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/workflow-builder/:workflowId"
+                  element={
+                    <ProtectedRoute>
+                      <WorkflowBuilder />
                     </ProtectedRoute>
                   }
                 />
