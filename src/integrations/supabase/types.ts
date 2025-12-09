@@ -355,7 +355,11 @@ export type Database = {
           credits_limit: number | null
           credits_used: number | null
           organization_id: string
+          performance_billing_enabled: boolean | null
           plan_tier: string | null
+          price_per_appointment: number | null
+          price_per_converted_lead: number | null
+          price_per_qualified_lead: number | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           subscription_ends_at: string | null
@@ -369,7 +373,11 @@ export type Database = {
           credits_limit?: number | null
           credits_used?: number | null
           organization_id: string
+          performance_billing_enabled?: boolean | null
           plan_tier?: string | null
+          price_per_appointment?: number | null
+          price_per_converted_lead?: number | null
+          price_per_qualified_lead?: number | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_ends_at?: string | null
@@ -383,7 +391,11 @@ export type Database = {
           credits_limit?: number | null
           credits_used?: number | null
           organization_id?: string
+          performance_billing_enabled?: boolean | null
           plan_tier?: string | null
+          price_per_appointment?: number | null
+          price_per_converted_lead?: number | null
+          price_per_qualified_lead?: number | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_ends_at?: string | null
@@ -892,6 +904,92 @@ export type Database = {
           },
         ]
       }
+      leads: {
+        Row: {
+          agent_id: string | null
+          client_id: string | null
+          conversation_id: string | null
+          converted_at: string | null
+          created_at: string
+          email: string | null
+          id: string
+          metadata: Json | null
+          name: string | null
+          organization_id: string
+          phone: string | null
+          qualified_at: string | null
+          score: number | null
+          source: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id?: string | null
+          client_id?: string | null
+          conversation_id?: string | null
+          converted_at?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          metadata?: Json | null
+          name?: string | null
+          organization_id: string
+          phone?: string | null
+          qualified_at?: string | null
+          score?: number | null
+          source?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string | null
+          client_id?: string | null
+          conversation_id?: string | null
+          converted_at?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          metadata?: Json | null
+          name?: string | null
+          organization_id?: string
+          phone?: string | null
+          qualified_at?: string | null
+          score?: number | null
+          source?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_api_keys: {
         Row: {
           created_at: string
@@ -1194,6 +1292,71 @@ export type Database = {
           },
           {
             foreignKeyName: "outbound_campaigns_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      performance_metrics: {
+        Row: {
+          appointments_booked: number | null
+          appointments_completed: number | null
+          billable_amount: number | null
+          billed_at: string | null
+          conversations_count: number | null
+          created_at: string
+          id: string
+          leads_converted: number | null
+          leads_generated: number | null
+          leads_qualified: number | null
+          organization_id: string
+          period_end: string
+          period_start: string
+          stripe_invoice_id: string | null
+          total_duration_minutes: number | null
+          updated_at: string
+        }
+        Insert: {
+          appointments_booked?: number | null
+          appointments_completed?: number | null
+          billable_amount?: number | null
+          billed_at?: string | null
+          conversations_count?: number | null
+          created_at?: string
+          id?: string
+          leads_converted?: number | null
+          leads_generated?: number | null
+          leads_qualified?: number | null
+          organization_id: string
+          period_end: string
+          period_start: string
+          stripe_invoice_id?: string | null
+          total_duration_minutes?: number | null
+          updated_at?: string
+        }
+        Update: {
+          appointments_booked?: number | null
+          appointments_completed?: number | null
+          billable_amount?: number | null
+          billed_at?: string | null
+          conversations_count?: number | null
+          created_at?: string
+          id?: string
+          leads_converted?: number | null
+          leads_generated?: number | null
+          leads_qualified?: number | null
+          organization_id?: string
+          period_end?: string
+          period_start?: string
+          stripe_invoice_id?: string | null
+          total_duration_minutes?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_metrics_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"

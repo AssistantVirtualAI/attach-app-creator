@@ -89,3 +89,6 @@ verify_jwt = false
 
 [functions.generate-faq]
 verify_jwt = true
+
+[functions.calculate-performance-billing]
+verify_jwt = true
