@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, Home, TrendingUp, MessageSquare, BookOpen, Settings, Bot, Webhook, CreditCard, Sliders, Moon, Sun, Users, BarChart3, GitBranch, Menu, X, Tag, Phone, Calendar, FileQuestion, Sparkles, UserPlus, Headphones } from 'lucide-react';
+import { Activity, Home, TrendingUp, MessageSquare, BookOpen, Settings, Bot, Webhook, CreditCard, Sliders, Moon, Sun, Users, BarChart3, GitBranch, Menu, X, Tag, Phone, Calendar, FileQuestion, Sparkles, UserPlus, Headphones, MessageCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useOrganization } from '@/context/OrganizationContext';
@@ -39,6 +39,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
     { name: 'Handoffs', href: '/handoffs', icon: Headphones },
     { name: 'Topics', href: '/topics', icon: Tag },
     { name: 'Campagnes', href: '/campaigns', icon: Phone },
+    { name: 'Templates SMS', href: '/sms-templates', icon: MessageCircle },
     { name: 'Rendez-vous', href: '/appointments', icon: Calendar },
     { name: 'Rapports Agents', href: '/agent-reports', icon: FileQuestion },
     { name: 'Workflows', href: '/workflows', icon: GitBranch },

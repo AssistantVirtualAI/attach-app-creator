@@ -1532,6 +1532,50 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_templates: {
+        Row: {
+          category: string | null
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          name: string
+          organization_id: string
+          updated_at: string
+          variables: string[] | null
+        }
+        Insert: {
+          category?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          organization_id: string
+          updated_at?: string
+          variables?: string[] | null
+        }
+        Update: {
+          category?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          organization_id?: string
+          updated_at?: string
+          variables?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       topic_aggregates: {
         Row: {
           avg_sentiment: number | null

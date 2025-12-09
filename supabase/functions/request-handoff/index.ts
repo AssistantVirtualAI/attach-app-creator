@@ -55,8 +55,21 @@ serve(async (req) => {
 
     console.log('Handoff request created:', handoff.id);
 
-    // Optionally: Send notifications to available agents
-    // This could be via email, push notification, or in-app notification
+    // Send notifications to available agents
+    try {
+      await supabase.functions.invoke('notify-handoff', {
+        body: {
+          handoffId: handoff.id,
+          organizationId,
+          customerInfo,
+          reason,
+        }
+      });
+      console.log('Handoff notifications sent');
+    } catch (notifyError) {
+      console.error('Failed to send notifications:', notifyError);
+      // Continue even if notifications fail
+    }
 
     return new Response(JSON.stringify({ 
       success: true, 

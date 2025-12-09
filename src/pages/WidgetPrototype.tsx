@@ -2,9 +2,10 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useConversation } from '@11labs/react';
 import { supabase } from '@/integrations/supabase/client';
-import { Mic, MicOff, Volume2, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Volume2, Loader2, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface AgentData {
   id: string;
@@ -14,6 +15,7 @@ interface AgentData {
   branding_url: string | null;
   platform_agent_id: string | null;
   platform: string;
+  organization_id: string;
   theme_config: {
     primaryColor?: string;
     secondaryColor?: string;
@@ -28,6 +30,26 @@ interface TranscriptMessage {
   timestamp: Date;
 }
 
+// Keywords that trigger handoff to human
+const HANDOFF_KEYWORDS = [
+  'parler à un humain',
+  'parler a un humain',
+  'agent humain',
+  'personne réelle',
+  'personne reelle',
+  'talk to human',
+  'speak to human',
+  'real person',
+  'human agent',
+  'représentant',
+  'representant',
+  'conseiller',
+  'opérateur',
+  'operateur',
+  'transfert',
+  'escalade',
+];
+
 const WidgetPrototype = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const [agent, setAgent] = useState<AgentData | null>(null);
@@ -35,6 +57,54 @@ const WidgetPrototype = () => {
   const [error, setError] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [handoffRequested, setHandoffRequested] = useState(false);
+
+  // Check if message contains handoff keywords
+  const checkForHandoffTrigger = useCallback((message: string) => {
+    const lowerMessage = message.toLowerCase();
+    return HANDOFF_KEYWORDS.some(keyword => lowerMessage.includes(keyword));
+  }, []);
+
+  // Request handoff to human agent
+  const requestHandoff = useCallback(async (reason: string) => {
+    if (!agent || handoffRequested) return;
+
+    setHandoffRequested(true);
+    
+    try {
+      const transcriptText = transcript.map(m => 
+        `${m.role === 'agent' ? agent.name : 'User'}: ${m.text}`
+      ).join('\n');
+
+      const { data, error: handoffError } = await supabase.functions.invoke('request-handoff', {
+        body: {
+          organizationId: agent.organization_id,
+          agentId: agent.id,
+          reason,
+          priority: 'normal',
+          customerInfo: {
+            name: 'Widget User',
+          },
+          transcriptSnapshot: transcriptText,
+        }
+      });
+
+      if (handoffError) throw handoffError;
+
+      toast.success('Demande de transfert envoyée ! Un agent humain vous contactera bientôt.');
+      
+      setTranscript(prev => [...prev, {
+        role: 'agent',
+        text: '🤝 Votre demande de parler à un agent humain a été enregistrée. Un conseiller vous contactera très bientôt.',
+        timestamp: new Date(),
+      }]);
+
+    } catch (err) {
+      console.error('Error requesting handoff:', err);
+      toast.error('Impossible de transférer vers un agent humain');
+      setHandoffRequested(false);
+    }
+  }, [agent, transcript, handoffRequested]);
 
   // ElevenLabs useConversation hook
   const conversation = useConversation({
@@ -49,11 +119,18 @@ const WidgetPrototype = () => {
       console.log('Message received:', message);
       if (message.message) {
         const role = message.source === 'ai' ? 'agent' : 'user';
+        const text = message.message;
+        
         setTranscript(prev => [...prev, {
           role,
-          text: message.message,
+          text,
           timestamp: new Date(),
         }]);
+
+        // Check for handoff trigger in user messages
+        if (role === 'user' && checkForHandoffTrigger(text)) {
+          requestHandoff(`User said: "${text}"`);
+        }
       }
     },
     onError: (error) => {
@@ -74,7 +151,7 @@ const WidgetPrototype = () => {
 
       const { data, error: fetchError } = await supabase
         .from('agents')
-        .select('id, name, description, avatar_url, branding_url, platform_agent_id, platform, theme_config')
+        .select('id, name, description, avatar_url, branding_url, platform_agent_id, platform, organization_id, theme_config')
         .eq('id', agentId)
         .single();
 
@@ -113,6 +190,7 @@ const WidgetPrototype = () => {
       
       setIsConnecting(true);
       setError(null);
+      setHandoffRequested(false);
       
       // Get signed URL from edge function
       const { data, error: urlError } = await supabase.functions.invoke('elevenlabs-signed-url', {
@@ -179,6 +257,11 @@ const WidgetPrototype = () => {
     }
   }, [conversation, agent, transcript]);
 
+  // Manual handoff button handler
+  const handleManualHandoff = useCallback(() => {
+    requestHandoff('User clicked handoff button');
+  }, [requestHandoff]);
+
   const themeConfig = agent?.theme_config || {};
   const primaryColor = themeConfig.primaryColor || '#8B5CF6';
   const borderRadius = themeConfig.borderRadius || '12px';
@@ -188,6 +271,7 @@ const WidgetPrototype = () => {
 
   // Determine current status
   const getStatusInfo = () => {
+    if (handoffRequested) return { text: 'Transfert en cours...', color: 'bg-yellow-500' };
     if (isConnecting) return { text: 'Connexion...', color: 'bg-yellow-500' };
     if (!isConnected) return { text: 'Prêt à démarrer', color: 'bg-muted-foreground' };
     if (isSpeaking) return { text: 'En train de parler...', color: 'bg-primary' };
@@ -332,7 +416,7 @@ const WidgetPrototype = () => {
           )}
 
           {/* Controls */}
-          <div className="p-6 flex justify-center">
+          <div className="p-6 flex justify-center gap-4">
             {!isConnected ? (
               <Button
                 size="lg"
@@ -348,16 +432,37 @@ const WidgetPrototype = () => {
                 )}
               </Button>
             ) : (
-              <Button
-                size="lg"
-                variant="destructive"
-                className="w-16 h-16 rounded-full"
-                onClick={handleEndConversation}
-              >
-                <MicOff className="h-8 w-8" />
-              </Button>
+              <>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-14 h-14 rounded-full"
+                  onClick={handleManualHandoff}
+                  disabled={handoffRequested}
+                  title="Parler à un humain"
+                >
+                  <UserRound className="h-6 w-6" />
+                </Button>
+                <Button
+                  size="lg"
+                  variant="destructive"
+                  className="w-16 h-16 rounded-full"
+                  onClick={handleEndConversation}
+                >
+                  <MicOff className="h-8 w-8" />
+                </Button>
+              </>
             )}
           </div>
+
+          {/* Handoff hint */}
+          {isConnected && !handoffRequested && (
+            <div className="px-6 pb-4 text-center">
+              <p className="text-xs text-muted-foreground">
+                Dites "parler à un humain" ou cliquez sur l'icône pour être transféré
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
