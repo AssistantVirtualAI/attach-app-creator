@@ -47,6 +47,8 @@ import Appointments from "./pages/Appointments";
 import AgentReports from "./pages/AgentReports";
 import AgentBuilder from "./pages/AgentBuilder";
 import Leads from "./pages/Leads";
+import PhoneNumbers from "./pages/PhoneNumbers";
+import Handoffs from "./pages/Handoffs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -298,6 +300,22 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <Leads />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/phone-numbers"
+                  element={
+                    <ProtectedRoute>
+                      <PhoneNumbers />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/handoffs"
+                  element={
+                    <ProtectedRoute>
+                      <Handoffs />
                     </ProtectedRoute>
                   }
                 />
