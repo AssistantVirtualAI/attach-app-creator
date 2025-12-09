@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useLeads } from '@/hooks/useLeads';
 import { LeadsTable } from '@/components/leads/LeadsTable';
 import { LeadFilters } from '@/components/leads/LeadFilters';
+import { LeadsCharts } from '@/components/leads/LeadsCharts';
 import { AddLeadModal } from '@/components/leads/AddLeadModal';
-import { Button } from '@/components/ui/button';
-import { Plus, Users, UserCheck, Phone, Trophy, XCircle } from 'lucide-react';
+import { Plus, Users, UserCheck, Phone, Trophy, XCircle, BarChart3 } from 'lucide-react';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
 
 export default function Leads() {
   const { leads, stats, isLoading } = useLeads();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showCharts, setShowCharts] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,11 +60,20 @@ export default function Leads() {
               Gérez vos prospects et suivez leur progression
             </p>
           </div>
-          <Button onClick={() => setIsModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nouveau lead
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowCharts(!showCharts)}>
+              <BarChart3 className="mr-2 h-4 w-4" />
+              {showCharts ? 'Masquer' : 'Graphiques'}
+            </Button>
+            <Button onClick={() => setIsModalOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nouveau lead
+            </Button>
+          </div>
         </div>
+
+        {/* Charts */}
+        {showCharts && <LeadsCharts leads={leads} />}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

@@ -95,3 +95,9 @@ verify_jwt = true
 
 [functions.simulate-agent]
 verify_jwt = true
+
+[functions.twilio-phone-numbers]
+verify_jwt = true
+
+[functions.request-handoff]
+verify_jwt = false
