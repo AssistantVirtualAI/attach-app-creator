@@ -15,12 +15,22 @@ const Dashboard = () => {
     conversationsToday: 0,
     conversationsThisWeek: 0,
     conversationsThisMonth: 0,
+    previousPeriodConversations: 0,
+    conversationsTrend: 0,
+    incomingMessages: 0,
+    previousPeriodMessages: 0,
+    messagesTrend: 0,
+    uniqueUsers: 0,
+    previousPeriodUsers: 0,
+    usersTrend: 0,
+    avgInteractions: 0,
     avgSatisfaction: 0,
     avgDuration: 0,
     activeClients: 0,
     totalAgents: 0,
     platformDistribution: [],
     recentActivity: [],
+    lastUpdated: new Date().toISOString(),
   };
 
   return (
