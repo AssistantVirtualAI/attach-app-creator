@@ -202,6 +202,105 @@ export type Database = {
           },
         ]
       }
+      appointments: {
+        Row: {
+          agent_id: string | null
+          attendee_email: string | null
+          attendee_name: string | null
+          attendee_phone: string | null
+          calendar_integration_id: string | null
+          client_id: string | null
+          conversation_id: string | null
+          created_at: string
+          description: string | null
+          end_time: string
+          external_event_id: string | null
+          id: string
+          metadata: Json | null
+          organization_id: string
+          start_time: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id?: string | null
+          attendee_email?: string | null
+          attendee_name?: string | null
+          attendee_phone?: string | null
+          calendar_integration_id?: string | null
+          client_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          description?: string | null
+          end_time: string
+          external_event_id?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id: string
+          start_time: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string | null
+          attendee_email?: string | null
+          attendee_name?: string | null
+          attendee_phone?: string | null
+          calendar_integration_id?: string | null
+          client_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          description?: string | null
+          end_time?: string
+          external_event_id?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string
+          start_time?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_calendar_integration_id_fkey"
+            columns: ["calendar_integration_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -297,6 +396,53 @@ export type Database = {
             foreignKeyName: "billing_config_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_integrations: {
+        Row: {
+          access_token: string | null
+          calendar_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean | null
+          organization_id: string
+          provider: string
+          refresh_token: string | null
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          calendar_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          organization_id: string
+          provider?: string
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          calendar_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          organization_id?: string
+          provider?: string
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
