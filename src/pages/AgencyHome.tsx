@@ -27,7 +27,6 @@ import {
   AlertTitle,
 } from "@/components/ui/alert";
 import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
-import { LoadingDemo } from "@/components/ui/loading-demo";
 
 const AgencyHome = () => {
   const { selectedOrg } = useOrganization();
@@ -254,9 +253,6 @@ const AgencyHome = () => {
             </div>
           </CardContent>
         </Card>
-
-        {/* Loading Demo Section */}
-        <LoadingDemo />
       </div>
     </AppLayout>
   );
