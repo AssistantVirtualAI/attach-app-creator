@@ -39,6 +39,7 @@ import WidgetIframe from "./pages/WidgetIframe";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import BAAgreement from "./pages/BAAgreement";
 import Legal from "./pages/Legal";
+import Docs from "./pages/Docs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -239,6 +240,7 @@ const App = () => (
                 />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/legal" element={<Legal />} />
+                <Route path="/docs" element={<Docs />} />
                 
                 {/* Client Portal Routes - Separate authentication */}
                 <Route
