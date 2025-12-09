@@ -809,6 +809,82 @@ export type Database = {
           },
         ]
       }
+      handoff_requests: {
+        Row: {
+          accepted_at: string | null
+          agent_id: string | null
+          chat_messages: Json | null
+          completed_at: string | null
+          conversation_id: string | null
+          customer_info: Json | null
+          human_agent_id: string | null
+          id: string
+          metadata: Json | null
+          organization_id: string
+          priority: string | null
+          reason: string | null
+          requested_at: string | null
+          status: string | null
+          transcript_snapshot: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          agent_id?: string | null
+          chat_messages?: Json | null
+          completed_at?: string | null
+          conversation_id?: string | null
+          customer_info?: Json | null
+          human_agent_id?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id: string
+          priority?: string | null
+          reason?: string | null
+          requested_at?: string | null
+          status?: string | null
+          transcript_snapshot?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          agent_id?: string | null
+          chat_messages?: Json | null
+          completed_at?: string | null
+          conversation_id?: string | null
+          customer_info?: Json | null
+          human_agent_id?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string
+          priority?: string | null
+          reason?: string | null
+          requested_at?: string | null
+          status?: string | null
+          transcript_snapshot?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handoff_requests_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handoff_requests_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handoff_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_base: {
         Row: {
           category: string | null
@@ -1357,6 +1433,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "performance_metrics_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      phone_numbers: {
+        Row: {
+          capabilities: Json | null
+          created_at: string | null
+          friendly_name: string | null
+          id: string
+          is_verified: boolean | null
+          metadata: Json | null
+          monthly_cost: number | null
+          organization_id: string
+          phone_number: string
+          provider: string
+          provider_sid: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          capabilities?: Json | null
+          created_at?: string | null
+          friendly_name?: string | null
+          id?: string
+          is_verified?: boolean | null
+          metadata?: Json | null
+          monthly_cost?: number | null
+          organization_id: string
+          phone_number: string
+          provider?: string
+          provider_sid?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          capabilities?: Json | null
+          created_at?: string | null
+          friendly_name?: string | null
+          id?: string
+          is_verified?: boolean | null
+          metadata?: Json | null
+          monthly_cost?: number | null
+          organization_id?: string
+          phone_number?: string
+          provider?: string
+          provider_sid?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phone_numbers_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
