@@ -1,12 +1,14 @@
 import { ReactNode, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, Home, TrendingUp, MessageSquare, BookOpen, Settings, Bot, Webhook, CreditCard, Sliders, Moon, Sun, Users, BarChart3, GitBranch, Menu, X, Tag, Phone, Calendar, FileQuestion, Sparkles, UserPlus, Headphones, MessageCircle } from 'lucide-react';
+import { Activity, Menu, X, Moon, Sun, Settings } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useOrganization } from '@/context/OrganizationContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useTheme } from '@/context/ThemeContext';
 import { SidebarFooter } from '@/components/sidebar/SidebarFooter';
+import { SidebarNavGroup } from '@/components/sidebar/SidebarNavGroup';
+import { sidebarGroups, settingsLink } from '@/components/sidebar/sidebarConfig';
 import { CookieConsentBanner } from '@/components/gdpr/CookieConsentBanner';
 
 interface AppLayoutProps {
@@ -20,48 +22,14 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Base navigation for all users
-  const baseNavigation = [
-    { name: 'Maison', href: '/', icon: Home },
-    { name: 'Dashboard', href: '/dashboard', icon: TrendingUp },
-    { name: 'Conversations', href: '/conversations', icon: MessageSquare },
-    { name: 'Voice Analytics', href: '/voice-analytics', icon: BarChart3 },
-    { name: 'Base de connaissances', href: '/knowledge-base', icon: BookOpen },
-  ];
+  // Filter groups based on role
+  const visibleGroups = sidebarGroups.filter(group => {
+    if (group.adminOnly && isRole('agent')) return false;
+    return true;
+  });
 
-  // Admin-only navigation
-  const adminNavigation = [
-    { name: 'Clientèle', href: '/clients', icon: Users },
-    { name: 'Agents', href: '/agents', icon: Bot },
-    { name: 'Agent Builder', href: '/agent-builder', icon: Sparkles },
-    { name: 'Leads', href: '/leads', icon: UserPlus },
-    { name: 'Numéros', href: '/phone-numbers', icon: Phone },
-    { name: 'Handoffs', href: '/handoffs', icon: Headphones },
-    { name: 'Topics', href: '/topics', icon: Tag },
-    { name: 'Campagnes', href: '/campaigns', icon: Phone },
-    { name: 'Templates SMS', href: '/sms-templates', icon: MessageCircle },
-    { name: 'Rendez-vous', href: '/appointments', icon: Calendar },
-    { name: 'Rapports Agents', href: '/agent-reports', icon: FileQuestion },
-    { name: 'Workflows', href: '/workflows', icon: GitBranch },
-    { name: 'Intégrations', href: '/integrations', icon: Sliders },
-    { name: 'Journaux Webhook', href: '/webhook-logs', icon: Webhook },
-    { name: 'Facturation Stripe', href: '/stripe-billing', icon: CreditCard },
-    { name: 'Config SaaS', href: '/saas-config', icon: Settings },
-  ];
-
-  // Settings available for all
-  const settingsNavigation = [
-    { name: 'Paramètres', href: '/settings', icon: Settings },
-  ];
-
-  // Combine navigation based on role
-  const navigation = [
-    ...baseNavigation,
-    ...(!isRole('agent') ? adminNavigation : []),
-    ...settingsNavigation,
-  ];
-
-  const isActive = (href: string) => location.pathname === href;
+  const isSettingsActive = location.pathname === settingsLink.href;
+  const SettingsIcon = settingsLink.icon;
 
   return (
     <div className="min-h-screen bg-[var(--gradient-hero)] cyber-grid">
@@ -135,25 +103,28 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setIsSidebarOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-                    isActive(item.href)
-                      ? 'bg-primary/20 text-primary border border-primary/30 shadow-neon'
-                      : 'text-muted-foreground hover:bg-card/50 hover:text-foreground'
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="font-medium">{item.name}</span>
-                </Link>
-              );
-            })}
+          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+            {visibleGroups.map((group) => (
+              <SidebarNavGroup
+                key={group.id}
+                group={group}
+                onNavigate={() => setIsSidebarOpen(false)}
+              />
+            ))}
+            
+            {/* Settings link - always visible */}
+            <Link
+              to={settingsLink.href}
+              onClick={() => setIsSidebarOpen(false)}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 mt-2 ${
+                isSettingsActive
+                  ? 'bg-primary/20 text-primary border border-primary/30 shadow-neon'
+                  : 'text-muted-foreground hover:bg-card/50 hover:text-foreground'
+              }`}
+            >
+              <SettingsIcon className="w-5 h-5" />
+              <span className="font-medium text-sm">{settingsLink.name}</span>
+            </Link>
           </nav>
 
           {/* Footer */}
