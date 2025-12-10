@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, Plus, RefreshCw, BookOpen, Tag, Edit, Trash2, X } from 'lucide-react';
 import { motion } from 'framer-motion';
+import DOMPurify from 'dompurify';
 import { KnowledgeBaseEditor } from '@/components/knowledge/KnowledgeBaseEditor';
 import { 
   useKnowledgeBase, 
@@ -291,7 +292,7 @@ const KnowledgeBase = () => {
               <div className="p-6 overflow-y-auto max-h-[60vh]">
                 <div 
                   className="prose prose-invert max-w-none"
-                  dangerouslySetInnerHTML={{ __html: selectedItem.content }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedItem.content) }}
                 />
                 
                 {selectedItem.tags.length > 0 && (

@@ -6,6 +6,42 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Simple in-memory rate limiter
+const rateLimiter = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(ip: string, maxRequests: number = 10, windowMs: number = 60000): boolean {
+  const now = Date.now();
+  const entry = rateLimiter.get(ip);
+  
+  // Clean up old entries periodically
+  if (rateLimiter.size > 10000) {
+    for (const [key, value] of rateLimiter.entries()) {
+      if (now > value.resetAt) {
+        rateLimiter.delete(key);
+      }
+    }
+  }
+  
+  if (!entry || now > entry.resetAt) {
+    rateLimiter.set(ip, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  
+  if (entry.count >= maxRequests) {
+    return false;
+  }
+  
+  entry.count++;
+  return true;
+}
+
+function getClientIP(req: Request): string {
+  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+         req.headers.get('cf-connecting-ip') || 
+         req.headers.get('x-real-ip') || 
+         'unknown';
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -13,11 +49,30 @@ serve(async (req) => {
   }
 
   try {
+    // Rate limiting: 10 requests per minute per IP
+    const clientIP = getClientIP(req);
+    if (!checkRateLimit(clientIP, 10, 60000)) {
+      console.warn(`Rate limit exceeded for IP: ${clientIP}`);
+      return new Response(
+        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { agentId } = await req.json();
 
-    if (!agentId) {
+    // Validate agentId format (UUID)
+    if (!agentId || typeof agentId !== 'string') {
       return new Response(
         JSON.stringify({ error: 'Agent ID is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(agentId)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid Agent ID format' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -27,10 +82,10 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch agent with API key
+    // Fetch agent with API key - also verify agent is active and has required config
     const { data: agent, error: agentError } = await supabase
       .from('agents')
-      .select('platform_agent_id, platform_api_key, platform')
+      .select('platform_agent_id, platform_api_key, platform, organization_id')
       .eq('id', agentId)
       .single();
 
@@ -39,6 +94,21 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Agent not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify organization exists and is active
+    const { data: org, error: orgError } = await supabase
+      .from('organizations')
+      .select('id, is_active')
+      .eq('id', agent.organization_id)
+      .single();
+
+    if (orgError || !org || !org.is_active) {
+      console.error('Organization validation failed:', orgError);
+      return new Response(
+        JSON.stringify({ error: 'Agent organization is not active' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -78,7 +148,7 @@ serve(async (req) => {
 
     const { signed_url } = await elevenLabsResponse.json();
 
-    console.log('Successfully generated signed URL for agent:', agentId);
+    console.log('Successfully generated signed URL for agent:', agentId, 'from IP:', clientIP);
 
     return new Response(
       JSON.stringify({ signedUrl: signed_url }),

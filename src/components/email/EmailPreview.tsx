@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Eye } from 'lucide-react';
+import DOMPurify from 'dompurify';
 
 interface EmailPreviewProps {
   subject: string;
@@ -43,7 +44,7 @@ export const EmailPreview = ({ subject, greeting, body, organizationName = 'Votr
             )}
             <div 
               className="prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: replaceVariables(body) || '<p class="text-muted-foreground">Contenu de l\'email...</p>' }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(replaceVariables(body) || '<p class="text-muted-foreground">Contenu de l\'email...</p>') }}
             />
           </div>
 
