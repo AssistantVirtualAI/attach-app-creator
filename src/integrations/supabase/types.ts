@@ -272,6 +272,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "appointments_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "appointments_calendar_integration_id_fkey"
             columns: ["calendar_integration_id"]
             isOneToOne: false
@@ -609,6 +616,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "clients_assigned_agent_id_fkey"
+            columns: ["assigned_agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "clients_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
@@ -753,6 +767,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "conversations_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "conversations_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -867,6 +888,13 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "handoff_requests_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
             referencedColumns: ["id"]
           },
           {
@@ -1041,6 +1069,13 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
             referencedColumns: ["id"]
           },
           {
@@ -1364,6 +1399,13 @@ export type Database = {
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "outbound_campaigns_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
             referencedColumns: ["id"]
           },
           {
@@ -1862,7 +1904,85 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      agents_safe: {
+        Row: {
+          assigned_to: string | null
+          avatar_url: string | null
+          branding_url: string | null
+          client_id: string | null
+          config: Json | null
+          created_at: string | null
+          description: string | null
+          id: string | null
+          is_external: boolean | null
+          name: string | null
+          organization_id: string | null
+          platform: string | null
+          platform_agent_id: string | null
+          theme_config: Json | null
+          updated_at: string | null
+          widget_layout: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          avatar_url?: string | null
+          branding_url?: string | null
+          client_id?: string | null
+          config?: Json | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          is_external?: boolean | null
+          name?: string | null
+          organization_id?: string | null
+          platform?: string | null
+          platform_agent_id?: string | null
+          theme_config?: Json | null
+          updated_at?: string | null
+          widget_layout?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          avatar_url?: string | null
+          branding_url?: string | null
+          client_id?: string | null
+          config?: Json | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          is_external?: boolean | null
+          name?: string | null
+          organization_id?: string | null
+          platform?: string | null
+          platform_agent_id?: string | null
+          theme_config?: Json | null
+          updated_at?: string | null
+          widget_layout?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agents_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       generate_api_key: { Args: never; Returns: string }
