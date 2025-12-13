@@ -47,11 +47,11 @@ export class IntegrationsService {
     return data;
   }
 
-  // Get integrations (without exposing API keys)
+  // Get integrations using safe view (excludes API keys for security)
   static async getIntegrations() {
     const { data, error } = await supabase
-      .from('organization_integrations')
-      .select('id, platform, agent_id, is_active, test_status, test_error, last_tested_at, created_at')
+      .from('organization_integrations_safe')
+      .select('*')
       .order('created_at', { ascending: false });
 
     if (error) throw error;

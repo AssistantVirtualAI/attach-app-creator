@@ -28,8 +28,9 @@ export function IntegrationsTab() {
     queryKey: ['integrations', selectedOrgId],
     queryFn: async () => {
       if (!selectedOrgId) return [];
+      // Use safe view that excludes api_key for security
       const { data, error } = await supabase
-        .from('organization_integrations')
+        .from('organization_integrations_safe')
         .select('*')
         .eq('organization_id', selectedOrgId);
       if (error) throw error;
