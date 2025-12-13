@@ -1983,6 +1983,59 @@ export type Database = {
           },
         ]
       }
+      organization_integrations_safe: {
+        Row: {
+          additional_config: Json | null
+          agent_id: string | null
+          created_at: string | null
+          id: string | null
+          is_active: boolean | null
+          last_tested_at: string | null
+          organization_id: string | null
+          platform: string | null
+          test_error: string | null
+          test_status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          additional_config?: Json | null
+          agent_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_tested_at?: string | null
+          organization_id?: string | null
+          platform?: string | null
+          test_error?: string | null
+          test_status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          additional_config?: Json | null
+          agent_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          last_tested_at?: string | null
+          organization_id?: string | null
+          platform?: string | null
+          test_error?: string | null
+          test_status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       generate_api_key: { Args: never; Returns: string }
