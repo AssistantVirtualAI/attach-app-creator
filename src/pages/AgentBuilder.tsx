@@ -19,7 +19,7 @@ export default function AgentBuilder() {
   const navigate = useNavigate();
   const { agentId } = useParams<{ agentId?: string }>();
   const { selectedOrgId } = useOrganization();
-  const [selectedClientId, setSelectedClientId] = useState('');
+  const [selectedClientId, setSelectedClientId] = useState<string | undefined>(undefined);
   
   const {
     config,
@@ -137,12 +137,15 @@ export default function AgentBuilder() {
             {!isEditMode && (
               <div className="w-64">
                 <Label>Assigner à un client</Label>
-                <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                <Select
+                  value={selectedClientId}
+                  onValueChange={(v) => setSelectedClientId(v === 'none' ? undefined : v)}
+                >
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Aucun client" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucun</SelectItem>
+                    <SelectItem value="none">Aucun</SelectItem>
                     {clients?.map((client) => (
                       <SelectItem key={client.id} value={client.id}>
                         {client.name}
