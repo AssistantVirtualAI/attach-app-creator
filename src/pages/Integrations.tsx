@@ -59,46 +59,87 @@ export default function Integrations() {
   const searchParams = new URLSearchParams(location.search);
   const fromAgents = searchParams.get('from') === 'agents';
 
+  // Fetch integrations - works with or without organization
   const { data: integrations = [], refetch } = useQuery({
     queryKey: ['integrations', selectedOrgId],
     queryFn: async () => {
-      if (!selectedOrgId) return [];
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
 
-      const { data, error } = await supabase
+      // Fetch user's integrations (with or without org)
+      let query = supabase
         .from('organization_integrations')
         .select('*')
-        .eq('organization_id', selectedOrgId);
+        .eq('user_id', user.id);
 
+      if (selectedOrgId) {
+        query = query.eq('organization_id', selectedOrgId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
-    enabled: !!selectedOrgId,
   });
 
   const handleSave = async () => {
-    if (!selectedOrgId || !selectedPlatform || !apiKey) return;
+    if (!selectedPlatform || !apiKey) {
+      toast({
+        title: 'Erreur',
+        description: 'Veuillez remplir tous les champs requis',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     try {
       setTesting(true);
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      const { error } = await supabase
-        .from('organization_integrations')
-        .insert({
-          organization_id: selectedOrgId,
-          user_id: user.id,
-          platform: selectedPlatform,
-          api_key: apiKey,
-          agent_id: agentId || null,
-          is_active: true,
+      if (!user) {
+        toast({
+          title: 'Erreur',
+          description: 'Vous devez être connecté pour ajouter une intégration',
+          variant: 'destructive',
         });
+        return;
+      }
 
-      if (error) throw error;
+      // Check if integration already exists for this platform
+      const existingIntegration = integrations.find(
+        (int) => int.platform === selectedPlatform
+      );
+
+      if (existingIntegration) {
+        // Update existing integration
+        const { error } = await supabase
+          .from('organization_integrations')
+          .update({
+            api_key: apiKey,
+            agent_id: agentId || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingIntegration.id);
+
+        if (error) throw error;
+      } else {
+        // Insert new integration
+        const { error } = await supabase
+          .from('organization_integrations')
+          .insert({
+            organization_id: selectedOrgId || null,
+            user_id: user.id,
+            platform: selectedPlatform,
+            api_key: apiKey,
+            agent_id: agentId || null,
+            is_active: true,
+          });
+
+        if (error) throw error;
+      }
 
       toast({
-        title: 'Intégration ajoutée',
+        title: 'Intégration sauvegardée',
         description: 'La configuration a été sauvegardée avec succès',
       });
 
@@ -107,9 +148,10 @@ export default function Integrations() {
       setAgentId('');
       refetch();
     } catch (error: any) {
+      console.error('Integration save error:', error);
       toast({
         title: 'Erreur',
-        description: error.message,
+        description: error.message || 'Impossible de sauvegarder l\'intégration',
         variant: 'destructive',
       });
     } finally {
