@@ -39,7 +39,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
   const [step, setStep] = useState(1);
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [selectedIntegration, setSelectedIntegration] = useState('');
-  const [selectedClientId, setSelectedClientId] = useState('');
+  const [selectedClientId, setSelectedClientId] = useState<string | undefined>(undefined);
   const [agentName, setAgentName] = useState('');
   const [agentId, setAgentId] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -259,12 +259,15 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
 
       <div className="space-y-2">
         <Label htmlFor="clientId">Assigner à un client (optionnel)</Label>
-        <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+        <Select
+          value={selectedClientId}
+          onValueChange={(v) => setSelectedClientId(v === 'none' ? undefined : v)}
+        >
           <SelectTrigger id="clientId">
             <SelectValue placeholder="Aucun client assigné" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Aucun</SelectItem>
+            <SelectItem value="none">Aucun</SelectItem>
             {clients?.map((client) => (
               <SelectItem key={client.id} value={client.id}>
                 {client.name}
