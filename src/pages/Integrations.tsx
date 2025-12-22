@@ -85,11 +85,11 @@ export default function Integrations() {
     },
   });
 
-  const testIntegration = async (integrationId: string, platform: string) => {
+  const testIntegration = async (platform: string) => {
     setTestingPlatform(platform);
     try {
       const { data, error } = await supabase.functions.invoke('test-integration', {
-        body: { integrationId },
+        body: { platform },
       });
 
       if (error) throw error;
@@ -192,7 +192,7 @@ export default function Integrations() {
       await refetch();
 
       // Auto-test the integration
-      await testIntegration(integrationId, selectedPlatform);
+      await testIntegration(selectedPlatform);
 
     } catch (error: any) {
       console.error('Integration save error:', error);
@@ -306,7 +306,7 @@ export default function Integrations() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => testIntegration(integration.id, platform.value)}
+                          onClick={() => testIntegration(platform.value)}
                           disabled={isTesting}
                         >
                           {isTesting ? (
