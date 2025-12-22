@@ -54,12 +54,18 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
       if (!user) return [];
 
       // Fetch both org integrations and personal integrations (where organization_id is null)
-      const { data, error } = await supabase
+      // If no organization is selected, fall back to personal integrations only.
+      const baseQuery = supabase
         .from('organization_integrations')
         .select('*')
         .eq('platform', selectedPlatform)
-        .eq('is_active', true)
-        .or(`organization_id.eq.${selectedOrgId},and(organization_id.is.null,user_id.eq.${user.id})`);
+        .eq('is_active', true);
+
+      const { data, error } = selectedOrgId
+        ? await baseQuery.or(
+            `organization_id.eq.${selectedOrgId},and(organization_id.is.null,user_id.eq.${user.id})`
+          )
+        : await baseQuery.is('organization_id', null).eq('user_id', user.id);
 
       if (error) throw error;
       return data || [];
