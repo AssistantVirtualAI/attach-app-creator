@@ -5,21 +5,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AgentBuilderSidebar } from '@/components/agent-builder/AgentBuilderSidebar';
 import { AgentBuilderCanvas } from '@/components/agent-builder/AgentBuilderCanvas';
 import { AgentPreviewPanel } from '@/components/agent-builder/AgentPreviewPanel';
+import { AgentBuilderWizard } from '@/components/agent-builder/AgentBuilderWizard';
+import { DeployAgentModal } from '@/components/agent-builder/DeployAgentModal';
 import { useAgentBuilder, AgentBuilderConfig } from '@/hooks/useAgentBuilder';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Save, Sparkles, Eye } from 'lucide-react';
+import { ArrowLeft, Save, Sparkles, Eye, Wand2, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
+
+type BuilderMode = 'wizard' | 'advanced';
 
 export default function AgentBuilder() {
   const navigate = useNavigate();
   const { agentId } = useParams<{ agentId?: string }>();
   const { selectedOrgId } = useOrganization();
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>(undefined);
+  const [mode, setMode] = useState<BuilderMode>('wizard');
+  const [showDeployModal, setShowDeployModal] = useState(false);
   
   const {
     config,
@@ -34,10 +41,11 @@ export default function AgentBuilder() {
 
   const isEditMode = !!agentId;
 
-  // Load agent data if editing
+  // Load agent data if editing - switch to advanced mode for editing
   useEffect(() => {
     if (agentId) {
       loadAgent(agentId);
+      setMode('advanced');
     }
   }, [agentId, loadAgent]);
 
@@ -67,6 +75,10 @@ export default function AgentBuilder() {
     updateConfig(newConfig);
   }, [updateConfig]);
 
+  const handleWizardConfigChange = useCallback((updates: Partial<AgentBuilderConfig>) => {
+    updateConfig(updates);
+  }, [updateConfig]);
+
   const handleSave = async () => {
     if (isEditMode && agentId) {
       const success = await updateAgent(agentId);
@@ -78,7 +90,18 @@ export default function AgentBuilder() {
       if (newAgentId) {
         navigate(`/agent-settings/${newAgentId}`);
       }
+      return newAgentId;
     }
+    return null;
+  };
+
+  const handleWizardComplete = () => {
+    setShowDeployModal(true);
+  };
+
+  const handleDeploy = async () => {
+    const newAgentId = await saveAgent(selectedClientId || undefined);
+    return newAgentId;
   };
 
   const handlePreview = () => {
@@ -89,6 +112,71 @@ export default function AgentBuilder() {
     toast.success('Utilisez le panneau de prévisualisation à droite pour tester');
   };
 
+  // Wizard mode (default for new agents)
+  if (mode === 'wizard' && !isEditMode) {
+    return (
+      <AppLayout>
+        <div className="flex flex-col h-[calc(100vh-4rem)]">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b bg-card">
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" onClick={() => navigate('/agents')}>
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div>
+                <h1 className="text-xl font-bold flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  Créer un Agent
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Configurez votre agent IA étape par étape
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Tabs value={mode} onValueChange={(v) => setMode(v as BuilderMode)}>
+                <TabsList>
+                  <TabsTrigger value="wizard" className="flex items-center gap-2">
+                    <Wand2 className="h-4 w-4" />
+                    Assistant
+                  </TabsTrigger>
+                  <TabsTrigger value="advanced" className="flex items-center gap-2">
+                    <Settings2 className="h-4 w-4" />
+                    Avancé
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          </div>
+
+          {/* Wizard Content */}
+          <div className="flex-1 overflow-hidden">
+            <AgentBuilderWizard
+              config={config}
+              agentName={agentName}
+              onConfigChange={handleWizardConfigChange}
+              onAgentNameChange={setAgentName}
+              onComplete={handleWizardComplete}
+              isSaving={isSaving}
+            />
+          </div>
+
+          {/* Deploy Modal */}
+          <DeployAgentModal
+            open={showDeployModal}
+            onOpenChange={setShowDeployModal}
+            agentName={agentName}
+            config={config}
+            onDeploy={handleDeploy}
+            isSaving={isSaving}
+          />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // Advanced mode (canvas view)
   return (
     <AppLayout>
       <div className="flex flex-col h-[calc(100vh-4rem)]">
@@ -104,12 +192,26 @@ export default function AgentBuilder() {
                 {isEditMode ? 'Modifier l\'agent' : 'Agent Builder'}
               </h1>
               <p className="text-sm text-muted-foreground">
-                Créez votre agent IA sans code
+                {isEditMode ? 'Modifiez la configuration de votre agent' : 'Mode avancé - Glissez-déposez les blocs'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
+            {!isEditMode && (
+              <Tabs value={mode} onValueChange={(v) => setMode(v as BuilderMode)}>
+                <TabsList>
+                  <TabsTrigger value="wizard" className="flex items-center gap-2">
+                    <Wand2 className="h-4 w-4" />
+                    Assistant
+                  </TabsTrigger>
+                  <TabsTrigger value="advanced" className="flex items-center gap-2">
+                    <Settings2 className="h-4 w-4" />
+                    Avancé
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
             <Button variant="outline" onClick={handlePreview}>
               <Eye className="mr-2 h-4 w-4" />
               Prévisualiser
