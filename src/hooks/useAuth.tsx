@@ -31,60 +31,16 @@ export const useAuth = () => {
 
   const createOrganizationForNewUser = async (userId: string, email: string, fullName?: string) => {
     try {
-      // Create organization
-      const orgName = fullName ? `${fullName}'s Agency` : `Agency ${email.split('@')[0]}`;
-      const orgSlug = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '') + '-' + Date.now();
+      // Use the SECURITY DEFINER function to create org, membership, role and billing
+      const { data, error } = await supabase.rpc('setup_new_user_organization', {
+        _user_id: userId,
+        _user_email: email,
+        _full_name: fullName || null,
+      });
 
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .insert({
-          name: orgName,
-          slug: orgSlug,
-          onboarding_completed: false,
-        })
-        .select('id')
-        .single();
+      if (error) throw error;
 
-      if (orgError) throw orgError;
-
-      // Add user as org member
-      const { error: memberError } = await supabase
-        .from('organization_members')
-        .insert({
-          user_id: userId,
-          organization_id: org.id,
-          accepted_at: new Date().toISOString(),
-        });
-
-      if (memberError) throw memberError;
-
-      // Assign org_admin role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: userId,
-          organization_id: org.id,
-          role: 'org_admin',
-        });
-
-      if (roleError) throw roleError;
-
-      // Create billing config with 7-day trial
-      const trialEndsAt = new Date();
-      trialEndsAt.setDate(trialEndsAt.getDate() + 7);
-
-      const { error: billingError } = await supabase
-        .from('billing_config')
-        .insert({
-          organization_id: org.id,
-          plan_tier: 'trial',
-          trial_ends_at: trialEndsAt.toISOString(),
-          subscription_status: 'trialing',
-          client_limit: 1,
-        });
-
-      if (billingError) throw billingError;
-
+      console.log('Organization created successfully:', data);
       return { error: null };
     } catch (error: any) {
       console.error('Error creating organization:', error);
