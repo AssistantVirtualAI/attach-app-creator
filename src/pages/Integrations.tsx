@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, Loader2, TestTube, Clock } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,11 +13,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Info, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 const platforms = [
   {
@@ -54,7 +57,8 @@ export default function Integrations() {
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [agentId, setAgentId] = useState('');
-  const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testingPlatform, setTestingPlatform] = useState<string | null>(null);
 
   const searchParams = new URLSearchParams(location.search);
   const fromAgents = searchParams.get('from') === 'agents';
@@ -66,7 +70,6 @@ export default function Integrations() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      // Fetch user's integrations (with or without org)
       let query = supabase
         .from('organization_integrations')
         .select('*')
@@ -82,6 +85,41 @@ export default function Integrations() {
     },
   });
 
+  const testIntegration = async (integrationId: string, platform: string) => {
+    setTestingPlatform(platform);
+    try {
+      const { data, error } = await supabase.functions.invoke('test-integration', {
+        body: { integrationId },
+      });
+
+      if (error) throw error;
+
+      await refetch();
+
+      if (data?.success) {
+        toast({
+          title: 'Connexion réussie',
+          description: `L'intégration ${platform} fonctionne correctement`,
+        });
+      } else {
+        toast({
+          title: 'Échec de la connexion',
+          description: data?.error || 'La connexion a échoué',
+          variant: 'destructive',
+        });
+      }
+    } catch (error: any) {
+      console.error('Test integration error:', error);
+      toast({
+        title: 'Erreur de test',
+        description: error.message || 'Impossible de tester la connexion',
+        variant: 'destructive',
+      });
+    } finally {
+      setTestingPlatform(null);
+    }
+  };
+
   const handleSave = async () => {
     if (!selectedPlatform || !apiKey) {
       toast({
@@ -93,7 +131,7 @@ export default function Integrations() {
     }
 
     try {
-      setTesting(true);
+      setSaving(true);
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -105,26 +143,27 @@ export default function Integrations() {
         return;
       }
 
-      // Check if integration already exists for this platform
       const existingIntegration = integrations.find(
         (int) => int.platform === selectedPlatform
       );
 
+      let integrationId: string;
+
       if (existingIntegration) {
-        // Update existing integration
         const { error } = await supabase
           .from('organization_integrations')
           .update({
             api_key: apiKey,
             agent_id: agentId || null,
             updated_at: new Date().toISOString(),
+            test_status: 'pending',
           })
           .eq('id', existingIntegration.id);
 
         if (error) throw error;
+        integrationId = existingIntegration.id;
       } else {
-        // Insert new integration
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('organization_integrations')
           .insert({
             organization_id: selectedOrgId || null,
@@ -133,20 +172,28 @@ export default function Integrations() {
             api_key: apiKey,
             agent_id: agentId || null,
             is_active: true,
-          });
+            test_status: 'pending',
+          })
+          .select('id')
+          .single();
 
         if (error) throw error;
+        integrationId = data.id;
       }
 
       toast({
         title: 'Intégration sauvegardée',
-        description: 'La configuration a été sauvegardée avec succès',
+        description: 'Test de connexion en cours...',
       });
 
       setSelectedPlatform(null);
       setApiKey('');
       setAgentId('');
-      refetch();
+      await refetch();
+
+      // Auto-test the integration
+      await testIntegration(integrationId, selectedPlatform);
+
     } catch (error: any) {
       console.error('Integration save error:', error);
       toast({
@@ -155,12 +202,31 @@ export default function Integrations() {
         variant: 'destructive',
       });
     } finally {
-      setTesting(false);
+      setSaving(false);
     }
   };
 
   const getIntegrationStatus = (platform: string) => {
     return integrations.find((int) => int.platform === platform);
+  };
+
+  const getTestStatusBadge = (status: string | null) => {
+    switch (status) {
+      case 'success':
+        return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Connecté</Badge>;
+      case 'failed':
+        return <Badge variant="destructive">Échec</Badge>;
+      case 'pending':
+        return <Badge variant="secondary">En attente</Badge>;
+      default:
+        return <Badge variant="outline">Non testé</Badge>;
+    }
+  };
+
+  const maskAgentId = (id: string | null) => {
+    if (!id) return null;
+    if (id.length <= 8) return id;
+    return `${id.slice(0, 4)}...${id.slice(-4)}`;
   };
 
   return (
@@ -194,6 +260,7 @@ export default function Integrations() {
           {platforms.map((platform) => {
             const integration = getIntegrationStatus(platform.value);
             const isConfigured = !!integration;
+            const isTesting = testingPlatform === platform.value;
 
             return (
               <Card key={platform.value} className="glass-card">
@@ -202,7 +269,10 @@ export default function Integrations() {
                     <div className="flex items-center gap-3">
                       <span className="text-4xl">{platform.icon}</span>
                       <div>
-                        <CardTitle>{platform.name}</CardTitle>
+                        <CardTitle className="flex items-center gap-2">
+                          {platform.name}
+                          {isConfigured && getTestStatusBadge(integration.test_status)}
+                        </CardTitle>
                         <CardDescription>{platform.description}</CardDescription>
                       </div>
                     </div>
@@ -215,17 +285,48 @@ export default function Integrations() {
                 </CardHeader>
                 <CardContent>
                   {isConfigured ? (
-                    <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">
-                        Configurée ✓
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedPlatform(platform.value)}
-                      >
-                        Reconfigurer
-                      </Button>
+                    <div className="space-y-3">
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        {integration.agent_id && (
+                          <p className="flex items-center gap-1">
+                            <span>Agent ID:</span>
+                            <code className="bg-muted px-1 rounded text-xs">
+                              {maskAgentId(integration.agent_id)}
+                            </code>
+                          </p>
+                        )}
+                        <p className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          <span>
+                            Configuré le {format(new Date(integration.updated_at || integration.created_at), 'dd MMM yyyy à HH:mm', { locale: fr })}
+                          </span>
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => testIntegration(integration.id, platform.value)}
+                          disabled={isTesting}
+                        >
+                          {isTesting ? (
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                          ) : (
+                            <TestTube className="w-4 h-4 mr-1" />
+                          )}
+                          Tester
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedPlatform(platform.value);
+                            setAgentId(integration.agent_id || '');
+                          }}
+                        >
+                          Reconfigurer
+                        </Button>
+                      </div>
                     </div>
                   ) : (
                     <Button
@@ -275,10 +376,17 @@ export default function Integrations() {
               <div className="flex gap-2">
                 <Button
                   onClick={handleSave}
-                  disabled={testing || !apiKey}
+                  disabled={saving || !apiKey}
                   className="flex-1"
                 >
-                  {testing ? 'Test en cours...' : 'Sauvegarder'}
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Sauvegarde...
+                    </>
+                  ) : (
+                    'Sauvegarder et tester'
+                  )}
                 </Button>
               </div>
             </div>
