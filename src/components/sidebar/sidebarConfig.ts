@@ -35,7 +35,7 @@ export const sidebarGroups: NavGroup[] = [
     icon: MessageSquare,
     items: [
       { name: 'Conversations', href: '/conversations', icon: MessageSquare },
-      { name: 'Voice Analytics', href: '/voice-analytics', icon: BarChart3 },
+      { name: 'Voice Analytics', href: '/analytics', icon: BarChart3 },
       { name: 'Handoffs', href: '/handoffs', icon: Headphones },
       { name: 'Topics', href: '/topics', icon: Tag },
     ]
