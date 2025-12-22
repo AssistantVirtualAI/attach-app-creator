@@ -47,19 +47,24 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
   const { data: integrations } = useQuery({
     queryKey: ['integrations', selectedOrgId, selectedPlatform],
     queryFn: async () => {
-      if (!selectedOrgId || !selectedPlatform) return [];
+      if (!selectedPlatform) return [];
       
+      // Get current user for personal integrations
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      // Fetch both org integrations and personal integrations (where organization_id is null)
       const { data, error } = await supabase
         .from('organization_integrations')
         .select('*')
-        .eq('organization_id', selectedOrgId)
         .eq('platform', selectedPlatform)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .or(`organization_id.eq.${selectedOrgId},and(organization_id.is.null,user_id.eq.${user.id})`);
 
       if (error) throw error;
       return data || [];
     },
-    enabled: !!selectedOrgId && !!selectedPlatform && step === 2,
+    enabled: !!selectedPlatform && step === 2,
   });
 
   const { data: clients } = useQuery({
