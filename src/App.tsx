@@ -51,6 +51,7 @@ import PhoneNumbers from "./pages/PhoneNumbers";
 import Handoffs from "./pages/Handoffs";
 import SmsTemplates from "./pages/SmsTemplates";
 import NotFound from "./pages/NotFound";
+import DemoCenter from "./pages/DemoCenter";
 
 const queryClient = new QueryClient();
 
@@ -339,6 +340,14 @@ const App = () => (
                 <Route path="/privacy" element={<PrivacyPolicy />} />
                 <Route path="/legal" element={<Legal />} />
                 <Route path="/docs" element={<Docs />} />
+                <Route
+                  path="/demo"
+                  element={
+                    <ProtectedRoute>
+                      <DemoCenter />
+                    </ProtectedRoute>
+                  }
+                />
                 
                 {/* Client Portal Routes - Separate authentication */}
                 <Route
