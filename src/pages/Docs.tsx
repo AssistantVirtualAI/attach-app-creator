@@ -141,42 +141,42 @@ const Docs = () => {
       description: "Tour complet de l'interface et des fonctionnalités principales",
       duration: "8:42",
       category: "Introduction",
-      thumbnail: "/placeholder.svg"
+      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
     },
     {
       title: "Configurer un Agent ElevenLabs",
       description: "De la création à la mise en production de votre premier agent",
       duration: "12:15",
       category: "Agents",
-      thumbnail: "/placeholder.svg"
+      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
     },
     {
       title: "Gérer le Portail Client",
       description: "Configuration du white-label et personnalisation CSS",
       duration: "10:30",
       category: "Clients",
-      thumbnail: "/placeholder.svg"
+      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
     },
     {
       title: "Comprendre les Analytics",
       description: "Lecture des métriques et prise de décisions basées sur les données",
       duration: "15:00",
       category: "Analytics",
-      thumbnail: "/placeholder.svg"
+      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
     },
     {
       title: "Intégrations et Webhooks",
       description: "Connecter vos outils existants à la plateforme",
       duration: "18:20",
       category: "Intégrations",
-      thumbnail: "/placeholder.svg"
+      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
     },
     {
       title: "Campagnes d'Appels Sortants",
       description: "Lancer et gérer des campagnes automatisées",
       duration: "14:45",
       category: "Campagnes",
-      thumbnail: "/placeholder.svg"
+      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
     }
   ];
 
@@ -527,24 +527,26 @@ const Docs = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {videoTutorials.map((video, index) => (
-                    <Card key={index} className="overflow-hidden hover:border-primary/50 transition-all cursor-pointer group">
+                    <Card key={index} className="overflow-hidden hover:border-primary/50 transition-all">
                       <div className="relative aspect-video bg-muted">
-                        <img 
-                          src={video.thumbnail} 
-                          alt={video.title}
-                          className="w-full h-full object-cover"
+                        <iframe
+                          src={video.embedUrl}
+                          title={video.title}
+                          className="w-full h-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
                         />
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center">
-                            <PlayCircle className="w-10 h-10 text-primary" />
-                          </div>
-                        </div>
-                        <Badge className="absolute top-2 right-2">{video.duration}</Badge>
                       </div>
                       <CardContent className="p-4">
-                        <Badge variant="outline" className="mb-2">{video.category}</Badge>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline">{video.category}</Badge>
+                          <Badge variant="secondary" className="gap-1">
+                            <Clock className="w-3 h-3" />
+                            {video.duration}
+                          </Badge>
+                        </div>
                         <h4 className="font-semibold mb-1">{video.title}</h4>
                         <p className="text-sm text-muted-foreground">{video.description}</p>
                       </CardContent>
