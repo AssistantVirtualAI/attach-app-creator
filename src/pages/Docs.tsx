@@ -23,16 +23,37 @@ import {
   FileText,
   Search,
   X,
-  ArrowLeft
+  ArrowLeft,
+  Play,
+  GraduationCap,
+  Video,
+  Clock,
+  CheckCircle2,
+  Lightbulb,
+  Target,
+  Rocket,
+  BookMarked,
+  PlayCircle
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Docs = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("installation");
+  const [activeTab, setActiveTab] = useState("getting-started");
 
   // Search content mapping for filtering
   const searchableContent = useMemo(() => ({
+    "getting-started": [
+      "démarrer", "commencer", "guide", "premier pas", "introduction", "bienvenue",
+      "agent", "client", "configuration", "installation", "rapide"
+    ],
+    training: [
+      "formation", "training", "apprendre", "tutoriel", "guide", "pratiques",
+      "astuces", "conseils", "use case", "cas d'usage", "best practices"
+    ],
+    videos: [
+      "vidéo", "tutorial", "démonstration", "walkthrough", "youtube", "regarder"
+    ],
     installation: [
       "installation", "guide", "prérequis", "node", "bun", "lovable", "stripe", "elevenlabs",
       "cloner", "repository", "npm", "variables", "environnement", "supabase", "smtp", "sentry",
@@ -53,7 +74,7 @@ const Docs = () => {
 
   // Filter sections based on search
   const matchedSections = useMemo(() => {
-    if (!searchQuery.trim()) return ["installation", "integrations", "api"];
+    if (!searchQuery.trim()) return ["getting-started", "training", "videos", "installation", "integrations", "api"];
     
     const query = searchQuery.toLowerCase();
     return Object.entries(searchableContent)
@@ -62,6 +83,129 @@ const Docs = () => {
   }, [searchQuery, searchableContent]);
 
   const hasResults = matchedSections.length > 0;
+
+  const trainingContent = [
+    {
+      title: "Créer votre Premier Agent",
+      description: "Guide étape par étape pour configurer un agent vocal IA fonctionnel",
+      duration: "15 min",
+      level: "Débutant",
+      icon: Rocket,
+      color: "text-blue-500"
+    },
+    {
+      title: "Personnaliser la Voix et le Comportement",
+      description: "Ajustez les paramètres vocaux, le ton et la personnalité de votre agent",
+      duration: "20 min",
+      level: "Intermédiaire",
+      icon: Settings,
+      color: "text-purple-500"
+    },
+    {
+      title: "Gérer vos Clients Efficacement",
+      description: "Organisation, permissions et portail client white-label",
+      duration: "25 min",
+      level: "Intermédiaire",
+      icon: Users,
+      color: "text-green-500"
+    },
+    {
+      title: "Analyser les Conversations",
+      description: "Comprendre les métriques, sentiment et insights de vos conversations",
+      duration: "20 min",
+      level: "Avancé",
+      icon: Target,
+      color: "text-orange-500"
+    },
+    {
+      title: "Automatiser avec les Workflows",
+      description: "Créer des automatisations et webhooks pour connecter vos outils",
+      duration: "30 min",
+      level: "Avancé",
+      icon: Zap,
+      color: "text-yellow-500"
+    },
+    {
+      title: "Optimiser les Performances",
+      description: "Meilleures pratiques pour maximiser l'efficacité de vos agents",
+      duration: "25 min",
+      level: "Expert",
+      icon: Lightbulb,
+      color: "text-cyan-500"
+    }
+  ];
+
+  const videoTutorials = [
+    {
+      title: "Présentation de la Plateforme",
+      description: "Tour complet de l'interface et des fonctionnalités principales",
+      duration: "8:42",
+      category: "Introduction",
+      thumbnail: "/placeholder.svg"
+    },
+    {
+      title: "Configurer un Agent ElevenLabs",
+      description: "De la création à la mise en production de votre premier agent",
+      duration: "12:15",
+      category: "Agents",
+      thumbnail: "/placeholder.svg"
+    },
+    {
+      title: "Gérer le Portail Client",
+      description: "Configuration du white-label et personnalisation CSS",
+      duration: "10:30",
+      category: "Clients",
+      thumbnail: "/placeholder.svg"
+    },
+    {
+      title: "Comprendre les Analytics",
+      description: "Lecture des métriques et prise de décisions basées sur les données",
+      duration: "15:00",
+      category: "Analytics",
+      thumbnail: "/placeholder.svg"
+    },
+    {
+      title: "Intégrations et Webhooks",
+      description: "Connecter vos outils existants à la plateforme",
+      duration: "18:20",
+      category: "Intégrations",
+      thumbnail: "/placeholder.svg"
+    },
+    {
+      title: "Campagnes d'Appels Sortants",
+      description: "Lancer et gérer des campagnes automatisées",
+      duration: "14:45",
+      category: "Campagnes",
+      thumbnail: "/placeholder.svg"
+    }
+  ];
+
+  const quickStartSteps = [
+    {
+      step: 1,
+      title: "Connecter ElevenLabs",
+      description: "Ajoutez votre clé API ElevenLabs dans les paramètres d'intégration",
+      completed: false
+    },
+    {
+      step: 2,
+      title: "Créer un Agent",
+      description: "Utilisez l'Agent Builder pour configurer votre premier agent vocal",
+      completed: false
+    },
+    {
+      step: 3,
+      title: "Ajouter un Client",
+      description: "Créez un client et assignez-lui un agent",
+      completed: false
+    },
+    {
+      step: 4,
+      title: "Tester le Widget",
+      description: "Testez le widget vocal sur la page de prototype",
+      completed: false
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -78,10 +222,10 @@ const Docs = () => {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <BookOpen className="h-10 w-10 text-primary" />
-            <h1 className="text-4xl font-bold">Documentation AVA Statistics</h1>
+            <h1 className="text-4xl font-bold">Centre d'Aide AVA Statistics</h1>
           </div>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Guide complet pour installer, configurer et utiliser la plateforme white-label SaaS pour agents vocaux IA
+            Guides, tutoriels et documentation complète pour maîtriser la plateforme
           </p>
           <Badge variant="secondary" className="mt-4">v1.0.0</Badge>
         </div>
@@ -119,7 +263,7 @@ const Docs = () => {
 
         {/* Section Filters */}
         {searchQuery && hasResults && (
-          <div className="flex justify-center gap-2 mb-6">
+          <div className="flex justify-center flex-wrap gap-2 mb-6">
             {matchedSections.map((section) => (
               <Badge 
                 key={section} 
@@ -127,6 +271,9 @@ const Docs = () => {
                 className="cursor-pointer"
                 onClick={() => setActiveTab(section)}
               >
+                {section === "getting-started" && "Démarrage"}
+                {section === "training" && "Formation"}
+                {section === "videos" && "Vidéos"}
                 {section === "installation" && "Installation"}
                 {section === "integrations" && "Intégrations"}
                 {section === "api" && "API Reference"}
@@ -136,14 +283,38 @@ const Docs = () => {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 lg:w-auto lg:inline-flex">
+            <TabsTrigger 
+              value="getting-started" 
+              className="gap-2"
+              disabled={searchQuery && !matchedSections.includes("getting-started")}
+            >
+              <Rocket className="h-4 w-4" />
+              <span className="hidden sm:inline">Démarrage</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="training" 
+              className="gap-2"
+              disabled={searchQuery && !matchedSections.includes("training")}
+            >
+              <GraduationCap className="h-4 w-4" />
+              <span className="hidden sm:inline">Formation</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="videos" 
+              className="gap-2"
+              disabled={searchQuery && !matchedSections.includes("videos")}
+            >
+              <Video className="h-4 w-4" />
+              <span className="hidden sm:inline">Vidéos</span>
+            </TabsTrigger>
             <TabsTrigger 
               value="installation" 
               className="gap-2"
               disabled={searchQuery && !matchedSections.includes("installation")}
             >
               <Download className="h-4 w-4" />
-              Installation
+              <span className="hidden sm:inline">Installation</span>
             </TabsTrigger>
             <TabsTrigger 
               value="integrations" 
@@ -151,7 +322,7 @@ const Docs = () => {
               disabled={searchQuery && !matchedSections.includes("integrations")}
             >
               <Settings className="h-4 w-4" />
-              Intégrations
+              <span className="hidden sm:inline">Intégrations</span>
             </TabsTrigger>
             <TabsTrigger 
               value="api" 
@@ -159,9 +330,250 @@ const Docs = () => {
               disabled={searchQuery && !matchedSections.includes("api")}
             >
               <Code className="h-4 w-4" />
-              API Reference
+              <span className="hidden sm:inline">API</span>
             </TabsTrigger>
           </TabsList>
+
+          {/* Getting Started Tab */}
+          <TabsContent value="getting-started" className="space-y-6">
+            <Card className="border-primary/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Rocket className="h-5 w-5 text-primary" />
+                  Bienvenue sur AVA Statistics
+                </CardTitle>
+                <CardDescription>
+                  Suivez ces étapes pour commencer à utiliser la plateforme
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {quickStartSteps.map((item) => (
+                    <div key={item.step} className="flex items-start gap-4 p-4 border rounded-lg">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        item.completed ? 'bg-green-500/10 text-green-500' : 'bg-primary/10 text-primary'
+                      }`}>
+                        {item.completed ? (
+                          <CheckCircle2 className="h-5 w-5" />
+                        ) : (
+                          <span className="font-bold">{item.step}</span>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">{item.title}</h4>
+                        <p className="text-sm text-muted-foreground">{item.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="glass-card hover:border-primary/50 transition-all cursor-pointer" onClick={() => setActiveTab("training")}>
+                <CardContent className="p-6 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                    <GraduationCap className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold">Contenu de Formation</h4>
+                    <p className="text-sm text-muted-foreground">Guides détaillés et best practices</p>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="glass-card hover:border-primary/50 transition-all cursor-pointer" onClick={() => setActiveTab("videos")}>
+                <CardContent className="p-6 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center">
+                    <Video className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold">Tutoriels Vidéo</h4>
+                    <p className="text-sm text-muted-foreground">Apprenez visuellement avec nos vidéos</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Training Content Tab */}
+          <TabsContent value="training" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5 text-primary" />
+                  Contenu de Formation
+                </CardTitle>
+                <CardDescription>
+                  Guides détaillés pour maîtriser chaque aspect de la plateforme
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {trainingContent.map((item, index) => {
+                    const Icon = item.icon;
+                    return (
+                      <Card key={index} className="hover:border-primary/50 transition-all cursor-pointer">
+                        <CardContent className="p-6">
+                          <div className="flex items-start gap-4">
+                            <Icon className={`w-8 h-8 ${item.color} flex-shrink-0`} />
+                            <div className="flex-1">
+                              <h4 className="font-semibold mb-1">{item.title}</h4>
+                              <p className="text-sm text-muted-foreground mb-3">{item.description}</p>
+                              <div className="flex items-center gap-3">
+                                <Badge variant="secondary" className="gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {item.duration}
+                                </Badge>
+                                <Badge variant="outline">{item.level}</Badge>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Best Practices */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Lightbulb className="h-5 w-5 text-yellow-500" />
+                  Meilleures Pratiques
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-semibold mb-2">Configuration Agent</h4>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      <li>• Définir un premier message clair</li>
+                      <li>• Tester le ton avant déploiement</li>
+                      <li>• Configurer les limites de conversation</li>
+                    </ul>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-semibold mb-2">Gestion Clients</h4>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      <li>• Personnaliser le branding par client</li>
+                      <li>• Définir des accès granulaires</li>
+                      <li>• Former les utilisateurs client</li>
+                    </ul>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-semibold mb-2">Analytics</h4>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      <li>• Surveiller les métriques clés</li>
+                      <li>• Analyser les topics récurrents</li>
+                      <li>• Exporter les rapports régulièrement</li>
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Use Cases */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5 text-green-500" />
+                  Cas d'Usage
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="p-4 border rounded-lg">
+                    <Badge className="mb-2">Support Client</Badge>
+                    <h4 className="font-semibold">Service Client 24/7</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Déployez un agent vocal qui répond aux questions fréquentes, qualifie les demandes 
+                      et transfère vers un humain si nécessaire.
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <Badge className="mb-2">Ventes</Badge>
+                    <h4 className="font-semibold">Qualification de Leads</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Qualifiez automatiquement vos prospects avec un agent qui pose les bonnes questions 
+                      et capture les informations essentielles.
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <Badge className="mb-2">Rendez-vous</Badge>
+                    <h4 className="font-semibold">Prise de Rendez-vous</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Automatisez la prise de rendez-vous avec synchronisation calendrier et confirmations 
+                      automatiques.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Video Tutorials Tab */}
+          <TabsContent value="videos" className="space-y-6" id="videos">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Video className="h-5 w-5 text-red-500" />
+                  Tutoriels Vidéo
+                </CardTitle>
+                <CardDescription>
+                  Apprenez visuellement avec nos guides vidéo détaillés
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {videoTutorials.map((video, index) => (
+                    <Card key={index} className="overflow-hidden hover:border-primary/50 transition-all cursor-pointer group">
+                      <div className="relative aspect-video bg-muted">
+                        <img 
+                          src={video.thumbnail} 
+                          alt={video.title}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center">
+                            <PlayCircle className="w-10 h-10 text-primary" />
+                          </div>
+                        </div>
+                        <Badge className="absolute top-2 right-2">{video.duration}</Badge>
+                      </div>
+                      <CardContent className="p-4">
+                        <Badge variant="outline" className="mb-2">{video.category}</Badge>
+                        <h4 className="font-semibold mb-1">{video.title}</h4>
+                        <p className="text-sm text-muted-foreground">{video.description}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Video Categories */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BookMarked className="h-5 w-5" />
+                  Catégories
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-3">
+                  {["Introduction", "Agents", "Clients", "Analytics", "Intégrations", "Campagnes", "Avancé"].map((category) => (
+                    <Button key={category} variant="outline" className="gap-2">
+                      <Play className="w-4 h-4" />
+                      {category}
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Installation Tab */}
           <TabsContent value="installation" className="space-y-6">

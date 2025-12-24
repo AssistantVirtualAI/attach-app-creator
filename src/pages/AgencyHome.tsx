@@ -62,8 +62,9 @@ const AgencyHome = () => {
       title: "Centre de démonstration",
       description: "Découvrez toutes les fonctionnalités de la plateforme",
       icon: PlayCircle,
-      href: "#demo",
-      color: "from-blue-500 to-cyan-500"
+      href: "/demo",
+      color: "from-blue-500 to-cyan-500",
+      internal: true
     },
     {
       title: "Centre d'aide",
@@ -74,18 +75,20 @@ const AgencyHome = () => {
       internal: true
     },
     {
-      title: "Communauté Discord",
-      description: "Rejoignez notre communauté d'utilisateurs",
-      icon: MessageCircle,
-      href: "https://discord.gg/lovable",
-      color: "from-indigo-500 to-purple-500"
+      title: "Contenu de formation",
+      description: "Guides et tutoriels pour maîtriser la plateforme",
+      icon: Youtube,
+      href: "/docs?tab=training",
+      color: "from-amber-500 to-orange-500",
+      internal: true
     },
     {
       title: "Tutoriels vidéo",
-      description: "Apprenez avec nos guides vidéo",
-      icon: Youtube,
-      href: "https://youtube.com/@lovable",
-      color: "from-red-500 to-orange-500"
+      description: "Apprenez visuellement avec nos vidéos",
+      icon: PlayCircle,
+      href: "/docs?tab=videos",
+      color: "from-red-500 to-rose-500",
+      internal: true
     }
   ];
 

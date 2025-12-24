@@ -77,18 +77,21 @@ export const DocumentationTab = () => {
   const helpLinks = [
     {
       title: "FAQ",
-      href: "https://docs.lovable.dev/faq",
-      icon: HelpCircle
+      href: "/docs",
+      icon: HelpCircle,
+      internal: true
     },
     {
-      title: "Communauté Discord",
-      href: "https://discord.gg/lovable",
-      icon: MessageCircle
+      title: "Contenu de Formation",
+      href: "/docs?tab=training",
+      icon: BookOpen,
+      internal: true
     },
     {
-      title: "Changelog",
-      href: "https://lovable.dev/changelog",
-      icon: ExternalLink
+      title: "Tutoriels Vidéo",
+      href: "/docs?tab=videos",
+      icon: ExternalLink,
+      internal: true
     }
   ];
 
@@ -180,7 +183,7 @@ export const DocumentationTab = () => {
                   key={link.title}
                   variant="secondary"
                   className="gap-2"
-                  onClick={() => window.open(link.href, '_blank')}
+                  onClick={() => link.internal ? navigate(link.href) : window.open(link.href, '_blank')}
                 >
                   <Icon className="w-4 h-4" />
                   {link.title}
