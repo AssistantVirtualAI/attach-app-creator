@@ -33,9 +33,18 @@ import {
   Target,
   Rocket,
   BookMarked,
-  PlayCircle
+  PlayCircle,
+  LayoutDashboard,
+  Bot,
+  MessageSquare,
+  BarChart3,
+  Palette,
+  Link as LinkIcon,
+  Phone,
+  UserPlus
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { InteractiveSlideshow, Slide } from "@/components/demo/InteractiveSlideshow";
 
 const Docs = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -135,48 +144,247 @@ const Docs = () => {
     }
   ];
 
-  const videoTutorials = [
+  // Interactive slideshows data replacing video tutorials
+  const platformOverviewSlides: Slide[] = [
+    {
+      title: "Tableau de Bord",
+      description: "Vue d'ensemble de vos métriques clés, conversations récentes et performances globales de vos agents.",
+      icon: <LayoutDashboard className="w-8 h-8" />,
+      highlights: ["KPIs en temps réel", "Graphiques de tendances", "Alertes importantes"]
+    },
+    {
+      title: "Gestion des Agents",
+      description: "Créez, configurez et gérez vos agents vocaux IA depuis une interface intuitive.",
+      icon: <Bot className="w-8 h-8" />,
+      highlights: ["Création en quelques clics", "Configuration vocale", "Base de connaissances"]
+    },
+    {
+      title: "Portail Clients",
+      description: "Offrez à vos clients un accès personnalisé à leurs agents et statistiques.",
+      icon: <Users className="w-8 h-8" />,
+      highlights: ["White-label complet", "Accès sécurisé", "Personnalisation CSS"]
+    },
+    {
+      title: "Conversations",
+      description: "Consultez l'historique des conversations avec transcriptions et analyses de sentiment.",
+      icon: <MessageSquare className="w-8 h-8" />,
+      highlights: ["Transcriptions complètes", "Analyse sentiment", "Export audio"]
+    },
+    {
+      title: "Analytics Avancés",
+      description: "Analysez les performances avec des graphiques détaillés et des insights actionnables.",
+      icon: <BarChart3 className="w-8 h-8" />,
+      highlights: ["Métriques détaillées", "Rapports exportables", "Tendances temporelles"]
+    }
+  ];
+
+  const agentConfigSlides: Slide[] = [
+    {
+      title: "Créer un Nouvel Agent",
+      description: "Commencez par donner un nom et une description à votre agent vocal.",
+      icon: <Bot className="w-8 h-8" />,
+      highlights: ["Nom unique", "Description claire", "Sélection de plateforme"]
+    },
+    {
+      title: "Sélectionner la Voix",
+      description: "Choisissez parmi les voix ElevenLabs disponibles et ajustez les paramètres vocaux.",
+      icon: <Settings className="w-8 h-8" />,
+      highlights: ["Stabilité vocale", "Clarté/Similarité", "Style expressif"]
+    },
+    {
+      title: "Configurer le Prompt",
+      description: "Définissez le comportement et la personnalité de votre agent avec un prompt système.",
+      icon: <FileText className="w-8 h-8" />,
+      highlights: ["Contexte métier", "Instructions précises", "Exemples de réponses"]
+    },
+    {
+      title: "Base de Connaissances",
+      description: "Ajoutez des documents et FAQ pour enrichir les réponses de l'agent.",
+      icon: <BookOpen className="w-8 h-8" />,
+      highlights: ["Upload documents", "FAQ dynamique", "Synchronisation auto"]
+    },
+    {
+      title: "Déployer et Tester",
+      description: "Testez votre agent dans le prototype avant de le déployer en production.",
+      icon: <Rocket className="w-8 h-8" />,
+      highlights: ["Test en direct", "Widget intégrable", "Monitoring actif"]
+    }
+  ];
+
+  const clientPortalSlides: Slide[] = [
+    {
+      title: "Créer un Client",
+      description: "Ajoutez un nouveau client avec ses informations de contact et préférences.",
+      icon: <UserPlus className="w-8 h-8" />,
+      highlights: ["Informations de base", "Email de contact", "Langue préférée"]
+    },
+    {
+      title: "Assigner des Agents",
+      description: "Associez un ou plusieurs agents au client pour leur utilisation.",
+      icon: <Bot className="w-8 h-8" />,
+      highlights: ["Multi-agents", "Permissions granulaires", "Limites d'usage"]
+    },
+    {
+      title: "Personnaliser le Branding",
+      description: "Appliquez les couleurs et le logo du client pour une expérience white-label.",
+      icon: <Palette className="w-8 h-8" />,
+      highlights: ["Logo personnalisé", "Couleurs de marque", "CSS avancé"]
+    },
+    {
+      title: "Configurer l'URL",
+      description: "Définissez une URL personnalisée pour le portail client.",
+      icon: <LinkIcon className="w-8 h-8" />,
+      highlights: ["Sous-domaine dédié", "Accès sécurisé", "SSL automatique"]
+    },
+    {
+      title: "Accès Portail",
+      description: "Le client peut accéder à son portail personnalisé avec ses identifiants.",
+      icon: <Users className="w-8 h-8" />,
+      highlights: ["Connexion OTP", "Vue conversations", "Analytics dédiés"]
+    }
+  ];
+
+  const analyticsSlides: Slide[] = [
+    {
+      title: "Vue d'Ensemble",
+      description: "Accédez au tableau de bord avec les métriques clés de toutes vos conversations.",
+      icon: <LayoutDashboard className="w-8 h-8" />,
+      highlights: ["Total conversations", "Durée moyenne", "Score satisfaction"]
+    },
+    {
+      title: "Analyse des Conversations",
+      description: "Filtrez et analysez les conversations par agent, client ou période.",
+      icon: <MessageSquare className="w-8 h-8" />,
+      highlights: ["Filtres avancés", "Recherche texte", "Exports CSV"]
+    },
+    {
+      title: "Sentiment Analysis",
+      description: "Visualisez la répartition des sentiments détectés dans vos conversations.",
+      icon: <Target className="w-8 h-8" />,
+      highlights: ["Positif/Négatif/Neutre", "Tendances", "Alertes automatiques"]
+    },
+    {
+      title: "Topics & Tendances",
+      description: "Identifiez les sujets récurrents abordés par vos utilisateurs.",
+      icon: <Lightbulb className="w-8 h-8" />,
+      highlights: ["Catégorisation auto", "Fréquence", "Nuage de mots"]
+    },
+    {
+      title: "Rapports Exportables",
+      description: "Générez et exportez des rapports PDF ou CSV pour vos clients.",
+      icon: <FileText className="w-8 h-8" />,
+      highlights: ["PDF personnalisé", "Données brutes CSV", "Planification auto"]
+    }
+  ];
+
+  const integrationsSlides: Slide[] = [
+    {
+      title: "Configuration API",
+      description: "Générez vos clés API et configurez l'authentification pour vos intégrations.",
+      icon: <Key className="w-8 h-8" />,
+      highlights: ["Clés API sécurisées", "Scopes personnalisés", "Rotation facile"]
+    },
+    {
+      title: "Webhooks",
+      description: "Configurez des webhooks pour recevoir des événements en temps réel.",
+      icon: <Webhook className="w-8 h-8" />,
+      highlights: ["Events personnalisables", "Payload JSON", "Retry automatique"]
+    },
+    {
+      title: "ElevenLabs",
+      description: "Connectez votre compte ElevenLabs pour les agents vocaux.",
+      icon: <Zap className="w-8 h-8" />,
+      highlights: ["Clé API simple", "Voix disponibles", "Usage suivi"]
+    },
+    {
+      title: "Stripe",
+      description: "Configurez Stripe pour la facturation et les abonnements.",
+      icon: <CreditCard className="w-8 h-8" />,
+      highlights: ["Paiements sécurisés", "Abonnements récurrents", "Portail client"]
+    },
+    {
+      title: "Email & SMTP",
+      description: "Configurez vos templates email et le serveur SMTP.",
+      icon: <Mail className="w-8 h-8" />,
+      highlights: ["Templates personnalisés", "Variables dynamiques", "Domaine vérifié"]
+    }
+  ];
+
+  const campaignsSlides: Slide[] = [
+    {
+      title: "Créer une Campagne",
+      description: "Définissez le nom, la description et les paramètres de votre campagne d'appels.",
+      icon: <Phone className="w-8 h-8" />,
+      highlights: ["Objectifs clairs", "Agent assigné", "Horaires d'appel"]
+    },
+    {
+      title: "Importer les Contacts",
+      description: "Uploadez votre liste de contacts à appeler via CSV ou saisie manuelle.",
+      icon: <Users className="w-8 h-8" />,
+      highlights: ["Import CSV", "Validation numéros", "Déduplication auto"]
+    },
+    {
+      title: "Configurer le Script",
+      description: "Personnalisez le script et les réponses de l'agent pour la campagne.",
+      icon: <FileText className="w-8 h-8" />,
+      highlights: ["Variables contact", "Branches conditionnelles", "Objectifs mesurables"]
+    },
+    {
+      title: "Lancer la Campagne",
+      description: "Démarrez la campagne et surveillez les appels en temps réel.",
+      icon: <Rocket className="w-8 h-8" />,
+      highlights: ["Démarrage planifié", "Pause/Reprise", "Monitoring live"]
+    },
+    {
+      title: "Analyser les Résultats",
+      description: "Consultez les statistiques de la campagne et les résultats par contact.",
+      icon: <BarChart3 className="w-8 h-8" />,
+      highlights: ["Taux de succès", "Durée moyenne", "Conversions"]
+    }
+  ];
+
+  const slideshowData = [
     {
       title: "Présentation de la Plateforme",
       description: "Tour complet de l'interface et des fonctionnalités principales",
-      duration: "8:42",
+      duration: "5 slides",
       category: "Introduction",
-      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+      slides: platformOverviewSlides
     },
     {
       title: "Configurer un Agent ElevenLabs",
       description: "De la création à la mise en production de votre premier agent",
-      duration: "12:15",
+      duration: "5 slides",
       category: "Agents",
-      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+      slides: agentConfigSlides
     },
     {
       title: "Gérer le Portail Client",
       description: "Configuration du white-label et personnalisation CSS",
-      duration: "10:30",
+      duration: "5 slides",
       category: "Clients",
-      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+      slides: clientPortalSlides
     },
     {
       title: "Comprendre les Analytics",
       description: "Lecture des métriques et prise de décisions basées sur les données",
-      duration: "15:00",
+      duration: "5 slides",
       category: "Analytics",
-      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+      slides: analyticsSlides
     },
     {
       title: "Intégrations et Webhooks",
       description: "Connecter vos outils existants à la plateforme",
-      duration: "18:20",
+      duration: "5 slides",
       category: "Intégrations",
-      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+      slides: integrationsSlides
     },
     {
       title: "Campagnes d'Appels Sortants",
       description: "Lancer et gérer des campagnes automatisées",
-      duration: "14:45",
+      duration: "5 slides",
       category: "Campagnes",
-      embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ"
+      slides: campaignsSlides
     }
   ];
 
@@ -514,43 +722,36 @@ const Docs = () => {
             </Card>
           </TabsContent>
 
-          {/* Video Tutorials Tab */}
+          {/* Video Tutorials Tab - Now Interactive Slideshows */}
           <TabsContent value="videos" className="space-y-6" id="videos">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Video className="h-5 w-5 text-red-500" />
-                  Tutoriels Vidéo
+                  Tutoriels Interactifs
                 </CardTitle>
                 <CardDescription>
-                  Apprenez visuellement avec nos guides vidéo détaillés
+                  Apprenez avec nos présentations interactives - cliquez sur Play pour lancer la lecture automatique
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {videoTutorials.map((video, index) => (
-                    <Card key={index} className="overflow-hidden hover:border-primary/50 transition-all">
-                      <div className="relative aspect-video bg-muted">
-                        <iframe
-                          src={video.embedUrl}
-                          title={video.title}
-                          className="w-full h-full"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
+                  {slideshowData.map((slideshow, index) => (
+                    <div key={index} className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{slideshow.category}</Badge>
+                        <Badge variant="secondary" className="gap-1">
+                          <PlayCircle className="w-3 h-3" />
+                          {slideshow.duration}
+                        </Badge>
                       </div>
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="outline">{video.category}</Badge>
-                          <Badge variant="secondary" className="gap-1">
-                            <Clock className="w-3 h-3" />
-                            {video.duration}
-                          </Badge>
-                        </div>
-                        <h4 className="font-semibold mb-1">{video.title}</h4>
-                        <p className="text-sm text-muted-foreground">{video.description}</p>
-                      </CardContent>
-                    </Card>
+                      <InteractiveSlideshow 
+                        slides={slideshow.slides} 
+                        title={slideshow.title}
+                        autoPlayInterval={4000}
+                      />
+                      <p className="text-sm text-muted-foreground">{slideshow.description}</p>
+                    </div>
                   ))}
                 </div>
               </CardContent>
