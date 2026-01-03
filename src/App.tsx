@@ -33,8 +33,14 @@ import ApiKeys from "./pages/ApiKeys";
 import ClientDetail from "./pages/ClientDetail";
 import ClientLogin from "./pages/ClientLogin";
 import ClientPortal from "./pages/ClientPortal";
+import ClientAgentPortal from "./pages/ClientAgentPortal";
 import ClientConversations from "./pages/ClientConversations";
 import ClientAnalytics from "./pages/ClientAnalytics";
+import ClientAgentDashboard from "./pages/ClientAgentDashboard";
+import ClientAgentConversations from "./pages/ClientAgentConversations";
+import ClientAgentAnalytics from "./pages/ClientAgentAnalytics";
+import ClientAgentKnowledge from "./pages/ClientAgentKnowledge";
+import ClientAgentSettings from "./pages/ClientAgentSettings";
 import WidgetPrototype from "./pages/WidgetPrototype";
 import WidgetIframe from "./pages/WidgetIframe";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -361,6 +367,15 @@ const App = () => (
                 <Route path="/client/:clientId" element={<ClientPortal />}>
                   <Route path="conversations" element={<ClientConversations />} />
                   <Route path="analytics" element={<ClientAnalytics />} />
+                </Route>
+
+                {/* Client Agent Portal Routes - Per agent access */}
+                <Route path="/client/:clientId/agent/:agentId" element={<ClientAgentPortal />}>
+                  <Route path="dashboard" element={<ClientAgentDashboard />} />
+                  <Route path="conversations" element={<ClientAgentConversations />} />
+                  <Route path="analytics" element={<ClientAgentAnalytics />} />
+                  <Route path="knowledge" element={<ClientAgentKnowledge />} />
+                  <Route path="settings" element={<ClientAgentSettings />} />
                 </Route>
 
                 {/* Public Widget Routes - No authentication */}

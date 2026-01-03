@@ -12,45 +12,65 @@ serve(async (req) => {
   }
 
   try {
-    const { action, agentId, conversationId, page = 1, limit = 50, filters, format = 'mp3' } = await req.json();
+    const { action, agentId, conversationId, page = 1, limit = 50, filters, format = 'mp3', apiKey: providedApiKey } = await req.json();
     
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader.replace('Bearer ', '');
+    let apiKey = providedApiKey;
+    let targetAgentId = agentId;
     
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    // If no API key provided directly, try to get from user's integration
+    if (!apiKey) {
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: 'API key or authorization required' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      const token = authHeader.replace('Bearer ', '');
+      
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+      if (userError || !user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data: integration, error: integrationError } = await supabase
+        .from('organization_integrations')
+        .select('api_key, agent_id')
+        .eq('user_id', user.id)
+        .eq('platform', 'elevenlabs')
+        .eq('is_active', true)
+        .single();
+
+      if (integrationError || !integration) {
+        return new Response(
+          JSON.stringify({ 
+            requiresSetup: true, 
+            message: 'Configuration ElevenLabs requise' 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      apiKey = integration.api_key;
+      targetAgentId = agentId || integration.agent_id;
     }
 
-    const { data: integration, error: integrationError } = await supabase
-      .from('organization_integrations')
-      .select('api_key, agent_id')
-      .eq('user_id', user.id)
-      .eq('platform', 'elevenlabs')
-      .eq('is_active', true)
-      .single();
-
-    if (integrationError || !integration) {
+    if (!apiKey) {
       return new Response(
-        JSON.stringify({ 
-          requiresSetup: true, 
-          message: 'Configuration ElevenLabs requise' 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'API key required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    const apiKey = integration.api_key;
-    const targetAgentId = agentId || integration.agent_id;
 
     switch (action) {
       case 'list': {
@@ -77,6 +97,7 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({
             conversations: conversationsData.conversations || [],
+            total: conversationsData.total || conversationsData.conversations?.length || 0,
             pagination: conversationsData.pagination || {
               page: page,
               limit: limit,
@@ -134,14 +155,18 @@ serve(async (req) => {
           throw new Error(`ElevenLabs API error: ${audioResponse.status}`);
         }
 
-        const audioBlob = await audioResponse.blob();
+        // Get audio as base64 for easier client handling
+        const audioBuffer = await audioResponse.arrayBuffer();
+        const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
         
-        return new Response(audioBlob, {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': `audio/${format}`,
-          },
-        });
+        return new Response(
+          JSON.stringify({ 
+            audio_base64: base64Audio,
+            audio_url: `data:audio/${format};base64,${base64Audio}`,
+            format 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       default:

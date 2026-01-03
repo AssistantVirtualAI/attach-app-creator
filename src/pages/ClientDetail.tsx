@@ -113,6 +113,7 @@ const ClientDetail = () => {
 
           <TabsContent value="agents">
             <ClientAgentsTab
+              clientId={clientId!}
               assignedAgents={assignedAgents || []}
               availableAgents={availableAgents || []}
               onAssign={assignAgent}
