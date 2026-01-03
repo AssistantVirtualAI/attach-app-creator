@@ -75,6 +75,25 @@ export const useAgentSettings = (agentId: string | undefined) => {
     enabled: !!agentId,
   });
 
+  // Fetch linked integration for API key and agent ID
+  const integrationId = (agent?.config as Record<string, any>)?.integration_id;
+  const { data: integration } = useQuery({
+    queryKey: ['agent-integration', integrationId],
+    queryFn: async () => {
+      if (!integrationId) return null;
+      
+      const { data, error } = await supabase
+        .from('organization_integrations')
+        .select('id, platform, api_key, agent_id')
+        .eq('id', integrationId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!integrationId,
+  });
+
   const updateAgentMutation = useMutation({
     mutationFn: async (updates: Partial<AgentSettings>) => {
       if (!agentId) throw new Error('No agent ID');
@@ -134,6 +153,7 @@ export const useAgentSettings = (agentId: string | undefined) => {
     client,
     conversations,
     analytics,
+    integration,
     isLoading,
     updateAgent: updateAgentMutation.mutate,
     testConnection: testConnectionMutation.mutate,
