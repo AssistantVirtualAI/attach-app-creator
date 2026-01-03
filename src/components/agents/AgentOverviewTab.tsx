@@ -81,7 +81,7 @@ export const AgentOverviewTab = ({ agent, client, analytics }: AgentOverviewTabP
             <div>
               <p className="text-sm text-muted-foreground">Agent ID</p>
               <code className="text-sm bg-muted px-2 py-1 rounded">
-                {agent.platform_agent_id || 'Non configuré'}
+                {(agent.config as Record<string, any>)?.agent_id || agent.platform_agent_id || 'Non configuré'}
               </code>
             </div>
             <div>
