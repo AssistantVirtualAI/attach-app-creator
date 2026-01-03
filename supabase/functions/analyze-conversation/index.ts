@@ -11,31 +11,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const t0 = Date.now();
+  const timings: Record<string, number> = {};
+
   try {
     const requestId = crypto.randomUUID();
     const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
 
-    const maskAuth = (value: string | null) => {
-      if (!value) return null;
-      const v = value.trim();
-      if (v.length <= 24) return `${v.slice(0, 8)}…`;
-      return `${v.slice(0, 12)}…${v.slice(-6)}`;
-    };
-
-    console.log('[analyze-conversation] Incoming request', {
-      requestId,
-      method: req.method,
-      url: req.url,
-      hasAuthHeader: !!authHeader,
-      authHeaderPreview: maskAuth(authHeader),
-      authHeaderStartsWithBearer: (authHeader || '').trim().toLowerCase().startsWith('bearer '),
-      hasSupabaseUrl: !!Deno.env.get('SUPABASE_URL'),
-      hasAnonKey: !!Deno.env.get('SUPABASE_ANON_KEY'),
-      hasServiceRoleKey: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-    });
+    console.log('[analyze-conversation] Request started', { requestId, t0 });
 
     if (!authHeader) {
-      console.warn('[analyze-conversation] Missing Authorization header', { requestId });
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -45,11 +30,7 @@ serve(async (req) => {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
+      { global: { headers: { Authorization: authHeader } } }
     );
 
     const serviceClient = createClient(
@@ -58,40 +39,71 @@ serve(async (req) => {
     );
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError) {
-      console.error('[analyze-conversation] auth.getUser error', {
-        requestId,
-        name: userError.name,
-        message: userError.message,
-        status: (userError as any).status,
-      });
-    }
+    timings.auth = Date.now() - t0;
 
-    if (!user) {
-      console.warn('[analyze-conversation] No user resolved from JWT', { requestId });
+    if (userError || !user) {
+      console.error('[analyze-conversation] Auth failed', { userError });
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log('[analyze-conversation] Auth OK', { requestId, userId: user.id });
-
-const { 
+    const { 
       conversationId, 
       externalConversationId,
       agentId: providedAgentId, 
       organizationId: providedOrgId, 
       transcript: externalTranscript,
-      platformAgentId
+      platformAgentId,
+      forceRegenerate = false
     } = await req.json();
     
-    // Support both internal conversationId and external (ElevenLabs) conversationId
     const effectiveConversationId = conversationId || externalConversationId;
     const isExternalConversation = !conversationId && !!externalConversationId;
     
-    console.log(`[analyze-conversation] Starting analysis for ${isExternalConversation ? 'external' : 'internal'} conversation ${effectiveConversationId}`);
-    console.log(`[analyze-conversation] Provided agentId: ${providedAgentId}, orgId: ${providedOrgId}, platformAgentId: ${platformAgentId}`);
+    console.log('[analyze-conversation] Params', {
+      requestId,
+      effectiveConversationId,
+      isExternalConversation,
+      forceRegenerate,
+      hasTranscript: !!externalTranscript
+    });
+
+    // CACHE CHECK: Return existing analysis if available and not forcing regenerate
+    if (!forceRegenerate && effectiveConversationId) {
+      const { data: existingInsight } = await serviceClient
+        .from('agent_insights')
+        .select('*')
+        .eq('conversation_id', effectiveConversationId)
+        .maybeSingle();
+
+      if (existingInsight) {
+        console.log('[analyze-conversation] Returning cached analysis', {
+          requestId,
+          totalTime: Date.now() - t0
+        });
+        
+        const cachedAnalysis = {
+          ...getDefaultAnalysis(),
+          satisfaction_score: existingInsight.satisfaction_score,
+          sentiment: existingInsight.overall_sentiment,
+          sentiment_timeline: existingInsight.sentiment_timeline,
+          improvements: existingInsight.improvements,
+          smart_tags: existingInsight.smart_tags,
+          cached: true
+        };
+        
+        return new Response(JSON.stringify({
+          analysis: cachedAnalysis,
+          cached: true
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    timings.cacheCheck = Date.now() - t0;
 
     let conversation: any = null;
     let agentId = providedAgentId;
@@ -99,17 +111,14 @@ const {
 
     // For internal conversations, fetch from database
     if (!isExternalConversation && effectiveConversationId) {
-      const { data: convData, error: convError } = await serviceClient
+      const { data: convData } = await serviceClient
         .from('conversations')
         .select('*')
         .eq('id', effectiveConversationId)
         .single();
 
-      if (convError) {
-        console.error('[analyze-conversation] Error fetching conversation:', convError);
-      } else {
+      if (convData) {
         conversation = convData;
-        console.log('[analyze-conversation] Conversation loaded successfully');
         agentId = agentId || conversation?.agent_id;
         organizationId = organizationId || conversation?.organization_id;
       }
@@ -126,30 +135,26 @@ const {
       if (agentData) {
         agentId = agentData.id;
         organizationId = organizationId || agentData.organization_id;
-        console.log(`[analyze-conversation] Found agent from platformAgentId: ${agentId}`);
       }
     }
 
-    console.log(`[analyze-conversation] Using agentId: ${agentId}, orgId: ${organizationId}`);
-
-    console.log(`[analyze-conversation] Using agentId: ${agentId}, orgId: ${organizationId}`);
+    timings.dataFetch = Date.now() - t0;
 
     // Build transcript from best available source
     let transcriptText = externalTranscript;
+    let transcriptSource = 'external';
     
     if (!transcriptText && conversation) {
       const meta = conversation.metadata as any;
       
-      // Priority 1: metadata.transcript (structured)
       if (meta?.transcript && Array.isArray(meta.transcript)) {
         transcriptText = meta.transcript.map((msg: any) => {
           const role = msg.role === 'agent' ? 'Agent' : 'Client';
           const text = msg.message || msg.text || msg.content || '';
           return `${role}: ${text}`;
         }).join('\n');
-        console.log('[analyze-conversation] Using metadata.transcript');
+        transcriptSource = 'metadata.transcript';
       }
-      // Priority 2: user_messages + agent_messages
       else if ((conversation.user_messages?.length || 0) > 0 || (conversation.agent_messages?.length || 0) > 0) {
         const userMsgs = conversation.user_messages || [];
         const agentMsgs = conversation.agent_messages || [];
@@ -167,17 +172,15 @@ const {
           }
         }
         transcriptText = combined.join('\n');
-        console.log('[analyze-conversation] Using user_messages + agent_messages');
+        transcriptSource = 'user_agent_messages';
       }
-      // Priority 3: transcript string
       else if (conversation.transcript && typeof conversation.transcript === 'string') {
         transcriptText = conversation.transcript;
-        console.log('[analyze-conversation] Using transcript string');
+        transcriptSource = 'transcript_string';
       }
     }
 
     if (!transcriptText) {
-      console.log('[analyze-conversation] No transcript available');
       return new Response(JSON.stringify({ 
         error: 'No transcript available',
         analysis: getDefaultAnalysis()
@@ -187,79 +190,74 @@ const {
       });
     }
 
+    // Calculate transcript stats (non-AI, instant)
+    const transcriptStats = calculateTranscriptStats(transcriptText);
+    
+    console.log('[analyze-conversation] Transcript ready', {
+      requestId,
+      source: transcriptSource,
+      wordCount: transcriptStats.wordCount,
+      turnCount: transcriptStats.turnCount
+    });
+
+    timings.transcriptReady = Date.now() - t0;
+
+    // Prepare optimized transcript (smart slicing)
+    const optimizedTranscript = optimizeTranscript(transcriptText, 4000);
+
     // Call Lovable AI for analysis
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
-      console.error('[analyze-conversation] LOVABLE_API_KEY not configured');
       return new Response(JSON.stringify({ 
         error: 'AI service not configured',
-        analysis: getDefaultAnalysis()
+        analysis: { ...getDefaultAnalysis(), transcriptStats }
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const analysisPrompt = `Tu es un expert en analyse de conversations client. Analyse cette conversation et fournis une évaluation complète en JSON.
+    const analysisPrompt = `Analyse cette conversation client/agent et fournis une évaluation JSON.
 
-Transcript de la conversation:
-${transcriptText.substring(0, 6000)}
+Conversation:
+${optimizedTranscript}
 
-Fournis une analyse JSON avec cette structure EXACTE:
+Réponds UNIQUEMENT en JSON valide avec cette structure:
 {
-  "satisfaction_score": <nombre de 1.0 à 10.0 - évalue la satisfaction globale du client>,
+  "satisfaction_score": <1.0-10.0>,
+  "satisfaction_reason": "<justification courte max 20 mots>",
   "sentiment": "positive" | "negative" | "neutral",
-  "confidence": <0.0 à 1.0>,
+  "confidence": <0.0-1.0>,
   "sentiment_timeline": [
-    {"time_percent": 0, "sentiment": "neutral", "reason": "Début de conversation"},
-    {"time_percent": 50, "sentiment": "positive" | "negative" | "neutral", "reason": "Explication courte"},
-    {"time_percent": 100, "sentiment": "positive" | "negative" | "neutral", "reason": "Fin de conversation"}
+    {"time_percent": 0, "sentiment": "neutral", "reason": "Début"},
+    {"time_percent": 50, "sentiment": "...", "reason": "..."},
+    {"time_percent": 100, "sentiment": "...", "reason": "Fin"}
   ],
   "topics": ["sujet1", "sujet2"],
-  "intentions": ["intention1", "intention2"],
-  "actionItems": ["action1", "action2"],
-  "smart_tags": ["tag1", "tag2"],
+  "intentions": ["intention1"],
+  "smart_tags": ["reclamation" | "demande_info" | "achat" | "support_technique" | "rendez_vous" | "facturation" | "rappel" | "autre"],
+  "key_moments": [
+    {"time_percent": <0-100>, "quote": "<citation courte>", "significance": "..."}
+  ],
   "callMetrics": {
-    "talkTime": <pourcentage 0-100>,
-    "silenceTime": <pourcentage 0-100>,
+    "talkTime": <0-100>,
+    "silenceTime": <0-100>,
     "interruptionCount": <nombre>,
-    "wordsPerMinute": <nombre estimé>
+    "wordsPerMinute": <nombre>
   },
-  "summary": "Résumé bref de la conversation en français (max 2 phrases)",
+  "summary": "<max 2 phrases>",
   "improvements": [
     {
       "category": "tone" | "response_speed" | "knowledge" | "clarity" | "problem_solving" | "handoff",
       "priority": "high" | "medium" | "low",
-      "suggestion": "Description de l'amélioration suggérée",
-      "example": "Exemple concret tiré de la conversation qui illustre le problème",
-      "recommended_action": "Action spécifique à mettre en place"
+      "suggestion": "...",
+      "recommended_action": "..."
     }
   ]
-}
+}`;
 
-SMART TAGS - Catégorise la conversation avec un ou plusieurs tags parmi:
-- "reclamation": Le client exprime une plainte, insatisfaction ou problème
-- "demande_info": Le client pose des questions pour obtenir des informations
-- "achat": Le client souhaite acheter, connaître les prix ou passer commande
-- "support_technique": Problème technique, bug, panne ou installation
-- "rendez_vous": Prise de rendez-vous, réservation, disponibilité
-- "facturation": Questions sur factures, paiements, remboursements
-- "rappel": Le client demande à être rappelé
-- "autre": Autre type de conversation
+    timings.aiStart = Date.now() - t0;
 
-Catégories d'amélioration possibles:
-- tone: Ton et empathie de l'agent
-- response_speed: Temps de réponse ou réactivité
-- knowledge: Lacunes dans les connaissances ou base de données
-- clarity: Clarté des explications
-- problem_solving: Capacité à résoudre le problème
-- handoff: Gestion du transfert vers un humain
-
-Sois précis et constructif. Fournis au moins 1 amélioration si tu identifies des points à améliorer.
-Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
-
-    console.log('[analyze-conversation] Calling Lovable AI...');
-    
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -267,25 +265,27 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'openai/gpt-5-mini',
+        model: 'google/gemini-2.5-flash',
         messages: [
           { 
             role: 'system', 
-            content: 'Tu es un expert en analyse de conversations service client. Tu fournis des analyses précises et des recommandations actionnables. Réponds toujours en JSON valide uniquement.' 
+            content: 'Tu es un expert en analyse de conversations service client. Réponds uniquement en JSON valide.' 
           },
           { role: 'user', content: analysisPrompt }
         ],
       }),
     });
 
+    timings.aiEnd = Date.now() - t0;
+
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('[analyze-conversation] Lovable AI error:', aiResponse.status, errorText);
+      console.error('[analyze-conversation] AI error', { status: aiResponse.status, errorText });
       
       if (aiResponse.status === 429) {
         return new Response(JSON.stringify({ 
-          error: 'Rate limit exceeded, please try again later',
-          analysis: getDefaultAnalysis()
+          error: 'Rate limit exceeded',
+          analysis: { ...getDefaultAnalysis(), transcriptStats }
         }), {
           status: 429,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -294,8 +294,8 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
       
       if (aiResponse.status === 402) {
         return new Response(JSON.stringify({ 
-          error: 'AI credits exhausted, please add funds',
-          analysis: getDefaultAnalysis()
+          error: 'AI credits exhausted',
+          analysis: { ...getDefaultAnalysis(), transcriptStats }
         }), {
           status: 402,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -304,23 +304,20 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
       
       return new Response(JSON.stringify({ 
         error: 'AI analysis failed',
-        analysis: getDefaultAnalysis()
+        analysis: { ...getDefaultAnalysis(), transcriptStats }
       }), {
-        status: 200,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const aiData = await aiResponse.json();
     const analysisText = aiData.choices[0]?.message?.content || '{}';
-    
-    console.log('[analyze-conversation] AI response received, parsing...');
 
     // Parse AI response
     let analysis;
     try {
-      let cleanJson = analysisText;
-      cleanJson = cleanJson.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+      let cleanJson = analysisText.replace(/```json\s*/g, '').replace(/```\s*/g, '');
       const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
       analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : getDefaultAnalysis();
       
@@ -330,23 +327,27 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
         satisfaction_score: analysis.satisfaction_score || 5.0,
         sentiment_timeline: analysis.sentiment_timeline || [],
         improvements: analysis.improvements || [],
-        smart_tags: analysis.smart_tags || ['autre']
+        smart_tags: analysis.smart_tags || ['autre'],
+        transcriptStats
       };
     } catch (e) {
-      console.error('[analyze-conversation] Failed to parse AI response:', e);
-      analysis = getDefaultAnalysis();
+      console.error('[analyze-conversation] Parse error', e);
+      analysis = { ...getDefaultAnalysis(), transcriptStats };
     }
 
-    console.log('[analyze-conversation] Analysis completed:', {
+    timings.parsed = Date.now() - t0;
+
+    console.log('[analyze-conversation] Analysis complete', {
+      requestId,
       satisfaction: analysis.satisfaction_score,
       sentiment: analysis.sentiment,
       improvements: analysis.improvements?.length || 0,
-      smartTags: analysis.smart_tags
+      aiDuration: timings.aiEnd - timings.aiStart
     });
 
     // Update internal conversation if we have one
     if (!isExternalConversation && effectiveConversationId) {
-      const { error: updateError } = await serviceClient
+      await serviceClient
         .from('conversations')
         .update({ 
           satisfaction_score: analysis.satisfaction_score,
@@ -359,19 +360,11 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
           }
         })
         .eq('id', effectiveConversationId);
-
-      if (updateError) {
-        console.error('[analyze-conversation] Failed to update conversation:', updateError);
-      } else {
-        console.log('[analyze-conversation] Conversation updated successfully');
-      }
     }
 
-    // Always save to agent_insights when we have agentId and organizationId
+    // Save to agent_insights
     if (agentId && organizationId && effectiveConversationId) {
-      console.log('[analyze-conversation] Saving to agent_insights...');
-      
-      const { error: insightError } = await serviceClient
+      await serviceClient
         .from('agent_insights')
         .upsert({
           agent_id: agentId,
@@ -387,24 +380,10 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
           onConflict: 'conversation_id'
         });
 
-      if (insightError) {
-        console.error('[analyze-conversation] Failed to save agent insights:', insightError);
-      } else {
-        console.log('[analyze-conversation] Agent insights saved successfully');
-      }
-
       // Send alert for low satisfaction
       if (analysis.satisfaction_score < 5) {
-        console.log(`[analyze-conversation] Low satisfaction detected (${analysis.satisfaction_score}), sending alert...`);
-        
-        const { data: agentData } = await serviceClient
-          .from('agents')
-          .select('name')
-          .eq('id', agentId)
-          .single();
-
         try {
-          const alertResponse = await fetch(
+          await fetch(
             `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-satisfaction-alert`,
             {
               method: 'POST',
@@ -413,35 +392,34 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                conversationId,
+                conversationId: effectiveConversationId,
                 agentId,
                 organizationId,
                 satisfactionScore: analysis.satisfaction_score,
-                agentName: agentData?.name,
                 summary: analysis.summary
               })
             }
           );
-
-          if (alertResponse.ok) {
-            console.log('[analyze-conversation] Satisfaction alert sent successfully');
-          } else {
-            console.error('[analyze-conversation] Failed to send alert:', await alertResponse.text());
-          }
-        } catch (alertError) {
-          console.error('[analyze-conversation] Error sending satisfaction alert:', alertError);
+        } catch (e) {
+          console.error('[analyze-conversation] Alert error', e);
         }
       }
-    } else {
-      console.log('[analyze-conversation] No agentId/orgId available, skipping agent_insights save');
     }
+
+    timings.saved = Date.now() - t0;
+
+    console.log('[analyze-conversation] Complete', {
+      requestId,
+      totalTime: Date.now() - t0,
+      timings
+    });
 
     return new Response(JSON.stringify({ analysis }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('[analyze-conversation] Error:', error);
+    console.error('[analyze-conversation] Error', error);
     return new Response(JSON.stringify({ 
       error: error instanceof Error ? error.message : 'Unknown error',
       analysis: getDefaultAnalysis()
@@ -461,8 +439,8 @@ function getDefaultAnalysis() {
       { time_percent: 0, sentiment: 'neutral', reason: 'Début' },
       { time_percent: 100, sentiment: 'neutral', reason: 'Fin' }
     ],
-    topics: ['conversation'],
-    intentions: ['demande d\'information'],
+    topics: [],
+    intentions: [],
     actionItems: [],
     smart_tags: ['autre'],
     callMetrics: {
@@ -471,7 +449,81 @@ function getDefaultAnalysis() {
       interruptionCount: 0,
       wordsPerMinute: 120
     },
-    summary: 'Analyse non disponible',
-    improvements: []
+    summary: '',
+    improvements: [],
+    key_moments: []
   };
+}
+
+function calculateTranscriptStats(text: string) {
+  const words = text.split(/\s+/).filter(w => w.length > 0);
+  const wordCount = words.length;
+  const charCount = text.length;
+  
+  // Count turns
+  const agentTurns = (text.match(/^Agent:/gm) || []).length;
+  const clientTurns = (text.match(/^Client:/gm) || []).length;
+  const turnCount = agentTurns + clientTurns;
+  
+  // Count words per role
+  const agentWords = (text.match(/Agent:.*$/gm) || [])
+    .join(' ')
+    .split(/\s+/)
+    .filter(w => w.length > 0 && w !== 'Agent:').length;
+  const clientWords = wordCount - agentWords;
+  
+  const talkRatio = wordCount > 0 ? Math.round((agentWords / wordCount) * 100) : 50;
+  
+  // Simple keyword extraction (top 5 words > 4 chars, excluding common words)
+  const stopwords = new Set(['agent', 'client', 'bonjour', 'merci', 'alors', 'donc', 'votre', 'notre', 'cette', 'cette', 'pour', 'avec', 'dans', 'vous', 'nous', 'leur', 'etes', 'avez', 'fait', 'bien', 'plus', 'tout', 'tres', 'peut', 'comme']);
+  const wordFreq: Record<string, number> = {};
+  
+  words.forEach(w => {
+    const clean = w.toLowerCase().replace(/[^a-zàâäéèêëïîôùûüç]/g, '');
+    if (clean.length > 4 && !stopwords.has(clean)) {
+      wordFreq[clean] = (wordFreq[clean] || 0) + 1;
+    }
+  });
+  
+  const topKeywords = Object.entries(wordFreq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([word]) => word);
+
+  return {
+    wordCount,
+    charCount,
+    turnCount,
+    agentTurns,
+    clientTurns,
+    talkRatio,
+    topKeywords
+  };
+}
+
+function optimizeTranscript(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  
+  const lines = text.split('\n');
+  if (lines.length <= 10) return text.substring(0, maxLength);
+  
+  // Take first 30%, middle 20%, last 50% (weighted toward recent messages)
+  const firstCount = Math.floor(lines.length * 0.3);
+  const middleStart = Math.floor(lines.length * 0.4);
+  const middleCount = Math.floor(lines.length * 0.1);
+  const lastCount = Math.floor(lines.length * 0.5);
+  
+  const firstPart = lines.slice(0, firstCount);
+  const middlePart = lines.slice(middleStart, middleStart + middleCount);
+  const lastPart = lines.slice(-lastCount);
+  
+  const combined = [
+    ...firstPart,
+    '--- [messages intermédiaires omis] ---',
+    ...middlePart,
+    '--- [suite] ---',
+    ...lastPart
+  ].join('\n');
+  
+  return combined.substring(0, maxLength);
 }
