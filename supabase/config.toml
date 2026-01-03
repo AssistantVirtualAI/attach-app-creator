@@ -1,5 +1,8 @@
 project_id = "gejxisrqtvxavbrfcoxz"
 
+[functions.generate-agent-advice]
+verify_jwt = true
+
 [api]
 enabled = true
 port = 54321
