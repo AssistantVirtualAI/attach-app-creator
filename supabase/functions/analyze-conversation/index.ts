@@ -35,33 +35,74 @@ serve(async (req) => {
       });
     }
 
-    const { conversationId, agentId, organizationId, transcript: externalTranscript } = await req.json();
+    const { conversationId, agentId: providedAgentId, organizationId: providedOrgId, transcript: externalTranscript } = await req.json();
     
-    console.log(`Analyzing conversation ${conversationId}`);
+    console.log(`[analyze-conversation] Starting analysis for conversation ${conversationId}`);
+    console.log(`[analyze-conversation] Provided agentId: ${providedAgentId}, orgId: ${providedOrgId}`);
 
-    // Déterminer la source du transcript
+    // Fetch conversation using service client to bypass RLS
+    const { data: conversation, error: convError } = await serviceClient
+      .from('conversations')
+      .select('*')
+      .eq('id', conversationId)
+      .single();
+
+    if (convError) {
+      console.error('[analyze-conversation] Error fetching conversation:', convError);
+    } else {
+      console.log('[analyze-conversation] Conversation loaded successfully');
+    }
+
+    // Derive agentId and organizationId from conversation if not provided
+    const agentId = providedAgentId || conversation?.agent_id;
+    const organizationId = providedOrgId || conversation?.organization_id;
+
+    console.log(`[analyze-conversation] Using agentId: ${agentId}, orgId: ${organizationId}`);
+
+    // Build transcript from best available source
     let transcriptText = externalTranscript;
-    let conversation = null;
-
-    // Si pas de transcript externe, chercher dans la DB
-    if (!transcriptText) {
-      const { data: convData, error: convError } = await supabaseClient
-        .from('conversations')
-        .select('*')
-        .eq('id', conversationId)
-        .eq('user_id', user.id)
-        .single();
-
-      if (!convError && convData) {
-        conversation = convData;
-        transcriptText = convData.transcript || 
-          (convData.user_messages || []).map((m: any, i: number) => 
-            `${i % 2 === 0 ? 'Client' : 'Agent'}: ${m}`
-          ).join('\n');
+    
+    if (!transcriptText && conversation) {
+      const meta = conversation.metadata as any;
+      
+      // Priority 1: metadata.transcript (structured)
+      if (meta?.transcript && Array.isArray(meta.transcript)) {
+        transcriptText = meta.transcript.map((msg: any) => {
+          const role = msg.role === 'agent' ? 'Agent' : 'Client';
+          const text = msg.message || msg.text || msg.content || '';
+          return `${role}: ${text}`;
+        }).join('\n');
+        console.log('[analyze-conversation] Using metadata.transcript');
+      }
+      // Priority 2: user_messages + agent_messages
+      else if ((conversation.user_messages?.length || 0) > 0 || (conversation.agent_messages?.length || 0) > 0) {
+        const userMsgs = conversation.user_messages || [];
+        const agentMsgs = conversation.agent_messages || [];
+        const combined: string[] = [];
+        const maxLen = Math.max(userMsgs.length, agentMsgs.length);
+        
+        for (let i = 0; i < maxLen; i++) {
+          if (i < agentMsgs.length && agentMsgs[i]) {
+            const msg = typeof agentMsgs[i] === 'string' ? agentMsgs[i] : (agentMsgs[i] as any)?.message || '';
+            if (msg) combined.push(`Agent: ${msg}`);
+          }
+          if (i < userMsgs.length && userMsgs[i]) {
+            const msg = typeof userMsgs[i] === 'string' ? userMsgs[i] : (userMsgs[i] as any)?.message || '';
+            if (msg) combined.push(`Client: ${msg}`);
+          }
+        }
+        transcriptText = combined.join('\n');
+        console.log('[analyze-conversation] Using user_messages + agent_messages');
+      }
+      // Priority 3: transcript string
+      else if (conversation.transcript && typeof conversation.transcript === 'string') {
+        transcriptText = conversation.transcript;
+        console.log('[analyze-conversation] Using transcript string');
       }
     }
 
     if (!transcriptText) {
+      console.log('[analyze-conversation] No transcript available');
       return new Response(JSON.stringify({ 
         error: 'No transcript available',
         analysis: getDefaultAnalysis()
@@ -71,10 +112,10 @@ serve(async (req) => {
       });
     }
 
-    // Appeler Lovable AI pour analyser avec le nouveau prompt enrichi
+    // Call Lovable AI for analysis
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY not configured');
+      console.error('[analyze-conversation] LOVABLE_API_KEY not configured');
       return new Response(JSON.stringify({ 
         error: 'AI service not configured',
         analysis: getDefaultAnalysis()
@@ -142,6 +183,8 @@ Catégories d'amélioration possibles:
 Sois précis et constructif. Fournis au moins 1 amélioration si tu identifies des points à améliorer.
 Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
 
+    console.log('[analyze-conversation] Calling Lovable AI...');
+    
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -149,7 +192,7 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'openai/gpt-5-mini',
         messages: [
           { 
             role: 'system', 
@@ -162,7 +205,28 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('Lovable AI error:', aiResponse.status, errorText);
+      console.error('[analyze-conversation] Lovable AI error:', aiResponse.status, errorText);
+      
+      if (aiResponse.status === 429) {
+        return new Response(JSON.stringify({ 
+          error: 'Rate limit exceeded, please try again later',
+          analysis: getDefaultAnalysis()
+        }), {
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      if (aiResponse.status === 402) {
+        return new Response(JSON.stringify({ 
+          error: 'AI credits exhausted, please add funds',
+          analysis: getDefaultAnalysis()
+        }), {
+          status: 402,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       return new Response(JSON.stringify({ 
         error: 'AI analysis failed',
         analysis: getDefaultAnalysis()
@@ -175,17 +239,16 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
     const aiData = await aiResponse.json();
     const analysisText = aiData.choices[0]?.message?.content || '{}';
     
-    // Parser le JSON de la réponse IA
+    console.log('[analyze-conversation] AI response received, parsing...');
+
+    // Parse AI response
     let analysis;
     try {
-      // Extraire le JSON s'il est entouré de texte ou de markdown
       let cleanJson = analysisText;
-      // Retirer les blocs de code markdown
       cleanJson = cleanJson.replace(/```json\s*/g, '').replace(/```\s*/g, '');
       const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
       analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : getDefaultAnalysis();
       
-      // S'assurer que tous les champs existent
       analysis = {
         ...getDefaultAnalysis(),
         ...analysis,
@@ -195,107 +258,105 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
         smart_tags: analysis.smart_tags || ['autre']
       };
     } catch (e) {
-      console.error('Failed to parse AI response:', e, analysisText);
+      console.error('[analyze-conversation] Failed to parse AI response:', e);
       analysis = getDefaultAnalysis();
     }
 
-    console.log('Analysis completed:', {
+    console.log('[analyze-conversation] Analysis completed:', {
       satisfaction: analysis.satisfaction_score,
       sentiment: analysis.sentiment,
       improvements: analysis.improvements?.length || 0,
       smartTags: analysis.smart_tags
     });
 
-    // Mettre à jour la conversation avec l'analyse si elle existe en DB
-    if (conversation) {
-      const { error: updateError } = await supabaseClient
-        .from('conversations')
-        .update({ 
-          satisfaction_score: analysis.satisfaction_score,
-          sentiment: analysis.sentiment,
-          smart_tags: analysis.smart_tags,
-          metadata: {
-            ...conversation.metadata,
-            aiAnalysis: analysis,
-            analyzedAt: new Date().toISOString()
-          }
-        })
-        .eq('id', conversationId);
+    // Always update the conversation with analysis
+    const { error: updateError } = await serviceClient
+      .from('conversations')
+      .update({ 
+        satisfaction_score: analysis.satisfaction_score,
+        sentiment: analysis.sentiment,
+        smart_tags: analysis.smart_tags,
+        metadata: {
+          ...(conversation?.metadata || {}),
+          aiAnalysis: analysis,
+          analyzedAt: new Date().toISOString()
+        }
+      })
+      .eq('id', conversationId);
 
-      if (updateError) {
-        console.error('Failed to update conversation:', updateError);
-      }
+    if (updateError) {
+      console.error('[analyze-conversation] Failed to update conversation:', updateError);
+    } else {
+      console.log('[analyze-conversation] Conversation updated successfully');
     }
 
-    // Sauvegarder les insights dans agent_insights si agentId et organizationId fournis
+    // Always save to agent_insights when we have agentId and organizationId
     if (agentId && organizationId) {
-      try {
-        const { error: insightError } = await serviceClient
-          .from('agent_insights')
-          .upsert({
-            agent_id: agentId,
-            conversation_id: conversationId,
-            organization_id: organizationId,
-            satisfaction_score: analysis.satisfaction_score,
-            sentiment_timeline: analysis.sentiment_timeline,
-            overall_sentiment: analysis.sentiment,
-            improvements: analysis.improvements,
-            smart_tags: analysis.smart_tags,
-            analyzed_at: new Date().toISOString()
-          }, {
-            onConflict: 'conversation_id'
-          });
+      console.log('[analyze-conversation] Saving to agent_insights...');
+      
+      const { error: insightError } = await serviceClient
+        .from('agent_insights')
+        .upsert({
+          agent_id: agentId,
+          conversation_id: conversationId,
+          organization_id: organizationId,
+          satisfaction_score: analysis.satisfaction_score,
+          sentiment_timeline: analysis.sentiment_timeline,
+          overall_sentiment: analysis.sentiment,
+          improvements: analysis.improvements,
+          smart_tags: analysis.smart_tags,
+          analyzed_at: new Date().toISOString()
+        }, {
+          onConflict: 'conversation_id'
+        });
 
-        if (insightError) {
-          console.error('Failed to save agent insights:', insightError);
-        } else {
-          console.log('Agent insights saved successfully');
-        }
-
-        // Envoyer une alerte si le score de satisfaction est < 5
-        if (analysis.satisfaction_score < 5) {
-          console.log(`Low satisfaction detected (${analysis.satisfaction_score}), sending alert...`);
-          
-          // Récupérer le nom de l'agent
-          const { data: agentData } = await serviceClient
-            .from('agents')
-            .select('name')
-            .eq('id', agentId)
-            .single();
-
-          try {
-            const alertResponse = await fetch(
-              `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-satisfaction-alert`,
-              {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  conversationId,
-                  agentId,
-                  organizationId,
-                  satisfactionScore: analysis.satisfaction_score,
-                  agentName: agentData?.name,
-                  summary: analysis.summary
-                })
-              }
-            );
-
-            if (alertResponse.ok) {
-              console.log('Satisfaction alert sent successfully');
-            } else {
-              console.error('Failed to send alert:', await alertResponse.text());
-            }
-          } catch (alertError) {
-            console.error('Error sending satisfaction alert:', alertError);
-          }
-        }
-
-      } catch (e) {
-        console.error('Error saving agent insights:', e);
+      if (insightError) {
+        console.error('[analyze-conversation] Failed to save agent insights:', insightError);
+      } else {
+        console.log('[analyze-conversation] Agent insights saved successfully');
       }
+
+      // Send alert for low satisfaction
+      if (analysis.satisfaction_score < 5) {
+        console.log(`[analyze-conversation] Low satisfaction detected (${analysis.satisfaction_score}), sending alert...`);
+        
+        const { data: agentData } = await serviceClient
+          .from('agents')
+          .select('name')
+          .eq('id', agentId)
+          .single();
+
+        try {
+          const alertResponse = await fetch(
+            `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-satisfaction-alert`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                conversationId,
+                agentId,
+                organizationId,
+                satisfactionScore: analysis.satisfaction_score,
+                agentName: agentData?.name,
+                summary: analysis.summary
+              })
+            }
+          );
+
+          if (alertResponse.ok) {
+            console.log('[analyze-conversation] Satisfaction alert sent successfully');
+          } else {
+            console.error('[analyze-conversation] Failed to send alert:', await alertResponse.text());
+          }
+        } catch (alertError) {
+          console.error('[analyze-conversation] Error sending satisfaction alert:', alertError);
+        }
+      }
+    } else {
+      console.log('[analyze-conversation] No agentId/orgId available, skipping agent_insights save');
     }
 
     return new Response(JSON.stringify({ analysis }), {
@@ -303,7 +364,7 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
     });
 
   } catch (error) {
-    console.error('Error in analyze-conversation:', error);
+    console.error('[analyze-conversation] Error:', error);
     return new Response(JSON.stringify({ 
       error: error instanceof Error ? error.message : 'Unknown error',
       analysis: getDefaultAnalysis()

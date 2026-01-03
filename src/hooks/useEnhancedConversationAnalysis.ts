@@ -63,46 +63,124 @@ export const useEnhancedConversationAnalysis = (conversationId: string) => {
     enabled: !!conversationId,
   });
 
+  // Récupérer la conversation pour le fallback
+  const { data: conversation } = useQuery({
+    queryKey: ['conversation-for-analysis', conversationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('satisfaction_score, sentiment, metadata, agent_id, organization_id')
+        .eq('id', conversationId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching conversation:', error);
+        return null;
+      }
+      return data;
+    },
+    enabled: !!conversationId,
+  });
+
   // Mutation pour générer l'analyse
   const generateAnalysis = useMutation({
     mutationFn: async (params: AnalyzeConversationParams) => {
+      // Auto-include agentId and organizationId from conversation if not provided
+      const enrichedParams = {
+        ...params,
+        agentId: params.agentId || conversation?.agent_id,
+        organizationId: params.organizationId || conversation?.organization_id,
+      };
+      
       const { data, error } = await supabase.functions.invoke('analyze-conversation', {
-        body: params
+        body: enrichedParams
       });
 
       if (error) throw error;
       return data.analysis as EnhancedConversationAnalysis;
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       toast.success('Analyse générée avec succès');
-      // Invalider les caches
       queryClient.invalidateQueries({ queryKey: ['agent-insight', conversationId] });
       queryClient.invalidateQueries({ queryKey: ['conversation-details', conversationId] });
+      queryClient.invalidateQueries({ queryKey: ['conversation-for-analysis', conversationId] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Analysis error:', error);
-      toast.error('Erreur lors de l\'analyse');
+      if (error.message?.includes('429')) {
+        toast.error('Limite de requêtes atteinte, réessayez plus tard');
+      } else if (error.message?.includes('402')) {
+        toast.error('Crédits IA épuisés');
+      } else {
+        toast.error('Erreur lors de l\'analyse');
+      }
     }
   });
 
-  // Construire l'analyse à partir de l'insight existant
-  const analysis: EnhancedConversationAnalysis | null = existingInsight ? {
-    satisfaction_score: Number(existingInsight.satisfaction_score) || 5.0,
-    sentiment: (existingInsight.overall_sentiment as 'positive' | 'negative' | 'neutral') || 'neutral',
-    confidence: 0.8,
-    sentiment_timeline: (existingInsight.sentiment_timeline as unknown as SentimentPoint[]) || [],
-    topics: [],
-    intentions: [],
-    actionItems: [],
-    callMetrics: {
-      talkTime: 50,
-      silenceTime: 10,
-      interruptionCount: 0,
-      wordsPerMinute: 120
-    },
-    summary: '',
-    improvements: (existingInsight.improvements as unknown as Improvement[]) || []
-  } : null;
+  // Build analysis from best available source
+  let analysis: EnhancedConversationAnalysis | null = null;
+  
+  // Priority 1: agent_insights
+  if (existingInsight) {
+    analysis = {
+      satisfaction_score: Number(existingInsight.satisfaction_score) || 5.0,
+      sentiment: (existingInsight.overall_sentiment as 'positive' | 'negative' | 'neutral') || 'neutral',
+      confidence: 0.8,
+      sentiment_timeline: (existingInsight.sentiment_timeline as unknown as SentimentPoint[]) || [],
+      topics: [],
+      intentions: [],
+      actionItems: [],
+      callMetrics: {
+        talkTime: 50,
+        silenceTime: 10,
+        interruptionCount: 0,
+        wordsPerMinute: 120
+      },
+      summary: '',
+      improvements: (existingInsight.improvements as unknown as Improvement[]) || []
+    };
+  }
+  // Priority 2: conversation.metadata.aiAnalysis
+  else if (conversation?.metadata && (conversation.metadata as any)?.aiAnalysis) {
+    const aiAnalysis = (conversation.metadata as any).aiAnalysis;
+    analysis = {
+      satisfaction_score: aiAnalysis.satisfaction_score || conversation.satisfaction_score || 5.0,
+      sentiment: aiAnalysis.sentiment || conversation.sentiment || 'neutral',
+      confidence: aiAnalysis.confidence || 0.7,
+      sentiment_timeline: aiAnalysis.sentiment_timeline || [],
+      topics: aiAnalysis.topics || [],
+      intentions: aiAnalysis.intentions || [],
+      actionItems: aiAnalysis.actionItems || [],
+      callMetrics: aiAnalysis.callMetrics || {
+        talkTime: 50,
+        silenceTime: 10,
+        interruptionCount: 0,
+        wordsPerMinute: 120
+      },
+      summary: aiAnalysis.summary || '',
+      improvements: aiAnalysis.improvements || []
+    };
+  }
+  // Priority 3: conversation base fields
+  else if (conversation?.satisfaction_score || conversation?.sentiment) {
+    analysis = {
+      satisfaction_score: Number(conversation.satisfaction_score) || 5.0,
+      sentiment: (conversation.sentiment as 'positive' | 'negative' | 'neutral') || 'neutral',
+      confidence: 0.5,
+      sentiment_timeline: [],
+      topics: [],
+      intentions: [],
+      actionItems: [],
+      callMetrics: {
+        talkTime: 50,
+        silenceTime: 10,
+        interruptionCount: 0,
+        wordsPerMinute: 120
+      },
+      summary: '',
+      improvements: []
+    };
+  }
 
   return {
     analysis,
