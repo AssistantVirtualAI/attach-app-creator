@@ -22,9 +22,12 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Filter groups based on role
+  // Filter groups based on role - show adminOnly groups for admins and managers
   const visibleGroups = sidebarGroups.filter(group => {
-    if (group.adminOnly && isRole('agent')) return false;
+    if (group.adminOnly) {
+      // Show adminOnly groups only for org_admin, manager, super_admin
+      return role === 'org_admin' || role === 'manager' || isSuperAdmin;
+    }
     return true;
   });
 
