@@ -5,9 +5,17 @@ import { useClientElevenLabsConversations, useClientElevenLabsConversationDetail
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Slider } from '@/components/ui/slider';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { 
   MessageSquare, 
   Play, 
@@ -17,10 +25,20 @@ import {
   ChevronLeft,
   ChevronRight,
   Volume2,
-  Loader2
+  Loader2,
+  Search,
+  SlidersHorizontal,
+  X,
+  Download,
+  FileSpreadsheet,
+  TrendingUp,
+  TrendingDown,
+  Minus
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { AdvancedAudioPlayer } from '@/components/audio/AdvancedAudioPlayer';
+import { toast } from 'sonner';
 
 const ClientAgentConversations = () => {
   const { clientId, agentId } = useParams();
@@ -29,6 +47,12 @@ const ClientAgentConversations = () => {
   const [page, setPage] = useState(1);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  
+  // Advanced filters
+  const [searchQuery, setSearchQuery] = useState('');
+  const [durationRange, setDurationRange] = useState<[number, number]>([0, 600]);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
   const { data: conversationsData, isLoading } = useClientElevenLabsConversations({
     apiKey,
@@ -42,7 +66,39 @@ const ClientAgentConversations = () => {
 
   const audioMutation = useClientElevenLabsAudio();
 
-  const conversations = conversationsData?.conversations || [];
+  const allConversations = conversationsData?.conversations || [];
+  
+  // Apply client-side filters
+  const filteredConversations = allConversations.filter((conv: any) => {
+    // Search filter
+    if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
+      const callerId = (conv.metadata?.caller_id || '').toLowerCase();
+      const transcript = (conv.transcript || '').toLowerCase();
+      if (!callerId.includes(searchLower) && !transcript.includes(searchLower)) {
+        return false;
+      }
+    }
+    
+    // Duration filter
+    const duration = conv.call_duration_secs || 0;
+    if (duration < durationRange[0] || duration > durationRange[1]) {
+      return false;
+    }
+    
+    // Date filter
+    if (dateFrom) {
+      const convDate = new Date(conv.start_time_unix_secs * 1000);
+      if (convDate < dateFrom) return false;
+    }
+    if (dateTo) {
+      const convDate = new Date(conv.start_time_unix_secs * 1000);
+      if (convDate > dateTo) return false;
+    }
+    
+    return true;
+  });
+
   const totalPages = Math.ceil((conversationsData?.total || 0) / 20);
 
   const handlePlayAudio = async (conversationId: string) => {
@@ -64,21 +120,191 @@ const ClientAgentConversations = () => {
     }
   };
 
+  const exportToCSV = () => {
+    if (!filteredConversations.length) {
+      toast.error('Aucune donnée à exporter');
+      return;
+    }
+
+    const headers = ['ID', 'Appelant', 'Durée', 'Statut', 'Date'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredConversations.map((conv: any) => [
+        conv.conversation_id,
+        `"${conv.metadata?.caller_id || 'Inconnu'}"`,
+        conv.call_duration_secs ? `${Math.floor(conv.call_duration_secs / 60)}:${(conv.call_duration_secs % 60).toString().padStart(2, '0')}` : 'N/A',
+        conv.status,
+        format(new Date(conv.start_time_unix_secs * 1000), 'dd/MM/yyyy HH:mm', { locale: fr })
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `conversations_${agentName}_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Export CSV téléchargé');
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setDurationRange([0, 600]);
+    setDateFrom(undefined);
+    setDateTo(undefined);
+  };
+
+  const activeFiltersCount = [
+    searchQuery,
+    durationRange[0] > 0 || durationRange[1] < 600,
+    dateFrom,
+    dateTo
+  ].filter(Boolean).length;
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getSentimentIcon = (sentiment?: string) => {
+    switch (sentiment) {
+      case 'positive':
+        return <TrendingUp className="w-4 h-4 text-green-500" />;
+      case 'negative':
+        return <TrendingDown className="w-4 h-4 text-destructive" />;
+      default:
+        return <Minus className="w-4 h-4 text-muted-foreground" />;
+    }
+  };
+
   const transcript = conversationDetails?.transcript || [];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Conversations</h1>
-        <p className="text-muted-foreground">Historique des appels de {agentName}</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Conversations</h1>
+          <p className="text-muted-foreground">Historique des appels de {agentName}</p>
+        </div>
+        <Button variant="outline" className="gap-2" onClick={exportToCSV}>
+          <FileSpreadsheet className="w-4 h-4" />
+          Export CSV
+        </Button>
       </div>
+
+      {/* Advanced Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-3">
+            {/* Search */}
+            <div className="flex-1 min-w-64 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher par appelant ou dans la transcription..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Duration Filter */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <SlidersHorizontal className="w-4 h-4" />
+                  Durée
+                  {(durationRange[0] > 0 || durationRange[1] < 600) && (
+                    <Badge variant="secondary" className="text-xs">
+                      {formatDuration(durationRange[0])} - {formatDuration(durationRange[1])}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                <div className="space-y-4">
+                  <h4 className="font-medium">Filtrer par durée</h4>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>{formatDuration(durationRange[0])}</span>
+                      <span>{formatDuration(durationRange[1])}</span>
+                    </div>
+                    <Slider
+                      value={durationRange}
+                      onValueChange={(v) => setDurationRange([v[0], v[1]])}
+                      max={600}
+                      step={10}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Date From */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  Du
+                  {dateFrom && (
+                    <Badge variant="secondary" className="text-xs">
+                      {format(dateFrom, 'dd/MM/yy', { locale: fr })}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateFrom}
+                  onSelect={setDateFrom}
+                  locale={fr}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
+            {/* Date To */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  Au
+                  {dateTo && (
+                    <Badge variant="secondary" className="text-xs">
+                      {format(dateTo, 'dd/MM/yy', { locale: fr })}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateTo}
+                  onSelect={setDateTo}
+                  locale={fr}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+
+            {/* Clear Filters */}
+            {activeFiltersCount > 0 && (
+              <Button variant="ghost" onClick={clearFilters} className="gap-2">
+                <X className="w-4 h-4" />
+                Effacer ({activeFiltersCount})
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Conversations List */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5" />
-            Toutes les conversations
+            {filteredConversations.length} conversation{filteredConversations.length !== 1 ? 's' : ''}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -88,27 +314,33 @@ const ClientAgentConversations = () => {
                 <Skeleton key={i} className="h-20 w-full" />
               ))}
             </div>
-          ) : conversations.length === 0 ? (
+          ) : filteredConversations.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
               Aucune conversation trouvée
             </p>
           ) : (
             <>
               <div className="space-y-3">
-                {conversations.map((conv: any) => (
+                {filteredConversations.map((conv: any) => (
                   <div
                     key={conv.conversation_id}
                     className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
-                    onClick={() => setSelectedConversation(conv.conversation_id)}
+                    onClick={() => {
+                      setSelectedConversation(conv.conversation_id);
+                      handlePlayAudio(conv.conversation_id);
+                    }}
                   >
                     <div className="flex items-center gap-4">
                       <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
                         <User className="h-6 w-6 text-primary" />
                       </div>
                       <div>
-                        <p className="font-medium">
-                          {conv.metadata?.caller_id || 'Appelant inconnu'}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">
+                            {conv.metadata?.caller_id || 'Appelant inconnu'}
+                          </p>
+                          {getSentimentIcon(conv.analysis?.sentiment)}
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           {format(new Date(conv.start_time_unix_secs * 1000), 'PPp', { locale: fr })}
                         </p>
@@ -119,7 +351,7 @@ const ClientAgentConversations = () => {
                         <div className="flex items-center gap-1 text-sm">
                           <Clock className="h-4 w-4" />
                           {conv.call_duration_secs 
-                            ? `${Math.floor(conv.call_duration_secs / 60)}:${(conv.call_duration_secs % 60).toString().padStart(2, '0')}`
+                            ? formatDuration(conv.call_duration_secs)
                             : 'N/A'
                           }
                         </div>
@@ -176,9 +408,12 @@ const ClientAgentConversations = () => {
         </CardContent>
       </Card>
 
-      {/* Conversation Detail Modal */}
-      <Dialog open={!!selectedConversation} onOpenChange={() => setSelectedConversation(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh]">
+      {/* Conversation Detail Modal with Advanced Audio Player */}
+      <Dialog open={!!selectedConversation} onOpenChange={() => {
+        setSelectedConversation(null);
+        setAudioUrl(null);
+      }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
@@ -188,64 +423,111 @@ const ClientAgentConversations = () => {
           
           {detailsLoading ? (
             <div className="space-y-3">
-              <Skeleton className="h-6 w-full" />
-              <Skeleton className="h-6 w-3/4" />
-              <Skeleton className="h-6 w-1/2" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-40 w-full" />
             </div>
           ) : (
-            <ScrollArea className="max-h-[60vh]">
-              <div className="space-y-4 pr-4">
-                {/* Audio Player */}
-                {audioUrl && (
-                  <div className="p-4 bg-muted rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Volume2 className="h-4 w-4" />
-                      <span className="text-sm font-medium">Audio de l'appel</span>
-                    </div>
-                    <audio controls className="w-full" src={audioUrl}>
-                      Votre navigateur ne supporte pas l'audio.
-                    </audio>
+            <div className="space-y-6">
+              {/* Metadata */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Appelant</p>
+                  <p className="font-medium">{conversationDetails?.metadata?.caller_id || 'Inconnu'}</p>
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Durée</p>
+                  <p className="font-medium">
+                    {conversationDetails?.call_duration_secs 
+                      ? formatDuration(conversationDetails.call_duration_secs)
+                      : 'N/A'}
+                  </p>
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Satisfaction</p>
+                  <p className="font-medium">
+                    {conversationDetails?.analysis?.satisfaction_score 
+                      ? `${(conversationDetails.analysis.satisfaction_score * 100).toFixed(0)}%`
+                      : 'N/A'}
+                  </p>
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm text-muted-foreground">Sentiment</p>
+                  <div className="flex items-center gap-2">
+                    {getSentimentIcon(conversationDetails?.analysis?.sentiment)}
+                    <span className="font-medium capitalize">
+                      {conversationDetails?.analysis?.sentiment || 'N/A'}
+                    </span>
                   </div>
-                )}
-
-                {/* Transcript */}
-                <div className="space-y-3">
-                  <h4 className="font-medium">Transcription</h4>
-                  {transcript.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">
-                      Aucune transcription disponible
-                    </p>
-                  ) : (
-                    transcript.map((msg: any, index: number) => (
-                      <div
-                        key={index}
-                        className={`flex gap-3 ${msg.role === 'agent' ? 'justify-start' : 'justify-end'}`}
-                      >
-                        <div
-                          className={`max-w-[80%] p-3 rounded-lg ${
-                            msg.role === 'agent'
-                              ? 'bg-primary/10 text-foreground'
-                              : 'bg-muted text-foreground'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 mb-1">
-                            {msg.role === 'agent' ? (
-                              <Bot className="h-4 w-4" />
-                            ) : (
-                              <User className="h-4 w-4" />
-                            )}
-                            <span className="text-xs font-medium">
-                              {msg.role === 'agent' ? 'Agent' : 'Utilisateur'}
-                            </span>
-                          </div>
-                          <p className="text-sm">{msg.message}</p>
-                        </div>
-                      </div>
-                    ))
-                  )}
                 </div>
               </div>
-            </ScrollArea>
+
+              {/* Advanced Audio Player */}
+              {audioUrl && selectedConversation && (
+                <AdvancedAudioPlayer
+                  audioUrl={audioUrl}
+                  conversation={{
+                    conversation_id: selectedConversation,
+                    caller_number: conversationDetails?.metadata?.caller_id,
+                    duration_seconds: conversationDetails?.call_duration_secs,
+                    satisfaction_score: conversationDetails?.analysis?.satisfaction_score,
+                  }}
+                  transcript={transcript.map((msg: any, index: number) => ({
+                    speaker: msg.role === 'agent' ? 'agent' : 'caller',
+                    text: msg.message,
+                    timestamp: msg.time_in_call_secs ? msg.time_in_call_secs * 1000 : index * 5000,
+                  }))}
+                />
+              )}
+
+              {audioMutation.isPending && (
+                <div className="p-6 bg-muted rounded-lg text-center">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Chargement de l'audio...</p>
+                </div>
+              )}
+
+              {/* Transcript */}
+              {transcript.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-medium">Transcription</h4>
+                  <ScrollArea className="max-h-64">
+                    <div className="space-y-3 pr-4">
+                      {transcript.map((msg: any, index: number) => (
+                        <div
+                          key={index}
+                          className={`flex gap-3 ${msg.role === 'agent' ? 'justify-start' : 'justify-end'}`}
+                        >
+                          <div
+                            className={`max-w-[80%] p-3 rounded-lg ${
+                              msg.role === 'agent'
+                                ? 'bg-primary/10 text-foreground'
+                                : 'bg-muted text-foreground'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              {msg.role === 'agent' ? (
+                                <Bot className="h-4 w-4" />
+                              ) : (
+                                <User className="h-4 w-4" />
+                              )}
+                              <span className="text-xs font-medium">
+                                {msg.role === 'agent' ? 'Agent' : 'Utilisateur'}
+                              </span>
+                              {msg.time_in_call_secs && (
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDuration(msg.time_in_call_secs)}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm">{msg.message}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
           )}
         </DialogContent>
       </Dialog>

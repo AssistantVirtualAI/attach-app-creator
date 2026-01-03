@@ -1,16 +1,12 @@
 import { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Search, Filter, Clock, TrendingUp, TrendingDown, Minus, ExternalLink, 
-  Download, Trash2, ChevronLeft, ChevronRight 
+  Clock, TrendingUp, TrendingDown, Minus, ExternalLink, 
+  ChevronLeft, ChevronRight, Play, Volume2
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { ConversationDetailModal } from '@/components/conversations/ConversationDetailModal';
-import { useConversations, useDeleteConversation, ConversationsFilters } from '@/hooks/useConversations';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Select, 
@@ -20,43 +16,30 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { toast } from 'sonner';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useAllAgentsConversations, useConversationDetails, useConversationAudio, ConversationFilters as Filters } from '@/hooks/useAllAgentsConversations';
+import { ConversationFilters } from '@/components/filters/ConversationFilters';
+import { ConversationExport } from '@/components/exports/ConversationExport';
+import { AdvancedAudioPlayer } from '@/components/audio/AdvancedAudioPlayer';
+import { SetupIntegrationCard } from '@/components/SetupIntegrationCard';
 
 const Conversations = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [filters, setFilters] = useState<ConversationsFilters>({});
+  const [filters, setFilters] = useState<Filters>({});
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   
-  const { data, isLoading } = useConversations(page, pageSize, filters);
-  const deleteConversation = useDeleteConversation();
+  const { data, isLoading } = useAllAgentsConversations(page, pageSize, filters);
+  const { data: conversationDetails, isLoading: isLoadingDetails } = useConversationDetails(selectedConversationId);
+  const { data: audioData, isLoading: isLoadingAudio } = useConversationAudio(selectedConversationId);
 
-  const getPlatformColor = (platform: string | null) => {
-    switch (platform) {
-      case 'elevenlabs':
-        return 'bg-primary/20 text-primary border-primary/30';
-      case 'vapi':
-        return 'bg-secondary/20 text-secondary border-secondary/30';
-      case 'retell':
-        return 'bg-accent/20 text-accent border-accent/30';
-      default:
-        return 'bg-muted text-muted-foreground';
-    }
-  };
-
-  const getSentimentIcon = (sentiment: string | null) => {
+  const getSentimentIcon = (sentiment: string | undefined) => {
     switch (sentiment) {
       case 'positive':
         return <TrendingUp className="w-4 h-4 text-green-500" />;
@@ -67,52 +50,42 @@ const Conversations = () => {
     }
   };
 
-  const formatDuration = (seconds: number | null) => {
+  const formatDuration = (seconds: number | undefined) => {
     if (!seconds) return 'N/A';
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}m ${secs}s`;
   };
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await deleteConversation.mutateAsync(id);
-      toast.success('Conversation supprimée');
-    } catch {
-      toast.error('Erreur lors de la suppression');
-    }
+  const handleSearch = (search: string) => {
+    setFilters(f => ({ ...f, search }));
+    setPage(1);
   };
 
-  const exportToCSV = () => {
-    if (!data?.data.length) {
-      toast.error('Aucune donnée à exporter');
-      return;
-    }
-
-    const headers = ['Titre', 'Plateforme', 'Durée (s)', 'Sentiment', 'Score', 'Statut', 'Date'];
-    const csvContent = [
-      headers.join(','),
-      ...data.data.map(conv => [
-        `"${conv.title.replace(/"/g, '""')}"`,
-        conv.platform || '',
-        conv.duration || '',
-        conv.sentiment || '',
-        conv.satisfaction_score || '',
-        conv.status || '',
-        conv.created_at
-      ].join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `conversations_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success('Export CSV téléchargé');
+  const handleFiltersChange = (newFilters: Filters) => {
+    setFilters(newFilters);
+    setPage(1);
   };
+
+  // Show setup message if no agents configured
+  if (data?.requiresSetup) {
+    return (
+      <AppLayout>
+        <div className="container mx-auto px-6 py-8">
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold mb-2 gradient-text">Conversations</h1>
+            <p className="text-muted-foreground text-lg">
+              Toutes les conversations de vos agents vocaux
+            </p>
+          </div>
+          <SetupIntegrationCard 
+            title="Configuration Requise" 
+            message={data.message || 'Veuillez configurer au moins un agent ElevenLabs pour voir les conversations.'} 
+          />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -122,83 +95,23 @@ const Conversations = () => {
           <div>
             <h1 className="text-4xl font-bold mb-2 gradient-text">Conversations</h1>
             <p className="text-muted-foreground text-lg">
-              {data?.count || 0} conversations au total
+              {data?.total || 0} conversations au total • {data?.agents?.length || 0} agents
             </p>
           </div>
-          <Button onClick={exportToCSV} variant="outline" className="gap-2">
-            <Download className="w-4 h-4" />
-            Export CSV
-          </Button>
+          <ConversationExport 
+            conversations={data?.conversations || []} 
+            filename="conversations"
+          />
         </div>
 
-        {/* Search & Filters */}
-        <div className="mb-6 flex flex-wrap gap-4">
-          <div className="flex-1 min-w-64 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher des conversations..."
-              value={filters.search || ''}
-              onChange={(e) => {
-                setFilters(f => ({ ...f, search: e.target.value }));
-                setPage(1);
-              }}
-              className="pl-10 glass-card"
-            />
-          </div>
-          
-          <Select 
-            value={filters.platform || 'all'} 
-            onValueChange={(v) => {
-              setFilters(f => ({ ...f, platform: v }));
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Plateforme" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Toutes</SelectItem>
-              <SelectItem value="elevenlabs">ElevenLabs</SelectItem>
-              <SelectItem value="vapi">Vapi</SelectItem>
-              <SelectItem value="retell">Retell</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select 
-            value={filters.sentiment || 'all'} 
-            onValueChange={(v) => {
-              setFilters(f => ({ ...f, sentiment: v }));
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Sentiment" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous</SelectItem>
-              <SelectItem value="positive">Positif</SelectItem>
-              <SelectItem value="neutral">Neutre</SelectItem>
-              <SelectItem value="negative">Négatif</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select 
-            value={filters.dateRange || 'all'} 
-            onValueChange={(v) => {
-              setFilters(f => ({ ...f, dateRange: v as any }));
-              setPage(1);
-            }}
-          >
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Période" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tout</SelectItem>
-              <SelectItem value="today">Aujourd'hui</SelectItem>
-              <SelectItem value="7days">7 jours</SelectItem>
-              <SelectItem value="30days">30 jours</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* Filters */}
+        <div className="mb-6">
+          <ConversationFilters
+            filters={filters}
+            onFiltersChange={handleFiltersChange}
+            agents={data?.agents || []}
+            onSearch={handleSearch}
+          />
         </div>
 
         {/* Conversations List */}
@@ -217,93 +130,73 @@ const Conversations = () => {
                 </CardContent>
               </Card>
             ))
-          ) : data?.data.length === 0 ? (
+          ) : data?.conversations?.length === 0 ? (
             <Card className="glass-card">
               <CardContent className="p-12 text-center">
                 <p className="text-muted-foreground">Aucune conversation trouvée</p>
               </CardContent>
             </Card>
           ) : (
-            data?.data.map((conversation) => (
-              <Card 
-                key={conversation.id} 
-                className="glass-card hover:neon-border transition-all duration-200 cursor-pointer"
-                onClick={() => setSelectedConversationId(conversation.id)}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold">{conversation.title}</h3>
-                        {conversation.platform && (
-                          <Badge className={getPlatformColor(conversation.platform)}>
-                            {conversation.platform}
+            data?.conversations?.map((conversation) => {
+              const duration = conversation.call_duration_secs || conversation.duration || 0;
+              const startTime = conversation.start_time || conversation.metadata?.start_time;
+              const sentiment = conversation.analysis?.sentiment;
+              const satisfaction = conversation.analysis?.satisfaction_score;
+              
+              return (
+                <Card 
+                  key={conversation.conversation_id} 
+                  className="glass-card hover:neon-border transition-all duration-200 cursor-pointer"
+                  onClick={() => setSelectedConversationId(conversation.conversation_id)}
+                >
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-lg font-semibold">
+                            Conversation {conversation.conversation_id.substring(0, 8)}
+                          </h3>
+                          <Badge className="bg-primary/20 text-primary border-primary/30">
+                            {conversation.agent_name}
                           </Badge>
+                          {getSentimentIcon(sentiment)}
+                        </div>
+
+                        <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4" />
+                            {formatDuration(duration)}
+                          </div>
+                          {satisfaction !== undefined && (
+                            <div>Satisfaction: {(satisfaction * 100).toFixed(0)}%</div>
+                          )}
+                          {startTime && (
+                            <div>
+                              {format(new Date(startTime), 'dd MMM yyyy HH:mm', { locale: fr })}
+                            </div>
+                          )}
+                        </div>
+
+                        {conversation.analysis?.summary && (
+                          <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+                            {conversation.analysis.summary}
+                          </p>
                         )}
-                        {getSentimentIcon(conversation.sentiment)}
                       </div>
 
-                      <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
-                          {formatDuration(conversation.duration)}
-                        </div>
-                        {conversation.satisfaction_score && (
-                          <div>Satisfaction: {conversation.satisfaction_score}/5</div>
-                        )}
-                        <div>
-                          {format(new Date(conversation.created_at), 'dd MMM yyyy HH:mm', { locale: fr })}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {conversation.status && (
-                        <Badge variant="outline">
-                          {conversation.status}
-                        </Badge>
-                      )}
-                      <Link 
-                        to={`/conversations/${conversation.id}`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" className="gap-2">
+                          <Play className="w-4 h-4" />
+                        </Button>
                         <Button variant="ghost" size="sm" className="gap-2">
                           <ExternalLink className="w-4 h-4" />
                         </Button>
-                      </Link>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Trash2 className="w-4 h-4 text-destructive" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Supprimer la conversation ?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Cette action est irréversible.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Annuler</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={(e) => handleDelete(conversation.id, e)}
-                              className="bg-destructive text-destructive-foreground"
-                            >
-                              Supprimer
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </div>
 
@@ -355,14 +248,120 @@ const Conversations = () => {
           </div>
         )}
 
-        {/* Modal de détails */}
-        {selectedConversationId && (
-          <ConversationDetailModal
-            isOpen={!!selectedConversationId}
-            onClose={() => setSelectedConversationId(null)}
-            conversationId={selectedConversationId}
-          />
-        )}
+        {/* Conversation Detail Modal */}
+        <Dialog open={!!selectedConversationId} onOpenChange={() => setSelectedConversationId(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-3">
+                <Volume2 className="w-5 h-5 text-primary" />
+                Détails de la conversation
+              </DialogTitle>
+            </DialogHeader>
+
+            {isLoadingDetails ? (
+              <div className="space-y-4">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-40 w-full" />
+              </div>
+            ) : conversationDetails ? (
+              <div className="space-y-6">
+                {/* Metadata */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="glass-card p-4 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Agent</p>
+                    <p className="font-semibold">{conversationDetails.agent_name || 'N/A'}</p>
+                  </div>
+                  <div className="glass-card p-4 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Durée</p>
+                    <p className="font-semibold">
+                      {formatDuration(conversationDetails.call_duration_secs || conversationDetails.metadata?.call_duration_secs)}
+                    </p>
+                  </div>
+                  <div className="glass-card p-4 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Satisfaction</p>
+                    <p className="font-semibold">
+                      {conversationDetails.analysis?.satisfaction_score 
+                        ? `${(conversationDetails.analysis.satisfaction_score * 100).toFixed(0)}%`
+                        : 'N/A'}
+                    </p>
+                  </div>
+                  <div className="glass-card p-4 rounded-lg">
+                    <p className="text-sm text-muted-foreground">Sentiment</p>
+                    <div className="flex items-center gap-2">
+                      {getSentimentIcon(conversationDetails.analysis?.sentiment)}
+                      <span className="font-semibold capitalize">
+                        {conversationDetails.analysis?.sentiment || 'N/A'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Summary */}
+                {conversationDetails.analysis?.summary && (
+                  <div className="glass-card p-4 rounded-lg">
+                    <h4 className="font-semibold mb-2">Résumé</h4>
+                    <p className="text-muted-foreground">{conversationDetails.analysis.summary}</p>
+                  </div>
+                )}
+
+                {/* Audio Player */}
+                {!isLoadingAudio && audioData?.audio_url && (
+                  <AdvancedAudioPlayer
+                    audioUrl={audioData.audio_url}
+                    conversation={{
+                      conversation_id: selectedConversationId!,
+                      duration_seconds: conversationDetails.call_duration_secs || conversationDetails.metadata?.call_duration_secs,
+                      satisfaction_score: conversationDetails.analysis?.satisfaction_score,
+                    }}
+                    transcript={conversationDetails.transcript?.map((segment: any, index: number) => ({
+                      speaker: segment.role === 'agent' ? 'agent' : 'caller',
+                      text: segment.message || segment.text,
+                      timestamp: segment.time_in_call_secs ? segment.time_in_call_secs * 1000 : index * 5000,
+                    })) || []}
+                  />
+                )}
+
+                {isLoadingAudio && (
+                  <div className="glass-card p-6 text-center">
+                    <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">Chargement de l'audio...</p>
+                  </div>
+                )}
+
+                {/* Transcript */}
+                {conversationDetails.transcript && conversationDetails.transcript.length > 0 && (
+                  <div className="glass-card p-4 rounded-lg">
+                    <h4 className="font-semibold mb-4">Transcription</h4>
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {conversationDetails.transcript.map((segment: any, index: number) => (
+                        <div 
+                          key={index}
+                          className={`flex gap-3 ${segment.role === 'agent' ? 'justify-start' : 'justify-end'}`}
+                        >
+                          <div className={`max-w-[80%] p-3 rounded-lg ${
+                            segment.role === 'agent' 
+                              ? 'bg-primary/10 text-foreground' 
+                              : 'bg-muted text-foreground'
+                          }`}>
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {segment.role === 'agent' ? '🤖 Agent' : '👤 Utilisateur'}
+                              {segment.time_in_call_secs && ` • ${formatDuration(segment.time_in_call_secs)}`}
+                            </p>
+                            <p className="text-sm">{segment.message || segment.text}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground py-8">
+                Impossible de charger les détails de la conversation
+              </p>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
