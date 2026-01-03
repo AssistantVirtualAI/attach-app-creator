@@ -553,11 +553,11 @@ export default function Clients() {
                               <Users className="mr-2 h-4 w-4" />
                               Gérer les membres
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}`)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Modifier
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}?tab=access`)}>
                               <Key className="mr-2 h-4 w-4" />
                               Réinitialiser mot de passe
                             </DropdownMenuItem>
