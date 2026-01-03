@@ -169,6 +169,60 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
     }
   });
 
+  // Mutation pour synchroniser la KB depuis ElevenLabs vers la base locale
+  const syncKnowledgeBase = useMutation({
+    mutationFn: async () => {
+      // Fetch KB from ElevenLabs and save to local DB
+      const kbItems = knowledgeBase?.knowledge_base?.items || [];
+      
+      if (kbItems.length === 0) {
+        throw new Error('Aucun document à synchroniser');
+      }
+
+      // Get user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Non authentifié');
+
+      // Get organization
+      const { data: orgMember } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .single();
+
+      // Insert/update local KB items
+      for (const item of kbItems) {
+        const { error } = await supabase
+          .from('knowledge_base_items')
+          .upsert({
+            user_id: user.id,
+            organization_id: orgMember?.organization_id,
+            title: item.name || item.title || 'Document sans titre',
+            content: item.content || 'Contenu non disponible',
+            category: item.metadata?.category || item.category || 'Général',
+            elevenlabs_id: item.id,
+            is_synced: true,
+            last_synced_at: new Date().toISOString(),
+          }, {
+            onConflict: 'elevenlabs_id',
+            ignoreDuplicates: false
+          });
+        
+        if (error) console.error('[AgentKnowledgePromptTab] Sync error for item:', error);
+      }
+
+      return { synced: kbItems.length };
+    },
+    onSuccess: (data) => {
+      toast.success(`${data.synced} documents synchronisés depuis ElevenLabs`);
+      queryClient.invalidateQueries({ queryKey: ['elevenlabs-knowledge-base', agent.id] });
+    },
+    onError: (error: any) => {
+      console.error('[AgentKnowledgePromptTab] Sync KB error:', error);
+      toast.error(error.message || 'Erreur lors de la synchronisation');
+    }
+  });
+
   const handlePromptChange = (value: string) => {
     setPrompt(value);
     setHasChanges(true);
@@ -333,13 +387,30 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
           {/* Contenu existant de la KB */}
           <Card className="glass-card">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-primary" />
-                Base de Connaissances
-              </CardTitle>
-              <CardDescription>
-                Documents et informations que l'agent utilise pour répondre aux questions.
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-primary" />
+                    Base de Connaissances
+                  </CardTitle>
+                  <CardDescription>
+                    Documents et informations que l'agent utilise pour répondre aux questions.
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => syncKnowledgeBase.mutate()}
+                  disabled={syncKnowledgeBase.isPending}
+                >
+                  {syncKnowledgeBase.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                  )}
+                  Sync depuis ElevenLabs
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {isLoadingKB ? (

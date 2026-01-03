@@ -87,7 +87,7 @@ export default function Clients() {
         .from('clients')
         .select(`
           *,
-          assigned_agent:agents(id, name, platform)
+          assigned_agent:agents(id, name, platform, platform_agent_id, config)
         `)
         .eq('organization_id', selectedOrgId);
 
@@ -448,6 +448,7 @@ export default function Clients() {
                   <TableHead>Client</TableHead>
                   <TableHead>Login ID</TableHead>
                   <TableHead>Agent assigné</TableHead>
+                  <TableHead>Agent ID ElevenLabs</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead>Date de création</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -456,7 +457,7 @@ export default function Clients() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12">
+                    <TableCell colSpan={7} className="text-center py-12">
                       <div className="flex items-center justify-center gap-2 text-muted-foreground">
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
                         Chargement...
@@ -465,7 +466,7 @@ export default function Clients() {
                   </TableRow>
                 ) : filteredClients.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12">
+                    <TableCell colSpan={7} className="text-center py-12">
                       <div className="text-muted-foreground">
                         {clients?.length === 0
                           ? 'Aucun client. Créez votre premier client !'
@@ -502,6 +503,19 @@ export default function Clients() {
                           </div>
                         ) : (
                           <span className="text-muted-foreground text-sm">Non assigné</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {client.assigned_agent && (client.assigned_agent as any).config?.agent_id ? (
+                          <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                            {(client.assigned_agent as any).config.agent_id}
+                          </code>
+                        ) : client.assigned_agent && (client.assigned_agent as any).platform_agent_id ? (
+                          <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                            {(client.assigned_agent as any).platform_agent_id}
+                          </code>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
                         )}
                       </TableCell>
                       <TableCell>
