@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -16,10 +16,10 @@ import { ConversationCardSkeleton } from '@/components/LoadingSkeleton';
 import { Brain, Sparkles, TrendingUp, TrendingDown, Minus, Target, Lightbulb, Tag, Bot, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  normalizeTranscript, 
+import {
+  normalizeTranscript,
   transcriptToAudioPlayerFormat,
-  type TranscriptMessage 
+  type TranscriptMessage
 } from '@/lib/transcript/normalizeElevenLabsTranscript';
 
 interface ConversationDetailModalProps {
@@ -28,21 +28,31 @@ interface ConversationDetailModalProps {
   conversationId: string;
 }
 
-export function ConversationDetailModal({ 
-  isOpen, 
-  onClose, 
-  conversationId 
+export function ConversationDetailModal({
+  isOpen,
+  onClose,
+  conversationId
 }: ConversationDetailModalProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const { data: conversation, isLoading, error } = useConversationDetails(conversationId);
-  const { analysis, isAnalyzing, generateAnalysis } = useEnhancedConversationAnalysis(conversationId);
+  const { analysis, isAnalyzing, generateAnalysis, error: analysisError } = useEnhancedConversationAnalysis(conversationId);
 
-  // Générer l'analyse automatiquement dès l'ouverture si elle n'existe pas
+  const autoAnalyzeAttemptedRef = useRef(false);
+
+  // Générer l'analyse automatiquement dès l'ouverture si elle n'existe pas (sans boucle infinie)
   useEffect(() => {
-    if (isOpen && conversation && !analysis && !isAnalyzing) {
+    if (!isOpen) {
+      autoAnalyzeAttemptedRef.current = false;
+      return;
+    }
+
+    if (analysisError) return;
+
+    if (conversationId !== '' && isOpen && conversation && !analysis && !isAnalyzing && !autoAnalyzeAttemptedRef.current) {
+      autoAnalyzeAttemptedRef.current = true;
       generateAnalysis({});
     }
-  }, [isOpen, conversation, analysis, isAnalyzing, generateAnalysis]);
+  }, [isOpen, conversationId, conversation, analysis, isAnalyzing, analysisError, generateAnalysis]);
 
   // Extraire le nom du client depuis les métadonnées
   const clientName = useMemo(() => {

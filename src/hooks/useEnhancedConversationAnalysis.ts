@@ -94,6 +94,12 @@ export const useEnhancedConversationAnalysis = (
   // Mutation pour générer l'analyse
   const generateAnalysis = useMutation({
     mutationFn: async (params: Omit<AnalyzeConversationParams, 'conversationId' | 'externalConversationId'>) => {
+      // Hard stop if not authenticated (prevents endless spinners + 401 loops)
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        throw new Error('Session expirée. Veuillez vous reconnecter.');
+      }
+
       // Build the request body based on whether it's an external conversation
       const body: AnalyzeConversationParams = isExternal
         ? {
@@ -109,9 +115,9 @@ export const useEnhancedConversationAnalysis = (
             organizationId: params.organizationId || conversation?.organization_id,
             transcript: params.transcript,
           };
-      
+
       const { data, error } = await supabase.functions.invoke('analyze-conversation', {
-        body
+        body,
       });
 
       if (error) {
