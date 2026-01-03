@@ -58,7 +58,7 @@ import Handoffs from "./pages/Handoffs";
 import SmsTemplates from "./pages/SmsTemplates";
 import NotFound from "./pages/NotFound";
 import DemoCenter from "./pages/DemoCenter";
-
+import RealtimeMonitor from "./pages/RealtimeMonitor";
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -351,6 +351,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <DemoCenter />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/realtime"
+                  element={
+                    <ProtectedRoute>
+                      <RealtimeMonitor />
                     </ProtectedRoute>
                   }
                 />
