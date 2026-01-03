@@ -6,10 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AdvancedAudioPlayer } from '@/components/audio/AdvancedAudioPlayer';
 import { ConversationMetrics } from './ConversationMetrics';
+import { SentimentTimeline } from './SentimentTimeline';
+import { ImprovementsList } from './ImprovementCard';
+import { SatisfactionScore } from './SatisfactionScore';
 import { useConversationDetails } from '@/hooks/useConversationDetails';
-import { useConversationAnalysis } from '@/hooks/useConversationAnalysis';
+import { useEnhancedConversationAnalysis } from '@/hooks/useEnhancedConversationAnalysis';
 import { ConversationCardSkeleton } from '@/components/LoadingSkeleton';
-import { Brain, Sparkles, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Brain, Sparkles, TrendingUp, TrendingDown, Minus, Target, Lightbulb } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface ConversationDetailModalProps {
@@ -25,12 +28,12 @@ export function ConversationDetailModal({
 }: ConversationDetailModalProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const { data: conversation, isLoading, error } = useConversationDetails(conversationId);
-  const { analysis, isAnalyzing, generateAnalysis } = useConversationAnalysis(conversationId);
+  const { analysis, isAnalyzing, generateAnalysis } = useEnhancedConversationAnalysis(conversationId);
 
   // Générer l'analyse automatiquement si elle n'existe pas
   useEffect(() => {
     if (conversation && !analysis && !isAnalyzing && activeTab === 'analysis') {
-      generateAnalysis();
+      generateAnalysis({});
     }
   }, [conversation, analysis, isAnalyzing, activeTab, generateAnalysis]);
 
@@ -213,9 +216,9 @@ export function ConversationDetailModal({
                 <Card className="p-8 text-center glass-card">
                   <Brain className="w-12 h-12 mx-auto mb-4 text-primary" />
                   <p className="text-muted-foreground mb-4">
-                    Générez une analyse IA complète de cette conversation
+                    Générez une analyse IA complète de cette conversation avec score de satisfaction et recommandations d'amélioration
                   </p>
-                  <Button onClick={generateAnalysis} className="gap-2">
+                  <Button onClick={() => generateAnalysis({})} className="gap-2">
                     <Sparkles className="w-4 h-4" />
                     Générer l'Analyse
                   </Button>
@@ -234,62 +237,110 @@ export function ConversationDetailModal({
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4 }}
-                  className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                  className="space-y-6"
                 >
-                  {/* Analyse de sentiment */}
-                  <Card className="glass-card">
-                    <CardHeader>
-                      <CardTitle className="text-primary">Analyse de Sentiment</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{getSentimentEmoji(analysis.sentiment)}</span>
-                        <div>
-                          <p className={`font-medium ${getSentimentColor(analysis.sentiment)}`}>
-                            {analysis.sentiment.charAt(0).toUpperCase() + analysis.sentiment.slice(1)}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Confiance: {(analysis.confidence * 100).toFixed(1)}%
-                          </p>
+                  {/* Score de satisfaction et Sentiment global */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="glass-card">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-primary">
+                          <Target className="w-5 h-5" />
+                          Score de Satisfaction
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex justify-center py-4">
+                        <SatisfactionScore score={analysis.satisfaction_score} size="lg" />
+                      </CardContent>
+                    </Card>
+
+                    <Card className="glass-card">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2">
+                          {getSentimentIcon(analysis.sentiment)}
+                          Analyse de Sentiment
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-3xl">{getSentimentEmoji(analysis.sentiment)}</span>
+                          <div>
+                            <p className={`font-medium text-lg ${getSentimentColor(analysis.sentiment)}`}>
+                              {analysis.sentiment === 'positive' ? 'Positif' : 
+                               analysis.sentiment === 'negative' ? 'Négatif' : 'Neutre'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Confiance: {(analysis.confidence * 100).toFixed(0)}%
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  </div>
 
-                  {/* Topics détectés */}
+                  {/* Timeline du sentiment */}
+                  {analysis.sentiment_timeline && analysis.sentiment_timeline.length > 0 && (
+                    <Card className="glass-card">
+                      <CardHeader>
+                        <CardTitle className="text-secondary">Évolution du Sentiment</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <SentimentTimeline timeline={analysis.sentiment_timeline} />
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Topics et Intentions */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {analysis.topics && analysis.topics.length > 0 && (
+                      <Card className="glass-card">
+                        <CardHeader>
+                          <CardTitle className="text-secondary">Topics Détectés</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-2">
+                            {analysis.topics.map((topic, index) => (
+                              <Badge key={index} variant="outline">
+                                {topic}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {analysis.intentions && analysis.intentions.length > 0 && (
+                      <Card className="glass-card">
+                        <CardHeader>
+                          <CardTitle className="text-accent">Intentions</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex flex-wrap gap-2">
+                            {analysis.intentions.map((intention, index) => (
+                              <Badge key={index} variant="outline">
+                                {intention}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+
+                  {/* Recommandations d'amélioration */}
                   <Card className="glass-card">
                     <CardHeader>
-                      <CardTitle className="text-secondary">Topics Détectés</CardTitle>
+                      <CardTitle className="flex items-center gap-2 text-primary">
+                        <Lightbulb className="w-5 h-5" />
+                        Recommandations d'Amélioration
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex flex-wrap gap-2">
-                        {analysis.topics.map((topic, index) => (
-                          <Badge key={index} variant="outline">
-                            {topic}
-                          </Badge>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Intentions */}
-                  <Card className="glass-card">
-                    <CardHeader>
-                      <CardTitle className="text-accent">Intentions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-wrap gap-2">
-                        {analysis.intentions.map((intention, index) => (
-                          <Badge key={index} variant="outline">
-                            {intention}
-                          </Badge>
-                        ))}
-                      </div>
+                      <ImprovementsList improvements={analysis.improvements || []} />
                     </CardContent>
                   </Card>
 
                   {/* Action Items */}
-                  {analysis.actionItems.length > 0 && (
+                  {analysis.actionItems && analysis.actionItems.length > 0 && (
                     <Card className="glass-card">
                       <CardHeader>
                         <CardTitle className="text-yellow-500">Action Items</CardTitle>

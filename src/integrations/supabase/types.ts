@@ -76,6 +76,67 @@ export type Database = {
           },
         ]
       }
+      agent_insights: {
+        Row: {
+          agent_id: string | null
+          analyzed_at: string | null
+          conversation_id: string
+          created_at: string | null
+          id: string
+          improvements: Json | null
+          organization_id: string | null
+          overall_sentiment: string | null
+          satisfaction_score: number | null
+          sentiment_timeline: Json | null
+        }
+        Insert: {
+          agent_id?: string | null
+          analyzed_at?: string | null
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          improvements?: Json | null
+          organization_id?: string | null
+          overall_sentiment?: string | null
+          satisfaction_score?: number | null
+          sentiment_timeline?: Json | null
+        }
+        Update: {
+          agent_id?: string | null
+          analyzed_at?: string | null
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          improvements?: Json | null
+          organization_id?: string | null
+          overall_sentiment?: string | null
+          satisfaction_score?: number | null
+          sentiment_timeline?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_insights_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_insights_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_insights_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agents: {
         Row: {
           assigned_to: string | null
