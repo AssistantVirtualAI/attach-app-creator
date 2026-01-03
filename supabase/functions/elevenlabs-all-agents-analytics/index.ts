@@ -181,15 +181,15 @@ serve(async (req) => {
         console.log(`Fetching analytics for agent ${config.name} (${config.agentId})`);
         
         // Get conversations to calculate metrics
-        const conversationsResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${config.agentId}/conversations?page=1&limit=100`,
-          {
-            headers: {
-              'Authorization': `Bearer ${config.apiKey}`,
-              'xi-api-key': config.apiKey,
-            },
-          }
-        );
+         const conversationsResponse = await fetch(
+           `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${config.agentId}&cursor=&limit=100`,
+           {
+             headers: {
+               'xi-api-key': config.apiKey,
+               'accept': 'application/json',
+             },
+           }
+         );
 
         if (conversationsResponse.ok) {
           const conversationsData = await conversationsResponse.json();
