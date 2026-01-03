@@ -28,7 +28,36 @@ export interface DashboardMetrics {
     timestamp: string;
   }[];
   lastUpdated: string;
+  dataSource: 'elevenlabs' | 'local' | 'mixed';
+  weeklyData: { name: string; conversations: number; satisfaction: number }[];
+  agentPerformance: { name: string; conversations: number; satisfaction: number; duration: number }[];
 }
+
+const defaultMetrics: DashboardMetrics = {
+  totalConversations: 0,
+  conversationsToday: 0,
+  conversationsThisWeek: 0,
+  conversationsThisMonth: 0,
+  previousPeriodConversations: 0,
+  conversationsTrend: 0,
+  incomingMessages: 0,
+  previousPeriodMessages: 0,
+  messagesTrend: 0,
+  uniqueUsers: 0,
+  previousPeriodUsers: 0,
+  usersTrend: 0,
+  avgInteractions: 0,
+  avgSatisfaction: 0,
+  avgDuration: 0,
+  activeClients: 0,
+  totalAgents: 0,
+  platformDistribution: [],
+  recentActivity: [],
+  lastUpdated: new Date().toISOString(),
+  dataSource: 'local',
+  weeklyData: [],
+  agentPerformance: [],
+};
 
 export const useDashboardMetrics = () => {
   const { selectedOrgId } = useOrganization();
@@ -37,94 +66,22 @@ export const useDashboardMetrics = () => {
     queryKey: ['dashboard-metrics', selectedOrgId],
     queryFn: async (): Promise<DashboardMetrics> => {
       if (!selectedOrgId) {
-        return {
-          totalConversations: 0,
-          conversationsToday: 0,
-          conversationsThisWeek: 0,
-          conversationsThisMonth: 0,
-          previousPeriodConversations: 0,
-          conversationsTrend: 0,
-          incomingMessages: 0,
-          previousPeriodMessages: 0,
-          messagesTrend: 0,
-          uniqueUsers: 0,
-          previousPeriodUsers: 0,
-          usersTrend: 0,
-          avgInteractions: 0,
-          avgSatisfaction: 0,
-          avgDuration: 0,
-          activeClients: 0,
-          totalAgents: 0,
-          platformDistribution: [],
-          recentActivity: [],
-          lastUpdated: new Date().toISOString(),
-        };
+        return defaultMetrics;
       }
 
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const previousWeekStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
-      // Fetch all data in parallel
+      // Fetch ElevenLabs analytics and conversations in parallel with local data
       const [
-        totalConversationsRes,
-        todayConversationsRes,
-        weekConversationsRes,
-        previousWeekConversationsRes,
-        monthConversationsRes,
-        conversationsWithMessagesRes,
-        previousWeekMessagesRes,
-        satisfactionRes,
+        elevenLabsAnalytics,
+        elevenLabsConversations,
         clientsRes,
         agentsRes,
-        platformRes,
-        recentConversationsRes,
       ] = await Promise.all([
-        supabase
-          .from('conversations')
-          .select('*', { count: 'exact', head: true })
-          .eq('organization_id', selectedOrgId),
-        supabase
-          .from('conversations')
-          .select('*', { count: 'exact', head: true })
-          .eq('organization_id', selectedOrgId)
-          .gte('created_at', todayStart),
-        supabase
-          .from('conversations')
-          .select('*', { count: 'exact', head: true })
-          .eq('organization_id', selectedOrgId)
-          .gte('created_at', weekStart),
-        supabase
-          .from('conversations')
-          .select('*', { count: 'exact', head: true })
-          .eq('organization_id', selectedOrgId)
-          .gte('created_at', previousWeekStart)
-          .lt('created_at', weekStart),
-        supabase
-          .from('conversations')
-          .select('*', { count: 'exact', head: true })
-          .eq('organization_id', selectedOrgId)
-          .gte('created_at', monthStart),
-        // Fetch conversations with messages for current week
-        supabase
-          .from('conversations')
-          .select('id, user_messages, metadata')
-          .eq('organization_id', selectedOrgId)
-          .gte('created_at', weekStart),
-        // Fetch conversations with messages for previous week
-        supabase
-          .from('conversations')
-          .select('id, user_messages, metadata')
-          .eq('organization_id', selectedOrgId)
-          .gte('created_at', previousWeekStart)
-          .lt('created_at', weekStart),
-        supabase
-          .from('conversations')
-          .select('satisfaction_score, duration')
-          .eq('organization_id', selectedOrgId)
-          .not('satisfaction_score', 'is', null),
+        supabase.functions.invoke('elevenlabs-all-agents-analytics', {
+          body: { timeframe: '30d', includeCharts: true }
+        }).catch(() => ({ data: null, error: 'Failed' })),
+        supabase.functions.invoke('elevenlabs-all-agents-conversations', {
+          body: { page: 1, limit: 100, action: 'list' }
+        }).catch(() => ({ data: null, error: 'Failed' })),
         supabase
           .from('clients')
           .select('*', { count: 'exact', head: true })
@@ -132,125 +89,185 @@ export const useDashboardMetrics = () => {
           .eq('status', 'active'),
         supabase
           .from('agents')
-          .select('*', { count: 'exact', head: true })
+          .select('id, name, platform, platform_agent_id')
           .eq('organization_id', selectedOrgId),
-        supabase
-          .from('conversations')
-          .select('platform')
-          .eq('organization_id', selectedOrgId)
-          .not('platform', 'is', null),
-        supabase
-          .from('conversations')
-          .select('id, title, created_at, platform')
-          .eq('organization_id', selectedOrgId)
-          .order('created_at', { ascending: false })
-          .limit(10),
       ]);
 
-      // Calculate incoming messages (count of user messages)
-      const currentWeekData = conversationsWithMessagesRes.data || [];
-      const previousWeekData = previousWeekMessagesRes.data || [];
+      const agents = agentsRes.data || [];
+      const elevenLabsData = elevenLabsAnalytics.data;
+      const conversationsData = elevenLabsConversations.data;
       
-      let incomingMessages = 0;
-      let totalInteractions = 0;
-      const uniqueUserIds = new Set<string>();
-      
-      currentWeekData.forEach((c) => {
-        const messages = c.user_messages as any[] || [];
-        incomingMessages += messages.length;
-        totalInteractions += messages.length;
+      let dataSource: 'elevenlabs' | 'local' | 'mixed' = 'local';
+      let totalConversations = 0;
+      let avgSatisfaction = 0;
+      let avgDuration = 0;
+      let platformDistribution: { platform: string; count: number }[] = [];
+      let recentActivity: DashboardMetrics['recentActivity'] = [];
+      let weeklyData: DashboardMetrics['weeklyData'] = [];
+      let agentPerformance: DashboardMetrics['agentPerformance'] = [];
+
+      // Process ElevenLabs data if available
+      if (elevenLabsData && !elevenLabsData.requiresSetup) {
+        dataSource = 'elevenlabs';
         
-        // Extract unique user identifier from metadata
-        const metadata = c.metadata as Record<string, any> || {};
-        const userId = metadata.user_id || metadata.caller_id || metadata.session_id || c.id;
-        if (userId) uniqueUserIds.add(String(userId));
-      });
+        totalConversations = elevenLabsData.metrics?.totalConversations || 0;
+        avgSatisfaction = elevenLabsData.metrics?.avgSatisfaction || 0;
+        avgDuration = elevenLabsData.metrics?.avgDuration || 0;
 
-      let previousPeriodMessages = 0;
-      const previousUniqueUserIds = new Set<string>();
-      
-      previousWeekData.forEach((c) => {
-        const messages = c.user_messages as any[] || [];
-        previousPeriodMessages += messages.length;
+        // Process agent performance
+        if (elevenLabsData.agents && Array.isArray(elevenLabsData.agents)) {
+          agentPerformance = elevenLabsData.agents.map((agent: any) => ({
+            name: agent.name || 'Agent',
+            conversations: agent.totalConversations || 0,
+            satisfaction: agent.avgSatisfaction || 0,
+            duration: agent.avgDuration || 0,
+          }));
+        }
+
+        // Process chart data for weekly view
+        if (elevenLabsData.chartData?.daily && Array.isArray(elevenLabsData.chartData.daily)) {
+          const last7Days = elevenLabsData.chartData.daily.slice(-7);
+          const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+          weeklyData = last7Days.map((day: any) => {
+            const date = new Date(day.date);
+            return {
+              name: dayNames[date.getDay()],
+              conversations: day.conversations || 0,
+              satisfaction: day.avgSatisfaction || 0,
+            };
+          });
+        }
+      }
+
+      // Process conversations for recent activity and platform distribution
+      if (conversationsData?.conversations && Array.isArray(conversationsData.conversations)) {
+        const conversations = conversationsData.conversations;
         
-        const metadata = c.metadata as Record<string, any> || {};
-        const userId = metadata.user_id || metadata.caller_id || metadata.session_id || c.id;
-        if (userId) previousUniqueUserIds.add(String(userId));
-      });
+        // Calculate today's conversations
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const conversationsToday = conversations.filter((c: any) => {
+          const convDate = new Date(c.start_time || c.created_at);
+          return convDate >= today;
+        }).length;
 
-      // Calculate trends (percentage change)
-      const currentConversations = weekConversationsRes.count || 0;
-      const previousConversations = previousWeekConversationsRes.count || 0;
-      const conversationsTrend = previousConversations > 0 
-        ? Math.round(((currentConversations - previousConversations) / previousConversations) * 100)
-        : currentConversations > 0 ? 100 : 0;
+        // Calculate this week's conversations
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        const conversationsThisWeek = conversations.filter((c: any) => {
+          const convDate = new Date(c.start_time || c.created_at);
+          return convDate >= weekAgo;
+        }).length;
 
-      const messagesTrend = previousPeriodMessages > 0
-        ? Math.round(((incomingMessages - previousPeriodMessages) / previousPeriodMessages) * 100)
-        : incomingMessages > 0 ? 100 : 0;
+        // Platform distribution
+        const platformCounts: Record<string, number> = {};
+        conversations.forEach((c: any) => {
+          const platform = 'ElevenLabs';
+          platformCounts[platform] = (platformCounts[platform] || 0) + 1;
+        });
+        platformDistribution = Object.entries(platformCounts).map(([platform, count]) => ({
+          platform,
+          count,
+        }));
 
-      const uniqueUsers = uniqueUserIds.size;
-      const previousPeriodUsers = previousUniqueUserIds.size;
-      const usersTrend = previousPeriodUsers > 0
-        ? Math.round(((uniqueUsers - previousPeriodUsers) / previousPeriodUsers) * 100)
-        : uniqueUsers > 0 ? 100 : 0;
+        // Recent activity
+        recentActivity = conversations.slice(0, 10).map((c: any) => ({
+          id: c.conversation_id || c.id,
+          type: 'conversation' as const,
+          title: `Conversation ${(c.conversation_id || c.id)?.substring(0, 8) || 'N/A'}`,
+          timestamp: c.start_time || c.created_at,
+        }));
 
-      const avgInteractions = currentWeekData.length > 0 
-        ? Math.round((totalInteractions / currentWeekData.length) * 10) / 10
-        : 0;
+        // Generate weekly data if not from analytics
+        if (weeklyData.length === 0) {
+          const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+          const dayCounts: Record<string, { conversations: number; satisfaction: number[] }> = {};
+          
+          for (let i = 6; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            const dayName = dayNames[date.getDay()];
+            dayCounts[dayName] = { conversations: 0, satisfaction: [] };
+          }
 
-      // Calculate averages
-      const satisfactionData = satisfactionRes.data || [];
-      const avgSatisfaction = satisfactionData.length > 0
-        ? satisfactionData.reduce((acc, c) => acc + (c.satisfaction_score || 0), 0) / satisfactionData.length
-        : 0;
-      const avgDuration = satisfactionData.length > 0
-        ? satisfactionData.reduce((acc, c) => acc + (c.duration || 0), 0) / satisfactionData.length
-        : 0;
+          conversations.forEach((c: any) => {
+            const convDate = new Date(c.start_time || c.created_at);
+            const dayName = dayNames[convDate.getDay()];
+            if (dayCounts[dayName]) {
+              dayCounts[dayName].conversations++;
+              if (c.analysis?.satisfaction_score) {
+                dayCounts[dayName].satisfaction.push(c.analysis.satisfaction_score);
+              }
+            }
+          });
 
-      // Calculate platform distribution
-      const platformCounts: Record<string, number> = {};
-      (platformRes.data || []).forEach((c) => {
-        const platform = c.platform || 'unknown';
-        platformCounts[platform] = (platformCounts[platform] || 0) + 1;
-      });
-      const platformDistribution = Object.entries(platformCounts).map(([platform, count]) => ({
-        platform,
-        count,
-      }));
+          weeklyData = Object.entries(dayCounts).map(([name, data]) => ({
+            name,
+            conversations: data.conversations,
+            satisfaction: data.satisfaction.length > 0 
+              ? data.satisfaction.reduce((a, b) => a + b, 0) / data.satisfaction.length 
+              : 0,
+          }));
+        }
 
-      // Format recent activity
-      const recentActivity = (recentConversationsRes.data || []).map((c) => ({
-        id: c.id,
-        type: 'conversation' as const,
-        title: c.title,
-        timestamp: c.created_at,
-      }));
+        // Update total if not from analytics
+        if (totalConversations === 0) {
+          totalConversations = conversationsData.total || conversations.length;
+        }
 
+        return {
+          totalConversations,
+          conversationsToday,
+          conversationsThisWeek,
+          conversationsThisMonth: totalConversations,
+          previousPeriodConversations: 0,
+          conversationsTrend: elevenLabsData?.trends?.conversationsTrend || 0,
+          incomingMessages: totalConversations,
+          previousPeriodMessages: 0,
+          messagesTrend: 0,
+          uniqueUsers: conversationsData.total || conversations.length,
+          previousPeriodUsers: 0,
+          usersTrend: 0,
+          avgInteractions: 0,
+          avgSatisfaction: Math.round(avgSatisfaction * 10) / 10,
+          avgDuration: Math.round(avgDuration),
+          activeClients: clientsRes.count || 0,
+          totalAgents: agents.length,
+          platformDistribution,
+          recentActivity,
+          lastUpdated: new Date().toISOString(),
+          dataSource,
+          weeklyData,
+          agentPerformance,
+        };
+      }
+
+      // Fallback to local data
       return {
-        totalConversations: totalConversationsRes.count || 0,
-        conversationsToday: todayConversationsRes.count || 0,
-        conversationsThisWeek: currentConversations,
-        conversationsThisMonth: monthConversationsRes.count || 0,
-        previousPeriodConversations: previousConversations,
-        conversationsTrend,
-        incomingMessages,
-        previousPeriodMessages,
-        messagesTrend,
-        uniqueUsers,
-        previousPeriodUsers,
-        usersTrend,
-        avgInteractions,
-        avgSatisfaction: Math.round(avgSatisfaction * 10) / 10,
-        avgDuration: Math.round(avgDuration),
+        ...defaultMetrics,
         activeClients: clientsRes.count || 0,
-        totalAgents: agentsRes.count || 0,
-        platformDistribution,
-        recentActivity,
+        totalAgents: agents.length,
         lastUpdated: new Date().toISOString(),
+        dataSource: 'local',
       };
     },
     enabled: !!selectedOrgId,
     refetchInterval: 30000,
+  });
+};
+
+// Hook for syncing ElevenLabs conversations
+export const useSyncElevenLabsConversations = () => {
+  return useQuery({
+    queryKey: ['sync-elevenlabs-conversations'],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('sync-elevenlabs-conversations', {
+        body: { action: 'sync' }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: false, // Manual trigger only
   });
 };

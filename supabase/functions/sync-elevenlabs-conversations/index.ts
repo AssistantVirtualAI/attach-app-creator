@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action = 'sync', agentId, limit = 100 } = await req.json();
+    const { action = 'sync', agentId, limit = 100, analyzeConversations = true } = await req.json();
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -26,14 +26,12 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
     
-    // User client for auth
     const supabase = createClient(
       supabaseUrl,
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     );
     
-    // Service client for writes
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
@@ -44,7 +42,6 @@ serve(async (req) => {
       });
     }
 
-    // Get user's organization
     const { data: orgMember } = await supabase
       .from('organization_members')
       .select('organization_id')
@@ -58,7 +55,6 @@ serve(async (req) => {
       });
     }
 
-    // Get agents to sync
     let agentsQuery = supabase
       .from('agents')
       .select('id, name, platform_agent_id, platform_api_key')
@@ -86,6 +82,7 @@ serve(async (req) => {
     let totalSynced = 0;
     let totalCreated = 0;
     let totalUpdated = 0;
+    let totalAnalyzed = 0;
     const syncErrors: string[] = [];
 
     for (const agent of agents) {
@@ -97,7 +94,6 @@ serve(async (req) => {
       try {
         console.log(`Syncing conversations for agent ${agent.name}`);
         
-        // Fetch conversations from ElevenLabs
         const response = await fetch(
           `https://api.elevenlabs.io/v1/convai/agents/${agent.platform_agent_id}/conversations?limit=${limit}`,
           {
@@ -119,12 +115,48 @@ serve(async (req) => {
         console.log(`Found ${conversations.length} conversations for ${agent.name}`);
 
         for (const conv of conversations) {
-          // Check if conversation already exists
+          // Check if conversation already exists using external_id
           const { data: existing } = await supabaseAdmin
             .from('conversations')
-            .select('id, external_id')
+            .select('id, external_id, satisfaction_score, sentiment')
             .eq('external_id', conv.conversation_id)
             .single();
+
+          // Fetch detailed conversation data for transcript
+          let detailedConv = conv;
+          try {
+            const detailResponse = await fetch(
+              `https://api.elevenlabs.io/v1/convai/conversations/${conv.conversation_id}`,
+              {
+                headers: {
+                  'xi-api-key': agent.platform_api_key,
+                },
+              }
+            );
+            if (detailResponse.ok) {
+              detailedConv = await detailResponse.json();
+            }
+          } catch (e) {
+            console.log(`Could not fetch details for ${conv.conversation_id}`);
+          }
+
+          // Extract transcript from detailed response
+          const transcript = detailedConv.transcript || [];
+          const userMessages = transcript.filter((m: any) => m.role === 'user').map((m: any) => ({
+            message: m.message,
+            time_in_call_secs: m.time_in_call_secs
+          }));
+          const agentMessages = transcript.filter((m: any) => m.role === 'agent').map((m: any) => ({
+            message: m.message,
+            time_in_call_secs: m.time_in_call_secs
+          }));
+
+          // Extract analysis from ElevenLabs if available
+          const elevenLabsAnalysis = detailedConv.analysis || conv.analysis || {};
+          const sentiment = elevenLabsAnalysis.user_sentiment || elevenLabsAnalysis.sentiment || null;
+          const satisfactionScore = elevenLabsAnalysis.call_successful === true ? 4 : 
+                                   elevenLabsAnalysis.call_successful === false ? 2 : 
+                                   elevenLabsAnalysis.satisfaction_score || null;
 
           const conversationData = {
             external_id: conv.conversation_id,
@@ -134,27 +166,42 @@ serve(async (req) => {
             user_id: user.id,
             platform: 'elevenlabs',
             status: conv.status || 'completed',
-            duration: conv.call_duration_secs || conv.duration || 0,
+            duration: detailedConv.call_duration_secs || conv.call_duration_secs || conv.duration || 0,
             created_at: conv.start_time || conv.created_at || new Date().toISOString(),
-            transcript: conv.transcript ? JSON.stringify(conv.transcript) : null,
-            sentiment: conv.analysis?.sentiment || null,
-            satisfaction_score: conv.analysis?.satisfaction_score || null,
-            keywords: conv.analysis?.keywords || [],
+            transcript: JSON.stringify(transcript),
+            user_messages: userMessages,
+            agent_messages: agentMessages,
+            sentiment: sentiment,
+            satisfaction_score: satisfactionScore,
+            keywords: elevenLabsAnalysis.keywords || [],
+            smart_tags: elevenLabsAnalysis.data_collection_results ? 
+              Object.keys(elevenLabsAnalysis.data_collection_results) : [],
             metadata: {
               start_time: conv.start_time,
-              end_time: conv.end_time,
-              caller_id: conv.caller_id,
-              summary: conv.analysis?.summary,
+              end_time: conv.end_time || detailedConv.end_time,
+              caller_id: conv.caller_id || detailedConv.caller_id,
+              summary: elevenLabsAnalysis.summary || elevenLabsAnalysis.transcript_summary,
               platform_agent_id: agent.platform_agent_id,
-              call_duration_secs: conv.call_duration_secs,
+              call_duration_secs: detailedConv.call_duration_secs || conv.call_duration_secs,
+              call_successful: elevenLabsAnalysis.call_successful,
+              data_collection: elevenLabsAnalysis.data_collection_results,
+              transcript: transcript,
             }
           };
 
           if (existing) {
-            // Update existing conversation
+            // Only update if we have new analysis data
+            const updateData = { ...conversationData };
+            if (existing.satisfaction_score && !satisfactionScore) {
+              delete (updateData as any).satisfaction_score;
+            }
+            if (existing.sentiment && !sentiment) {
+              delete (updateData as any).sentiment;
+            }
+
             const { error: updateError } = await supabaseAdmin
               .from('conversations')
-              .update(conversationData)
+              .update(updateData)
               .eq('id', existing.id);
 
             if (updateError) {
@@ -163,15 +210,41 @@ serve(async (req) => {
               totalUpdated++;
             }
           } else {
-            // Insert new conversation
-            const { error: insertError } = await supabaseAdmin
+            const { data: inserted, error: insertError } = await supabaseAdmin
               .from('conversations')
-              .insert(conversationData);
+              .insert(conversationData)
+              .select('id')
+              .single();
 
             if (insertError) {
               console.error(`Error inserting conversation ${conv.conversation_id}:`, insertError);
             } else {
               totalCreated++;
+              
+              // Trigger AI analysis for new conversations without satisfaction score
+              if (analyzeConversations && !satisfactionScore && inserted?.id) {
+                try {
+                  const analysisResponse = await fetch(`${supabaseUrl}/functions/v1/analyze-conversation`, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': authHeader,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      conversationId: inserted.id,
+                      transcript: transcript.map((m: any) => `${m.role}: ${m.message}`).join('\n'),
+                      agentId: agent.id,
+                    }),
+                  });
+                  
+                  if (analysisResponse.ok) {
+                    totalAnalyzed++;
+                    console.log(`Analysis triggered for conversation ${inserted.id}`);
+                  }
+                } catch (analysisError) {
+                  console.log(`Could not trigger analysis for ${inserted.id}:`, analysisError);
+                }
+              }
             }
           }
 
@@ -189,6 +262,7 @@ serve(async (req) => {
         synced: totalSynced,
         created: totalCreated,
         updated: totalUpdated,
+        analyzed: totalAnalyzed,
         errors: syncErrors,
         timestamp: new Date().toISOString()
       }),
