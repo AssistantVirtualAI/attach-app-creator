@@ -12,8 +12,30 @@ serve(async (req) => {
   }
 
   try {
+    const requestId = crypto.randomUUID();
     const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
+
+    const maskAuth = (value: string | null) => {
+      if (!value) return null;
+      const v = value.trim();
+      if (v.length <= 24) return `${v.slice(0, 8)}…`;
+      return `${v.slice(0, 12)}…${v.slice(-6)}`;
+    };
+
+    console.log('[analyze-conversation] Incoming request', {
+      requestId,
+      method: req.method,
+      url: req.url,
+      hasAuthHeader: !!authHeader,
+      authHeaderPreview: maskAuth(authHeader),
+      authHeaderStartsWithBearer: (authHeader || '').trim().toLowerCase().startsWith('bearer '),
+      hasSupabaseUrl: !!Deno.env.get('SUPABASE_URL'),
+      hasAnonKey: !!Deno.env.get('SUPABASE_ANON_KEY'),
+      hasServiceRoleKey: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+    });
+
     if (!authHeader) {
+      console.warn('[analyze-conversation] Missing Authorization header', { requestId });
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -37,15 +59,23 @@ serve(async (req) => {
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError) {
-      console.error('[analyze-conversation] auth.getUser error:', userError);
+      console.error('[analyze-conversation] auth.getUser error', {
+        requestId,
+        name: userError.name,
+        message: userError.message,
+        status: (userError as any).status,
+      });
     }
 
     if (!user) {
+      console.warn('[analyze-conversation] No user resolved from JWT', { requestId });
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    console.log('[analyze-conversation] Auth OK', { requestId, userId: user.id });
 
 const { 
       conversationId, 
