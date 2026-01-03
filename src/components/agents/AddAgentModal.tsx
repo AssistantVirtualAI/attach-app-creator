@@ -140,7 +140,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
       
       // Redirect to agent settings page
       if (newAgent?.id) {
-        navigate(`/agents/${newAgent.id}/settings`);
+        navigate(`/agent-settings/${newAgent.id}`);
       }
     } catch (error: any) {
       toast.error(error.message || 'Erreur lors de la création de l\'agent');
