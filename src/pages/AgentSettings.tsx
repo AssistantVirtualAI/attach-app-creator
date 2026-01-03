@@ -62,7 +62,9 @@ const AgentSettingsPage = () => {
           </Button>
           <div>
             <h1 className="text-2xl font-bold">{agent.name}</h1>
-            <p className="text-muted-foreground">{agent.platform} • {agent.platform_agent_id || 'Non configuré'}</p>
+            <p className="text-muted-foreground">
+              {agent.platform} • {(agent.config as Record<string, any>)?.agent_id || agent.platform_agent_id || 'Non configuré'}
+            </p>
           </div>
         </div>
 
