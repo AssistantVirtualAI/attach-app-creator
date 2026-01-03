@@ -31,10 +31,7 @@ export default function Agents() {
       
       const { data, error } = await supabase
         .from('agents')
-        .select(`
-          *,
-          integration:organization_integrations(id, platform, created_at)
-        `)
+        .select('*')
         .eq('organization_id', selectedOrgId)
         .order('created_at', { ascending: false });
 
