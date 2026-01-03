@@ -25,6 +25,7 @@ const AgentSettingsPage = () => {
     analytics,
     integration,
     isLoading,
+    isLoadingAnalytics,
     updateAgent,
     testConnection,
     isUpdating,
@@ -111,6 +112,7 @@ const AgentSettingsPage = () => {
               agent={agent}
               client={client}
               analytics={analytics}
+              isLoadingAnalytics={isLoadingAnalytics}
             />
           </TabsContent>
 
@@ -141,6 +143,7 @@ const AgentSettingsPage = () => {
             <AgentAnalyticsTab
               conversations={conversations || []}
               analytics={analytics}
+              isLoadingAnalytics={isLoadingAnalytics}
             />
           </TabsContent>
 

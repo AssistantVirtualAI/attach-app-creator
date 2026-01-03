@@ -20,6 +20,19 @@ export interface AgentSettings {
   updated_at: string;
 }
 
+export interface ElevenLabsAnalytics {
+  totalConversations: number;
+  avgDuration: number;
+  avgSatisfaction: string;
+  sentimentBreakdown: {
+    positive: number;
+    neutral: number;
+    negative: number;
+  };
+  source: 'elevenlabs' | 'local';
+  successRate?: number;
+}
+
 export const useAgentSettings = (agentId: string | undefined) => {
   const queryClient = useQueryClient();
 
@@ -94,6 +107,37 @@ export const useAgentSettings = (agentId: string | undefined) => {
     enabled: !!integrationId,
   });
 
+  // Fetch ElevenLabs real-time analytics
+  const platformAgentId = (agent?.config as Record<string, any>)?.agent_id || agent?.platform_agent_id;
+  const { data: elevenLabsAnalytics, isLoading: isLoadingElevenLabs } = useQuery({
+    queryKey: ['elevenlabs-agent-analytics', agentId, platformAgentId],
+    queryFn: async () => {
+      if (!platformAgentId || agent?.platform !== 'elevenlabs') return null;
+
+      const { data, error } = await supabase.functions.invoke('elevenlabs-convai-analytics', {
+        body: { 
+          agentId: platformAgentId,
+          timeframe: '30days',
+          includeCharts: false
+        }
+      });
+
+      if (error) {
+        console.error('[useAgentSettings] ElevenLabs analytics error:', error);
+        return null;
+      }
+
+      if (data?.requiresSetup) {
+        return null;
+      }
+
+      return data;
+    },
+    enabled: !!platformAgentId && agent?.platform === 'elevenlabs',
+    retry: 1,
+    staleTime: 30000,
+  });
+
   const updateAgentMutation = useMutation({
     mutationFn: async (updates: Partial<AgentSettings>) => {
       if (!agentId) throw new Error('No agent ID');
@@ -116,11 +160,9 @@ export const useAgentSettings = (agentId: string | undefined) => {
 
   const testConnectionMutation = useMutation({
     mutationFn: async () => {
-      // Use API key from integration, fallback to platform_api_key
       const apiKey = integration?.api_key || agent?.platform_api_key;
       if (!apiKey) throw new Error('Aucune clé API configurée');
       
-      // Call the test-integration edge function
       const { data, error } = await supabase.functions.invoke('test-integration', {
         body: { platform: agent?.platform }
       });
@@ -138,8 +180,19 @@ export const useAgentSettings = (agentId: string | undefined) => {
     },
   });
 
-  // Calculate analytics
-  const analytics = {
+  // Calculate analytics - prefer ElevenLabs data if available
+  const analytics: ElevenLabsAnalytics = elevenLabsAnalytics?.metrics ? {
+    totalConversations: elevenLabsAnalytics.metrics.total_conversations || 0,
+    avgDuration: Math.round(elevenLabsAnalytics.metrics.avg_duration || 0),
+    avgSatisfaction: (elevenLabsAnalytics.metrics.avg_satisfaction || 0).toFixed(1),
+    sentimentBreakdown: {
+      positive: elevenLabsAnalytics.metrics.successful_conversations || 0,
+      neutral: 0,
+      negative: elevenLabsAnalytics.metrics.failed_conversations || 0,
+    },
+    successRate: elevenLabsAnalytics.metrics.success_rate,
+    source: 'elevenlabs',
+  } : {
     totalConversations: conversations?.length || 0,
     avgDuration: conversations?.length 
       ? Math.round(conversations.reduce((acc, c) => acc + (c.duration || 0), 0) / conversations.length)
@@ -152,6 +205,7 @@ export const useAgentSettings = (agentId: string | undefined) => {
       neutral: conversations?.filter(c => c.sentiment === 'neutral').length || 0,
       negative: conversations?.filter(c => c.sentiment === 'negative').length || 0,
     },
+    source: 'local',
   };
 
   return {
@@ -161,6 +215,7 @@ export const useAgentSettings = (agentId: string | undefined) => {
     analytics,
     integration,
     isLoading,
+    isLoadingAnalytics: isLoadingElevenLabs,
     updateAgent: updateAgentMutation.mutate,
     testConnection: testConnectionMutation.mutate,
     isUpdating: updateAgentMutation.isPending,

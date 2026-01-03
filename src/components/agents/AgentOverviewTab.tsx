@@ -1,23 +1,38 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Calendar, MessageSquare, Clock, User } from 'lucide-react';
-import { AgentSettings } from '@/hooks/useAgentSettings';
+import { Bot, Calendar, MessageSquare, Clock, User, Cloud, Database, TrendingUp } from 'lucide-react';
+import { AgentSettings, ElevenLabsAnalytics } from '@/hooks/useAgentSettings';
 import { PlatformBadge } from './PlatformBadge';
 
 interface AgentOverviewTabProps {
   agent: AgentSettings;
   client: { id: string; name: string; email: string } | null;
-  analytics: {
-    totalConversations: number;
-    avgDuration: number;
-    avgSatisfaction: string;
-  };
+  analytics: ElevenLabsAnalytics;
+  isLoadingAnalytics?: boolean;
 }
 
-export const AgentOverviewTab = ({ agent, client, analytics }: AgentOverviewTabProps) => {
+export const AgentOverviewTab = ({ agent, client, analytics, isLoadingAnalytics }: AgentOverviewTabProps) => {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Data source indicator */}
+      <div className="flex items-center gap-2 text-sm">
+        {analytics.source === 'elevenlabs' ? (
+          <Badge variant="outline" className="gap-1 text-green-600 border-green-600">
+            <Cloud className="h-3 w-3" />
+            Données ElevenLabs (temps réel)
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="gap-1">
+            <Database className="h-3 w-3" />
+            Données locales
+          </Badge>
+        )}
+        {isLoadingAnalytics && (
+          <span className="text-muted-foreground animate-pulse">Chargement...</span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
@@ -59,6 +74,22 @@ export const AgentOverviewTab = ({ agent, client, analytics }: AgentOverviewTabP
             </div>
           </CardContent>
         </Card>
+
+        {analytics.successRate !== undefined && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <TrendingUp className="h-6 w-6 text-green-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{analytics.successRate.toFixed(1)}%</p>
+                  <p className="text-sm text-muted-foreground">Taux de succès</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Card>

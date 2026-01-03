@@ -1,19 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart3, TrendingUp, Clock, Smile, Meh, Frown } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { BarChart3, TrendingUp, Clock, Smile, Meh, Frown, Cloud, Database } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { ElevenLabsAnalytics } from '@/hooks/useAgentSettings';
 
 interface AgentAnalyticsTabProps {
   conversations: any[];
-  analytics: {
-    totalConversations: number;
-    avgDuration: number;
-    avgSatisfaction: string;
-    sentimentBreakdown: {
-      positive: number;
-      neutral: number;
-      negative: number;
-    };
-  };
+  analytics: ElevenLabsAnalytics;
+  isLoadingAnalytics?: boolean;
 }
 
 const SENTIMENT_COLORS = {
@@ -22,7 +16,7 @@ const SENTIMENT_COLORS = {
   negative: '#ef4444',
 };
 
-export const AgentAnalyticsTab = ({ conversations, analytics }: AgentAnalyticsTabProps) => {
+export const AgentAnalyticsTab = ({ conversations, analytics, isLoadingAnalytics }: AgentAnalyticsTabProps) => {
   // Prepare data for charts
   const last30Days = Array.from({ length: 30 }, (_, i) => {
     const date = new Date();
@@ -40,7 +34,10 @@ export const AgentAnalyticsTab = ({ conversations, analytics }: AgentAnalyticsTa
     };
   });
 
-  const sentimentData = [
+  const sentimentData = analytics.source === 'elevenlabs' ? [
+    { name: 'Réussies', value: analytics.sentimentBreakdown.positive, color: SENTIMENT_COLORS.positive },
+    { name: 'Échouées', value: analytics.sentimentBreakdown.negative, color: SENTIMENT_COLORS.negative },
+  ] : [
     { name: 'Positif', value: analytics.sentimentBreakdown.positive, color: SENTIMENT_COLORS.positive },
     { name: 'Neutre', value: analytics.sentimentBreakdown.neutral, color: SENTIMENT_COLORS.neutral },
     { name: 'Négatif', value: analytics.sentimentBreakdown.negative, color: SENTIMENT_COLORS.negative },
@@ -48,6 +45,24 @@ export const AgentAnalyticsTab = ({ conversations, analytics }: AgentAnalyticsTa
 
   return (
     <div className="space-y-6">
+      {/* Data source indicator */}
+      <div className="flex items-center gap-2 text-sm">
+        {analytics.source === 'elevenlabs' ? (
+          <Badge variant="outline" className="gap-1 text-green-600 border-green-600">
+            <Cloud className="h-3 w-3" />
+            Données ElevenLabs (temps réel)
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="gap-1">
+            <Database className="h-3 w-3" />
+            Données locales
+          </Badge>
+        )}
+        {isLoadingAnalytics && (
+          <span className="text-muted-foreground animate-pulse">Chargement...</span>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
