@@ -114,7 +114,20 @@ export const useEnhancedConversationAnalysis = (
         body
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('analyze-conversation error:', error);
+        // Check for auth errors
+        if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+          throw new Error('Session expirée. Veuillez vous reconnecter.');
+        }
+        throw error;
+      }
+      
+      if (data?.error) {
+        console.error('analyze-conversation response error:', data.error);
+        throw new Error(data.error);
+      }
+      
       return data.analysis as EnhancedConversationAnalysis;
     },
     onSuccess: () => {
@@ -125,12 +138,16 @@ export const useEnhancedConversationAnalysis = (
     },
     onError: (error: any) => {
       console.error('Analysis error:', error);
-      if (error.message?.includes('429')) {
+      const errorMessage = error.message || String(error);
+      
+      if (errorMessage.includes('Session expirée') || errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        toast.error('Session expirée. Veuillez vous reconnecter.');
+      } else if (errorMessage.includes('429')) {
         toast.error('Limite de requêtes atteinte, réessayez plus tard');
-      } else if (error.message?.includes('402')) {
+      } else if (errorMessage.includes('402')) {
         toast.error('Crédits IA épuisés');
       } else {
-        toast.error('Erreur lors de l\'analyse');
+        toast.error(`Erreur lors de l'analyse: ${errorMessage}`);
       }
     }
   });
