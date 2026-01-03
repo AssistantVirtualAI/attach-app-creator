@@ -3,7 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, User, Bot, Plug, Shield, Link, Code } from 'lucide-react';
+import { ArrowLeft, User, Bot, Plug, Shield, Link, Code, MessageSquare } from 'lucide-react';
 import { useClientDetail } from '@/hooks/useClientDetail';
 import { ClientOverviewTab } from '@/components/clients/ClientOverviewTab';
 import { ClientAgentsTab } from '@/components/clients/ClientAgentsTab';
@@ -11,6 +11,7 @@ import { ClientSolutionsTab } from '@/components/clients/ClientSolutionsTab';
 import { ClientAccessTab } from '@/components/clients/ClientAccessTab';
 import { ClientUrlTab } from '@/components/clients/ClientUrlTab';
 import { ClientCssTab } from '@/components/clients/ClientCssTab';
+import { ClientConversationsTab } from '@/components/clients/ClientConversationsTab';
 
 const ClientDetail = () => {
   const { clientId } = useParams<{ clientId: string }>();
@@ -66,10 +67,14 @@ const ClientDetail = () => {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">Aperçu</span>
+            </TabsTrigger>
+            <TabsTrigger value="conversations" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden sm:inline">Conversations</span>
             </TabsTrigger>
             <TabsTrigger value="agents" className="flex items-center gap-2">
               <Bot className="h-4 w-4" />
@@ -100,6 +105,10 @@ const ClientDetail = () => {
               onUpdate={updateClient}
               isUpdating={isUpdating}
             />
+          </TabsContent>
+
+          <TabsContent value="conversations">
+            <ClientConversationsTab clientId={clientId!} />
           </TabsContent>
 
           <TabsContent value="agents">
