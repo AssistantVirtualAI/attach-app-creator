@@ -2,20 +2,32 @@ import { useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/StatCard';
 import { ChartCard } from '@/components/ChartCard';
-import { Users, Clock, Star, Phone } from 'lucide-react';
+import { Users, Clock, Star, Phone, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useElevenLabsAnalytics } from '@/hooks/useElevenLabsAnalytics';
+import { useAllAgentsAnalytics } from '@/hooks/useAllAgentsAnalytics';
 import { SetupIntegrationCard } from '@/components/SetupIntegrationCard';
 import { StatCardSkeleton, ChartCardSkeleton } from '@/components/LoadingSkeleton';
+import { AnalyticsExport } from '@/components/exports/AnalyticsExport';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 const VoiceAnalytics = () => {
   const [timeframe, setTimeframe] = useState('7days');
-  const { data: analytics, isLoading, error } = useElevenLabsAnalytics(timeframe);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(undefined);
+  
+  const { data: analytics, isLoading, error } = useAllAgentsAnalytics(timeframe, selectedAgentId);
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${minutes}m ${secs}s`;
   };
 
@@ -30,7 +42,7 @@ const VoiceAnalytics = () => {
     },
     {
       title: 'Durée Moyenne',
-      value: formatDuration(Math.floor(analytics.metrics.avg_conversation_duration)),
+      value: formatDuration(analytics.metrics.avg_conversation_duration),
       change: `${analytics.trends.duration_change > 0 ? '+' : ''}${analytics.trends.duration_change.toFixed(1)}%`,
       changeType: analytics.trends.duration_change >= 0 ? 'positive' as const : 'negative' as const,
       icon: Clock,
@@ -49,48 +61,71 @@ const VoiceAnalytics = () => {
       value: `${analytics.metrics.success_rate.toFixed(1)}%`,
       change: `${analytics.trends.success_rate_change > 0 ? '+' : ''}${analytics.trends.success_rate_change.toFixed(1)}%`,
       changeType: analytics.trends.success_rate_change >= 0 ? 'positive' as const : 'negative' as const,
-      icon: Users,
+      icon: TrendingUp,
       trend: [40, 48, 45, 58, 52, 65, 70],
     },
   ] : [];
 
-  const platformData = (analytics && !analytics.requiresSetup) 
-    ? [{ platform: 'ElevenLabs', value: analytics.metrics.total_conversations }]
-    : [];
-
-  const sentimentData = (analytics && !analytics.requiresSetup) 
-    ? (analytics.charts?.satisfaction_trend || [])
-    : [];
+  const agentChartData = analytics?.charts?.per_agent || [];
+  const conversationsOverTime = analytics?.charts?.conversations_over_time || [];
+  const satisfactionTrend = analytics?.charts?.satisfaction_trend || [];
 
   return (
     <AppLayout>
       <div className="container mx-auto px-6 py-8">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-4xl font-bold mb-2 gradient-text">Voice Analytics</h1>
             <p className="text-muted-foreground text-lg">
-              Analyse détaillée des performances vocales IA
+              Analyse détaillée des performances de {analytics?.agents?.length || 0} agents vocaux
             </p>
           </div>
-          <Select value={timeframe} onValueChange={setTimeframe}>
-            <SelectTrigger className="w-[180px] glass-card">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="24h">Dernières 24h</SelectItem>
-              <SelectItem value="7days">7 derniers jours</SelectItem>
-              <SelectItem value="30days">30 derniers jours</SelectItem>
-              <SelectItem value="90days">90 derniers jours</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-3">
+            {/* Agent Filter */}
+            <Select value={selectedAgentId || 'all'} onValueChange={(v) => setSelectedAgentId(v === 'all' ? undefined : v)}>
+              <SelectTrigger className="w-[180px] glass-card">
+                <SelectValue placeholder="Tous les agents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les agents</SelectItem>
+                {analytics?.agents?.map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Timeframe */}
+            <Select value={timeframe} onValueChange={setTimeframe}>
+              <SelectTrigger className="w-[180px] glass-card">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="24h">Dernières 24h</SelectItem>
+                <SelectItem value="7days">7 derniers jours</SelectItem>
+                <SelectItem value="30days">30 derniers jours</SelectItem>
+                <SelectItem value="90days">90 derniers jours</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Export */}
+            {analytics && !analytics.requiresSetup && (
+              <AnalyticsExport 
+                analytics={analytics} 
+                timeframe={timeframe}
+                filename="voice-analytics"
+              />
+            )}
+          </div>
         </div>
 
         {/* Stats Grid */}
         {analytics?.requiresSetup ? (
           <SetupIntegrationCard 
             title="Configuration Requise" 
-            message={analytics.message} 
+            message={analytics.message || 'Veuillez configurer au moins un agent ElevenLabs.'} 
           />
         ) : isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -120,46 +155,145 @@ const VoiceAnalytics = () => {
               <ChartCardSkeleton />
             </div>
           ) : !error && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              <ChartCard
-                title="Conversations par Plateforme"
-                data={platformData}
-                type="bar"
-                dataKey="value"
-                xAxisKey="platform"
-              />
-              {sentimentData.length > 0 && (
-                <ChartCard
-                  title="Tendance de Satisfaction"
-                  data={sentimentData}
-                  type="area"
-                  dataKey="positive"
-                  xAxisKey="day"
-                />
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                {/* Conversations Over Time */}
+                {conversationsOverTime.length > 0 && (
+                  <ChartCard
+                    title="Évolution des Conversations"
+                    data={conversationsOverTime}
+                    type="area"
+                    dataKey="conversations"
+                    xAxisKey="day"
+                  />
+                )}
+
+                {/* Per Agent Chart */}
+                {agentChartData.length > 0 && (
+                  <ChartCard
+                    title="Conversations par Agent"
+                    data={agentChartData}
+                    type="bar"
+                    dataKey="conversations"
+                    xAxisKey="name"
+                  />
+                )}
+              </div>
+
+              {/* Satisfaction Trend */}
+              {satisfactionTrend.length > 0 && (
+                <div className="mb-8">
+                  <ChartCard
+                    title="Tendance de Satisfaction"
+                    data={satisfactionTrend}
+                    type="area"
+                    dataKey="positive"
+                    xAxisKey="day"
+                  />
+                </div>
               )}
-            </div>
+            </>
           )
         )}
 
-        {/* Top Keywords */}
-        <Card className="glass-card">
-          <CardHeader>
-            <CardTitle>Mots-clés Populaires</CardTitle>
-            <CardDescription>Les sujets les plus discutés cette semaine</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-3">
-              {['Support Client', 'Facturation', 'Produit', 'Installation', 'Livraison', 'Retour', 'Garantie', 'Paiement'].map((keyword) => (
-                <div
-                  key={keyword}
-                  className="px-4 py-2 rounded-full bg-primary/20 text-primary border border-primary/30 text-sm font-medium"
-                >
-                  {keyword}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Per Agent Table */}
+        {!analytics?.requiresSetup && !isLoading && analytics?.perAgent && analytics.perAgent.length > 0 && (
+          <Card className="glass-card mb-8">
+            <CardHeader>
+              <CardTitle>Performance par Agent</CardTitle>
+              <CardDescription>Métriques détaillées pour chaque agent vocal</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Agent</TableHead>
+                    <TableHead className="text-right">Conversations</TableHead>
+                    <TableHead className="text-right">Durée Moyenne</TableHead>
+                    <TableHead className="text-right">Satisfaction</TableHead>
+                    <TableHead className="text-right">Taux de Succès</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {analytics.perAgent.map((agent) => (
+                    <TableRow key={agent.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-primary/10">
+                            {agent.name}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {agent.metrics.total_conversations}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatDuration(agent.metrics.avg_duration)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Star className="w-4 h-4 text-yellow-500" />
+                          {agent.metrics.satisfaction_score.toFixed(1)}/5
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge 
+                          variant={agent.metrics.success_rate >= 70 ? "default" : "secondary"}
+                          className={agent.metrics.success_rate >= 70 ? "bg-green-500/20 text-green-500" : ""}
+                        >
+                          {agent.metrics.success_rate.toFixed(1)}%
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Additional Stats */}
+        {!analytics?.requiresSetup && !isLoading && analytics && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-lg">Minutes Vocales</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-primary">
+                  {analytics.metrics.total_voice_minutes}
+                </p>
+                <p className="text-sm text-muted-foreground">minutes totales</p>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-lg">Conversations Réussies</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-green-500">
+                  {analytics.metrics.successful_conversations}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  sur {analytics.metrics.total_conversations} au total
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-lg">Nombre d'Agents</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-primary">
+                  {analytics.agents?.length || 0}
+                </p>
+                <p className="text-sm text-muted-foreground">agents actifs</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </AppLayout>
   );
