@@ -598,6 +598,7 @@ export default function Clients() {
           onOpenChange={setMembersModalOpen}
           clientId={selectedClient.id}
           clientName={selectedClient.name}
+          enforceMemberLimit={false}
         />
       )}
     </AppLayout>
