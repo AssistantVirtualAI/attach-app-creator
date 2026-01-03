@@ -102,6 +102,7 @@ Fournis une analyse JSON avec cette structure EXACTE:
   "topics": ["sujet1", "sujet2"],
   "intentions": ["intention1", "intention2"],
   "actionItems": ["action1", "action2"],
+  "smart_tags": ["tag1", "tag2"],
   "callMetrics": {
     "talkTime": <pourcentage 0-100>,
     "silenceTime": <pourcentage 0-100>,
@@ -119,6 +120,16 @@ Fournis une analyse JSON avec cette structure EXACTE:
     }
   ]
 }
+
+SMART TAGS - Catégorise la conversation avec un ou plusieurs tags parmi:
+- "reclamation": Le client exprime une plainte, insatisfaction ou problème
+- "demande_info": Le client pose des questions pour obtenir des informations
+- "achat": Le client souhaite acheter, connaître les prix ou passer commande
+- "support_technique": Problème technique, bug, panne ou installation
+- "rendez_vous": Prise de rendez-vous, réservation, disponibilité
+- "facturation": Questions sur factures, paiements, remboursements
+- "rappel": Le client demande à être rappelé
+- "autre": Autre type de conversation
 
 Catégories d'amélioration possibles:
 - tone: Ton et empathie de l'agent
@@ -180,7 +191,8 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
         ...analysis,
         satisfaction_score: analysis.satisfaction_score || 5.0,
         sentiment_timeline: analysis.sentiment_timeline || [],
-        improvements: analysis.improvements || []
+        improvements: analysis.improvements || [],
+        smart_tags: analysis.smart_tags || ['autre']
       };
     } catch (e) {
       console.error('Failed to parse AI response:', e, analysisText);
@@ -190,7 +202,8 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
     console.log('Analysis completed:', {
       satisfaction: analysis.satisfaction_score,
       sentiment: analysis.sentiment,
-      improvements: analysis.improvements?.length || 0
+      improvements: analysis.improvements?.length || 0,
+      smartTags: analysis.smart_tags
     });
 
     // Mettre à jour la conversation avec l'analyse si elle existe en DB
@@ -200,6 +213,7 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
         .update({ 
           satisfaction_score: analysis.satisfaction_score,
           sentiment: analysis.sentiment,
+          smart_tags: analysis.smart_tags,
           metadata: {
             ...conversation.metadata,
             aiAnalysis: analysis,
@@ -226,6 +240,7 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
             sentiment_timeline: analysis.sentiment_timeline,
             overall_sentiment: analysis.sentiment,
             improvements: analysis.improvements,
+            smart_tags: analysis.smart_tags,
             analyzed_at: new Date().toISOString()
           }, {
             onConflict: 'conversation_id'
@@ -236,6 +251,48 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
         } else {
           console.log('Agent insights saved successfully');
         }
+
+        // Envoyer une alerte si le score de satisfaction est < 5
+        if (analysis.satisfaction_score < 5) {
+          console.log(`Low satisfaction detected (${analysis.satisfaction_score}), sending alert...`);
+          
+          // Récupérer le nom de l'agent
+          const { data: agentData } = await serviceClient
+            .from('agents')
+            .select('name')
+            .eq('id', agentId)
+            .single();
+
+          try {
+            const alertResponse = await fetch(
+              `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-satisfaction-alert`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  conversationId,
+                  agentId,
+                  organizationId,
+                  satisfactionScore: analysis.satisfaction_score,
+                  agentName: agentData?.name,
+                  summary: analysis.summary
+                })
+              }
+            );
+
+            if (alertResponse.ok) {
+              console.log('Satisfaction alert sent successfully');
+            } else {
+              console.error('Failed to send alert:', await alertResponse.text());
+            }
+          } catch (alertError) {
+            console.error('Error sending satisfaction alert:', alertError);
+          }
+        }
+
       } catch (e) {
         console.error('Error saving agent insights:', e);
       }
@@ -269,6 +326,7 @@ function getDefaultAnalysis() {
     topics: ['conversation'],
     intentions: ['demande d\'information'],
     actionItems: [],
+    smart_tags: ['autre'],
     callMetrics: {
       talkTime: 50,
       silenceTime: 10,

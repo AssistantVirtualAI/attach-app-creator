@@ -76,9 +76,86 @@ export type Database = {
           },
         ]
       }
+      agent_health_scores: {
+        Row: {
+          agent_id: string | null
+          created_at: string | null
+          id: string
+          negative_sentiments: number | null
+          organization_id: string | null
+          overall_health_score: number | null
+          period_end: string
+          period_start: string
+          positive_sentiments: number | null
+          resolution_rate: number | null
+          resolved_conversations: number | null
+          satisfaction_score: number | null
+          sentiment_score: number | null
+          total_conversations: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          created_at?: string | null
+          id?: string
+          negative_sentiments?: number | null
+          organization_id?: string | null
+          overall_health_score?: number | null
+          period_end: string
+          period_start: string
+          positive_sentiments?: number | null
+          resolution_rate?: number | null
+          resolved_conversations?: number | null
+          satisfaction_score?: number | null
+          sentiment_score?: number | null
+          total_conversations?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          created_at?: string | null
+          id?: string
+          negative_sentiments?: number | null
+          organization_id?: string | null
+          overall_health_score?: number | null
+          period_end?: string
+          period_start?: string
+          positive_sentiments?: number | null
+          resolution_rate?: number | null
+          resolved_conversations?: number | null
+          satisfaction_score?: number | null
+          sentiment_score?: number | null
+          total_conversations?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_health_scores_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_health_scores_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_health_scores_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_insights: {
         Row: {
           agent_id: string | null
+          alert_sent: boolean | null
           analyzed_at: string | null
           conversation_id: string
           created_at: string | null
@@ -88,9 +165,11 @@ export type Database = {
           overall_sentiment: string | null
           satisfaction_score: number | null
           sentiment_timeline: Json | null
+          smart_tags: string[] | null
         }
         Insert: {
           agent_id?: string | null
+          alert_sent?: boolean | null
           analyzed_at?: string | null
           conversation_id: string
           created_at?: string | null
@@ -100,9 +179,11 @@ export type Database = {
           overall_sentiment?: string | null
           satisfaction_score?: number | null
           sentiment_timeline?: Json | null
+          smart_tags?: string[] | null
         }
         Update: {
           agent_id?: string | null
+          alert_sent?: boolean | null
           analyzed_at?: string | null
           conversation_id?: string
           created_at?: string | null
@@ -112,6 +193,7 @@ export type Database = {
           overall_sentiment?: string | null
           satisfaction_score?: number | null
           sentiment_timeline?: Json | null
+          smart_tags?: string[] | null
         }
         Relationships: [
           {
@@ -212,6 +294,61 @@ export type Database = {
           },
           {
             foreignKeyName: "agents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alert_notifications: {
+        Row: {
+          agent_id: string | null
+          alert_type: string
+          conversation_id: string
+          created_at: string | null
+          email_sent_to: string[] | null
+          id: string
+          organization_id: string | null
+          satisfaction_score: number | null
+        }
+        Insert: {
+          agent_id?: string | null
+          alert_type: string
+          conversation_id: string
+          created_at?: string | null
+          email_sent_to?: string[] | null
+          id?: string
+          organization_id?: string | null
+          satisfaction_score?: number | null
+        }
+        Update: {
+          agent_id?: string | null
+          alert_type?: string
+          conversation_id?: string
+          created_at?: string | null
+          email_sent_to?: string[] | null
+          id?: string
+          organization_id?: string | null
+          satisfaction_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_notifications_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alert_notifications_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alert_notifications_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -814,6 +951,7 @@ export type Database = {
           resolution_status: string | null
           satisfaction_score: number | null
           sentiment: string | null
+          smart_tags: string[] | null
           status: string | null
           title: string
           transcript: string | null
@@ -838,6 +976,7 @@ export type Database = {
           resolution_status?: string | null
           satisfaction_score?: number | null
           sentiment?: string | null
+          smart_tags?: string[] | null
           status?: string | null
           title: string
           transcript?: string | null
@@ -862,6 +1001,7 @@ export type Database = {
           resolution_status?: string | null
           satisfaction_score?: number | null
           sentiment?: string | null
+          smart_tags?: string[] | null
           status?: string | null
           title?: string
           transcript?: string | null

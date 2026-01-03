@@ -3,7 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Bot, Key, Palette, BarChart3, Play, Code } from 'lucide-react';
+import { ArrowLeft, Bot, Key, Palette, BarChart3, Play, Code, Brain, Activity } from 'lucide-react';
 import { useAgentSettings } from '@/hooks/useAgentSettings';
 import { AgentOverviewTab } from '@/components/agents/AgentOverviewTab';
 import { AgentCredentialsTab } from '@/components/agents/AgentCredentialsTab';
@@ -11,6 +11,8 @@ import { AgentWidgetTab } from '@/components/agents/AgentWidgetTab';
 import { AgentAnalyticsTab } from '@/components/agents/AgentAnalyticsTab';
 import { AgentPrototypeTab } from '@/components/agents/AgentPrototypeTab';
 import { AgentEmbedTab } from '@/components/agents/AgentEmbedTab';
+import { AgentAnalyticsWidget } from '@/components/agents/AgentAnalyticsWidget';
+import { AgentKnowledgePromptTab } from '@/components/agents/AgentKnowledgePromptTab';
 
 const AgentSettingsPage = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -69,7 +71,7 @@ const AgentSettingsPage = () => {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Bot className="h-4 w-4" />
               <span className="hidden sm:inline">Aperçu</span>
@@ -78,6 +80,10 @@ const AgentSettingsPage = () => {
               <Key className="h-4 w-4" />
               <span className="hidden sm:inline">Config</span>
             </TabsTrigger>
+            <TabsTrigger value="knowledge" className="flex items-center gap-2">
+              <Brain className="h-4 w-4" />
+              <span className="hidden sm:inline">KB & Prompt</span>
+            </TabsTrigger>
             <TabsTrigger value="widget" className="flex items-center gap-2">
               <Palette className="h-4 w-4" />
               <span className="hidden sm:inline">Widget</span>
@@ -85,6 +91,10 @@ const AgentSettingsPage = () => {
             <TabsTrigger value="analytics" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Analytics</span>
+            </TabsTrigger>
+            <TabsTrigger value="health" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              <span className="hidden sm:inline">Health</span>
             </TabsTrigger>
             <TabsTrigger value="prototype" className="flex items-center gap-2">
               <Play className="h-4 w-4" />
@@ -115,6 +125,10 @@ const AgentSettingsPage = () => {
             />
           </TabsContent>
 
+          <TabsContent value="knowledge">
+            <AgentKnowledgePromptTab agent={agent} />
+          </TabsContent>
+
           <TabsContent value="widget">
             <AgentWidgetTab
               agent={agent}
@@ -128,6 +142,10 @@ const AgentSettingsPage = () => {
               conversations={conversations || []}
               analytics={analytics}
             />
+          </TabsContent>
+
+          <TabsContent value="health">
+            <AgentAnalyticsWidget agentId={agentId!} agentName={agent.name} />
           </TabsContent>
 
           <TabsContent value="prototype">

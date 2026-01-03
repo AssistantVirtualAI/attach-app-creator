@@ -9,10 +9,11 @@ import { ConversationMetrics } from './ConversationMetrics';
 import { SentimentTimeline } from './SentimentTimeline';
 import { ImprovementsList } from './ImprovementCard';
 import { SatisfactionScore } from './SatisfactionScore';
+import { SmartTagsList } from './SmartTags';
 import { useConversationDetails } from '@/hooks/useConversationDetails';
 import { useEnhancedConversationAnalysis } from '@/hooks/useEnhancedConversationAnalysis';
 import { ConversationCardSkeleton } from '@/components/LoadingSkeleton';
-import { Brain, Sparkles, TrendingUp, TrendingDown, Minus, Target, Lightbulb } from 'lucide-react';
+import { Brain, Sparkles, TrendingUp, TrendingDown, Minus, Target, Lightbulb, Tag } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface ConversationDetailModalProps {
@@ -285,6 +286,21 @@ export function ConversationDetailModal({
                       </CardHeader>
                       <CardContent>
                         <SentimentTimeline timeline={analysis.sentiment_timeline} />
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Smart Tags */}
+                  {(analysis as any).smart_tags && (analysis as any).smart_tags.length > 0 && (
+                    <Card className="glass-card">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Tag className="w-5 h-5 text-primary" />
+                          Catégories Intelligentes
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <SmartTagsList tags={(analysis as any).smart_tags} />
                       </CardContent>
                     </Card>
                   )}

@@ -110,3 +110,6 @@ verify_jwt = false
 
 [functions.notify-handoff]
 verify_jwt = false
+
+[functions.send-satisfaction-alert]
+verify_jwt = true
