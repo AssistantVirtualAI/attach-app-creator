@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -45,15 +45,18 @@ export function ElevenLabsConversationModal({
   const { data: audioData, isLoading: isLoadingAudio } = useConversationAudio(conversationId);
   
   // Use the enhanced analysis hook with external conversation support
-  const { 
-    analysis, 
-    isAnalyzing, 
+  const {
+    analysis,
+    isAnalyzing,
     generateAnalysis,
-    existingInsight
+    existingInsight,
+    error: analysisError,
   } = useEnhancedConversationAnalysis(conversationId || '', {
     isExternal: true,
-    platformAgentId
+    platformAgentId,
   });
+
+  const autoAnalyzeAttemptedRef = useRef(false);
 
   // Normalize transcript using the shared utility
   const transcriptMessages = useMemo(() => {
@@ -66,19 +69,46 @@ export function ElevenLabsConversationModal({
     });
   }, [conversationDetails]);
 
-  // Auto-generate analysis if not available
+  // Auto-generate analysis if not available (no infinite retry on auth errors)
   useEffect(() => {
-    if (isOpen && conversationId && conversationDetails && !analysis && !isAnalyzing && !existingInsight) {
+    if (!isOpen) {
+      autoAnalyzeAttemptedRef.current = false;
+      return;
+    }
+
+    if (analysisError) return;
+
+    if (
+      isOpen &&
+      conversationId &&
+      conversationDetails &&
+      !analysis &&
+      !isAnalyzing &&
+      !existingInsight &&
+      !autoAnalyzeAttemptedRef.current
+    ) {
+      autoAnalyzeAttemptedRef.current = true;
       // Generate transcript text for analysis
       const transcriptText = transcriptToText(transcriptMessages);
       if (transcriptText) {
-        generateAnalysis({ 
+        generateAnalysis({
           transcript: transcriptText,
-          platformAgentId 
+          platformAgentId,
         });
       }
     }
-  }, [isOpen, conversationId, conversationDetails, analysis, isAnalyzing, existingInsight, transcriptMessages, platformAgentId]);
+  }, [
+    isOpen,
+    conversationId,
+    conversationDetails,
+    analysis,
+    isAnalyzing,
+    existingInsight,
+    transcriptMessages,
+    platformAgentId,
+    analysisError,
+    generateAnalysis,
+  ]);
 
   const getSentimentIcon = (sentiment: string) => {
     switch (sentiment) {
