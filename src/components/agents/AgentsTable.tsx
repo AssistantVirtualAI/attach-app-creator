@@ -1,6 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Settings, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { PlatformBadge } from './PlatformBadge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -25,6 +26,8 @@ interface AgentsTableProps {
 }
 
 export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
+  const navigate = useNavigate();
+  
   const handleDelete = async (agentId: string) => {
     try {
       const { error } = await supabase
@@ -76,7 +79,11 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
-                  <Button variant="ghost" size="icon">
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => navigate(`/agent-settings/${agent.id}`)}
+                  >
                     <Settings className="h-4 w-4" />
                   </Button>
                   
