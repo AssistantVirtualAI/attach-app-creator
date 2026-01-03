@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
   Clock, TrendingUp, TrendingDown, Minus, ExternalLink, 
-  ChevronLeft, ChevronRight, Play, Volume2
+  ChevronLeft, ChevronRight, Play, Sparkles
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -15,29 +15,25 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useAllAgentsConversations, useConversationDetails, useConversationAudio, ConversationFilters as Filters } from '@/hooks/useAllAgentsConversations';
+import { useAllAgentsConversations, ConversationFilters as Filters } from '@/hooks/useAllAgentsConversations';
 import { ConversationFilters } from '@/components/filters/ConversationFilters';
 import { ConversationExport } from '@/components/exports/ConversationExport';
-import { AdvancedAudioPlayer } from '@/components/audio/AdvancedAudioPlayer';
 import { SetupIntegrationCard } from '@/components/SetupIntegrationCard';
+import { ElevenLabsConversationModal } from '@/components/conversations/ElevenLabsConversationModal';
 
 const Conversations = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [filters, setFilters] = useState<Filters>({});
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<{
+    id: string;
+    agentName: string;
+    platformAgentId: string;
+  } | null>(null);
   
   const { data, isLoading } = useAllAgentsConversations(page, pageSize, filters);
-  const { data: conversationDetails, isLoading: isLoadingDetails } = useConversationDetails(selectedConversationId);
-  const { data: audioData, isLoading: isLoadingAudio } = useConversationAudio(selectedConversationId);
 
   const getSentimentIcon = (sentiment: string | undefined) => {
     switch (sentiment) {
@@ -147,7 +143,11 @@ const Conversations = () => {
                 <Card 
                   key={conversation.conversation_id} 
                   className="glass-card hover:neon-border transition-all duration-200 cursor-pointer"
-                  onClick={() => setSelectedConversationId(conversation.conversation_id)}
+                  onClick={() => setSelectedConversation({
+                    id: conversation.conversation_id,
+                    agentName: conversation.agent_name,
+                    platformAgentId: conversation.platform_agent_id
+                  })}
                 >
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
@@ -189,7 +189,7 @@ const Conversations = () => {
                           <Play className="w-4 h-4" />
                         </Button>
                         <Button variant="ghost" size="sm" className="gap-2">
-                          <ExternalLink className="w-4 h-4" />
+                          <Sparkles className="w-4 h-4 text-primary" />
                         </Button>
                       </div>
                     </div>
@@ -248,139 +248,14 @@ const Conversations = () => {
           </div>
         )}
 
-        {/* Conversation Detail Modal */}
-        <Dialog open={!!selectedConversationId} onOpenChange={() => setSelectedConversationId(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-3">
-                <Volume2 className="w-5 h-5 text-primary" />
-                Détails de la conversation
-              </DialogTitle>
-            </DialogHeader>
-
-            {isLoadingDetails ? (
-              <div className="space-y-4">
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-40 w-full" />
-              </div>
-            ) : conversationDetails ? (
-              <div className="space-y-6">
-                {/* Metadata */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="glass-card p-4 rounded-lg">
-                    <p className="text-sm text-muted-foreground">Agent</p>
-                    <p className="font-semibold">{conversationDetails.agent_name || 'N/A'}</p>
-                  </div>
-                  <div className="glass-card p-4 rounded-lg">
-                    <p className="text-sm text-muted-foreground">Durée</p>
-                    <p className="font-semibold">
-                      {formatDuration(conversationDetails.call_duration_secs || conversationDetails.metadata?.call_duration_secs)}
-                    </p>
-                  </div>
-                  <div className="glass-card p-4 rounded-lg">
-                    <p className="text-sm text-muted-foreground">Satisfaction</p>
-                    <p className="font-semibold">
-                      {conversationDetails.analysis?.satisfaction_score 
-                        ? `${(conversationDetails.analysis.satisfaction_score * 100).toFixed(0)}%`
-                        : 'N/A'}
-                    </p>
-                  </div>
-                  <div className="glass-card p-4 rounded-lg">
-                    <p className="text-sm text-muted-foreground">Sentiment</p>
-                    <div className="flex items-center gap-2">
-                      {getSentimentIcon(conversationDetails.analysis?.sentiment)}
-                      <span className="font-semibold capitalize">
-                        {conversationDetails.analysis?.sentiment || 'N/A'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Summary */}
-                {conversationDetails.analysis?.summary && (
-                  <div className="glass-card p-4 rounded-lg">
-                    <h4 className="font-semibold mb-2">Résumé</h4>
-                    <p className="text-muted-foreground">{conversationDetails.analysis.summary}</p>
-                  </div>
-                )}
-
-                {/* Audio Player */}
-                {!isLoadingAudio && audioData?.audio_url && (
-                  <AdvancedAudioPlayer
-                    audioUrl={audioData.audio_url}
-                    conversation={{
-                      conversation_id: selectedConversationId!,
-                      duration_seconds: conversationDetails.call_duration_secs || conversationDetails.metadata?.call_duration_secs,
-                      satisfaction_score: conversationDetails.analysis?.satisfaction_score,
-                    }}
-                    transcript={conversationDetails.transcript?.map((segment: any, index: number) => ({
-                      speaker: segment.role === 'agent' ? 'agent' : 'caller',
-                      text: segment.message || segment.text,
-                      timestamp: segment.time_in_call_secs ? segment.time_in_call_secs * 1000 : index * 5000,
-                    })) || []}
-                  />
-                )}
-
-                {isLoadingAudio && (
-                  <div className="glass-card p-6 text-center">
-                    <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Chargement de l'audio...</p>
-                  </div>
-                )}
-
-                {/* Audio unavailable states */}
-                {!isLoadingAudio && !audioData?.audio_url && audioData?.notFound && (
-                  <div className="glass-card p-6 text-center border border-muted">
-                    <Volume2 className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      Audio non disponible pour cette conversation
-                    </p>
-                  </div>
-                )}
-
-                {!isLoadingAudio && !audioData?.audio_url && audioData?.error_code === 'AUDIO_AUTH_ERROR' && (
-                  <div className="glass-card p-6 text-center border border-destructive/30">
-                    <Volume2 className="w-8 h-8 text-destructive mx-auto mb-2" />
-                    <p className="text-sm text-destructive">
-                      Erreur d'autorisation lors de la récupération de l'audio
-                    </p>
-                  </div>
-                )}
-
-                {/* Transcript */}
-                {conversationDetails.transcript && conversationDetails.transcript.length > 0 && (
-                  <div className="glass-card p-4 rounded-lg">
-                    <h4 className="font-semibold mb-4">Transcription</h4>
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
-                      {conversationDetails.transcript.map((segment: any, index: number) => (
-                        <div 
-                          key={index}
-                          className={`flex gap-3 ${segment.role === 'agent' ? 'justify-start' : 'justify-end'}`}
-                        >
-                          <div className={`max-w-[80%] p-3 rounded-lg ${
-                            segment.role === 'agent' 
-                              ? 'bg-primary/10 text-foreground' 
-                              : 'bg-muted text-foreground'
-                          }`}>
-                            <p className="text-xs text-muted-foreground mb-1">
-                              {segment.role === 'agent' ? '🤖 Agent' : '👤 Utilisateur'}
-                              {segment.time_in_call_secs && ` • ${formatDuration(segment.time_in_call_secs)}`}
-                            </p>
-                            <p className="text-sm">{segment.message || segment.text}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-center text-muted-foreground py-8">
-                Impossible de charger les détails de la conversation
-              </p>
-            )}
-          </DialogContent>
-        </Dialog>
+        {/* ElevenLabs Conversation Modal with AI Analysis */}
+        <ElevenLabsConversationModal
+          isOpen={!!selectedConversation}
+          onClose={() => setSelectedConversation(null)}
+          conversationId={selectedConversation?.id || null}
+          agentName={selectedConversation?.agentName}
+          platformAgentId={selectedConversation?.platformAgentId}
+        />
       </div>
     </AppLayout>
   );

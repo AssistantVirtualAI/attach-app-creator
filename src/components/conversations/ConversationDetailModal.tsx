@@ -16,107 +16,16 @@ import { ConversationCardSkeleton } from '@/components/LoadingSkeleton';
 import { Brain, Sparkles, TrendingUp, TrendingDown, Minus, Target, Lightbulb, Tag, Bot, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  normalizeTranscript, 
+  transcriptToAudioPlayerFormat,
+  type TranscriptMessage 
+} from '@/lib/transcript/normalizeElevenLabsTranscript';
 
 interface ConversationDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   conversationId: string;
-}
-
-interface TranscriptMessage {
-  role: 'agent' | 'user';
-  message: string;
-  time_in_call_secs?: number;
-}
-
-// Helper functions for transcript normalization
-function hasStructuredMessages(userMsgs: any, agentMsgs: any): boolean {
-  const checkArray = (arr: any[]) => arr?.some((m: any) => 
-    typeof m === 'object' && (m.timestamp !== undefined || m.time_in_call_secs !== undefined || m.time !== undefined)
-  );
-  return checkArray(userMsgs) || checkArray(agentMsgs);
-}
-
-function mergeStructuredMessages(userMsgs: any[], agentMsgs: any[]): TranscriptMessage[] {
-  const all: { role: 'agent' | 'user'; message: string; time: number }[] = [];
-  
-  agentMsgs.forEach((m: any) => {
-    const msg = typeof m === 'string' ? m : (m?.message || m?.text || m?.content || '');
-    const time = m?.timestamp || m?.time_in_call_secs || m?.time || 0;
-    if (msg.trim()) all.push({ role: 'agent', message: msg.trim(), time });
-  });
-  
-  userMsgs.forEach((m: any) => {
-    const msg = typeof m === 'string' ? m : (m?.message || m?.text || m?.content || '');
-    const time = m?.timestamp || m?.time_in_call_secs || m?.time || 0;
-    if (msg.trim()) all.push({ role: 'user', message: msg.trim(), time });
-  });
-  
-  return all
-    .sort((a, b) => a.time - b.time)
-    .map(m => ({ role: m.role, message: m.message, time_in_call_secs: m.time || undefined }));
-}
-
-function mergeSimpleMessages(userMsgs: any[], agentMsgs: any[]): TranscriptMessage[] {
-  const combined: TranscriptMessage[] = [];
-  const maxLen = Math.max(userMsgs.length, agentMsgs.length);
-  
-  for (let i = 0; i < maxLen; i++) {
-    // Agent typically starts (first_message)
-    if (i < agentMsgs.length && agentMsgs[i]) {
-      const msg = typeof agentMsgs[i] === 'string' ? agentMsgs[i] : (agentMsgs[i] as any)?.message || '';
-      if (msg.trim()) combined.push({ role: 'agent', message: msg.trim() });
-    }
-    if (i < userMsgs.length && userMsgs[i]) {
-      const msg = typeof userMsgs[i] === 'string' ? userMsgs[i] : (userMsgs[i] as any)?.message || '';
-      if (msg.trim()) combined.push({ role: 'user', message: msg.trim() });
-    }
-  }
-  return combined;
-}
-
-function parseTranscriptString(transcript: string): TranscriptMessage[] {
-  const lines = transcript.split('\n').filter(l => l.trim());
-  const messages: TranscriptMessage[] = [];
-  
-  lines.forEach((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return;
-    
-    // Detect role from prefix patterns
-    const agentPatterns = /^(agent|assistant|ai|bot):\s*/i;
-    const userPatterns = /^(user|client|human|customer|caller):\s*/i;
-    
-    let role: 'agent' | 'user';
-    let cleanMessage: string;
-    
-    if (agentPatterns.test(trimmed)) {
-      role = 'agent';
-      cleanMessage = trimmed.replace(agentPatterns, '');
-    } else if (userPatterns.test(trimmed)) {
-      role = 'user';
-      cleanMessage = trimmed.replace(userPatterns, '');
-    } else {
-      // Use context from previous message or default
-      role = messages.length > 0 && messages[messages.length - 1].role === 'agent' ? 'user' : 'agent';
-      cleanMessage = trimmed;
-    }
-    
-    if (cleanMessage.trim()) {
-      messages.push({ role, message: cleanMessage.trim() });
-    }
-  });
-  
-  return messages;
-}
-
-function deduplicateMessages(messages: TranscriptMessage[]): TranscriptMessage[] {
-  return messages.filter((msg, idx, arr) => {
-    if (idx === 0) return true;
-    const prev = arr[idx - 1];
-    // Remove if same role and same message content
-    return !(prev.role === msg.role && prev.message === msg.message);
-  });
 }
 
 export function ConversationDetailModal({ 
@@ -142,44 +51,15 @@ export function ConversationDetailModal({
     return meta?.caller_name || meta?.customer_name || meta?.user_name || meta?.name || 'Inconnu';
   }, [conversation?.metadata]);
 
-  // Normalize and deduplicate transcript messages
+  // Normalize and deduplicate transcript messages using shared utility
   const transcriptMessages = useMemo((): TranscriptMessage[] => {
     if (!conversation) return [];
-
-    const meta = conversation.metadata as any;
-    let messages: TranscriptMessage[] = [];
-    
-    // Priority 1: metadata.transcript (structured, most reliable)
-    if (meta?.transcript && Array.isArray(meta.transcript)) {
-      messages = meta.transcript
-        .map((msg: any) => ({
-          role: (msg.role === 'agent' || msg.role === 'assistant') ? 'agent' as const : 'user' as const,
-          message: (msg.message || msg.text || msg.content || '').trim(),
-          time_in_call_secs: msg.time_in_call_secs || msg.timestamp || msg.time
-        }))
-        .filter((msg: TranscriptMessage) => msg.message.length > 0);
-    }
-    // Priority 2: Structured user_messages/agent_messages with timestamps
-    else if (hasStructuredMessages(conversation.user_messages, conversation.agent_messages)) {
-      messages = mergeStructuredMessages(
-        conversation.user_messages || [], 
-        conversation.agent_messages || []
-      );
-    }
-    // Priority 3: Simple user_messages/agent_messages arrays
-    else if ((conversation.user_messages?.length || 0) > 0 || (conversation.agent_messages?.length || 0) > 0) {
-      messages = mergeSimpleMessages(
-        conversation.user_messages || [], 
-        conversation.agent_messages || []
-      );
-    }
-    // Priority 4: Parse transcript string
-    else if (conversation.transcript && typeof conversation.transcript === 'string') {
-      messages = parseTranscriptString(conversation.transcript);
-    }
-
-    // Deduplicate consecutive identical messages
-    return deduplicateMessages(messages);
+    return normalizeTranscript({
+      metadata: conversation.metadata,
+      user_messages: conversation.user_messages,
+      agent_messages: conversation.agent_messages,
+      transcript: conversation.transcript
+    });
   }, [conversation]);
 
   // Keyboard shortcuts

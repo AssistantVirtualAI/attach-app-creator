@@ -35,14 +35,23 @@ export interface EnhancedConversationAnalysis {
 }
 
 interface AnalyzeConversationParams {
-  conversationId: string;
+  conversationId?: string;
+  externalConversationId?: string;
   agentId?: string;
   organizationId?: string;
+  platformAgentId?: string;
   transcript?: string;
 }
 
-export const useEnhancedConversationAnalysis = (conversationId: string) => {
+export const useEnhancedConversationAnalysis = (
+  conversationId: string,
+  options?: {
+    isExternal?: boolean;
+    platformAgentId?: string;
+  }
+) => {
   const queryClient = useQueryClient();
+  const isExternal = options?.isExternal || false;
 
   // Récupérer l'analyse existante depuis agent_insights
   const { data: existingInsight, isLoading: isLoadingInsight } = useQuery({
@@ -63,7 +72,7 @@ export const useEnhancedConversationAnalysis = (conversationId: string) => {
     enabled: !!conversationId,
   });
 
-  // Récupérer la conversation pour le fallback
+  // Récupérer la conversation pour le fallback (only for internal conversations)
   const { data: conversation } = useQuery({
     queryKey: ['conversation-for-analysis', conversationId],
     queryFn: async () => {
@@ -79,21 +88,30 @@ export const useEnhancedConversationAnalysis = (conversationId: string) => {
       }
       return data;
     },
-    enabled: !!conversationId,
+    enabled: !!conversationId && !isExternal,
   });
 
   // Mutation pour générer l'analyse
   const generateAnalysis = useMutation({
-    mutationFn: async (params: AnalyzeConversationParams) => {
-      // Auto-include agentId and organizationId from conversation if not provided
-      const enrichedParams = {
-        ...params,
-        agentId: params.agentId || conversation?.agent_id,
-        organizationId: params.organizationId || conversation?.organization_id,
-      };
+    mutationFn: async (params: Omit<AnalyzeConversationParams, 'conversationId' | 'externalConversationId'>) => {
+      // Build the request body based on whether it's an external conversation
+      const body: AnalyzeConversationParams = isExternal
+        ? {
+            externalConversationId: conversationId,
+            platformAgentId: options?.platformAgentId || params.platformAgentId,
+            agentId: params.agentId,
+            organizationId: params.organizationId,
+            transcript: params.transcript,
+          }
+        : {
+            conversationId,
+            agentId: params.agentId || conversation?.agent_id,
+            organizationId: params.organizationId || conversation?.organization_id,
+            transcript: params.transcript,
+          };
       
       const { data, error } = await supabase.functions.invoke('analyze-conversation', {
-        body: enrichedParams
+        body
       });
 
       if (error) throw error;
@@ -184,10 +202,11 @@ export const useEnhancedConversationAnalysis = (conversationId: string) => {
 
   return {
     analysis,
+    existingInsight,
     isLoading: isLoadingInsight,
     isAnalyzing: generateAnalysis.isPending,
-    generateAnalysis: (params: Omit<AnalyzeConversationParams, 'conversationId'>) => 
-      generateAnalysis.mutate({ conversationId, ...params }),
+    generateAnalysis: (params: Omit<AnalyzeConversationParams, 'conversationId' | 'externalConversationId'> = {}) => 
+      generateAnalysis.mutate(params),
     error: generateAnalysis.error,
   };
 };

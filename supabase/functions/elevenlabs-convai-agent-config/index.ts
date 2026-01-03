@@ -12,7 +12,17 @@ serve(async (req) => {
   }
 
   try {
-    const { action, agentId, prompt, firstMessage, voiceSettings, apiKey: providedApiKey, integrationId } = await req.json();
+const { 
+      action, 
+      agentId, 
+      prompt, 
+      firstMessage, 
+      voiceSettings, 
+      llmSettings,
+      fullConfig,
+      apiKey: providedApiKey, 
+      integrationId 
+    } = await req.json();
     
     console.log(`[elevenlabs-agent-config] Action: ${action}, AgentId: ${agentId}`);
     
@@ -225,8 +235,137 @@ serve(async (req) => {
         );
       }
 
+      case 'update_llm': {
+        console.log(`[elevenlabs-agent-config] Updating LLM settings for agent ${targetAgentId}`);
+        
+        if (!llmSettings) {
+          return new Response(
+            JSON.stringify({ error: 'LLM settings required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const llmBody: any = {
+          conversation_config: {
+            agent: {
+              prompt: {
+                llm: llmSettings
+              }
+            }
+          }
+        };
+        
+        const llmResponse = await fetch(
+          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'xi-api-key': apiKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(llmBody),
+          }
+        );
+
+        if (!llmResponse.ok) {
+          const errorText = await llmResponse.text();
+          console.error('[elevenlabs-agent-config] ElevenLabs API error:', llmResponse.status, errorText);
+          throw new Error(`ElevenLabs API error: ${llmResponse.status} - ${errorText}`);
+        }
+
+        const llmData = await llmResponse.json();
+        console.log('[elevenlabs-agent-config] Successfully updated LLM settings');
+        
+        return new Response(
+          JSON.stringify({ success: true, data: llmData }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'update_first_message': {
+        console.log(`[elevenlabs-agent-config] Updating first message for agent ${targetAgentId}`);
+        
+        if (!firstMessage) {
+          return new Response(
+            JSON.stringify({ error: 'First message required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const fmBody: any = {
+          conversation_config: {
+            agent: {
+              first_message: firstMessage
+            }
+          }
+        };
+        
+        const fmResponse = await fetch(
+          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'xi-api-key': apiKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(fmBody),
+          }
+        );
+
+        if (!fmResponse.ok) {
+          const errorText = await fmResponse.text();
+          console.error('[elevenlabs-agent-config] ElevenLabs API error:', fmResponse.status, errorText);
+          throw new Error(`ElevenLabs API error: ${fmResponse.status} - ${errorText}`);
+        }
+
+        const fmData = await fmResponse.json();
+        console.log('[elevenlabs-agent-config] Successfully updated first message');
+        
+        return new Response(
+          JSON.stringify({ success: true, data: fmData }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'update_full': {
+        console.log(`[elevenlabs-agent-config] Full update for agent ${targetAgentId}`);
+        
+        if (!fullConfig) {
+          return new Response(
+            JSON.stringify({ error: 'Full config required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const fullResponse = await fetch(
+          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'xi-api-key': apiKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(fullConfig),
+          }
+        );
+
+        if (!fullResponse.ok) {
+          const errorText = await fullResponse.text();
+          console.error('[elevenlabs-agent-config] ElevenLabs API error:', fullResponse.status, errorText);
+          throw new Error(`ElevenLabs API error: ${fullResponse.status} - ${errorText}`);
+        }
+
+        const fullData = await fullResponse.json();
+        console.log('[elevenlabs-agent-config] Successfully performed full update');
+        
+        return new Response(
+          JSON.stringify({ success: true, data: fullData }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       default:
-        throw new Error('Action non supportée');
+        throw new Error(`Action non supportée: ${action}`);
     }
 
   } catch (error) {
