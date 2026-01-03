@@ -5,37 +5,52 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
 import { useFAQGeneration } from '@/hooks/useFAQGeneration';
-import { useCustomKPIs } from '@/hooks/useCustomKPIs';
-import { useFeatureAccess } from '@/hooks/useFeatureAccess';
-import { FeatureGate } from '@/components/billing/FeatureGate';
+import { useAgentReports, AgentMetrics } from '@/hooks/useAgentReports';
+import { useOrganization } from '@/context/OrganizationContext';
 import { 
   FileQuestion, 
   RefreshCw, 
   AlertTriangle, 
   TrendingUp,
-  Calculator,
-  Plus,
-  Save,
-  Target,
+  TrendingDown,
+  Minus,
   BarChart3,
-  MessageSquareWarning
+  MessageSquareWarning,
+  Users,
+  Clock,
+  ThumbsUp,
+  Smile,
+  Meh,
+  Frown,
+  Target,
+  Lightbulb,
+  Tag,
+  Activity
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useOrganization } from '@/context/OrganizationContext';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
+
+const SENTIMENT_COLORS = {
+  positive: '#22c55e',
+  neutral: '#f59e0b',
+  negative: '#ef4444',
+};
 
 const AgentReports = () => {
   const { selectedOrg } = useOrganization();
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
-  const { faqs, misunderstoodQueries, conversationsAnalyzed, isLoading, isGenerating, regenerateFAQs } = useFAQGeneration(
+  
+  const { data: reportsData, isLoading: isLoadingReports, refetch } = useAgentReports(
     selectedAgent !== 'all' ? selectedAgent : undefined
   );
-  const { kpis, kpiValues, isCalculating, saveKPI } = useCustomKPIs();
-  const { canAccessFeature } = useFeatureAccess();
+  
+  const { faqs, misunderstoodQueries, conversationsAnalyzed, isLoading: isLoadingFAQ, isGenerating, regenerateFAQs } = useFAQGeneration(
+    selectedAgent !== 'all' ? selectedAgent : undefined
+  );
 
   // Fetch agents for filter
   const { data: agents } = useQuery({
@@ -61,6 +76,147 @@ const AgentReports = () => {
     'Général': 'bg-gray-500/20 text-gray-400'
   };
 
+  const getTrendIcon = (trend: 'up' | 'down' | 'stable') => {
+    switch (trend) {
+      case 'up':
+        return <TrendingUp className="h-4 w-4 text-green-500" />;
+      case 'down':
+        return <TrendingDown className="h-4 w-4 text-red-500" />;
+      default:
+        return <Minus className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  const renderAgentCard = (agent: AgentMetrics) => {
+    const sentimentData = [
+      { name: 'Positif', value: agent.sentimentDistribution.positive, color: SENTIMENT_COLORS.positive },
+      { name: 'Neutre', value: agent.sentimentDistribution.neutral, color: SENTIMENT_COLORS.neutral },
+      { name: 'Négatif', value: agent.sentimentDistribution.negative, color: SENTIMENT_COLORS.negative },
+    ].filter(d => d.value > 0);
+
+    return (
+      <Card key={agent.agentId} className="glass-card">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">{agent.agentName}</CardTitle>
+            <div className="flex items-center gap-1">
+              {getTrendIcon(agent.recentTrend)}
+              <span className="text-xs text-muted-foreground">
+                {agent.recentTrend === 'up' ? 'En hausse' : agent.recentTrend === 'down' ? 'En baisse' : 'Stable'}
+              </span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Key Metrics */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Users className="h-3 w-3" />
+                Conversations
+              </div>
+              <p className="text-2xl font-bold">{agent.totalConversations}</p>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <ThumbsUp className="h-3 w-3" />
+                Satisfaction
+              </div>
+              <p className="text-2xl font-bold">{agent.avgSatisfaction.toFixed(1)}<span className="text-sm text-muted-foreground">/10</span></p>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                Durée moy.
+              </div>
+              <p className="text-lg font-semibold">{Math.round(agent.avgDuration / 60)}min</p>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Target className="h-3 w-3" />
+                Résolution
+              </div>
+              <p className="text-lg font-semibold">{agent.resolutionRate.toFixed(0)}%</p>
+            </div>
+          </div>
+
+          {/* Sentiment Distribution */}
+          {sentimentData.length > 0 && (
+            <div className="pt-2 border-t">
+              <p className="text-xs text-muted-foreground mb-2">Sentiment</p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 flex gap-1">
+                  {agent.sentimentDistribution.positive > 0 && (
+                    <div 
+                      className="h-2 bg-green-500 rounded-full" 
+                      style={{ width: `${(agent.sentimentDistribution.positive / agent.totalConversations) * 100}%` }}
+                    />
+                  )}
+                  {agent.sentimentDistribution.neutral > 0 && (
+                    <div 
+                      className="h-2 bg-yellow-500 rounded-full" 
+                      style={{ width: `${(agent.sentimentDistribution.neutral / agent.totalConversations) * 100}%` }}
+                    />
+                  )}
+                  {agent.sentimentDistribution.negative > 0 && (
+                    <div 
+                      className="h-2 bg-red-500 rounded-full" 
+                      style={{ width: `${(agent.sentimentDistribution.negative / agent.totalConversations) * 100}%` }}
+                    />
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-between text-xs mt-1">
+                <span className="text-green-500 flex items-center gap-1">
+                  <Smile className="h-3 w-3" /> {agent.sentimentDistribution.positive}
+                </span>
+                <span className="text-yellow-500 flex items-center gap-1">
+                  <Meh className="h-3 w-3" /> {agent.sentimentDistribution.neutral}
+                </span>
+                <span className="text-red-500 flex items-center gap-1">
+                  <Frown className="h-3 w-3" /> {agent.sentimentDistribution.negative}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Top Tags */}
+          {agent.topTags.length > 0 && (
+            <div className="pt-2 border-t">
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Tag className="h-3 w-3" /> Tags fréquents
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {agent.topTags.slice(0, 4).map(({ tag, count }) => (
+                  <Badge key={tag} variant="secondary" className="text-xs">
+                    {tag} ({count})
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Top Improvements */}
+          {agent.topImprovements.length > 0 && (
+            <div className="pt-2 border-t">
+              <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                <Lightbulb className="h-3 w-3" /> Améliorations suggérées
+              </p>
+              <ul className="space-y-1">
+                {agent.topImprovements.slice(0, 3).map((imp, i) => (
+                  <li key={i} className="text-xs text-muted-foreground flex items-start gap-1">
+                    <span className="text-primary">•</span>
+                    <span className="line-clamp-1">{imp}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -68,26 +224,94 @@ const AgentReports = () => {
           <div>
             <h1 className="text-3xl font-bold">Rapports Agents</h1>
             <p className="text-muted-foreground">
-              Analyse NLP et génération automatique de FAQs
+              Statistiques personnalisées et analyses par agent
             </p>
           </div>
-          <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Tous les agents" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les agents</SelectItem>
-              {agents?.map((agent) => (
-                <SelectItem key={agent.id} value={agent.id}>
-                  {agent.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Tous les agents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les agents</SelectItem>
+                {agents?.map((agent) => (
+                  <SelectItem key={agent.id} value={agent.id}>
+                    {agent.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="icon" onClick={() => refetch()}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
-        <Tabs defaultValue="faq" className="space-y-6">
+        {/* Global Metrics */}
+        {reportsData && (
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card className="glass-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Users className="h-4 w-4 text-primary" />
+                  Total Conversations
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{reportsData.globalMetrics.totalConversations}</p>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <ThumbsUp className="h-4 w-4 text-primary" />
+                  Satisfaction Moyenne
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">
+                  {reportsData.globalMetrics.avgSatisfaction.toFixed(1)}
+                  <span className="text-lg text-muted-foreground">/10</span>
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-green-500" />
+                  Meilleur Agent
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-lg font-semibold truncate">
+                  {reportsData.globalMetrics.bestPerformingAgent || '—'}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-primary" />
+                  Agents Actifs
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{reportsData.agents.length}</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>
+            <TabsTrigger value="overview" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Vue d'ensemble
+            </TabsTrigger>
+            <TabsTrigger value="performance" className="gap-2">
+              <Activity className="h-4 w-4" />
+              Performance
+            </TabsTrigger>
             <TabsTrigger value="faq" className="gap-2">
               <FileQuestion className="h-4 w-4" />
               FAQs Générées
@@ -96,15 +320,141 @@ const AgentReports = () => {
               <MessageSquareWarning className="h-4 w-4" />
               Requêtes Incomprises
             </TabsTrigger>
-            <TabsTrigger value="kpis" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              KPIs Personnalisés
-            </TabsTrigger>
           </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            {isLoadingReports ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-80 w-full" />
+                ))}
+              </div>
+            ) : reportsData?.agents.length === 0 ? (
+              <Card className="glass-card">
+                <CardContent className="pt-6 text-center py-12">
+                  <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
+                  <p className="text-muted-foreground">Aucune donnée disponible</p>
+                  <p className="text-sm text-muted-foreground">Les statistiques apparaîtront après les premières conversations</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {reportsData?.agents.map(renderAgentCard)}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Performance Tab */}
+          <TabsContent value="performance" className="space-y-6">
+            {isLoadingReports ? (
+              <Skeleton className="h-96 w-full" />
+            ) : reportsData?.agents.length === 0 ? (
+              <Card className="glass-card">
+                <CardContent className="pt-6 text-center py-12">
+                  <Activity className="h-12 w-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
+                  <p className="text-muted-foreground">Aucune donnée de performance</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* Satisfaction Comparison Chart */}
+                <Card className="glass-card">
+                  <CardHeader>
+                    <CardTitle>Comparaison Satisfaction</CardTitle>
+                    <CardDescription>Score moyen par agent</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={reportsData?.agents.map(a => ({
+                        name: a.agentName.length > 12 ? a.agentName.slice(0, 12) + '...' : a.agentName,
+                        satisfaction: parseFloat(a.avgSatisfaction.toFixed(1)),
+                        resolution: parseFloat(a.resolutionRate.toFixed(0))
+                      }))}>
+                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                        <YAxis domain={[0, 10]} />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="satisfaction" name="Satisfaction (/10)" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                {/* Resolution Rate Chart */}
+                <Card className="glass-card">
+                  <CardHeader>
+                    <CardTitle>Taux de Résolution</CardTitle>
+                    <CardDescription>Pourcentage par agent</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {reportsData?.agents.map(agent => (
+                        <div key={agent.agentId} className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span>{agent.agentName}</span>
+                            <span className="font-medium">{agent.resolutionRate.toFixed(0)}%</span>
+                          </div>
+                          <Progress value={agent.resolutionRate} className="h-2" />
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Global Sentiment Distribution */}
+                <Card className="glass-card lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Distribution Globale des Sentiments</CardTitle>
+                    <CardDescription>Répartition sur tous les agents</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-center gap-12">
+                      <ResponsiveContainer width={200} height={200}>
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { name: 'Positif', value: reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.positive, 0) || 0 },
+                              { name: 'Neutre', value: reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.neutral, 0) || 0 },
+                              { name: 'Négatif', value: reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.negative, 0) || 0 },
+                            ]}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            dataKey="value"
+                          >
+                            <Cell fill={SENTIMENT_COLORS.positive} />
+                            <Cell fill={SENTIMENT_COLORS.neutral} />
+                            <Cell fill={SENTIMENT_COLORS.negative} />
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-green-500" />
+                          <span>Positif: {reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.positive, 0)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                          <span>Neutre: {reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.neutral, 0)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-red-500" />
+                          <span>Négatif: {reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.negative, 0)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </TabsContent>
 
           {/* FAQ Tab */}
           <TabsContent value="faq" className="space-y-6">
-            <Card>
+            <Card className="glass-card">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
@@ -127,7 +477,7 @@ const AgentReports = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                {isLoading ? (
+                {isLoadingFAQ ? (
                   <div className="space-y-4">
                     {[1, 2, 3].map((i) => (
                       <Skeleton key={i} className="h-24 w-full" />
@@ -170,7 +520,7 @@ const AgentReports = () => {
 
           {/* Misunderstood Queries Tab */}
           <TabsContent value="misunderstood" className="space-y-6">
-            <Card>
+            <Card className="glass-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-yellow-500" />
@@ -181,7 +531,7 @@ const AgentReports = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {isLoading ? (
+                {isLoadingFAQ ? (
                   <div className="space-y-4">
                     {[1, 2, 3].map((i) => (
                       <Skeleton key={i} className="h-20 w-full" />
@@ -217,90 +567,6 @@ const AgentReports = () => {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
-
-          {/* Custom KPIs Tab */}
-          <TabsContent value="kpis" className="space-y-6">
-            <FeatureGate feature="custom_kpis" showOverlay>
-              <div className="grid gap-6 md:grid-cols-3">
-                {kpis.map((kpi) => (
-                  <Card key={kpi.id}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium flex items-center gap-2">
-                        <Target className="h-4 w-4 text-primary" />
-                        {kpi.name}
-                      </CardTitle>
-                      <CardDescription className="text-xs">
-                        {kpi.description}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {isCalculating ? (
-                        <Skeleton className="h-8 w-20" />
-                      ) : (
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-3xl font-bold">
-                            {kpiValues[kpi.id] || '—'}
-                          </span>
-                          <span className="text-muted-foreground text-sm">{kpi.unit}</span>
-                        </div>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-2 font-mono bg-muted/50 p-1 rounded">
-                        {kpi.formula}
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calculator className="h-5 w-5" />
-                    Créer un KPI Personnalisé
-                  </CardTitle>
-                  <CardDescription>
-                    Définissez vos propres métriques avec des formules personnalisées
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Nom du KPI</label>
-                      <Input placeholder="Ex: Taux de résolution premier contact" />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Unité</label>
-                      <Input placeholder="Ex: %, sec, /5" />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <label className="text-sm font-medium">Description</label>
-                      <Input placeholder="Description de ce que mesure ce KPI" />
-                    </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <label className="text-sm font-medium">Formule</label>
-                      <Textarea 
-                        placeholder="Ex: COUNT(resolution_status='resolved' AND first_contact=true) / COUNT(*) * 100"
-                        className="font-mono text-sm"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Fonctions disponibles: COUNT, SUM, AVG, MIN, MAX, RATIO
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Objectif (optionnel)</label>
-                      <Input type="number" placeholder="Ex: 80" />
-                    </div>
-                  </div>
-                  <div className="flex justify-end mt-6">
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Ajouter le KPI
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </FeatureGate>
           </TabsContent>
         </Tabs>
       </div>

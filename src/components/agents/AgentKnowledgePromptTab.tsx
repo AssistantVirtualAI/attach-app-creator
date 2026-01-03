@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Brain, 
   Save, 
@@ -15,7 +16,10 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  FileText,
+  Plus,
+  ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,16 +36,20 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
   const [firstMessage, setFirstMessage] = useState('');
   const [kbContent, setKbContent] = useState('');
   const [kbTitle, setKbTitle] = useState('');
+  const [kbCategory, setKbCategory] = useState('Général');
+  const [hasChanges, setHasChanges] = useState(false);
 
   const platformAgentId = (agent.config as Record<string, any>)?.agent_id || agent.platform_agent_id;
 
   // Récupérer la configuration de l'agent depuis ElevenLabs
-  const { data: agentConfig, isLoading: isLoadingConfig } = useQuery({
-    queryKey: ['elevenlabs-agent-config', agent.id],
+  const { data: agentConfig, isLoading: isLoadingConfig, error: configError } = useQuery({
+    queryKey: ['elevenlabs-agent-config', agent.id, platformAgentId],
     queryFn: async () => {
       if (!platformAgentId || agent.platform !== 'elevenlabs') {
         return null;
       }
+
+      console.log('[AgentKnowledgePromptTab] Fetching config for agent:', platformAgentId);
 
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
         body: { 
@@ -50,22 +58,37 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
         }
       });
 
-      if (error) throw error;
-      
-      // Initialiser les champs avec les valeurs récupérées
-      if (data?.agent) {
-        setPrompt(data.agent.conversation_config?.agent?.prompt?.prompt || '');
-        setFirstMessage(data.agent.conversation_config?.agent?.first_message || '');
+      if (error) {
+        console.error('[AgentKnowledgePromptTab] Error fetching config:', error);
+        throw error;
       }
       
+      console.log('[AgentKnowledgePromptTab] Config received:', data);
       return data;
     },
     enabled: !!platformAgentId && agent.platform === 'elevenlabs',
+    retry: 1,
   });
+
+  // Initialiser les champs avec les valeurs récupérées
+  useEffect(() => {
+    if (agentConfig?.agent) {
+      const agentData = agentConfig.agent;
+      const conversationConfig = agentData.conversation_config || {};
+      const agentConf = conversationConfig.agent || {};
+      
+      const newPrompt = agentConf.prompt?.prompt || '';
+      const newFirstMessage = agentConf.first_message || '';
+      
+      setPrompt(newPrompt);
+      setFirstMessage(newFirstMessage);
+      setHasChanges(false);
+    }
+  }, [agentConfig]);
 
   // Récupérer la base de connaissances
   const { data: knowledgeBase, isLoading: isLoadingKB } = useQuery({
-    queryKey: ['elevenlabs-knowledge-base', agent.id],
+    queryKey: ['elevenlabs-knowledge-base', agent.id, platformAgentId],
     queryFn: async () => {
       if (!platformAgentId || agent.platform !== 'elevenlabs') {
         return null;
@@ -78,10 +101,16 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[AgentKnowledgePromptTab] Error fetching KB:', error);
+        throw error;
+      }
+      
+      console.log('[AgentKnowledgePromptTab] KB received:', data);
       return data;
     },
     enabled: !!platformAgentId && agent.platform === 'elevenlabs',
+    retry: 1,
   });
 
   // Mutation pour mettre à jour le prompt
@@ -101,9 +130,11 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
     },
     onSuccess: () => {
       toast.success('Prompt mis à jour et synchronisé avec ElevenLabs');
+      setHasChanges(false);
       queryClient.invalidateQueries({ queryKey: ['elevenlabs-agent-config', agent.id] });
     },
     onError: (error: any) => {
+      console.error('[AgentKnowledgePromptTab] Update prompt error:', error);
       toast.error(error.message || 'Erreur lors de la mise à jour du prompt');
     }
   });
@@ -116,7 +147,8 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
           action: 'add',
           agentId: platformAgentId,
           title: kbTitle,
-          content: kbContent
+          content: kbContent,
+          category: kbCategory
         }
       });
 
@@ -127,12 +159,24 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
       toast.success('Contenu ajouté à la base de connaissances');
       setKbTitle('');
       setKbContent('');
+      setKbCategory('Général');
       queryClient.invalidateQueries({ queryKey: ['elevenlabs-knowledge-base', agent.id] });
     },
     onError: (error: any) => {
+      console.error('[AgentKnowledgePromptTab] Add KB error:', error);
       toast.error(error.message || 'Erreur lors de l\'ajout');
     }
   });
+
+  const handlePromptChange = (value: string) => {
+    setPrompt(value);
+    setHasChanges(true);
+  };
+
+  const handleFirstMessageChange = (value: string) => {
+    setFirstMessage(value);
+    setHasChanges(true);
+  };
 
   if (agent.platform !== 'elevenlabs') {
     return (
@@ -141,6 +185,9 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
           <AlertCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">
             La synchronisation Knowledge Base & Prompt est disponible uniquement pour les agents ElevenLabs.
+          </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Pour les autres plateformes, configurez directement dans leur interface.
           </p>
         </CardContent>
       </Card>
@@ -155,6 +202,9 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
           <p className="text-muted-foreground">
             Veuillez configurer l'ID de l'agent ElevenLabs dans l'onglet Config.
           </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            L'ID de l'agent se trouve dans votre dashboard ElevenLabs.
+          </p>
         </CardContent>
       </Card>
     );
@@ -162,6 +212,25 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
 
   return (
     <div className="space-y-6">
+      {/* Status Banner */}
+      {configError ? (
+        <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-destructive" />
+          <div>
+            <p className="font-medium text-destructive">Erreur de connexion à ElevenLabs</p>
+            <p className="text-sm text-muted-foreground">Vérifiez la clé API et l'ID de l'agent dans la configuration.</p>
+          </div>
+        </div>
+      ) : agentConfig?.agent && (
+        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 flex items-center gap-3">
+          <CheckCircle className="h-5 w-5 text-green-500" />
+          <div>
+            <p className="font-medium text-green-600 dark:text-green-400">Connecté à ElevenLabs</p>
+            <p className="text-sm text-muted-foreground">Agent: {agentConfig.agent.name || platformAgentId}</p>
+          </div>
+        </div>
+      )}
+
       <Tabs defaultValue="prompt" className="space-y-4">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="prompt" className="gap-2">
@@ -180,16 +249,22 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-primary" />
                 Configuration du Prompt
+                {hasChanges && (
+                  <Badge variant="outline" className="ml-2 text-yellow-500 border-yellow-500">
+                    Non sauvegardé
+                  </Badge>
+                )}
               </CardTitle>
               <CardDescription>
                 Modifiez le prompt système et le premier message de l'agent. 
-                Les modifications sont synchronisées automatiquement avec ElevenLabs.
+                Les modifications sont synchronisées avec ElevenLabs.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {isLoadingConfig ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <span className="ml-2 text-muted-foreground">Chargement de la configuration...</span>
                 </div>
               ) : (
                 <>
@@ -198,12 +273,12 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
                     <Textarea
                       id="system-prompt"
                       value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
+                      onChange={(e) => handlePromptChange(e.target.value)}
                       placeholder="Vous êtes un assistant virtuel professionnel..."
-                      className="min-h-[200px] font-mono text-sm"
+                      className="min-h-[250px] font-mono text-sm"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Instructions générales pour le comportement de l'agent
+                      Instructions générales pour le comportement de l'agent. Ce texte définit la personnalité et les règles de réponse.
                     </p>
                   </div>
 
@@ -212,16 +287,16 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
                     <Textarea
                       id="first-message"
                       value={firstMessage}
-                      onChange={(e) => setFirstMessage(e.target.value)}
+                      onChange={(e) => handleFirstMessageChange(e.target.value)}
                       placeholder="Bonjour ! Comment puis-je vous aider aujourd'hui ?"
                       className="min-h-[100px]"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Message d'accueil affiché au début de chaque conversation
+                      Message d'accueil affiché/prononcé au début de chaque conversation.
                     </p>
                   </div>
 
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-between items-center pt-4 border-t">
                     <Button
                       variant="outline"
                       onClick={() => queryClient.invalidateQueries({ queryKey: ['elevenlabs-agent-config', agent.id] })}
@@ -231,7 +306,7 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
                     </Button>
                     <Button
                       onClick={() => updatePrompt.mutate()}
-                      disabled={updatePrompt.isPending}
+                      disabled={updatePrompt.isPending || !hasChanges}
                     >
                       {updatePrompt.isPending ? (
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -256,46 +331,73 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
                 Base de Connaissances
               </CardTitle>
               <CardDescription>
-                Ajoutez des documents et informations que l'agent peut utiliser pour répondre.
+                Documents et informations que l'agent utilise pour répondre aux questions.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {isLoadingKB ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <span className="ml-2 text-muted-foreground">Chargement de la base de connaissances...</span>
                 </div>
               ) : (
                 <>
                   {/* Liste des documents existants */}
-                  {knowledgeBase?.knowledge_base?.items?.length > 0 && (
-                    <div className="space-y-2 mb-4">
-                      <Label>Documents existants</Label>
-                      <div className="grid gap-2">
-                        {knowledgeBase.knowledge_base.items.map((item: any, index: number) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                            <div className="flex items-center gap-2">
-                              <CheckCircle className="w-4 h-4 text-green-500" />
-                              <span className="font-medium">{item.title || `Document ${index + 1}`}</span>
+                  <div className="space-y-2">
+                    <Label>Documents existants ({knowledgeBase?.knowledge_base?.items?.length || 0})</Label>
+                    <ScrollArea className="h-48 border rounded-lg p-2">
+                      {knowledgeBase?.knowledge_base?.items?.length > 0 ? (
+                        <div className="space-y-2">
+                          {knowledgeBase.knowledge_base.items.map((item: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-muted-foreground" />
+                                <div>
+                                  <span className="font-medium">{item.name || item.title || `Document ${index + 1}`}</span>
+                                  {item.type && (
+                                    <span className="text-xs text-muted-foreground ml-2">({item.type})</span>
+                                  )}
+                                </div>
+                              </div>
+                              <Badge variant="outline">{item.metadata?.category || item.category || 'Général'}</Badge>
                             </div>
-                            <Badge variant="outline">{item.category || 'Général'}</Badge>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                          <BookOpen className="w-8 h-8 mb-2 opacity-50" />
+                          <p className="text-sm">Aucun document dans la base de connaissances</p>
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </div>
 
                   {/* Formulaire d'ajout */}
                   <div className="space-y-4 pt-4 border-t">
-                    <Label className="text-base font-semibold">Ajouter du contenu</Label>
+                    <Label className="text-base font-semibold flex items-center gap-2">
+                      <Plus className="w-4 h-4" />
+                      Ajouter du contenu
+                    </Label>
                     
-                    <div className="space-y-2">
-                      <Label htmlFor="kb-title">Titre</Label>
-                      <Input
-                        id="kb-title"
-                        value={kbTitle}
-                        onChange={(e) => setKbTitle(e.target.value)}
-                        placeholder="FAQ Produit, Guide d'utilisation..."
-                      />
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="kb-title">Titre</Label>
+                        <Input
+                          id="kb-title"
+                          value={kbTitle}
+                          onChange={(e) => setKbTitle(e.target.value)}
+                          placeholder="FAQ Produit, Guide d'utilisation..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="kb-category">Catégorie</Label>
+                        <Input
+                          id="kb-category"
+                          value={kbCategory}
+                          onChange={(e) => setKbCategory(e.target.value)}
+                          placeholder="Général, Produit, Support..."
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -304,12 +406,15 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
                         id="kb-content"
                         value={kbContent}
                         onChange={(e) => setKbContent(e.target.value)}
-                        placeholder="Entrez le contenu que l'agent doit connaître..."
+                        placeholder="Entrez le contenu que l'agent doit connaître. Vous pouvez inclure des FAQ, des guides, des informations produit..."
                         className="min-h-[200px]"
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Ce contenu sera utilisé par l'agent pour répondre aux questions des utilisateurs.
+                      </p>
                     </div>
 
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-between items-center">
                       <Button
                         variant="outline"
                         onClick={() => queryClient.invalidateQueries({ queryKey: ['elevenlabs-knowledge-base', agent.id] })}
