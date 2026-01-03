@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -8,18 +8,25 @@ import { AdvancedAudioPlayer } from '@/components/audio/AdvancedAudioPlayer';
 import { ConversationMetrics } from './ConversationMetrics';
 import { SentimentTimeline } from './SentimentTimeline';
 import { ImprovementsList } from './ImprovementCard';
-import { SatisfactionScore } from './SatisfactionScore';
+import { SatisfactionScore, SatisfactionBadge } from './SatisfactionScore';
 import { SmartTagsList } from './SmartTags';
 import { useConversationDetails } from '@/hooks/useConversationDetails';
 import { useEnhancedConversationAnalysis } from '@/hooks/useEnhancedConversationAnalysis';
 import { ConversationCardSkeleton } from '@/components/LoadingSkeleton';
-import { Brain, Sparkles, TrendingUp, TrendingDown, Minus, Target, Lightbulb, Tag } from 'lucide-react';
+import { Brain, Sparkles, TrendingUp, TrendingDown, Minus, Target, Lightbulb, Tag, Bot, User } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ConversationDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   conversationId: string;
+}
+
+interface TranscriptMessage {
+  role: 'agent' | 'user';
+  message: string;
+  time_in_call_secs?: number;
 }
 
 export function ConversationDetailModal({ 
@@ -31,12 +38,79 @@ export function ConversationDetailModal({
   const { data: conversation, isLoading, error } = useConversationDetails(conversationId);
   const { analysis, isAnalyzing, generateAnalysis } = useEnhancedConversationAnalysis(conversationId);
 
-  // Générer l'analyse automatiquement si elle n'existe pas
+  // Générer l'analyse automatiquement dès l'ouverture si elle n'existe pas
   useEffect(() => {
-    if (conversation && !analysis && !isAnalyzing && activeTab === 'analysis') {
+    if (isOpen && conversation && !analysis && !isAnalyzing) {
       generateAnalysis({});
     }
-  }, [conversation, analysis, isAnalyzing, activeTab, generateAnalysis]);
+  }, [isOpen, conversation, analysis, isAnalyzing, generateAnalysis]);
+
+  // Extraire le nom du client depuis les métadonnées
+  const clientName = useMemo(() => {
+    if (!conversation?.metadata) return 'Inconnu';
+    const meta = conversation.metadata as any;
+    return meta?.caller_name || meta?.customer_name || meta?.user_name || meta?.name || 'Inconnu';
+  }, [conversation?.metadata]);
+
+  // Parser les messages de la transcription
+  const transcriptMessages = useMemo((): TranscriptMessage[] => {
+    if (!conversation) return [];
+
+    // Si on a des données structurées dans metadata.transcript
+    const meta = conversation.metadata as any;
+    if (meta?.transcript && Array.isArray(meta.transcript)) {
+      return meta.transcript.map((msg: any) => ({
+        role: msg.role === 'agent' ? 'agent' : 'user',
+        message: msg.message || msg.text || msg.content || '',
+        time_in_call_secs: msg.time_in_call_secs || msg.timestamp
+      }));
+    }
+
+    // Si on a user_messages et agent_messages séparés, les combiner
+    const userMsgs = conversation.user_messages || [];
+    const agentMsgs = conversation.agent_messages || [];
+    
+    // Si les deux sont non-vides, les intercaler (user d'abord généralement)
+    if (userMsgs.length > 0 || agentMsgs.length > 0) {
+      const combined: TranscriptMessage[] = [];
+      const maxLen = Math.max(userMsgs.length, agentMsgs.length);
+      
+      for (let i = 0; i < maxLen; i++) {
+        // Agent commence souvent (first_message)
+        if (i < agentMsgs.length && agentMsgs[i]) {
+          const msg = typeof agentMsgs[i] === 'string' ? agentMsgs[i] : (agentMsgs[i] as any)?.message || '';
+          if (msg) {
+            combined.push({ role: 'agent', message: msg });
+          }
+        }
+        if (i < userMsgs.length && userMsgs[i]) {
+          const msg = typeof userMsgs[i] === 'string' ? userMsgs[i] : (userMsgs[i] as any)?.message || '';
+          if (msg) {
+            combined.push({ role: 'user', message: msg });
+          }
+        }
+      }
+      return combined;
+    }
+
+    // Sinon parser le transcript texte
+    if (conversation.transcript && typeof conversation.transcript === 'string') {
+      const lines = conversation.transcript.split('\n').filter(l => l.trim());
+      return lines.map((line, idx) => {
+        // Essayer de détecter le rôle via des patterns
+        const isAgent = line.toLowerCase().startsWith('agent:') || 
+                       line.toLowerCase().startsWith('assistant:') ||
+                       line.toLowerCase().startsWith('ai:');
+        const cleanMessage = line.replace(/^(agent|assistant|ai|user|client|human):\s*/i, '');
+        return {
+          role: isAgent ? 'agent' : (idx % 2 === 0 ? 'agent' : 'user'),
+          message: cleanMessage
+        };
+      });
+    }
+
+    return [];
+  }, [conversation]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -68,6 +142,14 @@ export function ConversationDetailModal({
     }
   };
 
+  const getSentimentLabel = (sentiment: string) => {
+    switch (sentiment) {
+      case 'positive': return 'Positif';
+      case 'negative': return 'Négatif';
+      default: return 'Neutre';
+    }
+  };
+
   const getSentimentColor = (sentiment: string) => {
     switch (sentiment) {
       case 'positive': return 'text-green-400';
@@ -75,6 +157,10 @@ export function ConversationDetailModal({
       default: return 'text-yellow-400';
     }
   };
+
+  // Calculer le score à afficher (analyse > conversation)
+  const displayScore = analysis?.satisfaction_score ?? conversation?.satisfaction_score;
+  const displaySentiment = analysis?.sentiment ?? conversation?.sentiment;
 
   if (isLoading) {
     return (
@@ -103,9 +189,21 @@ export function ConversationDetailModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden glass-card animate-in fade-in-0 zoom-in-95">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold gradient-text">
-            {conversation.title}
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-xl font-bold gradient-text">
+              {conversation.title}
+            </DialogTitle>
+            <div className="flex items-center gap-2">
+              {displayScore !== null && displayScore !== undefined && (
+                <SatisfactionBadge score={displayScore} />
+              )}
+              {displaySentiment && (
+                <Badge variant="outline" className={getSentimentColor(displaySentiment)}>
+                  {getSentimentEmoji(displaySentiment)} {getSentimentLabel(displaySentiment)}
+                </Badge>
+              )}
+            </div>
+          </div>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden">
@@ -132,6 +230,63 @@ export function ConversationDetailModal({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
               >
+                {/* Score de satisfaction et Sentiment en haut */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <Card className="glass-card">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2 text-primary text-sm">
+                        <Target className="w-4 h-4" />
+                        Score de Satisfaction
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex justify-center py-2">
+                      {displayScore !== null && displayScore !== undefined ? (
+                        <SatisfactionScore score={displayScore} size="md" />
+                      ) : isAnalyzing ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                          <span className="text-xs text-muted-foreground">Analyse en cours...</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">En attente d'analyse</span>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="glass-card">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2 text-sm">
+                        {displaySentiment ? getSentimentIcon(displaySentiment) : <Minus className="w-4 h-4" />}
+                        Sentiment Global
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-center py-4">
+                      {displaySentiment ? (
+                        <div className="flex items-center gap-3">
+                          <span className="text-4xl">{getSentimentEmoji(displaySentiment)}</span>
+                          <div>
+                            <p className={`font-medium text-lg ${getSentimentColor(displaySentiment)}`}>
+                              {getSentimentLabel(displaySentiment)}
+                            </p>
+                            {analysis?.confidence && (
+                              <p className="text-xs text-muted-foreground">
+                                Confiance: {(analysis.confidence * 100).toFixed(0)}%
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ) : isAnalyzing ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                          <span className="text-xs text-muted-foreground">Analyse en cours...</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">En attente d'analyse</span>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
                 <ConversationMetrics conversation={conversation} analysis={analysis} />
               </motion.div>
 
@@ -181,30 +336,54 @@ export function ConversationDetailModal({
             </TabsContent>
 
             <TabsContent value="transcript" className="space-y-4">
-              {conversation.user_messages && conversation.user_messages.length > 0 ? (
-                <div className="space-y-3">
-                  {conversation.user_messages.map((message: any, index: number) => {
-                    const isAgent = index % 2 === 1;
-                    return (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, x: isAgent ? 20 : -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.05 }}
-                        className={`p-4 rounded-lg glass-card ${
-                          isAgent ? 'ml-8' : 'mr-8'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="outline">
-                            {isAgent ? '🤖 Agent' : '👤 Client'}
-                          </Badge>
-                        </div>
-                        <p className="text-sm">{message}</p>
-                      </motion.div>
-                    );
-                  })}
-                </div>
+              {transcriptMessages.length > 0 ? (
+                <ScrollArea className="h-[500px] pr-4">
+                  <div className="space-y-3">
+                    {transcriptMessages.map((msg, index) => {
+                      const isAgent = msg.role === 'agent';
+                      return (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, x: isAgent ? -20 : 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.3, delay: index * 0.03 }}
+                          className={`flex ${isAgent ? 'justify-start' : 'justify-end'}`}
+                        >
+                          <div className={`max-w-[80%] ${isAgent ? 'mr-auto' : 'ml-auto'}`}>
+                            <div className={`flex items-center gap-2 mb-1 ${isAgent ? '' : 'flex-row-reverse'}`}>
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                                isAgent ? 'bg-primary/20' : 'bg-secondary/20'
+                              }`}>
+                                {isAgent ? (
+                                  <Bot className="w-3 h-3 text-primary" />
+                                ) : (
+                                  <User className="w-3 h-3 text-secondary" />
+                                )}
+                              </div>
+                              <span className={`text-xs font-medium ${
+                                isAgent ? 'text-primary' : 'text-secondary'
+                              }`}>
+                                {isAgent ? 'Agent IA' : clientName}
+                              </span>
+                              {msg.time_in_call_secs !== undefined && (
+                                <span className="text-xs text-muted-foreground">
+                                  {Math.floor(msg.time_in_call_secs / 60)}:{String(Math.floor(msg.time_in_call_secs % 60)).padStart(2, '0')}
+                                </span>
+                              )}
+                            </div>
+                            <div className={`p-3 rounded-lg ${
+                              isAgent 
+                                ? 'bg-primary/10 border border-primary/20 rounded-tl-none' 
+                                : 'bg-secondary/10 border border-secondary/20 rounded-tr-none'
+                            }`}>
+                              <p className="text-sm">{msg.message}</p>
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
               ) : (
                 <Card className="p-8 text-center glass-card">
                   <p className="text-muted-foreground">Aucune transcription disponible</p>
@@ -266,8 +445,7 @@ export function ConversationDetailModal({
                           <span className="text-3xl">{getSentimentEmoji(analysis.sentiment)}</span>
                           <div>
                             <p className={`font-medium text-lg ${getSentimentColor(analysis.sentiment)}`}>
-                              {analysis.sentiment === 'positive' ? 'Positif' : 
-                               analysis.sentiment === 'negative' ? 'Négatif' : 'Neutre'}
+                              {getSentimentLabel(analysis.sentiment)}
                             </p>
                             <p className="text-sm text-muted-foreground">
                               Confiance: {(analysis.confidence * 100).toFixed(0)}%
