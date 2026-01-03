@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Shield, Save, Eye, BarChart3, BookOpen, Download, Bot } from 'lucide-react';
 import { ClientDetail } from '@/hooks/useClientDetail';
+import { ClientPasswordReset } from './ClientPasswordReset';
 
 interface AccessControl {
   key: string;
@@ -50,9 +51,10 @@ interface ClientAccessTabProps {
   client: ClientDetail;
   onUpdate: (updates: Partial<ClientDetail>) => void;
   isUpdating: boolean;
+  hasPassword?: boolean;
 }
 
-export const ClientAccessTab = ({ client, onUpdate, isUpdating }: ClientAccessTabProps) => {
+export const ClientAccessTab = ({ client, onUpdate, isUpdating, hasPassword = false }: ClientAccessTabProps) => {
   const [controls, setControls] = useState<Record<string, boolean>>({
     can_view_conversations: true,
     can_view_analytics: true,
@@ -85,6 +87,13 @@ export const ClientAccessTab = ({ client, onUpdate, isUpdating }: ClientAccessTa
 
   return (
     <div className="space-y-6">
+      {/* Password Management Section */}
+      <ClientPasswordReset 
+        clientId={client.id} 
+        clientEmail={client.email}
+        hasPassword={hasPassword}
+      />
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

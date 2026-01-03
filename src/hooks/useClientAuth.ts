@@ -31,29 +31,26 @@ export const useClientAuth = () => {
   const login = useCallback(async (loginId: string, password: string) => {
     setIsLoading(true);
     try {
-      // Find client by login_id
-      const { data: client, error } = await supabase
-        .from('clients')
-        .select('id, name, organization_id, theme, language, login_id')
-        .eq('login_id', loginId)
-        .eq('status', 'active')
-        .maybeSingle();
+      // Call edge function for secure password verification
+      const { data, error } = await supabase.functions.invoke('client-auth', {
+        body: { 
+          action: 'login', 
+          login_id: loginId,
+          password
+        }
+      });
 
       if (error) throw error;
-      if (!client) {
-        throw new Error('Identifiants invalides');
+      
+      if (data?.error) {
+        throw new Error(data.error);
       }
 
-      // For demo purposes - in production, implement proper password verification
-      // The password should be stored hashed in a separate table or field
-      
-      const clientSession: ClientSession = {
-        clientId: client.id,
-        clientName: client.name,
-        organizationId: client.organization_id,
-        theme: client.theme || 'light',
-        language: client.language || 'fr',
-      };
+      if (!data?.session) {
+        throw new Error('Erreur de connexion');
+      }
+
+      const clientSession: ClientSession = data.session;
 
       localStorage.setItem(CLIENT_SESSION_KEY, JSON.stringify(clientSession));
       setSession(clientSession);

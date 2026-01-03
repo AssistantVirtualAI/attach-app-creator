@@ -898,6 +898,9 @@ export type Database = {
           login_id: string | null
           name: string
           organization_id: string
+          password_hash: string | null
+          password_reset_expires_at: string | null
+          password_reset_token: string | null
           status: string | null
           theme: string | null
           updated_at: string
@@ -917,6 +920,9 @@ export type Database = {
           login_id?: string | null
           name: string
           organization_id: string
+          password_hash?: string | null
+          password_reset_expires_at?: string | null
+          password_reset_token?: string | null
           status?: string | null
           theme?: string | null
           updated_at?: string
@@ -936,6 +942,9 @@ export type Database = {
           login_id?: string | null
           name?: string
           organization_id?: string
+          password_hash?: string | null
+          password_reset_expires_at?: string | null
+          password_reset_token?: string | null
           status?: string | null
           theme?: string | null
           updated_at?: string

@@ -32,6 +32,8 @@ import Team from "./pages/Team";
 import ApiKeys from "./pages/ApiKeys";
 import ClientDetail from "./pages/ClientDetail";
 import ClientLogin from "./pages/ClientLogin";
+import ClientForgotPassword from "./pages/ClientForgotPassword";
+import ClientResetPassword from "./pages/ClientResetPassword";
 import ClientPortal from "./pages/ClientPortal";
 import ClientAgentPortal from "./pages/ClientAgentPortal";
 import ClientConversations from "./pages/ClientConversations";
@@ -378,6 +380,22 @@ const App = () => (
                   element={
                     <ClientProvider>
                       <ClientLogin />
+                    </ClientProvider>
+                  }
+                />
+                <Route
+                  path="/client/forgot-password"
+                  element={
+                    <ClientProvider>
+                      <ClientForgotPassword />
+                    </ClientProvider>
+                  }
+                />
+                <Route
+                  path="/client/reset-password/:token"
+                  element={
+                    <ClientProvider>
+                      <ClientResetPassword />
                     </ClientProvider>
                   }
                 />

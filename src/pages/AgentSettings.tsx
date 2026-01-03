@@ -3,7 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Bot, Key, Palette, BarChart3, Play, Code, Brain, Activity } from 'lucide-react';
+import { ArrowLeft, Bot, Key, Palette, BarChart3, Play, Code, Brain, Activity, Users } from 'lucide-react';
 import { useAgentSettings } from '@/hooks/useAgentSettings';
 import { AgentOverviewTab } from '@/components/agents/AgentOverviewTab';
 import { AgentCredentialsTab } from '@/components/agents/AgentCredentialsTab';
@@ -13,6 +13,8 @@ import { AgentPrototypeTab } from '@/components/agents/AgentPrototypeTab';
 import { AgentEmbedTab } from '@/components/agents/AgentEmbedTab';
 import { AgentAnalyticsWidget } from '@/components/agents/AgentAnalyticsWidget';
 import { AgentKnowledgePromptTab } from '@/components/agents/AgentKnowledgePromptTab';
+import { AgentClientsTab } from '@/components/agents/AgentClientsTab';
+import { AgentRealtimeAnalytics } from '@/components/agents/AgentRealtimeAnalytics';
 
 const AgentSettingsPage = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -72,7 +74,7 @@ const AgentSettingsPage = () => {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-9">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Bot className="h-4 w-4" />
               <span className="hidden sm:inline">Aperçu</span>
@@ -83,7 +85,7 @@ const AgentSettingsPage = () => {
             </TabsTrigger>
             <TabsTrigger value="knowledge" className="flex items-center gap-2">
               <Brain className="h-4 w-4" />
-              <span className="hidden sm:inline">KB & Prompt</span>
+              <span className="hidden sm:inline">KB</span>
             </TabsTrigger>
             <TabsTrigger value="widget" className="flex items-center gap-2">
               <Palette className="h-4 w-4" />
@@ -93,13 +95,17 @@ const AgentSettingsPage = () => {
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Analytics</span>
             </TabsTrigger>
+            <TabsTrigger value="clients" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Clients</span>
+            </TabsTrigger>
             <TabsTrigger value="health" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               <span className="hidden sm:inline">Health</span>
             </TabsTrigger>
             <TabsTrigger value="prototype" className="flex items-center gap-2">
               <Play className="h-4 w-4" />
-              <span className="hidden sm:inline">Prototype</span>
+              <span className="hidden sm:inline">Test</span>
             </TabsTrigger>
             <TabsTrigger value="embed" className="flex items-center gap-2">
               <Code className="h-4 w-4" />
@@ -140,10 +146,24 @@ const AgentSettingsPage = () => {
           </TabsContent>
 
           <TabsContent value="analytics">
-            <AgentAnalyticsTab
-              conversations={conversations || []}
-              analytics={analytics}
-              isLoadingAnalytics={isLoadingAnalytics}
+            <div className="space-y-6">
+              <AgentRealtimeAnalytics 
+                agentId={agentId!}
+                platformAgentId={(agent.config as Record<string, any>)?.agent_id || agent.platform_agent_id}
+                apiKey={agent.platform_api_key}
+              />
+              <AgentAnalyticsTab
+                conversations={conversations || []}
+                analytics={analytics}
+                isLoadingAnalytics={isLoadingAnalytics}
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="clients">
+            <AgentClientsTab 
+              agentId={agentId!} 
+              organizationId={agent.organization_id}
             />
           </TabsContent>
 

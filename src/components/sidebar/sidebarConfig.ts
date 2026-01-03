@@ -52,6 +52,7 @@ export const sidebarGroups: NavGroup[] = [
       { name: 'Comparaison', href: '/agent-comparison', icon: BarChart3 },
       { name: 'Rapports Agents', href: '/agent-reports', icon: FileQuestion },
       { name: 'Base de connaissances', href: '/knowledge-base', icon: BookOpen },
+      { name: 'Clientèle', href: '/clients', icon: Users },
     ]
   },
   {
@@ -60,7 +61,6 @@ export const sidebarGroups: NavGroup[] = [
     icon: Users,
     adminOnly: true,
     items: [
-      { name: 'Clientèle', href: '/clients', icon: Users },
       { name: 'Leads', href: '/leads', icon: UserPlus },
       { name: 'Rendez-vous', href: '/appointments', icon: Calendar },
     ]

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,7 +60,15 @@ const ClientLogin = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Mot de passe</Label>
+                <Link 
+                  to="/client/forgot-password" 
+                  className="text-sm text-primary hover:underline"
+                >
+                  Mot de passe oublié ?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"
