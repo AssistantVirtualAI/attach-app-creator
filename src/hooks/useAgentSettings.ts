@@ -116,12 +116,18 @@ export const useAgentSettings = (agentId: string | undefined) => {
 
   const testConnectionMutation = useMutation({
     mutationFn: async () => {
-      if (!agent?.platform_api_key) throw new Error('Aucune clé API configurée');
+      // Use API key from integration, fallback to platform_api_key
+      const apiKey = integration?.api_key || agent?.platform_api_key;
+      if (!apiKey) throw new Error('Aucune clé API configurée');
       
-      // Simulate API test - in production, call the actual platform API
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Call the test-integration edge function
+      const { data, error } = await supabase.functions.invoke('test-integration', {
+        body: { platform: agent?.platform }
+      });
       
-      // For demo, always succeed if API key exists
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Test échoué');
+      
       return { success: true };
     },
     onSuccess: () => {
