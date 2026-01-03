@@ -116,7 +116,12 @@ export const useConversationAudio = (conversationId: string | null, format: stri
         }
       });
 
+      // If audio isn't available yet, don't crash the UI
       if (error) {
+        const msg = (error as any)?.message || String(error);
+        if (msg.includes('404') || msg.toLowerCase().includes('audio not found')) {
+          return { audio_url: null, audio_base64: null, notFound: true };
+        }
         console.error('Error fetching conversation audio:', error);
         throw error;
       }

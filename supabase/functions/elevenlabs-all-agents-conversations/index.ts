@@ -194,10 +194,10 @@ serve(async (req) => {
         }
       }
       
-      return new Response(
-        JSON.stringify({ error: 'Conversation not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+       return new Response(
+         JSON.stringify({ notFound: true, error: 'Conversation not found' }),
+         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+       );
     }
 
     if (action === 'audio' && conversationId) {
@@ -232,8 +232,14 @@ serve(async (req) => {
       }
       
       return new Response(
-        JSON.stringify({ error: 'Audio not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          audio_base64: null,
+          audio_url: null,
+          format,
+          notFound: true,
+          error: 'Audio not found'
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
