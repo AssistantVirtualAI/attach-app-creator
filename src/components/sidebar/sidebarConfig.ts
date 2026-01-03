@@ -49,6 +49,7 @@ export const sidebarGroups: NavGroup[] = [
     items: [
       { name: 'Agents', href: '/agents', icon: Bot },
       { name: 'Agent Builder', href: '/agent-builder', icon: Sparkles },
+      { name: 'Comparaison', href: '/agent-comparison', icon: BarChart3 },
       { name: 'Rapports Agents', href: '/agent-reports', icon: FileQuestion },
       { name: 'Base de connaissances', href: '/knowledge-base', icon: BookOpen },
     ]

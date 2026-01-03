@@ -52,6 +52,7 @@ import Campaigns from "./pages/Campaigns";
 import Appointments from "./pages/Appointments";
 import AgentReports from "./pages/AgentReports";
 import AgentBuilder from "./pages/AgentBuilder";
+import AgentComparison from "./pages/AgentComparison";
 import Leads from "./pages/Leads";
 import PhoneNumbers from "./pages/PhoneNumbers";
 import Handoffs from "./pages/Handoffs";
@@ -300,6 +301,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <AgentBuilder />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/agent-comparison"
+                  element={
+                    <ProtectedRoute>
+                      <AgentComparison />
                     </ProtectedRoute>
                   }
                 />
