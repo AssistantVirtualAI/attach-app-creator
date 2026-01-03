@@ -109,8 +109,16 @@ serve(async (req) => {
     }
 
     switch (action) {
-      case 'get': {
+      case 'get':
+      case 'list': {
         console.log(`[elevenlabs-kb] Fetching knowledge base for agent ${targetAgentId}`);
+        
+        if (!targetAgentId) {
+          return new Response(
+            JSON.stringify({ error: 'Agent ID required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
         
         // Get agent config which includes knowledge base
         const configResponse = await fetch(
@@ -134,10 +142,22 @@ serve(async (req) => {
         // Extract knowledge base from agent config
         const knowledgeBase = configData.knowledge_base || [];
         
+        // Transform to consistent format
+        const items = knowledgeBase.map((item: any, index: number) => ({
+          id: item.id || item.document_id || `kb-${index}`,
+          name: item.name || item.title || `Document ${index + 1}`,
+          type: item.type || 'text',
+          content: item.content || item.text || '',
+          url: item.url || null,
+          file_name: item.file_name || null,
+          file_size: item.file_size || null,
+          metadata: item.metadata || {}
+        }));
+        
         return new Response(
           JSON.stringify({ 
             knowledge_base: { 
-              items: knowledgeBase,
+              items,
               agent_name: configData.name
             } 
           }),
@@ -148,6 +168,13 @@ serve(async (req) => {
       case 'add': {
         console.log(`[elevenlabs-kb] Adding document to agent ${targetAgentId}`);
         
+        if (!targetAgentId) {
+          return new Response(
+            JSON.stringify({ error: 'Agent ID required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
         if (!title || !content) {
           return new Response(
             JSON.stringify({ error: 'Title and content are required' }),
@@ -155,115 +182,123 @@ serve(async (req) => {
           );
         }
         
-        // Create a text document in ElevenLabs knowledge base
-        const formData = new FormData();
-        const blob = new Blob([content], { type: 'text/plain' });
-        formData.append('file', blob, `${title}.txt`);
-        formData.append('name', title);
-        
-        const createDocResponse = await fetch(
-          'https://api.elevenlabs.io/v1/convai/knowledge-base/documents',
+        // Get current agent config
+        const agentResponse = await fetch(
+          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
           {
-            method: 'POST',
-            headers: {
-              'xi-api-key': apiKey,
-            },
-            body: formData,
+            headers: { 'xi-api-key': apiKey },
           }
         );
-
-        let docData = null;
         
-        if (!createDocResponse.ok) {
-          const errorText = await createDocResponse.text();
-          console.error('[elevenlabs-kb] Error creating document:', createDocResponse.status, errorText);
-          
-          // Try alternative: add as text directly via agent update
-          // Get current agent config
-          const agentResponse = await fetch(
-            `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-            {
-              headers: { 'xi-api-key': apiKey },
-            }
-          );
-          
-          if (agentResponse.ok) {
-            const agentData = await agentResponse.json();
-            const currentKB = agentData.knowledge_base || [];
-            
-            // Add new text item to knowledge base
-            const updateResponse = await fetch(
-              `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-              {
-                method: 'PATCH',
-                headers: {
-                  'xi-api-key': apiKey,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  knowledge_base: [...currentKB, { 
-                    type: 'text',
-                    name: title,
-                    content: content,
-                    metadata: { category: category || 'Général' }
-                  }]
-                }),
-              }
-            );
-            
-            if (updateResponse.ok) {
-              docData = { success: true, method: 'direct_update' };
-              console.log('[elevenlabs-kb] Added content via direct agent update');
-            } else {
-              const updateError = await updateResponse.text();
-              console.error('[elevenlabs-kb] Failed to update agent:', updateError);
-              throw new Error(`Failed to add document: ${updateError}`);
-            }
-          }
-        } else {
-          docData = await createDocResponse.json();
-          console.log('[elevenlabs-kb] Document created:', docData);
-
-          // Link document to the agent if we got a document_id
-          if (docData?.document_id) {
-            const agentResponse = await fetch(
-              `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-              {
-                headers: { 'xi-api-key': apiKey },
-              }
-            );
-            
-            if (agentResponse.ok) {
-              const agentData = await agentResponse.json();
-              const currentKB = agentData.knowledge_base || [];
-              
-              const updateResponse = await fetch(
-                `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-                {
-                  method: 'PATCH',
-                  headers: {
-                    'xi-api-key': apiKey,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    knowledge_base: [...currentKB, { 
-                      type: 'document',
-                      id: docData.document_id,
-                      name: title
-                    }]
-                  }),
-                }
-              );
-              
-              if (!updateResponse.ok) {
-                console.error('[elevenlabs-kb] Failed to link document to agent');
-              }
-            }
-          }
+        if (!agentResponse.ok) {
+          const errorText = await agentResponse.text();
+          console.error('[elevenlabs-kb] Failed to fetch agent:', errorText);
+          throw new Error('Failed to fetch agent config');
         }
         
+        const agentData = await agentResponse.json();
+        const currentKB = agentData.knowledge_base || [];
+        
+        // Add new text item to knowledge base
+        const newItem = { 
+          type: 'text',
+          name: title,
+          content: content,
+          id: `kb-${Date.now()}`,
+          metadata: { category: category || 'Général', created_at: new Date().toISOString() }
+        };
+        
+        const updateResponse = await fetch(
+          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'xi-api-key': apiKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              knowledge_base: [...currentKB, newItem]
+            }),
+          }
+        );
+        
+        if (!updateResponse.ok) {
+          const updateError = await updateResponse.text();
+          console.error('[elevenlabs-kb] Failed to update agent:', updateError);
+          throw new Error(`Failed to add document: ${updateError}`);
+        }
+        
+        console.log('[elevenlabs-kb] Added content via direct agent update');
+        
         return new Response(
-          JSON.stringify({ success: true, data: docData }),
+          JSON.stringify({ success: true, item: newItem }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'delete': {
+        const { itemId, itemName } = await req.json().catch(() => ({}));
+        console.log(`[elevenlabs-kb] Deleting item from agent ${targetAgentId}: ${itemId || itemName}`);
+        
+        if (!targetAgentId) {
+          return new Response(
+            JSON.stringify({ error: 'Agent ID required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // Get current agent config
+        const agentResponse = await fetch(
+          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
+          {
+            headers: { 'xi-api-key': apiKey },
+          }
+        );
+        
+        if (!agentResponse.ok) {
+          throw new Error('Failed to fetch agent config');
+        }
+        
+        const agentData = await agentResponse.json();
+        const currentKB = agentData.knowledge_base || [];
+        
+        // Filter out the item to delete
+        const updatedKB = currentKB.filter((item: any) => {
+          if (itemId && (item.id === itemId || item.document_id === itemId)) return false;
+          if (itemName && item.name === itemName) return false;
+          return true;
+        });
+        
+        if (updatedKB.length === currentKB.length) {
+          return new Response(
+            JSON.stringify({ error: 'Item not found' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const updateResponse = await fetch(
+          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'xi-api-key': apiKey,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              knowledge_base: updatedKB
+            }),
+          }
+        );
+        
+        if (!updateResponse.ok) {
+          const updateError = await updateResponse.text();
+          throw new Error(`Failed to delete item: ${updateError}`);
+        }
+        
+        console.log('[elevenlabs-kb] Successfully deleted item');
+        
+        return new Response(
+          JSON.stringify({ success: true }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -294,10 +329,11 @@ serve(async (req) => {
         const currentKB = agentData.knowledge_base || [];
         
         // Add all items as text entries
-        const newItems = items.map(item => ({
+        const newItems = items.map((item: any) => ({
           type: 'text',
           name: item.title,
           content: item.content,
+          id: `kb-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           metadata: { category: item.category || 'Général' }
         }));
         
@@ -327,7 +363,10 @@ serve(async (req) => {
       }
 
       default:
-        throw new Error('Action non supportée');
+        return new Response(
+          JSON.stringify({ error: 'Action non supportée' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
     }
 
   } catch (error) {
