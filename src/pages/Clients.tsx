@@ -43,6 +43,7 @@ import { ClientFilters, StatusFilter, SortField, SortOrder } from '@/components/
 import { ClientMembersModal } from '@/components/clients/ClientMembersModal';
 import { ClientLimitBanner, useClientLimit } from '@/components/billing/ClientLimitBanner';
 import { ClientsDashboard } from '@/components/clients/ClientsDashboard';
+import { ClientsExport } from '@/components/clients/ClientsExport';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useToast } from '@/hooks/use-toast';
@@ -285,13 +286,16 @@ export default function Clients() {
             </p>
           </div>
 
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2" disabled={!canCreateClient}>
-                <Plus className="h-4 w-4" />
-                {canCreateClient ? 'Nouvelle clientèle' : 'Limite atteinte'}
-              </Button>
-            </DialogTrigger>
+          <div className="flex items-center gap-2">
+            <ClientsExport clients={clients || []} />
+            
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2" disabled={!canCreateClient}>
+                  <Plus className="h-4 w-4" />
+                  {canCreateClient ? 'Nouvelle clientèle' : 'Limite atteinte'}
+                </Button>
+              </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
                 <DialogTitle>Créer un nouveau client</DialogTitle>
@@ -419,6 +423,7 @@ export default function Clients() {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <div className="glass-card p-6 space-y-6">
