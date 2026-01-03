@@ -34,11 +34,12 @@ const KnowledgeBase = () => {
   const agents = agentsData?.agents || [];
   const fallbackApiKey = agentsData?.fallbackApiKey;
 
-  // Get the selected agent's API key
-  const selectedAgent = agents.find(a => a.platform_agent_id === selectedAgentId);
+  // Get the selected agent (using internal UUID)
+  const selectedAgent = agents.find(a => a.id === selectedAgentId);
   const apiKey = selectedAgent?.platform_api_key || (selectedAgent?.config as any)?.api_key || fallbackApiKey;
+  const platformAgentId = selectedAgent?.platform_agent_id;
 
-  // Fetch knowledge base for selected agent
+  // Fetch knowledge base for selected agent - pass internal UUID, function will look up platform_agent_id
   const { 
     data: kbData, 
     isLoading: isLoadingKB, 
@@ -96,9 +97,9 @@ const KnowledgeBase = () => {
     }
   };
 
-  // Auto-select first agent if none selected
+  // Auto-select first agent if none selected (use internal ID, not platform_agent_id)
   if (!selectedAgentId && agents.length > 0 && !isLoadingAgents) {
-    setSelectedAgentId(agents[0].platform_agent_id);
+    setSelectedAgentId(agents[0].id);
   }
 
   const getItemIcon = (type: string) => {
@@ -137,7 +138,7 @@ const KnowledgeBase = () => {
                   </SelectTrigger>
                   <SelectContent className="bg-background border-border">
                     {agents.map(agent => (
-                      <SelectItem key={agent.platform_agent_id} value={agent.platform_agent_id}>
+                      <SelectItem key={agent.id} value={agent.id}>
                         <div className="flex items-center gap-2">
                           <Bot className="w-4 h-4 text-primary" />
                           <span>{agent.name}</span>
