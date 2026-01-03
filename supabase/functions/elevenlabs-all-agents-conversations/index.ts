@@ -72,7 +72,7 @@ serve(async (req) => {
     // Get all ElevenLabs agents for the organization
     const { data: agents, error: agentsError } = await supabase
       .from('agents')
-      .select('id, name, platform_agent_id, platform_api_key, platform')
+      .select('id, name, platform_agent_id, platform_api_key, platform, config')
       .eq('organization_id', orgMember.organization_id)
       .eq('platform', 'elevenlabs');
 
@@ -81,30 +81,61 @@ serve(async (req) => {
       throw new Error('Error fetching agents');
     }
 
+    // Get all ElevenLabs integrations (by org_id OR user_id)
+    const { data: integrations } = await supabase
+      .from('organization_integrations')
+      .select('id, agent_id, api_key, additional_config')
+      .eq('platform', 'elevenlabs')
+      .eq('is_active', true)
+      .or(`organization_id.eq.${orgMember.organization_id},user_id.eq.${user.id}`);
+
+    // Build a map of integration_id -> api_key
+    const integrationApiKeys: Record<string, string> = {};
+    if (integrations) {
+      for (const integration of integrations) {
+        if (integration.api_key) {
+          integrationApiKeys[integration.id] = integration.api_key;
+        }
+      }
+    }
+
     // If no agents found, try organization_integrations as fallback
     let agentConfigs: Array<{ id: string; name: string; agentId: string; apiKey: string }> = [];
 
     if (agents && agents.length > 0) {
       // Use agents from the agents table
       for (const agent of agents) {
-        if (agent.platform_agent_id && agent.platform_api_key) {
+        // Get agent ID from platform_agent_id OR config.agent_id
+        const agentId = agent.platform_agent_id || (agent.config as any)?.agent_id;
+        
+        if (!agentId) {
+          console.log(`Agent ${agent.name} has no agent_id configured`);
+          continue;
+        }
+
+        // Get API key from platform_api_key OR via integration_id in config
+        let apiKey = agent.platform_api_key;
+        
+        if (!apiKey && (agent.config as any)?.integration_id) {
+          apiKey = integrationApiKeys[(agent.config as any).integration_id];
+          console.log(`Using API key from integration ${(agent.config as any).integration_id} for agent ${agent.name}`);
+        }
+
+        if (apiKey) {
           agentConfigs.push({
             id: agent.id,
             name: agent.name,
-            agentId: agent.platform_agent_id,
-            apiKey: agent.platform_api_key
+            agentId: agentId,
+            apiKey: apiKey
           });
+          console.log(`Added agent config for ${agent.name} with agentId ${agentId}`);
+        } else {
+          console.log(`Agent ${agent.name} has no API key available`);
         }
       }
     }
 
-    // Also check organization_integrations for any additional configs
-    const { data: integrations } = await supabase
-      .from('organization_integrations')
-      .select('id, agent_id, api_key, additional_config')
-      .eq('organization_id', orgMember.organization_id)
-      .eq('platform', 'elevenlabs')
-      .eq('is_active', true);
+    // Also add agents from integrations that have agent_id directly
 
     if (integrations) {
       for (const integration of integrations) {
