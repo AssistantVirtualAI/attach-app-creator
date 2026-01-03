@@ -3,20 +3,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export interface ElevenLabsKBItem {
-  id?: string;
+  id: string;
   name: string;
-  type: 'text' | 'file' | 'url' | 'document';
+  type: 'text' | 'file' | 'url' | 'folder';
   content?: string;
   url?: string;
   file_name?: string;
   file_size?: number;
+  created_at?: string;
+  updated_at?: string;
+  dependent_agents?: Array<{ id: string; name: string }>;
   metadata?: Record<string, any>;
 }
 
 export interface ElevenLabsKBResponse {
   knowledge_base: {
     items: ElevenLabsKBItem[];
-    agent_name?: string;
+    total: number;
+    all_documents_count: number;
   };
   requiresSetup?: boolean;
   message?: string;
@@ -31,9 +35,10 @@ export const useElevenLabsKnowledgeBase = (agentId: string | null, apiKey: strin
 
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
         body: { 
-          action: 'get',
+          action: 'list',
           agentId,
-          apiKey: apiKey || undefined
+          apiKey: apiKey || undefined,
+          pageSize: 100
         }
       });
 
@@ -47,7 +52,7 @@ export const useElevenLabsKnowledgeBase = (agentId: string | null, apiKey: strin
   });
 };
 
-// Add item to knowledge base
+// Add text document to knowledge base
 export const useAddKnowledgeBaseItem = () => {
   const queryClient = useQueryClient();
 
@@ -67,7 +72,7 @@ export const useAddKnowledgeBaseItem = () => {
     }) => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
         body: { 
-          action: 'add',
+          action: 'create_text',
           agentId,
           apiKey: apiKey || undefined,
           title,
@@ -90,6 +95,46 @@ export const useAddKnowledgeBaseItem = () => {
   });
 };
 
+// Add URL document to knowledge base
+export const useAddKnowledgeBaseUrl = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      agentId, 
+      apiKey, 
+      url,
+      title
+    }: { 
+      agentId: string; 
+      apiKey?: string; 
+      url: string;
+      title?: string;
+    }) => {
+      const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
+        body: { 
+          action: 'create_url',
+          agentId,
+          apiKey: apiKey || undefined,
+          url,
+          title
+        }
+      });
+
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || 'Échec de l\'ajout depuis l\'URL');
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['elevenlabs-knowledge-base', variables.agentId] });
+      toast.success('Document importé depuis l\'URL');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur lors de l\'import depuis l\'URL');
+    },
+  });
+};
+
 // Delete item from knowledge base
 export const useDeleteKnowledgeBaseItem = () => {
   const queryClient = useQueryClient();
@@ -98,21 +143,18 @@ export const useDeleteKnowledgeBaseItem = () => {
     mutationFn: async ({ 
       agentId, 
       apiKey, 
-      itemId,
-      itemName
+      documentId
     }: { 
       agentId: string; 
       apiKey?: string; 
-      itemId?: string;
-      itemName?: string;
+      documentId: string;
     }) => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
         body: { 
           action: 'delete',
           agentId,
           apiKey: apiKey || undefined,
-          itemId,
-          itemName
+          documentId
         }
       });
 
@@ -130,6 +172,43 @@ export const useDeleteKnowledgeBaseItem = () => {
   });
 };
 
+// Link document to agent
+export const useLinkDocumentToAgent = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      agentId, 
+      apiKey, 
+      documentId
+    }: { 
+      agentId: string; 
+      apiKey?: string; 
+      documentId: string;
+    }) => {
+      const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
+        body: { 
+          action: 'link_to_agent',
+          agentId,
+          apiKey: apiKey || undefined,
+          documentId
+        }
+      });
+
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || 'Échec de la liaison');
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['elevenlabs-knowledge-base', variables.agentId] });
+      toast.success('Document lié à l\'agent');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur lors de la liaison');
+    },
+  });
+};
+
 // Legacy hook for backwards compatibility
 export const useUpdateKnowledgeBase = () => {
   const queryClient = useQueryClient();
@@ -138,7 +217,7 @@ export const useUpdateKnowledgeBase = () => {
     mutationFn: async ({ title, content, category }: { title: string; content: string; category: string }) => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
         body: { 
-          action: 'add',
+          action: 'create_text',
           title,
           content,
           category
