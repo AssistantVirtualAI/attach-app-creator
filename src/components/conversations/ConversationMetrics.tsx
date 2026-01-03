@@ -41,26 +41,6 @@ export function ConversationMetrics({ conversation, analysis }: ConversationMetr
               {conversation.status}
             </Badge>
           </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Satisfaction:</span>
-            <div className="flex items-center gap-2">
-              <span>{(conversation.satisfaction_score || 0).toFixed(1)}/5</span>
-              <div className="flex">
-                {[1, 2, 3, 4, 5].map(star => (
-                  <span
-                    key={star}
-                    className={`text-sm ${
-                      star <= (conversation.satisfaction_score || 0)
-                        ? 'text-yellow-400'
-                        : 'text-gray-600'
-                    }`}
-                  >
-                    ⭐
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
