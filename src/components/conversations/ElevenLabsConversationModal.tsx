@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,7 @@ import { ImprovementsList } from './ImprovementCard';
 import { SmartTagsList } from './SmartTags';
 import { 
   Brain, Sparkles, TrendingUp, TrendingDown, Minus, Target, 
-  Lightbulb, Tag, Bot, User, Volume2 
+  Lightbulb, Tag, Bot, User, Volume2, AlertCircle, RefreshCw, Clock
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useConversationDetails, useConversationAudio } from '@/hooks/useAllAgentsConversations';
@@ -23,6 +23,154 @@ import {
   transcriptToAudioPlayerFormat,
   transcriptToText 
 } from '@/lib/transcript/normalizeElevenLabsTranscript';
+
+// Analysis content component with timeout handling
+function AnalysisContent({
+  analysis,
+  isAnalyzing,
+  analysisError,
+  transcriptMessages,
+  platformAgentId,
+  generateAnalysis,
+  transcriptToText
+}: {
+  analysis: any;
+  isAnalyzing: boolean;
+  analysisError: any;
+  transcriptMessages: any[];
+  platformAgentId?: string;
+  generateAnalysis: (params: any) => void;
+  transcriptToText: (msgs: any[]) => string;
+}) {
+  const [analysisStartTime, setAnalysisStartTime] = useState<number | null>(null);
+  const [showTimeout, setShowTimeout] = useState(false);
+
+  useEffect(() => {
+    if (isAnalyzing && !analysisStartTime) {
+      setAnalysisStartTime(Date.now());
+      setShowTimeout(false);
+    } else if (!isAnalyzing) {
+      setAnalysisStartTime(null);
+      setShowTimeout(false);
+    }
+  }, [isAnalyzing, analysisStartTime]);
+
+  useEffect(() => {
+    if (!analysisStartTime) return;
+    
+    const timeout = setTimeout(() => {
+      setShowTimeout(true);
+    }, 15000); // Show timeout message after 15s
+    
+    return () => clearTimeout(timeout);
+  }, [analysisStartTime]);
+
+  const handleRetry = useCallback(() => {
+    const transcriptText = transcriptToText(transcriptMessages);
+    generateAnalysis({ transcript: transcriptText, platformAgentId, forceRegenerate: true });
+  }, [transcriptMessages, platformAgentId, generateAnalysis, transcriptToText]);
+
+  // Error state
+  if (analysisError) {
+    const errorMessage = analysisError.message || String(analysisError);
+    const isAuthError = errorMessage.includes('401') || errorMessage.includes('Session') || errorMessage.includes('Unauthorized');
+    const isRateLimit = errorMessage.includes('429');
+    const isCredits = errorMessage.includes('402');
+
+    return (
+      <Card className="p-8 text-center glass-card border-destructive/50">
+        <AlertCircle className="w-12 h-12 mx-auto mb-4 text-destructive" />
+        <p className="text-destructive font-medium mb-2">
+          {isAuthError ? 'Session expirée' : 
+           isRateLimit ? 'Limite de requêtes atteinte' :
+           isCredits ? 'Crédits IA épuisés' : 
+           'Erreur lors de l\'analyse'}
+        </p>
+        <p className="text-muted-foreground text-sm mb-4">
+          {isAuthError ? 'Veuillez vous reconnecter pour continuer.' :
+           isRateLimit ? 'Veuillez patienter quelques minutes.' :
+           isCredits ? 'Contactez votre administrateur.' :
+           errorMessage}
+        </p>
+        {!isAuthError && !isCredits && (
+          <Button onClick={handleRetry} variant="outline" className="gap-2">
+            <RefreshCw className="w-4 h-4" />
+            Réessayer
+          </Button>
+        )}
+      </Card>
+    );
+  }
+
+  // Analyzing state with timeout
+  if (isAnalyzing) {
+    return (
+      <Card className="p-8 text-center glass-card">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+        <p className="text-muted-foreground">Analyse IA en cours...</p>
+        <p className="text-xs text-muted-foreground mt-2">
+          Génération du score de satisfaction et des recommandations
+        </p>
+        
+        {showTimeout && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-4 p-3 bg-warning/10 rounded-lg border border-warning/30"
+          >
+            <div className="flex items-center justify-center gap-2 text-warning mb-2">
+              <Clock className="w-4 h-4" />
+              <span className="text-sm font-medium">L'analyse prend plus de temps que prévu</span>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Cela peut arriver pour les longues conversations. Patientez ou réessayez.
+            </p>
+            <Button 
+              onClick={handleRetry} 
+              variant="outline" 
+              size="sm"
+              className="gap-2"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Relancer l'analyse
+            </Button>
+          </motion.div>
+        )}
+      </Card>
+    );
+  }
+
+  // No analysis state
+  if (!analysis) {
+    return (
+      <Card className="p-8 text-center glass-card">
+        <Brain className="w-12 h-12 mx-auto mb-4 text-primary" />
+        <p className="text-muted-foreground mb-4">
+          Générez une analyse IA complète de cette conversation
+        </p>
+        <Button 
+          onClick={() => {
+            const transcriptText = transcriptToText(transcriptMessages);
+            generateAnalysis({ transcript: transcriptText, platformAgentId });
+          }} 
+          className="gap-2"
+          disabled={transcriptMessages.length === 0}
+        >
+          <Sparkles className="w-4 h-4" />
+          Générer l'Analyse
+        </Button>
+        {transcriptMessages.length === 0 && (
+          <p className="text-xs text-muted-foreground mt-2">
+            Aucune transcription disponible
+          </p>
+        )}
+      </Card>
+    );
+  }
+
+  // Analysis available - return null to let parent render the full analysis
+  return null;
+}
 
 interface ElevenLabsConversationModalProps {
   isOpen: boolean;
@@ -369,35 +517,15 @@ export function ElevenLabsConversationModal({
               </TabsContent>
 
               <TabsContent value="analysis" className="space-y-4">
-                {isAnalyzing && (
-                  <Card className="p-8 text-center glass-card">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-                    <p className="text-muted-foreground">Analyse IA en cours...</p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Génération du score de satisfaction et des recommandations
-                    </p>
-                  </Card>
-                )}
-
-                {!analysis && !isAnalyzing && (
-                  <Card className="p-8 text-center glass-card">
-                    <Brain className="w-12 h-12 mx-auto mb-4 text-primary" />
-                    <p className="text-muted-foreground mb-4">
-                      Générez une analyse IA complète de cette conversation
-                    </p>
-                    <Button 
-                      onClick={() => {
-                        const transcriptText = transcriptToText(transcriptMessages);
-                        generateAnalysis({ transcript: transcriptText, platformAgentId });
-                      }} 
-                      className="gap-2"
-                      disabled={transcriptMessages.length === 0}
-                    >
-                      <Sparkles className="w-4 h-4" />
-                      Générer l'Analyse
-                    </Button>
-                  </Card>
-                )}
+                <AnalysisContent
+                  analysis={analysis}
+                  isAnalyzing={isAnalyzing}
+                  analysisError={analysisError}
+                  transcriptMessages={transcriptMessages}
+                  platformAgentId={platformAgentId}
+                  generateAnalysis={generateAnalysis}
+                  transcriptToText={transcriptToText}
+                />
 
                 {analysis && (
                   <motion.div

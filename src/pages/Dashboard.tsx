@@ -54,6 +54,10 @@ const Dashboard = () => {
     qualityScore: 0,
     weeklyGrowth: 0,
     totalDurationMinutes: 0,
+    aiInsightsAvailable: false,
+    analysisCoverageRate: 0,
+    topSmartTags: [],
+    topImprovements: [],
   };
 
   const handleSync = async () => {

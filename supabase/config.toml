@@ -128,3 +128,9 @@ verify_jwt = true
 
 [functions.client-auth]
 verify_jwt = false
+
+[functions.dashboard-insights]
+verify_jwt = true
+
+[functions.realtime-conversations]
+verify_jwt = true

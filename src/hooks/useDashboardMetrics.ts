@@ -39,6 +39,11 @@ export interface DashboardMetrics {
   qualityScore: number;
   weeklyGrowth: number;
   totalDurationMinutes: number;
+  // AI insights data
+  aiInsightsAvailable: boolean;
+  analysisCoverageRate: number;
+  topSmartTags: { tag: string; count: number }[];
+  topImprovements: { category: string; suggestion: string; count: number }[];
 }
 
 const defaultMetrics: DashboardMetrics = {
@@ -73,6 +78,10 @@ const defaultMetrics: DashboardMetrics = {
   qualityScore: 0,
   weeklyGrowth: 0,
   totalDurationMinutes: 0,
+  aiInsightsAvailable: false,
+  analysisCoverageRate: 0,
+  topSmartTags: [],
+  topImprovements: [],
 };
 
 export const useDashboardMetrics = () => {
@@ -85,10 +94,11 @@ export const useDashboardMetrics = () => {
         return defaultMetrics;
       }
 
-      // Fetch ElevenLabs analytics and conversations in parallel with local data
+      // Fetch ElevenLabs analytics, conversations, AI insights, and local data in parallel
       const [
         elevenLabsAnalytics,
         elevenLabsConversations,
+        dashboardInsights,
         clientsRes,
         agentsRes,
       ] = await Promise.all([
@@ -98,6 +108,7 @@ export const useDashboardMetrics = () => {
         supabase.functions.invoke('elevenlabs-all-agents-conversations', {
           body: { page: 1, limit: 100, action: 'list' }
         }).catch(() => ({ data: null, error: 'Failed' })),
+        supabase.functions.invoke('dashboard-insights', {}).catch(() => ({ data: null, error: 'Failed' })),
         supabase
           .from('clients')
           .select('*', { count: 'exact', head: true })
@@ -112,6 +123,7 @@ export const useDashboardMetrics = () => {
       const agents = agentsRes.data || [];
       const elevenLabsData = elevenLabsAnalytics.data;
       const conversationsData = elevenLabsConversations.data;
+      const aiInsights = dashboardInsights.data;
       
       let dataSource: 'elevenlabs' | 'local' | 'mixed' = 'local';
       let totalConversations = 0;
@@ -272,9 +284,21 @@ export const useDashboardMetrics = () => {
           ? Math.round((resolvedCount / conversations.length) * 100) 
           : 0;
 
-        const qualityScore = avgSatisfaction > 0 
-          ? Math.round((avgSatisfaction / 5) * 100) 
-          : 0;
+        // Use AI insights for quality score if available, otherwise calculate from avgSatisfaction
+        const qualityScore = aiInsights?.period7d?.avgSatisfaction 
+          ? Math.round((aiInsights.period7d.avgSatisfaction / 10) * 100)
+          : avgSatisfaction > 0 
+            ? Math.round((avgSatisfaction / 5) * 100) 
+            : 0;
+        
+        // Merge sentiment breakdown from AI insights if available
+        const finalSentimentBreakdown = aiInsights?.period7d?.sentimentBreakdown 
+          ? {
+              positive: aiInsights.period7d.sentimentBreakdown.positive,
+              neutral: aiInsights.period7d.sentimentBreakdown.neutral,
+              negative: aiInsights.period7d.sentimentBreakdown.negative,
+            }
+          : sentimentBreakdown;
 
         return {
           totalConversations,
@@ -300,14 +324,19 @@ export const useDashboardMetrics = () => {
           dataSource,
           weeklyData,
           agentPerformance,
-          // Enhanced metrics
+          // Enhanced metrics - prefer AI insights when available
           resolutionRate,
           resolvedConversations: resolvedCount,
-          sentimentBreakdown,
+          sentimentBreakdown: finalSentimentBreakdown,
           peakHours,
           qualityScore,
           weeklyGrowth: elevenLabsData?.trends?.conversationsTrend || 0,
           totalDurationMinutes: Math.round(totalDuration / 60),
+          // Additional AI insights data
+          aiInsightsAvailable: !!aiInsights,
+          analysisCoverageRate: aiInsights?.coverageRate || 0,
+          topSmartTags: aiInsights?.topTags || [],
+          topImprovements: aiInsights?.topImprovements || [],
         };
       }
 
