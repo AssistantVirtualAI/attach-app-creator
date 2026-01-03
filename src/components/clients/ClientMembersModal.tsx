@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, UserPlus } from "lucide-react";
+import { Plus, Trash2, UserPlus, AlertTriangle, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ClientAvatar } from "./ClientAvatar";
 import { toast } from "sonner";
 
@@ -36,16 +47,25 @@ interface ClientMembersModalProps {
   onOpenChange: (open: boolean) => void;
   clientId: string;
   clientName: string;
+  /** Whether the current user is a client admin (can add members up to limit) */
+  isClientAdmin?: boolean;
+  /** Whether to enforce the 2 member limit (true for client portal, false for agency admin) */
+  enforceMemberLimit?: boolean;
 }
+
+const CLIENT_MEMBER_LIMIT = 2;
 
 export const ClientMembersModal = ({
   open,
   onOpenChange,
   clientId,
   clientName,
+  isClientAdmin = false,
+  enforceMemberLimit = false,
 }: ClientMembersModalProps) => {
   const queryClient = useQueryClient();
   const [newMember, setNewMember] = useState({ email: "", name: "", role: "member" });
+  const [showRequestDialog, setShowRequestDialog] = useState(false);
 
   const { data: members, isLoading } = useQuery({
     queryKey: ["client-members", clientId],
@@ -62,8 +82,17 @@ export const ClientMembersModal = ({
     enabled: open && !!clientId,
   });
 
+  const currentMemberCount = members?.length || 0;
+  const isAtLimit = enforceMemberLimit && currentMemberCount >= CLIENT_MEMBER_LIMIT;
+  const canAddMember = !enforceMemberLimit || (isClientAdmin && currentMemberCount < CLIENT_MEMBER_LIMIT);
+
   const addMemberMutation = useMutation({
     mutationFn: async (member: { email: string; name: string; role: string }) => {
+      // Check limit before adding (only for client portal)
+      if (enforceMemberLimit && currentMemberCount >= CLIENT_MEMBER_LIMIT) {
+        throw new Error("Limite de membres atteinte. Veuillez contacter l'administrateur pour ajouter plus de membres.");
+      }
+
       const { error } = await supabase.from("client_members").insert({
         client_id: clientId,
         email: member.email,
@@ -104,132 +133,195 @@ export const ClientMembersModal = ({
       toast.error("Email et nom requis");
       return;
     }
+
+    // If at limit, show request dialog instead
+    if (isAtLimit && enforceMemberLimit) {
+      setShowRequestDialog(true);
+      return;
+    }
+
     addMemberMutation.mutate(newMember);
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <UserPlus className="w-5 h-5" />
-            Membres de {clientName}
-          </DialogTitle>
-          <DialogDescription>
-            Gérez les membres qui ont accès à ce compte client
-          </DialogDescription>
-        </DialogHeader>
+  const handleRequestMoreMembers = () => {
+    // This could send a notification to super admin - for now just show a toast
+    toast.info("Demande envoyée à l'administrateur pour augmenter la limite de membres.");
+    setShowRequestDialog(false);
+  };
 
-        {/* Add new member form */}
-        <div className="border rounded-lg p-4 bg-muted/30 space-y-4">
-          <h4 className="font-medium text-sm">Ajouter un membre</h4>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label htmlFor="memberName" className="text-xs">Nom</Label>
-              <Input
-                id="memberName"
-                placeholder="Jean Dupont"
-                value={newMember.name}
-                onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
-              />
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5" />
+              Membres de {clientName}
+            </DialogTitle>
+            <DialogDescription>
+              Gérez les membres qui ont accès à ce compte client
+              {enforceMemberLimit && (
+                <span className="ml-2 text-xs">
+                  ({currentMemberCount}/{CLIENT_MEMBER_LIMIT} membres)
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Limit warning for client portal */}
+          {enforceMemberLimit && isAtLimit && (
+            <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <AlertDescription className="text-amber-600 dark:text-amber-400">
+                Vous avez atteint la limite de {CLIENT_MEMBER_LIMIT} membres. 
+                Contactez l'administrateur pour ajouter plus de membres.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Add new member form */}
+          <div className="border rounded-lg p-4 bg-muted/30 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium text-sm">Ajouter un membre</h4>
+              {isClientAdmin && enforceMemberLimit && (
+                <Badge variant="outline" className="gap-1">
+                  <Shield className="w-3 h-3" />
+                  Admin Client
+                </Badge>
+              )}
             </div>
-            <div>
-              <Label htmlFor="memberEmail" className="text-xs">Email</Label>
-              <Input
-                id="memberEmail"
-                type="email"
-                placeholder="jean@example.com"
-                value={newMember.email}
-                onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
-              />
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label htmlFor="memberName" className="text-xs">Nom</Label>
+                <Input
+                  id="memberName"
+                  placeholder="Jean Dupont"
+                  value={newMember.name}
+                  onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+                  disabled={isAtLimit && !isClientAdmin}
+                />
+              </div>
+              <div>
+                <Label htmlFor="memberEmail" className="text-xs">Email</Label>
+                <Input
+                  id="memberEmail"
+                  type="email"
+                  placeholder="jean@example.com"
+                  value={newMember.email}
+                  onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+                  disabled={isAtLimit && !isClientAdmin}
+                />
+              </div>
+              <div>
+                <Label htmlFor="memberRole" className="text-xs">Rôle</Label>
+                <Select
+                  value={newMember.role}
+                  onValueChange={(value) => setNewMember({ ...newMember, role: value })}
+                  disabled={isAtLimit && !isClientAdmin}
+                >
+                  <SelectTrigger id="memberRole">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="member">Membre</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div>
-              <Label htmlFor="memberRole" className="text-xs">Rôle</Label>
-              <Select
-                value={newMember.role}
-                onValueChange={(value) => setNewMember({ ...newMember, role: value })}
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={handleAddMember}
+                disabled={addMemberMutation.isPending || (!canAddMember && enforceMemberLimit)}
+                className="gap-2"
               >
-                <SelectTrigger id="memberRole">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="member">Membre</SelectItem>
-                </SelectContent>
-              </Select>
+                <Plus className="w-4 h-4" />
+                {isAtLimit && enforceMemberLimit ? "Demander autorisation" : "Ajouter"}
+              </Button>
             </div>
           </div>
-          <Button
-            size="sm"
-            onClick={handleAddMember}
-            disabled={addMemberMutation.isPending}
-            className="gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Ajouter
-          </Button>
-        </div>
 
-        {/* Members list */}
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Membre</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Rôle</TableHead>
-                <TableHead>Ajouté le</TableHead>
-                <TableHead className="w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
+          {/* Members list */}
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    Chargement...
-                  </TableCell>
+                  <TableHead>Membre</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Rôle</TableHead>
+                  <TableHead>Ajouté le</TableHead>
+                  <TableHead className="w-12"></TableHead>
                 </TableRow>
-              ) : members?.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    Aucun membre pour l'instant
-                  </TableCell>
-                </TableRow>
-              ) : (
-                members?.map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <ClientAvatar name={member.name || member.email} size="sm" />
-                        <span className="font-medium">{member.name || "-"}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{member.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={member.role === "admin" ? "default" : "secondary"}>
-                        {member.role === "admin" ? "Admin" : "Membre"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {new Date(member.created_at).toLocaleDateString("fr-FR")}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeMemberMutation.mutate(member.id)}
-                        disabled={removeMemberMutation.isPending}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      Chargement...
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </DialogContent>
-    </Dialog>
+                ) : members?.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      Aucun membre pour l'instant
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  members?.map((member) => (
+                    <TableRow key={member.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <ClientAvatar name={member.name || member.email} size="sm" />
+                          <span className="font-medium">{member.name || "-"}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{member.email}</TableCell>
+                      <TableCell>
+                        <Badge variant={member.role === "admin" ? "default" : "secondary"}>
+                          {member.role === "admin" ? "Admin" : "Membre"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {new Date(member.created_at).toLocaleDateString("fr-FR")}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeMemberMutation.mutate(member.id)}
+                          disabled={removeMemberMutation.isPending}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Request more members dialog */}
+      <AlertDialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Limite de membres atteinte</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vous avez atteint la limite de {CLIENT_MEMBER_LIMIT} membres pour votre compte. 
+              Souhaitez-vous demander l'autorisation à l'administrateur pour ajouter plus de membres ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRequestMoreMembers}>
+              Envoyer la demande
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
