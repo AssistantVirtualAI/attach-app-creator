@@ -42,6 +42,7 @@ import { ClientAvatar } from '@/components/clients/ClientAvatar';
 import { ClientFilters, StatusFilter, SortField, SortOrder } from '@/components/clients/ClientFilters';
 import { ClientMembersModal } from '@/components/clients/ClientMembersModal';
 import { ClientLimitBanner, useClientLimit } from '@/components/billing/ClientLimitBanner';
+import { ClientsDashboard } from '@/components/clients/ClientsDashboard';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useToast } from '@/hooks/use-toast';
@@ -272,6 +273,9 @@ export default function Clients() {
         <div className="mb-6">
           <ClientLimitBanner />
         </div>
+
+        {/* Dashboard avec statistiques */}
+        <ClientsDashboard />
 
         <div className="flex items-center justify-between mb-8">
           <div>
