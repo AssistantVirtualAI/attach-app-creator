@@ -1,12 +1,28 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, Clock } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { DashboardMetrics } from '@/hooks/useDashboardMetrics';
 
 interface RecentActivityProps {
   metrics: DashboardMetrics;
 }
+
+const isValidDate = (date: Date): boolean => {
+  return date instanceof Date && !isNaN(date.getTime());
+};
+
+const formatTimestamp = (timestamp: string | undefined): string => {
+  if (!timestamp) return 'Date inconnue';
+  
+  const date = new Date(timestamp);
+  if (!isValidDate(date)) return 'Date invalide';
+  
+  return formatDistanceToNow(date, {
+    addSuffix: true,
+    locale: fr,
+  });
+};
 
 export const RecentActivity = ({ metrics }: RecentActivityProps) => {
   if (metrics.recentActivity.length === 0) {
@@ -45,10 +61,7 @@ export const RecentActivity = ({ metrics }: RecentActivityProps) => {
               <div className="flex items-center gap-2 mt-1">
                 <Clock className="h-3 w-3 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">
-                  {formatDistanceToNow(new Date(activity.timestamp), {
-                    addSuffix: true,
-                    locale: fr,
-                  })}
+                  {formatTimestamp(activity.timestamp)}
                 </span>
               </div>
             </div>

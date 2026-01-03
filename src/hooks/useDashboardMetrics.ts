@@ -170,13 +170,21 @@ export const useDashboardMetrics = () => {
           count,
         }));
 
-        // Recent activity
-        recentActivity = conversations.slice(0, 10).map((c: any) => ({
-          id: c.conversation_id || c.id,
-          type: 'conversation' as const,
-          title: `Conversation ${(c.conversation_id || c.id)?.substring(0, 8) || 'N/A'}`,
-          timestamp: c.start_time || c.created_at,
-        }));
+        // Recent activity - filter out invalid dates
+        recentActivity = conversations
+          .filter((c: any) => {
+            const timestamp = c.start_time || c.created_at;
+            if (!timestamp) return false;
+            const date = new Date(timestamp);
+            return !isNaN(date.getTime());
+          })
+          .slice(0, 10)
+          .map((c: any) => ({
+            id: c.conversation_id || c.id,
+            type: 'conversation' as const,
+            title: `Conversation ${(c.conversation_id || c.id)?.substring(0, 8) || 'N/A'}`,
+            timestamp: c.start_time || c.created_at,
+          }));
 
         // Generate weekly data if not from analytics
         if (weeklyData.length === 0) {
