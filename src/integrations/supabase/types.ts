@@ -514,6 +514,55 @@ export type Database = {
           },
         ]
       }
+      client_agent_assignments: {
+        Row: {
+          agent_id: string
+          client_id: string
+          created_at: string
+          id: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          agent_id: string
+          client_id: string
+          created_at?: string
+          id?: string
+          role?: string
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_agent_assignments_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_agent_assignments_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_agent_assignments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_members: {
         Row: {
           client_id: string
