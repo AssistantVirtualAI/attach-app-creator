@@ -35,27 +35,60 @@ serve(async (req) => {
       });
     }
 
-    const { conversationId, agentId: providedAgentId, organizationId: providedOrgId, transcript: externalTranscript } = await req.json();
+const { 
+      conversationId, 
+      externalConversationId,
+      agentId: providedAgentId, 
+      organizationId: providedOrgId, 
+      transcript: externalTranscript,
+      platformAgentId
+    } = await req.json();
     
-    console.log(`[analyze-conversation] Starting analysis for conversation ${conversationId}`);
-    console.log(`[analyze-conversation] Provided agentId: ${providedAgentId}, orgId: ${providedOrgId}`);
+    // Support both internal conversationId and external (ElevenLabs) conversationId
+    const effectiveConversationId = conversationId || externalConversationId;
+    const isExternalConversation = !conversationId && !!externalConversationId;
+    
+    console.log(`[analyze-conversation] Starting analysis for ${isExternalConversation ? 'external' : 'internal'} conversation ${effectiveConversationId}`);
+    console.log(`[analyze-conversation] Provided agentId: ${providedAgentId}, orgId: ${providedOrgId}, platformAgentId: ${platformAgentId}`);
 
-    // Fetch conversation using service client to bypass RLS
-    const { data: conversation, error: convError } = await serviceClient
-      .from('conversations')
-      .select('*')
-      .eq('id', conversationId)
-      .single();
+    let conversation: any = null;
+    let agentId = providedAgentId;
+    let organizationId = providedOrgId;
 
-    if (convError) {
-      console.error('[analyze-conversation] Error fetching conversation:', convError);
-    } else {
-      console.log('[analyze-conversation] Conversation loaded successfully');
+    // For internal conversations, fetch from database
+    if (!isExternalConversation && effectiveConversationId) {
+      const { data: convData, error: convError } = await serviceClient
+        .from('conversations')
+        .select('*')
+        .eq('id', effectiveConversationId)
+        .single();
+
+      if (convError) {
+        console.error('[analyze-conversation] Error fetching conversation:', convError);
+      } else {
+        conversation = convData;
+        console.log('[analyze-conversation] Conversation loaded successfully');
+        agentId = agentId || conversation?.agent_id;
+        organizationId = organizationId || conversation?.organization_id;
+      }
     }
 
-    // Derive agentId and organizationId from conversation if not provided
-    const agentId = providedAgentId || conversation?.agent_id;
-    const organizationId = providedOrgId || conversation?.organization_id;
+    // If we have a platformAgentId but no agentId, try to find the agent
+    if (!agentId && platformAgentId) {
+      const { data: agentData } = await serviceClient
+        .from('agents')
+        .select('id, organization_id')
+        .eq('platform_agent_id', platformAgentId)
+        .single();
+      
+      if (agentData) {
+        agentId = agentData.id;
+        organizationId = organizationId || agentData.organization_id;
+        console.log(`[analyze-conversation] Found agent from platformAgentId: ${agentId}`);
+      }
+    }
+
+    console.log(`[analyze-conversation] Using agentId: ${agentId}, orgId: ${organizationId}`);
 
     console.log(`[analyze-conversation] Using agentId: ${agentId}, orgId: ${organizationId}`);
 
@@ -269,36 +302,38 @@ Réponds UNIQUEMENT avec du JSON valide, sans texte additionnel.`;
       smartTags: analysis.smart_tags
     });
 
-    // Always update the conversation with analysis
-    const { error: updateError } = await serviceClient
-      .from('conversations')
-      .update({ 
-        satisfaction_score: analysis.satisfaction_score,
-        sentiment: analysis.sentiment,
-        smart_tags: analysis.smart_tags,
-        metadata: {
-          ...(conversation?.metadata || {}),
-          aiAnalysis: analysis,
-          analyzedAt: new Date().toISOString()
-        }
-      })
-      .eq('id', conversationId);
+    // Update internal conversation if we have one
+    if (!isExternalConversation && effectiveConversationId) {
+      const { error: updateError } = await serviceClient
+        .from('conversations')
+        .update({ 
+          satisfaction_score: analysis.satisfaction_score,
+          sentiment: analysis.sentiment,
+          smart_tags: analysis.smart_tags,
+          metadata: {
+            ...(conversation?.metadata || {}),
+            aiAnalysis: analysis,
+            analyzedAt: new Date().toISOString()
+          }
+        })
+        .eq('id', effectiveConversationId);
 
-    if (updateError) {
-      console.error('[analyze-conversation] Failed to update conversation:', updateError);
-    } else {
-      console.log('[analyze-conversation] Conversation updated successfully');
+      if (updateError) {
+        console.error('[analyze-conversation] Failed to update conversation:', updateError);
+      } else {
+        console.log('[analyze-conversation] Conversation updated successfully');
+      }
     }
 
     // Always save to agent_insights when we have agentId and organizationId
-    if (agentId && organizationId) {
+    if (agentId && organizationId && effectiveConversationId) {
       console.log('[analyze-conversation] Saving to agent_insights...');
       
       const { error: insightError } = await serviceClient
         .from('agent_insights')
         .upsert({
           agent_id: agentId,
-          conversation_id: conversationId,
+          conversation_id: effectiveConversationId,
           organization_id: organizationId,
           satisfaction_score: analysis.satisfaction_score,
           sentiment_timeline: analysis.sentiment_timeline,
