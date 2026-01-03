@@ -9,7 +9,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { useFAQGeneration } from '@/hooks/useFAQGeneration';
 import { useAgentReports, AgentMetrics } from '@/hooks/useAgentReports';
+import { useSyncElevenLabsConversations } from '@/hooks/useAgentAdvice';
 import { useOrganization } from '@/context/OrganizationContext';
+import { AgentAIAdvice } from '@/components/agents/AgentAIAdvice';
 import { 
   FileQuestion, 
   RefreshCw, 
@@ -28,7 +30,11 @@ import {
   Target,
   Lightbulb,
   Tag,
-  Activity
+  Activity,
+  Sparkles,
+  Download,
+  CheckCircle,
+  Database
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -51,6 +57,8 @@ const AgentReports = () => {
   const { faqs, misunderstoodQueries, conversationsAnalyzed, isLoading: isLoadingFAQ, isGenerating, regenerateFAQs } = useFAQGeneration(
     selectedAgent !== 'all' ? selectedAgent : undefined
   );
+
+  const { mutate: syncConversations, isPending: isSyncing } = useSyncElevenLabsConversations();
 
   // Fetch agents for filter
   const { data: agents } = useQuery({
@@ -241,11 +249,41 @@ const AgentReports = () => {
                 ))}
               </SelectContent>
             </Select>
+            <Button 
+              variant="outline" 
+              onClick={() => syncConversations({ agentId: selectedAgent !== 'all' ? selectedAgent : undefined })}
+              disabled={isSyncing}
+            >
+              {isSyncing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              Sync ElevenLabs
+            </Button>
             <Button variant="outline" size="icon" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
         </div>
+
+        {/* Data Source Indicator */}
+        {reportsData && (
+          <div className="flex items-center gap-2 text-sm">
+            {reportsData.dataSource === 'elevenlabs' ? (
+              <Badge variant="outline" className="gap-1 text-green-500 border-green-500/30">
+                <CheckCircle className="h-3 w-3" />
+                Connecté à ElevenLabs
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="gap-1 text-muted-foreground">
+                <Database className="h-3 w-3" />
+                Données locales
+              </Badge>
+            )}
+            {reportsData.globalMetrics.totalConversations > 0 && (
+              <span className="text-muted-foreground">
+                {reportsData.globalMetrics.totalConversations} conversations • {reportsData.globalMetrics.totalVoiceMinutes} min vocales
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Global Metrics */}
         {reportsData && (
@@ -319,6 +357,10 @@ const AgentReports = () => {
             <TabsTrigger value="misunderstood" className="gap-2">
               <MessageSquareWarning className="h-4 w-4" />
               Requêtes Incomprises
+            </TabsTrigger>
+            <TabsTrigger value="ai-advice" className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              Conseils IA
             </TabsTrigger>
           </TabsList>
 
@@ -567,6 +609,24 @@ const AgentReports = () => {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* AI Advice Tab */}
+          <TabsContent value="ai-advice" className="space-y-6">
+            {selectedAgent === 'all' ? (
+              <Card className="glass-card">
+                <CardContent className="pt-6 text-center py-12">
+                  <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
+                  <p className="text-muted-foreground">Sélectionnez un agent spécifique</p>
+                  <p className="text-sm text-muted-foreground">Les conseils IA sont générés par agent</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <AgentAIAdvice 
+                agentId={selectedAgent} 
+                agentName={agents?.find(a => a.id === selectedAgent)?.name || 'Agent'} 
+              />
+            )}
           </TabsContent>
         </Tabs>
       </div>

@@ -76,6 +76,94 @@ export type Database = {
           },
         ]
       }
+      agent_daily_reports: {
+        Row: {
+          agent_id: string | null
+          avg_duration_seconds: number | null
+          avg_satisfaction: number | null
+          conversations_analyzed: number | null
+          created_at: string | null
+          generated_at: string | null
+          id: string
+          kb_suggestions: string[] | null
+          organization_id: string | null
+          priority_actions: Json | null
+          prompt_suggestions: string[] | null
+          recommendations: Json | null
+          report_date: string
+          strengths: Json | null
+          success_rate: number | null
+          summary: string | null
+          total_conversations: number | null
+          updated_at: string | null
+          weaknesses: Json | null
+        }
+        Insert: {
+          agent_id?: string | null
+          avg_duration_seconds?: number | null
+          avg_satisfaction?: number | null
+          conversations_analyzed?: number | null
+          created_at?: string | null
+          generated_at?: string | null
+          id?: string
+          kb_suggestions?: string[] | null
+          organization_id?: string | null
+          priority_actions?: Json | null
+          prompt_suggestions?: string[] | null
+          recommendations?: Json | null
+          report_date?: string
+          strengths?: Json | null
+          success_rate?: number | null
+          summary?: string | null
+          total_conversations?: number | null
+          updated_at?: string | null
+          weaknesses?: Json | null
+        }
+        Update: {
+          agent_id?: string | null
+          avg_duration_seconds?: number | null
+          avg_satisfaction?: number | null
+          conversations_analyzed?: number | null
+          created_at?: string | null
+          generated_at?: string | null
+          id?: string
+          kb_suggestions?: string[] | null
+          organization_id?: string | null
+          priority_actions?: Json | null
+          prompt_suggestions?: string[] | null
+          recommendations?: Json | null
+          report_date?: string
+          strengths?: Json | null
+          success_rate?: number | null
+          summary?: string | null
+          total_conversations?: number | null
+          updated_at?: string | null
+          weaknesses?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_daily_reports_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_daily_reports_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_daily_reports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_health_scores: {
         Row: {
           agent_id: string | null
