@@ -1,13 +1,15 @@
-import { Wallet, Zap, BookOpen } from 'lucide-react';
+import { Wallet, Zap, BookOpen, Sun, Moon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useClientStats } from '@/hooks/useClientStats';
 import { useAICredits } from '@/hooks/useAICredits';
+import { useTheme } from '@/context/ThemeContext';
 import { UserAvatar } from './UserAvatar';
 
 export const SidebarFooter = () => {
   const { activeClients, clientLimit } = useClientStats();
   const { credits } = useAICredits();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="p-4 border-t border-border/50 space-y-3">
@@ -37,9 +39,21 @@ export const SidebarFooter = () => {
         </Link>
       </Button>
 
-      {/* Social Icons */}
+      {/* Social Icons + Theme Toggle */}
       <div className="flex items-center justify-between pt-2">
         <div className="flex gap-2">
+          {/* Theme Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="w-8 h-8 rounded-lg bg-card hover:bg-accent flex items-center justify-center transition-colors"
+            title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+          >
+            {theme === 'dark' ? (
+              <Sun className="w-4 h-4 text-yellow-500" />
+            ) : (
+              <Moon className="w-4 h-4 text-primary" />
+            )}
+          </button>
           <Link
             to="/docs"
             className="w-8 h-8 rounded-lg bg-card hover:bg-accent flex items-center justify-center transition-colors"
