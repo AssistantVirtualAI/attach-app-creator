@@ -1824,6 +1824,59 @@ export type Database = {
         }
         Relationships: []
       }
+      prompt_templates: {
+        Row: {
+          created_at: string
+          description: string | null
+          first_message: string | null
+          id: string
+          is_default: boolean | null
+          max_tokens: number | null
+          name: string
+          organization_id: string | null
+          system_prompt: string
+          tags: string[] | null
+          temperature: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          first_message?: string | null
+          id?: string
+          is_default?: boolean | null
+          max_tokens?: number | null
+          name: string
+          organization_id?: string | null
+          system_prompt: string
+          tags?: string[] | null
+          temperature?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          first_message?: string | null
+          id?: string
+          is_default?: boolean | null
+          max_tokens?: number | null
+          name?: string
+          organization_id?: string | null
+          system_prompt?: string
+          tags?: string[] | null
+          temperature?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prompt_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sms_templates: {
         Row: {
           category: string | null

@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AgentSettings } from '@/hooks/useAgentSettings';
+import { PromptTemplatesSection } from './PromptTemplatesSection';
 
 interface AgentKnowledgePromptTabProps {
   agent: AgentSettings;
@@ -212,6 +213,12 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
 
   return (
     <div className="space-y-6">
+      {/* Templates Section */}
+      <PromptTemplatesSection 
+        agentId={agent.id} 
+        platformAgentId={platformAgentId}
+        onApplied={() => queryClient.invalidateQueries({ queryKey: ['elevenlabs-agent-config', agent.id] })}
+      />
       {/* Status Banner */}
       {configError ? (
         <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 flex items-center gap-3">
