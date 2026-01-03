@@ -87,7 +87,7 @@ export default function Clients() {
         .from('clients')
         .select(`
           *,
-          assigned_agent:agents(id, name, platform, platform_agent_id, config)
+          assigned_agent:agents!clients_assigned_agent_id_fkey(id, name, platform, platform_agent_id, config)
         `)
         .eq('organization_id', selectedOrgId);
 

@@ -34,7 +34,7 @@ export function useClientsDistribution() {
         .select(`
           id,
           assigned_agent_id,
-          assigned_agent:agents(id, name)
+          assigned_agent:agents!clients_assigned_agent_id_fkey(id, name)
         `)
         .eq('organization_id', selectedOrgId);
 
