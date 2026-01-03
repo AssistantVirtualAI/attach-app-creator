@@ -16,11 +16,14 @@ interface AppLayoutProps {
 }
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
-  const { role, isSuperAdmin, isRole } = usePermissions();
-  const { selectedOrg, isLoading } = useOrganization();
+  const { role, isSuperAdmin } = usePermissions();
+  const { selectedOrg, isLoading, userRole } = useOrganization();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Debug: log sidebar visibility info
+  console.log('[Sidebar Debug] Role:', role, 'isSuperAdmin:', isSuperAdmin, 'isLoading:', isLoading, 'userRole:', userRole);
 
   // Filter groups based on role - show adminOnly groups for admins and managers
   // During loading, show all groups to prevent flash of missing items
@@ -29,7 +32,9 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       // During loading, show adminOnly groups (they'll be hidden if user doesn't have access after load)
       if (isLoading) return true;
       // Show adminOnly groups only for org_admin, manager, super_admin
-      return role === 'org_admin' || role === 'manager' || isSuperAdmin;
+      const isVisible = role === 'org_admin' || role === 'manager' || isSuperAdmin;
+      console.log(`[Sidebar Debug] Group "${group.label}" adminOnly=${group.adminOnly}, visible=${isVisible}`);
+      return isVisible;
     }
     return true;
   });

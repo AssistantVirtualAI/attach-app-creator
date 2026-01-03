@@ -122,6 +122,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
           organization_id: selectedOrgId,
           name: finalName,
           platform: selectedPlatform,
+          platform_agent_id: agentId.trim(), // Auto-sync platform_agent_id from config.agent_id
           is_external: true,
           client_id: selectedClientId || null,
           config: {
