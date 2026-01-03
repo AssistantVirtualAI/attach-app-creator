@@ -125,3 +125,6 @@ verify_jwt = true
 
 [functions.sync-elevenlabs-conversations]
 verify_jwt = true
+
+[functions.client-auth]
+verify_jwt = false
