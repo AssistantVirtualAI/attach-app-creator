@@ -2,7 +2,7 @@ import {
   Home, TrendingUp, MessageSquare, BarChart3, BookOpen, 
   Bot, Sparkles, FileQuestion, Users, UserPlus, Calendar,
   Phone, MessageCircle, GitBranch, Sliders, Webhook,
-  CreditCard, Settings, Tag, Headphones, LayoutDashboard
+  CreditCard, Settings, Tag, Headphones, LayoutDashboard, Radio
 } from 'lucide-react';
 
 export interface NavItem {
@@ -34,6 +34,7 @@ export const sidebarGroups: NavGroup[] = [
     label: 'Conversations',
     icon: MessageSquare,
     items: [
+      { name: 'Temps Réel', href: '/realtime', icon: Radio },
       { name: 'Conversations', href: '/conversations', icon: MessageSquare },
       { name: 'Voice Analytics', href: '/analytics', icon: BarChart3 },
       { name: 'Handoffs', href: '/handoffs', icon: Headphones },
