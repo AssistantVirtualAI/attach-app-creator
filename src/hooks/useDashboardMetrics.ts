@@ -31,6 +31,14 @@ export interface DashboardMetrics {
   dataSource: 'elevenlabs' | 'local' | 'mixed';
   weeklyData: { name: string; conversations: number; satisfaction: number }[];
   agentPerformance: { name: string; conversations: number; satisfaction: number; duration: number }[];
+  // New enhanced metrics
+  resolutionRate: number;
+  resolvedConversations: number;
+  sentimentBreakdown: { positive: number; neutral: number; negative: number };
+  peakHours: { hour: number; count: number }[];
+  qualityScore: number;
+  weeklyGrowth: number;
+  totalDurationMinutes: number;
 }
 
 const defaultMetrics: DashboardMetrics = {
@@ -57,6 +65,14 @@ const defaultMetrics: DashboardMetrics = {
   dataSource: 'local',
   weeklyData: [],
   agentPerformance: [],
+  // New enhanced metrics defaults
+  resolutionRate: 0,
+  resolvedConversations: 0,
+  sentimentBreakdown: { positive: 0, neutral: 0, negative: 0 },
+  peakHours: [],
+  qualityScore: 0,
+  weeklyGrowth: 0,
+  totalDurationMinutes: 0,
 };
 
 export const useDashboardMetrics = () => {
@@ -223,6 +239,43 @@ export const useDashboardMetrics = () => {
           totalConversations = conversationsData.total || conversations.length;
         }
 
+        // Calculate sentiment breakdown from conversations
+        const sentimentBreakdown = { positive: 0, neutral: 0, negative: 0 };
+        let resolvedCount = 0;
+        let totalDuration = 0;
+        const hourCounts: Record<number, number> = {};
+
+        conversations.forEach((c: any) => {
+          // Sentiment
+          const sentiment = c.analysis?.overall_sentiment || 'neutral';
+          if (sentiment === 'positive') sentimentBreakdown.positive++;
+          else if (sentiment === 'negative') sentimentBreakdown.negative++;
+          else sentimentBreakdown.neutral++;
+          
+          // Resolution
+          if (c.status === 'done' || c.analysis?.call_successful) resolvedCount++;
+          
+          // Duration
+          if (c.call_duration_secs) totalDuration += c.call_duration_secs;
+          
+          // Peak hours
+          const hour = new Date(c.start_time || c.created_at).getHours();
+          hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+        });
+
+        const peakHours = Object.entries(hourCounts)
+          .map(([hour, count]) => ({ hour: parseInt(hour), count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+
+        const resolutionRate = conversations.length > 0 
+          ? Math.round((resolvedCount / conversations.length) * 100) 
+          : 0;
+
+        const qualityScore = avgSatisfaction > 0 
+          ? Math.round((avgSatisfaction / 5) * 100) 
+          : 0;
+
         return {
           totalConversations,
           conversationsToday,
@@ -247,6 +300,14 @@ export const useDashboardMetrics = () => {
           dataSource,
           weeklyData,
           agentPerformance,
+          // Enhanced metrics
+          resolutionRate,
+          resolvedConversations: resolvedCount,
+          sentimentBreakdown,
+          peakHours,
+          qualityScore,
+          weeklyGrowth: elevenLabsData?.trends?.conversationsTrend || 0,
+          totalDurationMinutes: Math.round(totalDuration / 60),
         };
       }
 

@@ -1,7 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Bot, TrendingUp, Clock, Star } from 'lucide-react';
+import { Bot, Clock, Star, TrendingUp, Trophy, AlertTriangle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 
 interface AgentPerformance {
   name: string;
@@ -18,7 +20,7 @@ interface AgentPerformanceCardProps {
 export const AgentPerformanceCard = ({ agents, isLoading }: AgentPerformanceCardProps) => {
   if (isLoading) {
     return (
-      <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Bot className="h-5 w-5 text-primary" />
@@ -28,7 +30,7 @@ export const AgentPerformanceCard = ({ agents, isLoading }: AgentPerformanceCard
         <CardContent>
           <div className="space-y-4 animate-pulse">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-muted rounded-lg" />
+              <div key={i} className="h-20 bg-muted rounded-lg" />
             ))}
           </div>
         </CardContent>
@@ -38,7 +40,7 @@ export const AgentPerformanceCard = ({ agents, isLoading }: AgentPerformanceCard
 
   if (!agents || agents.length === 0) {
     return (
-      <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+      <Card className="glass-card">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Bot className="h-5 w-5 text-primary" />
@@ -46,9 +48,13 @@ export const AgentPerformanceCard = ({ agents, isLoading }: AgentPerformanceCard
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground text-sm text-center py-8">
-            Aucun agent configuré avec des conversations
-          </p>
+          <div className="text-center py-8">
+            <Bot className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+            <p className="text-muted-foreground text-sm">Aucun agent avec des conversations</p>
+            <Link to="/agents" className="text-primary text-sm hover:underline mt-2 inline-block">
+              Configurer un agent
+            </Link>
+          </div>
         </CardContent>
       </Card>
     );
@@ -66,62 +72,106 @@ export const AgentPerformanceCard = ({ agents, isLoading }: AgentPerformanceCard
     return 'text-red-500';
   };
 
+  const getSatisfactionBg = (score: number) => {
+    if (score >= 4) return 'bg-emerald-500';
+    if (score >= 3) return 'bg-amber-500';
+    return 'bg-red-500';
+  };
+
   const maxConversations = Math.max(...agents.map(a => a.conversations), 1);
+  const sortedAgents = [...agents].sort((a, b) => b.satisfaction - a.satisfaction);
+  const bestAgent = sortedAgents[0];
 
   return (
-    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-      <CardHeader>
+    <Card className="glass-card">
+      <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <Bot className="h-5 w-5 text-primary" />
           Performance des Agents
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {agents.slice(0, 5).map((agent, index) => (
-            <div 
-              key={index}
-              className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                    <Bot className="h-4 w-4 text-primary" />
+        <div className="space-y-3">
+          {agents.slice(0, 5).map((agent, index) => {
+            const isBest = agent.name === bestAgent?.name && agent.satisfaction >= 4;
+            const needsAttention = agent.satisfaction < 3;
+            
+            return (
+              <motion.div 
+                key={index}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className={`p-3 rounded-lg transition-all ${
+                  isBest ? 'bg-emerald-500/10 border border-emerald-500/20' : 
+                  needsAttention ? 'bg-red-500/5 border border-red-500/20' :
+                  'bg-muted/30 hover:bg-muted/50'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    {/* Avatar with gradient */}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      isBest ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' :
+                      needsAttention ? 'bg-gradient-to-br from-red-500 to-red-600' :
+                      'bg-gradient-to-br from-primary to-secondary'
+                    }`}>
+                      <span className="text-white text-xs font-bold">
+                        {agent.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="font-medium text-sm flex items-center gap-1.5">
+                        {agent.name}
+                        {isBest && <Trophy className="h-3.5 w-3.5 text-amber-500" />}
+                        {needsAttention && <AlertTriangle className="h-3.5 w-3.5 text-red-500" />}
+                      </span>
+                    </div>
                   </div>
-                  <span className="font-medium text-sm">{agent.name}</span>
+                  <Badge variant="outline" className="text-xs">
+                    {agent.conversations} conv.
+                  </Badge>
                 </div>
-                <Badge variant="outline" className="text-xs">
-                  {agent.conversations} conv.
-                </Badge>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Volume</span>
-                  <span className="text-foreground">
-                    {Math.round((agent.conversations / maxConversations) * 100)}%
-                  </span>
+                
+                {/* Progress bar */}
+                <div className="space-y-1.5 mb-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Volume relatif</span>
+                    <span className="text-foreground">
+                      {Math.round((agent.conversations / maxConversations) * 100)}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                    <motion.div 
+                      className="h-full bg-gradient-to-r from-primary to-secondary rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(agent.conversations / maxConversations) * 100}%` }}
+                      transition={{ delay: index * 0.05 + 0.2, duration: 0.5 }}
+                    />
+                  </div>
                 </div>
-                <Progress 
-                  value={(agent.conversations / maxConversations) * 100} 
-                  className="h-1.5" 
-                />
-              </div>
 
-              <div className="flex items-center gap-4 mt-2 text-xs">
-                <div className="flex items-center gap-1">
-                  <Star className={`h-3 w-3 ${getSatisfactionColor(agent.satisfaction)}`} />
-                  <span className={getSatisfactionColor(agent.satisfaction)}>
-                    {agent.satisfaction.toFixed(1)}/5
-                  </span>
+                {/* Stats row */}
+                <div className="flex items-center gap-4 text-xs">
+                  <div className="flex items-center gap-1">
+                    <Star className={`h-3.5 w-3.5 ${getSatisfactionColor(agent.satisfaction)}`} />
+                    <span className={`font-medium ${getSatisfactionColor(agent.satisfaction)}`}>
+                      {agent.satisfaction.toFixed(1)}/5
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>{formatDuration(agent.duration)}</span>
+                  </div>
+                  {agent.satisfaction > 0 && (
+                    <div className="flex items-center gap-1 ml-auto">
+                      <TrendingUp className={`h-3.5 w-3.5 ${getSatisfactionColor(agent.satisfaction)}`} />
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  <span>{formatDuration(agent.duration)}</span>
-                </div>
-              </div>
-            </div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>
