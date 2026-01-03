@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
@@ -209,22 +210,28 @@ serve(async (req) => {
             {
               headers: {
                 'xi-api-key': config.apiKey,
+                // Some accounts/endpoints accept Bearer as well; include both to maximize compatibility
+                'Authorization': `Bearer ${config.apiKey}`,
+                'accept': 'audio/mpeg',
               },
             }
           );
 
           if (audioResponse.ok) {
             const audioBuffer = await audioResponse.arrayBuffer();
-            const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
-            
+            const base64Audio = base64Encode(audioBuffer);
+
             return new Response(
-              JSON.stringify({ 
+              JSON.stringify({
                 audio_base64: base64Audio,
-                audio_url: `data:audio/${format};base64,${base64Audio}`,
-                format 
+                audio_url: `data:audio/mpeg;base64,${base64Audio}`,
+                format,
               }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
+          } else {
+            const errorText = await audioResponse.text().catch(() => '');
+            console.log(`Audio fetch failed for ${conversationId} (agent ${config.name}): ${audioResponse.status} ${errorText}`);
           }
         } catch (e) {
           console.log(`Audio for ${conversationId} not found for agent ${config.name}`);
