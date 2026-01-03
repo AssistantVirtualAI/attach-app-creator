@@ -328,6 +328,25 @@ const Conversations = () => {
                   </div>
                 )}
 
+                {/* Audio unavailable states */}
+                {!isLoadingAudio && !audioData?.audio_url && audioData?.notFound && (
+                  <div className="glass-card p-6 text-center border border-muted">
+                    <Volume2 className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      Audio non disponible pour cette conversation
+                    </p>
+                  </div>
+                )}
+
+                {!isLoadingAudio && !audioData?.audio_url && audioData?.error_code === 'AUDIO_AUTH_ERROR' && (
+                  <div className="glass-card p-6 text-center border border-destructive/30">
+                    <Volume2 className="w-8 h-8 text-destructive mx-auto mb-2" />
+                    <p className="text-sm text-destructive">
+                      Erreur d'autorisation lors de la récupération de l'audio
+                    </p>
+                  </div>
+                )}
+
                 {/* Transcript */}
                 {conversationDetails.transcript && conversationDetails.transcript.length > 0 && (
                   <div className="glass-card p-4 rounded-lg">

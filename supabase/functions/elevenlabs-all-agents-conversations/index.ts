@@ -204,37 +204,61 @@ serve(async (req) => {
     if (action === 'audio' && conversationId) {
       // Find the right agent for this conversation
       for (const config of agentConfigs) {
-        try {
-          const audioResponse = await fetch(
-            `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}/audio?format=${format}`,
-            {
+        // Try multiple endpoints for audio retrieval
+        const audioEndpoints = [
+          `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}/audio?format=${format}`,
+          `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}/audio`,
+        ];
+
+        for (const audioUrl of audioEndpoints) {
+          try {
+            console.log(`Trying audio endpoint: ${audioUrl} for agent ${config.name}`);
+            
+            const audioResponse = await fetch(audioUrl, {
               headers: {
                 'xi-api-key': config.apiKey,
-                // Some accounts/endpoints accept Bearer as well; include both to maximize compatibility
-                'Authorization': `Bearer ${config.apiKey}`,
                 'accept': 'audio/mpeg',
               },
+            });
+
+            console.log(`Audio response status: ${audioResponse.status}`);
+
+            if (audioResponse.ok) {
+              const audioBuffer = await audioResponse.arrayBuffer();
+              const base64Audio = base64Encode(audioBuffer);
+
+              console.log(`Audio fetched successfully for ${conversationId}, size: ${audioBuffer.byteLength} bytes`);
+
+              return new Response(
+                JSON.stringify({
+                  audio_base64: base64Audio,
+                  audio_url: `data:audio/mpeg;base64,${base64Audio}`,
+                  format,
+                }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            } else {
+              const errorText = await audioResponse.text().catch(() => '');
+              console.log(`Audio fetch failed for ${conversationId} (${audioUrl}): ${audioResponse.status} - ${errorText.substring(0, 200)}`);
+              
+              // If 401/403 auth error, return specific error
+              if (audioResponse.status === 401 || audioResponse.status === 403) {
+                return new Response(
+                  JSON.stringify({ 
+                    audio_base64: null,
+                    audio_url: null,
+                    format,
+                    notFound: false,
+                    error_code: 'AUDIO_AUTH_ERROR',
+                    error: 'Authentication error when fetching audio'
+                  }),
+                  { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                );
+              }
             }
-          );
-
-          if (audioResponse.ok) {
-            const audioBuffer = await audioResponse.arrayBuffer();
-            const base64Audio = base64Encode(audioBuffer);
-
-            return new Response(
-              JSON.stringify({
-                audio_base64: base64Audio,
-                audio_url: `data:audio/mpeg;base64,${base64Audio}`,
-                format,
-              }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          } else {
-            const errorText = await audioResponse.text().catch(() => '');
-            console.log(`Audio fetch failed for ${conversationId} (agent ${config.name}): ${audioResponse.status} ${errorText}`);
+          } catch (e) {
+            console.log(`Audio fetch error for ${conversationId} (${audioUrl}):`, e);
           }
-        } catch (e) {
-          console.log(`Audio for ${conversationId} not found for agent ${config.name}`);
         }
       }
       
@@ -244,6 +268,7 @@ serve(async (req) => {
           audio_url: null,
           format,
           notFound: true,
+          error_code: 'AUDIO_NOT_FOUND',
           error: 'Audio not found'
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
