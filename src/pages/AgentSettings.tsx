@@ -21,6 +21,7 @@ const AgentSettingsPage = () => {
     client,
     conversations,
     analytics,
+    integration,
     isLoading,
     updateAgent,
     testConnection,
@@ -104,6 +105,7 @@ const AgentSettingsPage = () => {
           <TabsContent value="config">
             <AgentCredentialsTab
               agent={agent}
+              integration={integration}
               onUpdate={updateAgent}
               onTestConnection={testConnection}
               isUpdating={isUpdating}
