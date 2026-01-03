@@ -50,7 +50,7 @@ const KnowledgeBase = () => {
   const deleteMutation = useDeleteKnowledgeBaseItem();
 
   const items = kbData?.knowledge_base?.items || [];
-  const agentName = kbData?.knowledge_base?.agent_name;
+  const totalDocs = kbData?.knowledge_base?.all_documents_count || 0;
 
   // Filter items
   const filteredItems = useMemo(() => {
@@ -85,8 +85,7 @@ const KnowledgeBase = () => {
     await deleteMutation.mutateAsync({
       agentId: selectedAgentId,
       apiKey: apiKey || undefined,
-      itemId: item.id,
-      itemName: item.name
+      documentId: item.id
     });
   };
 
@@ -166,9 +165,9 @@ const KnowledgeBase = () => {
                       API Key manquante
                     </Badge>
                   )}
-                  {agentName && (
+                  {totalDocs > items.length && (
                     <span className="text-sm text-muted-foreground">
-                      Agent: <strong>{agentName}</strong>
+                      {items.length} liés / {totalDocs} total
                     </span>
                   )}
                 </div>

@@ -1,382 +1,406 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1";
+
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { action, agentId, title, content, category, items, apiKey: providedApiKey, integrationId } = await req.json();
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const body = await req.json();
+    const { action, agentId, apiKey, documentId, title, content, url, category, itemId, search, pageSize } = body;
     
-    console.log(`[elevenlabs-kb] Action: ${action}, AgentId: ${agentId}`);
+    console.log(`[KB] Action: ${action}, agentId: ${agentId}`);
+
+    // Get API key from integration if not provided directly
+    let elevenLabsApiKey = apiKey;
+    let platformAgentId: string | null = null;
     
-    let apiKey = providedApiKey;
-    let targetAgentId = agentId;
-    
-    // If no API key provided directly, try to get from integration or user
-    if (!apiKey) {
-      const authHeader = req.headers.get('Authorization');
-      if (!authHeader) {
-        return new Response(JSON.stringify({ error: 'API key or authorization required' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
-      const token = authHeader.replace('Bearer ', '');
-      
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { global: { headers: { Authorization: authHeader } } }
-      );
+    if (agentId) {
+      // Get the agent to find its platform_agent_id and API key
+      const { data: agent } = await supabase
+        .from("agents")
+        .select("platform_agent_id, platform_api_key, organization_id, config, name")
+        .eq("id", agentId)
+        .single();
 
-      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-      if (userError || !user) {
-        console.error('[elevenlabs-kb] Auth error:', userError);
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Try to get API key from agent's config first if agentId is provided
-      if (agentId) {
-        const { data: agentData } = await supabase
-          .from('agents')
-          .select('platform_api_key, config')
-          .eq('platform_agent_id', agentId)
-          .single();
-
-        if (agentData?.platform_api_key) {
-          apiKey = agentData.platform_api_key;
-          console.log('[elevenlabs-kb] Got API key from agent config');
-        } else if (agentData?.config && (agentData.config as any)?.api_key) {
-          apiKey = (agentData.config as any).api_key;
-          console.log('[elevenlabs-kb] Got API key from agent config.api_key');
+      if (agent) {
+        platformAgentId = agent.platform_agent_id;
+        
+        // Try agent's own API key first
+        if (agent.platform_api_key) {
+          elevenLabsApiKey = agent.platform_api_key;
+        } else if ((agent.config as any)?.api_key) {
+          elevenLabsApiKey = (agent.config as any).api_key;
         }
-      }
+        
+        // Fallback to organization integration
+        if (!elevenLabsApiKey && agent.organization_id) {
+          const { data: integration } = await supabase
+            .from("organization_integrations")
+            .select("api_key")
+            .eq("organization_id", agent.organization_id)
+            .eq("platform", "elevenlabs")
+            .eq("is_active", true)
+            .maybeSingle();
 
-      // If still no key, try integration
-      if (!apiKey && integrationId) {
-        const { data: integration } = await supabase
-          .from('organization_integrations')
-          .select('api_key, agent_id')
-          .eq('id', integrationId)
-          .eq('is_active', true)
-          .single();
-
-        if (integration?.api_key) {
-          apiKey = integration.api_key;
-          targetAgentId = agentId || integration.agent_id;
-          console.log('[elevenlabs-kb] Got API key from integration');
+          if (integration?.api_key) {
+            elevenLabsApiKey = integration.api_key;
+          }
         }
-      }
-
-      // Fallback: try user's ElevenLabs integration
-      if (!apiKey) {
-        const { data: integration } = await supabase
-          .from('organization_integrations')
-          .select('api_key, agent_id')
-          .eq('user_id', user.id)
-          .eq('platform', 'elevenlabs')
-          .eq('is_active', true)
-          .single();
-
-        if (integration?.api_key) {
-          apiKey = integration.api_key;
-          targetAgentId = agentId || integration.agent_id;
-          console.log('[elevenlabs-kb] Got API key from user integration');
-        }
+        
+        console.log(`[KB] Agent: ${agent.name}, platformAgentId: ${platformAgentId}`);
       }
     }
 
-    if (!apiKey) {
-      console.log('[elevenlabs-kb] No API key found');
+    if (!elevenLabsApiKey) {
+      console.log("[KB] No ElevenLabs API key found");
       return new Response(
         JSON.stringify({ 
           requiresSetup: true, 
-          message: 'Configuration ElevenLabs requise' 
+          message: "Configuration ElevenLabs requise. Veuillez configurer votre clé API." 
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    // Helper function for ElevenLabs API calls
+    const callElevenLabs = async (endpoint: string, options: RequestInit = {}) => {
+      const fullUrl = `${ELEVENLABS_API_BASE}${endpoint}`;
+      console.log(`[KB] Calling: ${options.method || 'GET'} ${fullUrl}`);
+      
+      const response = await fetch(fullUrl, {
+        ...options,
+        headers: {
+          "xi-api-key": elevenLabsApiKey,
+          ...options.headers,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[KB] ElevenLabs API error ${response.status}: ${errorText}`);
+        throw new Error(`ElevenLabs API error ${response.status}: ${errorText}`);
+      }
+
+      // Handle DELETE which may return empty response
+      if (response.status === 204 || (options.method === 'DELETE' && response.status < 300)) {
+        return { success: true };
+      }
+
+      return response.json();
+    };
+
     switch (action) {
-      case 'get':
-      case 'list': {
-        console.log(`[elevenlabs-kb] Fetching knowledge base for agent ${targetAgentId}`);
+      case "list":
+      case "get": {
+        // List all knowledge base documents using the dedicated KB endpoint
+        const params = new URLSearchParams();
+        if (pageSize) params.append("page_size", pageSize.toString());
+        if (search) params.append("search", search);
         
-        if (!targetAgentId) {
-          return new Response(
-            JSON.stringify({ error: 'Agent ID required' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+        const queryString = params.toString() ? `?${params.toString()}` : "";
+        
+        console.log(`[KB] Fetching knowledge base list`);
+        const data = await callElevenLabs(`/convai/knowledge-base${queryString}`);
+        
+        console.log(`[KB] Response keys: ${Object.keys(data).join(', ')}`);
+        
+        // ElevenLabs returns documents in 'documents' array
+        const documents = data.documents || data.knowledge_base || [];
+        console.log(`[KB] Found ${documents.length} total documents`);
+        
+        // Filter by agent if platformAgentId is available
+        let filteredDocs = documents;
+        if (platformAgentId) {
+          filteredDocs = documents.filter((doc: any) => {
+            const dependentAgents = doc.dependent_agents || [];
+            const isLinked = dependentAgents.some((a: any) => a.id === platformAgentId || a.agent_id === platformAgentId);
+            return isLinked;
+          });
+          console.log(`[KB] After filtering for agent ${platformAgentId}: ${filteredDocs.length} documents`);
         }
         
-        // Get agent config which includes knowledge base
-        const configResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-          {
-            headers: {
-              'xi-api-key': apiKey,
-            },
-          }
-        );
-
-        if (!configResponse.ok) {
-          const errorText = await configResponse.text();
-          console.error('[elevenlabs-kb] ElevenLabs API error:', configResponse.status, errorText);
-          throw new Error(`ElevenLabs API error: ${configResponse.status}`);
-        }
-
-        const configData = await configResponse.json();
-        console.log('[elevenlabs-kb] Successfully fetched agent knowledge base');
-        
-        // Extract knowledge base from agent config
-        const knowledgeBase = configData.knowledge_base || [];
-        
-        // Transform to consistent format
-        const items = knowledgeBase.map((item: any, index: number) => ({
-          id: item.id || item.document_id || `kb-${index}`,
-          name: item.name || item.title || `Document ${index + 1}`,
-          type: item.type || 'text',
-          content: item.content || item.text || '',
-          url: item.url || null,
-          file_name: item.file_name || null,
-          file_size: item.file_size || null,
-          metadata: item.metadata || {}
+        // Transform to our format
+        const items = filteredDocs.map((doc: any) => ({
+          id: doc.id,
+          name: doc.name,
+          type: doc.type || 'text',
+          content: doc.text || doc.content || '',
+          url: doc.url,
+          file_name: doc.file_name || doc.name,
+          file_size: doc.metadata?.size_bytes || doc.size_bytes,
+          created_at: doc.metadata?.created_at_unix_secs 
+            ? new Date(doc.metadata.created_at_unix_secs * 1000).toISOString()
+            : doc.created_at,
+          updated_at: doc.metadata?.last_updated_at_unix_secs
+            ? new Date(doc.metadata.last_updated_at_unix_secs * 1000).toISOString()
+            : doc.updated_at,
+          dependent_agents: doc.dependent_agents || [],
+          metadata: doc.metadata || {},
         }));
-        
+
         return new Response(
           JSON.stringify({ 
             knowledge_base: { 
               items,
-              agent_name: configData.name
+              total: items.length,
+              all_documents_count: documents.length
             } 
           }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      case 'add': {
-        console.log(`[elevenlabs-kb] Adding document to agent ${targetAgentId}`);
-        
-        if (!targetAgentId) {
-          return new Response(
-            JSON.stringify({ error: 'Agent ID required' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+      case "get_document": {
+        const docId = documentId || itemId;
+        if (!docId) {
+          throw new Error("documentId requis pour get_document");
         }
         
-        if (!title || !content) {
-          return new Response(
-            JSON.stringify({ error: 'Title and content are required' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        
-        // Get current agent config
-        const agentResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-          {
-            headers: { 'xi-api-key': apiKey },
-          }
-        );
-        
-        if (!agentResponse.ok) {
-          const errorText = await agentResponse.text();
-          console.error('[elevenlabs-kb] Failed to fetch agent:', errorText);
-          throw new Error('Failed to fetch agent config');
-        }
-        
-        const agentData = await agentResponse.json();
-        const currentKB = agentData.knowledge_base || [];
-        
-        // Add new text item to knowledge base
-        const newItem = { 
-          type: 'text',
-          name: title,
-          content: content,
-          id: `kb-${Date.now()}`,
-          metadata: { category: category || 'Général', created_at: new Date().toISOString() }
-        };
-        
-        const updateResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'xi-api-key': apiKey,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              knowledge_base: [...currentKB, newItem]
-            }),
-          }
-        );
-        
-        if (!updateResponse.ok) {
-          const updateError = await updateResponse.text();
-          console.error('[elevenlabs-kb] Failed to update agent:', updateError);
-          throw new Error(`Failed to add document: ${updateError}`);
-        }
-        
-        console.log('[elevenlabs-kb] Added content via direct agent update');
+        const doc = await callElevenLabs(`/convai/knowledge-base/${docId}`);
         
         return new Response(
-          JSON.stringify({ success: true, item: newItem }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ 
+            success: true, 
+            document: {
+              id: doc.id,
+              name: doc.name,
+              type: doc.type,
+              content: doc.text || doc.content,
+              url: doc.url,
+              file_size: doc.metadata?.size_bytes,
+              created_at: doc.metadata?.created_at_unix_secs 
+                ? new Date(doc.metadata.created_at_unix_secs * 1000).toISOString()
+                : null,
+              dependent_agents: doc.dependent_agents || [],
+            }
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      case 'delete': {
-        const { itemId, itemName } = await req.json().catch(() => ({}));
-        console.log(`[elevenlabs-kb] Deleting item from agent ${targetAgentId}: ${itemId || itemName}`);
+      case "add":
+      case "create_text": {
+        // Create a text document using the dedicated endpoint
+        const docName = title || `Document ${new Date().toISOString()}`;
+        const docContent = content || "";
         
-        if (!targetAgentId) {
-          return new Response(
-            JSON.stringify({ error: 'Agent ID required' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+        if (!docContent) {
+          throw new Error("Le contenu est requis pour créer un document texte");
         }
+
+        console.log(`[KB] Creating text document: ${docName}`);
         
-        // Get current agent config
-        const agentResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-          {
-            headers: { 'xi-api-key': apiKey },
-          }
-        );
-        
-        if (!agentResponse.ok) {
-          throw new Error('Failed to fetch agent config');
-        }
-        
-        const agentData = await agentResponse.json();
-        const currentKB = agentData.knowledge_base || [];
-        
-        // Filter out the item to delete
-        const updatedKB = currentKB.filter((item: any) => {
-          if (itemId && (item.id === itemId || item.document_id === itemId)) return false;
-          if (itemName && item.name === itemName) return false;
-          return true;
+        const data = await callElevenLabs("/convai/knowledge-base/text", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: docName,
+            text: docContent,
+          }),
         });
+
+        console.log(`[KB] Created document: ${JSON.stringify(data)}`);
         
-        if (updatedKB.length === currentKB.length) {
-          return new Response(
-            JSON.stringify({ error: 'Item not found' }),
-            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        
-        const updateResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'xi-api-key': apiKey,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              knowledge_base: updatedKB
-            }),
+        // Link to agent if we have a platformAgentId
+        if (platformAgentId && data.id) {
+          try {
+            console.log(`[KB] Linking document ${data.id} to agent ${platformAgentId}`);
+            
+            // Get current agent config
+            const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
+            const currentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb);
+            
+            if (!currentKbIds.includes(data.id)) {
+              currentKbIds.push(data.id);
+              
+              await callElevenLabs(`/convai/agents/${platformAgentId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  knowledge_base: currentKbIds,
+                }),
+              });
+              console.log(`[KB] Document linked to agent`);
+            }
+          } catch (linkError) {
+            console.error(`[KB] Failed to link document to agent:`, linkError);
+            // Don't fail the whole operation
           }
-        );
-        
-        if (!updateResponse.ok) {
-          const updateError = await updateResponse.text();
-          throw new Error(`Failed to delete item: ${updateError}`);
         }
-        
-        console.log('[elevenlabs-kb] Successfully deleted item');
-        
+
         return new Response(
-          JSON.stringify({ success: true }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ 
+            success: true, 
+            documentId: data.id,
+            message: "Document créé avec succès"
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      case 'sync': {
-        console.log(`[elevenlabs-kb] Syncing items to agent ${targetAgentId}`);
+      case "create_url": {
+        // Create a document from URL
+        if (!url) {
+          throw new Error("L'URL est requise pour créer un document depuis une URL");
+        }
+
+        console.log(`[KB] Creating URL document: ${url}`);
         
-        if (!items || !Array.isArray(items)) {
-          return new Response(
-            JSON.stringify({ error: 'Items array required' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+        const data = await callElevenLabs("/convai/knowledge-base/url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: url,
+            name: title || url,
+          }),
+        });
+
+        console.log(`[KB] Created URL document: ${JSON.stringify(data)}`);
+
+        // Link to agent if we have a platformAgentId
+        if (platformAgentId && data.id) {
+          try {
+            const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
+            const currentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb);
+            
+            if (!currentKbIds.includes(data.id)) {
+              currentKbIds.push(data.id);
+              
+              await callElevenLabs(`/convai/agents/${platformAgentId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  knowledge_base: currentKbIds,
+                }),
+              });
+            }
+          } catch (linkError) {
+            console.error(`[KB] Failed to link URL document to agent:`, linkError);
+          }
+        }
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            documentId: data.id,
+            message: "Document créé depuis l'URL avec succès"
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "delete": {
+        // Delete a document using the dedicated endpoint
+        const docIdToDelete = documentId || itemId;
+        
+        if (!docIdToDelete) {
+          throw new Error("documentId requis pour supprimer");
+        }
+
+        console.log(`[KB] Deleting document: ${docIdToDelete}`);
+        
+        // Use force=true to delete even if used by agents
+        await callElevenLabs(`/convai/knowledge-base/${docIdToDelete}?force=true`, {
+          method: "DELETE",
+        });
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: "Document supprimé avec succès" 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "link_to_agent": {
+        // Link a document to an agent
+        const docId = documentId || itemId;
+        if (!docId || !platformAgentId) {
+          throw new Error("documentId et agentId requis pour lier un document");
         }
 
         // Get current agent config
-        const agentResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-          {
-            headers: { 'xi-api-key': apiKey },
-          }
-        );
+        const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
+        const currentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb);
         
-        if (!agentResponse.ok) {
-          throw new Error('Failed to fetch agent config');
-        }
-        
-        const agentData = await agentResponse.json();
-        const currentKB = agentData.knowledge_base || [];
-        
-        // Add all items as text entries
-        const newItems = items.map((item: any) => ({
-          type: 'text',
-          name: item.title,
-          content: item.content,
-          id: `kb-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          metadata: { category: item.category || 'Général' }
-        }));
-        
-        const updateResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'xi-api-key': apiKey,
-              'Content-Type': 'application/json',
-            },
+        if (!currentKbIds.includes(docId)) {
+          currentKbIds.push(docId);
+          
+          await callElevenLabs(`/convai/agents/${platformAgentId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              knowledge_base: [...currentKB, ...newItems]
+              knowledge_base: currentKbIds,
             }),
-          }
-        );
-        
-        if (!updateResponse.ok) {
-          const errorText = await updateResponse.text();
-          throw new Error(`Failed to sync items: ${errorText}`);
+          });
         }
-        
+
         return new Response(
-          JSON.stringify({ success: true, synced: items.length }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ 
+            success: true, 
+            message: "Document lié à l'agent avec succès" 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "unlink_from_agent": {
+        // Unlink a document from an agent
+        const docId = documentId || itemId;
+        if (!docId || !platformAgentId) {
+          throw new Error("documentId et agentId requis pour délier un document");
+        }
+
+        // Get current agent config
+        const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
+        const currentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb)
+          .filter((id: string) => id !== docId);
+
+        await callElevenLabs(`/convai/agents/${platformAgentId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            knowledge_base: currentKbIds,
+          }),
+        });
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: "Document délié de l'agent avec succès" 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       default:
-        return new Response(
-          JSON.stringify({ error: 'Action non supportée' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        throw new Error(`Action non supportée: ${action}`);
     }
-
-  } catch (error) {
-    console.error('[elevenlabs-kb] Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  } catch (error: unknown) {
+    console.error("[KB] Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Erreur lors de l'opération";
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ 
+        error: errorMessage,
+        success: false 
+      }),
       { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
   }
