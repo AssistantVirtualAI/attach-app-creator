@@ -176,8 +176,8 @@ serve(async (req) => {
             `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`,
             {
               headers: {
-                'Authorization': `Bearer ${config.apiKey}`,
                 'xi-api-key': config.apiKey,
+                'accept': 'application/json',
               },
             }
           );
@@ -208,7 +208,6 @@ serve(async (req) => {
             `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}/audio?format=${format}`,
             {
               headers: {
-                'Authorization': `Bearer ${config.apiKey}`,
                 'xi-api-key': config.apiKey,
               },
             }
@@ -254,11 +253,11 @@ serve(async (req) => {
         console.log(`Fetching conversations for agent ${config.name} (${config.agentId})`);
         
         const conversationsResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${config.agentId}/conversations?page=1&limit=100`,
+          `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${config.agentId}&cursor=&limit=100`,
           {
             headers: {
-              'Authorization': `Bearer ${config.apiKey}`,
               'xi-api-key': config.apiKey,
+              'accept': 'application/json',
             },
           }
         );
@@ -283,7 +282,15 @@ serve(async (req) => {
             conversationCount: conversations.length
           });
         } else {
-          console.error(`Error fetching for agent ${config.name}:`, conversationsResponse.status);
+          const errorText = await conversationsResponse.text().catch(() => '');
+          console.error(`Error fetching for agent ${config.name}:`, conversationsResponse.status, errorText);
+          // Still show the agent in the UI
+          agentsList.push({
+            id: config.id,
+            name: config.name,
+            agentId: config.agentId,
+            conversationCount: 0
+          });
         }
       } catch (error) {
         console.error(`Error fetching conversations for agent ${config.name}:`, error);
