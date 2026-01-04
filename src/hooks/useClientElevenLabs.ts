@@ -78,15 +78,21 @@ export const useClientElevenLabsKnowledgeBase = ({ apiKey, agentId, enabled = tr
   return useQuery({
     queryKey: ['client-elevenlabs-knowledge-base', agentId],
     queryFn: async () => {
+      console.log('[Client KB] Fetching knowledge base for agent:', agentId);
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
         body: { 
-          action: 'get',
+          action: 'list',
           apiKey,
-          agentId
+          agentId,
+          pageSize: 100
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[Client KB] Error:', error);
+        throw error;
+      }
+      console.log('[Client KB] Response:', data);
       return data;
     },
     enabled: enabled && !!apiKey && !!agentId,
