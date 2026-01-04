@@ -43,6 +43,7 @@ import ClientAgentConversations from "./pages/ClientAgentConversations";
 import ClientAgentAnalytics from "./pages/ClientAgentAnalytics";
 import ClientAgentKnowledge from "./pages/ClientAgentKnowledge";
 import ClientAgentSettings from "./pages/ClientAgentSettings";
+import ClientAgentEndpoints from "./pages/ClientAgentEndpoints";
 import WidgetPrototype from "./pages/WidgetPrototype";
 import WidgetIframe from "./pages/WidgetIframe";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -427,6 +428,7 @@ const App = () => (
                   <Route path="analytics" element={<ClientAgentAnalytics />} />
                   <Route path="knowledge" element={<ClientAgentKnowledge />} />
                   <Route path="settings" element={<ClientAgentSettings />} />
+                  <Route path="endpoints" element={<ClientAgentEndpoints />} />
                 </Route>
 
                 {/* New Portal Routes - Agent slug based */}

@@ -42,9 +42,11 @@ const ClientAgentKnowledge = () => {
   const categories = knowledgeBase?.knowledge_base?.categories || [];
 
   const filteredItems = items.filter((item: any) => {
+    const itemTitle = item.title || item.name || '';
+    const itemContent = item.content || '';
     const matchesSearch = 
-      item.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.content?.toLowerCase().includes(searchTerm.toLowerCase());
+      itemTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      itemContent.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -158,7 +160,7 @@ const ClientAgentKnowledge = () => {
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-medium truncate">{item.title}</h3>
+                          <h3 className="font-medium truncate">{item.title || item.name}</h3>
                           {item.category && (
                             <Badge variant="secondary" className="flex items-center gap-1">
                               <Tag className="h-3 w-3" />

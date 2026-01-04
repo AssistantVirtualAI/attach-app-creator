@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Key, Save, Eye, EyeOff, RefreshCw, CheckCircle, ExternalLink } from 'lucide-react';
 import { AgentSettings } from '@/hooks/useAgentSettings';
+import { ElevenLabsEndpointsCard } from '@/components/elevenlabs/ElevenLabsEndpointsCard';
 
 interface Integration {
   id: string;
@@ -209,6 +210,15 @@ export const AgentCredentialsTab = ({
           </Button>
         </CardContent>
       </Card>
+
+      {/* ElevenLabs Endpoints */}
+      {agent.platform === 'elevenlabs' && (
+        <ElevenLabsEndpointsCard 
+          agentId={formData.agent_id || undefined}
+          apiKey={apiKey || undefined}
+          showAllEndpoints
+        />
+      )}
     </div>
   );
 };

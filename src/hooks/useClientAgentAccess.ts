@@ -32,10 +32,10 @@ export const useClientAgentAccess = (clientId: string | undefined, agentId: stri
 
       if (!assignment) return null;
 
-      // Get agent details with API key
+      // Get agent details with API key and platform_agent_id
       const { data: agent, error: agentError } = await supabase
         .from('agents')
-        .select('id, name, platform_api_key, config')
+        .select('id, name, platform_api_key, platform_agent_id, organization_id, config')
         .eq('id', agentId)
         .single();
 
@@ -46,10 +46,31 @@ export const useClientAgentAccess = (clientId: string | undefined, agentId: stri
 
       const config = agent.config as Record<string, any> | null;
       
+      // Priority: platform_agent_id > config.agent_id
+      const platformAgentId = agent.platform_agent_id || config?.agent_id || null;
+      
+      // Priority: platform_api_key > config.api_key > organization_integrations
+      let apiKey = agent.platform_api_key || config?.api_key || null;
+      
+      // Fallback: try to get API key from organization_integrations
+      if (!apiKey && agent.organization_id) {
+        const { data: integration } = await supabase
+          .from('organization_integrations')
+          .select('api_key')
+          .eq('organization_id', agent.organization_id)
+          .eq('platform', 'elevenlabs')
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (integration?.api_key) {
+          apiKey = integration.api_key;
+        }
+      }
+      
       return {
         role: assignment.role as 'admin' | 'viewer',
-        apiKey: agent.platform_api_key || null,
-        agentId: config?.agent_id || null,
+        apiKey: apiKey,
+        agentId: platformAgentId,
         agentName: agent.name,
       };
     },
