@@ -62,6 +62,17 @@ import SmsTemplates from "./pages/SmsTemplates";
 import NotFound from "./pages/NotFound";
 import DemoCenter from "./pages/DemoCenter";
 import RealtimeMonitor from "./pages/RealtimeMonitor";
+
+// Portal pages
+import PortalLogin from "./pages/PortalLogin";
+import PortalLayout from "./components/portal/PortalLayout";
+import PortalDashboard from "./pages/PortalDashboard";
+import PortalConversations from "./pages/PortalConversations";
+import PortalAnalytics from "./pages/PortalAnalytics";
+import PortalKnowledge from "./pages/PortalKnowledge";
+import PortalPrompt from "./pages/PortalPrompt";
+import PortalSettings from "./pages/PortalSettings";
+
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -415,6 +426,17 @@ const App = () => (
                   <Route path="analytics" element={<ClientAgentAnalytics />} />
                   <Route path="knowledge" element={<ClientAgentKnowledge />} />
                   <Route path="settings" element={<ClientAgentSettings />} />
+                </Route>
+
+                {/* New Portal Routes - Agent slug based */}
+                <Route path="/portal/:agentSlug" element={<PortalLogin />} />
+                <Route path="/portal/:agentSlug" element={<PortalLayout />}>
+                  <Route path="dashboard" element={<PortalDashboard />} />
+                  <Route path="conversations" element={<PortalConversations />} />
+                  <Route path="analytics" element={<PortalAnalytics />} />
+                  <Route path="knowledge" element={<PortalKnowledge />} />
+                  <Route path="prompt" element={<PortalPrompt />} />
+                  <Route path="settings" element={<PortalSettings />} />
                 </Route>
 
                 {/* Public Widget Routes - No authentication */}

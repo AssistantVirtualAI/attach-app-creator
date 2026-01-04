@@ -94,6 +94,123 @@ serve(async (req) => {
         );
       }
 
+      case "login-by-agent-slug": {
+        const { agent_slug, login_id, password } = params;
+        
+        if (!agent_slug || !login_id || !password) {
+          return new Response(
+            JSON.stringify({ error: "Agent slug, Login ID et mot de passe requis" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Find agent by slug
+        const { data: agent, error: agentError } = await supabase
+          .from("agents")
+          .select("id, name, slug, organization_id")
+          .eq("slug", agent_slug)
+          .maybeSingle();
+
+        if (agentError || !agent) {
+          console.error("Error finding agent:", agentError);
+          return new Response(
+            JSON.stringify({ error: "Agent non trouvé" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Find client by login_id
+        const { data: client, error: clientError } = await supabase
+          .from("clients")
+          .select("id, name, organization_id, theme, language, login_id, password_hash, status")
+          .eq("login_id", login_id)
+          .maybeSingle();
+
+        if (clientError) {
+          console.error("Error finding client:", clientError);
+          return new Response(
+            JSON.stringify({ error: "Erreur lors de la recherche du client" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (!client) {
+          return new Response(
+            JSON.stringify({ error: "Identifiants invalides" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (client.status !== "active") {
+          return new Response(
+            JSON.stringify({ error: "Ce compte est désactivé" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (!client.password_hash) {
+          return new Response(
+            JSON.stringify({ error: "Aucun mot de passe défini. Contactez votre administrateur." }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Verify password with bcrypt
+        const passwordMatch = await bcrypt.compare(password, client.password_hash);
+        
+        if (!passwordMatch) {
+          return new Response(
+            JSON.stringify({ error: "Identifiants invalides" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Check if client has access to this agent
+        const { data: assignment, error: assignmentError } = await supabase
+          .from("client_agent_assignments")
+          .select("role, can_edit_knowledge, can_edit_prompt")
+          .eq("client_id", client.id)
+          .eq("agent_id", agent.id)
+          .maybeSingle();
+
+        if (assignmentError) {
+          console.error("Error checking assignment:", assignmentError);
+          return new Response(
+            JSON.stringify({ error: "Erreur lors de la vérification des accès" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (!assignment) {
+          return new Response(
+            JSON.stringify({ error: "Vous n'avez pas accès à cet agent" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Return portal session data
+        const session = {
+          clientId: client.id,
+          clientName: client.name,
+          organizationId: client.organization_id,
+          agentId: agent.id,
+          agentName: agent.name,
+          agentSlug: agent.slug,
+          role: assignment.role || "viewer",
+          canEditKnowledge: assignment.can_edit_knowledge || assignment.role === "admin",
+          canEditPrompt: assignment.can_edit_prompt || assignment.role === "admin",
+          theme: client.theme || "light",
+          language: client.language || "fr",
+        };
+
+        console.log(`Client ${client.name} logged in to agent ${agent.name} with role ${assignment.role}`);
+
+        return new Response(
+          JSON.stringify({ success: true, session }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       case "set-password": {
         const { client_id, password } = params;
         
