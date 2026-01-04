@@ -131,10 +131,23 @@ serve(async (req) => {
         }
 
         const detailsData = await detailsResponse.json();
-        console.log(`[conversations] Got details for ${conversationId}, has transcript: ${!!detailsData.transcript}`);
+        console.log(`[conversations] Got details for ${conversationId}, transcript type: ${typeof detailsData.transcript}, isArray: ${Array.isArray(detailsData.transcript)}`);
+        
+        // Normalize transcript to always be an array
+        let normalizedTranscript: Array<{ role: string; message: string; time_in_call_secs?: number }> = [];
+        if (Array.isArray(detailsData.transcript)) {
+          normalizedTranscript = detailsData.transcript;
+        } else if (typeof detailsData.transcript === 'string' && detailsData.transcript.trim()) {
+          // If transcript is a string, wrap it as a single agent message
+          normalizedTranscript = [{ role: 'agent', message: detailsData.transcript }];
+        }
         
         return new Response(
-          JSON.stringify(detailsData),
+          JSON.stringify({
+            ...detailsData,
+            transcript: normalizedTranscript,
+            transcript_raw: detailsData.transcript,
+          }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

@@ -179,7 +179,9 @@ const ClientAgentConversations = () => {
     }
   };
 
-  const transcript = conversationDetails?.transcript || [];
+  // Guard transcript: ensure it's always an array to prevent crashes
+  const transcriptRaw = conversationDetails?.transcript;
+  const transcript = Array.isArray(transcriptRaw) ? transcriptRaw : [];
 
   return (
     <div className="space-y-6">

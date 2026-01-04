@@ -31,7 +31,7 @@ const ClientAgentKnowledge = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newItem, setNewItem] = useState({ title: '', content: '', category: '' });
 
-  const { data: knowledgeBase, isLoading } = useClientElevenLabsKnowledgeBase({
+  const { data: knowledgeBase, isLoading, error, refetch } = useClientElevenLabsKnowledgeBase({
     apiKey,
     agentId: elevenlabsAgentId,
   });
@@ -123,7 +123,18 @@ const ClientAgentKnowledge = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {!apiKey || !elevenlabsAgentId ? (
+            <div className="text-center py-12">
+              <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">Configuration ElevenLabs manquante pour cet agent</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <FileText className="h-12 w-12 mx-auto text-destructive/50 mb-4" />
+              <p className="text-muted-foreground mb-4">Erreur lors du chargement de la base de connaissances</p>
+              <Button variant="outline" onClick={() => refetch()}>Réessayer</Button>
+            </div>
+          ) : isLoading ? (
             <div className="space-y-3">
               {[1, 2, 3, 4].map((i) => (
                 <Skeleton key={i} className="h-24 w-full" />
