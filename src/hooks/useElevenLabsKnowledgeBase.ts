@@ -52,6 +52,30 @@ export const useElevenLabsKnowledgeBase = (agentId: string | null, apiKey: strin
   });
 };
 
+// Get a single document with full content
+export const useKnowledgeBaseDocument = (agentId: string | null, documentId: string | null, apiKey: string | null) => {
+  return useQuery({
+    queryKey: ['elevenlabs-knowledge-document', documentId],
+    queryFn: async () => {
+      if (!documentId) throw new Error('Document ID required');
+
+      const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
+        body: { 
+          action: 'get_document',
+          agentId: agentId || undefined,
+          apiKey: apiKey || undefined,
+          documentId
+        }
+      });
+
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || 'Échec du chargement du document');
+      return data.document as ElevenLabsKBItem;
+    },
+    enabled: !!documentId,
+  });
+};
+
 // Add text document to knowledge base
 export const useAddKnowledgeBaseItem = () => {
   const queryClient = useQueryClient();
