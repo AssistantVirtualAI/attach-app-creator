@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Key, Trash2, Users, Edit, MoreHorizontal } from 'lucide-react';
+import { Plus, Key, Trash2, Users, Edit, MoreHorizontal, ExternalLink } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,7 +87,7 @@ export default function Clients() {
         .from('clients')
         .select(`
           *,
-          assigned_agent:agents!clients_assigned_agent_id_fkey(id, name, platform, platform_agent_id, config)
+          assigned_agent:agents!clients_assigned_agent_id_fkey(id, name, platform, platform_agent_id, config, slug)
         `)
         .eq('organization_id', selectedOrgId);
 
@@ -548,7 +548,7 @@ export default function Clients() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align="end" className="bg-slate-900 border-slate-700">
                             <DropdownMenuItem onClick={() => handleOpenMembers(client)}>
                               <Users className="mr-2 h-4 w-4" />
                               Gérer les membres
@@ -561,6 +561,17 @@ export default function Clients() {
                               <Key className="mr-2 h-4 w-4" />
                               Réinitialiser mot de passe
                             </DropdownMenuItem>
+                            {client.assigned_agent && (client.assigned_agent as any).slug && (
+                              <>
+                                <DropdownMenuSeparator className="bg-slate-700" />
+                                <DropdownMenuItem 
+                                  onClick={() => window.open(`/portal/${(client.assigned_agent as any).slug}`, '_blank')}
+                                >
+                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                  Accéder au portail
+                                </DropdownMenuItem>
+                              </>
+                            )}
                             <DropdownMenuItem
                               onClick={() =>
                                 toggleStatusMutation.mutate({
@@ -571,7 +582,7 @@ export default function Clients() {
                             >
                               {client.status === 'active' ? 'Désactiver' : 'Activer'}
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
+                            <DropdownMenuSeparator className="bg-slate-700" />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => deleteClientMutation.mutate(client.id)}
