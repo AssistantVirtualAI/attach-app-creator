@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import WaveSurfer from 'wavesurfer.js';
-import { Play, Pause, SkipBack, SkipForward, Download, Volume2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Download, Volume2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
@@ -38,59 +38,81 @@ export function AdvancedAudioPlayer({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [volume, setVolume] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [audioError, setAudioError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!waveformRef.current) return;
+    if (!waveformRef.current || !audioUrl) return;
 
-    // Initialize WaveSurfer with cyberpunk style
-    wavesurfer.current = WaveSurfer.create({
-      container: waveformRef.current,
-      waveColor: 'rgba(139, 92, 246, 0.6)',
-      progressColor: 'hsl(var(--primary))',
-      cursorColor: 'hsl(var(--accent))',
-      barWidth: 2,
-      barRadius: 1,
-      height: 80,
-      normalize: true,
-    });
+    setIsLoading(true);
+    setAudioError(null);
 
-    // Load audio
-    wavesurfer.current.load(audioUrl);
+    try {
+      // Initialize WaveSurfer with cyberpunk style
+      wavesurfer.current = WaveSurfer.create({
+        container: waveformRef.current,
+        waveColor: 'rgba(139, 92, 246, 0.6)',
+        progressColor: 'hsl(var(--primary))',
+        cursorColor: 'hsl(var(--accent))',
+        barWidth: 2,
+        barRadius: 1,
+        height: 80,
+        normalize: true,
+      });
 
-    // Event listeners
-    wavesurfer.current.on('ready', () => {
-      setDuration(wavesurfer.current?.getDuration() || 0);
+      // Load audio
+      wavesurfer.current.load(audioUrl);
+
+      // Event listeners
+      wavesurfer.current.on('ready', () => {
+        setDuration(wavesurfer.current?.getDuration() || 0);
+        setIsLoading(false);
+        setAudioError(null);
+      });
+
+      wavesurfer.current.on('audioprocess', () => {
+        setCurrentTime(wavesurfer.current?.getCurrentTime() || 0);
+      });
+
+      wavesurfer.current.on('play', () => setIsPlaying(true));
+      wavesurfer.current.on('pause', () => setIsPlaying(false));
+
+      // Error handling
+      wavesurfer.current.on('error', (err) => {
+        console.error('[AdvancedAudioPlayer] WaveSurfer error:', err);
+        setAudioError('Impossible de charger l\'audio');
+        setIsLoading(false);
+      });
+
+    } catch (err) {
+      console.error('[AdvancedAudioPlayer] Error initializing WaveSurfer:', err);
+      setAudioError('Erreur d\'initialisation du lecteur audio');
       setIsLoading(false);
-    });
-
-    wavesurfer.current.on('audioprocess', () => {
-      setCurrentTime(wavesurfer.current?.getCurrentTime() || 0);
-    });
-
-    wavesurfer.current.on('play', () => setIsPlaying(true));
-    wavesurfer.current.on('pause', () => setIsPlaying(false));
+    }
 
     return () => {
-      wavesurfer.current?.destroy();
+      try {
+        wavesurfer.current?.destroy();
+      } catch (e) {
+        // Ignore destroy errors
+      }
     };
   }, [audioUrl]);
 
   const togglePlayPause = () => {
-    wavesurfer.current?.playPause();
+    if (!wavesurfer.current || audioError) return;
+    wavesurfer.current.playPause();
   };
 
   const skipBackward = () => {
-    if (wavesurfer.current) {
-      const newTime = Math.max(0, currentTime - 10);
-      wavesurfer.current.seekTo(newTime / duration);
-    }
+    if (!wavesurfer.current || duration <= 0) return;
+    const newTime = Math.max(0, currentTime - 10);
+    wavesurfer.current.seekTo(newTime / duration);
   };
 
   const skipForward = () => {
-    if (wavesurfer.current) {
-      const newTime = Math.min(duration, currentTime + 10);
-      wavesurfer.current.seekTo(newTime / duration);
-    }
+    if (!wavesurfer.current || duration <= 0) return;
+    const newTime = Math.min(duration, currentTime + 10);
+    wavesurfer.current.seekTo(newTime / duration);
   };
 
   const changePlaybackRate = (rate: number) => {
@@ -150,86 +172,104 @@ export function AdvancedAudioPlayer({
           variant="outline"
           size="sm"
           onClick={downloadAudio}
+          disabled={!!audioError}
         >
           <Download className="w-4 h-4" />
         </Button>
       </div>
 
+      {/* Audio Error State */}
+      {audioError && (
+        <div className="flex items-center gap-3 p-4 bg-destructive/10 rounded-lg text-destructive">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <p className="text-sm">{audioError}</p>
+        </div>
+      )}
+
       {/* Waveform */}
-      <div className="relative">
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/20 rounded">
-            <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
-          </div>
-        )}
-        <div ref={waveformRef} className="w-full" />
-      </div>
+      {!audioError && (
+        <div className="relative">
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/20 rounded">
+              <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
+            </div>
+          )}
+          <div ref={waveformRef} className="w-full" />
+        </div>
+      )}
 
       {/* Controls */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {/* Playback controls */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={skipBackward}
-            >
-              <SkipBack className="w-4 h-4" />
-            </Button>
-            
-            <Button
-              onClick={togglePlayPause}
-            >
-              {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-            </Button>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={skipForward}
-            >
-              <SkipForward className="w-4 h-4" />
-            </Button>
-          </div>
+      {!audioError && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {/* Playback controls */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={skipBackward}
+                disabled={isLoading || duration <= 0}
+              >
+                <SkipBack className="w-4 h-4" />
+              </Button>
+              
+              <Button
+                onClick={togglePlayPause}
+                disabled={isLoading}
+              >
+                {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={skipForward}
+                disabled={isLoading || duration <= 0}
+              >
+                <SkipForward className="w-4 h-4" />
+              </Button>
+            </div>
 
-          {/* Time */}
-          <div className="text-sm text-muted-foreground">
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-6">
-          {/* Speed control */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Speed:</span>
-            <div className="flex gap-1">
-              {[0.5, 1, 1.5, 2].map(rate => (
-                <Button
-                  key={rate}
-                  variant={playbackRate === rate ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => changePlaybackRate(rate)}
-                >
-                  {rate}x
-                </Button>
-              ))}
+            {/* Time */}
+            <div className="text-sm text-muted-foreground">
+              {formatTime(currentTime)} / {formatTime(duration)}
             </div>
           </div>
 
-          {/* Volume control */}
-          <div className="flex items-center gap-2">
-            <Volume2 className="w-4 h-4 text-muted-foreground" />
-            <Slider
-              value={[volume]}
-              onValueChange={changeVolume}
-              max={1}
-              step={0.1}
-              className="w-20"
-            />
+          <div className="flex items-center gap-6">
+            {/* Speed control */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Speed:</span>
+              <div className="flex gap-1">
+                {[0.5, 1, 1.5, 2].map(rate => (
+                  <Button
+                    key={rate}
+                    variant={playbackRate === rate ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => changePlaybackRate(rate)}
+                    disabled={isLoading}
+                  >
+                    {rate}x
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Volume control */}
+            <div className="flex items-center gap-2">
+              <Volume2 className="w-4 h-4 text-muted-foreground" />
+              <Slider
+                value={[volume]}
+                onValueChange={changeVolume}
+                max={1}
+                step={0.1}
+                className="w-20"
+                disabled={isLoading}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Transcript with clickable timestamps */}
       {transcript.length > 0 && (

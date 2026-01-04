@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { OrganizationProvider } from "@/context/OrganizationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ClientProvider } from "@/context/ClientContext";
+import { AppErrorBoundary } from "@/components/errors/AppErrorBoundary";
 
 import Landing from "./pages/Landing";
 import AuthPage from "./pages/Auth";
@@ -96,20 +97,21 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter
-          future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true,
-          }}
-        >
-          <OrganizationProvider>
-            <Suspense fallback={<div>Loading...</div>}>
-              <Routes>
+  <AppErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
+            <OrganizationProvider>
+              <Suspense fallback={<div>Loading...</div>}>
+                <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<Landing />} />
                 <Route path="/auth" element={<AuthPage />} />
@@ -455,6 +457,7 @@ const App = () => (
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
+  </AppErrorBoundary>
 );
 
 export default App;
