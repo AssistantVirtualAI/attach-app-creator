@@ -349,7 +349,30 @@ serve(async (req) => {
           throw new Error("documentId requis pour get_document");
         }
         
+        console.log(`[KB] Fetching document metadata for: ${docId}`);
         const doc = await callElevenLabs(`/convai/knowledge-base/${docId}`);
+        console.log(`[KB] Document metadata:`, JSON.stringify(doc));
+        
+        // Fetch the actual content from the /content endpoint
+        let textContent: string | null = null;
+        try {
+          console.log(`[KB] Fetching document content from /content endpoint`);
+          const contentResponse = await fetch(
+            `${ELEVENLABS_API_BASE}/convai/knowledge-base/${docId}/content`,
+            {
+              headers: { "xi-api-key": elevenLabsApiKey }
+            }
+          );
+          
+          if (contentResponse.ok) {
+            textContent = await contentResponse.text();
+            console.log(`[KB] Content fetched successfully, length: ${textContent?.length || 0}`);
+          } else {
+            console.log(`[KB] Content endpoint returned status: ${contentResponse.status}`);
+          }
+        } catch (contentError) {
+          console.log(`[KB] Could not fetch content for ${docId}:`, contentError);
+        }
         
         return new Response(
           JSON.stringify({ 
@@ -358,7 +381,7 @@ serve(async (req) => {
               id: doc.id,
               name: doc.name,
               type: doc.type,
-              content: doc.text || doc.content,
+              content: textContent || doc.text || doc.content || null,
               url: doc.url,
               file_size: doc.metadata?.size_bytes,
               created_at: doc.metadata?.created_at_unix_secs 
