@@ -351,6 +351,8 @@ const KnowledgeBase = () => {
       {/* Document Viewer Modal */}
       <KnowledgeDocumentViewer 
         document={selectedDocument} 
+        agentId={selectedAgentId}
+        apiKey={apiKey}
         open={viewerOpen} 
         onOpenChange={setViewerOpen} 
       />
