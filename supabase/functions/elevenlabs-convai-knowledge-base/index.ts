@@ -315,7 +315,7 @@ serve(async (req) => {
         
         do {
           const params = new URLSearchParams();
-          params.append("page_size", "300"); // Max page size
+          params.append("page_size", "100"); // ElevenLabs max is 100
           if (sanitizedSearch) params.append("search", sanitizedSearch);
           if (cursor) params.append("cursor", cursor);
           
