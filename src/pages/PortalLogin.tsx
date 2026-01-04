@@ -9,7 +9,7 @@ import { usePortal, PortalProvider } from '@/hooks/usePortalAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Bot, AlertTriangle, MessageSquare, BarChart3, BookOpen, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { AvaLogo } from '@/components/portal/AvaLogo';
+import { AvaLogo } from '@/components/shared/AvaLogo';
 
 const PortalLoginContent = () => {
   const { agentSlug } = useParams<{ agentSlug: string }>();

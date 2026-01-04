@@ -26,7 +26,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { AvaLogo } from '@/components/portal/AvaLogo';
+import { AvaLogo } from '@/components/shared/AvaLogo';
 import { GlowBadge } from '@/components/portal/GlowBadge';
 
 const PortalLayoutContent = () => {
