@@ -75,12 +75,19 @@ serve(async (req) => {
     switch (action) {
       case 'list': {
         console.log(`Fetching conversations for agent ${targetAgentId}, page ${page}, limit ${limit}`);
-        
+
+        // ElevenLabs API uses cursor-based pagination.
+        // We keep page/limit for backwards compatibility, but only the first page is guaranteed
+        // unless the caller provides a cursor.
+        const cursor = (filters as any)?.cursor ?? undefined;
+        const qs = new URLSearchParams();
+        if (targetAgentId) qs.set('agent_id', targetAgentId);
+        if (cursor) qs.set('cursor', String(cursor));
+
         const conversationsResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}/conversations?page=${page}&limit=${limit}`,
+          `https://api.elevenlabs.io/v1/convai/conversations?${qs.toString()}`,
           {
             headers: {
-              'Authorization': `Bearer ${apiKey}`,
               'xi-api-key': apiKey,
             },
           }
@@ -93,17 +100,13 @@ serve(async (req) => {
         }
 
         const conversationsData = await conversationsResponse.json();
-        
+
         return new Response(
           JSON.stringify({
             conversations: conversationsData.conversations || [],
-            total: conversationsData.total || conversationsData.conversations?.length || 0,
-            pagination: conversationsData.pagination || {
-              page: page,
-              limit: limit,
-              total: 0,
-              has_more: false,
-            },
+            total: (conversationsData.conversations || []).length,
+            has_more: !!conversationsData.has_more,
+            next_cursor: conversationsData.next_cursor ?? null,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
