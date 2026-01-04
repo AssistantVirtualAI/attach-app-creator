@@ -442,6 +442,545 @@ serve(async (req) => {
         );
       }
 
+      // ========== MEMBER AUTHENTICATION ==========
+      
+      case "login-member": {
+        const { agent_slug, login_id, password } = params;
+        
+        if (!agent_slug || !login_id || !password) {
+          return new Response(
+            JSON.stringify({ error: "Agent slug, Login ID et mot de passe requis" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Find agent by slug
+        const { data: agent, error: agentError } = await supabase
+          .from("agents")
+          .select("id, name, slug, organization_id, platform, platform_agent_id")
+          .eq("slug", agent_slug)
+          .maybeSingle();
+
+        if (agentError || !agent) {
+          return new Response(
+            JSON.stringify({ error: "Agent non trouvé" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Find member by login_id
+        const { data: member, error: memberError } = await supabase
+          .from("client_members")
+          .select("id, client_id, name, email, role, login_id, password_hash, status")
+          .eq("login_id", login_id)
+          .maybeSingle();
+
+        if (memberError) {
+          console.error("Error finding member:", memberError);
+          return new Response(
+            JSON.stringify({ error: "Erreur lors de la recherche" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (!member) {
+          return new Response(
+            JSON.stringify({ error: "Identifiants invalides" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (member.status !== "active") {
+          return new Response(
+            JSON.stringify({ error: "Ce compte est désactivé" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (!member.password_hash) {
+          return new Response(
+            JSON.stringify({ error: "Aucun mot de passe défini. Contactez votre administrateur." }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Verify password
+        const memberPasswordMatch = bcrypt.compareSync(password, member.password_hash);
+        if (!memberPasswordMatch) {
+          return new Response(
+            JSON.stringify({ error: "Identifiants invalides" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Get parent client info and check agent access
+        const { data: client, error: clientFetchError } = await supabase
+          .from("clients")
+          .select("id, name, organization_id, theme, language")
+          .eq("id", member.client_id)
+          .maybeSingle();
+
+        if (clientFetchError || !client) {
+          return new Response(
+            JSON.stringify({ error: "Client parent non trouvé" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Check if parent client has access to this agent
+        const { data: assignment, error: assignmentError } = await supabase
+          .from("client_agent_assignments")
+          .select("role, can_edit_knowledge, can_edit_prompt")
+          .eq("client_id", client.id)
+          .eq("agent_id", agent.id)
+          .maybeSingle();
+
+        if (assignmentError || !assignment) {
+          return new Response(
+            JSON.stringify({ error: "Vous n'avez pas accès à cet agent" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Fetch platform API key
+        let platformApiKey: string | null = null;
+        if (agent.platform && agent.organization_id) {
+          const { data: integration } = await supabase
+            .from("organization_integrations")
+            .select("api_key")
+            .eq("organization_id", agent.organization_id)
+            .eq("platform", agent.platform)
+            .eq("is_active", true)
+            .maybeSingle();
+          platformApiKey = integration?.api_key || null;
+        }
+
+        // Update last login
+        await supabase
+          .from("client_members")
+          .update({ last_login_at: new Date().toISOString() })
+          .eq("id", member.id);
+
+        // Member role determines permissions (admin members get full access, regular members get view only)
+        const isAdminMember = member.role === "admin";
+        
+        const session = {
+          clientId: client.id,
+          clientName: client.name,
+          organizationId: client.organization_id,
+          agentId: agent.id,
+          agentName: agent.name,
+          agentSlug: agent.slug,
+          platformAgentId: agent.platform_agent_id || undefined,
+          platformApiKey: platformApiKey || undefined,
+          role: isAdminMember ? assignment.role : "viewer",
+          canEditKnowledge: isAdminMember && (assignment.can_edit_knowledge || assignment.role === "admin"),
+          canEditPrompt: isAdminMember && (assignment.can_edit_prompt || assignment.role === "admin"),
+          theme: client.theme || "light",
+          language: client.language || "fr",
+          // Member-specific fields
+          memberType: "member" as const,
+          memberId: member.id,
+          memberName: member.name,
+          memberEmail: member.email,
+          memberRole: member.role,
+        };
+
+        console.log(`Member ${member.name} logged in to agent ${agent.name}`);
+
+        return new Response(
+          JSON.stringify({ success: true, session }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "change-password": {
+        const { client_id, member_id, current_password, new_password } = params;
+        
+        if (!new_password || new_password.length < 8) {
+          return new Response(
+            JSON.stringify({ error: "Le mot de passe doit contenir au moins 8 caractères" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (!current_password) {
+          return new Response(
+            JSON.stringify({ error: "Le mot de passe actuel est requis" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Determine if changing client or member password
+        if (member_id) {
+          // Member password change
+          const { data: member, error: memberError } = await supabase
+            .from("client_members")
+            .select("id, password_hash")
+            .eq("id", member_id)
+            .maybeSingle();
+
+          if (memberError || !member) {
+            return new Response(
+              JSON.stringify({ error: "Membre non trouvé" }),
+              { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          if (!member.password_hash || !bcrypt.compareSync(current_password, member.password_hash)) {
+            return new Response(
+              JSON.stringify({ error: "Mot de passe actuel incorrect" }),
+              { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          const salt = bcrypt.genSaltSync(10);
+          const newHash = bcrypt.hashSync(new_password, salt);
+
+          const { error: updateError } = await supabase
+            .from("client_members")
+            .update({ password_hash: newHash })
+            .eq("id", member_id);
+
+          if (updateError) {
+            return new Response(
+              JSON.stringify({ error: "Erreur lors de la mise à jour" }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        } else if (client_id) {
+          // Client password change
+          const { data: client, error: clientError } = await supabase
+            .from("clients")
+            .select("id, password_hash")
+            .eq("id", client_id)
+            .maybeSingle();
+
+          if (clientError || !client) {
+            return new Response(
+              JSON.stringify({ error: "Client non trouvé" }),
+              { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          if (!client.password_hash || !bcrypt.compareSync(current_password, client.password_hash)) {
+            return new Response(
+              JSON.stringify({ error: "Mot de passe actuel incorrect" }),
+              { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          const salt = bcrypt.genSaltSync(10);
+          const newHash = bcrypt.hashSync(new_password, salt);
+
+          const { error: updateError } = await supabase
+            .from("clients")
+            .update({ password_hash: newHash })
+            .eq("id", client_id);
+
+          if (updateError) {
+            return new Response(
+              JSON.stringify({ error: "Erreur lors de la mise à jour" }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        } else {
+          return new Response(
+            JSON.stringify({ error: "Client ID ou Member ID requis" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, message: "Mot de passe modifié avec succès" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "get-profile": {
+        const { client_id, member_id } = params;
+
+        if (member_id) {
+          const { data: member, error } = await supabase
+            .from("client_members")
+            .select("id, name, email, role, login_id, status, created_at, last_login_at, client_id")
+            .eq("id", member_id)
+            .maybeSingle();
+
+          if (error || !member) {
+            return new Response(
+              JSON.stringify({ error: "Membre non trouvé" }),
+              { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          return new Response(
+            JSON.stringify({ success: true, profile: { ...member, type: "member" } }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        } else if (client_id) {
+          const { data: client, error } = await supabase
+            .from("clients")
+            .select("id, name, email, login_id, status, theme, language, created_at")
+            .eq("id", client_id)
+            .maybeSingle();
+
+          if (error || !client) {
+            return new Response(
+              JSON.stringify({ error: "Client non trouvé" }),
+              { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          return new Response(
+            JSON.stringify({ success: true, profile: { ...client, type: "client" } }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ error: "Client ID ou Member ID requis" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "update-profile": {
+        const { client_id, member_id, name, email } = params;
+
+        if (member_id) {
+          const { error } = await supabase
+            .from("client_members")
+            .update({ name, email })
+            .eq("id", member_id);
+
+          if (error) {
+            return new Response(
+              JSON.stringify({ error: "Erreur lors de la mise à jour" }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        } else if (client_id) {
+          const { error } = await supabase
+            .from("clients")
+            .update({ name, email })
+            .eq("id", client_id);
+
+          if (error) {
+            return new Response(
+              JSON.stringify({ error: "Erreur lors de la mise à jour" }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        } else {
+          return new Response(
+            JSON.stringify({ error: "Client ID ou Member ID requis" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, message: "Profil mis à jour" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // ========== ADMIN MEMBER MANAGEMENT ==========
+
+      case "get-members": {
+        const { client_id } = params;
+
+        if (!client_id) {
+          return new Response(
+            JSON.stringify({ error: "Client ID requis" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const { data: members, error } = await supabase
+          .from("client_members")
+          .select("id, name, email, role, login_id, status, created_at, last_login_at")
+          .eq("client_id", client_id)
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          return new Response(
+            JSON.stringify({ error: "Erreur lors de la récupération" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, members: members || [] }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "admin-add-member": {
+        const { client_id, name, email, login_id, password, role } = params;
+
+        if (!client_id || !name || !email || !login_id || !password) {
+          return new Response(
+            JSON.stringify({ error: "Tous les champs sont requis" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (password.length < 8) {
+          return new Response(
+            JSON.stringify({ error: "Le mot de passe doit contenir au moins 8 caractères" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Check if login_id already exists
+        const { data: existing } = await supabase
+          .from("client_members")
+          .select("id")
+          .eq("login_id", login_id)
+          .maybeSingle();
+
+        if (existing) {
+          return new Response(
+            JSON.stringify({ error: "Ce login ID existe déjà" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const salt = bcrypt.genSaltSync(10);
+        const passwordHash = bcrypt.hashSync(password, salt);
+
+        const { data: newMember, error } = await supabase
+          .from("client_members")
+          .insert({
+            client_id,
+            name,
+            email,
+            login_id,
+            password_hash: passwordHash,
+            role: role || "member",
+            status: "active",
+          })
+          .select()
+          .single();
+
+        if (error) {
+          console.error("Error adding member:", error);
+          return new Response(
+            JSON.stringify({ error: "Erreur lors de l'ajout du membre" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, member: newMember }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "admin-update-member": {
+        const { member_id, name, email, role, status } = params;
+
+        if (!member_id) {
+          return new Response(
+            JSON.stringify({ error: "Member ID requis" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const updates: Record<string, any> = {};
+        if (name !== undefined) updates.name = name;
+        if (email !== undefined) updates.email = email;
+        if (role !== undefined) updates.role = role;
+        if (status !== undefined) updates.status = status;
+
+        const { error } = await supabase
+          .from("client_members")
+          .update(updates)
+          .eq("id", member_id);
+
+        if (error) {
+          return new Response(
+            JSON.stringify({ error: "Erreur lors de la mise à jour" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, message: "Membre mis à jour" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "admin-delete-member": {
+        const { member_id } = params;
+
+        if (!member_id) {
+          return new Response(
+            JSON.stringify({ error: "Member ID requis" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const { error } = await supabase
+          .from("client_members")
+          .delete()
+          .eq("id", member_id);
+
+        if (error) {
+          return new Response(
+            JSON.stringify({ error: "Erreur lors de la suppression" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, message: "Membre supprimé" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "admin-reset-member-password": {
+        const { member_id, new_password } = params;
+
+        if (!member_id || !new_password) {
+          return new Response(
+            JSON.stringify({ error: "Member ID et nouveau mot de passe requis" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (new_password.length < 8) {
+          return new Response(
+            JSON.stringify({ error: "Le mot de passe doit contenir au moins 8 caractères" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const salt = bcrypt.genSaltSync(10);
+        const passwordHash = bcrypt.hashSync(new_password, salt);
+
+        const { error } = await supabase
+          .from("client_members")
+          .update({ 
+            password_hash: passwordHash,
+            password_reset_token: null,
+            password_reset_expires_at: null
+          })
+          .eq("id", member_id);
+
+        if (error) {
+          return new Response(
+            JSON.stringify({ error: "Erreur lors de la réinitialisation" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, message: "Mot de passe réinitialisé" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       default:
         return new Response(
           JSON.stringify({ error: "Action non reconnue" }),

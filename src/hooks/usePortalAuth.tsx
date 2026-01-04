@@ -22,6 +22,12 @@ export interface PortalSession {
   theme: string;
   language: string;
   isSuperAdmin?: boolean;
+  // Member-specific fields
+  memberType?: 'client' | 'member';
+  memberId?: string;
+  memberName?: string;
+  memberEmail?: string;
+  memberRole?: string;
 }
 
 const PORTAL_SESSION_KEY = 'ava_portal_session';
@@ -127,6 +133,7 @@ export const usePortalAuth = () => {
   const login = useCallback(async (agentSlug: string, loginId: string, password: string) => {
     setIsLoading(true);
     try {
+      // Try client login first
       const { data, error } = await supabase.functions.invoke('client-auth', {
         body: { 
           action: 'login-by-agent-slug', 
@@ -137,12 +144,37 @@ export const usePortalAuth = () => {
       });
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      
+      // If client login failed, try member login
+      if (data?.error) {
+        const { data: memberData, error: memberError } = await supabase.functions.invoke('client-auth', {
+          body: {
+            action: 'login-member',
+            agent_slug: agentSlug,
+            login_id: loginId,
+            password
+          }
+        });
+        
+        if (memberError) throw memberError;
+        if (memberData?.error) throw new Error(memberData.error);
+        if (!memberData?.session) throw new Error('Erreur de connexion');
+        
+        const portalSession: PortalSession = {
+          ...memberData.session,
+          isSuperAdmin: false,
+        };
+        localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(portalSession));
+        setSession(portalSession);
+        return portalSession;
+      }
+      
       if (!data?.session) throw new Error('Erreur de connexion');
 
       const portalSession: PortalSession = {
         ...data.session,
         isSuperAdmin: false,
+        memberType: 'client',
       };
       localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(portalSession));
       setSession(portalSession);
