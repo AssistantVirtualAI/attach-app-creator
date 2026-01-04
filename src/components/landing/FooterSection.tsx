@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import { Activity, Github, Twitter, Linkedin, Mail } from "lucide-react";
+import { Github, Twitter, Linkedin, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
+import { AvaLogo } from "@/components/shared/AvaLogo";
 
 const footerLinks = {
   product: [
@@ -47,12 +48,9 @@ export const FooterSection = () => {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="flex items-center gap-3 mb-6"
+              className="mb-6"
             >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                <Activity className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold">AVA Statistics</span>
+              <AvaLogo size="sm" animated={false} />
             </motion.div>
             <p className="text-muted-foreground mb-6">
               La plateforme complète pour créer et gérer vos agents IA conversationnels.

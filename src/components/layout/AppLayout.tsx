@@ -1,6 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, Menu, X, Moon, Sun } from 'lucide-react';
+import { Menu, X, Moon, Sun } from 'lucide-react';
+import { AvaLogo } from '@/components/shared/AvaLogo';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useOrganization } from '@/context/OrganizationContext';
@@ -53,14 +54,8 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         >
           <Menu className="w-6 h-6 text-foreground" />
         </button>
-        <Link to="/" className="flex items-center gap-2 ml-3">
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-accent rounded-lg blur-sm opacity-60" />
-            <div className="relative w-8 h-8 rounded-lg bg-gradient-to-br from-primary via-secondary to-accent flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-primary-foreground" />
-            </div>
-          </div>
-          <span className="font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">AVA Statistics</span>
+        <Link to="/" className="ml-3">
+          <AvaLogo size="sm" animated={false} />
         </Link>
       </header>
 
@@ -79,32 +74,8 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
         <div className="flex flex-col h-full">
           {/* Logo - AVA Statistics */}
           <div className="p-6 border-b border-sidebar-border flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-3" onClick={() => setIsSidebarOpen(false)}>
-              <motion.div 
-                className="relative"
-                whileHover={{ scale: 1.05 }}
-                transition={{ type: "spring", stiffness: 400 }}
-              >
-                <motion.div 
-                  className="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-accent rounded-xl blur-lg opacity-60"
-                  animate={{ 
-                    opacity: [0.4, 0.7, 0.4],
-                    scale: [1, 1.1, 1]
-                  }}
-                  transition={{ 
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                />
-                <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-primary via-secondary to-accent flex items-center justify-center shadow-xl">
-                  <BarChart3 className="w-6 h-6 text-primary-foreground" />
-                </div>
-              </motion.div>
-              <div className="flex flex-col">
-                <h1 className="text-xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">AVA Statistics</h1>
-                <span className="text-xs text-muted-foreground">Analytics Platform</span>
-              </div>
+            <Link to="/" onClick={() => setIsSidebarOpen(false)}>
+              <AvaLogo size="md" animated={true} />
             </Link>
             <button
               onClick={() => setIsSidebarOpen(false)}

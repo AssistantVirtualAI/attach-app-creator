@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, Clock, TrendingUp, Phone, Activity, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { PortalStatCard } from '@/components/portal/PortalStatCard';
-import { AvaLogo } from '@/components/portal/AvaLogo';
+import { AvaLogo } from '@/components/shared/AvaLogo';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const PortalDashboard = () => {
