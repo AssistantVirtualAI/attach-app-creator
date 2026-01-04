@@ -270,3 +270,83 @@ export const usePortalUpdatePrompt = () => {
     },
   });
 };
+
+// Hook for portal phone numbers
+export const usePortalPhoneNumbers = () => {
+  const { session } = usePortal();
+
+  return useQuery({
+    queryKey: ['portal-phone-numbers', session?.platformAgentId],
+    queryFn: async () => {
+      if (!session?.platformAgentId || !session?.platformApiKey) {
+        return { phone_numbers: [] };
+      }
+
+      const { data, error } = await supabase.functions.invoke('elevenlabs-phone-numbers', {
+        body: {
+          action: 'list',
+          agentId: session.platformAgentId,
+          apiKey: session.platformApiKey,
+        },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!session?.platformAgentId && !!session?.platformApiKey,
+  });
+};
+
+// Hook for syncing conversations
+export const usePortalSyncConversations = () => {
+  const { session } = usePortal();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!session?.platformAgentId || !session?.platformApiKey) {
+        throw new Error('Configuration manquante');
+      }
+
+      const { data, error } = await supabase.functions.invoke('sync-elevenlabs-conversations', {
+        body: {
+          action: 'sync',
+          agentId: session.platformAgentId,
+          apiKey: session.platformApiKey,
+          limit: 100,
+        },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['portal-conversations'] });
+    },
+  });
+};
+
+// Hook for conversation audio
+export const usePortalConversationAudio = () => {
+  const { session } = usePortal();
+
+  return useMutation({
+    mutationFn: async ({ conversationId, format = 'mp3' }: { conversationId: string; format?: string }) => {
+      if (!session?.platformApiKey) {
+        throw new Error('Configuration manquante');
+      }
+
+      const { data, error } = await supabase.functions.invoke('elevenlabs-convai-conversations', {
+        body: {
+          action: 'audio',
+          conversationId,
+          apiKey: session.platformApiKey,
+          format,
+        },
+      });
+
+      if (error) throw error;
+      return data;
+    },
+  });
+};

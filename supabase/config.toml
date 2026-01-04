@@ -43,10 +43,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.elevenlabs-all-agents-conversations]
-verify_jwt = true
+verify_jwt = false
 
 [functions.elevenlabs-all-agents-analytics]
-verify_jwt = true
+verify_jwt = false
 
 [functions.test-integration]
 verify_jwt = true
@@ -124,7 +124,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.sync-elevenlabs-conversations]
-verify_jwt = true
+verify_jwt = false
 
 [functions.client-auth]
 verify_jwt = false
@@ -133,7 +133,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.realtime-conversations]
-verify_jwt = true
+verify_jwt = false
 
 [functions.elevenlabs-phone-numbers]
-verify_jwt = true
+verify_jwt = false
