@@ -210,12 +210,27 @@ serve(async (req) => {
     let platformAgentId: string | null = null;
     
     if (agentId) {
-      // Get the agent to find its platform_agent_id and API key
-      const { data: agent } = await supabaseService
-        .from("agents")
-        .select("platform_agent_id, platform_api_key, organization_id, config, name")
-        .eq("id", agentId)
-        .single();
+      let agent = null;
+      
+      // First try by UUID (internal id)
+      if (isValidUUID(agentId)) {
+        const { data } = await supabaseService
+          .from("agents")
+          .select("platform_agent_id, platform_api_key, organization_id, config, name")
+          .eq("id", agentId)
+          .single();
+        agent = data;
+      }
+      
+      // If not found or agentId is not UUID, try by platform_agent_id (ElevenLabs ID)
+      if (!agent) {
+        const { data } = await supabaseService
+          .from("agents")
+          .select("platform_agent_id, platform_api_key, organization_id, config, name")
+          .eq("platform_agent_id", agentId)
+          .single();
+        agent = data;
+      }
 
       if (agent) {
         platformAgentId = agent.platform_agent_id;
@@ -241,6 +256,12 @@ serve(async (req) => {
         }
         
         console.log(`[KB] Agent: ${agent.name}, platformAgentId: ${platformAgentId}`);
+      } else {
+        // If still no agent found but agentId looks like ElevenLabs ID, use it directly as platformAgentId
+        if (!isValidUUID(agentId)) {
+          platformAgentId = agentId;
+          console.log(`[KB] Using agentId directly as platformAgentId: ${platformAgentId}`);
+        }
       }
     }
 
