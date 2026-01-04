@@ -15,7 +15,9 @@ import {
   ArrowLeft,
   Crown,
   Sparkles,
-  Brain
+  Brain,
+  User,
+  Users
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AvaLogo } from '@/components/portal/AvaLogo';
@@ -69,8 +71,12 @@ const PortalLayoutContent = () => {
     { icon: FileCode, label: 'Prompt & Endpoints', href: `/portal/${agentSlug}/prompt`, color: 'text-orange-400' },
   ];
 
-  // Add settings for admins and super admins
+  // Add profile for all users
+  navItems.push({ icon: User, label: 'Mon Profil', href: `/portal/${agentSlug}/profile`, color: 'text-teal-400' });
+
+  // Add settings and members for admins and super admins
   if (hasEditAccess() || isSuperAdminSession) {
+    navItems.push({ icon: Users, label: 'Membres', href: `/portal/${agentSlug}/members`, color: 'text-amber-400' });
     navItems.push({ icon: Settings, label: 'Configuration', href: `/portal/${agentSlug}/settings`, color: 'text-pink-400' });
   }
 

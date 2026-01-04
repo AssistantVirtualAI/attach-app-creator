@@ -75,6 +75,8 @@ import PortalKnowledge from "./pages/PortalKnowledge";
 import PortalPrompt from "./pages/PortalPrompt";
 import PortalSettings from "./pages/PortalSettings";
 import PortalAIAnalysis from "./pages/PortalAIAnalysis";
+import PortalProfile from "./pages/PortalProfile";
+import PortalMembers from "./pages/PortalMembers";
 
 const queryClient = new QueryClient();
 
@@ -443,6 +445,8 @@ const App = () => (
                   <Route path="prompt" element={<PortalPrompt />} />
                   <Route path="settings" element={<PortalSettings />} />
                   <Route path="ai-analysis" element={<PortalAIAnalysis />} />
+                  <Route path="profile" element={<PortalProfile />} />
+                  <Route path="members" element={<PortalMembers />} />
                 </Route>
 
                 {/* Public Widget Routes - No authentication */}

@@ -864,24 +864,42 @@ export type Database = {
           created_at: string | null
           email: string
           id: string
+          last_login_at: string | null
+          login_id: string | null
           name: string | null
+          password_hash: string | null
+          password_reset_expires_at: string | null
+          password_reset_token: string | null
           role: string | null
+          status: string | null
         }
         Insert: {
           client_id: string
           created_at?: string | null
           email: string
           id?: string
+          last_login_at?: string | null
+          login_id?: string | null
           name?: string | null
+          password_hash?: string | null
+          password_reset_expires_at?: string | null
+          password_reset_token?: string | null
           role?: string | null
+          status?: string | null
         }
         Update: {
           client_id?: string
           created_at?: string | null
           email?: string
           id?: string
+          last_login_at?: string | null
+          login_id?: string | null
           name?: string | null
+          password_hash?: string | null
+          password_reset_expires_at?: string | null
+          password_reset_token?: string | null
           role?: string | null
+          status?: string | null
         }
         Relationships: [
           {
