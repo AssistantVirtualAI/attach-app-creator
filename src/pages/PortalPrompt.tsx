@@ -5,16 +5,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { FileCode, MessageSquare, Eye, Globe, Key, Copy, Save, Loader2, AlertCircle } from 'lucide-react';
+import { FileCode, MessageSquare, Eye, Save, Loader2, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
 const PortalPrompt = () => {
-  const { session, canEditPrompt, hasEditAccess } = usePortal();
+  const { session } = usePortal();
   const { data: agentConfig, isLoading } = usePortalAgentConfig();
   const updatePrompt = usePortalUpdatePrompt();
 
-  const canEdit = canEditPrompt() || hasEditAccess();
+  // Only admins can edit: super_admin, admin role, client principal, or member with admin role
+  const isAdmin = session?.role === 'super_admin' || 
+                  session?.role === 'admin' || 
+                  session?.memberType === 'client' || 
+                  session?.memberRole === 'admin';
+  const canEdit = isAdmin;
 
   const [systemPrompt, setSystemPrompt] = useState('');
   const [firstMessage, setFirstMessage] = useState('');
@@ -51,13 +56,6 @@ const PortalPrompt = () => {
     setHasChanges(true);
   };
 
-  const endpoints = [
-    { name: 'Widget Embed', url: `${window.location.origin}/iframe/${session?.agentId}` },
-    { name: 'Prototype', url: `${window.location.origin}/prototype/${session?.agentId}` },
-    { name: 'Agent ID (Supabase)', url: session?.agentId || '' },
-    { name: 'Agent ID (ElevenLabs)', url: session?.platformAgentId || '' },
-  ];
-
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <div className="flex items-center justify-between">
@@ -66,7 +64,7 @@ const PortalPrompt = () => {
             <FileCode className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Prompt & Endpoints</h1>
+            <h1 className="text-2xl font-bold">Prompt</h1>
             <p className="text-muted-foreground">{session?.agentName}</p>
           </div>
         </div>
@@ -156,36 +154,6 @@ const PortalPrompt = () => {
               </CardContent>
             </Card>
           </div>
-
-          <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="h-5 w-5 text-primary" />
-                Endpoints API
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {endpoints.filter(e => e.url).map((endpoint) => (
-                <div key={endpoint.name} className="flex items-center justify-between gap-4 p-3 rounded-lg bg-muted/30">
-                  <div className="flex items-center gap-2">
-                    <Key className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">{endpoint.name}</span>
-                  </div>
-                  <code className="text-sm truncate max-w-[400px] text-muted-foreground">{endpoint.url}</code>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => { 
-                      navigator.clipboard.writeText(endpoint.url); 
-                      toast.success('Copié'); 
-                    }}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
         </>
       )}
     </motion.div>
