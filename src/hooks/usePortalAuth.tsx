@@ -29,7 +29,8 @@ const PORTAL_SESSION_KEY = 'ava_portal_session';
 export const usePortalAuth = () => {
   const [session, setSession] = useState<PortalSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [supabaseUser, setSupabaseUser] = useState<any>(null);
+  // undefined = still checking, null = not logged in, user = logged in
+  const [supabaseUser, setSupabaseUser] = useState<any | undefined>(undefined);
 
   // Check Supabase auth on mount
   useEffect(() => {
