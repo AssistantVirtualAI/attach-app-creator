@@ -6,6 +6,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Validation helpers
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUUID(value: unknown): boolean {
+  return typeof value === 'string' && UUID_REGEX.test(value);
+}
+
+function sanitizeString(value: unknown, maxLength: number = 50000): string | null {
+  if (typeof value !== 'string') return null;
+  return value.slice(0, maxLength);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -49,6 +61,7 @@ serve(async (req) => {
       });
     }
 
+    const body = await req.json();
     const { 
       conversationId, 
       externalConversationId,
@@ -57,17 +70,44 @@ serve(async (req) => {
       transcript: externalTranscript,
       platformAgentId,
       forceRegenerate = false
-    } = await req.json();
+    } = body;
+
+    // Input validation
+    if (conversationId && !isValidUUID(conversationId)) {
+      return new Response(JSON.stringify({ error: 'Invalid conversationId format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (providedAgentId && !isValidUUID(providedAgentId)) {
+      return new Response(JSON.stringify({ error: 'Invalid agentId format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (providedOrgId && !isValidUUID(providedOrgId)) {
+      return new Response(JSON.stringify({ error: 'Invalid organizationId format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Sanitize external inputs
+    const sanitizedTranscript = externalTranscript ? sanitizeString(externalTranscript, 100000) : null;
+    const sanitizedExternalConvId = externalConversationId ? sanitizeString(externalConversationId, 100) : null;
+    const sanitizedPlatformAgentId = platformAgentId ? sanitizeString(platformAgentId, 100) : null;
     
-    const effectiveConversationId = conversationId || externalConversationId;
-    const isExternalConversation = !conversationId && !!externalConversationId;
+    const effectiveConversationId = conversationId || sanitizedExternalConvId;
+    const isExternalConversation = !conversationId && !!sanitizedExternalConvId;
     
     console.log('[analyze-conversation] Params', {
       requestId,
       effectiveConversationId,
       isExternalConversation,
       forceRegenerate,
-      hasTranscript: !!externalTranscript
+      hasTranscript: !!sanitizedTranscript
     });
 
     // CACHE CHECK: Return existing analysis if available and not forcing regenerate
@@ -125,11 +165,11 @@ serve(async (req) => {
     }
 
     // If we have a platformAgentId but no agentId, try to find the agent
-    if (!agentId && platformAgentId) {
+    if (!agentId && sanitizedPlatformAgentId) {
       const { data: agentData } = await serviceClient
         .from('agents')
         .select('id, organization_id')
-        .eq('platform_agent_id', platformAgentId)
+        .eq('platform_agent_id', sanitizedPlatformAgentId)
         .single();
       
       if (agentData) {
@@ -141,7 +181,7 @@ serve(async (req) => {
     timings.dataFetch = Date.now() - t0;
 
     // Build transcript from best available source
-    let transcriptText = externalTranscript;
+    let transcriptText = sanitizedTranscript;
     let transcriptSource = 'external';
     
     if (!transcriptText && conversation) {

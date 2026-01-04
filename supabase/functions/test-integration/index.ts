@@ -6,14 +6,39 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Validation helpers
+const VALID_PLATFORMS = ['elevenlabs', 'vapi', 'retell'] as const;
+type ValidPlatform = typeof VALID_PLATFORMS[number];
+
+function isValidPlatform(value: unknown): value is ValidPlatform {
+  return typeof value === 'string' && VALID_PLATFORMS.includes(value as ValidPlatform);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { platform } = await req.json()
-    console.log(`Testing integration for platform: ${platform}`)
+    const body = await req.json();
+    const { platform } = body;
+
+    // Input validation
+    if (!platform) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Platform is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!isValidPlatform(platform)) {
+      return new Response(
+        JSON.stringify({ success: false, error: `Invalid platform. Must be one of: ${VALID_PLATFORMS.join(', ')}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[test-integration] Testing platform: ${platform}`)
 
     // Get user's integration using Service Role Key (bypasses RLS)
     const supabase = createClient(
@@ -21,12 +46,22 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const authHeader = req.headers.get('Authorization')!
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Authorization header required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const token = authHeader.replace('Bearer ', '')
     const { data: { user } } = await supabase.auth.getUser(token)
 
     if (!user) {
-      throw new Error('Not authenticated')
+      return new Response(
+        JSON.stringify({ success: false, error: 'Not authenticated' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const { data: integration, error: fetchError } = await supabase
@@ -37,7 +72,10 @@ serve(async (req) => {
       .single()
 
     if (fetchError || !integration) {
-      throw new Error('Integration not found')
+      return new Response(
+        JSON.stringify({ success: false, error: 'Integration not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     let testResult = { success: false, error: '' }
@@ -54,9 +92,9 @@ serve(async (req) => {
         if (!response.ok) {
           const errorText = await response.text()
           testResult.error = `HTTP ${response.status}: ${errorText}`
-          console.error('ElevenLabs test failed:', errorText)
+          console.error('[test-integration] ElevenLabs test failed:', errorText)
         } else {
-          console.log('ElevenLabs test succeeded')
+          console.log('[test-integration] ElevenLabs test succeeded')
         }
         break
 
@@ -70,9 +108,9 @@ serve(async (req) => {
         if (!vapiResponse.ok) {
           const errorText = await vapiResponse.text()
           testResult.error = `HTTP ${vapiResponse.status}: ${errorText}`
-          console.error('Vapi test failed:', errorText)
+          console.error('[test-integration] Vapi test failed:', errorText)
         } else {
-          console.log('Vapi test succeeded')
+          console.log('[test-integration] Vapi test succeeded')
         }
         break
 
@@ -89,14 +127,11 @@ serve(async (req) => {
         if (!retellResponse.ok) {
           const errorText = await retellResponse.text()
           testResult.error = `HTTP ${retellResponse.status}: ${errorText}`
-          console.error('Retell test failed:', errorText)
+          console.error('[test-integration] Retell test failed:', errorText)
         } else {
-          console.log('Retell test succeeded')
+          console.log('[test-integration] Retell test succeeded')
         }
         break
-
-      default:
-        throw new Error(`Unsupported platform: ${platform}`)
     }
 
     // Update test status

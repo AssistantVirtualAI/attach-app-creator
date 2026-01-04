@@ -8,6 +8,34 @@ const corsHeaders = {
 
 const ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1";
 
+// Validation helpers
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VALID_ACTIONS = ['list', 'get', 'get_document', 'add', 'create_text', 'create_url', 'delete', 'link_to_agent', 'unlink_from_agent'] as const;
+type ValidAction = typeof VALID_ACTIONS[number];
+
+function isValidUUID(value: unknown): boolean {
+  return typeof value === 'string' && UUID_REGEX.test(value);
+}
+
+function isValidAction(value: unknown): value is ValidAction {
+  return typeof value === 'string' && VALID_ACTIONS.includes(value as ValidAction);
+}
+
+function sanitizeString(value: unknown, maxLength: number = 10000): string | null {
+  if (typeof value !== 'string') return null;
+  return value.slice(0, maxLength).trim();
+}
+
+function isValidUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -20,6 +48,52 @@ serve(async (req) => {
 
     const body = await req.json();
     const { action, agentId, apiKey, documentId, title, content, url, category, itemId, search, pageSize } = body;
+
+    // Validate action
+    if (!action) {
+      return new Response(
+        JSON.stringify({ error: 'Action is required', success: false }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!isValidAction(action)) {
+      return new Response(
+        JSON.stringify({ error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}`, success: false }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate agentId if provided
+    if (agentId && !isValidUUID(agentId)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid agent ID format', success: false }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate documentId/itemId if provided
+    const docId = documentId || itemId;
+    if (docId && typeof docId === 'string' && docId.length > 100) {
+      return new Response(
+        JSON.stringify({ error: 'Document ID too long', success: false }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Sanitize text inputs
+    const sanitizedTitle = title ? sanitizeString(title, 500) : null;
+    const sanitizedContent = content ? sanitizeString(content, 100000) : null;
+    const sanitizedCategory = category ? sanitizeString(category, 100) : null;
+    const sanitizedSearch = search ? sanitizeString(search, 200) : null;
+
+    // Validate URL if provided
+    if (url && !isValidUrl(url)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid URL format', success: false }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     
     console.log(`[KB] Action: ${action}, agentId: ${agentId}`);
 
@@ -107,8 +181,8 @@ serve(async (req) => {
       case "get": {
         // List all knowledge base documents using the dedicated KB endpoint
         const params = new URLSearchParams();
-        if (pageSize) params.append("page_size", pageSize.toString());
-        if (search) params.append("search", search);
+        if (pageSize) params.append("page_size", String(Math.min(Number(pageSize) || 100, 100)));
+        if (sanitizedSearch) params.append("search", sanitizedSearch);
         
         const queryString = params.toString() ? `?${params.toString()}` : "";
         
@@ -194,11 +268,14 @@ serve(async (req) => {
       case "add":
       case "create_text": {
         // Create a text document using the dedicated endpoint
-        const docName = title || `Document ${new Date().toISOString()}`;
-        const docContent = content || "";
+        const docName = sanitizedTitle || `Document ${new Date().toISOString()}`;
+        const docContent = sanitizedContent || "";
         
         if (!docContent) {
-          throw new Error("Le contenu est requis pour créer un document texte");
+          return new Response(
+            JSON.stringify({ error: "Le contenu est requis pour créer un document texte", success: false }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
 
         console.log(`[KB] Creating text document: ${docName}`);
@@ -252,9 +329,12 @@ serve(async (req) => {
       }
 
       case "create_url": {
-        // Create a document from URL
+        // Create a document from URL - validation already done above
         if (!url) {
-          throw new Error("L'URL est requise pour créer un document depuis une URL");
+          return new Response(
+            JSON.stringify({ error: "L'URL est requise pour créer un document depuis une URL", success: false }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
 
         console.log(`[KB] Creating URL document: ${url}`);
@@ -264,7 +344,7 @@ serve(async (req) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             url: url,
-            name: title || url,
+            name: sanitizedTitle || url,
           }),
         });
 
