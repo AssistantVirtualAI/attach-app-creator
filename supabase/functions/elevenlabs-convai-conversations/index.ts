@@ -133,6 +133,16 @@ serve(async (req) => {
         const detailsData = await detailsResponse.json();
         console.log(`[conversations] Got details for ${conversationId}, transcript type: ${typeof detailsData.transcript}, isArray: ${Array.isArray(detailsData.transcript)}`);
         
+        // Log analysis availability for debugging
+        console.log(`[conversations] Analysis available:`, {
+          hasSentiment: !!detailsData.analysis?.sentiment,
+          hasSatisfaction: detailsData.analysis?.satisfaction_score !== undefined,
+          hasSummary: !!detailsData.analysis?.summary,
+          hasDataCollection: !!detailsData.analysis?.data_collection_results,
+          hasEvaluation: !!detailsData.analysis?.evaluation_criteria_results,
+          analysisKeys: detailsData.analysis ? Object.keys(detailsData.analysis) : [],
+        });
+        
         // Normalize transcript to always be an array
         let normalizedTranscript: Array<{ role: string; message: string; time_in_call_secs?: number }> = [];
         if (Array.isArray(detailsData.transcript)) {
@@ -166,13 +176,35 @@ serve(async (req) => {
 
         if (!audioResponse.ok) {
           const errorText = await audioResponse.text();
-          console.error('ElevenLabs API error:', audioResponse.status, errorText);
-          throw new Error(`ElevenLabs API error: ${audioResponse.status}`);
+          console.error('[conversations] Audio API error:', audioResponse.status, errorText);
+          
+          // Return a specific error for audio not available
+          return new Response(
+            JSON.stringify({ 
+              error: 'Audio not available',
+              audio_unavailable: true,
+              reason: audioResponse.status === 404 ? 'not_found' : 'api_error'
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
 
-        // Get audio as base64 for easier client handling
+        // Get audio as base64 using a safe method for large files
         const audioBuffer = await audioResponse.arrayBuffer();
-        const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+        const uint8Array = new Uint8Array(audioBuffer);
+        
+        console.log(`[conversations] Audio buffer size: ${uint8Array.length} bytes`);
+        
+        // Safe base64 encoding for large files - chunk approach to avoid stack overflow
+        let binaryString = '';
+        const chunkSize = 32768;
+        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+          const chunk = uint8Array.slice(i, Math.min(i + chunkSize, uint8Array.length));
+          binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+        }
+        const base64Audio = btoa(binaryString);
+        
+        console.log(`[conversations] Audio encoded, base64 length: ${base64Audio.length}`);
         
         return new Response(
           JSON.stringify({ 
