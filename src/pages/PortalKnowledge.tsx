@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { usePortal } from '@/hooks/usePortalAuth';
 import { 
   usePortalKnowledgeBase, 
@@ -13,7 +13,8 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { BookOpen, Search, FileText, Plus, Calendar, Trash2, ExternalLink, Loader2, AlertCircle, Eye, Edit, Link as LinkIcon } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { BookOpen, Search, FileText, Plus, Calendar, Trash2, ExternalLink, Loader2, AlertCircle, Eye, Edit, Link as LinkIcon, RefreshCw, Filter } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { GlowBadge } from '@/components/portal/GlowBadge';
@@ -29,6 +30,7 @@ const PortalKnowledge = () => {
   const updateDocument = usePortalUpdateKnowledgeDocument();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newDocName, setNewDocName] = useState('');
   const [newDocContent, setNewDocContent] = useState('');
@@ -45,10 +47,33 @@ const PortalKnowledge = () => {
   
   // Read from knowledge_base.items structure
   const items = kbData?.knowledge_base?.items || [];
+  const allDocumentsCount = kbData?.knowledge_base?.all_documents_count || items.length;
+  
+  // Get unique categories
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    items.forEach((doc: any) => {
+      const cat = doc.category || doc.type || 'Général';
+      cats.add(cat);
+    });
+    return Array.from(cats).sort();
+  }, [items]);
 
   const filteredDocuments = items.filter((doc: any) => {
     const docName = doc.name || doc.title || '';
-    return docName.toLowerCase().includes(searchTerm.toLowerCase());
+    const docCategory = doc.category || doc.type || 'Général';
+    
+    // Search filter
+    if (searchTerm && !docName.toLowerCase().includes(searchTerm.toLowerCase())) {
+      return false;
+    }
+    
+    // Category filter
+    if (categoryFilter !== 'all' && docCategory !== categoryFilter) {
+      return false;
+    }
+    
+    return true;
   });
 
   const handleAddDocument = async () => {
@@ -137,10 +162,13 @@ const PortalKnowledge = () => {
       <PortalPageHeader
         icon={BookOpen}
         title="Base de connaissances"
-        description={session?.agentName}
+        description={`${session?.agentName} • ${items.length} document(s) liés${allDocumentsCount > items.length ? ` (${allDocumentsCount} total)` : ''}`}
         gradient="green-cyan"
         actions={
-          <>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
             {!canEdit && (
               <GlowBadge variant="secondary">Lecture seule</GlowBadge>
             )}
@@ -153,7 +181,7 @@ const PortalKnowledge = () => {
                 Ajouter
               </Button>
             )}
-          </>
+          </div>
         }
       />
 
@@ -183,18 +211,37 @@ const PortalKnowledge = () => {
 
       {items.length > 0 && (
         <div className="space-y-4">
-          {/* Search */}
+          {/* Search and Filters */}
           <Card className="bg-card/50 backdrop-blur-sm border-border/30">
             <CardContent className="p-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Rechercher dans la base de connaissances..." 
-                  value={searchTerm} 
-                  onChange={(e) => setSearchTerm(e.target.value)} 
-                  className="pl-10 bg-muted/30 border-border/50 h-11" 
-                />
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Rechercher dans la base de connaissances..." 
+                    value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)} 
+                    className="pl-10 bg-muted/30 border-border/50 h-11" 
+                  />
+                </div>
+                {categories.length > 1 && (
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="w-full md:w-48 bg-muted/30 border-border/50">
+                      <Filter className="h-4 w-4 mr-2" />
+                      <SelectValue placeholder="Catégorie" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes les catégories</SelectItem>
+                      {categories.map(cat => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                {filteredDocuments.length} document(s) affiché(s) sur {items.length}
+              </p>
             </CardContent>
           </Card>
 

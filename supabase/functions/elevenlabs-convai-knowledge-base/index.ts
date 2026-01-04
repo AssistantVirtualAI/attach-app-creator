@@ -305,25 +305,49 @@ serve(async (req) => {
     switch (action) {
       case "list":
       case "get": {
-        const params = new URLSearchParams();
-        if (pageSize) params.append("page_size", String(Math.min(Number(pageSize) || 100, 100)));
-        if (sanitizedSearch) params.append("search", sanitizedSearch);
+        // Fetch ALL documents with pagination to ensure we get everything
+        const allDocuments: any[] = [];
+        let cursor: string | null = null;
+        let fetchCount = 0;
+        const maxFetches = 10; // Safety limit
         
-        const queryString = params.toString() ? `?${params.toString()}` : "";
+        console.log(`[KB] Fetching knowledge base list for agent ${platformAgentId || 'all'}`);
         
-        console.log(`[KB] Fetching knowledge base list`);
-        const data = await callElevenLabs(`/convai/knowledge-base${queryString}`);
+        do {
+          const params = new URLSearchParams();
+          params.append("page_size", "300"); // Max page size
+          if (sanitizedSearch) params.append("search", sanitizedSearch);
+          if (cursor) params.append("cursor", cursor);
+          
+          const queryString = `?${params.toString()}`;
+          const data = await callElevenLabs(`/convai/knowledge-base${queryString}`);
+          
+          const documents = data.documents || data.knowledge_base || [];
+          allDocuments.push(...documents);
+          
+          cursor = data.next_cursor || null;
+          fetchCount++;
+          
+          console.log(`[KB] Fetched page ${fetchCount}: ${documents.length} documents, has_more: ${!!data.has_more}`);
+        } while (cursor && fetchCount < maxFetches);
         
-        console.log(`[KB] Response keys: ${Object.keys(data).join(', ')}`);
+        console.log(`[KB] Total documents fetched: ${allDocuments.length}`);
         
-        const documents = data.documents || data.knowledge_base || [];
-        console.log(`[KB] Found ${documents.length} total documents`);
-        
-        let filteredDocs = documents;
+        let filteredDocs = allDocuments;
         if (platformAgentId) {
-          filteredDocs = documents.filter((doc: any) => {
+          filteredDocs = allDocuments.filter((doc: any) => {
             const dependentAgents = doc.dependent_agents || [];
-            const isLinked = dependentAgents.some((a: any) => a.id === platformAgentId || a.agent_id === platformAgentId);
+            // Check all possible ID formats
+            const isLinked = dependentAgents.some((a: any) => {
+              const agentIdMatches = a.id === platformAgentId || 
+                                     a.agent_id === platformAgentId ||
+                                     a.platform_agent_id === platformAgentId;
+              return agentIdMatches;
+            });
+            if (!isLinked && dependentAgents.length > 0) {
+              console.log(`[KB] Doc ${doc.id} (${doc.name}) not linked to ${platformAgentId}, has agents:`, 
+                dependentAgents.map((a: any) => a.id || a.agent_id).join(', '));
+            }
             return isLinked;
           });
           console.log(`[KB] After filtering for agent ${platformAgentId}: ${filteredDocs.length} documents`);
@@ -357,7 +381,7 @@ serve(async (req) => {
               items,
               categories,
               total: items.length,
-              all_documents_count: documents.length
+              all_documents_count: allDocuments.length
             } 
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

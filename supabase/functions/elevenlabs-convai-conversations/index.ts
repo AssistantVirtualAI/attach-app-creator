@@ -165,55 +165,102 @@ serve(async (req) => {
       case 'audio': {
         console.log(`[conversations] Fetching audio for conversation ${conversationId}, format: ${format}`);
         
-        const audioResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}/audio?format=${format}`,
-          {
-            headers: {
-              'xi-api-key': apiKey,
-            },
+        try {
+          const audioResponse = await fetch(
+            `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}/audio?format=${format}`,
+            {
+              headers: {
+                'xi-api-key': apiKey,
+              },
+            }
+          );
+  
+          const contentType = audioResponse.headers.get('content-type') || '';
+          console.log(`[conversations] Audio response status: ${audioResponse.status}, content-type: ${contentType}`);
+  
+          if (!audioResponse.ok) {
+            const errorText = await audioResponse.text();
+            console.error('[conversations] Audio API error:', audioResponse.status, errorText);
+            
+            return new Response(
+              JSON.stringify({ 
+                error: 'Audio not available',
+                audio_unavailable: true,
+                reason: audioResponse.status === 404 ? 'not_found' : 'api_error',
+                details: errorText.substring(0, 200)
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
           }
-        );
-
-        if (!audioResponse.ok) {
-          const errorText = await audioResponse.text();
-          console.error('[conversations] Audio API error:', audioResponse.status, errorText);
+  
+          // Get audio as ArrayBuffer
+          const audioBuffer = await audioResponse.arrayBuffer();
+          const uint8Array = new Uint8Array(audioBuffer);
           
-          // Return a specific error for audio not available
+          console.log(`[conversations] Audio buffer size: ${uint8Array.length} bytes`);
+          
+          // Check for empty or too small audio
+          if (uint8Array.length < 100) {
+            console.error('[conversations] Audio buffer too small, likely empty');
+            return new Response(
+              JSON.stringify({ 
+                error: 'Audio content is empty',
+                audio_unavailable: true,
+                reason: 'empty_audio',
+                size: uint8Array.length
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          
+          // Safe base64 encoding for large files using chunked approach
+          const CHUNK_SIZE = 0x8000; // 32KB chunks
+          const chunks: string[] = [];
+          
+          for (let i = 0; i < uint8Array.length; i += CHUNK_SIZE) {
+            const chunk = uint8Array.subarray(i, Math.min(i + CHUNK_SIZE, uint8Array.length));
+            chunks.push(String.fromCharCode.apply(null, Array.from(chunk)));
+          }
+          
+          const binaryString = chunks.join('');
+          const base64Audio = btoa(binaryString);
+          
+          console.log(`[conversations] Audio encoded successfully, base64 length: ${base64Audio.length}`);
+          
+          // Verify base64 is valid
+          if (base64Audio.length < 100) {
+            console.error('[conversations] Base64 encoding produced unexpected result');
+            return new Response(
+              JSON.stringify({ 
+                error: 'Audio encoding failed',
+                audio_unavailable: true,
+                reason: 'encoding_error'
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          
           return new Response(
             JSON.stringify({ 
-              error: 'Audio not available',
+              audio_base64: base64Audio,
+              audio_url: `data:audio/${format};base64,${base64Audio}`,
+              format,
+              size_bytes: uint8Array.length
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (audioError) {
+          console.error('[conversations] Audio fetch/encode error:', audioError);
+          return new Response(
+            JSON.stringify({ 
+              error: 'Audio processing failed',
               audio_unavailable: true,
-              reason: audioResponse.status === 404 ? 'not_found' : 'api_error'
+              reason: 'processing_error',
+              details: audioError instanceof Error ? audioError.message : 'Unknown error'
             }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-
-        // Get audio as base64 using a safe method for large files
-        const audioBuffer = await audioResponse.arrayBuffer();
-        const uint8Array = new Uint8Array(audioBuffer);
-        
-        console.log(`[conversations] Audio buffer size: ${uint8Array.length} bytes`);
-        
-        // Safe base64 encoding for large files - chunk approach to avoid stack overflow
-        let binaryString = '';
-        const chunkSize = 32768;
-        for (let i = 0; i < uint8Array.length; i += chunkSize) {
-          const chunk = uint8Array.slice(i, Math.min(i + chunkSize, uint8Array.length));
-          binaryString += String.fromCharCode.apply(null, Array.from(chunk));
-        }
-        const base64Audio = btoa(binaryString);
-        
-        console.log(`[conversations] Audio encoded, base64 length: ${base64Audio.length}`);
-        
-        return new Response(
-          JSON.stringify({ 
-            audio_base64: base64Audio,
-            audio_url: `data:audio/${format};base64,${base64Audio}`,
-            format 
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
       }
 
       default:
