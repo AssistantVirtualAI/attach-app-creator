@@ -23,7 +23,7 @@ import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 const PortalKnowledge = () => {
-  const { session, canEditKnowledge, hasEditAccess } = usePortal();
+  const { session } = usePortal();
   const { data: kbData, isLoading, refetch } = usePortalKnowledgeBase();
   const addDocument = usePortalAddKnowledgeDocument();
   const deleteDocument = usePortalDeleteKnowledgeDocument();
@@ -43,7 +43,12 @@ const PortalKnowledge = () => {
 
   const { data: documentData, isLoading: isLoadingDocument } = usePortalKnowledgeBaseDocument(viewDocumentId);
 
-  const canEdit = canEditKnowledge() || hasEditAccess();
+  // Only admins can edit: super_admin, admin role, client principal, or member with admin role
+  const isAdmin = session?.role === 'super_admin' || 
+                  session?.role === 'admin' || 
+                  session?.memberType === 'client' || 
+                  session?.memberRole === 'admin';
+  const canEdit = isAdmin;
   
   // Read from knowledge_base.items structure
   const items = kbData?.knowledge_base?.items || [];
