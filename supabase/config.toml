@@ -137,3 +137,9 @@ verify_jwt = false
 
 [functions.elevenlabs-phone-numbers]
 verify_jwt = false
+
+[functions.vapi-proxy]
+verify_jwt = false
+
+[functions.retell-proxy]
+verify_jwt = false

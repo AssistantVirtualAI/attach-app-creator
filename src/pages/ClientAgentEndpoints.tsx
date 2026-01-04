@@ -1,38 +1,75 @@
 import { useParams } from 'react-router-dom';
 import { useClientAgentAccess } from '@/hooks/useClientAgentAccess';
-import { ElevenLabsEndpointsCard } from '@/components/elevenlabs/ElevenLabsEndpointsCard';
+import { PlatformEndpointsCard } from '@/components/shared/PlatformEndpointsCard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Copy, Check, Code } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useLanguage } from '@/context/LanguageContext';
+import type { Platform } from '@/lib/connectors/endpoints-registry';
 
 const ClientAgentEndpoints = () => {
   const { clientId, agentId } = useParams();
-  const { apiKey, agentId: elevenlabsAgentId, agentName } = useClientAgentAccess(clientId, agentId);
+  const { apiKey, agentId: platformAgentId, agentName } = useClientAgentAccess(clientId, agentId);
+  const { language } = useLanguage();
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<Platform>('elevenlabs');
+
+  useEffect(() => {
+    // Fetch the agent's platform
+    const fetchPlatform = async () => {
+      if (!agentId) return;
+      
+      const { data } = await supabase
+        .from('agents')
+        .select('platform')
+        .eq('id', agentId)
+        .single();
+      
+      if (data?.platform) {
+        setPlatform(data.platform as Platform);
+      }
+    };
+    
+    fetchPlatform();
+  }, [agentId]);
 
   const handleCopy = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(field);
-    toast.success('Copié');
+    toast.success(language === 'fr' ? 'Copié' : 'Copied');
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const widgetUrl = elevenlabsAgentId 
+  const widgetUrl = platformAgentId 
     ? `${window.location.origin}/iframe/${agentId}` 
     : null;
   
-  const prototypeUrl = elevenlabsAgentId 
+  const prototypeUrl = platformAgentId 
     ? `${window.location.origin}/prototype/${agentId}` 
     : null;
+
+  const texts = {
+    title: language === 'fr' ? 'Endpoints & Intégration' : 'Endpoints & Integration',
+    subtitle: language === 'fr' ? 'Informations techniques pour' : 'Technical information for',
+    agentIds: language === 'fr' ? 'Identifiants Agent' : 'Agent Identifiers',
+    agentIdsDesc: language === 'fr' 
+      ? 'Identifiants uniques pour intégrer cet agent'
+      : 'Unique identifiers to integrate this agent',
+    internalId: language === 'fr' ? 'Agent ID (Interne)' : 'Agent ID (Internal)',
+    platformId: language === 'fr' ? `Agent ID (${platform})` : `Agent ID (${platform})`,
+    widgetUrl: language === 'fr' ? 'Widget Embed URL' : 'Widget Embed URL',
+    prototypeUrl: language === 'fr' ? 'Prototype URL' : 'Prototype URL',
+  };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Endpoints & Intégration</h1>
-        <p className="text-muted-foreground">Informations techniques pour {agentName}</p>
+        <h1 className="text-2xl font-bold">{texts.title}</h1>
+        <p className="text-muted-foreground">{texts.subtitle} {agentName}</p>
       </div>
 
       {/* Agent IDs */}
@@ -40,16 +77,14 @@ const ClientAgentEndpoints = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Code className="h-5 w-5" />
-            Identifiants Agent
+            {texts.agentIds}
           </CardTitle>
-          <CardDescription>
-            Identifiants uniques pour intégrer cet agent
-          </CardDescription>
+          <CardDescription>{texts.agentIdsDesc}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-muted/50">
             <div>
-              <p className="text-sm font-medium">Agent ID (Interne)</p>
+              <p className="text-sm font-medium">{texts.internalId}</p>
               <code className="text-xs text-muted-foreground">{agentId || 'N/A'}</code>
             </div>
             {agentId && (
@@ -69,16 +104,16 @@ const ClientAgentEndpoints = () => {
 
           <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-muted/50">
             <div>
-              <p className="text-sm font-medium">Agent ID (ElevenLabs)</p>
-              <code className="text-xs text-muted-foreground">{elevenlabsAgentId || 'N/A'}</code>
+              <p className="text-sm font-medium">{texts.platformId}</p>
+              <code className="text-xs text-muted-foreground">{platformAgentId || 'N/A'}</code>
             </div>
-            {elevenlabsAgentId && (
+            {platformAgentId && (
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => handleCopy(elevenlabsAgentId, 'elevenLabsId')}
+                onClick={() => handleCopy(platformAgentId, 'platformId')}
               >
-                {copiedField === 'elevenLabsId' ? (
+                {copiedField === 'platformId' ? (
                   <Check className="h-4 w-4 text-green-500" />
                 ) : (
                   <Copy className="h-4 w-4" />
@@ -90,7 +125,7 @@ const ClientAgentEndpoints = () => {
           {widgetUrl && (
             <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-muted/50">
               <div>
-                <p className="text-sm font-medium">Widget Embed URL</p>
+                <p className="text-sm font-medium">{texts.widgetUrl}</p>
                 <code className="text-xs text-muted-foreground truncate block max-w-md">{widgetUrl}</code>
               </div>
               <Button
@@ -110,7 +145,7 @@ const ClientAgentEndpoints = () => {
           {prototypeUrl && (
             <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-muted/50">
               <div>
-                <p className="text-sm font-medium">Prototype URL</p>
+                <p className="text-sm font-medium">{texts.prototypeUrl}</p>
                 <code className="text-xs text-muted-foreground truncate block max-w-md">{prototypeUrl}</code>
               </div>
               <Button
@@ -129,9 +164,10 @@ const ClientAgentEndpoints = () => {
         </CardContent>
       </Card>
 
-      {/* API Endpoints */}
-      <ElevenLabsEndpointsCard 
-        agentId={elevenlabsAgentId || undefined}
+      {/* Platform Endpoints - now unified for any platform */}
+      <PlatformEndpointsCard 
+        platform={platform}
+        agentId={platformAgentId || undefined}
         apiKey={apiKey || undefined}
       />
     </div>
