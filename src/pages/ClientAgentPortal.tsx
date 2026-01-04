@@ -15,7 +15,8 @@ import {
   Bot,
   Crown,
   Eye,
-  ChevronLeft
+  ChevronLeft,
+  Code
 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -58,6 +59,7 @@ const ClientAgentPortalContent = () => {
     { icon: BarChart3, label: 'Analytics', href: `/client/${clientId}/agent/${agentId}/analytics` },
     { icon: BookOpen, label: 'Base de connaissances', href: `/client/${clientId}/agent/${agentId}/knowledge` },
     { icon: Settings, label: 'Configuration', href: `/client/${clientId}/agent/${agentId}/settings` },
+    { icon: Code, label: 'Endpoints', href: `/client/${clientId}/agent/${agentId}/endpoints` },
   ];
 
   return (

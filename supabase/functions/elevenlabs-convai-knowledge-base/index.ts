@@ -214,12 +214,14 @@ serve(async (req) => {
           console.log(`[KB] After filtering for agent ${platformAgentId}: ${filteredDocs.length} documents`);
         }
         
-        // Transform to our format
+        // Transform to our format - ensure 'title' is always present for client compatibility
         const items = filteredDocs.map((doc: any) => ({
           id: doc.id,
           name: doc.name,
+          title: doc.name, // Add title field for client compatibility
           type: doc.type || 'text',
           content: doc.text || doc.content || '',
+          category: doc.metadata?.category || doc.metadata?.tag || 'Général',
           url: doc.url,
           file_name: doc.file_name || doc.name,
           file_size: doc.metadata?.size_bytes || doc.size_bytes,
@@ -232,11 +234,15 @@ serve(async (req) => {
           dependent_agents: doc.dependent_agents || [],
           metadata: doc.metadata || {},
         }));
+        
+        // Extract unique categories
+        const categories = [...new Set(items.map((item: any) => item.category).filter(Boolean))];
 
         return new Response(
           JSON.stringify({ 
             knowledge_base: { 
               items,
+              categories,
               total: items.length,
               all_documents_count: documents.length
             } 

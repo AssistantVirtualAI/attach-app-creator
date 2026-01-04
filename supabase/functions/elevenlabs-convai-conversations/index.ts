@@ -113,13 +113,12 @@ serve(async (req) => {
       }
 
       case 'details': {
-        console.log(`Fetching details for conversation ${conversationId}`);
+        console.log(`[conversations] Fetching details for conversation ${conversationId}`);
         
         const detailsResponse = await fetch(
           `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`,
           {
             headers: {
-              'Authorization': `Bearer ${apiKey}`,
               'xi-api-key': apiKey,
             },
           }
@@ -127,11 +126,12 @@ serve(async (req) => {
 
         if (!detailsResponse.ok) {
           const errorText = await detailsResponse.text();
-          console.error('ElevenLabs API error:', detailsResponse.status, errorText);
-          throw new Error(`ElevenLabs API error: ${detailsResponse.status}`);
+          console.error('[conversations] ElevenLabs API error:', detailsResponse.status, errorText);
+          throw new Error(`ElevenLabs API error: ${detailsResponse.status} - ${errorText}`);
         }
 
         const detailsData = await detailsResponse.json();
+        console.log(`[conversations] Got details for ${conversationId}, has transcript: ${!!detailsData.transcript}`);
         
         return new Response(
           JSON.stringify(detailsData),
@@ -140,13 +140,12 @@ serve(async (req) => {
       }
 
       case 'audio': {
-        console.log(`Fetching audio for conversation ${conversationId}, format: ${format}`);
+        console.log(`[conversations] Fetching audio for conversation ${conversationId}, format: ${format}`);
         
         const audioResponse = await fetch(
           `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}/audio?format=${format}`,
           {
             headers: {
-              'Authorization': `Bearer ${apiKey}`,
               'xi-api-key': apiKey,
             },
           }

@@ -197,8 +197,27 @@ serve(async (req) => {
         const configData = await configResponse.json();
         console.log('[elevenlabs-agent-config] Successfully fetched agent config');
         
+        // Normalize the response so the client always gets the same structure
+        // ElevenLabs returns conversation_config.agent.prompt.prompt, etc.
+        const conversationConfig = configData.conversation_config || {};
+        const agentConfig = conversationConfig.agent || {};
+        
+        const normalizedAgent = {
+          ...configData,
+          // Flatten prompt access
+          prompt: {
+            prompt: agentConfig.prompt?.prompt || configData.prompt?.prompt || '',
+          },
+          // Flatten first_message access
+          first_message: agentConfig.first_message || configData.first_message || '',
+          // Flatten TTS settings
+          tts: conversationConfig.tts || configData.tts || {},
+          // Keep original for reference
+          conversation_config: conversationConfig,
+        };
+        
         return new Response(
-          JSON.stringify({ agent: configData }),
+          JSON.stringify({ agent: normalizedAgent }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
