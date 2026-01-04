@@ -156,32 +156,115 @@ export const usePortalKnowledgeBase = () => {
   });
 };
 
-// Hook for adding knowledge base document
-export const usePortalAddKnowledgeDocument = () => {
+// Hook for fetching a single knowledge base document content
+export const usePortalKnowledgeBaseDocument = (documentId: string | null) => {
   const { session } = usePortal();
-  const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async ({ name, content, type = 'text' }: { name: string; content: string; type?: string }) => {
-      if (!session?.platformAgentId || !session?.platformApiKey) {
-        throw new Error('Configuration manquante');
+  return useQuery({
+    queryKey: ['portal-kb-document', documentId],
+    queryFn: async () => {
+      if (!documentId || !session?.platformAgentId || !session?.platformApiKey) {
+        return null;
       }
 
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
         body: {
-          action: 'add_text',
+          action: 'get_document',
           agentId: session.platformAgentId,
           apiKey: session.platformApiKey,
-          name,
-          content,
+          documentId,
         },
       });
 
       if (error) throw error;
       return data;
     },
+    enabled: !!documentId && !!session?.platformAgentId && !!session?.platformApiKey,
+  });
+};
+
+// Hook for adding knowledge base document
+export const usePortalAddKnowledgeDocument = () => {
+  const { session } = usePortal();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ name, content }: { name: string; content: string }) => {
+      if (!session?.platformAgentId || !session?.platformApiKey) {
+        throw new Error('Configuration manquante');
+      }
+
+      const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
+        body: {
+          action: 'create_text',
+          agentId: session.platformAgentId,
+          apiKey: session.platformApiKey,
+          title: name,
+          content,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['portal-knowledge-base'] });
+    },
+  });
+};
+
+// Hook for updating knowledge base document (recreate strategy)
+export const usePortalUpdateKnowledgeDocument = () => {
+  const { session } = usePortal();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ documentId, name, content, deleteOld = true }: { 
+      documentId: string;
+      name: string; 
+      content: string;
+      deleteOld?: boolean;
+    }) => {
+      if (!session?.platformAgentId || !session?.platformApiKey) {
+        throw new Error('Configuration manquante');
+      }
+
+      // Create new document
+      const { data: createData, error: createError } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
+        body: {
+          action: 'create_text',
+          agentId: session.platformAgentId,
+          apiKey: session.platformApiKey,
+          title: name,
+          content,
+        },
+      });
+
+      if (createError) throw createError;
+      if (createData?.error) throw new Error(createData.error);
+
+      // Delete old document if requested
+      if (deleteOld && documentId) {
+        try {
+          await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
+            body: {
+              action: 'delete',
+              agentId: session.platformAgentId,
+              apiKey: session.platformApiKey,
+              documentId,
+            },
+          });
+        } catch (e) {
+          console.warn('Could not delete old document:', e);
+        }
+      }
+
+      return createData;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['portal-knowledge-base'] });
+      queryClient.invalidateQueries({ queryKey: ['portal-kb-document'] });
     },
   });
 };

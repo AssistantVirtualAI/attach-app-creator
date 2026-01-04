@@ -355,6 +355,8 @@ serve(async (req) => {
         
         // Fetch the actual content from the /content endpoint
         let textContent: string | null = null;
+        let contentUnavailableReason: string | null = null;
+        
         try {
           console.log(`[KB] Fetching document content from /content endpoint`);
           const contentResponse = await fetch(
@@ -364,14 +366,36 @@ serve(async (req) => {
             }
           );
           
+          console.log(`[KB] Content endpoint status: ${contentResponse.status}`);
+          const contentType = contentResponse.headers.get('content-type') || '';
+          console.log(`[KB] Content-Type: ${contentType}`);
+          
           if (contentResponse.ok) {
-            textContent = await contentResponse.text();
-            console.log(`[KB] Content fetched successfully, length: ${textContent?.length || 0}`);
+            if (contentType.includes('application/json')) {
+              // ElevenLabs might return JSON with text field
+              const jsonData = await contentResponse.json();
+              textContent = jsonData.text || jsonData.content || JSON.stringify(jsonData);
+              console.log(`[KB] Content parsed from JSON, length: ${textContent?.length || 0}`);
+            } else {
+              // Plain text response
+              textContent = await contentResponse.text();
+              console.log(`[KB] Content fetched as text, length: ${textContent?.length || 0}`);
+            }
+            
+            // Check if content is empty for file types
+            if (!textContent && (doc.type === 'file' || doc.type === 'pdf')) {
+              contentUnavailableReason = 'binary_or_not_extractible';
+            }
+          } else if (contentResponse.status === 404) {
+            console.log(`[KB] Content not found for document`);
+            contentUnavailableReason = 'content_not_found';
           } else {
             console.log(`[KB] Content endpoint returned status: ${contentResponse.status}`);
+            contentUnavailableReason = 'fetch_error';
           }
         } catch (contentError) {
           console.log(`[KB] Could not fetch content for ${docId}:`, contentError);
+          contentUnavailableReason = 'fetch_exception';
         }
         
         return new Response(
@@ -382,6 +406,7 @@ serve(async (req) => {
               name: doc.name,
               type: doc.type,
               content: textContent || doc.text || doc.content || null,
+              content_unavailable_reason: contentUnavailableReason,
               url: doc.url,
               file_size: doc.metadata?.size_bytes,
               created_at: doc.metadata?.created_at_unix_secs 

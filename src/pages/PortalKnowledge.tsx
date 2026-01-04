@@ -1,13 +1,19 @@
 import { useState } from 'react';
 import { usePortal } from '@/hooks/usePortalAuth';
-import { usePortalKnowledgeBase, usePortalAddKnowledgeDocument, usePortalDeleteKnowledgeDocument } from '@/hooks/usePortalElevenLabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { 
+  usePortalKnowledgeBase, 
+  usePortalKnowledgeBaseDocument,
+  usePortalAddKnowledgeDocument, 
+  usePortalDeleteKnowledgeDocument,
+  usePortalUpdateKnowledgeDocument
+} from '@/hooks/usePortalElevenLabs';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { BookOpen, Search, FileText, Plus, Calendar, Trash2, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { BookOpen, Search, FileText, Plus, Calendar, Trash2, ExternalLink, Loader2, AlertCircle, Eye, Edit, Link as LinkIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { GlowBadge } from '@/components/portal/GlowBadge';
@@ -17,21 +23,33 @@ import { toast } from 'sonner';
 
 const PortalKnowledge = () => {
   const { session, canEditKnowledge, hasEditAccess } = usePortal();
-  const { data: kbData, isLoading } = usePortalKnowledgeBase();
+  const { data: kbData, isLoading, refetch } = usePortalKnowledgeBase();
   const addDocument = usePortalAddKnowledgeDocument();
   const deleteDocument = usePortalDeleteKnowledgeDocument();
+  const updateDocument = usePortalUpdateKnowledgeDocument();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newDocName, setNewDocName] = useState('');
   const [newDocContent, setNewDocContent] = useState('');
+  
+  // View/Edit modal state
+  const [viewDocumentId, setViewDocumentId] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editContent, setEditContent] = useState('');
+
+  const { data: documentData, isLoading: isLoadingDocument } = usePortalKnowledgeBaseDocument(viewDocumentId);
 
   const canEdit = canEditKnowledge() || hasEditAccess();
-  const documents = kbData?.documents || [];
+  
+  // Read from knowledge_base.items structure
+  const items = kbData?.knowledge_base?.items || [];
 
-  const filteredDocuments = documents.filter((doc: any) => 
-    doc.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredDocuments = items.filter((doc: any) => {
+    const docName = doc.name || doc.title || '';
+    return docName.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   const handleAddDocument = async () => {
     if (!newDocName.trim() || !newDocContent.trim()) {
@@ -45,8 +63,12 @@ const PortalKnowledge = () => {
       setIsAddModalOpen(false);
       setNewDocName('');
       setNewDocContent('');
-    } catch (error) {
-      toast.error('Erreur lors de l\'ajout du document');
+    } catch (error: any) {
+      if (error.message?.includes('403') || error.message?.includes('Accès refusé')) {
+        toast.error('Accès refusé. Seuls les administrateurs peuvent ajouter des documents.');
+      } else {
+        toast.error('Erreur lors de l\'ajout du document');
+      }
     }
   };
 
@@ -56,9 +78,58 @@ const PortalKnowledge = () => {
     try {
       await deleteDocument.mutateAsync(documentId);
       toast.success('Document supprimé');
-    } catch (error) {
-      toast.error('Erreur lors de la suppression');
+    } catch (error: any) {
+      if (error.message?.includes('403') || error.message?.includes('Accès refusé')) {
+        toast.error('Accès refusé. Seuls les administrateurs peuvent supprimer des documents.');
+      } else {
+        toast.error('Erreur lors de la suppression');
+      }
     }
+  };
+
+  const handleOpenView = (docId: string, docName: string) => {
+    setViewDocumentId(docId);
+    setIsEditMode(false);
+    setEditName(docName);
+    setEditContent('');
+  };
+
+  const handleStartEdit = () => {
+    if (documentData?.document) {
+      setEditName(documentData.document.name || '');
+      setEditContent(documentData.document.content || '');
+    }
+    setIsEditMode(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!viewDocumentId || !editName.trim() || !editContent.trim()) {
+      toast.error('Veuillez remplir tous les champs');
+      return;
+    }
+
+    try {
+      await updateDocument.mutateAsync({
+        documentId: viewDocumentId,
+        name: editName,
+        content: editContent,
+        deleteOld: true,
+      });
+      toast.success('Document modifié avec succès');
+      setViewDocumentId(null);
+      setIsEditMode(false);
+    } catch (error: any) {
+      if (error.message?.includes('403') || error.message?.includes('Accès refusé')) {
+        toast.error('Accès refusé. Seuls les administrateurs peuvent modifier des documents.');
+      } else {
+        toast.error('Erreur lors de la modification');
+      }
+    }
+  };
+
+  const getDocIcon = (type: string) => {
+    if (type === 'url' || type === 'link') return <LinkIcon className="h-5 w-5 text-primary" />;
+    return <FileText className="h-5 w-5 text-primary" />;
   };
 
   return (
@@ -92,7 +163,7 @@ const PortalKnowledge = () => {
         </div>
       )}
 
-      {!isLoading && documents.length === 0 && (
+      {!isLoading && items.length === 0 && (
         <Card className="bg-card/50 backdrop-blur-sm border-border/30">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
@@ -110,7 +181,7 @@ const PortalKnowledge = () => {
         </Card>
       )}
 
-      {documents.length > 0 && (
+      {items.length > 0 && (
         <div className="space-y-4">
           {/* Search */}
           <Card className="bg-card/50 backdrop-blur-sm border-border/30">
@@ -132,7 +203,7 @@ const PortalKnowledge = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredDocuments.map((doc: any, index: number) => (
                 <motion.div
-                  key={doc.id || doc.document_id || index}
+                  key={doc.id || index}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
@@ -141,7 +212,7 @@ const PortalKnowledge = () => {
                     <CardContent className="p-5">
                       <div className="flex items-start justify-between mb-3">
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <FileText className="h-5 w-5 text-primary" />
+                          {getDocIcon(doc.type)}
                         </div>
                         <GlowBadge variant="secondary" className="text-xs">
                           {doc.type || 'text'}
@@ -151,6 +222,12 @@ const PortalKnowledge = () => {
                       <h3 className="font-semibold mb-2 group-hover:text-primary transition-colors truncate">
                         {doc.name || doc.title || 'Sans titre'}
                       </h3>
+
+                      {doc.content && (
+                        <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+                          {doc.content.substring(0, 100)}...
+                        </p>
+                      )}
                       
                       {doc.created_at && (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
@@ -164,16 +241,27 @@ const PortalKnowledge = () => {
                           variant="ghost" 
                           size="sm" 
                           className="flex-1 gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleOpenView(doc.id, doc.name || doc.title || '')}
                         >
-                          <ExternalLink className="h-3 w-3" />
+                          <Eye className="h-3 w-3" />
                           Voir
                         </Button>
+                        {doc.url && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => window.open(doc.url, '_blank')}
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
+                        )}
                         {canEdit && (
                           <Button 
                             variant="ghost" 
                             size="sm" 
                             className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => handleDeleteDocument(doc.id || doc.document_id)}
+                            onClick={() => handleDeleteDocument(doc.id)}
                             disabled={deleteDocument.isPending}
                           >
                             <Trash2 className="h-3 w-3" />
@@ -188,6 +276,104 @@ const PortalKnowledge = () => {
           </ScrollArea>
         </div>
       )}
+
+      {/* View/Edit Document Modal */}
+      <Dialog open={!!viewDocumentId} onOpenChange={(open) => { if (!open) { setViewDocumentId(null); setIsEditMode(false); } }}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              {isEditMode ? 'Modifier le document' : (documentData?.document?.name || 'Document')}
+            </DialogTitle>
+            <DialogDescription>
+              {isEditMode ? 'Modifiez le contenu du document' : 'Contenu complet du document'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[60vh]">
+            {isLoadingDocument ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : isEditMode ? (
+              <div className="space-y-4 p-1">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Nom du document</label>
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Nom du document"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Contenu</label>
+                  <Textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    placeholder="Contenu du document..."
+                    rows={12}
+                    className="font-mono text-sm"
+                  />
+                </div>
+              </div>
+            ) : documentData?.document?.content ? (
+              <div className="whitespace-pre-wrap text-sm p-4 bg-muted rounded-lg">
+                {documentData.document.content}
+              </div>
+            ) : documentData?.document?.url ? (
+              <div className="p-4">
+                <p className="text-sm text-muted-foreground mb-2">Document lié à une URL :</p>
+                <a 
+                  href={documentData.document.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline flex items-center gap-1"
+                >
+                  {documentData.document.url}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            ) : documentData?.document?.content_unavailable_reason ? (
+              <div className="p-4 text-center">
+                <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">
+                  {documentData.document.content_unavailable_reason === 'binary_or_not_extractible' 
+                    ? 'Ce fichier est binaire ou son contenu ne peut pas être extrait.'
+                    : 'Le contenu de ce document n\'est pas disponible.'}
+                </p>
+              </div>
+            ) : (
+              <p className="text-muted-foreground p-4 text-center">Aucun contenu disponible</p>
+            )}
+          </ScrollArea>
+
+          <DialogFooter className="gap-2">
+            {isEditMode ? (
+              <>
+                <Button variant="outline" onClick={() => setIsEditMode(false)}>
+                  Annuler
+                </Button>
+                <Button onClick={handleSaveEdit} disabled={updateDocument.isPending} className="gap-2">
+                  {updateDocument.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Sauvegarder
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setViewDocumentId(null)}>
+                  Fermer
+                </Button>
+                {canEdit && documentData?.document?.type !== 'url' && documentData?.document?.content && (
+                  <Button onClick={handleStartEdit} className="gap-2">
+                    <Edit className="h-4 w-4" />
+                    Modifier
+                  </Button>
+                )}
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Document Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
