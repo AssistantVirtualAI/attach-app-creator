@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Settings, Trash2, MessageSquare, MoreHorizontal } from 'lucide-react';
+import { Settings, Trash2, MessageSquare, MoreHorizontal, ExternalLink, Bot } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PlatformBadge } from './PlatformBadge';
 import { QuickPromptModal } from './QuickPromptModal';
@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { motion } from 'framer-motion';
 
 interface Agent {
   id: string;
@@ -22,6 +23,7 @@ interface Agent {
   created_at: string;
   organization_id: string;
   client_id?: string | null;
+  slug?: string | null;
   client?: { id: string; name: string } | null;
 }
 
@@ -62,25 +64,52 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
     return prompt.length > 60 ? prompt.substring(0, 60) + '...' : prompt;
   };
 
+  const getAgentSlug = (agent: Agent): string | null => {
+    return agent.slug || agent.config?.slug || null;
+  };
+
+  const handleOpenPortal = (agent: Agent) => {
+    const slug = getAgentSlug(agent);
+    if (slug) {
+      window.open(`/portal/${slug}`, '_blank');
+    }
+  };
+
   return (
     <>
-      <div className="border rounded-lg">
+      <div className="rounded-xl overflow-hidden border border-slate-700/50 bg-gradient-to-br from-slate-900/80 to-slate-800/80">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Nom</TableHead>
-              <TableHead>Plateforme</TableHead>
-              <TableHead>Prompt</TableHead>
-              <TableHead>Client assigné</TableHead>
-              <TableHead>Agent ID</TableHead>
-              <TableHead>Date de création</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+            <TableRow className="border-slate-700/50 hover:bg-transparent">
+              <TableHead className="text-slate-400 font-medium">Agent</TableHead>
+              <TableHead className="text-slate-400 font-medium">Plateforme</TableHead>
+              <TableHead className="text-slate-400 font-medium">Prompt</TableHead>
+              <TableHead className="text-slate-400 font-medium">Client assigné</TableHead>
+              <TableHead className="text-slate-400 font-medium">Agent ID</TableHead>
+              <TableHead className="text-slate-400 font-medium">Date de création</TableHead>
+              <TableHead className="text-right text-slate-400 font-medium">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {agents.map((agent) => (
-              <TableRow key={agent.id}>
-                <TableCell className="font-medium">{agent.name}</TableCell>
+            {agents.map((agent, index) => (
+              <motion.tr
+                key={agent.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="border-slate-700/30 hover:bg-slate-800/30 transition-colors group"
+              >
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg blur opacity-40 group-hover:opacity-60 transition-opacity" />
+                      <div className="relative w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
+                        <Bot className="h-5 w-5 text-white" />
+                      </div>
+                    </div>
+                    <span className="font-medium text-white">{agent.name}</span>
+                  </div>
+                </TableCell>
                 <TableCell>
                   <PlatformBadge platform={agent.platform} />
                 </TableCell>
@@ -91,7 +120,7 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-auto p-1 text-left font-normal text-xs text-muted-foreground hover:text-foreground"
+                          className="h-auto p-1 text-left font-normal text-xs text-slate-400 hover:text-purple-300"
                           onClick={() => handleOpenPrompt(agent)}
                         >
                           {getPromptSnippet(agent.config) || (
@@ -110,25 +139,27 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                 </TableCell>
                 <TableCell>
                   {agent.client ? (
-                    <span className="text-foreground">{agent.client.name}</span>
+                    <span className="text-white">{agent.client.name}</span>
                   ) : (
-                    <span className="text-muted-foreground">Non assigné</span>
+                    <span className="text-slate-500">Non assigné</span>
                   )}
                 </TableCell>
-                <TableCell className="font-mono text-sm">
-                  {agent.config?.agent_id || agent.platform_agent_id || 'N/A'}
+                <TableCell>
+                  <code className="text-xs bg-slate-800 px-2 py-1 rounded text-purple-300 font-mono">
+                    {agent.config?.agent_id || agent.platform_agent_id || 'N/A'}
+                  </code>
                 </TableCell>
-                <TableCell className="text-muted-foreground">
+                <TableCell className="text-slate-400">
                   {format(new Date(agent.created_at), 'dd MMM yyyy', { locale: fr })}
                 </TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="bg-slate-900 border-slate-700">
                       <DropdownMenuItem onClick={() => navigate(`/agent-settings/${agent.id}`)}>
                         <Settings className="h-4 w-4 mr-2" />
                         Paramètres
@@ -137,7 +168,16 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                         <MessageSquare className="h-4 w-4 mr-2" />
                         Modifier Prompt
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
+                      {getAgentSlug(agent) && (
+                        <>
+                          <DropdownMenuSeparator className="bg-slate-700" />
+                          <DropdownMenuItem onClick={() => handleOpenPortal(agent)}>
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Ouvrir le portail
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                      <DropdownMenuSeparator className="bg-slate-700" />
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <DropdownMenuItem 
@@ -148,15 +188,15 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                             Supprimer
                           </DropdownMenuItem>
                         </AlertDialogTrigger>
-                        <AlertDialogContent>
+                        <AlertDialogContent className="bg-slate-900 border-slate-700">
                           <AlertDialogHeader>
-                            <AlertDialogTitle>Supprimer l'agent ?</AlertDialogTitle>
-                            <AlertDialogDescription>
+                            <AlertDialogTitle className="text-white">Supprimer l'agent ?</AlertDialogTitle>
+                            <AlertDialogDescription className="text-slate-400">
                               Cette action est irréversible. L'agent "{agent.name}" sera définitivement supprimé.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                            <AlertDialogCancel className="border-slate-700">Annuler</AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => handleDelete(agent.id)}
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -169,7 +209,7 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
-              </TableRow>
+              </motion.tr>
             ))}
           </TableBody>
         </Table>
