@@ -6,6 +6,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Validation helpers
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VALID_PLATFORMS = ['elevenlabs', 'vapi', 'retell'] as const;
+type ValidPlatform = typeof VALID_PLATFORMS[number];
+
+function isValidUUID(value: unknown): boolean {
+  return typeof value === 'string' && UUID_REGEX.test(value);
+}
+
+function isValidPlatform(value: unknown): value is ValidPlatform {
+  return typeof value === 'string' && VALID_PLATFORMS.includes(value as ValidPlatform);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -19,7 +32,10 @@ serve(async (req) => {
     // Get authenticated user
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      throw new Error('Missing authorization header');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const { data: { user }, error: authError } = await supabase.auth.getUser(
@@ -27,16 +43,45 @@ serve(async (req) => {
     );
 
     if (authError || !user) {
-      throw new Error('Unauthorized');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    const { platform, organizationId } = await req.json();
+    const body = await req.json();
+    const { platform, organizationId } = body;
 
-    if (!platform || !organizationId) {
-      throw new Error('Missing required parameters: platform, organizationId');
+    // Input validation
+    if (!platform) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Platform is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    console.log(`Testing connection for platform: ${platform}, org: ${organizationId}`);
+    if (!isValidPlatform(platform)) {
+      return new Response(
+        JSON.stringify({ success: false, error: `Invalid platform. Must be one of: ${VALID_PLATFORMS.join(', ')}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!organizationId) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Organization ID is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!isValidUUID(organizationId)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid organization ID format' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[connector-test] Testing platform: ${platform}, org: ${organizationId}`);
 
     // Fetch integration config from database
     const { data: integration, error: integrationError } = await supabase
@@ -48,7 +93,10 @@ serve(async (req) => {
       .single();
 
     if (integrationError || !integration) {
-      throw new Error(`Integration not found for platform: ${platform}`);
+      return new Response(
+        JSON.stringify({ success: false, error: `Integration not found for platform: ${platform}` }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Test connection based on platform
@@ -64,8 +112,6 @@ serve(async (req) => {
       case 'elevenlabs':
         testResult = await testElevenLabsConnection(integration.api_key);
         break;
-      default:
-        throw new Error(`Unsupported platform: ${platform}`);
     }
 
     // Update integration test status

@@ -6,6 +6,29 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Validation helpers
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const VALID_ACTIONS = ['get-auth-url', 'exchange-code', 'refresh-token', 'disconnect'] as const;
+type ValidAction = typeof VALID_ACTIONS[number];
+
+function isValidUUID(value: unknown): boolean {
+  return typeof value === 'string' && UUID_REGEX.test(value);
+}
+
+function isValidAction(value: unknown): value is ValidAction {
+  return typeof value === 'string' && VALID_ACTIONS.includes(value as ValidAction);
+}
+
+function isValidUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -18,7 +41,10 @@ serve(async (req) => {
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      throw new Error('No authorization header');
+      return new Response(
+        JSON.stringify({ error: 'No authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const { data: { user }, error: authError } = await supabase.auth.getUser(
@@ -26,16 +52,61 @@ serve(async (req) => {
     );
 
     if (authError || !user) {
-      throw new Error('Unauthorized');
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    const { action, organizationId, code, redirectUri } = await req.json();
+    const body = await req.json();
+    const { action, organizationId, code, redirectUri } = body;
+
+    // Validate action
+    if (!action) {
+      return new Response(
+        JSON.stringify({ error: 'Action is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!isValidAction(action)) {
+      return new Response(
+        JSON.stringify({ error: `Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate organizationId for actions that need it
+    if (['get-auth-url', 'exchange-code', 'refresh-token', 'disconnect'].includes(action)) {
+      if (!organizationId) {
+        return new Response(
+          JSON.stringify({ error: 'Organization ID is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (!isValidUUID(organizationId)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid organization ID format' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Validate redirectUri for actions that need it
+    if (['get-auth-url', 'exchange-code'].includes(action) && redirectUri) {
+      if (!isValidUrl(redirectUri)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid redirect URI format' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
     
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
     const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
 
     if (!clientId || !clientSecret) {
-      console.log('Google Calendar credentials not configured');
+      console.log('[google-calendar-auth] Google Calendar credentials not configured');
       return new Response(
         JSON.stringify({ 
           error: 'Google Calendar not configured',
@@ -44,6 +115,8 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log(`[google-calendar-auth] Action: ${action}, org: ${organizationId}`);
 
     if (action === 'get-auth-url') {
       // Generate OAuth URL for Google Calendar
