@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { OrganizationProvider } from "@/context/OrganizationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ClientProvider } from "@/context/ClientContext";
+import { LanguageProvider } from "@/context/LanguageContext";
 import { AppErrorBoundary } from "@/components/errors/AppErrorBoundary";
 
 import Landing from "./pages/Landing";
@@ -99,9 +100,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const App = () => (
   <AppErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <Toaster />
+      <LanguageProvider>
+        <ThemeProvider>
+          <TooltipProvider>
+            <Toaster />
           <Sonner />
           <BrowserRouter
             future={{
@@ -453,9 +455,10 @@ const App = () => (
               </Routes>
             </Suspense>
           </OrganizationProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ThemeProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
+    </LanguageProvider>
   </QueryClientProvider>
   </AppErrorBoundary>
 );
