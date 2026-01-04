@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+// Super admin emails that can access portals without credentials
+const SUPER_ADMIN_EMAILS = [
+  'mhassoun@assistantvirtualai.com',
+  'amassaro@assistantvirtualai.com',
+];
+
 export interface PortalSession {
   clientId: string;
   clientName: string;
@@ -8,11 +14,14 @@ export interface PortalSession {
   agentId: string;
   agentName: string;
   agentSlug: string;
-  role: 'viewer' | 'admin';
+  platformAgentId?: string;
+  platformApiKey?: string;
+  role: 'viewer' | 'admin' | 'super_admin';
   canEditKnowledge: boolean;
   canEditPrompt: boolean;
   theme: string;
   language: string;
+  isSuperAdmin?: boolean;
 }
 
 const PORTAL_SESSION_KEY = 'ava_portal_session';
@@ -20,6 +29,22 @@ const PORTAL_SESSION_KEY = 'ava_portal_session';
 export const usePortalAuth = () => {
   const [session, setSession] = useState<PortalSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [supabaseUser, setSupabaseUser] = useState<any>(null);
+
+  // Check Supabase auth on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setSupabaseUser(user);
+    };
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSupabaseUser(session?.user || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const storedSession = localStorage.getItem(PORTAL_SESSION_KEY);
@@ -33,6 +58,56 @@ export const usePortalAuth = () => {
     }
     setIsLoading(false);
   }, []);
+
+  // Check if current Supabase user is a super admin
+  const isSuperAdmin = useCallback(() => {
+    return supabaseUser?.email && SUPER_ADMIN_EMAILS.includes(supabaseUser.email);
+  }, [supabaseUser]);
+
+  // Auto-login for super admins
+  const loginAsSuperAdmin = useCallback(async (agentSlug: string): Promise<PortalSession | null> => {
+    if (!supabaseUser?.email || !SUPER_ADMIN_EMAILS.includes(supabaseUser.email)) {
+      return null;
+    }
+
+    try {
+      // Fetch agent details
+      const { data: agent, error: agentError } = await supabase
+        .from('agents')
+        .select('id, name, organization_id, platform_agent_id, platform_api_key, slug')
+        .eq('slug', agentSlug)
+        .single();
+
+      if (agentError || !agent) {
+        console.error('Agent not found:', agentError);
+        return null;
+      }
+
+      const portalSession: PortalSession = {
+        clientId: 'super-admin',
+        clientName: 'Super Admin',
+        organizationId: agent.organization_id,
+        agentId: agent.id,
+        agentName: agent.name,
+        agentSlug: agent.slug || agentSlug,
+        platformAgentId: agent.platform_agent_id || undefined,
+        platformApiKey: agent.platform_api_key || undefined,
+        role: 'super_admin',
+        canEditKnowledge: true,
+        canEditPrompt: true,
+        theme: 'dark',
+        language: 'fr',
+        isSuperAdmin: true,
+      };
+
+      localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(portalSession));
+      setSession(portalSession);
+      return portalSession;
+    } catch (error) {
+      console.error('Super admin login error:', error);
+      return null;
+    }
+  }, [supabaseUser]);
 
   const login = useCallback(async (agentSlug: string, loginId: string, password: string) => {
     setIsLoading(true);
@@ -50,7 +125,10 @@ export const usePortalAuth = () => {
       if (data?.error) throw new Error(data.error);
       if (!data?.session) throw new Error('Erreur de connexion');
 
-      const portalSession: PortalSession = data.session;
+      const portalSession: PortalSession = {
+        ...data.session,
+        isSuperAdmin: false,
+      };
       localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(portalSession));
       setSession(portalSession);
       return portalSession;
@@ -69,8 +147,11 @@ export const usePortalAuth = () => {
     isLoading,
     isAuthenticated: !!session,
     login,
+    loginAsSuperAdmin,
     logout,
-    hasEditAccess: () => session?.role === 'admin',
+    isSuperAdmin,
+    supabaseUser,
+    hasEditAccess: () => session?.role === 'admin' || session?.role === 'super_admin',
     canEditKnowledge: () => session?.canEditKnowledge === true,
     canEditPrompt: () => session?.canEditPrompt === true,
   };
@@ -81,7 +162,10 @@ interface PortalContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (agentSlug: string, loginId: string, password: string) => Promise<PortalSession>;
+  loginAsSuperAdmin: (agentSlug: string) => Promise<PortalSession | null>;
   logout: () => void;
+  isSuperAdmin: () => boolean;
+  supabaseUser: any;
   hasEditAccess: () => boolean;
   canEditKnowledge: () => boolean;
   canEditPrompt: () => boolean;
