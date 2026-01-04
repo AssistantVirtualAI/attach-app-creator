@@ -34,7 +34,13 @@ export const useClientDetail = (clientId: string | undefined) => {
         .single();
 
       if (error) throw error;
-      return data as ClientDetail;
+      
+      // Check if password is defined (we can't access password_hash directly from client)
+      // We add a flag based on the existence of the hash
+      return {
+        ...data,
+        hasPassword: !!data.password_hash
+      } as ClientDetail & { hasPassword: boolean };
     },
     enabled: !!clientId,
   });

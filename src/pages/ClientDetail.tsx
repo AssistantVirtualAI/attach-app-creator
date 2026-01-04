@@ -133,6 +133,7 @@ const ClientDetail = () => {
               client={client}
               onUpdate={updateClient}
               isUpdating={isUpdating}
+              hasPassword={(client as any)?.hasPassword ?? false}
             />
           </TabsContent>
 
