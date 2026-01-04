@@ -29,9 +29,81 @@ import {
   Trash2,
   RefreshCw,
   Link as LinkIcon,
-  ExternalLink
+  ExternalLink,
+  Edit,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+// Hook for updating knowledge base document (recreate strategy)
+const useClientUpdateKnowledgeDocument = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      apiKey, 
+      agentId, 
+      documentId, 
+      name, 
+      content, 
+      deleteOld = true 
+    }: { 
+      apiKey: string;
+      agentId: string;
+      documentId: string;
+      name: string; 
+      content: string;
+      deleteOld?: boolean;
+    }) => {
+      // Create new document
+      const { data: createData, error: createError } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
+        body: {
+          action: 'create_text',
+          agentId,
+          apiKey,
+          title: name,
+          content,
+        },
+      });
+
+      if (createError) throw createError;
+      if (createData?.error) throw new Error(createData.error);
+
+      // Delete old document if requested
+      if (deleteOld && documentId) {
+        try {
+          await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
+            body: {
+              action: 'delete',
+              agentId,
+              apiKey,
+              documentId,
+            },
+          });
+        } catch (e) {
+          console.warn('Could not delete old document:', e);
+        }
+      }
+
+      return createData;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['client-elevenlabs-knowledge-base', variables.agentId] });
+      queryClient.invalidateQueries({ queryKey: ['client-elevenlabs-kb-document'] });
+      toast.success('Document modifié avec succès');
+    },
+    onError: (error: any) => {
+      if (error.message?.includes('403') || error.message?.includes('Accès refusé')) {
+        toast.error('Accès refusé. Seuls les administrateurs peuvent modifier des documents.');
+      } else {
+        toast.error(error.message || 'Erreur lors de la modification');
+      }
+    },
+  });
+};
 
 const ClientAgentKnowledge = () => {
   const { clientId, agentId } = useParams();
@@ -43,6 +115,11 @@ const ClientAgentKnowledge = () => {
   const [viewDocumentId, setViewDocumentId] = useState<string | null>(null);
   const [deleteDocumentId, setDeleteDocumentId] = useState<string | null>(null);
   const [newItem, setNewItem] = useState({ title: '', content: '', category: '' });
+  
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editContent, setEditContent] = useState('');
 
   const { data: knowledgeBase, isLoading, error, refetch } = useClientElevenLabsKnowledgeBase({
     apiKey,
@@ -56,6 +133,7 @@ const ClientAgentKnowledge = () => {
 
   const addMutation = useClientAddKnowledgeBaseText();
   const deleteMutation = useClientDeleteKnowledgeBaseItem();
+  const updateMutation = useClientUpdateKnowledgeDocument();
 
   const items = knowledgeBase?.knowledge_base?.items || [];
   const categories = knowledgeBase?.knowledge_base?.categories || [];
@@ -103,6 +181,43 @@ const ClientAgentKnowledge = () => {
         documentId: deleteDocumentId,
       });
       setDeleteDocumentId(null);
+    } catch (error) {
+      // Error handled by mutation
+    }
+  };
+
+  const handleOpenView = (docId: string, docName: string) => {
+    setViewDocumentId(docId);
+    setIsEditMode(false);
+    setEditName(docName);
+    setEditContent('');
+  };
+
+  const handleStartEdit = () => {
+    if (documentData?.document) {
+      setEditName(documentData.document.name || '');
+      setEditContent(documentData.document.content || '');
+    }
+    setIsEditMode(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!apiKey || !elevenlabsAgentId || !viewDocumentId || !editName.trim() || !editContent.trim()) {
+      toast.error('Veuillez remplir tous les champs');
+      return;
+    }
+
+    try {
+      await updateMutation.mutateAsync({
+        apiKey,
+        agentId: elevenlabsAgentId,
+        documentId: viewDocumentId,
+        name: editName,
+        content: editContent,
+        deleteOld: true,
+      });
+      setViewDocumentId(null);
+      setIsEditMode(false);
     } catch (error) {
       // Error handled by mutation
     }
@@ -246,7 +361,7 @@ const ClientAgentKnowledge = () => {
                         <Button 
                           variant="ghost" 
                           size="icon"
-                          onClick={() => setViewDocumentId(item.id)}
+                          onClick={() => handleOpenView(item.id, item.title || item.name || '')}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -279,23 +394,43 @@ const ClientAgentKnowledge = () => {
         </CardContent>
       </Card>
 
-      {/* View Document Modal */}
-      <Dialog open={!!viewDocumentId} onOpenChange={(open) => !open && setViewDocumentId(null)}>
+      {/* View/Edit Document Modal */}
+      <Dialog open={!!viewDocumentId} onOpenChange={(open) => { if (!open) { setViewDocumentId(null); setIsEditMode(false); } }}>
         <DialogContent className="max-w-2xl max-h-[80vh]">
           <DialogHeader>
-            <DialogTitle>
-              {documentData?.document?.name || 'Document'}
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              {isEditMode ? 'Modifier le document' : (documentData?.document?.name || 'Document')}
             </DialogTitle>
             <DialogDescription>
-              Contenu complet du document
+              {isEditMode ? 'Modifiez le contenu du document' : 'Contenu complet du document'}
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
             {isLoadingDocument ? (
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : isEditMode ? (
+              <div className="space-y-4 p-1">
+                <div className="space-y-2">
+                  <Label>Nom du document</Label>
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Nom du document"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Contenu</Label>
+                  <Textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    placeholder="Contenu du document..."
+                    rows={12}
+                    className="font-mono text-sm"
+                  />
+                </div>
               </div>
             ) : documentData?.document?.content ? (
               <div className="whitespace-pre-wrap text-sm p-4 bg-muted rounded-lg">
@@ -314,14 +449,43 @@ const ClientAgentKnowledge = () => {
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
+            ) : documentData?.document?.content_unavailable_reason ? (
+              <div className="p-4 text-center">
+                <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">
+                  {documentData.document.content_unavailable_reason === 'binary_or_not_extractible' 
+                    ? 'Ce fichier est binaire ou son contenu ne peut pas être extrait.'
+                    : 'Le contenu de ce document n\'est pas disponible.'}
+                </p>
+              </div>
             ) : (
-              <p className="text-muted-foreground p-4">Aucun contenu disponible</p>
+              <p className="text-muted-foreground p-4 text-center">Aucun contenu disponible</p>
             )}
           </ScrollArea>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewDocumentId(null)}>
-              Fermer
-            </Button>
+          <DialogFooter className="gap-2">
+            {isEditMode ? (
+              <>
+                <Button variant="outline" onClick={() => setIsEditMode(false)}>
+                  Annuler
+                </Button>
+                <Button onClick={handleSaveEdit} disabled={updateMutation.isPending} className="gap-2">
+                  {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Sauvegarder
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setViewDocumentId(null)}>
+                  Fermer
+                </Button>
+                {canEdit && documentData?.document?.type !== 'url' && documentData?.document?.content && (
+                  <Button onClick={handleStartEdit} className="gap-2">
+                    <Edit className="h-4 w-4" />
+                    Modifier
+                  </Button>
+                )}
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
