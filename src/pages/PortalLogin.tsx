@@ -18,8 +18,34 @@ const PortalLoginContent = () => {
   const [error, setError] = useState('');
   const [agentInfo, setAgentInfo] = useState<{ name: string; avatar_url?: string } | null>(null);
   const [loadingAgent, setLoadingAgent] = useState(true);
-  const { login, isLoading, isAuthenticated, session } = usePortal();
+  const [checkingSuperAdmin, setCheckingSuperAdmin] = useState(true);
+  const { login, isLoading, isAuthenticated, session, isSuperAdmin, loginAsSuperAdmin, supabaseUser } = usePortal();
   const navigate = useNavigate();
+
+  // Check for super admin auto-login first
+  useEffect(() => {
+    const checkSuperAdminAccess = async () => {
+      if (!agentSlug) {
+        setCheckingSuperAdmin(false);
+        return;
+      }
+
+      // Wait for supabase auth to be checked
+      if (supabaseUser === undefined) return;
+
+      if (isSuperAdmin()) {
+        console.log('Super admin detected, auto-logging in...');
+        const superAdminSession = await loginAsSuperAdmin(agentSlug);
+        if (superAdminSession) {
+          navigate(`/portal/${agentSlug}/dashboard`);
+          return;
+        }
+      }
+      setCheckingSuperAdmin(false);
+    };
+
+    checkSuperAdminAccess();
+  }, [agentSlug, isSuperAdmin, loginAsSuperAdmin, supabaseUser, navigate]);
 
   useEffect(() => {
     const loadAgent = async () => {
@@ -65,7 +91,7 @@ const PortalLoginContent = () => {
     }
   };
 
-  if (loadingAgent) {
+  if (loadingAgent || checkingSuperAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <motion.div
