@@ -1,26 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePortal } from '@/hooks/usePortalAuth';
 import { usePortalConversations, usePortalConversationDetails, usePortalConversationAudio } from '@/hooks/usePortalElevenLabs';
+import { usePortalConversationAnalysis } from '@/hooks/usePortalConversationAnalysis';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Slider } from '@/components/ui/slider';
-import { MessageSquare, Search, Phone, Clock, TrendingUp, User, Loader2, AlertCircle, Volume2, Download, Filter, X, CheckCircle, XCircle, Brain, FileText, RefreshCw } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MessageSquare, Search, Phone, Clock, TrendingUp, TrendingDown, Minus, User, Loader2, AlertCircle, Volume2, Download, Filter, X, Brain, RefreshCw, Sparkles, Target, Bot, Lightbulb } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { GlowBadge } from '@/components/portal/GlowBadge';
 import { AdvancedAudioPlayer } from '@/components/audio/AdvancedAudioPlayer';
+import { SatisfactionScore } from '@/components/conversations/SatisfactionScore';
+import { SentimentTimeline } from '@/components/conversations/SentimentTimeline';
+import { ImprovementsList } from '@/components/conversations/ImprovementCard';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const PortalConversations = () => {
+  const { t, language } = useTranslation();
   const { session } = usePortal();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [activeTab, setActiveTab] = useState('overview');
   
   // Audio state
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -36,23 +44,23 @@ const PortalConversations = () => {
   const { data: conversationsData, isLoading, refetch } = usePortalConversations(page, 100);
   const { data: selectedConversation, isLoading: detailsLoading } = usePortalConversationDetails(selectedConversationId);
   const audioMutation = usePortalConversationAudio();
+  
+  // AI Analysis hook
+  const { analysis, isAnalyzing, generateAnalysis } = usePortalConversationAnalysis(selectedConversationId);
 
   const conversations = conversationsData?.conversations || [];
 
   // Apply filters
   const filteredConversations = conversations.filter(c => {
-    // Search filter
     if (searchTerm && !c.conversation_id.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
     }
     
-    // Duration filter
     const duration = c.call_duration_secs || 0;
     if (duration < durationFilter[0] || duration > durationFilter[1]) {
       return false;
     }
     
-    // Date filters
     if (dateFrom || dateTo) {
       const convDate = c.start_time_unix_secs ? new Date(c.start_time_unix_secs * 1000) : null;
       if (convDate) {
@@ -63,6 +71,13 @@ const PortalConversations = () => {
     
     return true;
   });
+
+  // Auto-load audio when conversation is selected
+  useEffect(() => {
+    if (selectedConversationId && selectedConversation?.conversation_id) {
+      handlePlayAudio(selectedConversation.conversation_id);
+    }
+  }, [selectedConversationId, selectedConversation?.conversation_id]);
 
   // Audio handler
   const handlePlayAudio = async (conversationId: string) => {
@@ -75,26 +90,36 @@ const PortalConversations = () => {
       
       if (result?.audio_unavailable) {
         setAudioUnavailable(true);
-        toast.error(`Audio non disponible: ${result.reason || 'raison inconnue'}`);
       } else if (result?.audio_url) {
         setAudioUrl(result.audio_url);
-        toast.success('Audio chargé');
       } else {
         setAudioUnavailable(true);
-        toast.error("Impossible de charger l'audio");
       }
     } catch (error) {
       console.error('Audio error:', error);
       setAudioUnavailable(true);
-      toast.error("Erreur lors du chargement de l'audio");
     } finally {
       setIsLoadingAudio(false);
     }
   };
 
+  // Generate AI Analysis
+  const handleGenerateAnalysis = () => {
+    if (!session?.platformAgentId || !selectedConversation) return;
+    
+    const transcript = selectedConversation.transcript 
+      ? JSON.stringify(selectedConversation.transcript) 
+      : undefined;
+    
+    generateAnalysis({
+      platformAgentId: session.platformAgentId,
+      transcript,
+    });
+  };
+
   // CSV Export
   const exportToCSV = () => {
-    const headers = ['ID', 'Date', 'Durée (s)', 'Messages', 'Statut'];
+    const headers = ['ID', 'Date', 'Duration (s)', 'Messages', 'Status'];
     const rows = filteredConversations.map(c => [
       c.conversation_id,
       c.start_time_unix_secs ? new Date(c.start_time_unix_secs * 1000).toISOString() : '',
@@ -109,7 +134,7 @@ const PortalConversations = () => {
     link.href = URL.createObjectURL(blob);
     link.download = `conversations_${format(new Date(), 'yyyy-MM-dd')}.csv`;
     link.click();
-    toast.success('Export CSV téléchargé');
+    toast.success(t('clientPortal.conversations.exportSuccess'));
   };
 
   const clearFilters = () => {
@@ -126,21 +151,21 @@ const PortalConversations = () => {
     dateTo
   ].filter(Boolean).length;
 
-  // Helper to safely format timestamps
   const formatTimestamp = (unixSecs: number | undefined, formatStr: string): string => {
-    if (!unixSecs || isNaN(unixSecs)) return 'Date inconnue';
+    if (!unixSecs || isNaN(unixSecs)) return t('common.unknownDate');
     try {
       const date = new Date(unixSecs * 1000);
-      if (isNaN(date.getTime())) return 'Date inconnue';
-      return format(date, formatStr, { locale: fr });
+      if (isNaN(date.getTime())) return t('common.unknownDate');
+      return format(date, formatStr, { locale: enUS });
     } catch {
-      return 'Date inconnue';
+      return t('common.unknownDate');
     }
   };
 
-  const safeDuration = (seconds: number | undefined): number => {
-    if (seconds === undefined || isNaN(seconds)) return 0;
-    return Math.floor(seconds);
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const getStatusVariant = (status: string): 'success' | 'destructive' | 'secondary' => {
@@ -153,24 +178,63 @@ const PortalConversations = () => {
     }
   };
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  const getSentimentIcon = (sentiment: string) => {
+    switch (sentiment) {
+      case 'positive': return <TrendingUp className="w-4 h-4 text-green-500" />;
+      case 'negative': return <TrendingDown className="w-4 h-4 text-red-500" />;
+      default: return <Minus className="w-4 h-4 text-yellow-500" />;
+    }
   };
 
-  // Reset audio when changing conversation
+  const getSentimentEmoji = (sentiment: string) => {
+    switch (sentiment) {
+      case 'positive': return '😊';
+      case 'negative': return '😞';
+      default: return '😐';
+    }
+  };
+
+  const getSentimentLabel = (sentiment: string) => {
+    switch (sentiment) {
+      case 'positive': return t('clientPortal.conversations.sentimentPositive');
+      case 'negative': return t('clientPortal.conversations.sentimentNegative');
+      default: return t('clientPortal.conversations.sentimentNeutral');
+    }
+  };
+
   const handleSelectConversation = (id: string) => {
     setSelectedConversationId(id);
     setAudioUrl(null);
     setAudioUnavailable(false);
+    setActiveTab('overview');
   };
+
+  // Parse transcript messages
+  const parseTranscriptMessages = () => {
+    if (!selectedConversation?.transcript) return [];
+    
+    try {
+      const transcript = selectedConversation.transcript;
+      if (Array.isArray(transcript)) {
+        return transcript.map((msg: any) => ({
+          role: msg.role || (msg.is_agent ? 'agent' : 'user'),
+          message: msg.message || msg.text || msg.content || '',
+          time: msg.time_in_call_secs,
+        }));
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  };
+
+  const transcriptMessages = parseTranscriptMessages();
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <PortalPageHeader
         icon={MessageSquare}
-        title="Conversations"
+        title={t('clientPortal.nav.conversations')}
         description={session?.agentName}
         gradient="blue-purple"
         actions={
@@ -189,7 +253,7 @@ const PortalConversations = () => {
               className="gap-2"
             >
               <Filter className="h-4 w-4" />
-              Filtres
+              {t('clientPortal.conversations.filters')}
               {activeFiltersCount > 0 && (
                 <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center">
                   {activeFiltersCount}
@@ -205,14 +269,14 @@ const PortalConversations = () => {
         <Card className="bg-card/50 backdrop-blur-sm border-border/30">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
-              <h4 className="font-semibold">Filtres avancés</h4>
+              <h4 className="font-semibold">{t('clientPortal.conversations.advancedFilters')}</h4>
               <Button variant="ghost" size="sm" onClick={clearFilters}>
-                <X className="h-4 w-4 mr-1" /> Réinitialiser
+                <X className="h-4 w-4 mr-1" /> {t('common.reset')}
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Durée (secondes)</label>
+                <label className="text-sm font-medium">{t('clientPortal.conversations.duration')} (s)</label>
                 <Slider
                   value={durationFilter}
                   onValueChange={(v) => setDurationFilter(v as [number, number])}
@@ -225,7 +289,7 @@ const PortalConversations = () => {
                 </p>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Date de début</label>
+                <label className="text-sm font-medium">{t('clientPortal.conversations.startDate')}</label>
                 <Input
                   type="date"
                   value={dateFrom}
@@ -234,7 +298,7 @@ const PortalConversations = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Date de fin</label>
+                <label className="text-sm font-medium">{t('clientPortal.conversations.endDate')}</label>
                 <Input
                   type="date"
                   value={dateTo}
@@ -257,9 +321,9 @@ const PortalConversations = () => {
         <Card className="bg-card/50 backdrop-blur-sm border-border/30">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Aucune conversation</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('clientPortal.conversations.noConversations')}</h3>
             <p className="text-muted-foreground text-center max-w-md">
-              Aucune conversation n'a encore été enregistrée pour cet agent.
+              {t('clientPortal.conversations.noConversationsDesc')}
             </p>
           </CardContent>
         </Card>
@@ -273,14 +337,14 @@ const PortalConversations = () => {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
-                  placeholder="Rechercher..." 
+                  placeholder={t('common.search')} 
                   value={searchTerm} 
                   onChange={(e) => setSearchTerm(e.target.value)} 
                   className="pl-10 bg-muted/30 border-border/50" 
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {filteredConversations.length} conversation(s) sur {conversations.length}
+                {filteredConversations.length} {t('clientPortal.conversations.conversationsOf')} {conversations.length}
               </p>
             </CardHeader>
             <CardContent className="p-0">
@@ -342,7 +406,14 @@ const PortalConversations = () => {
               </div>
             )}
 
-            {selectedConversation ? (
+            {!selectedConversationId && (
+              <div className="flex flex-col items-center justify-center h-[600px] text-muted-foreground">
+                <MessageSquare className="h-12 w-12 mb-4 opacity-50" />
+                <p>{t('clientPortal.conversations.selectConversation')}</p>
+              </div>
+            )}
+
+            {selectedConversation && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -355,7 +426,7 @@ const PortalConversations = () => {
                         <Phone className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-lg">Conversation</h3>
+                        <h3 className="font-semibold text-lg">{t('clientPortal.conversations.conversation')}</h3>
                         <p className="text-sm text-muted-foreground">
                           {formatTimestamp(selectedConversation.start_time_unix_secs, 'PPPp')}
                         </p>
@@ -372,210 +443,296 @@ const PortalConversations = () => {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="flex-1 p-6 overflow-auto">
-                  <div className="space-y-6">
-                    {/* Metrics */}
-                    <div className="grid grid-cols-3 gap-4">
-                      {[
-                        { label: 'Messages', value: selectedConversation.message_count, icon: MessageSquare },
-                        { label: 'Durée', value: formatDuration(selectedConversation.call_duration_secs), icon: Clock },
-                        { label: 'Statut', value: selectedConversation.status, icon: TrendingUp },
-                      ].map((metric) => (
-                        <div key={metric.label} className="p-4 rounded-xl bg-muted/20 border border-border/30">
-                          <metric.icon className="h-4 w-4 text-primary mb-2" />
-                          <p className="text-2xl font-bold">{metric.value}</p>
-                          <p className="text-xs text-muted-foreground">{metric.label}</p>
-                        </div>
-                      ))}
-                    </div>
 
-                    {/* Audio Player Section */}
-                    <div className="p-4 rounded-xl bg-muted/10 border border-border/30">
-                      <h4 className="font-semibold mb-3 flex items-center gap-2">
-                        <Volume2 className="h-4 w-4 text-primary" />
-                        Écouter l'appel
-                      </h4>
-                      
-                      {!audioUrl && !audioUnavailable && !isLoadingAudio && (
-                        <Button 
-                          onClick={() => handlePlayAudio(selectedConversation.conversation_id)}
-                          className="gap-2"
-                        >
-                          <Volume2 className="h-4 w-4" />
-                          Charger l'audio
-                        </Button>
-                      )}
-                      
-                      {isLoadingAudio && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Chargement de l'audio...
-                        </div>
-                      )}
-                      
-                      {audioUnavailable && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <AlertCircle className="h-4 w-4" />
-                          Audio non disponible pour cette conversation
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handlePlayAudio(selectedConversation.conversation_id)}
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+                  <TabsList className="mx-6 mt-4 grid w-auto grid-cols-4 bg-muted/30">
+                    <TabsTrigger value="overview">{t('clientPortal.conversations.tabs.overview')}</TabsTrigger>
+                    <TabsTrigger value="audio">{t('clientPortal.conversations.tabs.audio')}</TabsTrigger>
+                    <TabsTrigger value="transcript">{t('clientPortal.conversations.tabs.transcript')}</TabsTrigger>
+                    <TabsTrigger value="analysis" className="gap-1">
+                      <Sparkles className="h-3 w-3" />
+                      {t('clientPortal.conversations.tabs.aiAnalysis')}
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <div className="flex-1 overflow-auto p-6">
+                    {/* Overview Tab */}
+                    <TabsContent value="overview" className="mt-0 space-y-4">
+                      <div className="grid grid-cols-3 gap-4">
+                        {[
+                          { label: t('clientPortal.conversations.messages'), value: selectedConversation.message_count, icon: MessageSquare },
+                          { label: t('clientPortal.conversations.duration'), value: formatDuration(selectedConversation.call_duration_secs), icon: Clock },
+                          { label: t('clientPortal.conversations.status'), value: selectedConversation.status, icon: TrendingUp },
+                        ].map((metric) => (
+                          <motion.div 
+                            key={metric.label} 
+                            className="p-4 rounded-xl bg-gradient-to-br from-muted/30 to-muted/10 border border-border/30"
+                            whileHover={{ scale: 1.02 }}
+                            transition={{ type: "spring", stiffness: 300 }}
                           >
-                            Réessayer
-                          </Button>
-                        </div>
-                      )}
-                      
-                      {audioUrl && (
-                        <AdvancedAudioPlayer 
-                          audioUrl={audioUrl} 
-                          conversation={{
-                            conversation_id: selectedConversation.conversation_id,
-                            duration_seconds: selectedConversation.call_duration_secs
-                          }}
-                        />
-                      )}
-                    </div>
-
-                    {/* AI Analysis Section */}
-                    {selectedConversation.analysis && (
-                      <div className="p-4 rounded-xl bg-gradient-to-br from-primary/5 to-purple-500/5 border border-primary/20">
-                        <h4 className="font-semibold mb-4 flex items-center gap-2">
-                          <Brain className="h-4 w-4 text-primary" />
-                          Analyse IA
-                        </h4>
-                        
-                        <div className="space-y-4">
-                          {/* Summary */}
-                          {((selectedConversation.analysis as any).summary || (selectedConversation.analysis as any).transcript_summary) && (
-                            <div className="p-3 rounded-lg bg-muted/20">
-                              <h5 className="text-sm font-medium mb-2 flex items-center gap-2">
-                                <FileText className="h-3 w-3" />
-                                Résumé
-                              </h5>
-                              <p className="text-sm text-muted-foreground">
-                                {(selectedConversation.analysis as any).summary || (selectedConversation.analysis as any).transcript_summary}
-                              </p>
-                            </div>
-                          )}
-                          
-                          {/* Call Success */}
-                          {selectedConversation.analysis.call_successful !== undefined && (
-                            <div className="flex items-center gap-2">
-                              {selectedConversation.analysis.call_successful === 'success' || String(selectedConversation.analysis.call_successful) === 'true' ? (
-                                <Badge className="bg-green-500/20 text-green-600 gap-1">
-                                  <CheckCircle className="h-3 w-3" />
-                                  Appel réussi
-                                </Badge>
-                              ) : (
-                                <Badge className="bg-red-500/20 text-red-600 gap-1">
-                                  <XCircle className="h-3 w-3" />
-                                  Appel non réussi
-                                </Badge>
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Data Collection Results */}
-                          {selectedConversation.analysis.data_collection_results && 
-                           Object.keys(selectedConversation.analysis.data_collection_results).length > 0 && (
-                            <div className="p-3 rounded-lg bg-muted/20">
-                              <h5 className="text-sm font-medium mb-2">Informations collectées</h5>
-                              <div className="grid grid-cols-2 gap-2">
-                                {Object.entries(selectedConversation.analysis.data_collection_results).map(([key, value]) => (
-                                  <div key={key} className="text-sm">
-                                    <span className="text-muted-foreground">{key}:</span>{' '}
-                                    <span className="font-medium">{String(value) || '-'}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Evaluation Criteria */}
-                          {selectedConversation.analysis.evaluation_criteria_results && 
-                           Object.keys(selectedConversation.analysis.evaluation_criteria_results).length > 0 && (
-                            <div className="p-3 rounded-lg bg-muted/20">
-                              <h5 className="text-sm font-medium mb-2">Critères d'évaluation</h5>
-                              <div className="flex flex-wrap gap-2">
-                                {Object.entries(selectedConversation.analysis.evaluation_criteria_results).map(([key, value]) => {
-                                  const isSuccess = value === 'success' || value === true || value === 'true';
-                                  return (
-                                    <Badge 
-                                      key={key} 
-                                      variant="outline"
-                                      className={isSuccess ? 'border-green-500/50 text-green-600' : 'border-red-500/50 text-red-600'}
-                                    >
-                                      {isSuccess ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
-                                      {key}
-                                    </Badge>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Fallback if no detailed analysis */}
-                          {!(selectedConversation.analysis as any).summary && 
-                           !(selectedConversation.analysis as any).transcript_summary &&
-                           !selectedConversation.analysis.data_collection_results &&
-                           !selectedConversation.analysis.evaluation_criteria_results && (
-                            <p className="text-sm text-muted-foreground">
-                              L'analyse détaillée n'est pas disponible pour cette conversation.
-                            </p>
-                          )}
-                        </div>
+                            <metric.icon className="h-4 w-4 text-primary mb-2" />
+                            <p className="text-2xl font-bold">{metric.value}</p>
+                            <p className="text-xs text-muted-foreground">{metric.label}</p>
+                          </motion.div>
+                        ))}
                       </div>
-                    )}
 
-                    {/* Transcript */}
-                    {selectedConversation.transcript && selectedConversation.transcript.length > 0 ? (
-                      <div className="space-y-4">
-                        <h4 className="font-semibold flex items-center gap-2">
-                          <Volume2 className="h-4 w-4 text-primary" />
-                          Transcription
-                        </h4>
-                        <ScrollArea className="h-[300px] rounded-xl border border-border/30 p-4">
-                          <div className="space-y-3">
-                            {selectedConversation.transcript.map((entry, idx) => (
-                              <div
-                                key={idx}
-                                className={`flex gap-3 ${entry.role === 'agent' ? 'flex-row' : 'flex-row-reverse'}`}
-                              >
-                                <div className={`max-w-[80%] p-3 rounded-xl ${
-                                  entry.role === 'agent' 
-                                    ? 'bg-primary/10 border border-primary/20' 
-                                    : 'bg-muted/30 border border-border/30'
-                                }`}>
-                                  <p className="text-xs font-medium text-muted-foreground mb-1">
-                                    {entry.role === 'agent' ? 'Agent' : 'Utilisateur'} • {formatDuration(safeDuration(entry.time_in_call_secs))}
-                                  </p>
-                                  <p className="text-sm">{entry.message}</p>
-                                </div>
+                      {/* AI Analysis Summary (if available) */}
+                      {analysis && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="grid grid-cols-2 gap-4"
+                        >
+                          <Card className="bg-gradient-to-br from-primary/10 to-purple-500/10 border-primary/20">
+                            <CardContent className="p-4 flex items-center gap-4">
+                              <SatisfactionScore score={analysis.satisfaction_score} size="sm" showLabel={false} />
+                              <div>
+                                <p className="text-sm font-medium">{t('clientPortal.conversations.satisfactionScore')}</p>
+                                <p className="text-xs text-muted-foreground">{t('clientPortal.conversations.aiAnalysis')}</p>
                               </div>
-                            ))}
+                            </CardContent>
+                          </Card>
+                          <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20">
+                            <CardContent className="p-4 flex items-center gap-4">
+                              <span className="text-4xl">{getSentimentEmoji(analysis.sentiment)}</span>
+                              <div>
+                                <p className="text-sm font-medium flex items-center gap-2">
+                                  {getSentimentIcon(analysis.sentiment)}
+                                  {getSentimentLabel(analysis.sentiment)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{t('clientPortal.conversations.overallSentiment')}</p>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      )}
+
+                      {/* Quick Analysis Button */}
+                      {!analysis && !isAnalyzing && (
+                        <Card className="bg-gradient-to-br from-primary/5 to-purple-500/5 border-primary/20">
+                          <CardContent className="p-6 text-center">
+                            <Brain className="h-10 w-10 mx-auto mb-3 text-primary" />
+                            <p className="text-sm text-muted-foreground mb-4">
+                              {t('clientPortal.conversations.generateAnalysisDesc')}
+                            </p>
+                            <Button onClick={handleGenerateAnalysis} className="gap-2">
+                              <Sparkles className="h-4 w-4" />
+                              {t('clientPortal.conversations.generateAnalysis')}
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {isAnalyzing && (
+                        <Card className="bg-gradient-to-br from-primary/5 to-purple-500/5 border-primary/20">
+                          <CardContent className="p-6 text-center">
+                            <Loader2 className="h-10 w-10 mx-auto mb-3 text-primary animate-spin" />
+                            <p className="text-sm text-muted-foreground">
+                              {t('clientPortal.conversations.analyzingInProgress')}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+
+                    {/* Audio Tab */}
+                    <TabsContent value="audio" className="mt-0">
+                      <div className="space-y-4">
+                        {isLoadingAudio && (
+                          <div className="flex items-center justify-center py-12">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <span className="ml-2 text-muted-foreground">{t('clientPortal.conversations.loadingAudio')}</span>
+                          </div>
+                        )}
+
+                        {audioUnavailable && !isLoadingAudio && (
+                          <Card className="bg-muted/20 border-border/30">
+                            <CardContent className="p-8 text-center">
+                              <Volume2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                              <p className="text-muted-foreground">{t('clientPortal.conversations.audioUnavailable')}</p>
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {audioUrl && !isLoadingAudio && (
+                          <AdvancedAudioPlayer
+                            audioUrl={audioUrl}
+                            conversation={{
+                              conversation_id: selectedConversation.conversation_id,
+                              caller_number: '',
+                              duration_seconds: selectedConversation.call_duration_secs,
+                              satisfaction_score: analysis?.satisfaction_score,
+                            }}
+                            transcript={[]}
+                          />
+                        )}
+                      </div>
+                    </TabsContent>
+
+                    {/* Transcript Tab */}
+                    <TabsContent value="transcript" className="mt-0">
+                      {transcriptMessages.length > 0 ? (
+                        <ScrollArea className="h-[400px] pr-4">
+                          <div className="space-y-3">
+                            {transcriptMessages.map((msg, index) => {
+                              const isAgent = msg.role === 'agent';
+                              return (
+                                <motion.div
+                                  key={index}
+                                  initial={{ opacity: 0, x: isAgent ? -20 : 20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ duration: 0.3, delay: index * 0.03 }}
+                                  className={`flex ${isAgent ? 'justify-start' : 'justify-end'}`}
+                                >
+                                  <div className={`max-w-[80%] ${isAgent ? 'mr-auto' : 'ml-auto'}`}>
+                                    <div className={`flex items-center gap-2 mb-1 ${isAgent ? '' : 'flex-row-reverse'}`}>
+                                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                                        isAgent ? 'bg-primary/20' : 'bg-secondary/20'
+                                      }`}>
+                                        {isAgent ? (
+                                          <Bot className="w-3 h-3 text-primary" />
+                                        ) : (
+                                          <User className="w-3 h-3 text-secondary" />
+                                        )}
+                                      </div>
+                                      <span className={`text-xs font-medium ${
+                                        isAgent ? 'text-primary' : 'text-secondary'
+                                      }`}>
+                                        {isAgent ? t('clientPortal.conversations.aiAgent') : t('clientPortal.conversations.user')}
+                                      </span>
+                                      {msg.time !== undefined && (
+                                        <span className="text-xs text-muted-foreground">
+                                          {Math.floor(msg.time / 60)}:{String(Math.floor(msg.time % 60)).padStart(2, '0')}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className={`p-3 rounded-lg ${
+                                      isAgent 
+                                        ? 'bg-primary/10 border border-primary/20 rounded-tl-none' 
+                                        : 'bg-secondary/10 border border-secondary/20 rounded-tr-none'
+                                    }`}>
+                                      <p className="text-sm">{msg.message}</p>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              );
+                            })}
                           </div>
                         </ScrollArea>
-                      </div>
-                    ) : (
-                      <div className="p-4 rounded-xl bg-muted/10 border border-border/30 border-dashed">
-                        <p className="text-sm text-muted-foreground text-center">
-                          Transcription non disponible pour cette conversation
-                        </p>
-                      </div>
-                    )}
+                      ) : (
+                        <Card className="bg-muted/20 border-border/30">
+                          <CardContent className="p-8 text-center">
+                            <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
+                            <p className="text-muted-foreground">{t('clientPortal.conversations.noTranscript')}</p>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </TabsContent>
+
+                    {/* AI Analysis Tab */}
+                    <TabsContent value="analysis" className="mt-0 space-y-6">
+                      {!analysis && !isAnalyzing && (
+                        <Card className="bg-gradient-to-br from-primary/5 to-purple-500/5 border-primary/20">
+                          <CardContent className="p-8 text-center">
+                            <Brain className="h-16 w-16 mx-auto mb-4 text-primary" />
+                            <h3 className="text-lg font-semibold mb-2">{t('clientPortal.conversations.aiAnalysisTitle')}</h3>
+                            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                              {t('clientPortal.conversations.aiAnalysisDescription')}
+                            </p>
+                            <Button onClick={handleGenerateAnalysis} size="lg" className="gap-2">
+                              <Sparkles className="h-5 w-5" />
+                              {t('clientPortal.conversations.generateAnalysis')}
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {isAnalyzing && (
+                        <Card className="bg-gradient-to-br from-primary/5 to-purple-500/5 border-primary/20">
+                          <CardContent className="p-8 text-center">
+                            <Loader2 className="h-16 w-16 mx-auto mb-4 text-primary animate-spin" />
+                            <p className="text-muted-foreground">{t('clientPortal.conversations.analyzingInProgress')}</p>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {analysis && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="space-y-6"
+                        >
+                          {/* Score & Sentiment */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Card className="bg-gradient-to-br from-primary/10 to-purple-500/10 border-primary/20">
+                              <CardContent className="p-6 flex flex-col items-center">
+                                <Target className="h-5 w-5 text-primary mb-2" />
+                                <p className="text-sm font-medium mb-4">{t('clientPortal.conversations.satisfactionScore')}</p>
+                                <SatisfactionScore score={analysis.satisfaction_score} size="lg" />
+                              </CardContent>
+                            </Card>
+                            <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-500/20">
+                              <CardContent className="p-6">
+                                <div className="flex items-center gap-2 mb-4">
+                                  {getSentimentIcon(analysis.sentiment)}
+                                  <p className="text-sm font-medium">{t('clientPortal.conversations.overallSentiment')}</p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <span className="text-5xl">{getSentimentEmoji(analysis.sentiment)}</span>
+                                  <div>
+                                    <p className="text-xl font-bold">{getSentimentLabel(analysis.sentiment)}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {t('clientPortal.conversations.confidence')}: {(analysis.confidence * 100).toFixed(0)}%
+                                    </p>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </div>
+
+                          {/* Summary */}
+                          {analysis.summary && (
+                            <Card className="bg-card/50 border-border/30">
+                              <CardContent className="p-6">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <Brain className="h-5 w-5 text-primary" />
+                                  <h4 className="font-semibold">{t('clientPortal.conversations.aiSummary')}</h4>
+                                </div>
+                                <p className="text-muted-foreground">{analysis.summary}</p>
+                              </CardContent>
+                            </Card>
+                          )}
+
+                          {/* Sentiment Timeline */}
+                          {analysis.sentiment_timeline && analysis.sentiment_timeline.length > 0 && (
+                            <Card className="bg-card/50 border-border/30">
+                              <CardContent className="p-6">
+                                <div className="flex items-center gap-2 mb-4">
+                                  <TrendingUp className="h-5 w-5 text-primary" />
+                                  <h4 className="font-semibold">{t('clientPortal.conversations.sentimentEvolution')}</h4>
+                                </div>
+                                <SentimentTimeline timeline={analysis.sentiment_timeline} />
+                              </CardContent>
+                            </Card>
+                          )}
+
+                          {/* Improvements */}
+                          {analysis.improvements && analysis.improvements.length > 0 && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-4">
+                                <Lightbulb className="h-5 w-5 text-primary" />
+                                <h4 className="font-semibold">{t('clientPortal.conversations.suggestions')}</h4>
+                              </div>
+                              <ImprovementsList improvements={analysis.improvements} />
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </TabsContent>
                   </div>
-                </CardContent>
+                </Tabs>
               </motion.div>
-            ) : !detailsLoading && (
-              <div className="flex flex-col items-center justify-center h-[600px] text-muted-foreground">
-                <div className="w-20 h-20 rounded-2xl bg-muted/20 flex items-center justify-center mb-4">
-                  <MessageSquare className="h-10 w-10 opacity-30" />
-                </div>
-                <p className="text-lg font-medium">Sélectionnez une conversation</p>
-                <p className="text-sm">Pour voir les détails et la transcription</p>
-              </div>
             )}
           </Card>
         </div>

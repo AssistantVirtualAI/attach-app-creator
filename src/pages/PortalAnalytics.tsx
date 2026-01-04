@@ -1,5 +1,5 @@
 import { usePortal } from '@/hooks/usePortalAuth';
-import { usePortalAnalytics, usePortalConversations } from '@/hooks/usePortalElevenLabs';
+import { usePortalAnalytics } from '@/hooks/usePortalElevenLabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, TrendingUp, Clock, MessageSquare, Users, Zap, Loader2, AlertCircle, Brain, Target, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
@@ -11,8 +11,10 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
 } from 'recharts';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const PortalAnalytics = () => {
+  const { t, language } = useTranslation();
   const { session } = usePortal();
   const { data: analytics, isLoading } = usePortalAnalytics('7days');
   const { data: analytics30, isLoading: analytics30Loading } = usePortalAnalytics('30days');
@@ -29,7 +31,7 @@ const PortalAnalytics = () => {
 
   // Format chart data
   const conversationData = analytics?.charts?.conversations_over_time?.map(item => ({
-    name: new Date(item.date).toLocaleDateString('fr-FR', { weekday: 'short' }),
+    name: new Date(item.date).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { weekday: 'short' }),
     calls: item.count,
   })) || [];
 
@@ -41,8 +43,8 @@ const PortalAnalytics = () => {
   // Calculate sentiment data from success rate
   const successRate = analytics?.metrics?.success_rate || 0;
   const sentimentData = [
-    { name: 'Réussis', value: successRate, color: 'hsl(var(--success))' },
-    { name: 'Échoués', value: 100 - successRate, color: 'hsl(var(--destructive))' },
+    { name: t('clientPortal.analytics.successful'), value: successRate, color: 'hsl(var(--success))' },
+    { name: t('clientPortal.analytics.failed'), value: 100 - successRate, color: 'hsl(var(--destructive))' },
   ];
 
   const formatDuration = (seconds: number) => {
@@ -65,25 +67,25 @@ const PortalAnalytics = () => {
 
   const insights = [
     {
-      title: 'Performance globale',
-      value: successRate30 >= 80 ? 'Excellente' : successRate30 >= 60 ? 'Bonne' : 'À améliorer',
-      description: `Taux de succès de ${successRate30}% sur ${totalConversations30} conversations`,
+      title: t('clientPortal.analytics.globalPerf'),
+      value: successRate30 >= 80 ? t('clientPortal.analytics.excellent') : successRate30 >= 60 ? t('clientPortal.analytics.good') : t('clientPortal.analytics.needsImprovement'),
+      description: t('clientPortal.analytics.successRateOf').replace('{rate}', String(successRate30)).replace('{total}', String(totalConversations30)),
       icon: TrendingUp,
       color: successRate30 >= 80 ? 'text-green-400' : successRate30 >= 60 ? 'text-yellow-400' : 'text-red-400',
       bgColor: successRate30 >= 80 ? 'from-green-500/10 to-emerald-500/10' : successRate30 >= 60 ? 'from-yellow-500/10 to-orange-500/10' : 'from-red-500/10 to-pink-500/10',
     },
     {
-      title: 'Durée optimale',
-      value: avgDuration30 < 180 ? 'Efficace' : avgDuration30 < 300 ? 'Normal' : 'Long',
-      description: `Durée moyenne de ${Math.floor(avgDuration30 / 60)}:${(avgDuration30 % 60).toString().padStart(2, '0')}`,
+      title: t('clientPortal.analytics.optimalDuration'),
+      value: avgDuration30 < 180 ? t('clientPortal.analytics.efficient') : avgDuration30 < 300 ? t('clientPortal.analytics.normal') : t('clientPortal.analytics.long'),
+      description: t('clientPortal.analytics.avgDurationOf').replace('{duration}', formatDuration(avgDuration30)),
       icon: Target,
       color: avgDuration30 < 180 ? 'text-green-400' : avgDuration30 < 300 ? 'text-yellow-400' : 'text-orange-400',
       bgColor: avgDuration30 < 180 ? 'from-green-500/10 to-emerald-500/10' : avgDuration30 < 300 ? 'from-yellow-500/10 to-orange-500/10' : 'from-orange-500/10 to-red-500/10',
     },
     {
-      title: 'Volume d\'appels',
-      value: totalConversations30 > 100 ? 'Élevé' : totalConversations30 > 50 ? 'Modéré' : 'Faible',
-      description: `${totalConversations30} conversations enregistrées`,
+      title: t('clientPortal.analytics.callVolume'),
+      value: totalConversations30 > 100 ? t('clientPortal.analytics.high') : totalConversations30 > 50 ? t('clientPortal.analytics.moderate') : t('clientPortal.analytics.low'),
+      description: t('clientPortal.analytics.recordedConversations').replace('{count}', String(totalConversations30)),
       icon: MessageSquare,
       color: 'text-blue-400',
       bgColor: 'from-blue-500/10 to-cyan-500/10',
@@ -93,11 +95,11 @@ const PortalAnalytics = () => {
   const recommendations = [
     {
       type: 'success',
-      title: 'Points forts',
+      title: t('clientPortal.analytics.strengths'),
       items: [
-        successRate30 >= 70 && 'Bon taux de résolution des conversations',
-        avgDuration30 < 300 && 'Durée des appels optimisée',
-        totalConversations30 > 50 && 'Volume d\'utilisation satisfaisant',
+        successRate30 >= 70 && t('clientPortal.analytics.goodResolutionRate'),
+        avgDuration30 < 300 && t('clientPortal.analytics.optimizedCallDuration'),
+        totalConversations30 > 50 && t('clientPortal.analytics.satisfactoryUsageVolume'),
       ].filter(Boolean),
       icon: CheckCircle,
       color: 'text-green-400',
@@ -105,11 +107,11 @@ const PortalAnalytics = () => {
     },
     {
       type: 'warning',
-      title: 'Points d\'amélioration',
+      title: t('clientPortal.analytics.improvements'),
       items: [
-        successRate30 < 70 && 'Améliorer le taux de succès des conversations',
-        avgDuration30 > 300 && 'Optimiser la durée des appels',
-        totalConversations30 < 20 && 'Augmenter l\'utilisation de l\'agent',
+        successRate30 < 70 && t('clientPortal.analytics.improveSuccessRate'),
+        avgDuration30 > 300 && t('clientPortal.analytics.optimizeCallDuration'),
+        totalConversations30 < 20 && t('clientPortal.analytics.increaseAgentUsage'),
       ].filter(Boolean),
       icon: AlertTriangle,
       color: 'text-yellow-400',
@@ -121,7 +123,7 @@ const PortalAnalytics = () => {
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
       <PortalPageHeader
         icon={BarChart3}
-        title="Analytics"
+        title={t('clientPortal.analytics.title')}
         description={session?.agentName}
         gradient="purple-pink"
       />
@@ -136,9 +138,9 @@ const PortalAnalytics = () => {
         <Card className="bg-card/50 backdrop-blur-sm border-border/30">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Données non disponibles</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('clientPortal.analytics.notEnoughData')}</h3>
             <p className="text-muted-foreground text-center max-w-md">
-              Vérifiez que l'agent ElevenLabs est correctement configuré.
+              {t('clientPortal.dashboard.noDataAvailable')}
             </p>
           </CardContent>
         </Card>
@@ -149,11 +151,11 @@ const PortalAnalytics = () => {
           <TabsList className="bg-muted/30 border border-border/30">
             <TabsTrigger value="overview" className="gap-2">
               <BarChart3 className="h-4 w-4" />
-              Vue globale
+              {t('clientPortal.analytics.overview')}
             </TabsTrigger>
             <TabsTrigger value="ai-analysis" className="gap-2">
               <Brain className="h-4 w-4" />
-              Analyse IA
+              {t('clientPortal.analytics.aiAnalysis')}
             </TabsTrigger>
           </TabsList>
 
@@ -162,28 +164,28 @@ const PortalAnalytics = () => {
             {/* Stats Grid */}
             <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <PortalStatCard
-                title="Total Conversations"
+                title={t('clientPortal.analytics.totalConversations')}
                 value={analytics.metrics.total_conversations}
                 icon={MessageSquare}
                 gradient="blue"
                 trend={{ value: 12, isPositive: true }}
               />
               <PortalStatCard
-                title="Durée Totale"
+                title={t('clientPortal.analytics.totalDuration')}
                 value={formatTotalDuration(analytics.metrics.total_duration)}
                 icon={Clock}
                 gradient="purple"
                 trend={{ value: 8, isPositive: true }}
               />
               <PortalStatCard
-                title="Durée Moyenne"
+                title={t('clientPortal.analytics.avgDuration')}
                 value={formatDuration(analytics.metrics.avg_duration)}
                 icon={TrendingUp}
                 gradient="green"
                 trend={{ value: 5, isPositive: true }}
               />
               <PortalStatCard
-                title="Aujourd'hui"
+                title={t('clientPortal.analytics.today')}
                 value={analytics.metrics.today_conversations}
                 icon={Users}
                 gradient="pink"
@@ -198,7 +200,7 @@ const PortalAnalytics = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <TrendingUp className="h-5 w-5 text-primary" />
-                    Tendance des conversations
+                    {t('clientPortal.analytics.conversationTrend')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -219,14 +221,14 @@ const PortalAnalytics = () => {
                             contentStyle={{ 
                               backgroundColor: 'hsl(var(--card))', 
                               border: '1px solid hsl(var(--border))',
-                              borderRadius: '8px'
+                              borderRadius: '12px'
                             }}
                           />
                           <Area 
                             type="monotone" 
                             dataKey="calls" 
                             stroke="hsl(var(--primary))" 
-                            strokeWidth={2}
+                            strokeWidth={3}
                             fillOpacity={1} 
                             fill="url(#colorCalls)" 
                           />
@@ -234,7 +236,7 @@ const PortalAnalytics = () => {
                       </ResponsiveContainer>
                     ) : (
                       <div className="flex items-center justify-center h-full text-muted-foreground">
-                        Pas assez de données
+                        {t('clientPortal.analytics.notEnoughData')}
                       </div>
                     )}
                   </div>
@@ -246,7 +248,7 @@ const PortalAnalytics = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Clock className="h-5 w-5 text-purple-400" />
-                    Heures de pointe
+                    {t('clientPortal.analytics.peakHours')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -261,19 +263,19 @@ const PortalAnalytics = () => {
                             contentStyle={{ 
                               backgroundColor: 'hsl(var(--card))', 
                               border: '1px solid hsl(var(--border))',
-                              borderRadius: '8px'
+                              borderRadius: '12px'
                             }}
                           />
                           <Bar 
                             dataKey="calls" 
                             fill="hsl(var(--primary))" 
-                            radius={[4, 4, 0, 0]}
+                            radius={[6, 6, 0, 0]}
                           />
                         </BarChart>
                       </ResponsiveContainer>
                     ) : (
                       <div className="flex items-center justify-center h-full text-muted-foreground">
-                        Pas assez de données
+                        {t('clientPortal.analytics.notEnoughData')}
                       </div>
                     )}
                   </div>
@@ -288,7 +290,7 @@ const PortalAnalytics = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Zap className="h-5 w-5 text-yellow-400" />
-                    Taux de succès
+                    {t('clientPortal.analytics.successRate')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -312,7 +314,7 @@ const PortalAnalytics = () => {
                           contentStyle={{ 
                             backgroundColor: 'hsl(var(--card))', 
                             border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px'
+                            borderRadius: '12px'
                           }}
                           formatter={(value: number) => [`${value.toFixed(1)}%`, '']}
                         />
@@ -328,31 +330,31 @@ const PortalAnalytics = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Zap className="h-5 w-5 text-primary animate-pulse" />
-                    Insights IA
+                    {t('clientPortal.analytics.aiInsights')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[
                       { 
-                        title: 'Conversations réussies', 
+                        title: t('clientPortal.analytics.successful'), 
                         value: `${analytics.metrics.successful_conversations}`, 
-                        desc: `Sur ${analytics.metrics.total_conversations} total` 
+                        desc: t('clientPortal.analytics.onTotal').replace('{total}', String(analytics.metrics.total_conversations))
                       },
                       { 
-                        title: 'Conversations échouées', 
+                        title: t('clientPortal.analytics.failed'), 
                         value: `${analytics.metrics.failed_conversations}`, 
-                        desc: 'Nécessitent attention' 
+                        desc: t('clientPortal.analytics.needAttention')
                       },
                       { 
-                        title: 'Taux de succès', 
+                        title: t('clientPortal.analytics.successRate'), 
                         value: `${analytics.metrics.success_rate}%`, 
-                        desc: 'Performance globale' 
+                        desc: t('clientPortal.analytics.globalPerformance')
                       },
                       { 
-                        title: 'Durée moyenne', 
+                        title: t('clientPortal.analytics.avgDuration'), 
                         value: formatDuration(analytics.metrics.avg_duration), 
-                        desc: 'Par conversation' 
+                        desc: t('clientPortal.analytics.perConversation')
                       },
                     ].map((insight, i) => (
                       <motion.div
@@ -360,7 +362,7 @@ const PortalAnalytics = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.5 + i * 0.1 }}
-                        className="p-4 rounded-xl bg-card/50 border border-border/30"
+                        className="p-4 rounded-xl bg-card/50 border border-border/30 hover:border-primary/30 transition-colors"
                       >
                         <p className="text-sm text-muted-foreground mb-1">{insight.title}</p>
                         <p className="text-xl font-bold text-primary">{insight.value}</p>
@@ -388,20 +390,29 @@ const PortalAnalytics = () => {
                       <div className="flex items-center justify-between flex-wrap gap-6">
                         <div>
                           <div className="flex items-center gap-3 mb-4">
-                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center">
+                            <motion.div 
+                              className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center"
+                              animate={{ scale: [1, 1.05, 1] }}
+                              transition={{ repeat: Infinity, duration: 2 }}
+                            >
                               <Sparkles className="h-7 w-7 text-white" />
-                            </div>
+                            </motion.div>
                             <div>
-                              <h2 className="text-2xl font-bold">Score de Performance</h2>
-                              <p className="text-muted-foreground">Analyse IA de votre agent (30 jours)</p>
+                              <h2 className="text-2xl font-bold">{t('clientPortal.analytics.performanceScore')}</h2>
+                              <p className="text-muted-foreground">{t('clientPortal.analytics.days30Analysis')}</p>
                             </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-6xl font-bold bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                          <motion.div 
+                            className="text-6xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent"
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ type: "spring", stiffness: 200 }}
+                          >
                             {successRate30}%
-                          </div>
-                          <p className="text-muted-foreground mt-1">Taux de succès global</p>
+                          </motion.div>
+                          <p className="text-muted-foreground">{t('clientPortal.analytics.successRate')}</p>
                         </div>
                       </div>
                     </CardContent>
@@ -410,83 +421,72 @@ const PortalAnalytics = () => {
 
                 {/* Insights Grid */}
                 <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {insights.map((insight) => (
-                    <Card 
-                      key={insight.title} 
-                      className={`bg-gradient-to-br ${insight.bgColor} border-border/30`}
+                  {insights.map((insight, i) => (
+                    <motion.div
+                      key={insight.title}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + i * 0.1 }}
                     >
-                      <CardContent className="p-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className={`w-10 h-10 rounded-xl bg-background/50 flex items-center justify-center ${insight.color}`}>
-                            <insight.icon className="h-5 w-5" />
+                      <Card className={`bg-gradient-to-br ${insight.bgColor} border-border/30 hover:border-primary/30 transition-all`}>
+                        <CardContent className="p-6">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-xl bg-card/50 flex items-center justify-center">
+                              <insight.icon className={`h-5 w-5 ${insight.color}`} />
+                            </div>
+                            <h3 className="font-semibold">{insight.title}</h3>
                           </div>
-                          <GlowBadge variant={successRate30 >= 80 ? 'success' : 'secondary'}>
-                            {insight.value}
-                          </GlowBadge>
-                        </div>
-                        <h3 className="font-semibold text-lg mb-1">{insight.title}</h3>
-                        <p className="text-sm text-muted-foreground">{insight.description}</p>
-                      </CardContent>
-                    </Card>
+                          <p className={`text-2xl font-bold ${insight.color} mb-2`}>{insight.value}</p>
+                          <p className="text-sm text-muted-foreground">{insight.description}</p>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
                   ))}
                 </motion.div>
 
                 {/* Recommendations */}
                 <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {recommendations.map((rec) => (
-                    <Card key={rec.type} className="bg-card/50 backdrop-blur-sm border-border/30">
-                      <CardHeader>
-                        <CardTitle className={`flex items-center gap-2 ${rec.color}`}>
-                          <rec.icon className="h-5 w-5" />
-                          {rec.title}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {rec.items.length > 0 ? (
-                          <ul className="space-y-3">
-                            {rec.items.map((item, idx) => (
-                              <motion.li
-                                key={idx}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: 0.3 + idx * 0.1 }}
-                                className={`flex items-start gap-3 p-3 rounded-lg ${rec.bgColor}`}
-                              >
-                                <div className={`w-2 h-2 rounded-full mt-2 ${rec.color.replace('text-', 'bg-')}`} />
-                                <span className="text-sm">{item}</span>
-                              </motion.li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-sm text-muted-foreground text-center py-4">
-                            Aucune recommandation pour le moment
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
+                  {recommendations.map((rec, i) => (
+                    <motion.div
+                      key={rec.type}
+                      initial={{ opacity: 0, x: i === 0 ? -20 : 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.5 + i * 0.1 }}
+                    >
+                      <Card className={`${rec.bgColor} border-border/30`}>
+                        <CardHeader>
+                          <CardTitle className={`flex items-center gap-2 ${rec.color}`}>
+                            <rec.icon className="h-5 w-5" />
+                            {rec.title}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {rec.items.length > 0 ? (
+                            <ul className="space-y-3">
+                              {rec.items.map((item, j) => (
+                                <motion.li 
+                                  key={j} 
+                                  className="flex items-start gap-2"
+                                  initial={{ opacity: 0, x: -10 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: 0.7 + j * 0.1 }}
+                                >
+                                  <div className={`w-5 h-5 rounded-full ${rec.bgColor} flex items-center justify-center shrink-0 mt-0.5`}>
+                                    <rec.icon className={`h-3 w-3 ${rec.color}`} />
+                                  </div>
+                                  <span className="text-sm">{item}</span>
+                                </motion.li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-muted-foreground text-sm">
+                              {rec.type === 'success' ? '🎉 ' : ''}{t('clientPortal.analytics.notEnoughData')}
+                            </p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
                   ))}
-                </motion.div>
-
-                {/* Tips Card */}
-                <motion.div variants={itemVariants}>
-                  <Card className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-blue-500/20">
-                    <CardContent className="p-6">
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400">
-                          <Brain className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold mb-2">Conseils pour améliorer les performances</h3>
-                          <ul className="space-y-2 text-sm text-muted-foreground">
-                            <li>• Affinez le prompt système pour des réponses plus précises</li>
-                            <li>• Enrichissez la base de connaissances avec des FAQ détaillées</li>
-                            <li>• Analysez les conversations échouées pour identifier les patterns</li>
-                            <li>• Testez régulièrement l'agent avec différents scénarios</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
                 </motion.div>
               </>
             )}
