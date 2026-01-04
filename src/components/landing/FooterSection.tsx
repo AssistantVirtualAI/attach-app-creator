@@ -2,33 +2,7 @@ import { motion } from "framer-motion";
 import { Github, Twitter, Linkedin, Mail } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AvaLogo } from "@/components/shared/AvaLogo";
-
-const footerLinks = {
-  product: [
-    { label: "Fonctionnalités", href: "#features" },
-    { label: "Tarifs", href: "#pricing" },
-    { label: "Intégrations", href: "#integrations" },
-    { label: "API", href: "/docs" },
-  ],
-  company: [
-    { label: "À propos", href: "#about" },
-    { label: "Blog", href: "#blog" },
-    { label: "Carrières", href: "#careers" },
-    { label: "Contact", href: "#contact" },
-  ],
-  legal: [
-    { label: "Confidentialité", href: "/privacy" },
-    { label: "Conditions", href: "/legal" },
-    { label: "Cookies", href: "#cookies" },
-    { label: "RGPD", href: "#gdpr" },
-  ],
-  support: [
-    { label: "Centre d'aide", href: "/docs" },
-    { label: "Documentation", href: "/docs" },
-    { label: "Status", href: "#status" },
-    { label: "FAQ", href: "#faq" },
-  ],
-};
+import { useTranslation } from "@/hooks/useTranslation";
 
 const socialLinks = [
   { icon: Twitter, href: "#", label: "Twitter" },
@@ -38,6 +12,8 @@ const socialLinks = [
 ];
 
 export const FooterSection = () => {
+  const { t } = useTranslation();
+
   return (
     <footer className="relative pt-24 pb-12 bg-gradient-to-b from-background to-card/50 border-t border-border/50">
       <div className="container mx-auto px-6">
@@ -53,7 +29,7 @@ export const FooterSection = () => {
               <AvaLogo size="sm" animated={false} />
             </motion.div>
             <p className="text-muted-foreground mb-6">
-              La plateforme complète pour créer et gérer vos agents IA conversationnels.
+              {t('footer.description')}
             </p>
             {/* Social links */}
             <div className="flex gap-3">
@@ -72,68 +48,79 @@ export const FooterSection = () => {
             </div>
           </div>
 
-          {/* Links columns */}
+          {/* Product column */}
           <div>
-            <h4 className="font-semibold mb-4">Produit</h4>
+            <h4 className="font-semibold mb-4">{t('footer.product')}</h4>
             <ul className="space-y-3">
-              {footerLinks.product.map((link) => (
-                <li key={link.label}>
-                  <Link
-                    to={link.href}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
+              <li>
+                <Link to="#features" className="text-muted-foreground hover:text-foreground transition-colors">
+                  {t('footer.features')}
+                </Link>
+              </li>
+              <li>
+                <Link to="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
+                  {t('footer.pricing')}
+                </Link>
+              </li>
+              <li>
+                <Link to="#integrations" className="text-muted-foreground hover:text-foreground transition-colors">
+                  {t('footer.integrations')}
+                </Link>
+              </li>
+              <li>
+                <Link to="#changelog" className="text-muted-foreground hover:text-foreground transition-colors">
+                  {t('footer.changelog')}
+                </Link>
+              </li>
             </ul>
           </div>
 
+          {/* Company column */}
           <div>
-            <h4 className="font-semibold mb-4">Entreprise</h4>
+            <h4 className="font-semibold mb-4">{t('footer.company')}</h4>
             <ul className="space-y-3">
-              {footerLinks.company.map((link) => (
-                <li key={link.label}>
-                  <Link
-                    to={link.href}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
+              <li>
+                <Link to="#about" className="text-muted-foreground hover:text-foreground transition-colors">
+                  {t('footer.about')}
+                </Link>
+              </li>
+              <li>
+                <Link to="#blog" className="text-muted-foreground hover:text-foreground transition-colors">
+                  {t('footer.blog')}
+                </Link>
+              </li>
+              <li>
+                <Link to="#careers" className="text-muted-foreground hover:text-foreground transition-colors">
+                  {t('footer.careers')}
+                </Link>
+              </li>
+              <li>
+                <Link to="#contact" className="text-muted-foreground hover:text-foreground transition-colors">
+                  {t('footer.contact')}
+                </Link>
+              </li>
             </ul>
           </div>
 
+          {/* Legal column */}
           <div>
-            <h4 className="font-semibold mb-4">Légal</h4>
+            <h4 className="font-semibold mb-4">{t('footer.legal')}</h4>
             <ul className="space-y-3">
-              {footerLinks.legal.map((link) => (
-                <li key={link.label}>
-                  <Link
-                    to={link.href}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="font-semibold mb-4">Support</h4>
-            <ul className="space-y-3">
-              {footerLinks.support.map((link) => (
-                <li key={link.label}>
-                  <Link
-                    to={link.href}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
+              <li>
+                <Link to="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">
+                  {t('footer.privacy')}
+                </Link>
+              </li>
+              <li>
+                <Link to="/legal" className="text-muted-foreground hover:text-foreground transition-colors">
+                  {t('footer.terms')}
+                </Link>
+              </li>
+              <li>
+                <Link to="#cookies" className="text-muted-foreground hover:text-foreground transition-colors">
+                  {t('footer.cookies')}
+                </Link>
+              </li>
             </ul>
           </div>
         </div>
@@ -146,12 +133,12 @@ export const FooterSection = () => {
           className="pt-8 border-t border-border/50 flex flex-col md:flex-row justify-between items-center gap-4"
         >
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} AVA Statistics. Tous droits réservés.
+            {t('footer.copyright')}
           </p>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span className="inline-flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-              Tous les systèmes opérationnels
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              All systems operational
             </span>
           </div>
         </motion.div>

@@ -2,18 +2,22 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { AvaLogo } from '@/components/shared/AvaLogo';
 import { useNavigate } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Globe } from 'lucide-react';
 import { useState } from 'react';
-
-const navLinks = [
-  { label: 'Fonctionnalités', href: '#features' },
-  { label: 'Témoignages', href: '#testimonials' },
-  { label: 'Tarifs', href: '#pricing' },
-];
+import { useLanguage } from '@/context/LanguageContext';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export const Navbar = () => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { language, toggleLanguage } = useLanguage();
+  const { t } = useTranslation();
+
+  const navLinks = [
+    { label: t('nav.features'), href: '#features' },
+    { label: t('nav.testimonials'), href: '#testimonials' },
+    { label: t('nav.pricing'), href: '#pricing' },
+  ];
 
   const scrollToSection = (href: string) => {
     setIsMobileMenuOpen(false);
@@ -48,33 +52,54 @@ export const Navbar = () => {
             ))}
           </nav>
 
-          {/* Desktop CTA */}
+          {/* Desktop CTA + Language */}
           <div className="hidden md:flex items-center gap-3">
+            {/* Language Toggle */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleLanguage}
+              className="flex items-center gap-2"
+            >
+              <Globe className="w-4 h-4" />
+              <span className="font-medium">{language.toUpperCase()}</span>
+            </Button>
+
             <Button
               variant="ghost"
               onClick={() => navigate('/auth')}
             >
-              Connexion
+              {t('nav.login')}
             </Button>
             <Button
               className="bg-gradient-to-r from-primary to-secondary hover:opacity-90"
               onClick={() => navigate('/auth')}
             >
-              Commencer
+              {t('nav.getStarted')}
             </Button>
           </div>
 
           {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg hover:bg-muted transition-colors"
-          >
-            {isMobileMenuOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
-          </button>
+          <div className="md:hidden flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleLanguage}
+            >
+              <Globe className="w-4 h-4" />
+              <span className="ml-1 font-medium">{language.toUpperCase()}</span>
+            </Button>
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-2 rounded-lg hover:bg-muted transition-colors"
+            >
+              {isMobileMenuOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -102,13 +127,13 @@ export const Navbar = () => {
                 className="w-full"
                 onClick={() => navigate('/auth')}
               >
-                Connexion
+                {t('nav.login')}
               </Button>
               <Button
                 className="w-full bg-gradient-to-r from-primary to-secondary"
                 onClick={() => navigate('/auth')}
               >
-                Commencer
+                {t('nav.getStarted')}
               </Button>
             </div>
           </div>
