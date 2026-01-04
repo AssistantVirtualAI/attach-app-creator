@@ -323,6 +323,7 @@ export type Database = {
           platform: string
           platform_agent_id: string | null
           platform_api_key: string | null
+          slug: string | null
           theme_config: Json | null
           updated_at: string
           widget_layout: string | null
@@ -342,6 +343,7 @@ export type Database = {
           platform: string
           platform_agent_id?: string | null
           platform_api_key?: string | null
+          slug?: string | null
           theme_config?: Json | null
           updated_at?: string
           widget_layout?: string | null
@@ -361,6 +363,7 @@ export type Database = {
           platform?: string
           platform_agent_id?: string | null
           platform_api_key?: string | null
+          slug?: string | null
           theme_config?: Json | null
           updated_at?: string
           widget_layout?: string | null
@@ -803,6 +806,8 @@ export type Database = {
       client_agent_assignments: {
         Row: {
           agent_id: string
+          can_edit_knowledge: boolean | null
+          can_edit_prompt: boolean | null
           client_id: string
           created_at: string
           id: string
@@ -811,6 +816,8 @@ export type Database = {
         }
         Insert: {
           agent_id: string
+          can_edit_knowledge?: boolean | null
+          can_edit_prompt?: boolean | null
           client_id: string
           created_at?: string
           id?: string
@@ -819,6 +826,8 @@ export type Database = {
         }
         Update: {
           agent_id?: string
+          can_edit_knowledge?: boolean | null
+          can_edit_prompt?: boolean | null
           client_id?: string
           created_at?: string
           id?: string
@@ -2438,6 +2447,7 @@ export type Database = {
       }
     }
     Functions: {
+      generate_agent_slug: { Args: { agent_name: string }; Returns: string }
       generate_api_key: { Args: never; Returns: string }
       generate_unique_username: { Args: { base_name: string }; Returns: string }
       get_user_organization_ids: {
