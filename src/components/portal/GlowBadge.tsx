@@ -3,12 +3,12 @@ import { cn } from '@/lib/utils';
 
 interface GlowBadgeProps {
   children: React.ReactNode;
-  variant?: 'admin' | 'viewer' | 'success' | 'warning' | 'info';
+  variant?: 'admin' | 'viewer' | 'success' | 'warning' | 'info' | 'secondary' | 'destructive' | 'primary';
   pulse?: boolean;
   className?: string;
 }
 
-const variantStyles = {
+const variantStyles: Record<string, { bg: string; glow: string; text: string }> = {
   admin: {
     bg: 'bg-gradient-to-r from-amber-400 to-orange-500',
     glow: 'bg-amber-400/50',
@@ -32,6 +32,21 @@ const variantStyles = {
   info: {
     bg: 'bg-gradient-to-r from-blue-400 to-cyan-500',
     glow: 'bg-blue-400/50',
+    text: 'text-white',
+  },
+  secondary: {
+    bg: 'bg-gradient-to-r from-slate-400 to-slate-500',
+    glow: 'bg-slate-400/30',
+    text: 'text-white',
+  },
+  destructive: {
+    bg: 'bg-gradient-to-r from-red-400 to-rose-500',
+    glow: 'bg-red-400/50',
+    text: 'text-white',
+  },
+  primary: {
+    bg: 'bg-gradient-to-r from-primary to-purple-500',
+    glow: 'bg-primary/50',
     text: 'text-white',
   },
 };

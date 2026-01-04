@@ -1,8 +1,21 @@
 import { usePortal } from '@/hooks/usePortalAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
-import { MessageSquare, Clock, TrendingUp, Phone, BarChart3, Sparkles } from 'lucide-react';
+import { MessageSquare, Clock, TrendingUp, Phone, Activity, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
+import { PortalStatCard } from '@/components/portal/PortalStatCard';
+import { AvaLogo } from '@/components/portal/AvaLogo';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+const mockChartData = [
+  { name: 'Lun', conversations: 12 },
+  { name: 'Mar', conversations: 19 },
+  { name: 'Mer', conversations: 15 },
+  { name: 'Jeu', conversations: 25 },
+  { name: 'Ven', conversations: 22 },
+  { name: 'Sam', conversations: 8 },
+  { name: 'Dim', conversations: 5 },
+];
 
 const PortalDashboard = () => {
   const { session } = usePortal();
@@ -18,40 +31,60 @@ const PortalDashboard = () => {
   };
 
   return (
-    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
-      <motion.div variants={itemVariants} className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-          <Sparkles className="h-6 w-6 text-white" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">{session?.agentName}</p>
+    <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-8">
+      {/* Hero Section */}
+      <motion.div variants={itemVariants} className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-purple-500/10 to-pink-500/10 p-8 border border-border/30">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-pink-500/10 rounded-full blur-3xl" />
+        
+        <div className="relative flex items-center gap-6">
+          <AvaLogo size="lg" animated />
+          <div>
+            <h1 className="text-3xl font-bold mb-2">
+              Bienvenue sur <span className="bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent">AVA Statistics</span>
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Agent: <span className="font-semibold text-foreground">{session?.agentName}</span>
+            </p>
+          </div>
         </div>
       </motion.div>
 
+      {/* Stats Grid */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { title: 'Total Conversations', icon: MessageSquare, color: 'from-electric-blue/20 to-cyber-cyan/10' },
-          { title: 'Durée Moyenne', icon: Clock, color: 'from-neon-green/20 to-success/10' },
-          { title: 'Appels Aujourd\'hui', icon: Phone, color: 'from-vivid-purple/20 to-primary/10' },
-          { title: 'Score Performance', icon: BarChart3, color: 'from-sunset-orange/20 to-warning/10' },
-        ].map((stat) => (
-          <Card key={stat.title} className={`bg-gradient-to-br ${stat.color} border backdrop-blur-sm`}>
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">{stat.title}</p>
-                  <Skeleton className="h-8 w-20" />
-                </div>
-                <stat.icon className="h-6 w-6 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+        <PortalStatCard
+          title="Total Conversations"
+          value={156}
+          icon={MessageSquare}
+          gradient="blue"
+          trend={{ value: 12, isPositive: true }}
+        />
+        <PortalStatCard
+          title="Durée Moyenne"
+          value="4:32"
+          icon={Clock}
+          gradient="green"
+          trend={{ value: 8, isPositive: true }}
+        />
+        <PortalStatCard
+          title="Appels Aujourd'hui"
+          value={23}
+          icon={Phone}
+          gradient="purple"
+          trend={{ value: 5, isPositive: true }}
+        />
+        <PortalStatCard
+          title="Score Performance"
+          value="92%"
+          icon={Activity}
+          gradient="pink"
+          trend={{ value: 3, isPositive: true }}
+        />
       </motion.div>
 
-      <motion.div variants={itemVariants}>
-        <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+      {/* Charts */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2 bg-card/50 backdrop-blur-sm border-border/30">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-primary" />
@@ -59,9 +92,64 @@ const PortalDashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-              Chargement des données...
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={mockChartData}>
+                  <defs>
+                    <linearGradient id="colorConversations" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                  <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="conversations" 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
+                    fillOpacity={1} 
+                    fill="url(#colorConversations)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Stats Card */}
+        <Card className="bg-gradient-to-br from-primary/5 via-purple-500/5 to-pink-500/5 border-border/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Insights IA
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {[
+              { label: 'Satisfaction client', value: '94%', color: 'text-green-400' },
+              { label: 'Taux de résolution', value: '87%', color: 'text-blue-400' },
+              { label: 'Temps de réponse', value: '1.2s', color: 'text-purple-400' },
+            ].map((item, i) => (
+              <motion.div 
+                key={item.label}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.5 + i * 0.1 }}
+                className="flex items-center justify-between p-3 rounded-xl bg-card/50 border border-border/30"
+              >
+                <span className="text-sm text-muted-foreground">{item.label}</span>
+                <span className={`font-bold ${item.color}`}>{item.value}</span>
+              </motion.div>
+            ))}
           </CardContent>
         </Card>
       </motion.div>
