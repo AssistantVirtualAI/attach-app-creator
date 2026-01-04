@@ -6,13 +6,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const ELEVENLABS_BASE_URL = 'https://api.elevenlabs.io/v1';
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-const { 
+    const { 
       action, 
       agentId, 
       prompt, 
@@ -20,6 +22,14 @@ const {
       voiceSettings, 
       llmSettings,
       fullConfig,
+      ttsSettings,
+      asrSettings,
+      turnSettings,
+      conversationSettings,
+      agentAdvancedSettings,
+      platformSettings,
+      tools,
+      webhookConfig,
       apiKey: providedApiKey, 
       integrationId 
     } = await req.json();
@@ -118,6 +128,49 @@ const {
       );
     }
 
+    // Actions that don't require an agent ID
+    if (action === 'get_voices') {
+      console.log('[elevenlabs-agent-config] Fetching available voices');
+      
+      const voicesResponse = await fetch(`${ELEVENLABS_BASE_URL}/voices`, {
+        headers: { 'xi-api-key': apiKey },
+      });
+
+      if (!voicesResponse.ok) {
+        const errorText = await voicesResponse.text();
+        throw new Error(`ElevenLabs API error: ${voicesResponse.status} - ${errorText}`);
+      }
+
+      const voicesData = await voicesResponse.json();
+      console.log(`[elevenlabs-agent-config] Fetched ${voicesData.voices?.length || 0} voices`);
+      
+      return new Response(
+        JSON.stringify({ voices: voicesData.voices }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (action === 'get_models') {
+      console.log('[elevenlabs-agent-config] Fetching available models');
+      
+      const modelsResponse = await fetch(`${ELEVENLABS_BASE_URL}/models`, {
+        headers: { 'xi-api-key': apiKey },
+      });
+
+      if (!modelsResponse.ok) {
+        const errorText = await modelsResponse.text();
+        throw new Error(`ElevenLabs API error: ${modelsResponse.status} - ${errorText}`);
+      }
+
+      const modelsData = await modelsResponse.json();
+      console.log(`[elevenlabs-agent-config] Fetched ${modelsData.length || 0} models`);
+      
+      return new Response(
+        JSON.stringify({ models: modelsData }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (!targetAgentId) {
       return new Response(
         JSON.stringify({ error: 'Agent ID required' }),
@@ -125,18 +178,15 @@ const {
       );
     }
 
+    const agentUrl = `${ELEVENLABS_BASE_URL}/convai/agents/${targetAgentId}`;
+
     switch (action) {
       case 'get': {
         console.log(`[elevenlabs-agent-config] Fetching config for agent ${targetAgentId}`);
         
-        const configResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-          {
-            headers: {
-              'xi-api-key': apiKey,
-            },
-          }
-        );
+        const configResponse = await fetch(agentUrl, {
+          headers: { 'xi-api-key': apiKey },
+        });
 
         if (!configResponse.ok) {
           const errorText = await configResponse.text();
@@ -156,7 +206,6 @@ const {
       case 'update_prompt': {
         console.log(`[elevenlabs-agent-config] Updating prompt for agent ${targetAgentId}`);
         
-        // Use PATCH to update agent configuration
         const updateBody: any = {
           conversation_config: {
             agent: {
@@ -167,22 +216,18 @@ const {
           }
         };
 
-        // Add first message if provided
         if (firstMessage) {
           updateBody.conversation_config.agent.first_message = firstMessage;
         }
         
-        const promptResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'xi-api-key': apiKey,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(updateBody),
-          }
-        );
+        const promptResponse = await fetch(agentUrl, {
+          method: 'PATCH',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updateBody),
+        });
 
         if (!promptResponse.ok) {
           const errorText = await promptResponse.text();
@@ -208,17 +253,14 @@ const {
           }
         };
         
-        const voiceResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'xi-api-key': apiKey,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(voiceBody),
-          }
-        );
+        const voiceResponse = await fetch(agentUrl, {
+          method: 'PATCH',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(voiceBody),
+        });
 
         if (!voiceResponse.ok) {
           const errorText = await voiceResponse.text();
@@ -231,6 +273,326 @@ const {
         
         return new Response(
           JSON.stringify({ success: true, data: voiceData }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'update_tts_full': {
+        console.log(`[elevenlabs-agent-config] Updating full TTS settings for agent ${targetAgentId}`);
+        
+        if (!ttsSettings) {
+          return new Response(
+            JSON.stringify({ error: 'TTS settings required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const ttsBody = {
+          conversation_config: {
+            tts: ttsSettings
+          }
+        };
+        
+        const ttsResponse = await fetch(agentUrl, {
+          method: 'PATCH',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(ttsBody),
+        });
+
+        if (!ttsResponse.ok) {
+          const errorText = await ttsResponse.text();
+          console.error('[elevenlabs-agent-config] ElevenLabs API error:', ttsResponse.status, errorText);
+          throw new Error(`ElevenLabs API error: ${ttsResponse.status} - ${errorText}`);
+        }
+
+        const ttsData = await ttsResponse.json();
+        console.log('[elevenlabs-agent-config] Successfully updated TTS settings');
+        
+        return new Response(
+          JSON.stringify({ success: true, data: ttsData }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'update_asr': {
+        console.log(`[elevenlabs-agent-config] Updating ASR settings for agent ${targetAgentId}`);
+        
+        if (!asrSettings) {
+          return new Response(
+            JSON.stringify({ error: 'ASR settings required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const asrBody = {
+          conversation_config: {
+            stt: asrSettings
+          }
+        };
+        
+        const asrResponse = await fetch(agentUrl, {
+          method: 'PATCH',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(asrBody),
+        });
+
+        if (!asrResponse.ok) {
+          const errorText = await asrResponse.text();
+          console.error('[elevenlabs-agent-config] ElevenLabs API error:', asrResponse.status, errorText);
+          throw new Error(`ElevenLabs API error: ${asrResponse.status} - ${errorText}`);
+        }
+
+        const asrData = await asrResponse.json();
+        console.log('[elevenlabs-agent-config] Successfully updated ASR settings');
+        
+        return new Response(
+          JSON.stringify({ success: true, data: asrData }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'update_turn': {
+        console.log(`[elevenlabs-agent-config] Updating turn settings for agent ${targetAgentId}`);
+        
+        if (!turnSettings) {
+          return new Response(
+            JSON.stringify({ error: 'Turn settings required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const turnBody = {
+          conversation_config: {
+            turn: turnSettings
+          }
+        };
+        
+        const turnResponse = await fetch(agentUrl, {
+          method: 'PATCH',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(turnBody),
+        });
+
+        if (!turnResponse.ok) {
+          const errorText = await turnResponse.text();
+          console.error('[elevenlabs-agent-config] ElevenLabs API error:', turnResponse.status, errorText);
+          throw new Error(`ElevenLabs API error: ${turnResponse.status} - ${errorText}`);
+        }
+
+        const turnData = await turnResponse.json();
+        console.log('[elevenlabs-agent-config] Successfully updated turn settings');
+        
+        return new Response(
+          JSON.stringify({ success: true, data: turnData }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'update_conversation': {
+        console.log(`[elevenlabs-agent-config] Updating conversation settings for agent ${targetAgentId}`);
+        
+        if (!conversationSettings) {
+          return new Response(
+            JSON.stringify({ error: 'Conversation settings required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const convBody = {
+          conversation_config: {
+            conversation: conversationSettings
+          }
+        };
+        
+        const convResponse = await fetch(agentUrl, {
+          method: 'PATCH',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(convBody),
+        });
+
+        if (!convResponse.ok) {
+          const errorText = await convResponse.text();
+          console.error('[elevenlabs-agent-config] ElevenLabs API error:', convResponse.status, errorText);
+          throw new Error(`ElevenLabs API error: ${convResponse.status} - ${errorText}`);
+        }
+
+        const convData = await convResponse.json();
+        console.log('[elevenlabs-agent-config] Successfully updated conversation settings');
+        
+        return new Response(
+          JSON.stringify({ success: true, data: convData }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'update_agent_advanced': {
+        console.log(`[elevenlabs-agent-config] Updating advanced agent settings for agent ${targetAgentId}`);
+        
+        if (!agentAdvancedSettings) {
+          return new Response(
+            JSON.stringify({ error: 'Agent advanced settings required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const advancedBody = {
+          conversation_config: {
+            agent: agentAdvancedSettings
+          }
+        };
+        
+        const advancedResponse = await fetch(agentUrl, {
+          method: 'PATCH',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(advancedBody),
+        });
+
+        if (!advancedResponse.ok) {
+          const errorText = await advancedResponse.text();
+          console.error('[elevenlabs-agent-config] ElevenLabs API error:', advancedResponse.status, errorText);
+          throw new Error(`ElevenLabs API error: ${advancedResponse.status} - ${errorText}`);
+        }
+
+        const advancedData = await advancedResponse.json();
+        console.log('[elevenlabs-agent-config] Successfully updated advanced agent settings');
+        
+        return new Response(
+          JSON.stringify({ success: true, data: advancedData }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'update_platform_settings': {
+        console.log(`[elevenlabs-agent-config] Updating platform settings for agent ${targetAgentId}`);
+        
+        if (!platformSettings) {
+          return new Response(
+            JSON.stringify({ error: 'Platform settings required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const platformBody = {
+          platform_settings: platformSettings
+        };
+        
+        const platformResponse = await fetch(agentUrl, {
+          method: 'PATCH',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(platformBody),
+        });
+
+        if (!platformResponse.ok) {
+          const errorText = await platformResponse.text();
+          console.error('[elevenlabs-agent-config] ElevenLabs API error:', platformResponse.status, errorText);
+          throw new Error(`ElevenLabs API error: ${platformResponse.status} - ${errorText}`);
+        }
+
+        const platformData = await platformResponse.json();
+        console.log('[elevenlabs-agent-config] Successfully updated platform settings');
+        
+        return new Response(
+          JSON.stringify({ success: true, data: platformData }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'update_tools': {
+        console.log(`[elevenlabs-agent-config] Updating tools for agent ${targetAgentId}`);
+        
+        if (!tools) {
+          return new Response(
+            JSON.stringify({ error: 'Tools configuration required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const toolsBody = {
+          conversation_config: {
+            agent: {
+              tools: tools
+            }
+          }
+        };
+        
+        const toolsResponse = await fetch(agentUrl, {
+          method: 'PATCH',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(toolsBody),
+        });
+
+        if (!toolsResponse.ok) {
+          const errorText = await toolsResponse.text();
+          console.error('[elevenlabs-agent-config] ElevenLabs API error:', toolsResponse.status, errorText);
+          throw new Error(`ElevenLabs API error: ${toolsResponse.status} - ${errorText}`);
+        }
+
+        const toolsData = await toolsResponse.json();
+        console.log('[elevenlabs-agent-config] Successfully updated tools');
+        
+        return new Response(
+          JSON.stringify({ success: true, data: toolsData }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'update_webhooks': {
+        console.log(`[elevenlabs-agent-config] Updating webhooks for agent ${targetAgentId}`);
+        
+        if (!webhookConfig) {
+          return new Response(
+            JSON.stringify({ error: 'Webhook configuration required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        const webhookBody = {
+          platform_settings: {
+            webhooks: webhookConfig
+          }
+        };
+        
+        const webhookResponse = await fetch(agentUrl, {
+          method: 'PATCH',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(webhookBody),
+        });
+
+        if (!webhookResponse.ok) {
+          const errorText = await webhookResponse.text();
+          console.error('[elevenlabs-agent-config] ElevenLabs API error:', webhookResponse.status, errorText);
+          throw new Error(`ElevenLabs API error: ${webhookResponse.status} - ${errorText}`);
+        }
+
+        const webhookData = await webhookResponse.json();
+        console.log('[elevenlabs-agent-config] Successfully updated webhooks');
+        
+        return new Response(
+          JSON.stringify({ success: true, data: webhookData }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -255,17 +617,14 @@ const {
           }
         };
         
-        const llmResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'xi-api-key': apiKey,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(llmBody),
-          }
-        );
+        const llmResponse = await fetch(agentUrl, {
+          method: 'PATCH',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(llmBody),
+        });
 
         if (!llmResponse.ok) {
           const errorText = await llmResponse.text();
@@ -300,17 +659,14 @@ const {
           }
         };
         
-        const fmResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'xi-api-key': apiKey,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(fmBody),
-          }
-        );
+        const fmResponse = await fetch(agentUrl, {
+          method: 'PATCH',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(fmBody),
+        });
 
         if (!fmResponse.ok) {
           const errorText = await fmResponse.text();
@@ -337,17 +693,14 @@ const {
           );
         }
         
-        const fullResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${targetAgentId}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'xi-api-key': apiKey,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(fullConfig),
-          }
-        );
+        const fullResponse = await fetch(agentUrl, {
+          method: 'PATCH',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(fullConfig),
+        });
 
         if (!fullResponse.ok) {
           const errorText = await fullResponse.text();
