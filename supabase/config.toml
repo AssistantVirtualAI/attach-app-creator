@@ -31,16 +31,16 @@ client_id = ""
 secret = ""
 
 [functions.elevenlabs-convai-analytics]
-verify_jwt = true
+verify_jwt = false
 
 [functions.elevenlabs-convai-conversations]
-verify_jwt = true
+verify_jwt = false
 
 [functions.elevenlabs-convai-knowledge-base]
-verify_jwt = true
+verify_jwt = false
 
 [functions.elevenlabs-convai-agent-config]
-verify_jwt = true
+verify_jwt = false
 
 [functions.elevenlabs-all-agents-conversations]
 verify_jwt = true
