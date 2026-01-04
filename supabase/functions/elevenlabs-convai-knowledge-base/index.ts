@@ -10,11 +10,19 @@ const ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1";
 
 // Validation helpers
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// ElevenLabs agent IDs are alphanumeric strings (e.g., "QNdB45Jpgh06Hr67TzFO")
+const ELEVENLABS_AGENT_ID_REGEX = /^[a-zA-Z0-9]{10,30}$/;
 const VALID_ACTIONS = ['list', 'get', 'get_document', 'add', 'create_text', 'create_url', 'delete', 'link_to_agent', 'unlink_from_agent'] as const;
 type ValidAction = typeof VALID_ACTIONS[number];
 
 function isValidUUID(value: unknown): boolean {
   return typeof value === 'string' && UUID_REGEX.test(value);
+}
+
+function isValidAgentId(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  // Accept both UUID format (internal) and ElevenLabs format
+  return UUID_REGEX.test(value) || ELEVENLABS_AGENT_ID_REGEX.test(value);
 }
 
 function isValidAction(value: unknown): value is ValidAction {
@@ -64,8 +72,8 @@ serve(async (req) => {
       );
     }
 
-    // Validate agentId if provided
-    if (agentId && !isValidUUID(agentId)) {
+    // Validate agentId if provided - accept both UUID (internal DB) and ElevenLabs format
+    if (agentId && !isValidAgentId(agentId)) {
       return new Response(
         JSON.stringify({ error: 'Invalid agent ID format', success: false }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
