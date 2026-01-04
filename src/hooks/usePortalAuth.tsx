@@ -74,13 +74,27 @@ export const usePortalAuth = () => {
       // Fetch agent details
       const { data: agent, error: agentError } = await supabase
         .from('agents')
-        .select('id, name, organization_id, platform_agent_id, platform_api_key, slug')
+        .select('id, name, organization_id, platform_agent_id, platform_api_key, platform, slug')
         .eq('slug', agentSlug)
         .single();
 
       if (agentError || !agent) {
         console.error('Agent not found:', agentError);
         return null;
+      }
+
+      // Fetch API key from organization_integrations if not on agent
+      let platformApiKey: string | null = agent.platform_api_key || null;
+      if (!platformApiKey && agent.organization_id && agent.platform) {
+        const { data: integration } = await supabase
+          .from('organization_integrations')
+          .select('api_key')
+          .eq('organization_id', agent.organization_id)
+          .eq('platform', agent.platform)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        platformApiKey = integration?.api_key || null;
       }
 
       const portalSession: PortalSession = {
@@ -91,7 +105,7 @@ export const usePortalAuth = () => {
         agentName: agent.name,
         agentSlug: agent.slug || agentSlug,
         platformAgentId: agent.platform_agent_id || undefined,
-        platformApiKey: agent.platform_api_key || undefined,
+        platformApiKey: platformApiKey || undefined,
         role: 'super_admin',
         canEditKnowledge: true,
         canEditPrompt: true,
