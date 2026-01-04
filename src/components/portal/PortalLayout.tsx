@@ -23,13 +23,18 @@ import {
   Crown,
   Sparkles,
   User,
-  ChevronUp
+  ChevronUp,
+  Globe
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AvaLogo } from '@/components/shared/AvaLogo';
 import { GlowBadge } from '@/components/portal/GlowBadge';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useLanguage } from '@/context/LanguageContext';
 
 const PortalLayoutContent = () => {
+  const { t } = useTranslation();
+  const { language, setLanguage } = useLanguage();
   const { isAuthenticated, isLoading, session, logout, hasEditAccess, isSuperAdmin } = usePortal();
   const { agentSlug } = useParams();
   const navigate = useNavigate();
@@ -69,16 +74,16 @@ const PortalLayoutContent = () => {
 
   // Navigation items - show Configuration only to admins
   const navItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', href: `/portal/${agentSlug}/dashboard`, color: 'text-blue-400' },
-    { icon: MessageSquare, label: 'Conversations', href: `/portal/${agentSlug}/conversations`, color: 'text-cyan-400' },
-    { icon: BarChart3, label: 'Analytics', href: `/portal/${agentSlug}/analytics`, color: 'text-purple-400' },
-    { icon: BookOpen, label: 'Base de connaissances', href: `/portal/${agentSlug}/knowledge`, color: 'text-green-400' },
-    { icon: FileCode, label: 'Prompt', href: `/portal/${agentSlug}/prompt`, color: 'text-orange-400' },
+    { icon: LayoutDashboard, labelKey: 'clientPortal.sidebar.dashboard', href: `/portal/${agentSlug}/dashboard`, color: 'text-blue-400' },
+    { icon: MessageSquare, labelKey: 'clientPortal.sidebar.conversations', href: `/portal/${agentSlug}/conversations`, color: 'text-cyan-400' },
+    { icon: BarChart3, labelKey: 'clientPortal.sidebar.analytics', href: `/portal/${agentSlug}/analytics`, color: 'text-purple-400' },
+    { icon: BookOpen, labelKey: 'clientPortal.sidebar.knowledge', href: `/portal/${agentSlug}/knowledge`, color: 'text-green-400' },
+    { icon: FileCode, labelKey: 'clientPortal.sidebar.prompt', href: `/portal/${agentSlug}/prompt`, color: 'text-orange-400' },
   ];
 
   // Add settings for admins and super admins only
   if (hasEditAccess() || isSuperAdminSession) {
-    navItems.push({ icon: Settings, label: 'Configuration', href: `/portal/${agentSlug}/settings`, color: 'text-pink-400' });
+    navItems.push({ icon: Settings, labelKey: 'clientPortal.sidebar.settings', href: `/portal/${agentSlug}/settings`, color: 'text-pink-400' });
   }
 
   const handleLogout = () => {
@@ -89,6 +94,18 @@ const PortalLayoutContent = () => {
   const handleBackToAdmin = () => {
     navigate('/agents');
   };
+
+  const getRoleBadge = () => {
+    if (isSuperAdminSession) {
+      return { variant: 'warning' as const, label: t('clientPortal.roles.superAdmin'), icon: Crown };
+    }
+    if (session.role === 'admin') {
+      return { variant: 'admin' as const, label: t('clientPortal.roles.admin'), icon: null };
+    }
+    return { variant: 'viewer' as const, label: t('clientPortal.roles.viewer'), icon: null };
+  };
+
+  const roleBadge = getRoleBadge();
 
   return (
     <div className="min-h-screen bg-background flex overflow-hidden">
@@ -106,34 +123,50 @@ const PortalLayoutContent = () => {
       >
         {/* Header with AVA Logo */}
         <div className="p-5 border-b border-border/50">
-          <div className="flex items-center gap-3 mb-4">
-            <AvaLogo size="sm" />
-            <div className="flex-1 min-w-0">
-              <span className="font-bold text-lg bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                AVA Statistics
-              </span>
-              <span className="text-xs text-muted-foreground block mt-0.5">
-                {isSuperAdminSession ? 'Super Admin' : 'Portail Client'}
-              </span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <AvaLogo size="sm" />
+              <div className="flex-1 min-w-0">
+                <span className="font-bold text-lg bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                  AVA Statistics
+                </span>
+                <span className="text-xs text-muted-foreground block mt-0.5">
+                  {isSuperAdminSession ? t('clientPortal.roles.superAdmin') : t('clientPortal.title')}
+                </span>
+              </div>
             </div>
+            {/* Language Toggle */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Globe className="w-4 h-4 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem 
+                  onClick={() => setLanguage('en')}
+                  className={language === 'en' ? 'bg-primary/10' : ''}
+                >
+                  🇬🇧 English
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setLanguage('fr')}
+                  className={language === 'fr' ? 'bg-primary/10' : ''}
+                >
+                  🇫🇷 Français
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           
           {/* Agent info */}
           <div className="p-3 rounded-xl bg-muted/30 border border-border/30">
             <p className="font-medium truncate text-sm">{session.agentName}</p>
             <div className="mt-2 flex items-center gap-2">
-              {isSuperAdminSession ? (
-                <GlowBadge variant="warning" className="flex items-center gap-1">
-                  <Crown className="h-3 w-3" />
-                  Super Admin
-                </GlowBadge>
-              ) : (
-                <GlowBadge 
-                  variant={session.role === 'admin' ? 'admin' : 'viewer'}
-                >
-                  {session.role === 'admin' ? 'Administrateur' : 'Lecture seule'}
-                </GlowBadge>
-              )}
+              <GlowBadge variant={roleBadge.variant} className="flex items-center gap-1">
+                {roleBadge.icon && <roleBadge.icon className="h-3 w-3" />}
+                {roleBadge.label}
+              </GlowBadge>
             </div>
           </div>
 
@@ -146,7 +179,7 @@ const PortalLayoutContent = () => {
               onClick={handleBackToAdmin}
             >
               <ArrowLeft className="h-4 w-4" />
-              Retour à l'admin
+              {t('clientPortal.actions.backToAdmin')}
             </Button>
           )}
         </div>
@@ -173,7 +206,7 @@ const PortalLayoutContent = () => {
                       }`}
                     >
                       <item.icon className={`h-4 w-4 ${isActive ? 'text-primary' : item.color}`} />
-                      <span className={isActive ? 'font-medium' : ''}>{item.label}</span>
+                      <span className={isActive ? 'font-medium' : ''}>{t(item.labelKey)}</span>
                     </Button>
                   </Link>
                 </motion.div>
@@ -191,10 +224,10 @@ const PortalLayoutContent = () => {
             >
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles className="h-4 w-4 text-yellow-500" />
-                <span className="font-medium text-yellow-500 text-sm">Mode Super Admin</span>
+                <span className="font-medium text-yellow-500 text-sm">{t('clientPortal.superAdminMode')}</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Accès complet à toutes les fonctionnalités de l'agent.
+                {t('clientPortal.superAdminAccess')}
               </p>
             </motion.div>
           )}
@@ -217,7 +250,7 @@ const PortalLayoutContent = () => {
             <DropdownMenuContent align="start" className="w-56">
               <DropdownMenuItem onClick={() => navigate(`/portal/${agentSlug}/profile`)}>
                 <User className="h-4 w-4 mr-2" />
-                Mon profil
+                {t('clientPortal.actions.myProfile')}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
@@ -225,7 +258,7 @@ const PortalLayoutContent = () => {
                 className="text-destructive focus:text-destructive focus:bg-destructive/10"
               >
                 <LogOut className="h-4 w-4 mr-2" />
-                Déconnexion
+                {t('clientPortal.actions.logout')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

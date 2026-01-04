@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { NavGroup } from './sidebarConfig';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface SidebarNavGroupProps {
   group: NavGroup;
@@ -27,6 +28,7 @@ const setCollapsedGroups = (groups: string[]) => {
 
 export const SidebarNavGroup = ({ group, onNavigate }: SidebarNavGroupProps) => {
   const location = useLocation();
+  const { t } = useTranslation();
   const isActiveGroup = group.items.some(item => location.pathname === item.href);
   
   const [isOpen, setIsOpen] = useState(() => {
@@ -68,7 +70,7 @@ export const SidebarNavGroup = ({ group, onNavigate }: SidebarNavGroupProps) => 
           }`}>
             <Icon className="w-4 h-4" />
           </div>
-          <span className="font-medium text-sm">{group.label}</span>
+          <span className="font-medium text-sm">{t(group.labelKey)}</span>
         </div>
         <motion.div
           animate={{ rotate: isOpen ? 180 : 0 }}
@@ -102,7 +104,7 @@ export const SidebarNavGroup = ({ group, onNavigate }: SidebarNavGroupProps) => 
                     }`}
                   >
                     <ItemIcon className="w-4 h-4" />
-                    <span className="text-sm">{item.name}</span>
+                    <span className="text-sm">{t(item.nameKey)}</span>
                   </Link>
                 </motion.div>
               );

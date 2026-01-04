@@ -3,7 +3,6 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { 
   Clock, TrendingUp, TrendingDown, Minus,
   ChevronLeft, ChevronRight, Play, Sparkles, Search,
@@ -18,7 +17,7 @@ import {
   SelectValue 
 } from '@/components/ui/select';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS } from 'date-fns/locale';
 import { useAllAgentsConversations, ConversationFilters as Filters } from '@/hooks/useAllAgentsConversations';
 import { ConversationFilters } from '@/components/filters/ConversationFilters';
 import { ConversationExport } from '@/components/exports/ConversationExport';
@@ -27,8 +26,12 @@ import { ElevenLabsConversationModal } from '@/components/conversations/ElevenLa
 import { motion } from 'framer-motion';
 import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { GlowBadge } from '@/components/portal/GlowBadge';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useLanguage } from '@/context/LanguageContext';
 
 const Conversations = () => {
+  const { t } = useTranslation();
+  const { language } = useLanguage();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [filters, setFilters] = useState<Filters>({});
@@ -39,6 +42,8 @@ const Conversations = () => {
   } | null>(null);
   
   const { data, isLoading } = useAllAgentsConversations(page, pageSize, filters);
+
+  const dateLocale = language === 'fr' ? fr : enUS;
 
   const getSentimentVariant = (sentiment: string | undefined): 'success' | 'warning' | 'destructive' | 'info' => {
     switch (sentiment) {
@@ -59,6 +64,17 @@ const Conversations = () => {
         return <TrendingDown className="w-3 h-3" />;
       default:
         return <Minus className="w-3 h-3" />;
+    }
+  };
+
+  const getSentimentLabel = (sentiment: string | undefined) => {
+    switch (sentiment) {
+      case 'positive':
+        return t('conversations.sentiment.positive');
+      case 'negative':
+        return t('conversations.sentiment.negative');
+      default:
+        return t('conversations.sentiment.neutral');
     }
   };
 
@@ -85,13 +101,13 @@ const Conversations = () => {
       <AppLayout>
         <div className="space-y-6">
           <PortalPageHeader
-            title="Conversations"
-            description="Toutes les conversations de vos agents vocaux"
+            title={t('conversations.title')}
+            description={t('conversations.allConversations')}
             icon={MessageCircle}
           />
           <SetupIntegrationCard 
-            title="Configuration Requise" 
-            message={data.message || 'Veuillez configurer au moins un agent ElevenLabs pour voir les conversations.'} 
+            title={t('conversations.configRequired')} 
+            message={data.message || t('conversations.configMessage')} 
           />
         </div>
       </AppLayout>
@@ -104,8 +120,8 @@ const Conversations = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <PortalPageHeader
-            title="Conversations"
-            description={`${data?.total || 0} conversations au total • ${data?.agents?.length || 0} agents`}
+            title={t('conversations.title')}
+            description={t('conversations.description').replace('{total}', String(data?.total || 0)).replace('{agents}', String(data?.agents?.length || 0))}
             icon={MessageCircle}
           />
           <ConversationExport 
@@ -117,10 +133,10 @@ const Conversations = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[
-            { label: 'Total', value: data?.total || 0, icon: MessageCircle, gradient: 'from-primary to-secondary' },
-            { label: 'Agents actifs', value: data?.agents?.length || 0, icon: User, gradient: 'from-secondary to-accent' },
-            { label: 'Positives', value: data?.conversations?.filter((c: any) => c.analysis?.sentiment === 'positive').length || 0, icon: TrendingUp, gradient: 'from-success to-neon-green' },
-            { label: 'Durée moy.', value: data?.conversations?.length ? formatDuration(Math.round(data.conversations.reduce((acc: number, c: any) => acc + (c.call_duration_secs || c.duration || 0), 0) / data.conversations.length)) : '0m', icon: Phone, gradient: 'from-warning to-sunset-orange' },
+            { label: t('conversations.stats.total'), value: data?.total || 0, icon: MessageCircle, gradient: 'from-primary to-secondary' },
+            { label: t('conversations.stats.activeAgents'), value: data?.agents?.length || 0, icon: User, gradient: 'from-secondary to-accent' },
+            { label: t('conversations.stats.positive'), value: data?.conversations?.filter((c: any) => c.analysis?.sentiment === 'positive').length || 0, icon: TrendingUp, gradient: 'from-success to-neon-green' },
+            { label: t('conversations.stats.avgDuration'), value: data?.conversations?.length ? formatDuration(Math.round(data.conversations.reduce((acc: number, c: any) => acc + (c.call_duration_secs || c.duration || 0), 0) / data.conversations.length)) : '0m', icon: Phone, gradient: 'from-warning to-sunset-orange' },
           ].map((stat, index) => (
             <motion.div
               key={stat.label}
@@ -190,8 +206,8 @@ const Conversations = () => {
             <Card className="border border-border bg-card">
               <CardContent className="p-12 text-center">
                 <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-2">Aucune conversation</h3>
-                <p className="text-muted-foreground">Les conversations apparaîtront ici une fois que vos agents auront des interactions.</p>
+                <h3 className="text-lg font-medium text-foreground mb-2">{t('conversations.empty.title')}</h3>
+                <p className="text-muted-foreground">{t('conversations.empty.description')}</p>
               </CardContent>
             </Card>
           ) : (
@@ -230,7 +246,7 @@ const Conversations = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="text-lg font-semibold text-foreground">
-                              Conversation {conversation.conversation_id.substring(0, 8)}
+                              {t('conversations.conversation')} {conversation.conversation_id.substring(0, 8)}
                             </h3>
                             <Badge className="bg-primary/20 text-primary border-primary/30">
                               {conversation.agent_name}
@@ -243,11 +259,11 @@ const Conversations = () => {
                               {formatDuration(duration)}
                             </div>
                             {satisfaction !== undefined && (
-                              <div>Satisfaction: {(satisfaction * 100).toFixed(0)}%</div>
+                              <div>{t('conversations.satisfaction')}: {(satisfaction * 100).toFixed(0)}%</div>
                             )}
                             {startTime && (
                               <div>
-                                {format(new Date(startTime), 'dd MMM yyyy HH:mm', { locale: fr })}
+                                {format(new Date(startTime), 'dd MMM yyyy HH:mm', { locale: dateLocale })}
                               </div>
                             )}
                           </div>
@@ -263,7 +279,7 @@ const Conversations = () => {
                         <div className="flex items-center gap-3">
                           <GlowBadge variant={getSentimentVariant(sentiment)}>
                             {getSentimentIcon(sentiment)}
-                            <span className="ml-1 capitalize">{sentiment || 'Neutre'}</span>
+                            <span className="ml-1 capitalize">{getSentimentLabel(sentiment)}</span>
                           </GlowBadge>
 
                           <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -303,7 +319,7 @@ const Conversations = () => {
             className="flex items-center justify-between"
           >
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Afficher</span>
+              <span className="text-sm text-muted-foreground">{t('conversations.pagination.show')}</span>
               <Select 
                 value={pageSize.toString()} 
                 onValueChange={(v) => {
@@ -320,7 +336,7 @@ const Conversations = () => {
                   <SelectItem value="100">100</SelectItem>
                 </SelectContent>
               </Select>
-              <span className="text-sm text-muted-foreground">par page</span>
+              <span className="text-sm text-muted-foreground">{t('conversations.pagination.perPage')}</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -334,7 +350,7 @@ const Conversations = () => {
                 <ChevronLeft className="w-4 h-4" />
               </Button>
               <span className="text-sm text-foreground px-3">
-                Page {page} sur {data.totalPages}
+                {t('conversations.pagination.page')} {page} {t('conversations.pagination.of')} {data.totalPages}
               </span>
               <Button 
                 variant="outline" 

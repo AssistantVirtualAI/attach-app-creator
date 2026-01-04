@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
 import { motion } from 'framer-motion';
 import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
+import { useTranslation } from '@/hooks/useTranslation';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export default function Agents() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { selectedOrgId } = useOrganization();
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,8 +85,8 @@ export default function Agents() {
       <AppLayout>
         <div className="space-y-6">
           <PortalPageHeader
-            title="Agents IA"
-            description="Gérez vos agents conversationnels"
+            title={t('agents.title')}
+            description={t('agents.description')}
             icon={Bot}
           />
           <TableSkeleton rows={5} />
@@ -99,26 +101,26 @@ export default function Agents() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <PortalPageHeader
-            title="Agents IA"
-            description="Gérez vos agents conversationnels"
+            title={t('agents.title')}
+            description={t('agents.description')}
             icon={Bot}
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 border-0 shadow-lg">
                 <Plus className="mr-2 h-4 w-4" />
-                Nouvel agent
+                {t('agents.newAgent')}
                 <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-popover border-border">
               <DropdownMenuItem onClick={() => setIsModalOpen(true)}>
                 <Settings className="mr-2 h-4 w-4" />
-                Via intégration
+                {t('agents.viaIntegration')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate('/agent-builder')}>
                 <Sparkles className="mr-2 h-4 w-4" />
-                Créer avec Builder (No-Code)
+                {t('agents.createWithBuilder')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -127,10 +129,10 @@ export default function Agents() {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[
-            { label: 'Total agents', value: agents?.length || 0, icon: Bot, gradient: 'from-primary to-secondary' },
-            { label: 'ElevenLabs', value: agents?.filter(a => a.platform === 'elevenlabs').length || 0, icon: Zap, gradient: 'from-secondary to-accent' },
-            { label: 'Avec clients', value: agents?.filter(a => a.client).length || 0, icon: TrendingUp, gradient: 'from-success to-neon-green' },
-            { label: 'Ce mois', value: agents?.filter(a => new Date(a.created_at).getMonth() === new Date().getMonth()).length || 0, icon: Plus, gradient: 'from-warning to-sunset-orange' },
+            { label: t('agents.stats.totalAgents'), value: agents?.length || 0, icon: Bot, gradient: 'from-primary to-secondary' },
+            { label: t('agents.stats.elevenlabs'), value: agents?.filter(a => a.platform === 'elevenlabs').length || 0, icon: Zap, gradient: 'from-secondary to-accent' },
+            { label: t('agents.stats.withClients'), value: agents?.filter(a => a.client).length || 0, icon: TrendingUp, gradient: 'from-success to-neon-green' },
+            { label: t('agents.stats.thisMonth'), value: agents?.filter(a => new Date(a.created_at).getMonth() === new Date().getMonth()).length || 0, icon: Plus, gradient: 'from-warning to-sunset-orange' },
           ].map((stat, index) => (
             <motion.div
               key={stat.label}
@@ -169,7 +171,7 @@ export default function Agents() {
                   <div className="relative max-w-md">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Rechercher par nom ou plateforme..."
+                      placeholder={t('agents.searchPlaceholder')}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-10 bg-muted/50 border-border focus:border-primary"

@@ -6,14 +6,14 @@ import {
 } from 'lucide-react';
 
 export interface NavItem {
-  name: string;
+  nameKey: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
 export interface NavGroup {
   id: string;
-  label: string;
+  labelKey: string;
   icon: React.ComponentType<{ className?: string }>;
   items: NavItem[];
   adminOnly?: boolean;
@@ -22,85 +22,85 @@ export interface NavGroup {
 export const sidebarGroups: NavGroup[] = [
   {
     id: 'overview',
-    label: 'Vue d\'ensemble',
+    labelKey: 'sidebar.groups.overview',
     icon: LayoutDashboard,
     items: [
-      { name: 'Maison', href: '/', icon: Home },
-      { name: 'Dashboard', href: '/dashboard', icon: TrendingUp },
+      { nameKey: 'sidebar.home', href: '/', icon: Home },
+      { nameKey: 'sidebar.dashboard', href: '/dashboard', icon: TrendingUp },
     ]
   },
   {
     id: 'conversations',
-    label: 'Conversations',
+    labelKey: 'sidebar.groups.conversations',
     icon: MessageSquare,
     items: [
-      { name: 'Temps Réel', href: '/realtime', icon: Radio },
-      { name: 'Conversations', href: '/conversations', icon: MessageSquare },
-      { name: 'Voice Analytics', href: '/analytics', icon: BarChart3 },
-      { name: 'Handoffs', href: '/handoffs', icon: Headphones },
-      { name: 'Topics', href: '/topics', icon: Tag },
+      { nameKey: 'sidebar.realtime', href: '/realtime', icon: Radio },
+      { nameKey: 'sidebar.conversationsList', href: '/conversations', icon: MessageSquare },
+      { nameKey: 'sidebar.voiceAnalytics', href: '/analytics', icon: BarChart3 },
+      { nameKey: 'sidebar.handoffs', href: '/handoffs', icon: Headphones },
+      { nameKey: 'sidebar.topics', href: '/topics', icon: Tag },
     ]
   },
   {
     id: 'agents',
-    label: 'Agents',
+    labelKey: 'sidebar.groups.agents',
     icon: Bot,
     adminOnly: true,
     items: [
-      { name: 'Agents', href: '/agents', icon: Bot },
-      { name: 'Agent Builder', href: '/agent-builder', icon: Sparkles },
-      { name: 'Comparaison', href: '/agent-comparison', icon: BarChart3 },
-      { name: 'Rapports Agents', href: '/agent-reports', icon: FileQuestion },
-      { name: 'Base de connaissances', href: '/knowledge-base', icon: BookOpen },
-      { name: 'Clientèle', href: '/clients', icon: Users },
+      { nameKey: 'sidebar.agentsList', href: '/agents', icon: Bot },
+      { nameKey: 'sidebar.agentBuilder', href: '/agent-builder', icon: Sparkles },
+      { nameKey: 'sidebar.comparison', href: '/agent-comparison', icon: BarChart3 },
+      { nameKey: 'sidebar.agentReports', href: '/agent-reports', icon: FileQuestion },
+      { nameKey: 'sidebar.knowledgeBase', href: '/knowledge-base', icon: BookOpen },
+      { nameKey: 'sidebar.clients', href: '/clients', icon: Users },
     ]
   },
   {
     id: 'crm',
-    label: 'CRM',
+    labelKey: 'sidebar.groups.crm',
     icon: Users,
     adminOnly: true,
     items: [
-      { name: 'Leads', href: '/leads', icon: UserPlus },
-      { name: 'Rendez-vous', href: '/appointments', icon: Calendar },
+      { nameKey: 'sidebar.leads', href: '/leads', icon: UserPlus },
+      { nameKey: 'sidebar.appointments', href: '/appointments', icon: Calendar },
     ]
   },
   {
     id: 'campaigns',
-    label: 'Campagnes',
+    labelKey: 'sidebar.groups.campaigns',
     icon: Phone,
     adminOnly: true,
     items: [
-      { name: 'Campagnes', href: '/campaigns', icon: Phone },
-      { name: 'Numéros', href: '/phone-numbers', icon: Phone },
-      { name: 'Templates SMS', href: '/sms-templates', icon: MessageCircle },
+      { nameKey: 'sidebar.campaignsList', href: '/campaigns', icon: Phone },
+      { nameKey: 'sidebar.phoneNumbers', href: '/phone-numbers', icon: Phone },
+      { nameKey: 'sidebar.smsTemplates', href: '/sms-templates', icon: MessageCircle },
     ]
   },
   {
     id: 'config',
-    label: 'Configuration',
+    labelKey: 'sidebar.groups.config',
     icon: Sliders,
     adminOnly: true,
     items: [
-      { name: 'Workflows', href: '/workflows', icon: GitBranch },
-      { name: 'Intégrations', href: '/integrations', icon: Sliders },
-      { name: 'Journaux Webhook', href: '/webhook-logs', icon: Webhook },
+      { nameKey: 'sidebar.workflows', href: '/workflows', icon: GitBranch },
+      { nameKey: 'sidebar.integrations', href: '/integrations', icon: Sliders },
+      { nameKey: 'sidebar.webhookLogs', href: '/webhook-logs', icon: Webhook },
     ]
   },
   {
     id: 'billing',
-    label: 'Facturation',
+    labelKey: 'sidebar.groups.billing',
     icon: CreditCard,
     adminOnly: true,
     items: [
-      { name: 'Facturation Stripe', href: '/stripe-billing', icon: CreditCard },
-      { name: 'Config SaaS', href: '/saas-config', icon: Settings },
+      { nameKey: 'sidebar.stripeBilling', href: '/stripe-billing', icon: CreditCard },
+      { nameKey: 'sidebar.saasConfig', href: '/saas-config', icon: Settings },
     ]
   },
 ];
 
 export const settingsLink: NavItem = {
-  name: 'Paramètres',
+  nameKey: 'sidebar.settings',
   href: '/settings',
   icon: Settings,
 };
