@@ -335,22 +335,25 @@ serve(async (req) => {
         
         let filteredDocs = allDocuments;
         if (platformAgentId) {
+          // Include documents linked to this agent OR documents with no agents (unassigned/global)
           filteredDocs = allDocuments.filter((doc: any) => {
             const dependentAgents = doc.dependent_agents || [];
-            // Check all possible ID formats
+            
+            // Include unassigned documents (no dependent agents)
+            if (dependentAgents.length === 0) {
+              return true;
+            }
+            
+            // Check if linked to this specific agent
             const isLinked = dependentAgents.some((a: any) => {
               const agentIdMatches = a.id === platformAgentId || 
                                      a.agent_id === platformAgentId ||
                                      a.platform_agent_id === platformAgentId;
               return agentIdMatches;
             });
-            if (!isLinked && dependentAgents.length > 0) {
-              console.log(`[KB] Doc ${doc.id} (${doc.name}) not linked to ${platformAgentId}, has agents:`, 
-                dependentAgents.map((a: any) => a.id || a.agent_id).join(', '));
-            }
             return isLinked;
           });
-          console.log(`[KB] After filtering for agent ${platformAgentId}: ${filteredDocs.length} documents`);
+          console.log(`[KB] After filtering for agent ${platformAgentId}: ${filteredDocs.length} documents (including unassigned)`);
         }
         
         const items = filteredDocs.map((doc: any) => ({
