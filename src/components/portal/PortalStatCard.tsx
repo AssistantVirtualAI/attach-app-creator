@@ -11,19 +11,27 @@ interface PortalStatCardProps {
     value: number;
     isPositive: boolean;
   };
-  gradient?: 'blue-purple' | 'green-cyan' | 'pink-orange' | 'purple-pink';
+  gradient?: 'blue' | 'green' | 'purple' | 'pink' | 'blue-purple' | 'green-cyan' | 'pink-orange' | 'purple-pink';
   suffix?: string;
   delay?: number;
 }
 
-const gradientClasses = {
+const gradientClasses: Record<string, string> = {
+  'blue': 'from-blue-500 to-cyan-500',
+  'green': 'from-green-400 to-emerald-500',
+  'purple': 'from-purple-500 to-violet-500',
+  'pink': 'from-pink-500 to-rose-500',
   'blue-purple': 'from-blue-500 to-purple-500',
   'green-cyan': 'from-green-400 to-cyan-400',
   'pink-orange': 'from-pink-500 to-orange-400',
   'purple-pink': 'from-purple-500 to-pink-500',
 };
 
-const iconBgClasses = {
+const iconBgClasses: Record<string, string> = {
+  'blue': 'bg-blue-500/10 text-blue-500',
+  'green': 'bg-green-500/10 text-green-500',
+  'purple': 'bg-purple-500/10 text-purple-500',
+  'pink': 'bg-pink-500/10 text-pink-500',
   'blue-purple': 'bg-blue-500/10 text-blue-500',
   'green-cyan': 'bg-green-500/10 text-green-500',
   'pink-orange': 'bg-pink-500/10 text-pink-500',

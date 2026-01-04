@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortal, PortalProvider } from '@/hooks/usePortalAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Bot, AlertTriangle, Sparkles } from 'lucide-react';
+import { Loader2, Bot, AlertTriangle, MessageSquare, BarChart3, BookOpen, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { AvaLogo } from '@/components/portal/AvaLogo';
 
 const PortalLoginContent = () => {
   const { agentSlug } = useParams<{ agentSlug: string }>();
@@ -20,7 +21,6 @@ const PortalLoginContent = () => {
   const { login, isLoading, isAuthenticated, session } = usePortal();
   const navigate = useNavigate();
 
-  // Load agent info from slug
   useEffect(() => {
     const loadAgent = async () => {
       if (!agentSlug) return;
@@ -42,7 +42,6 @@ const PortalLoginContent = () => {
     loadAgent();
   }, [agentSlug]);
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && session?.agentSlug === agentSlug) {
       navigate(`/portal/${agentSlug}/dashboard`);
@@ -69,36 +68,60 @@ const PortalLoginContent = () => {
   if (loadingAgent) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        >
+          <Loader2 className="h-8 w-8 text-primary" />
+        </motion.div>
       </div>
     );
   }
 
+  const features = [
+    { icon: MessageSquare, title: 'Conversations', desc: 'Historique complet des échanges' },
+    { icon: BarChart3, title: 'Analytics', desc: 'Métriques et tendances en temps réel' },
+    { icon: BookOpen, title: 'Knowledge Base', desc: 'Gérez le contenu de votre agent' },
+    { icon: Zap, title: 'Performance', desc: 'Scores et optimisations IA' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex">
+    <div className="min-h-screen bg-background flex overflow-hidden">
+      {/* Animated background */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[100px] animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-secondary/10 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-1/2 left-1/2 w-[300px] h-[300px] bg-pink-500/5 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '2s' }} />
+      </div>
+
       {/* Left side - Login form */}
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center p-8 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="w-full max-w-md"
         >
-          <Card className="bg-card/80 backdrop-blur-xl border-border/50 shadow-xl">
+          <Card className="bg-card/60 backdrop-blur-2xl border-border/30 shadow-2xl shadow-primary/5">
             <CardHeader className="text-center pb-2">
               <motion.div 
-                initial={{ scale: 0.8 }}
-                animate={{ scale: 1 }}
-                className="mx-auto mb-4 w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="mx-auto mb-4"
               >
                 {agentInfo?.avatar_url ? (
-                  <img 
-                    src={agentInfo.avatar_url} 
-                    alt={agentInfo.name} 
-                    className="w-full h-full object-cover rounded-2xl"
-                  />
+                  <div className="w-24 h-24 rounded-2xl overflow-hidden ring-4 ring-primary/20 shadow-lg">
+                    <img 
+                      src={agentInfo.avatar_url} 
+                      alt={agentInfo.name} 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                 ) : (
-                  <Bot className="h-10 w-10 text-white" />
+                  <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-primary via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-primary/30">
+                    <Bot className="h-12 w-12 text-white" />
+                  </div>
                 )}
               </motion.div>
               <CardTitle className="text-2xl font-bold">
@@ -129,7 +152,7 @@ const PortalLoginContent = () => {
                     value={loginId}
                     onChange={(e) => setLoginId(e.target.value)}
                     placeholder="Votre identifiant client"
-                    className="h-11"
+                    className="h-12 bg-muted/30 border-border/50 focus:border-primary focus:ring-primary/20"
                     required
                   />
                 </div>
@@ -142,14 +165,14 @@ const PortalLoginContent = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="h-11"
+                    className="h-12 bg-muted/30 border-border/50 focus:border-primary focus:ring-primary/20"
                     required
                   />
                 </div>
 
                 <Button 
                   type="submit" 
-                  className="w-full h-11 bg-gradient-to-r from-primary to-secondary hover:opacity-90 transition-opacity" 
+                  className="w-full h-12 bg-gradient-to-r from-primary via-purple-500 to-pink-500 hover:opacity-90 transition-all shadow-lg shadow-primary/30 font-semibold" 
                   disabled={isLoading}
                 >
                   {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -171,42 +194,63 @@ const PortalLoginContent = () => {
       </div>
 
       {/* Right side - Features */}
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-primary/10 via-secondary/10 to-accent/10 items-center justify-center p-8">
+      <div className="hidden lg:flex flex-1 items-center justify-center p-8 relative z-10">
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="max-w-md space-y-8"
+          className="max-w-lg space-y-8"
         >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-              <Sparkles className="h-6 w-6 text-white" />
+          {/* Logo */}
+          <div className="flex items-center gap-4 mb-10">
+            <AvaLogo size="lg" animated />
+            <div>
+              <h2 className="text-4xl font-black bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                AVA Statistics
+              </h2>
+              <p className="text-muted-foreground mt-1">Votre portail d'analytics intelligent</p>
             </div>
-            <h2 className="text-3xl font-bold gradient-text">AVA Statistics</h2>
           </div>
 
-          {[
-            { title: 'Tableau de bord', desc: 'Visualisez les performances de votre agent en temps réel' },
-            { title: 'Conversations', desc: 'Accédez à l\'historique complet des conversations' },
-            { title: 'Analytics', desc: 'Analysez les tendances et métriques clés' },
-            { title: 'Base de connaissances', desc: 'Gérez le contenu de votre agent' },
-          ].map((feature, i) => (
-            <motion.div
-              key={feature.title}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: 0.3 + i * 0.1 }}
-              className="flex gap-4 p-4 rounded-xl bg-card/50 backdrop-blur-sm border border-border/50"
-            >
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-              </div>
-              <div>
-                <h3 className="font-semibold">{feature.title}</h3>
+          {/* Features grid */}
+          <div className="grid grid-cols-2 gap-4">
+            {features.map((feature, i) => (
+              <motion.div
+                key={feature.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.4 + i * 0.1 }}
+                className="p-5 rounded-2xl bg-card/40 backdrop-blur-sm border border-border/30 hover:border-primary/30 transition-all group"
+              >
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                  <feature.icon className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="font-semibold mb-1">{feature.title}</h3>
                 <p className="text-sm text-muted-foreground">{feature.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Stats */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+            className="flex items-center gap-6 pt-6"
+          >
+            {[
+              { value: '99.9%', label: 'Uptime' },
+              { value: '<100ms', label: 'Latence' },
+              { value: '24/7', label: 'Support' },
+            ].map((stat, i) => (
+              <div key={i} className="text-center">
+                <p className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+                  {stat.value}
+                </p>
+                <p className="text-xs text-muted-foreground">{stat.label}</p>
               </div>
-            </motion.div>
-          ))}
+            ))}
+          </motion.div>
         </motion.div>
       </div>
     </div>
