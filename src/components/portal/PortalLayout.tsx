@@ -4,6 +4,13 @@ import { usePortal, PortalProvider } from '@/hooks/usePortalAuth';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { 
   LogOut, 
   LayoutDashboard, 
   MessageSquare, 
@@ -15,9 +22,8 @@ import {
   ArrowLeft,
   Crown,
   Sparkles,
-  Brain,
   User,
-  Users
+  ChevronUp
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AvaLogo } from '@/components/portal/AvaLogo';
@@ -61,22 +67,17 @@ const PortalLayoutContent = () => {
 
   const isSuperAdminSession = session.role === 'super_admin' || session.isSuperAdmin;
 
-  // All navigation items - super admin sees everything
+  // Navigation items - show Configuration only to admins
   const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: `/portal/${agentSlug}/dashboard`, color: 'text-blue-400' },
     { icon: MessageSquare, label: 'Conversations', href: `/portal/${agentSlug}/conversations`, color: 'text-cyan-400' },
     { icon: BarChart3, label: 'Analytics', href: `/portal/${agentSlug}/analytics`, color: 'text-purple-400' },
-    { icon: Brain, label: 'Analyse IA', href: `/portal/${agentSlug}/ai-analysis`, color: 'text-pink-400' },
     { icon: BookOpen, label: 'Base de connaissances', href: `/portal/${agentSlug}/knowledge`, color: 'text-green-400' },
-    { icon: FileCode, label: 'Prompt & Endpoints', href: `/portal/${agentSlug}/prompt`, color: 'text-orange-400' },
+    { icon: FileCode, label: 'Prompt', href: `/portal/${agentSlug}/prompt`, color: 'text-orange-400' },
   ];
 
-  // Add profile for all users
-  navItems.push({ icon: User, label: 'Mon Profil', href: `/portal/${agentSlug}/profile`, color: 'text-teal-400' });
-
-  // Add settings and members for admins and super admins
+  // Add settings for admins and super admins only
   if (hasEditAccess() || isSuperAdminSession) {
-    navItems.push({ icon: Users, label: 'Membres', href: `/portal/${agentSlug}/members`, color: 'text-amber-400' });
     navItems.push({ icon: Settings, label: 'Configuration', href: `/portal/${agentSlug}/settings`, color: 'text-pink-400' });
   }
 
@@ -199,24 +200,35 @@ const PortalLayoutContent = () => {
           )}
         </ScrollArea>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-border/50 space-y-3">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/20">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-              <span className="text-xs font-bold text-primary">
-                {session.clientName?.charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <span className="text-sm truncate flex-1">{session.clientName}</span>
-          </div>
-          <Button 
-            variant="ghost" 
-            className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 h-10" 
-            onClick={handleLogout}
-          >
-            <LogOut className="h-4 w-4" />
-            Déconnexion
-          </Button>
+        {/* Footer with User Menu */}
+        <div className="p-4 border-t border-border/50">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer group">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                  <span className="text-xs font-bold text-primary">
+                    {session.clientName?.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <span className="text-sm truncate flex-1 text-left">{session.clientName}</span>
+                <ChevronUp className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56">
+              <DropdownMenuItem onClick={() => navigate(`/portal/${agentSlug}/profile`)}>
+                <User className="h-4 w-4 mr-2" />
+                Mon profil
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={handleLogout}
+                className="text-destructive focus:text-destructive focus:bg-destructive/10"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Déconnexion
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </motion.aside>
 
