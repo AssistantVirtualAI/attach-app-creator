@@ -10,6 +10,7 @@ import { SetupIntegrationCard } from '@/components/SetupIntegrationCard';
 import { StatCardSkeleton, ChartCardSkeleton } from '@/components/LoadingSkeleton';
 import { AnalyticsExport } from '@/components/exports/AnalyticsExport';
 import { Badge } from '@/components/ui/badge';
+import { useTranslation } from '@/hooks/useTranslation';
 import {
   Table,
   TableBody,
@@ -20,6 +21,7 @@ import {
 } from '@/components/ui/table';
 
 const VoiceAnalytics = () => {
+  const { t } = useTranslation();
   const [timeframe, setTimeframe] = useState('7days');
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(undefined);
   
@@ -33,7 +35,7 @@ const VoiceAnalytics = () => {
 
   const stats = (analytics && !analytics.requiresSetup) ? [
     {
-      title: 'Total Conversations',
+      title: t('analytics.stats.totalConversations'),
       value: analytics.metrics.total_conversations.toString(),
       change: `${analytics.trends.conversations_change > 0 ? '+' : ''}${analytics.trends.conversations_change.toFixed(1)}%`,
       changeType: analytics.trends.conversations_change >= 0 ? 'positive' as const : 'negative' as const,
@@ -41,7 +43,7 @@ const VoiceAnalytics = () => {
       trend: [45, 52, 48, 65, 58, 72, 68],
     },
     {
-      title: 'Durée Moyenne',
+      title: t('analytics.stats.avgDuration'),
       value: formatDuration(analytics.metrics.avg_conversation_duration),
       change: `${analytics.trends.duration_change > 0 ? '+' : ''}${analytics.trends.duration_change.toFixed(1)}%`,
       changeType: analytics.trends.duration_change >= 0 ? 'positive' as const : 'negative' as const,
@@ -49,7 +51,7 @@ const VoiceAnalytics = () => {
       trend: [30, 42, 38, 55, 48, 62, 58],
     },
     {
-      title: 'Satisfaction',
+      title: t('analytics.stats.satisfaction'),
       value: `${analytics.metrics.satisfaction_score.toFixed(1)}/5`,
       change: `${analytics.trends.satisfaction_change > 0 ? '+' : ''}${analytics.trends.satisfaction_change.toFixed(1)}`,
       changeType: analytics.trends.satisfaction_change >= 0 ? 'positive' as const : 'negative' as const,
@@ -57,7 +59,7 @@ const VoiceAnalytics = () => {
       trend: [75, 78, 80, 82, 81, 85, 87],
     },
     {
-      title: 'Taux de Succès',
+      title: t('analytics.stats.successRate'),
       value: `${analytics.metrics.success_rate.toFixed(1)}%`,
       change: `${analytics.trends.success_rate_change > 0 ? '+' : ''}${analytics.trends.success_rate_change.toFixed(1)}%`,
       changeType: analytics.trends.success_rate_change >= 0 ? 'positive' as const : 'negative' as const,
@@ -76,19 +78,19 @@ const VoiceAnalytics = () => {
         {/* Header */}
         <div className="mb-8 flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h1 className="text-4xl font-bold mb-2 gradient-text">Voice Analytics</h1>
+            <h1 className="text-4xl font-bold mb-2 gradient-text">{t('analytics.title')}</h1>
             <p className="text-muted-foreground text-lg">
-              Analyse détaillée des performances de {analytics?.agents?.length || 0} agents vocaux
+              {t('analytics.description').replace('{count}', String(analytics?.agents?.length || 0))}
             </p>
           </div>
           <div className="flex items-center gap-3">
             {/* Agent Filter */}
             <Select value={selectedAgentId || 'all'} onValueChange={(v) => setSelectedAgentId(v === 'all' ? undefined : v)}>
               <SelectTrigger className="w-[180px] glass-card">
-                <SelectValue placeholder="Tous les agents" />
+                <SelectValue placeholder={t('analytics.filters.allAgents')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les agents</SelectItem>
+                <SelectItem value="all">{t('analytics.filters.allAgents')}</SelectItem>
                 {analytics?.agents?.map((agent) => (
                   <SelectItem key={agent.id} value={agent.id}>
                     {agent.name}
@@ -103,10 +105,10 @@ const VoiceAnalytics = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="24h">Dernières 24h</SelectItem>
-                <SelectItem value="7days">7 derniers jours</SelectItem>
-                <SelectItem value="30days">30 derniers jours</SelectItem>
-                <SelectItem value="90days">90 derniers jours</SelectItem>
+                <SelectItem value="24h">{t('analytics.filters.last24h')}</SelectItem>
+                <SelectItem value="7days">{t('analytics.filters.last7days')}</SelectItem>
+                <SelectItem value="30days">{t('analytics.filters.last30days')}</SelectItem>
+                <SelectItem value="90days">{t('analytics.filters.last90days')}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -124,8 +126,8 @@ const VoiceAnalytics = () => {
         {/* Stats Grid */}
         {analytics?.requiresSetup ? (
           <SetupIntegrationCard 
-            title="Configuration Requise" 
-            message={analytics.message || 'Veuillez configurer au moins un agent ElevenLabs.'} 
+            title={t('analytics.configRequired')} 
+            message={analytics.message || t('analytics.configMessage')} 
           />
         ) : isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -136,7 +138,7 @@ const VoiceAnalytics = () => {
         ) : error ? (
           <Card className="glass-card border-destructive/50">
             <CardContent className="pt-6">
-              <p className="text-destructive">Erreur lors du chargement des analytics</p>
+              <p className="text-destructive">{t('analytics.loadingError')}</p>
             </CardContent>
           </Card>
         ) : (
@@ -160,7 +162,7 @@ const VoiceAnalytics = () => {
                 {/* Conversations Over Time */}
                 {conversationsOverTime.length > 0 && (
                   <ChartCard
-                    title="Évolution des Conversations"
+                    title={t('analytics.charts.conversationsOverTime')}
                     data={conversationsOverTime}
                     type="area"
                     dataKey="conversations"
@@ -171,7 +173,7 @@ const VoiceAnalytics = () => {
                 {/* Per Agent Chart */}
                 {agentChartData.length > 0 && (
                   <ChartCard
-                    title="Conversations par Agent"
+                    title={t('analytics.charts.conversationsPerAgent')}
                     data={agentChartData}
                     type="bar"
                     dataKey="conversations"
@@ -184,7 +186,7 @@ const VoiceAnalytics = () => {
               {satisfactionTrend.length > 0 && (
                 <div className="mb-8">
                   <ChartCard
-                    title="Tendance de Satisfaction"
+                    title={t('analytics.charts.satisfactionTrend')}
                     data={satisfactionTrend}
                     type="area"
                     dataKey="positive"
@@ -200,18 +202,18 @@ const VoiceAnalytics = () => {
         {!analytics?.requiresSetup && !isLoading && analytics?.perAgent && analytics.perAgent.length > 0 && (
           <Card className="glass-card mb-8">
             <CardHeader>
-              <CardTitle>Performance par Agent</CardTitle>
-              <CardDescription>Métriques détaillées pour chaque agent vocal</CardDescription>
+              <CardTitle>{t('analytics.charts.performancePerAgent')}</CardTitle>
+              <CardDescription>{t('analytics.description').replace('{count}', String(analytics.perAgent.length))}</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Agent</TableHead>
-                    <TableHead className="text-right">Conversations</TableHead>
-                    <TableHead className="text-right">Durée Moyenne</TableHead>
-                    <TableHead className="text-right">Satisfaction</TableHead>
-                    <TableHead className="text-right">Taux de Succès</TableHead>
+                    <TableHead>{t('analytics.table.agent')}</TableHead>
+                    <TableHead className="text-right">{t('analytics.table.conversations')}</TableHead>
+                    <TableHead className="text-right">{t('analytics.table.avgDuration')}</TableHead>
+                    <TableHead className="text-right">{t('analytics.table.satisfaction')}</TableHead>
+                    <TableHead className="text-right">{t('analytics.table.successRate')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -257,39 +259,39 @@ const VoiceAnalytics = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="text-lg">Minutes Vocales</CardTitle>
+                <CardTitle className="text-lg">{t('analytics.additionalStats.voiceMinutes')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-primary">
                   {analytics.metrics.total_voice_minutes}
                 </p>
-                <p className="text-sm text-muted-foreground">minutes totales</p>
+                <p className="text-sm text-muted-foreground">{t('analytics.additionalStats.totalMinutes')}</p>
               </CardContent>
             </Card>
 
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="text-lg">Conversations Réussies</CardTitle>
+                <CardTitle className="text-lg">{t('analytics.additionalStats.successfulConversations')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-green-500">
                   {analytics.metrics.successful_conversations}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  sur {analytics.metrics.total_conversations} au total
+                  {t('analytics.additionalStats.outOf').replace('{total}', String(analytics.metrics.total_conversations))}
                 </p>
               </CardContent>
             </Card>
 
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle className="text-lg">Nombre d'Agents</CardTitle>
+                <CardTitle className="text-lg">{t('analytics.additionalStats.numberOfAgents')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-primary">
                   {analytics.agents?.length || 0}
                 </p>
-                <p className="text-sm text-muted-foreground">agents actifs</p>
+                <p className="text-sm text-muted-foreground">{t('analytics.additionalStats.activeAgents')}</p>
               </CardContent>
             </Card>
           </div>

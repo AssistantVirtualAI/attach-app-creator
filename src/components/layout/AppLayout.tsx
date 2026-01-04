@@ -1,17 +1,25 @@
 import { ReactNode, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Moon, Sun } from 'lucide-react';
+import { Menu, X, Moon, Sun, Globe } from 'lucide-react';
 import { AvaLogo } from '@/components/shared/AvaLogo';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useOrganization } from '@/context/OrganizationContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useTheme } from '@/context/ThemeContext';
+import { useLanguage } from '@/context/LanguageContext';
+import { useTranslation } from '@/hooks/useTranslation';
 import { SidebarFooter } from '@/components/sidebar/SidebarFooter';
 import { SidebarNavGroup } from '@/components/sidebar/SidebarNavGroup';
 import { sidebarGroups, settingsLink } from '@/components/sidebar/sidebarConfig';
 import { CookieConsentBanner } from '@/components/gdpr/CookieConsentBanner';
 import { motion } from 'framer-motion';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -21,6 +29,8 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const { role, isSuperAdmin } = usePermissions();
   const { selectedOrg, isLoading, userRole } = useOrganization();
   const { theme, toggleTheme } = useTheme();
+  const { language, setLanguage } = useLanguage();
+  const { t } = useTranslation();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -35,7 +45,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       if (isLoading) return true;
       // Show adminOnly groups only for org_admin, manager, super_admin
       const isVisible = role === 'org_admin' || role === 'manager' || isSuperAdmin;
-      console.log(`[Sidebar Debug] Group "${group.label}" adminOnly=${group.adminOnly}, visible=${isVisible}`);
+      console.log(`[Sidebar Debug] Group "${group.labelKey}" adminOnly=${group.adminOnly}, visible=${isVisible}`);
       return isVisible;
     }
     return true;
@@ -43,6 +53,14 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
   const isSettingsActive = location.pathname === settingsLink.href;
   const SettingsIcon = settingsLink.icon;
+
+  const getRoleBadge = () => {
+    if (isSuperAdmin) return `👑 ${t('roles.superAdmin')}`;
+    if (role === 'org_admin') return `🔑 ${t('roles.admin')}`;
+    if (role === 'manager') return `👨‍💼 ${t('roles.manager')}`;
+    if (role === 'agent') return `👤 ${t('roles.agent')}`;
+    return `👁️ ${t('roles.viewer')}`;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -85,28 +103,55 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             </button>
           </div>
 
-          {/* Role Badge & Theme Toggle */}
+          {/* Role Badge & Theme/Language Toggle */}
           <div className="px-4 py-3 border-b border-sidebar-border flex items-center justify-between">
             {role && (
               <Badge variant="outline" className="text-xs border-primary/40 bg-primary/10 text-foreground font-medium">
-                {isSuperAdmin ? '👑 Super Admin' : 
-                 role === 'org_admin' ? '🔑 Admin' :
-                 role === 'manager' ? '👨‍💼 Manager' :
-                 role === 'agent' ? '👤 Agent' : '👁️ Viewer'}
+                {getRoleBadge()}
               </Badge>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="h-8 w-8 hover:bg-muted"
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-4 h-4 text-warning" />
-              ) : (
-                <Moon className="w-4 h-4 text-primary" />
-              )}
-            </Button>
+            <div className="flex items-center gap-1">
+              {/* Language Toggle */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 hover:bg-muted"
+                  >
+                    <Globe className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem 
+                    onClick={() => setLanguage('en')}
+                    className={language === 'en' ? 'bg-primary/10' : ''}
+                  >
+                    🇬🇧 English
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setLanguage('fr')}
+                    className={language === 'fr' ? 'bg-primary/10' : ''}
+                  >
+                    🇫🇷 Français
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Theme Toggle */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                className="h-8 w-8 hover:bg-muted"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-warning" />
+                ) : (
+                  <Moon className="w-4 h-4 text-primary" />
+                )}
+              </Button>
+            </div>
           </div>
 
           {/* Navigation */}
@@ -130,7 +175,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
               }`}
             >
               <SettingsIcon className="w-5 h-5" />
-              <span className="font-medium text-sm">{settingsLink.name}</span>
+              <span className="font-medium text-sm">{t(settingsLink.nameKey)}</span>
             </Link>
           </nav>
 

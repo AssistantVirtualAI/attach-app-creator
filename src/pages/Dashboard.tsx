@@ -12,6 +12,7 @@ import { AlertsSection } from '@/components/dashboard/AlertsSection';
 import { AgentSelector } from '@/components/dashboard/AgentSelector';
 import { useDashboardMetrics, DashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { useDashboardAgents, useAgentDashboardMetrics } from '@/hooks/useDashboardAgentMetrics';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,7 @@ import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
 const Dashboard = () => {
+  const { t } = useTranslation();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   
@@ -85,15 +87,15 @@ const Dashboard = () => {
       
       if (error) throw error;
       
-      toast.success(`Synchronisation réussie: ${data.synced} conversations`, {
-        description: `${data.created} créées, ${data.updated} mises à jour`
+      toast.success(t('portal.dashboard.syncSuccess').replace('{count}', data.synced), {
+        description: t('portal.dashboard.syncCreated').replace('{created}', data.created).replace('{updated}', data.updated)
       });
       
       refetch();
     } catch (error) {
       console.error('Sync error:', error);
-      toast.error('Erreur de synchronisation', {
-        description: 'Vérifiez la configuration de vos agents ElevenLabs'
+      toast.error(t('portal.dashboard.syncError'), {
+        description: t('portal.dashboard.syncErrorDescription')
       });
     } finally {
       setIsSyncing(false);
@@ -106,17 +108,17 @@ const Dashboard = () => {
   // Get greeting based on time of day
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Bonjour';
-    if (hour < 18) return 'Bon après-midi';
-    return 'Bonsoir';
+    if (hour < 12) return t('portal.dashboard.greetings.morning');
+    if (hour < 18) return t('portal.dashboard.greetings.afternoon');
+    return t('portal.dashboard.greetings.evening');
   };
 
   // Get health status text
   const getHealthStatus = () => {
-    if (currentMetrics.avgSatisfaction >= 4) return { text: 'Vos agents performent excellemment', color: 'text-emerald-500' };
-    if (currentMetrics.avgSatisfaction >= 3) return { text: 'Performance stable, quelques optimisations possibles', color: 'text-amber-500' };
-    if (currentMetrics.totalConversations === 0) return { text: 'En attente de données...', color: 'text-muted-foreground' };
-    return { text: 'Attention requise sur certains agents', color: 'text-red-500' };
+    if (currentMetrics.avgSatisfaction >= 4) return { text: t('portal.dashboard.healthStatus.excellent'), color: 'text-emerald-500' };
+    if (currentMetrics.avgSatisfaction >= 3) return { text: t('portal.dashboard.healthStatus.stable'), color: 'text-amber-500' };
+    if (currentMetrics.totalConversations === 0) return { text: t('portal.dashboard.healthStatus.waiting'), color: 'text-muted-foreground' };
+    return { text: t('portal.dashboard.healthStatus.attention'), color: 'text-red-500' };
   };
 
   const healthStatus = getHealthStatus();
@@ -150,7 +152,7 @@ const Dashboard = () => {
                   <p className={`mt-1 flex items-center gap-2 ${healthStatus.color}`}>
                     <Sparkles className="h-4 w-4" />
                     {selectedAgent 
-                      ? `Statistiques de ${selectedAgent.name}` 
+                      ? `${t('portal.dashboard.stats.conversations')} - ${selectedAgent.name}` 
                       : healthStatus.text}
                   </p>
                 </div>
@@ -165,7 +167,7 @@ const Dashboard = () => {
                   className="gap-2 bg-background/50 backdrop-blur-sm"
                 >
                   <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                  Synchroniser
+                  {t('portal.dashboard.actions.sync')}
                 </Button>
                 <Button
                   variant="outline"
@@ -179,7 +181,7 @@ const Dashboard = () => {
                 <Link to="/agents">
                   <Button size="sm" className="gap-2 shadow-lg shadow-primary/20">
                     <Plus className="h-4 w-4" />
-                    Nouvel agent
+                    {t('portal.dashboard.actions.newAgent')}
                   </Button>
                 </Link>
               </div>
@@ -202,7 +204,7 @@ const Dashboard = () => {
                 >
                   <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
                     <Bot className="h-3 w-3 mr-1" />
-                    Vue agent unique
+                    {t('portal.dashboard.singleAgentView')}
                   </Badge>
                   <Button
                     variant="ghost"
@@ -210,7 +212,7 @@ const Dashboard = () => {
                     onClick={() => setSelectedAgentId(null)}
                     className="text-xs"
                   >
-                    Voir tous
+                    {t('portal.dashboard.actions.viewAll')}
                   </Button>
                 </motion.div>
               )}
@@ -261,7 +263,7 @@ const Dashboard = () => {
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Bot className="h-5 w-5 text-primary" />
-                  Détails Agent
+                  {t('portal.dashboard.agentDetails')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -277,19 +279,19 @@ const Dashboard = () => {
                 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-xs text-muted-foreground">Conversations</p>
+                    <p className="text-xs text-muted-foreground">{t('portal.dashboard.stats.conversations')}</p>
                     <p className="text-xl font-bold">{currentMetrics.totalConversations}</p>
                   </div>
                   <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-xs text-muted-foreground">Satisfaction</p>
+                    <p className="text-xs text-muted-foreground">{t('portal.dashboard.stats.satisfaction')}</p>
                     <p className="text-xl font-bold">{currentMetrics.avgSatisfaction.toFixed(1)}/10</p>
                   </div>
                   <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-xs text-muted-foreground">Durée moy.</p>
+                    <p className="text-xs text-muted-foreground">{t('portal.dashboard.stats.avgDuration')}</p>
                     <p className="text-xl font-bold">{Math.round(currentMetrics.avgDuration)}s</p>
                   </div>
                   <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-xs text-muted-foreground">Résolution</p>
+                    <p className="text-xs text-muted-foreground">{t('portal.dashboard.stats.resolution')}</p>
                     <p className="text-xl font-bold">{currentMetrics.resolutionRate}%</p>
                   </div>
                 </div>
@@ -297,11 +299,11 @@ const Dashboard = () => {
                 {/* Top Tags for this agent */}
                 {currentMetrics.topSmartTags.length > 0 && (
                   <div>
-                    <p className="text-sm font-medium mb-2">Tags fréquents</p>
+                    <p className="text-sm font-medium mb-2">{t('portal.dashboard.stats.frequentTags')}</p>
                     <div className="flex flex-wrap gap-1">
-                      {currentMetrics.topSmartTags.slice(0, 4).map((t, i) => (
+                      {currentMetrics.topSmartTags.slice(0, 4).map((tag, i) => (
                         <Badge key={i} variant="secondary" className="text-xs">
-                          {t.tag} ({t.count})
+                          {tag.tag} ({tag.count})
                         </Badge>
                       ))}
                     </div>
@@ -310,7 +312,7 @@ const Dashboard = () => {
 
                 <Link to={`/agents/${selectedAgentId}`}>
                   <Button variant="outline" className="w-full gap-2 mt-2">
-                    Voir les détails complets
+                    {t('portal.dashboard.actions.seeFullDetails')}
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -328,19 +330,19 @@ const Dashboard = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Zap className="h-5 w-5 text-amber-500" />
-                Actions rapides
+                {t('portal.dashboard.quickActions')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <Link to="/conversations" className="block">
                 <Button variant="ghost" className="w-full justify-between group hover:bg-primary/10">
-                  <span>Voir les conversations</span>
+                  <span>{t('portal.dashboard.actions.seeConversations')}</span>
                   <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Button>
               </Link>
               <Link to="/clients" className="block">
                 <Button variant="ghost" className="w-full justify-between group hover:bg-primary/10">
-                  <span>Gérer les clients</span>
+                  <span>{t('portal.dashboard.actions.manageClients')}</span>
                   <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Button>
               </Link>
@@ -348,21 +350,21 @@ const Dashboard = () => {
                 <Button variant="ghost" className="w-full justify-between group hover:bg-primary/10">
                   <span className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-primary" />
-                    Rapports IA
+                    {t('portal.dashboard.actions.aiReports')}
                   </span>
                   <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Button>
               </Link>
               <Link to="/integrations" className="block">
                 <Button variant="ghost" className="w-full justify-between group hover:bg-primary/10">
-                  <span>Configurer les intégrations</span>
+                  <span>{t('portal.dashboard.actions.configureIntegrations')}</span>
                   <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Button>
               </Link>
               <Link to="/settings" className="block">
                 <Button variant="ghost" className="w-full justify-between group hover:bg-primary/10">
                   <Settings className="h-4 w-4 mr-2" />
-                  <span className="flex-1 text-left">Paramètres</span>
+                  <span className="flex-1 text-left">{t('portal.dashboard.actions.settings')}</span>
                   <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Button>
               </Link>
