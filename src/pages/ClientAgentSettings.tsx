@@ -4,7 +4,8 @@ import { useClientAgentAccess } from '@/hooks/useClientAgentAccess';
 import { 
   useClientElevenLabsAgentConfig, 
   useClientUpdateAgentPrompt,
-  useClientUpdateAgentVoice
+  useClientUpdateAgentVoice,
+  useClientElevenLabsVoices
 } from '@/hooks/useClientElevenLabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Settings, 
   MessageSquare, 
@@ -22,7 +24,11 @@ import {
   Save,
   Lock,
   Info,
-  RefreshCw
+  RefreshCw,
+  Play,
+  Pause,
+  Search,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -48,8 +54,15 @@ const ClientAgentSettings = () => {
     agentId: elevenlabsAgentId,
   });
 
+  const { data: voices = [], isLoading: voicesLoading } = useClientElevenLabsVoices(apiKey);
+
   const updatePromptMutation = useClientUpdateAgentPrompt();
   const updateVoiceMutation = useClientUpdateAgentVoice();
+  
+  // Voice preview state
+  const [voiceSearch, setVoiceSearch] = useState('');
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
 
   // Initialize prompt state from config
   useEffect(() => {
@@ -98,6 +111,40 @@ const ClientAgentSettings = () => {
       style !== (tts.style ?? 0) ||
       speed !== (tts.speed ?? 1)
     );
+  };
+
+  // Filter voices based on search
+  const filteredVoices = voices.filter((voice: any) => 
+    voice.name?.toLowerCase().includes(voiceSearch.toLowerCase()) ||
+    voice.labels?.accent?.toLowerCase().includes(voiceSearch.toLowerCase()) ||
+    voice.labels?.gender?.toLowerCase().includes(voiceSearch.toLowerCase())
+  );
+
+  // Handle voice preview
+  const handlePlayPreview = (voice: any) => {
+    if (playingVoiceId === voice.voice_id) {
+      audioElement?.pause();
+      setPlayingVoiceId(null);
+      return;
+    }
+
+    if (audioElement) {
+      audioElement.pause();
+    }
+
+    if (voice.preview_url) {
+      const audio = new Audio(voice.preview_url);
+      audio.onended = () => setPlayingVoiceId(null);
+      audio.play();
+      setAudioElement(audio);
+      setPlayingVoiceId(voice.voice_id);
+    }
+  };
+
+  // Handle voice selection
+  const handleSelectVoice = (selectedVoiceId: string) => {
+    setVoiceId(selectedVoiceId);
+    handleVoiceChange();
   };
 
   const handleSavePrompt = async () => {
@@ -274,21 +321,101 @@ const ClientAgentSettings = () => {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {/* Voice ID */}
-                    <div className="space-y-2">
-                      <Label>Voice ID</Label>
-                      <Input
-                        value={voiceId}
-                        onChange={(e) => {
-                          setVoiceId(e.target.value);
-                          handleVoiceChange();
-                        }}
-                        placeholder="ID de la voix ElevenLabs"
-                        disabled={!canEdit}
-                        className="font-mono text-sm"
-                      />
+                    {/* Voice Selector */}
+                    <div className="space-y-3">
+                      <Label>Sélectionner une voix</Label>
+                      
+                      {/* Current voice */}
+                      {voiceId && (
+                        <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
+                          <p className="text-sm font-medium">Voix actuelle</p>
+                          <p className="text-xs text-muted-foreground font-mono">{voiceId}</p>
+                        </div>
+                      )}
+                      
+                      {/* Voice search */}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          value={voiceSearch}
+                          onChange={(e) => setVoiceSearch(e.target.value)}
+                          placeholder="Rechercher une voix..."
+                          className="pl-10"
+                          disabled={!canEdit}
+                        />
+                      </div>
+
+                      {/* Voices list */}
+                      {voicesLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        </div>
+                      ) : (
+                        <ScrollArea className="h-[250px] rounded-lg border border-border/50">
+                          <div className="p-2 space-y-2">
+                            {filteredVoices.length === 0 ? (
+                              <p className="text-sm text-muted-foreground text-center py-4">
+                                Aucune voix trouvée
+                              </p>
+                            ) : (
+                              filteredVoices.map((voice: any) => (
+                                <div
+                                  key={voice.voice_id}
+                                  className={`p-3 rounded-lg cursor-pointer transition-all border ${
+                                    voiceId === voice.voice_id
+                                      ? 'bg-primary/10 border-primary/30'
+                                      : 'bg-muted/20 border-border/30 hover:bg-muted/40'
+                                  }`}
+                                  onClick={() => canEdit && handleSelectVoice(voice.voice_id)}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-sm truncate">{voice.name}</p>
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {voice.labels?.accent && (
+                                          <Badge variant="secondary" className="text-xs">
+                                            {voice.labels.accent}
+                                          </Badge>
+                                        )}
+                                        {voice.labels?.gender && (
+                                          <Badge variant="outline" className="text-xs">
+                                            {voice.labels.gender}
+                                          </Badge>
+                                        )}
+                                        {voice.labels?.age && (
+                                          <Badge variant="outline" className="text-xs">
+                                            {voice.labels.age}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {voice.preview_url && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 ml-2"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handlePlayPreview(voice);
+                                        }}
+                                      >
+                                        {playingVoiceId === voice.voice_id ? (
+                                          <Pause className="h-4 w-4" />
+                                        ) : (
+                                          <Play className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </ScrollArea>
+                      )}
+                      
                       <p className="text-xs text-muted-foreground">
-                        Identifiant de la voix utilisée par l'agent
+                        Sélectionnez une voix ou écoutez un aperçu avant de choisir
                       </p>
                     </div>
 

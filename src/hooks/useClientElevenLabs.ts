@@ -360,3 +360,25 @@ export const useClientElevenLabsAudio = () => {
     },
   });
 };
+
+// Hook for fetching available ElevenLabs voices
+export const useClientElevenLabsVoices = (apiKey: string | null) => {
+  return useQuery({
+    queryKey: ['client-elevenlabs-voices', apiKey],
+    queryFn: async () => {
+      if (!apiKey) return [];
+      
+      const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
+        body: { 
+          action: 'get_voices',
+          apiKey 
+        }
+      });
+
+      if (error) throw error;
+      return data?.voices || [];
+    },
+    enabled: !!apiKey,
+    staleTime: 300000, // Cache 5 minutes
+  });
+};
