@@ -413,7 +413,7 @@ const ClientAgentConversations = () => {
         setSelectedConversation(null);
         setAudioUrl(null);
       }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-background">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
@@ -422,9 +422,21 @@ const ClientAgentConversations = () => {
           </DialogHeader>
           
           {detailsLoading ? (
-            <div className="space-y-3">
+            <div className="space-y-3 p-4">
               <Skeleton className="h-20 w-full" />
               <Skeleton className="h-40 w-full" />
+            </div>
+          ) : !conversationDetails ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Impossible de charger les détails de la conversation</p>
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => selectedConversation && handlePlayAudio(selectedConversation)}
+              >
+                Réessayer
+              </Button>
             </div>
           ) : (
             <div className="space-y-6">
