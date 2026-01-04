@@ -3,7 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Bot, Key, Palette, BarChart3, Play, Code, Brain, Activity, Users } from 'lucide-react';
+import { ArrowLeft, Bot, Key, Palette, BarChart3, Play, Code, Brain, Activity, Users, Settings2 } from 'lucide-react';
 import { useAgentSettings } from '@/hooks/useAgentSettings';
 import { AgentOverviewTab } from '@/components/agents/AgentOverviewTab';
 import { AgentCredentialsTab } from '@/components/agents/AgentCredentialsTab';
@@ -15,6 +15,7 @@ import { AgentAnalyticsWidget } from '@/components/agents/AgentAnalyticsWidget';
 import { AgentKnowledgePromptTab } from '@/components/agents/AgentKnowledgePromptTab';
 import { AgentClientsTab } from '@/components/agents/AgentClientsTab';
 import { AgentRealtimeAnalytics } from '@/components/agents/AgentRealtimeAnalytics';
+import { AgentFullConfigTab } from '@/components/agents/AgentFullConfigTab';
 
 const AgentSettingsPage = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -58,6 +59,8 @@ const AgentSettingsPage = () => {
     );
   }
 
+  const platformAgentId = (agent.config as Record<string, any>)?.agent_id || agent.platform_agent_id;
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -68,13 +71,13 @@ const AgentSettingsPage = () => {
           <div>
             <h1 className="text-2xl font-bold">{agent.name}</h1>
             <p className="text-muted-foreground">
-              {agent.platform} • {(agent.config as Record<string, any>)?.agent_id || agent.platform_agent_id || 'Non configuré'}
+              {agent.platform} • {platformAgentId || 'Non configuré'}
             </p>
           </div>
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-9">
+          <TabsList className="grid w-full grid-cols-10">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Bot className="h-4 w-4" />
               <span className="hidden sm:inline">Aperçu</span>
@@ -82,6 +85,10 @@ const AgentSettingsPage = () => {
             <TabsTrigger value="config" className="flex items-center gap-2">
               <Key className="h-4 w-4" />
               <span className="hidden sm:inline">Config</span>
+            </TabsTrigger>
+            <TabsTrigger value="advanced" className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Avancé</span>
             </TabsTrigger>
             <TabsTrigger value="knowledge" className="flex items-center gap-2">
               <Brain className="h-4 w-4" />
@@ -133,6 +140,14 @@ const AgentSettingsPage = () => {
             />
           </TabsContent>
 
+          <TabsContent value="advanced">
+            <AgentFullConfigTab
+              agentId={agentId!}
+              platformAgentId={platformAgentId}
+              apiKey={agent.platform_api_key}
+            />
+          </TabsContent>
+
           <TabsContent value="knowledge">
             <AgentKnowledgePromptTab agent={agent} />
           </TabsContent>
@@ -149,7 +164,7 @@ const AgentSettingsPage = () => {
             <div className="space-y-6">
               <AgentRealtimeAnalytics 
                 agentId={agentId!}
-                platformAgentId={(agent.config as Record<string, any>)?.agent_id || agent.platform_agent_id}
+                platformAgentId={platformAgentId}
                 apiKey={agent.platform_api_key}
               />
               <AgentAnalyticsTab
