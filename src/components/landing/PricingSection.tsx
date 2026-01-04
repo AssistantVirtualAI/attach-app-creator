@@ -6,11 +6,13 @@ import { useNavigate } from "react-router-dom";
 const plans = [
   {
     name: "Starter",
-    price: "49",
+    price: "69",
+    currency: "CAD",
     description: "Parfait pour démarrer avec les agents IA",
     icon: Zap,
     color: "from-blue-500 to-cyan-500",
     features: [
+      "5 clients",
       "3 agents IA",
       "1 000 conversations/mois",
       "Analytics basiques",
@@ -22,11 +24,13 @@ const plans = [
   },
   {
     name: "Pro",
-    price: "149",
+    price: "199",
+    currency: "CAD",
     description: "Pour les équipes en croissance",
     icon: Sparkles,
     color: "from-purple-500 to-pink-500",
     features: [
+      "15 clients",
       "10 agents IA",
       "10 000 conversations/mois",
       "Analytics avancés",
@@ -41,10 +45,12 @@ const plans = [
   {
     name: "Enterprise",
     price: "Sur mesure",
+    currency: "CAD",
     description: "Solution personnalisée pour votre entreprise",
     icon: Crown,
     color: "from-orange-500 to-amber-500",
     features: [
+      "Clients illimités",
       "Agents illimités",
       "Conversations illimitées",
       "Analytics entreprise",
@@ -136,8 +142,8 @@ export const PricingSection = () => {
                   <span className="text-3xl font-bold">{plan.price}</span>
                 ) : (
                   <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold">{plan.price}€</span>
-                    <span className="text-muted-foreground">/mois</span>
+                    <span className="text-4xl font-bold">${plan.price}</span>
+                    <span className="text-muted-foreground text-sm">CAD/mois</span>
                   </div>
                 )}
               </div>
@@ -177,7 +183,7 @@ export const PricingSection = () => {
           viewport={{ once: true }}
           className="text-center text-muted-foreground mt-12"
         >
-          Tous les plans incluent un essai gratuit de 14 jours. Aucune carte de crédit requise.
+          Tous les plans incluent un essai gratuit de 7 jours. Prix en dollars canadiens (CAD). Aucune carte de crédit requise.
         </motion.p>
       </div>
     </section>

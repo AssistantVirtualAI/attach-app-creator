@@ -134,3 +134,6 @@ verify_jwt = true
 
 [functions.realtime-conversations]
 verify_jwt = true
+
+[functions.elevenlabs-phone-numbers]
+verify_jwt = true

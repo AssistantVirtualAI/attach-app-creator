@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Key, Trash2, Users, Edit, MoreHorizontal, ExternalLink } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Plus, Key, Trash2, Users, Edit, MoreHorizontal, ExternalLink, Building2, TrendingUp, UserCheck, Bot, Crown, Infinity } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import { PlatformBadge } from '@/components/agents/PlatformBadge';
 import { ClientAvatar } from '@/components/clients/ClientAvatar';
 import { ClientFilters, StatusFilter, SortField, SortOrder } from '@/components/clients/ClientFilters';
@@ -54,7 +56,7 @@ export default function Clients() {
   const { selectedOrgId } = useOrganization();
   const { toast: toastHook } = useToast();
   const queryClient = useQueryClient();
-  const { canCreateClient, clientCount, clientsIncluded } = useClientLimit();
+  const { canCreateClient, clientCount, clientsIncluded, isSuperAdmin } = useClientLimit();
   
   // Filters state
   const [search, setSearch] = useState('');
@@ -269,43 +271,62 @@ export default function Clients() {
 
   return (
     <AppLayout>
-      <div className="p-8">
-        {/* Client limit banner */}
-        <div className="mb-6">
-          <ClientLimitBanner />
-        </div>
+      <div className="p-8 space-y-8">
+        {/* Premium Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 border border-primary/20 p-8"
+        >
+          <div className="absolute inset-0 bg-grid-white/5 [mask-image:linear-gradient(0deg,transparent,black)]" />
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-secondary shadow-lg">
+                  <Building2 className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
+                    Gestion Clientèle
+                  </h1>
+                  <p className="text-muted-foreground">
+                    {isSuperAdmin ? (
+                      <span className="flex items-center gap-2">
+                        <Crown className="h-4 w-4 text-primary" />
+                        Super Admin - Clients illimités
+                        <span className="text-primary font-medium">({clientCount} actifs)</span>
+                      </span>
+                    ) : (
+                      <>Gérez vos clients et leurs agents assignés ({clientCount}/{clientsIncluded === Infinity ? '∞' : clientsIncluded})</>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
 
-        {/* Dashboard avec statistiques */}
-        <ClientsDashboard />
-
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold gradient-text mb-2">Clientèle</h1>
-            <p className="text-muted-foreground">
-              Gérez vos clients et leurs agents assignés ({clientCount}/{clientsIncluded} utilisés)
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <ClientsExport clients={clients || []} />
+            <div className="flex items-center gap-3">
+              <ClientsExport clients={clients || []} />
             
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2" disabled={!canCreateClient}>
+              <Button className="gap-2 shadow-lg" disabled={!canCreateClient}>
                   <Plus className="h-4 w-4" />
                   {canCreateClient ? 'Nouvelle clientèle' : 'Limite atteinte'}
                 </Button>
               </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Créer un nouveau client</DialogTitle>
-                <DialogDescription>
-                  Le client recevra un accès limité au dashboard de l'organisation
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                <div>
-                  <Label htmlFor="name">Nom du client *</Label>
+              <DialogContent className="sm:max-w-[600px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary" />
+                    Créer un nouveau client
+                  </DialogTitle>
+                  <DialogDescription>
+                    Le client recevra un accès limité au dashboard de l'organisation
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 mt-4">
+                  <div>
+                    <Label htmlFor="name">Nom du client *</Label>
                   <Input
                     id="name"
                     value={newClient.name}
@@ -423,8 +444,19 @@ export default function Clients() {
               </div>
             </DialogContent>
           </Dialog>
+            </div>
           </div>
-        </div>
+        </motion.div>
+
+        {/* Client limit banner (only for non-super admins) */}
+        {!isSuperAdmin && (
+          <div className="mb-2">
+            <ClientLimitBanner />
+          </div>
+        )}
+
+        {/* Dashboard avec statistiques */}
+        <ClientsDashboard />
 
         <div className="glass-card p-6 space-y-6">
           {/* Filters */}
@@ -475,20 +507,29 @@ export default function Clients() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredClients.map((client) => (
-                    <TableRow key={client.id} className="group">
+                  filteredClients.map((client, index) => (
+                    <motion.tr
+                      key={client.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                      className="group hover:bg-primary/5 transition-colors"
+                    >
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <ClientAvatar name={client.name} />
+                          <div className="relative">
+                            <ClientAvatar name={client.name} />
+                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background ${client.status === 'active' ? 'bg-green-500' : 'bg-gray-400'}`} />
+                          </div>
                           <div>
-                            <div className="font-medium">{client.name}</div>
+                            <div className="font-medium group-hover:text-primary transition-colors">{client.name}</div>
                             <div className="text-sm text-muted-foreground">{client.email}</div>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
                         {client.login_id || client.username ? (
-                          <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                          <code className="text-xs bg-primary/10 text-primary px-2 py-1 rounded font-mono border border-primary/20">
                             {client.login_id || client.username}
                           </code>
                         ) : (
@@ -499,19 +540,22 @@ export default function Clients() {
                         {client.assigned_agent ? (
                           <div className="flex items-center gap-2">
                             <PlatformBadge platform={client.assigned_agent.platform} />
-                            <span className="text-sm">{client.assigned_agent.name}</span>
+                            <span className="text-sm font-medium">{client.assigned_agent.name}</span>
                           </div>
                         ) : (
-                          <span className="text-muted-foreground text-sm">Non assigné</span>
+                          <Badge variant="outline" className="text-muted-foreground border-dashed">
+                            <Bot className="h-3 w-3 mr-1" />
+                            Non assigné
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell>
                         {client.assigned_agent && (client.assigned_agent as any).config?.agent_id ? (
-                          <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                          <code className="text-xs bg-secondary/50 px-2 py-1 rounded font-mono">
                             {(client.assigned_agent as any).config.agent_id}
                           </code>
                         ) : client.assigned_agent && (client.assigned_agent as any).platform_agent_id ? (
-                          <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                          <code className="text-xs bg-secondary/50 px-2 py-1 rounded font-mono">
                             {(client.assigned_agent as any).platform_agent_id}
                           </code>
                         ) : (
@@ -523,10 +567,11 @@ export default function Clients() {
                           variant={client.status === 'active' ? 'default' : 'secondary'}
                           className={
                             client.status === 'active'
-                              ? 'bg-green-500/10 text-green-600 hover:bg-green-500/20 border-green-500/30'
-                              : 'bg-gray-500/10 text-gray-600 hover:bg-gray-500/20'
+                              ? 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-600 border-green-500/30 shadow-sm'
+                              : 'bg-gray-500/10 text-gray-500 border-gray-500/20'
                           }
                         >
+                          <span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${client.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
                           {client.status === 'active' ? 'Actif' : 'Inactif'}
                         </Badge>
                       </TableCell>
@@ -593,7 +638,7 @@ export default function Clients() {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
-                    </TableRow>
+                    </motion.tr>
                   ))
                 )}
               </TableBody>

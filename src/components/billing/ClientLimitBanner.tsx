@@ -1,12 +1,19 @@
-import { useBillingConfig, PLANS } from '@/hooks/useBillingConfig';
+import { useBillingConfig } from '@/hooks/useBillingConfig';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { AlertTriangle, Users, Crown, ShoppingCart } from 'lucide-react';
+import { AlertTriangle, Users, Crown, ShoppingCart, Infinity } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
+// Super admin emails with unlimited client access
+const SUPER_ADMIN_EMAILS = [
+  'mhassoun@assistantvirtualai.com',
+  'amassaro@assistantvirtualai.com',
+];
 
 interface ClientLimitBannerProps {
   showProgress?: boolean;
@@ -15,7 +22,11 @@ interface ClientLimitBannerProps {
 
 export const ClientLimitBanner = ({ showProgress = true, compact = false }: ClientLimitBannerProps) => {
   const { selectedOrgId } = useOrganization();
+  const { user } = useAuth();
   const { billingConfig, currentPlan, isLoading: billingLoading } = useBillingConfig();
+
+  // Check if user is a super admin with unlimited access
+  const isSuperAdmin = user?.email && SUPER_ADMIN_EMAILS.includes(user.email);
 
   const { data: clientCount = 0 } = useQuery({
     queryKey: ['client-count', selectedOrgId],
@@ -33,7 +44,38 @@ export const ClientLimitBanner = ({ showProgress = true, compact = false }: Clie
 
   if (billingLoading) return null;
 
-  const clientsIncluded = currentPlan?.clientsIncluded || 1;
+  // Super admins have unlimited access
+  if (isSuperAdmin) {
+    if (compact) {
+      return (
+        <div className="flex items-center gap-3 text-sm">
+          <Users className="h-4 w-4 text-primary" />
+          <span className="text-primary font-medium flex items-center gap-1">
+            {clientCount} clients
+            <Infinity className="h-3 w-3" />
+          </span>
+          <span className="text-xs text-muted-foreground">(Super Admin)</span>
+        </div>
+      );
+    }
+    
+    if (showProgress) {
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground flex items-center gap-2">
+              <Crown className="h-4 w-4 text-primary" />
+              Super Admin - Clients illimités
+            </span>
+            <span className="font-medium text-primary">{clientCount} clients</span>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }
+
+  const clientsIncluded = currentPlan?.clientsIncluded || 5;
   const additionalClientPrice = currentPlan?.additionalClientPrice;
   const isAtLimit = clientCount >= clientsIncluded;
   const usagePercent = Math.min((clientCount / clientsIncluded) * 100, 100);
@@ -99,14 +141,14 @@ export const ClientLimitBanner = ({ showProgress = true, compact = false }: Clie
             <Link to="/billing">
               <Button size="sm" variant={isAtLimit ? 'destructive' : 'default'}>
                 <Crown className="h-4 w-4 mr-2" />
-                Passer à un plan supérieur
+                Passer au plan supérieur
               </Button>
             </Link>
             
             {additionalClientPrice && !isAtLimit && (
               <Button size="sm" variant="outline">
                 <ShoppingCart className="h-4 w-4 mr-2" />
-                Acheter des emplacements (${additionalClientPrice}/client)
+                Acheter des emplacements (${additionalClientPrice} CAD/client)
               </Button>
             )}
           </div>
@@ -119,7 +161,11 @@ export const ClientLimitBanner = ({ showProgress = true, compact = false }: Clie
 // Hook to check if client creation is allowed
 export const useClientLimit = () => {
   const { selectedOrgId } = useOrganization();
+  const { user } = useAuth();
   const { currentPlan } = useBillingConfig();
+
+  // Check if user is a super admin with unlimited access
+  const isSuperAdmin = user?.email && SUPER_ADMIN_EMAILS.includes(user.email);
 
   const { data: clientCount = 0 } = useQuery({
     queryKey: ['client-count', selectedOrgId],
@@ -135,7 +181,19 @@ export const useClientLimit = () => {
     enabled: !!selectedOrgId,
   });
 
-  const clientsIncluded = currentPlan?.clientsIncluded || 1;
+  // Super admins have unlimited access
+  if (isSuperAdmin) {
+    return {
+      clientCount,
+      clientsIncluded: Infinity,
+      canCreateClient: true,
+      remainingSlots: Infinity,
+      additionalClientPrice: undefined,
+      isSuperAdmin: true,
+    };
+  }
+
+  const clientsIncluded = currentPlan?.clientsIncluded || 5;
   const canCreateClient = clientCount < clientsIncluded;
   const remainingSlots = Math.max(0, clientsIncluded - clientCount);
 
@@ -145,5 +203,6 @@ export const useClientLimit = () => {
     canCreateClient,
     remainingSlots,
     additionalClientPrice: currentPlan?.additionalClientPrice,
+    isSuperAdmin: false,
   };
 };
