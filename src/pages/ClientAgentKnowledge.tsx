@@ -1,13 +1,19 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useClientAgentAccess } from '@/hooks/useClientAgentAccess';
-import { useClientElevenLabsKnowledgeBase, useClientUpdateKnowledgeBase } from '@/hooks/useClientElevenLabs';
+import { 
+  useClientElevenLabsKnowledgeBase, 
+  useClientElevenLabsKnowledgeBaseDocument,
+  useClientAddKnowledgeBaseText,
+  useClientDeleteKnowledgeBaseItem 
+} from '@/hooks/useClientElevenLabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,7 +24,12 @@ import {
   Search,
   FileText,
   Tag,
-  Lock
+  Lock,
+  Eye,
+  Trash2,
+  RefreshCw,
+  Link as LinkIcon,
+  ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -29,6 +40,8 @@ const ClientAgentKnowledge = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [viewDocumentId, setViewDocumentId] = useState<string | null>(null);
+  const [deleteDocumentId, setDeleteDocumentId] = useState<string | null>(null);
   const [newItem, setNewItem] = useState({ title: '', content: '', category: '' });
 
   const { data: knowledgeBase, isLoading, error, refetch } = useClientElevenLabsKnowledgeBase({
@@ -36,7 +49,13 @@ const ClientAgentKnowledge = () => {
     agentId: elevenlabsAgentId,
   });
 
-  const updateMutation = useClientUpdateKnowledgeBase();
+  const { data: documentData, isLoading: isLoadingDocument } = useClientElevenLabsKnowledgeBaseDocument(
+    { apiKey, agentId: elevenlabsAgentId },
+    viewDocumentId
+  );
+
+  const addMutation = useClientAddKnowledgeBaseText();
+  const deleteMutation = useClientDeleteKnowledgeBaseItem();
 
   const items = knowledgeBase?.knowledge_base?.items || [];
   const categories = knowledgeBase?.knowledge_base?.categories || [];
@@ -58,16 +77,40 @@ const ClientAgentKnowledge = () => {
       return;
     }
 
-    await updateMutation.mutateAsync({
-      apiKey,
-      agentId: elevenlabsAgentId,
-      title: newItem.title,
-      content: newItem.content,
-      category: newItem.category || 'Général',
-    });
+    try {
+      await addMutation.mutateAsync({
+        apiKey,
+        agentId: elevenlabsAgentId,
+        title: newItem.title,
+        content: newItem.content,
+        category: newItem.category || 'Général',
+      });
 
-    setIsAddModalOpen(false);
-    setNewItem({ title: '', content: '', category: '' });
+      setIsAddModalOpen(false);
+      setNewItem({ title: '', content: '', category: '' });
+    } catch (error) {
+      // Error handled by mutation
+    }
+  };
+
+  const handleDeleteItem = async () => {
+    if (!apiKey || !elevenlabsAgentId || !deleteDocumentId) return;
+
+    try {
+      await deleteMutation.mutateAsync({
+        apiKey,
+        agentId: elevenlabsAgentId,
+        documentId: deleteDocumentId,
+      });
+      setDeleteDocumentId(null);
+    } catch (error) {
+      // Error handled by mutation
+    }
+  };
+
+  const getItemIcon = (type: string) => {
+    if (type === 'url' || type === 'link') return <LinkIcon className="h-4 w-4" />;
+    return <FileText className="h-4 w-4" />;
   };
 
   return (
@@ -77,17 +120,22 @@ const ClientAgentKnowledge = () => {
           <h1 className="text-2xl font-bold">Base de connaissances</h1>
           <p className="text-muted-foreground">Informations disponibles pour {agentName}</p>
         </div>
-        {canEdit ? (
-          <Button onClick={() => setIsAddModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Ajouter
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4" />
           </Button>
-        ) : (
-          <Badge variant="secondary" className="flex items-center gap-1">
-            <Lock className="h-3 w-3" />
-            Lecture seule
-          </Badge>
-        )}
+          {canEdit ? (
+            <Button onClick={() => setIsAddModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Ajouter
+            </Button>
+          ) : (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              <Lock className="h-3 w-3" />
+              Lecture seule
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -171,6 +219,7 @@ const ClientAgentKnowledge = () => {
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
+                          {getItemIcon(item.type)}
                           <h3 className="font-medium truncate">{item.title || item.name}</h3>
                           {item.category && (
                             <Badge variant="secondary" className="flex items-center gap-1">
@@ -178,10 +227,48 @@ const ClientAgentKnowledge = () => {
                               {item.category}
                             </Badge>
                           )}
+                          {item.type && (
+                            <Badge variant="outline" className="text-xs">
+                              {item.type}
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-2">
-                          {item.content}
+                          {item.content || item.url || 'Cliquer pour voir le contenu complet'}
                         </p>
+                        {item.created_at && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Créé le {new Date(item.created_at).toLocaleDateString('fr-FR')}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => setViewDocumentId(item.id)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {item.url && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => window.open(item.url, '_blank')}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {canEdit && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setDeleteDocumentId(item.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -192,11 +279,61 @@ const ClientAgentKnowledge = () => {
         </CardContent>
       </Card>
 
+      {/* View Document Modal */}
+      <Dialog open={!!viewDocumentId} onOpenChange={(open) => !open && setViewDocumentId(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>
+              {documentData?.document?.name || 'Document'}
+            </DialogTitle>
+            <DialogDescription>
+              Contenu complet du document
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            {isLoadingDocument ? (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            ) : documentData?.document?.content ? (
+              <div className="whitespace-pre-wrap text-sm p-4 bg-muted rounded-lg">
+                {documentData.document.content}
+              </div>
+            ) : documentData?.document?.url ? (
+              <div className="p-4">
+                <p className="text-sm text-muted-foreground mb-2">Document lié à une URL:</p>
+                <a 
+                  href={documentData.document.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline flex items-center gap-1"
+                >
+                  {documentData.document.url}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            ) : (
+              <p className="text-muted-foreground p-4">Aucun contenu disponible</p>
+            )}
+          </ScrollArea>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewDocumentId(null)}>
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Item Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Ajouter à la base de connaissances</DialogTitle>
+            <DialogDescription>
+              Ajoutez du contenu texte qui sera utilisé par l'agent
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -224,7 +361,7 @@ const ClientAgentKnowledge = () => {
                 value={newItem.content}
                 onChange={(e) => setNewItem(prev => ({ ...prev, content: e.target.value }))}
                 placeholder="Contenu de l'élément..."
-                rows={6}
+                rows={8}
               />
             </div>
           </div>
@@ -232,12 +369,34 @@ const ClientAgentKnowledge = () => {
             <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
               Annuler
             </Button>
-            <Button onClick={handleAddItem} disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? 'Ajout...' : 'Ajouter'}
+            <Button onClick={handleAddItem} disabled={addMutation.isPending}>
+              {addMutation.isPending ? 'Ajout...' : 'Ajouter'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteDocumentId} onOpenChange={(open) => !open && setDeleteDocumentId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce document ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Le document sera définitivement supprimé de la base de connaissances.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteItem}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Suppression...' : 'Supprimer'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

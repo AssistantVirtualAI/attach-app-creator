@@ -10,9 +10,10 @@ const ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1";
 
 // Validation helpers
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// ElevenLabs agent IDs are alphanumeric strings (e.g., "QNdB45Jpgh06Hr67TzFO")
 const ELEVENLABS_AGENT_ID_REGEX = /^[a-zA-Z0-9]{10,30}$/;
-const VALID_ACTIONS = ['list', 'get', 'get_document', 'add', 'create_text', 'create_url', 'delete', 'link_to_agent', 'unlink_from_agent'] as const;
+const READ_ACTIONS = ['list', 'get', 'get_document'] as const;
+const WRITE_ACTIONS = ['add', 'create_text', 'create_url', 'delete', 'link_to_agent', 'unlink_from_agent', 'rename'] as const;
+const VALID_ACTIONS = [...READ_ACTIONS, ...WRITE_ACTIONS] as const;
 type ValidAction = typeof VALID_ACTIONS[number];
 
 function isValidUUID(value: unknown): boolean {
@@ -21,12 +22,15 @@ function isValidUUID(value: unknown): boolean {
 
 function isValidAgentId(value: unknown): boolean {
   if (typeof value !== 'string') return false;
-  // Accept both UUID format (internal) and ElevenLabs format
   return UUID_REGEX.test(value) || ELEVENLABS_AGENT_ID_REGEX.test(value);
 }
 
 function isValidAction(value: unknown): value is ValidAction {
   return typeof value === 'string' && VALID_ACTIONS.includes(value as ValidAction);
+}
+
+function isWriteAction(action: ValidAction): boolean {
+  return (WRITE_ACTIONS as readonly string[]).includes(action);
 }
 
 function sanitizeString(value: unknown, maxLength: number = 10000): string | null {
@@ -51,11 +55,14 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    
+    // Create service client for DB operations
+    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json();
-    const { action, agentId, apiKey, documentId, title, content, url, category, itemId, search, pageSize } = body;
+    const { action, agentId, apiKey, documentId, title, content, url, category, itemId, search, pageSize, newName } = body;
 
     // Validate action
     if (!action) {
@@ -72,7 +79,7 @@ serve(async (req) => {
       );
     }
 
-    // Validate agentId if provided - accept both UUID (internal DB) and ElevenLabs format
+    // Validate agentId if provided
     if (agentId && !isValidAgentId(agentId)) {
       return new Response(
         JSON.stringify({ error: 'Invalid agent ID format', success: false }),
@@ -94,6 +101,7 @@ serve(async (req) => {
     const sanitizedContent = content ? sanitizeString(content, 100000) : null;
     const sanitizedCategory = category ? sanitizeString(category, 100) : null;
     const sanitizedSearch = search ? sanitizeString(search, 200) : null;
+    const sanitizedNewName = newName ? sanitizeString(newName, 500) : null;
 
     // Validate URL if provided
     if (url && !isValidUrl(url)) {
@@ -105,13 +113,105 @@ serve(async (req) => {
     
     console.log(`[KB] Action: ${action}, agentId: ${agentId}`);
 
-    // Get API key from integration if not provided directly
+    // ============ RBAC CHECK FOR WRITE ACTIONS ============
+    if (isWriteAction(action)) {
+      const authHeader = req.headers.get('Authorization');
+      
+      if (!authHeader) {
+        console.log('[KB] Write action attempted without auth header');
+        return new Response(
+          JSON.stringify({ error: 'Accès refusé. Authentification requise pour cette action.', success: false }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Create client with user's auth
+      const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } }
+      });
+
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
+      
+      if (userError || !user) {
+        console.log('[KB] Auth validation failed:', userError);
+        return new Response(
+          JSON.stringify({ error: 'Accès refusé. Session invalide.', success: false }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log(`[KB] User ${user.id} attempting write action: ${action}`);
+
+      // Check if super admin
+      const { data: isSuperAdmin } = await supabaseService.rpc('is_super_admin', { _user_id: user.id });
+      
+      if (isSuperAdmin) {
+        console.log('[KB] User is super admin, access granted');
+      } else {
+        // Need to check org_admin role for the agent's organization
+        let organizationId: string | null = null;
+
+        // Get organization from agent
+        if (agentId && isValidUUID(agentId)) {
+          const { data: agent } = await supabaseService
+            .from('agents')
+            .select('organization_id')
+            .eq('id', agentId)
+            .single();
+          
+          if (agent) {
+            organizationId = agent.organization_id;
+          }
+        }
+
+        // If no org found from agent, try from platform_agent_id
+        if (!organizationId && agentId) {
+          const { data: agent } = await supabaseService
+            .from('agents')
+            .select('organization_id')
+            .eq('platform_agent_id', agentId)
+            .single();
+          
+          if (agent) {
+            organizationId = agent.organization_id;
+          }
+        }
+
+        if (!organizationId) {
+          console.log('[KB] Could not determine organization for access check');
+          return new Response(
+            JSON.stringify({ error: 'Accès refusé. Organisation non trouvée.', success: false }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Check if user has org_admin role
+        const { data: hasRole } = await supabaseService.rpc('has_role', { 
+          _user_id: user.id, 
+          _org_id: organizationId,
+          _role: 'org_admin'
+        });
+
+        if (!hasRole) {
+          console.log(`[KB] User ${user.id} does not have org_admin role for org ${organizationId}`);
+          return new Response(
+            JSON.stringify({ error: 'Accès refusé. Seuls les administrateurs peuvent effectuer cette action.', success: false }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        console.log('[KB] User has org_admin role, access granted');
+      }
+    }
+
+    // ============ GET API KEY ============
     let elevenLabsApiKey = apiKey;
     let platformAgentId: string | null = null;
     
     if (agentId) {
       // Get the agent to find its platform_agent_id and API key
-      const { data: agent } = await supabase
+      const { data: agent } = await supabaseService
         .from("agents")
         .select("platform_agent_id, platform_api_key, organization_id, config, name")
         .eq("id", agentId)
@@ -120,16 +220,14 @@ serve(async (req) => {
       if (agent) {
         platformAgentId = agent.platform_agent_id;
         
-        // Try agent's own API key first
         if (agent.platform_api_key) {
           elevenLabsApiKey = agent.platform_api_key;
         } else if ((agent.config as any)?.api_key) {
           elevenLabsApiKey = (agent.config as any).api_key;
         }
         
-        // Fallback to organization integration
         if (!elevenLabsApiKey && agent.organization_id) {
-          const { data: integration } = await supabase
+          const { data: integration } = await supabaseService
             .from("organization_integrations")
             .select("api_key")
             .eq("organization_id", agent.organization_id)
@@ -176,7 +274,6 @@ serve(async (req) => {
         throw new Error(`ElevenLabs API error ${response.status}: ${errorText}`);
       }
 
-      // Handle DELETE which may return empty response
       if (response.status === 204 || (options.method === 'DELETE' && response.status < 300)) {
         return { success: true };
       }
@@ -187,7 +284,6 @@ serve(async (req) => {
     switch (action) {
       case "list":
       case "get": {
-        // List all knowledge base documents using the dedicated KB endpoint
         const params = new URLSearchParams();
         if (pageSize) params.append("page_size", String(Math.min(Number(pageSize) || 100, 100)));
         if (sanitizedSearch) params.append("search", sanitizedSearch);
@@ -199,11 +295,9 @@ serve(async (req) => {
         
         console.log(`[KB] Response keys: ${Object.keys(data).join(', ')}`);
         
-        // ElevenLabs returns documents in 'documents' array
         const documents = data.documents || data.knowledge_base || [];
         console.log(`[KB] Found ${documents.length} total documents`);
         
-        // Filter by agent if platformAgentId is available
         let filteredDocs = documents;
         if (platformAgentId) {
           filteredDocs = documents.filter((doc: any) => {
@@ -214,11 +308,10 @@ serve(async (req) => {
           console.log(`[KB] After filtering for agent ${platformAgentId}: ${filteredDocs.length} documents`);
         }
         
-        // Transform to our format - ensure 'title' is always present for client compatibility
         const items = filteredDocs.map((doc: any) => ({
           id: doc.id,
           name: doc.name,
-          title: doc.name, // Add title field for client compatibility
+          title: doc.name,
           type: doc.type || 'text',
           content: doc.text || doc.content || '',
           category: doc.metadata?.category || doc.metadata?.tag || 'Général',
@@ -235,7 +328,6 @@ serve(async (req) => {
           metadata: doc.metadata || {},
         }));
         
-        // Extract unique categories
         const categories = [...new Set(items.map((item: any) => item.category).filter(Boolean))];
 
         return new Response(
@@ -281,7 +373,6 @@ serve(async (req) => {
 
       case "add":
       case "create_text": {
-        // Create a text document using the dedicated endpoint
         const docName = sanitizedTitle || `Document ${new Date().toISOString()}`;
         const docContent = sanitizedContent || "";
         
@@ -305,12 +396,10 @@ serve(async (req) => {
 
         console.log(`[KB] Created document: ${JSON.stringify(data)}`);
         
-        // Link to agent if we have a platformAgentId
         if (platformAgentId && data.id) {
           try {
             console.log(`[KB] Linking document ${data.id} to agent ${platformAgentId}`);
             
-            // Get current agent config
             const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
             const currentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb);
             
@@ -328,7 +417,6 @@ serve(async (req) => {
             }
           } catch (linkError) {
             console.error(`[KB] Failed to link document to agent:`, linkError);
-            // Don't fail the whole operation
           }
         }
 
@@ -343,7 +431,6 @@ serve(async (req) => {
       }
 
       case "create_url": {
-        // Create a document from URL - validation already done above
         if (!url) {
           return new Response(
             JSON.stringify({ error: "L'URL est requise pour créer un document depuis une URL", success: false }),
@@ -364,7 +451,6 @@ serve(async (req) => {
 
         console.log(`[KB] Created URL document: ${JSON.stringify(data)}`);
 
-        // Link to agent if we have a platformAgentId
         if (platformAgentId && data.id) {
           try {
             const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
@@ -396,8 +482,37 @@ serve(async (req) => {
         );
       }
 
+      case "rename": {
+        const docIdToRename = documentId || itemId;
+        
+        if (!docIdToRename) {
+          throw new Error("documentId requis pour renommer");
+        }
+        
+        if (!sanitizedNewName) {
+          throw new Error("newName requis pour renommer");
+        }
+
+        console.log(`[KB] Renaming document ${docIdToRename} to: ${sanitizedNewName}`);
+        
+        await callElevenLabs(`/convai/knowledge-base/${docIdToRename}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: sanitizedNewName,
+          }),
+        });
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: "Document renommé avec succès" 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       case "delete": {
-        // Delete a document using the dedicated endpoint
         const docIdToDelete = documentId || itemId;
         
         if (!docIdToDelete) {
@@ -406,7 +521,6 @@ serve(async (req) => {
 
         console.log(`[KB] Deleting document: ${docIdToDelete}`);
         
-        // Use force=true to delete even if used by agents
         await callElevenLabs(`/convai/knowledge-base/${docIdToDelete}?force=true`, {
           method: "DELETE",
         });
@@ -421,13 +535,11 @@ serve(async (req) => {
       }
 
       case "link_to_agent": {
-        // Link a document to an agent
         const docId = documentId || itemId;
         if (!docId || !platformAgentId) {
           throw new Error("documentId et agentId requis pour lier un document");
         }
 
-        // Get current agent config
         const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
         const currentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb);
         
@@ -453,13 +565,11 @@ serve(async (req) => {
       }
 
       case "unlink_from_agent": {
-        // Unlink a document from an agent
         const docId = documentId || itemId;
         if (!docId || !platformAgentId) {
           throw new Error("documentId et agentId requis pour délier un document");
         }
 
-        // Get current agent config
         const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
         const currentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb)
           .filter((id: string) => id !== docId);
@@ -482,20 +592,20 @@ serve(async (req) => {
       }
 
       default:
-        throw new Error(`Action non supportée: ${action}`);
+        return new Response(
+          JSON.stringify({ error: 'Action non reconnue', success: false }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
     }
   } catch (error: unknown) {
     console.error("[KB] Error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Erreur lors de l'opération";
+    const errorMessage = error instanceof Error ? error.message : "Une erreur est survenue";
     return new Response(
       JSON.stringify({ 
         error: errorMessage,
         success: false 
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
