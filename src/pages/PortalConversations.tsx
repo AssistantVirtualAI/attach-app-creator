@@ -28,6 +28,28 @@ const PortalConversations = () => {
     c.conversation_id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Helper to safely format timestamps
+  const formatTimestamp = (unixSecs: number | undefined, formatStr: string): string => {
+    if (!unixSecs || isNaN(unixSecs)) {
+      return 'Date inconnue';
+    }
+    try {
+      const date = new Date(unixSecs * 1000);
+      if (isNaN(date.getTime())) {
+        return 'Date inconnue';
+      }
+      return format(date, formatStr, { locale: fr });
+    } catch {
+      return 'Date inconnue';
+    }
+  };
+
+  // Helper to safely format duration
+  const safeDuration = (seconds: number | undefined): number => {
+    if (seconds === undefined || isNaN(seconds)) return 0;
+    return Math.floor(seconds);
+  };
+
   const getStatusVariant = (status: string): 'success' | 'destructive' | 'secondary' => {
     switch (status) {
       case 'done':
@@ -112,7 +134,7 @@ const PortalConversations = () => {
                               {conversation.conversation_id.slice(0, 8)}...
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {format(new Date(conversation.start_time_unix_secs * 1000), 'PPp', { locale: fr })}
+                              {formatTimestamp(conversation.start_time_unix_secs, 'PPp')}
                             </p>
                           </div>
                         </div>
@@ -160,7 +182,7 @@ const PortalConversations = () => {
                       <div>
                         <h3 className="font-semibold text-lg">Conversation</h3>
                         <p className="text-sm text-muted-foreground">
-                          {format(new Date(selectedConversation.start_time_unix_secs * 1000), 'PPPp', { locale: fr })}
+                          {formatTimestamp(selectedConversation.start_time_unix_secs, 'PPPp')}
                         </p>
                       </div>
                     </div>
@@ -212,7 +234,7 @@ const PortalConversations = () => {
                                     : 'bg-muted/30 border border-border/30'
                                 }`}>
                                   <p className="text-xs font-medium text-muted-foreground mb-1">
-                                    {entry.role === 'agent' ? 'Agent' : 'Utilisateur'} • {formatDuration(Math.floor(entry.time_in_call_secs))}
+                                    {entry.role === 'agent' ? 'Agent' : 'Utilisateur'} • {formatDuration(safeDuration(entry.time_in_call_secs))}
                                   </p>
                                   <p className="text-sm">{entry.message}</p>
                                 </div>
