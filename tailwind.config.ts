@@ -26,6 +26,7 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          glow: "hsl(var(--primary-glow))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -68,6 +69,25 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
+        },
+        // Vibrant color palette
+        electric: {
+          blue: "hsl(var(--electric-blue))",
+        },
+        vivid: {
+          purple: "hsl(var(--vivid-purple))",
+        },
+        hot: {
+          pink: "hsl(var(--hot-pink))",
+        },
+        cyber: {
+          cyan: "hsl(var(--cyber-cyan))",
+        },
+        neon: {
+          green: "hsl(var(--neon-green))",
+        },
+        sunset: {
+          orange: "hsl(var(--sunset-orange))",
         },
       },
       borderRadius: {
@@ -115,6 +135,14 @@ export default {
           "0%, 40%, 100%": { transform: "scaleY(0.4)" },
           "20%": { transform: "scaleY(1)" },
         },
+        "float": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
+        "glow-pulse": {
+          "0%, 100%": { boxShadow: "0 0 20px hsl(var(--primary) / 0.3)" },
+          "50%": { boxShadow: "0 0 40px hsl(var(--primary) / 0.6)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -124,6 +152,8 @@ export default {
         "pulse-ring": "pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         "bounce-ball": "bounce-ball 0.6s infinite ease-in-out",
         "scale-bars": "scale-bars 1.2s ease-in-out infinite",
+        "float": "float 3s ease-in-out infinite",
+        "glow-pulse": "glow-pulse 2s ease-in-out infinite",
       },
     },
   },
