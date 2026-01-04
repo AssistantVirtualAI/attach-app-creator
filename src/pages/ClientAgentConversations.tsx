@@ -102,8 +102,12 @@ const ClientAgentConversations = () => {
 
   const totalPages = Math.ceil((conversationsData?.total || 0) / 20);
 
+  const [audioUnavailable, setAudioUnavailable] = useState(false);
+
   const handlePlayAudio = async (conversationId: string) => {
     if (!apiKey || !elevenlabsAgentId) return;
+    
+    setAudioUnavailable(false);
     
     try {
       const result = await audioMutation.mutateAsync({
@@ -113,11 +117,15 @@ const ClientAgentConversations = () => {
         format: 'mp3'
       });
       
-      if (result?.audio_url) {
+      if (result?.audio_unavailable) {
+        setAudioUnavailable(true);
+        toast.error("L'audio n'est pas disponible pour cette conversation");
+      } else if (result?.audio_url) {
         setAudioUrl(result.audio_url);
       }
     } catch (error) {
       console.error('Error fetching audio:', error);
+      toast.error("Erreur lors du chargement de l'audio");
     }
   };
 
@@ -332,7 +340,7 @@ const ClientAgentConversations = () => {
                       setSelectedConversation(conv.conversation_id);
                       setAudioUrl(null);
                       setAudioLoadRequested(false);
-                      // Don't auto-play audio - let user click load button
+                      setAudioUnavailable(false);
                     }}
                   >
                     <div className="flex items-center gap-4">
@@ -418,6 +426,7 @@ const ClientAgentConversations = () => {
         setSelectedConversation(null);
         setAudioUrl(null);
         setAudioLoadRequested(false);
+        setAudioUnavailable(false);
       }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-background">
           <DialogHeader>
@@ -492,8 +501,69 @@ const ClientAgentConversations = () => {
                 </div>
               </div>
 
+              {/* AI Analysis Section */}
+              {conversationDetails?.analysis && (
+                <div className="space-y-3 p-4 bg-primary/5 rounded-lg border border-primary/10">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    Analyse AI
+                  </h4>
+                  
+                  {/* Summary */}
+                  {conversationDetails.analysis.summary && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Résumé</p>
+                      <p className="text-sm">{conversationDetails.analysis.summary}</p>
+                    </div>
+                  )}
+                  
+                  {/* Data Collection Results */}
+                  {conversationDetails.analysis.data_collection_results && 
+                   Object.keys(conversationDetails.analysis.data_collection_results).length > 0 && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Informations collectées</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {Object.entries(conversationDetails.analysis.data_collection_results).map(([key, value]: [string, any]) => (
+                          <div key={key} className="text-sm bg-background p-2 rounded">
+                            <span className="text-muted-foreground">{key}:</span>{' '}
+                            <span className="font-medium">{String(value?.value || value || 'N/A')}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Evaluation Criteria Results */}
+                  {conversationDetails.analysis.evaluation_criteria_results && 
+                   Object.keys(conversationDetails.analysis.evaluation_criteria_results).length > 0 && (
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Évaluations</p>
+                      <div className="space-y-1">
+                        {Object.entries(conversationDetails.analysis.evaluation_criteria_results).map(([key, value]: [string, any]) => (
+                          <div key={key} className="flex items-center justify-between text-sm bg-background p-2 rounded">
+                            <span>{key}</span>
+                            <Badge variant={value?.result === 'success' ? 'default' : value?.result === 'failure' ? 'destructive' : 'secondary'}>
+                              {value?.result || String(value || 'N/A')}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Show message if no detailed analysis */}
+                  {!conversationDetails.analysis.summary && 
+                   !conversationDetails.analysis.data_collection_results &&
+                   !conversationDetails.analysis.evaluation_criteria_results && (
+                    <p className="text-sm text-muted-foreground">
+                      L'analyse détaillée n'est pas disponible pour cette conversation.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Load Audio Button - Only show if audio not yet loaded */}
-              {!audioUrl && !audioMutation.isPending && (
+              {!audioUrl && !audioMutation.isPending && !audioUnavailable && (
                 <div className="p-4 bg-muted/50 rounded-lg text-center">
                   <Button 
                     onClick={() => {
@@ -513,6 +583,16 @@ const ClientAgentConversations = () => {
                 </div>
               )}
 
+              {/* Audio Unavailable State */}
+              {audioUnavailable && (
+                <div className="p-4 bg-muted rounded-lg text-center">
+                  <Volume2 className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    L'audio n'est pas disponible pour cette conversation
+                  </p>
+                </div>
+              )}
+
               {/* Audio Loading State */}
               {audioMutation.isPending && (
                 <div className="p-6 bg-muted rounded-lg text-center">
@@ -522,7 +602,7 @@ const ClientAgentConversations = () => {
               )}
 
               {/* Audio Error State */}
-              {audioLoadRequested && !audioMutation.isPending && !audioUrl && audioMutation.isError && (
+              {audioLoadRequested && !audioMutation.isPending && !audioUrl && !audioUnavailable && audioMutation.isError && (
                 <div className="p-4 bg-destructive/10 rounded-lg text-center">
                   <p className="text-sm text-destructive">Impossible de charger l'audio</p>
                   <Button 
