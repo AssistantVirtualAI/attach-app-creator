@@ -1,10 +1,11 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { 
   MessageSquare, Clock, Users, Bot, TrendingUp, TrendingDown, 
-  UserCheck, Star, CheckCircle, Smile, Activity, Timer
+  UserCheck, Star, CheckCircle, Smile, Activity
 } from 'lucide-react';
 import { DashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { motion } from 'framer-motion';
+import { SimpleAnimatedCounter } from '@/components/ui/animated-counter';
 
 interface MetricsGridProps {
   metrics: DashboardMetrics;
@@ -14,6 +15,7 @@ interface MetricsGridProps {
 const MetricCard = ({
   title,
   value,
+  numericValue,
   subValue,
   icon: Icon,
   trend,
@@ -21,43 +23,134 @@ const MetricCard = ({
   previousValue,
   accentColor = 'primary',
   delay = 0,
+  isImportant = false,
+  suffix = '',
+  decimals = 0,
 }: {
   title: string;
-  value: string | number;
+  value?: string | number;
+  numericValue?: number;
   subValue?: string;
   icon: React.ElementType;
   trend?: 'up' | 'down' | 'neutral';
   trendValue?: string;
   previousValue?: string;
-  accentColor?: 'primary' | 'emerald' | 'amber' | 'purple' | 'cyan' | 'pink';
+  accentColor?: 'primary' | 'emerald' | 'amber' | 'purple' | 'cyan' | 'pink' | 'orange' | 'blue';
   delay?: number;
+  isImportant?: boolean;
+  suffix?: string;
+  decimals?: number;
 }) => {
   const colorClasses = {
-    primary: 'bg-primary/10 text-primary',
-    emerald: 'bg-emerald-500/10 text-emerald-500',
-    amber: 'bg-amber-500/10 text-amber-500',
-    purple: 'bg-purple-500/10 text-purple-500',
-    cyan: 'bg-cyan-500/10 text-cyan-500',
-    pink: 'bg-pink-500/10 text-pink-500',
+    primary: {
+      bg: 'bg-gradient-to-br from-primary/20 to-primary/5',
+      text: 'text-primary',
+      glow: 'shadow-primary/30',
+      border: 'border-primary/30',
+    },
+    emerald: {
+      bg: 'bg-gradient-to-br from-emerald-500/20 to-emerald-500/5',
+      text: 'text-emerald-500',
+      glow: 'shadow-emerald-500/30',
+      border: 'border-emerald-500/30',
+    },
+    amber: {
+      bg: 'bg-gradient-to-br from-amber-500/20 to-amber-500/5',
+      text: 'text-amber-500',
+      glow: 'shadow-amber-500/30',
+      border: 'border-amber-500/30',
+    },
+    purple: {
+      bg: 'bg-gradient-to-br from-purple-500/20 to-purple-500/5',
+      text: 'text-purple-500',
+      glow: 'shadow-purple-500/30',
+      border: 'border-purple-500/30',
+    },
+    cyan: {
+      bg: 'bg-gradient-to-br from-cyan-500/20 to-cyan-500/5',
+      text: 'text-cyan-500',
+      glow: 'shadow-cyan-500/30',
+      border: 'border-cyan-500/30',
+    },
+    pink: {
+      bg: 'bg-gradient-to-br from-pink-500/20 to-pink-500/5',
+      text: 'text-pink-500',
+      glow: 'shadow-pink-500/30',
+      border: 'border-pink-500/30',
+    },
+    orange: {
+      bg: 'bg-gradient-to-br from-orange-500/20 to-orange-500/5',
+      text: 'text-orange-500',
+      glow: 'shadow-orange-500/30',
+      border: 'border-orange-500/30',
+    },
+    blue: {
+      bg: 'bg-gradient-to-br from-blue-500/20 to-blue-500/5',
+      text: 'text-blue-500',
+      glow: 'shadow-blue-500/30',
+      border: 'border-blue-500/30',
+    },
   };
+
+  const colors = colorClasses[accentColor];
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.3 }}
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ 
+        delay, 
+        duration: 0.4,
+        type: "spring",
+        stiffness: 100,
+        damping: 15
+      }}
+      whileHover={{ 
+        scale: 1.02, 
+        y: -4,
+        transition: { duration: 0.2 }
+      }}
     >
-      <Card className="glass-card metric-card-hover">
-        <CardContent className="p-4">
+      <Card className={`relative overflow-hidden bg-card/50 backdrop-blur-xl border transition-all duration-300 hover:border-opacity-100 ${
+        isImportant 
+          ? `${colors.border} shadow-lg ${colors.glow}` 
+          : 'border-border/50 hover:border-primary/30'
+      }`}>
+        {/* Glow effect for important metrics */}
+        {isImportant && (
+          <motion.div
+            className={`absolute inset-0 ${colors.bg} opacity-50`}
+            animate={{ opacity: [0.3, 0.5, 0.3] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+        )}
+        
+        <CardContent className="relative p-4">
           <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium">{title}</p>
-              <p className="text-2xl font-bold text-foreground tracking-tight">{value}</p>
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{title}</p>
+              <div className="text-2xl font-bold text-foreground tracking-tight">
+                {numericValue !== undefined ? (
+                  <SimpleAnimatedCounter 
+                    value={numericValue} 
+                    suffix={suffix}
+                    decimals={decimals}
+                    duration={1200 + delay * 500}
+                  />
+                ) : (
+                  value
+                )}
+              </div>
               {subValue && (
                 <p className="text-xs text-muted-foreground">{subValue}</p>
               )}
               {(trendValue || previousValue) && (
-                <div className="flex items-center gap-2 pt-0.5">
+                <motion.div 
+                  className="flex items-center gap-2 pt-0.5"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: delay + 0.3 }}
+                >
                   {trendValue && (
                     <div className={`flex items-center gap-1 text-xs font-semibold ${
                       trend === 'up' ? 'text-emerald-500' : 
@@ -73,12 +166,16 @@ const MetricCard = ({
                       vs {previousValue}
                     </span>
                   )}
-                </div>
+                </motion.div>
               )}
             </div>
-            <div className={`p-2.5 rounded-xl ${colorClasses[accentColor]} transition-transform duration-200 group-hover:scale-110`}>
-              <Icon className="h-4 w-4" />
-            </div>
+            <motion.div 
+              className={`p-3 rounded-xl ${colors.bg} ${colors.text}`}
+              whileHover={{ rotate: 10, scale: 1.1 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              <Icon className="h-5 w-5" />
+            </motion.div>
           </div>
         </CardContent>
       </Card>
@@ -92,9 +189,22 @@ export const MetricsGrid = ({ metrics, isLoading }: MetricsGridProps) => {
       <div className="space-y-4">
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
           {[...Array(6)].map((_, i) => (
-            <Card key={i} className="glass-card animate-pulse">
-              <CardContent className="p-4 h-24" />
-            </Card>
+            <motion.div
+              key={i}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: i * 0.05 }}
+            >
+              <Card className="glass-card">
+                <CardContent className="p-4 h-24">
+                  <div className="animate-pulse space-y-3">
+                    <div className="h-3 bg-muted rounded w-20" />
+                    <div className="h-6 bg-muted rounded w-16" />
+                    <div className="h-2 bg-muted rounded w-24" />
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
           ))}
         </div>
       </div>
@@ -127,53 +237,68 @@ export const MetricsGrid = ({ metrics, isLoading }: MetricsGridProps) => {
     : 0;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Primary metrics - 3 columns */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      <motion.div 
+        className="grid grid-cols-2 lg:grid-cols-3 gap-3"
+        initial="hidden"
+        animate="visible"
+        variants={{
+          visible: { transition: { staggerChildren: 0.08 } }
+        }}
+      >
         <MetricCard
           title="Total Conversations"
-          value={metrics.totalConversations.toLocaleString()}
+          numericValue={metrics.totalConversations}
           subValue={`${metrics.conversationsToday} aujourd'hui`}
           icon={MessageSquare}
           trend={getTrend(metrics.conversationsTrend)}
           trendValue={metrics.conversationsTrend !== 0 ? formatTrendValue(metrics.conversationsTrend) : undefined}
-          accentColor="primary"
+          accentColor="blue"
           delay={0}
+          isImportant={true}
         />
         <MetricCard
           title="Cette Semaine"
-          value={metrics.conversationsThisWeek.toLocaleString()}
+          numericValue={metrics.conversationsThisWeek}
           subValue="7 derniers jours"
           icon={TrendingUp}
           accentColor="emerald"
-          delay={0.05}
+          delay={0.08}
+          isImportant={metrics.conversationsThisWeek > 100}
         />
         <MetricCard
           title="Satisfaction"
-          value={metrics.avgSatisfaction > 0 ? `${metrics.avgSatisfaction.toFixed(1)}/5` : 'N/A'}
+          numericValue={metrics.avgSatisfaction}
+          suffix="/5"
+          decimals={1}
           subValue="score moyen"
           icon={Star}
           trend={metrics.avgSatisfaction >= 4 ? 'up' : metrics.avgSatisfaction >= 3 ? 'neutral' : 'down'}
           accentColor="amber"
-          delay={0.1}
+          delay={0.16}
+          isImportant={true}
         />
         <MetricCard
           title="Taux Résolution"
-          value={`${metrics.resolutionRate}%`}
+          numericValue={metrics.resolutionRate}
+          suffix="%"
           subValue={`${metrics.resolvedConversations} résolues`}
           icon={CheckCircle}
           trend={metrics.resolutionRate >= 80 ? 'up' : metrics.resolutionRate >= 60 ? 'neutral' : 'down'}
           accentColor="emerald"
-          delay={0.15}
+          delay={0.24}
+          isImportant={metrics.resolutionRate >= 80}
         />
         <MetricCard
           title="Sentiment Positif"
-          value={`${positivePercent}%`}
+          numericValue={positivePercent}
+          suffix="%"
           subValue={`${metrics.sentimentBreakdown.positive} positifs`}
           icon={Smile}
           trend={positivePercent >= 60 ? 'up' : positivePercent >= 40 ? 'neutral' : 'down'}
           accentColor="cyan"
-          delay={0.2}
+          delay={0.32}
         />
         <MetricCard
           title="Durée Moyenne"
@@ -181,47 +306,58 @@ export const MetricsGrid = ({ metrics, isLoading }: MetricsGridProps) => {
           subValue="par conversation"
           icon={Clock}
           accentColor="purple"
-          delay={0.25}
+          delay={0.40}
         />
-      </div>
+      </motion.div>
 
       {/* Secondary metrics - 4 columns on larger screens */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <motion.div 
+        className="grid grid-cols-2 lg:grid-cols-4 gap-3"
+        initial="hidden"
+        animate="visible"
+        variants={{
+          visible: { transition: { staggerChildren: 0.06, delayChildren: 0.5 } }
+        }}
+      >
         <MetricCard
           title="Clients Actifs"
-          value={metrics.activeClients}
+          numericValue={metrics.activeClients}
           subValue="comptes actifs"
           icon={Users}
-          delay={0.3}
+          accentColor="orange"
+          delay={0.48}
         />
         <MetricCard
           title="Agents IA"
-          value={metrics.totalAgents}
+          numericValue={metrics.totalAgents}
           subValue="configurés"
           icon={Bot}
           accentColor="purple"
-          delay={0.35}
+          delay={0.56}
         />
         <MetricCard
           title="Utilisateurs"
-          value={metrics.uniqueUsers}
+          numericValue={metrics.uniqueUsers}
           subValue="cette semaine"
           icon={UserCheck}
           trend={getTrend(metrics.usersTrend)}
           trendValue={metrics.usersTrend !== 0 ? formatTrendValue(metrics.usersTrend) : undefined}
           accentColor="cyan"
-          delay={0.4}
+          delay={0.64}
         />
         <MetricCard
           title="Score Qualité"
-          value={metrics.qualityScore > 0 ? `${metrics.qualityScore}%` : 'N/A'}
+          numericValue={metrics.qualityScore > 0 ? metrics.qualityScore : 0}
+          suffix={metrics.qualityScore > 0 ? "%" : ""}
+          value={metrics.qualityScore <= 0 ? "N/A" : undefined}
           subValue="performance IA"
           icon={Activity}
           trend={metrics.qualityScore >= 80 ? 'up' : metrics.qualityScore >= 60 ? 'neutral' : 'down'}
           accentColor="pink"
-          delay={0.45}
+          delay={0.72}
+          isImportant={metrics.qualityScore >= 80}
         />
-      </div>
+      </motion.div>
     </div>
   );
 };
