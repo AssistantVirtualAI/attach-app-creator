@@ -4,28 +4,26 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Search, Plus, RefreshCw, BookOpen, FileText, Trash2, Link2, AlertCircle, CheckCircle2, Bot, File, Upload } from 'lucide-react';
+import { Search, Plus, RefreshCw, BookOpen, FileText, Trash2, Link2, AlertCircle, CheckCircle2, Bot, File, Eye } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { 
   useElevenLabsKnowledgeBase, 
-  useAddKnowledgeBaseItem,
   useDeleteKnowledgeBaseItem,
   type ElevenLabsKBItem
 } from '@/hooks/useElevenLabsKnowledgeBase';
 import { useElevenLabsAgents } from '@/hooks/useElevenLabsAgents';
 import { useQueryClient } from '@tanstack/react-query';
+import { KnowledgeDocumentViewer } from '@/components/knowledge/KnowledgeDocumentViewer';
+import { AddKnowledgeDocumentModal } from '@/components/knowledge/AddKnowledgeDocumentModal';
 
 const KnowledgeBase = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newContent, setNewContent] = useState('');
-  const [newCategory, setNewCategory] = useState('Général');
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<ElevenLabsKBItem | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -47,7 +45,6 @@ const KnowledgeBase = () => {
     refetch 
   } = useElevenLabsKnowledgeBase(selectedAgentId, apiKey);
 
-  const addMutation = useAddKnowledgeBaseItem();
   const deleteMutation = useDeleteKnowledgeBaseItem();
 
   const items = kbData?.knowledge_base?.items || [];
@@ -62,21 +59,9 @@ const KnowledgeBase = () => {
     );
   }, [items, searchTerm]);
 
-  const handleAddItem = async () => {
-    if (!selectedAgentId || !newTitle || !newContent) return;
-
-    await addMutation.mutateAsync({
-      agentId: selectedAgentId,
-      apiKey: apiKey || undefined,
-      title: newTitle,
-      content: newContent,
-      category: newCategory
-    });
-
-    setNewTitle('');
-    setNewContent('');
-    setNewCategory('Général');
-    setIsAddDialogOpen(false);
+  const handleViewDocument = (item: ElevenLabsKBItem) => {
+    setSelectedDocument(item);
+    setViewerOpen(true);
   };
 
   const handleDeleteItem = async (item: ElevenLabsKBItem) => {
@@ -200,65 +185,13 @@ const KnowledgeBase = () => {
                 Rafraîchir
               </Button>
 
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-primary hover:bg-primary/90">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Ajouter
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="bg-background border-border">
-                  <DialogHeader>
-                    <DialogTitle>Ajouter un document</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 pt-4">
-                    <div>
-                      <Label>Titre</Label>
-                      <Input
-                        value={newTitle}
-                        onChange={(e) => setNewTitle(e.target.value)}
-                        placeholder="Ex: FAQ Produits"
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label>Catégorie</Label>
-                      <Select value={newCategory} onValueChange={setNewCategory}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Général">Général</SelectItem>
-                          <SelectItem value="FAQ">FAQ</SelectItem>
-                          <SelectItem value="Produits">Produits</SelectItem>
-                          <SelectItem value="Services">Services</SelectItem>
-                          <SelectItem value="Politiques">Politiques</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Contenu</Label>
-                      <Textarea
-                        value={newContent}
-                        onChange={(e) => setNewContent(e.target.value)}
-                        placeholder="Contenu du document..."
-                        className="mt-1 min-h-[200px]"
-                      />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                        Annuler
-                      </Button>
-                      <Button 
-                        onClick={handleAddItem}
-                        disabled={!newTitle || !newContent || addMutation.isPending}
-                      >
-                        {addMutation.isPending ? 'Ajout...' : 'Ajouter'}
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
+              <Button 
+                className="bg-primary hover:bg-primary/90"
+                onClick={() => setIsAddDialogOpen(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Ajouter
+              </Button>
             </div>
           </div>
         )}
@@ -365,7 +298,15 @@ const KnowledgeBase = () => {
                           </Badge>
                         )}
 
-                        <div className="flex items-center justify-end pt-2 border-t border-border">
+                        <div className="flex items-center justify-end gap-1 pt-2 border-t border-border">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewDocument(item)}
+                            className="text-primary hover:text-primary hover:bg-primary/10"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -406,6 +347,23 @@ const KnowledgeBase = () => {
           </div>
         )}
       </div>
+
+      {/* Document Viewer Modal */}
+      <KnowledgeDocumentViewer 
+        document={selectedDocument} 
+        open={viewerOpen} 
+        onOpenChange={setViewerOpen} 
+      />
+
+      {/* Add Document Modal */}
+      {selectedAgentId && (
+        <AddKnowledgeDocumentModal
+          open={isAddDialogOpen}
+          onOpenChange={setIsAddDialogOpen}
+          agentId={selectedAgentId}
+          apiKey={apiKey || undefined}
+        />
+      )}
     </AppLayout>
   );
 };
