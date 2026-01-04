@@ -105,13 +105,13 @@ export default function Agents() {
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 border-0 shadow-lg shadow-purple-500/25">
+              <Button className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 border-0 shadow-lg">
                 <Plus className="mr-2 h-4 w-4" />
                 Nouvel agent
                 <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-slate-900 border-slate-700">
+            <DropdownMenuContent align="end" className="bg-popover border-border">
               <DropdownMenuItem onClick={() => setIsModalOpen(true)}>
                 <Settings className="mr-2 h-4 w-4" />
                 Via intégration
@@ -127,10 +127,10 @@ export default function Agents() {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[
-            { label: 'Total agents', value: agents?.length || 0, icon: Bot, gradient: 'from-blue-500 to-cyan-500' },
-            { label: 'ElevenLabs', value: agents?.filter(a => a.platform === 'elevenlabs').length || 0, icon: Zap, gradient: 'from-purple-500 to-pink-500' },
-            { label: 'Avec clients', value: agents?.filter(a => a.client).length || 0, icon: TrendingUp, gradient: 'from-green-500 to-emerald-500' },
-            { label: 'Ce mois', value: agents?.filter(a => new Date(a.created_at).getMonth() === new Date().getMonth()).length || 0, icon: Plus, gradient: 'from-orange-500 to-amber-500' },
+            { label: 'Total agents', value: agents?.length || 0, icon: Bot, gradient: 'from-primary to-secondary' },
+            { label: 'ElevenLabs', value: agents?.filter(a => a.platform === 'elevenlabs').length || 0, icon: Zap, gradient: 'from-secondary to-accent' },
+            { label: 'Avec clients', value: agents?.filter(a => a.client).length || 0, icon: TrendingUp, gradient: 'from-success to-neon-green' },
+            { label: 'Ce mois', value: agents?.filter(a => new Date(a.created_at).getMonth() === new Date().getMonth()).length || 0, icon: Plus, gradient: 'from-warning to-sunset-orange' },
           ].map((stat, index) => (
             <motion.div
               key={stat.label}
@@ -138,16 +138,16 @@ export default function Agents() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
             >
-              <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-slate-900/80 to-slate-800/80 backdrop-blur-xl">
+              <Card className="relative overflow-hidden border border-border bg-card">
                 <div className={`absolute inset-0 bg-gradient-to-r ${stat.gradient} opacity-10`} />
                 <CardContent className="p-4 relative">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-slate-400">{stat.label}</p>
-                      <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
+                      <p className="text-sm text-muted-foreground">{stat.label}</p>
+                      <p className="text-2xl font-bold text-foreground mt-1">{stat.value}</p>
                     </div>
                     <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg`}>
-                      <stat.icon className="h-5 w-5 text-white" />
+                      <stat.icon className="h-5 w-5 text-primary-foreground" />
                     </div>
                   </div>
                 </CardContent>
@@ -164,15 +164,15 @@ export default function Agents() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
             >
-              <Card className="border-0 bg-gradient-to-br from-slate-900/80 to-slate-800/80 backdrop-blur-xl">
+              <Card className="border border-border bg-card">
                 <CardContent className="p-4">
                   <div className="relative max-w-md">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Rechercher par nom ou plateforme..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 bg-slate-800/50 border-slate-700 focus:border-purple-500"
+                      className="pl-10 bg-muted/50 border-border focus:border-primary"
                     />
                   </div>
                 </CardContent>

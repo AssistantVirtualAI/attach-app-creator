@@ -38,7 +38,7 @@ export function PortalPageHeader({
           <Icon className="h-6 w-6 text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">{title}</h1>
+          <h1 className="text-2xl font-bold text-foreground">{title}</h1>
           {description && (
             <p className="text-muted-foreground mt-0.5">{description}</p>
           )}

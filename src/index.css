@@ -79,13 +79,13 @@ All colors MUST be HSL.
 
   .dark {
     --background: 240 6% 10%;
-    --foreground: 0 0% 100%;
+    --foreground: 0 0% 98%;
 
-    --card: 240 6% 12%;
-    --card-foreground: 0 0% 98%;
+    --card: 240 6% 13%;
+    --card-foreground: 0 0% 96%;
 
-    --popover: 240 6% 12%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 240 6% 14%;
+    --popover-foreground: 0 0% 96%;
 
     --primary: 231 100% 60%;
     --primary-foreground: 0 0% 100%;
@@ -105,8 +105,8 @@ All colors MUST be HSL.
     --neon-green: 145 85% 55%;
     --sunset-orange: 25 100% 60%;
 
-    --muted: 218 11% 20%;
-    --muted-foreground: 218 11% 65%;
+    --muted: 218 11% 18%;
+    --muted-foreground: 218 15% 75%;
 
     --destructive: 3 89% 55%;
     --destructive-foreground: 0 0% 100%;
@@ -117,8 +117,8 @@ All colors MUST be HSL.
     --warning: 45 100% 51%;
     --warning-foreground: 0 0% 0%;
 
-    --border: 218 11% 25%;
-    --input: 218 11% 25%;
+    --border: 218 11% 28%;
+    --input: 218 11% 28%;
     --ring: 231 100% 55%;
 
     --gradient-primary: linear-gradient(135deg, hsl(231, 100%, 55%), hsl(328, 86%, 70%));
@@ -135,14 +135,14 @@ All colors MUST be HSL.
     
     --transition-smooth: all 150ms ease-in-out;
 
-    /* Sidebar Dark */
-    --sidebar-background: 240 6% 8%;
-    --sidebar-foreground: 240 5% 65%;
-    --sidebar-primary: 231 100% 55%;
+    /* Sidebar Dark - Improved visibility */
+    --sidebar-background: 240 6% 9%;
+    --sidebar-foreground: 0 0% 88%;
+    --sidebar-primary: 231 100% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 218 11% 15%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 218 11% 20%;
+    --sidebar-accent: 218 11% 18%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 218 11% 25%;
     --sidebar-ring: 231 100% 55%;
   }
 }

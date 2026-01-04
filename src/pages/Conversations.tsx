@@ -117,10 +117,10 @@ const Conversations = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[
-            { label: 'Total', value: data?.total || 0, icon: MessageCircle, gradient: 'from-blue-500 to-cyan-500' },
-            { label: 'Agents actifs', value: data?.agents?.length || 0, icon: User, gradient: 'from-purple-500 to-pink-500' },
-            { label: 'Positives', value: data?.conversations?.filter((c: any) => c.analysis?.sentiment === 'positive').length || 0, icon: TrendingUp, gradient: 'from-green-500 to-emerald-500' },
-            { label: 'Durée moy.', value: data?.conversations?.length ? formatDuration(Math.round(data.conversations.reduce((acc: number, c: any) => acc + (c.call_duration_secs || c.duration || 0), 0) / data.conversations.length)) : '0m', icon: Phone, gradient: 'from-orange-500 to-amber-500' },
+            { label: 'Total', value: data?.total || 0, icon: MessageCircle, gradient: 'from-primary to-secondary' },
+            { label: 'Agents actifs', value: data?.agents?.length || 0, icon: User, gradient: 'from-secondary to-accent' },
+            { label: 'Positives', value: data?.conversations?.filter((c: any) => c.analysis?.sentiment === 'positive').length || 0, icon: TrendingUp, gradient: 'from-success to-neon-green' },
+            { label: 'Durée moy.', value: data?.conversations?.length ? formatDuration(Math.round(data.conversations.reduce((acc: number, c: any) => acc + (c.call_duration_secs || c.duration || 0), 0) / data.conversations.length)) : '0m', icon: Phone, gradient: 'from-warning to-sunset-orange' },
           ].map((stat, index) => (
             <motion.div
               key={stat.label}
@@ -128,16 +128,16 @@ const Conversations = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
             >
-              <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-slate-900/80 to-slate-800/80 backdrop-blur-xl">
+              <Card className="relative overflow-hidden border border-border bg-card">
                 <div className={`absolute inset-0 bg-gradient-to-r ${stat.gradient} opacity-10`} />
                 <CardContent className="p-4 relative">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-slate-400">{stat.label}</p>
-                      <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
+                      <p className="text-sm text-muted-foreground">{stat.label}</p>
+                      <p className="text-2xl font-bold text-foreground mt-1">{stat.value}</p>
                     </div>
                     <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg`}>
-                      <stat.icon className="h-5 w-5 text-white" />
+                      <stat.icon className="h-5 w-5 text-primary-foreground" />
                     </div>
                   </div>
                 </CardContent>
@@ -152,7 +152,7 @@ const Conversations = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          <Card className="border-0 bg-gradient-to-br from-slate-900/80 to-slate-800/80 backdrop-blur-xl">
+          <Card className="border border-border bg-card">
             <CardContent className="p-4">
               <ConversationFilters
                 filters={filters}
@@ -173,25 +173,25 @@ const Conversations = () => {
         >
           {isLoading ? (
             Array.from({ length: 5 }).map((_, i) => (
-              <Card key={i} className="border-0 bg-gradient-to-br from-slate-900/80 to-slate-800/80">
+              <Card key={i} className="border border-border bg-card">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-4">
-                    <Skeleton className="w-12 h-12 rounded-full bg-slate-700" />
+                    <Skeleton className="w-12 h-12 rounded-full bg-muted" />
                     <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-48 bg-slate-700" />
-                      <Skeleton className="h-3 w-32 bg-slate-700" />
+                      <Skeleton className="h-4 w-48 bg-muted" />
+                      <Skeleton className="h-3 w-32 bg-muted" />
                     </div>
-                    <Skeleton className="h-8 w-20 bg-slate-700" />
+                    <Skeleton className="h-8 w-20 bg-muted" />
                   </div>
                 </CardContent>
               </Card>
             ))
           ) : data?.conversations?.length === 0 ? (
-            <Card className="border-0 bg-gradient-to-br from-slate-900/80 to-slate-800/80">
+            <Card className="border border-border bg-card">
               <CardContent className="p-12 text-center">
-                <MessageCircle className="h-12 w-12 text-slate-600 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">Aucune conversation</h3>
-                <p className="text-slate-400">Les conversations apparaîtront ici une fois que vos agents auront des interactions.</p>
+                <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">Aucune conversation</h3>
+                <p className="text-muted-foreground">Les conversations apparaîtront ici une fois que vos agents auront des interactions.</p>
               </CardContent>
             </Card>
           ) : (
@@ -209,7 +209,7 @@ const Conversations = () => {
                   transition={{ delay: index * 0.05 }}
                 >
                   <Card 
-                    className="group cursor-pointer border-0 bg-gradient-to-br from-slate-900/80 to-slate-800/80 hover:from-slate-800/90 hover:to-slate-700/90 transition-all duration-300 hover:shadow-[0_0_30px_rgba(139,92,246,0.15)]"
+                    className="group cursor-pointer border border-border bg-card hover:bg-muted/50 transition-all duration-300 hover:shadow-lg hover:border-primary/30"
                     onClick={() => setSelectedConversation({
                       id: conversation.conversation_id,
                       agentName: conversation.agent_name,
@@ -220,24 +220,24 @@ const Conversations = () => {
                       <div className="flex items-center gap-4">
                         {/* Avatar */}
                         <div className="relative">
-                          <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur opacity-40 group-hover:opacity-60 transition-opacity" />
-                          <div className="relative w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-                            <User className="h-6 w-6 text-white" />
+                          <div className="absolute inset-0 bg-gradient-to-r from-primary to-secondary rounded-full blur opacity-40 group-hover:opacity-60 transition-opacity" />
+                          <div className="relative w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center">
+                            <User className="h-6 w-6 text-primary-foreground" />
                           </div>
                         </div>
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold text-white">
+                            <h3 className="text-lg font-semibold text-foreground">
                               Conversation {conversation.conversation_id.substring(0, 8)}
                             </h3>
-                            <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">
+                            <Badge className="bg-primary/20 text-primary border-primary/30">
                               {conversation.agent_name}
                             </Badge>
                           </div>
 
-                          <div className="flex items-center gap-6 text-sm text-slate-400">
+                          <div className="flex items-center gap-6 text-sm text-muted-foreground">
                             <div className="flex items-center gap-2">
                               <Clock className="w-4 h-4" />
                               {formatDuration(duration)}
@@ -253,7 +253,7 @@ const Conversations = () => {
                           </div>
 
                           {conversation.analysis?.summary && (
-                            <p className="mt-2 text-sm text-slate-400 line-clamp-2">
+                            <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
                               {conversation.analysis.summary}
                             </p>
                           )}
@@ -270,7 +270,7 @@ const Conversations = () => {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 rounded-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300"
+                              className="h-8 w-8 rounded-full bg-primary/20 hover:bg-primary/30 text-primary"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <Play className="h-4 w-4" />
@@ -278,7 +278,7 @@ const Conversations = () => {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 rounded-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-300"
+                              className="h-8 w-8 rounded-full bg-secondary/20 hover:bg-secondary/30 text-secondary"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <Sparkles className="h-4 w-4" />
@@ -303,7 +303,7 @@ const Conversations = () => {
             className="flex items-center justify-between"
           >
             <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-400">Afficher</span>
+              <span className="text-sm text-muted-foreground">Afficher</span>
               <Select 
                 value={pageSize.toString()} 
                 onValueChange={(v) => {
@@ -311,7 +311,7 @@ const Conversations = () => {
                   setPage(1);
                 }}
               >
-                <SelectTrigger className="w-20 bg-slate-800/50 border-slate-700">
+                <SelectTrigger className="w-20 bg-muted/50 border-border">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -320,7 +320,7 @@ const Conversations = () => {
                   <SelectItem value="100">100</SelectItem>
                 </SelectContent>
               </Select>
-              <span className="text-sm text-slate-400">par page</span>
+              <span className="text-sm text-muted-foreground">par page</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -329,11 +329,11 @@ const Conversations = () => {
                 size="icon"
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="border-purple-500/30 hover:bg-purple-500/20"
+                className="border-primary/30 hover:bg-primary/20"
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <span className="text-sm text-slate-300 px-3">
+              <span className="text-sm text-foreground px-3">
                 Page {page} sur {data.totalPages}
               </span>
               <Button 
@@ -341,7 +341,7 @@ const Conversations = () => {
                 size="icon"
                 onClick={() => setPage(p => Math.min(data.totalPages, p + 1))}
                 disabled={page === data.totalPages}
-                className="border-purple-500/30 hover:bg-purple-500/20"
+                className="border-primary/30 hover:bg-primary/20"
               >
                 <ChevronRight className="w-4 h-4" />
               </Button>

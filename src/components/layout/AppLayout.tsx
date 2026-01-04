@@ -44,41 +44,41 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const SettingsIcon = settingsLink.icon;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950/20 to-slate-950">
+    <div className="min-h-screen bg-background">
       {/* Mobile Header with Hamburger */}
-      <header className="fixed top-0 left-0 right-0 h-14 bg-gradient-to-r from-slate-900/95 via-purple-950/80 to-slate-900/95 backdrop-blur-xl border-b border-purple-500/20 z-40 flex items-center px-4 md:hidden">
+      <header className="fixed top-0 left-0 right-0 h-14 bg-card/95 backdrop-blur-xl border-b border-border z-40 flex items-center px-4 md:hidden">
         <button
           onClick={() => setIsSidebarOpen(true)}
-          className="p-2 rounded-lg hover:bg-purple-500/20 transition-colors"
+          className="p-2 rounded-lg hover:bg-muted transition-colors"
         >
-          <Menu className="w-6 h-6 text-purple-300" />
+          <Menu className="w-6 h-6 text-foreground" />
         </button>
         <Link to="/" className="flex items-center gap-2 ml-3">
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-lg blur-sm opacity-60" />
-            <div className="relative w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-white" />
+            <div className="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-accent rounded-lg blur-sm opacity-60" />
+            <div className="relative w-8 h-8 rounded-lg bg-gradient-to-br from-primary via-secondary to-accent flex items-center justify-center">
+              <BarChart3 className="w-5 h-5 text-primary-foreground" />
             </div>
           </div>
-          <span className="font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">AVA Statistics</span>
+          <span className="font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">AVA Statistics</span>
         </Link>
       </header>
 
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed left-0 top-0 h-screen w-72 bg-gradient-to-b from-slate-900 via-purple-950/30 to-slate-900 backdrop-blur-xl border-r border-purple-500/20 z-50 transition-transform duration-300 ease-in-out ${
+      <aside className={`fixed left-0 top-0 h-screen w-72 bg-sidebar backdrop-blur-xl border-r border-sidebar-border z-50 transition-transform duration-300 ease-in-out ${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } md:translate-x-0`}>
         <div className="flex flex-col h-full">
           {/* Logo - AVA Statistics */}
-          <div className="p-6 border-b border-purple-500/20 flex items-center justify-between">
+          <div className="p-6 border-b border-sidebar-border flex items-center justify-between">
             <Link to="/" className="flex items-center gap-3" onClick={() => setIsSidebarOpen(false)}>
               <motion.div 
                 className="relative"
@@ -86,7 +86,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                 transition={{ type: "spring", stiffness: 400 }}
               >
                 <motion.div 
-                  className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-xl blur-lg opacity-60"
+                  className="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-accent rounded-xl blur-lg opacity-60"
                   animate={{ 
                     opacity: [0.4, 0.7, 0.4],
                     scale: [1, 1.1, 1]
@@ -97,27 +97,27 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                     ease: "easeInOut"
                   }}
                 />
-                <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center shadow-xl">
-                  <BarChart3 className="w-6 h-6 text-white" />
+                <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-primary via-secondary to-accent flex items-center justify-center shadow-xl">
+                  <BarChart3 className="w-6 h-6 text-primary-foreground" />
                 </div>
               </motion.div>
               <div className="flex flex-col">
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">AVA Statistics</h1>
-                <span className="text-xs text-purple-300/60">Analytics Platform</span>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">AVA Statistics</h1>
+                <span className="text-xs text-muted-foreground">Analytics Platform</span>
               </div>
             </Link>
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="p-2 rounded-lg hover:bg-purple-500/20 transition-colors md:hidden"
+              className="p-2 rounded-lg hover:bg-muted transition-colors md:hidden"
             >
-              <X className="w-5 h-5 text-purple-300" />
+              <X className="w-5 h-5 text-foreground" />
             </button>
           </div>
 
           {/* Role Badge & Theme Toggle */}
-          <div className="px-4 py-3 border-b border-purple-500/20 flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-sidebar-border flex items-center justify-between">
             {role && (
-              <Badge variant="outline" className="text-xs border-purple-500/30 bg-purple-500/10 text-purple-300">
+              <Badge variant="outline" className="text-xs border-primary/40 bg-primary/10 text-foreground font-medium">
                 {isSuperAdmin ? '👑 Super Admin' : 
                  role === 'org_admin' ? '🔑 Admin' :
                  role === 'manager' ? '👨‍💼 Manager' :
@@ -128,12 +128,12 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
               variant="ghost"
               size="icon"
               onClick={toggleTheme}
-              className="h-8 w-8 hover:bg-purple-500/20"
+              className="h-8 w-8 hover:bg-muted"
             >
               {theme === 'dark' ? (
-                <Sun className="w-4 h-4 text-yellow-400" />
+                <Sun className="w-4 h-4 text-warning" />
               ) : (
-                <Moon className="w-4 h-4 text-purple-400" />
+                <Moon className="w-4 h-4 text-primary" />
               )}
             </Button>
           </div>
@@ -154,8 +154,8 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
               onClick={() => setIsSidebarOpen(false)}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 mt-4 ${
                 isSettingsActive
-                  ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 shadow-[0_0_20px_rgba(139,92,246,0.2)]'
-                  : 'text-slate-400 hover:text-purple-300 hover:bg-purple-500/10 hover:translate-x-1'
+                  ? 'bg-primary/15 text-foreground shadow-md border border-primary/30'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted hover:translate-x-1'
               }`}
             >
               <SettingsIcon className="w-5 h-5" />

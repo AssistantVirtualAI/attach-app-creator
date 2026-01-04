@@ -57,14 +57,14 @@ export const SidebarNavGroup = ({ group, onNavigate }: SidebarNavGroupProps) => 
     <Collapsible open={isOpen} onOpenChange={handleOpenChange}>
       <CollapsibleTrigger className={`flex items-center justify-between w-full px-4 py-3 rounded-xl transition-all duration-300 ${
         isActiveGroup 
-          ? 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300' 
-          : 'text-slate-400 hover:text-purple-300 hover:bg-purple-500/10'
+          ? 'bg-primary/15 text-foreground border border-primary/30' 
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted'
       }`}>
         <div className="flex items-center gap-3">
           <div className={`p-1.5 rounded-lg transition-all duration-300 ${
             isActiveGroup 
-              ? 'bg-gradient-to-br from-purple-500/30 to-pink-500/30 shadow-[0_0_10px_rgba(139,92,246,0.3)]' 
-              : 'bg-slate-800/50'
+              ? 'bg-primary/20 shadow-sm' 
+              : 'bg-muted'
           }`}>
             <Icon className="w-4 h-4" />
           </div>
@@ -97,8 +97,8 @@ export const SidebarNavGroup = ({ group, onNavigate }: SidebarNavGroupProps) => 
                     onClick={onNavigate}
                     className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-300 border-l-2 ml-2 ${
                       isActive
-                        ? 'bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 text-white font-medium shadow-[0_0_15px_rgba(139,92,246,0.25)] border-l-purple-500'
-                        : 'text-slate-400 hover:text-purple-300 hover:bg-purple-500/10 hover:translate-x-1 border-l-purple-500/20'
+                        ? 'bg-primary/15 text-foreground font-medium shadow-sm border-l-primary'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted hover:translate-x-1 border-l-border'
                     }`}
                   >
                     <ItemIcon className="w-4 h-4" />
