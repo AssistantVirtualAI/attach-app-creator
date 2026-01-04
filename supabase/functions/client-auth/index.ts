@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
+import bcrypt from "https://esm.sh/bcryptjs@2.4.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -70,7 +70,7 @@ serve(async (req) => {
         }
 
         // Verify password with bcrypt
-        const passwordMatch = await bcrypt.compare(password, client.password_hash);
+        const passwordMatch = bcrypt.compareSync(password, client.password_hash);
         
         if (!passwordMatch) {
           return new Response(
@@ -156,7 +156,7 @@ serve(async (req) => {
         }
 
         // Verify password with bcrypt
-        const passwordMatch = await bcrypt.compare(password, client.password_hash);
+        const passwordMatch = bcrypt.compareSync(password, client.password_hash);
         
         if (!passwordMatch) {
           return new Response(
@@ -229,8 +229,8 @@ serve(async (req) => {
         }
 
         // Hash the password
-        const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(password, salt);
+        const salt = bcrypt.genSaltSync(10);
+        const passwordHash = bcrypt.hashSync(password, salt);
 
         // Update client password
         const { error: updateError } = await supabase
@@ -398,8 +398,8 @@ serve(async (req) => {
         }
 
         // Hash the new password
-        const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(new_password, salt);
+        const salt = bcrypt.genSaltSync(10);
+        const passwordHash = bcrypt.hashSync(new_password, salt);
 
         // Update client password and clear reset token
         const { error: updateError } = await supabase
