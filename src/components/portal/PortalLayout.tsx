@@ -11,14 +11,18 @@ import {
   BookOpen, 
   Settings,
   FileCode,
-  Loader2
+  Loader2,
+  ArrowLeft,
+  Crown,
+  Sparkles,
+  Brain
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AvaLogo } from '@/components/portal/AvaLogo';
 import { GlowBadge } from '@/components/portal/GlowBadge';
 
 const PortalLayoutContent = () => {
-  const { isAuthenticated, isLoading, session, logout, hasEditAccess } = usePortal();
+  const { isAuthenticated, isLoading, session, logout, hasEditAccess, isSuperAdmin } = usePortal();
   const { agentSlug } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,21 +57,30 @@ const PortalLayoutContent = () => {
     return null;
   }
 
+  const isSuperAdminSession = session.role === 'super_admin' || session.isSuperAdmin;
+
+  // All navigation items - super admin sees everything
   const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: `/portal/${agentSlug}/dashboard`, color: 'text-blue-400' },
     { icon: MessageSquare, label: 'Conversations', href: `/portal/${agentSlug}/conversations`, color: 'text-cyan-400' },
     { icon: BarChart3, label: 'Analytics', href: `/portal/${agentSlug}/analytics`, color: 'text-purple-400' },
+    { icon: Brain, label: 'Analyse IA', href: `/portal/${agentSlug}/ai-analysis`, color: 'text-pink-400' },
     { icon: BookOpen, label: 'Base de connaissances', href: `/portal/${agentSlug}/knowledge`, color: 'text-green-400' },
     { icon: FileCode, label: 'Prompt & Endpoints', href: `/portal/${agentSlug}/prompt`, color: 'text-orange-400' },
   ];
 
-  if (hasEditAccess()) {
+  // Add settings for admins and super admins
+  if (hasEditAccess() || isSuperAdminSession) {
     navItems.push({ icon: Settings, label: 'Configuration', href: `/portal/${agentSlug}/settings`, color: 'text-pink-400' });
   }
 
   const handleLogout = () => {
     logout();
     navigate(`/portal/${agentSlug}`);
+  };
+
+  const handleBackToAdmin = () => {
+    navigate('/agents');
   };
 
   return (
@@ -92,21 +105,43 @@ const PortalLayoutContent = () => {
               <span className="font-bold text-lg bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent">
                 AVA Statistics
               </span>
-              <span className="text-xs text-muted-foreground block mt-0.5">Portail Client</span>
+              <span className="text-xs text-muted-foreground block mt-0.5">
+                {isSuperAdminSession ? 'Super Admin' : 'Portail Client'}
+              </span>
             </div>
           </div>
           
           {/* Agent info */}
           <div className="p-3 rounded-xl bg-muted/30 border border-border/30">
             <p className="font-medium truncate text-sm">{session.agentName}</p>
-            <div className="mt-2">
-              <GlowBadge 
-                variant={session.role === 'admin' ? 'admin' : 'viewer'}
-              >
-                {session.role === 'admin' ? 'Administrateur' : 'Lecture seule'}
-              </GlowBadge>
+            <div className="mt-2 flex items-center gap-2">
+              {isSuperAdminSession ? (
+                <GlowBadge variant="warning" className="flex items-center gap-1">
+                  <Crown className="h-3 w-3" />
+                  Super Admin
+                </GlowBadge>
+              ) : (
+                <GlowBadge 
+                  variant={session.role === 'admin' ? 'admin' : 'viewer'}
+                >
+                  {session.role === 'admin' ? 'Administrateur' : 'Lecture seule'}
+                </GlowBadge>
+              )}
             </div>
           </div>
+
+          {/* Super Admin: Back to Admin Dashboard */}
+          {isSuperAdminSession && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mt-3 gap-2 border-primary/30 text-primary hover:bg-primary/10"
+              onClick={handleBackToAdmin}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Retour à l'admin
+            </Button>
+          )}
         </div>
 
         {/* Navigation */}
@@ -138,6 +173,24 @@ const PortalLayoutContent = () => {
               );
             })}
           </nav>
+
+          {/* Super Admin Indicator */}
+          {isSuperAdminSession && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="mt-6 p-4 rounded-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="h-4 w-4 text-yellow-500" />
+                <span className="font-medium text-yellow-500 text-sm">Mode Super Admin</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Accès complet à toutes les fonctionnalités de l'agent.
+              </p>
+            </motion.div>
+          )}
         </ScrollArea>
 
         {/* Footer */}
