@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Activity, Mail, Lock, User, ArrowLeft, Chrome } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import {
   Dialog,
@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { AnimatedFeatures } from '@/components/auth/AnimatedFeatures';
 
 type AuthMode = 'login' | 'signup' | 'forgot' | 'reset';
 
@@ -33,7 +34,7 @@ const AuthPage = () => {
 
   useEffect(() => {
     if (user && mode !== 'reset') {
-      navigate('/');
+      navigate('/home');
     }
   }, [user, navigate, mode]);
 
@@ -52,7 +53,7 @@ const AuthPage = () => {
       if (mode === 'login') {
         const { error } = await signIn(email, password);
         if (!error) {
-          navigate('/');
+          navigate('/home');
         }
       } else if (mode === 'signup') {
         const { error } = await signUp(email, password, fullName);
@@ -65,7 +66,7 @@ const AuthPage = () => {
         }
         const { error } = await updatePassword(password);
         if (!error) {
-          navigate('/');
+          navigate('/home');
         }
       }
     } finally {
@@ -115,172 +116,231 @@ const AuthPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--gradient-hero)] cyber-grid flex items-center justify-center p-6">
-      <Card className="w-full max-w-md glass-card neon-border">
-        <CardHeader className="text-center space-y-4">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-neon">
-            <Activity className="w-8 h-8 text-white" />
-          </div>
-          <CardTitle className="text-3xl font-bold gradient-text">{getTitle()}</CardTitle>
-          <CardDescription className="text-base">{getDescription()}</CardDescription>
-        </CardHeader>
-
-        <CardContent className="space-y-6">
-          {/* Google OAuth Button */}
-          {(mode === 'login' || mode === 'signup') && (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-12 gap-3 bg-background/50 hover:bg-background/80 border-border/50"
-                onClick={handleGoogleLogin}
-                disabled={loading}
+    <div className="min-h-screen flex">
+      {/* Left side - Form */}
+      <motion.div 
+        initial={{ opacity: 0, x: -50 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full lg:w-[45%] flex items-center justify-center p-8 bg-background"
+      >
+        <div className="w-full max-w-md space-y-8">
+          {/* Logo */}
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-center"
+          >
+            <div className="inline-flex items-center gap-3 mb-8">
+              <motion.div 
+                whileHover={{ rotate: 10, scale: 1.1 }}
+                className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/25"
               >
-                <Chrome className="w-5 h-5" />
-                Continuer avec Google
-              </Button>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <Separator className="w-full" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">ou</span>
-                </div>
-              </div>
-            </>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'signup' && (
-              <div className="space-y-2">
-                <Label htmlFor="fullName" className="flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  Nom complet
-                </Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder="John Doe"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                  className="bg-background/50 h-11"
-                />
-              </div>
-            )}
-
-            {mode !== 'reset' && (
-              <div className="space-y-2">
-                <Label htmlFor="email" className="flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="vous@exemple.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="bg-background/50 h-11"
-                />
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="flex items-center gap-2">
-                <Lock className="w-4 h-4" />
-                {mode === 'reset' ? 'Nouveau mot de passe' : 'Mot de passe'}
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="bg-background/50 h-11"
-              />
+                <Activity className="w-7 h-7 text-white" />
+              </motion.div>
+              <span className="text-2xl font-bold">AVA Statistics</span>
             </div>
+            <h1 className="text-3xl font-bold mb-2">{getTitle()}</h1>
+            <p className="text-muted-foreground">{getDescription()}</p>
+          </motion.div>
 
-            {mode === 'reset' && (
+          {/* Form */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="space-y-6"
+          >
+            {/* Google OAuth Button */}
+            {(mode === 'login' || mode === 'signup') && (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12 gap-3 bg-card hover:bg-muted border-border"
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                >
+                  <Chrome className="w-5 h-5" />
+                  Continuer avec Google
+                </Button>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator className="w-full" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">ou</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {mode === 'signup' && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="space-y-2"
+                >
+                  <Label htmlFor="fullName" className="flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    Nom complet
+                  </Label>
+                  <Input
+                    id="fullName"
+                    type="text"
+                    placeholder="John Doe"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                    className="h-12 bg-card border-border focus:border-primary focus:ring-primary"
+                  />
+                </motion.div>
+              )}
+
+              {mode !== 'reset' && (
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="flex items-center gap-2">
+                    <Mail className="w-4 h-4" />
+                    Email
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="vous@exemple.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-12 bg-card border-border focus:border-primary focus:ring-primary"
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="flex items-center gap-2">
+                <Label htmlFor="password" className="flex items-center gap-2">
                   <Lock className="w-4 h-4" />
-                  Confirmer le mot de passe
+                  {mode === 'reset' ? 'Nouveau mot de passe' : 'Mot de passe'}
                 </Label>
                 <Input
-                  id="confirmPassword"
+                  id="password"
                   type="password"
                   placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
-                  className="bg-background/50 h-11"
+                  className="h-12 bg-card border-border focus:border-primary focus:ring-primary"
                 />
-                {password !== confirmPassword && confirmPassword && (
-                  <p className="text-sm text-destructive">Les mots de passe ne correspondent pas</p>
-                )}
               </div>
-            )}
 
-            {mode === 'login' && (
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  variant="link"
-                  className="text-sm text-muted-foreground hover:text-primary p-0 h-auto"
-                  onClick={() => setShowForgotDialog(true)}
+              {mode === 'reset' && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="space-y-2"
                 >
-                  Mot de passe oublié ?
-                </Button>
-              </div>
-            )}
+                  <Label htmlFor="confirmPassword" className="flex items-center gap-2">
+                    <Lock className="w-4 h-4" />
+                    Confirmer le mot de passe
+                  </Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    className="h-12 bg-card border-border focus:border-primary focus:ring-primary"
+                  />
+                  {password !== confirmPassword && confirmPassword && (
+                    <p className="text-sm text-destructive">Les mots de passe ne correspondent pas</p>
+                  )}
+                </motion.div>
+              )}
 
-            <Button
-              type="submit"
-              className="w-full h-12 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white shadow-neon"
-              disabled={loading || (mode === 'reset' && password !== confirmPassword)}
-            >
-              {loading ? 'Chargement...' : 
-                mode === 'login' ? 'Se connecter' : 
-                mode === 'signup' ? "S'inscrire" :
-                'Mettre à jour le mot de passe'}
-            </Button>
+              {mode === 'login' && (
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="text-sm text-muted-foreground hover:text-primary p-0 h-auto"
+                    onClick={() => setShowForgotDialog(true)}
+                  >
+                    Mot de passe oublié ?
+                  </Button>
+                </div>
+              )}
 
-            {mode !== 'reset' && (
-              <div className="text-center space-y-2">
-                <Button
-                  type="button"
-                  variant="link"
-                  onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-                  className="text-primary hover:text-primary-glow"
-                >
-                  {mode === 'login' ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
-                </Button>
-              </div>
-            )}
-
-            {mode === 'reset' && (
               <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setMode('login');
-                  navigate('/auth');
-                }}
-                className="w-full gap-2"
+                type="submit"
+                className="w-full h-12 bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white shadow-lg shadow-primary/25"
+                disabled={loading || (mode === 'reset' && password !== confirmPassword)}
               >
-                <ArrowLeft className="w-4 h-4" />
-                Retour à la connexion
+                {loading ? 'Chargement...' : 
+                  mode === 'login' ? 'Se connecter' : 
+                  mode === 'signup' ? "S'inscrire" :
+                  'Mettre à jour le mot de passe'}
               </Button>
-            )}
-          </form>
-        </CardContent>
-      </Card>
+
+              {mode !== 'reset' && (
+                <div className="text-center">
+                  <Button
+                    type="button"
+                    variant="link"
+                    onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+                    className="text-primary hover:text-primary/80"
+                  >
+                    {mode === 'login' ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
+                  </Button>
+                </div>
+              )}
+
+              {mode === 'reset' && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setMode('login');
+                    navigate('/auth');
+                  }}
+                  className="w-full gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Retour à la connexion
+                </Button>
+              )}
+            </form>
+          </motion.div>
+
+          {/* Footer links */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="text-center text-sm text-muted-foreground"
+          >
+            <p>
+              En continuant, vous acceptez nos{' '}
+              <a href="/legal" className="text-primary hover:underline">conditions d'utilisation</a>
+              {' '}et notre{' '}
+              <a href="/privacy" className="text-primary hover:underline">politique de confidentialité</a>
+            </p>
+          </motion.div>
+        </div>
+      </motion.div>
+
+      {/* Right side - Animated Features */}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.8 }}
+        className="hidden lg:block w-[55%] bg-gradient-to-br from-primary/90 via-secondary/90 to-accent/90 relative overflow-hidden"
+      >
+        <AnimatedFeatures />
+      </motion.div>
 
       {/* Forgot Password Dialog */}
       <Dialog open={showForgotDialog} onOpenChange={setShowForgotDialog}>
@@ -301,7 +361,7 @@ const AuthPage = () => {
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
                 required
-                className="bg-background/50"
+                className="bg-card"
               />
             </div>
             <div className="flex gap-3 justify-end">

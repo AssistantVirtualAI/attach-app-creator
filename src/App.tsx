@@ -9,7 +9,7 @@ import { OrganizationProvider } from "@/context/OrganizationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ClientProvider } from "@/context/ClientContext";
 
-import Index from "./pages/Index";
+import Landing from "./pages/Landing";
 import AuthPage from "./pages/Auth";
 import AgencyHome from "./pages/AgencyHome";
 import Dashboard from "./pages/Dashboard";
@@ -97,9 +97,13 @@ const App = () => (
           <OrganizationProvider>
             <Suspense fallback={<div>Loading...</div>}>
               <Routes>
+                {/* Public routes */}
+                <Route path="/" element={<Landing />} />
                 <Route path="/auth" element={<AuthPage />} />
+                
+                {/* Protected routes */}
                 <Route
-                  path="/"
+                  path="/home"
                   element={
                     <ProtectedRoute>
                       <AgencyHome />
