@@ -104,10 +104,10 @@ serve(async (req) => {
           );
         }
 
-        // Find agent by slug
+        // Find agent by slug with platform info
         const { data: agent, error: agentError } = await supabase
           .from("agents")
-          .select("id, name, slug, organization_id")
+          .select("id, name, slug, organization_id, platform, platform_agent_id")
           .eq("slug", agent_slug)
           .maybeSingle();
 
@@ -188,7 +188,22 @@ serve(async (req) => {
           );
         }
 
-        // Return portal session data
+        // Fetch API key from organization integration
+        let platformApiKey: string | null = null;
+        if (agent.platform && agent.organization_id) {
+          const { data: integration } = await supabase
+            .from("organization_integrations")
+            .select("api_key")
+            .eq("organization_id", agent.organization_id)
+            .eq("platform", agent.platform)
+            .eq("is_active", true)
+            .maybeSingle();
+          
+          platformApiKey = integration?.api_key || null;
+          console.log(`Found integration for platform ${agent.platform}: ${platformApiKey ? 'yes' : 'no'}`);
+        }
+
+        // Return portal session data with platform credentials
         const session = {
           clientId: client.id,
           clientName: client.name,
@@ -196,6 +211,8 @@ serve(async (req) => {
           agentId: agent.id,
           agentName: agent.name,
           agentSlug: agent.slug,
+          platformAgentId: agent.platform_agent_id || undefined,
+          platformApiKey: platformApiKey || undefined,
           role: assignment.role || "viewer",
           canEditKnowledge: assignment.can_edit_knowledge || assignment.role === "admin",
           canEditPrompt: assignment.can_edit_prompt || assignment.role === "admin",
