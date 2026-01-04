@@ -59,12 +59,13 @@ const ClientAgentConversations = () => {
     agentId: elevenlabsAgentId,
   }, page, 20);
 
-  const { data: conversationDetails, isLoading: detailsLoading } = useClientElevenLabsConversationDetails({
+  const { data: conversationDetails, isLoading: detailsLoading, error: detailsError, refetch: refetchDetails } = useClientElevenLabsConversationDetails({
     apiKey,
     agentId: elevenlabsAgentId,
   }, selectedConversation || undefined);
 
   const audioMutation = useClientElevenLabsAudio();
+  const [audioLoadRequested, setAudioLoadRequested] = useState(false);
 
   const allConversations = conversationsData?.conversations || [];
   
@@ -329,7 +330,9 @@ const ClientAgentConversations = () => {
                     className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
                     onClick={() => {
                       setSelectedConversation(conv.conversation_id);
-                      handlePlayAudio(conv.conversation_id);
+                      setAudioUrl(null);
+                      setAudioLoadRequested(false);
+                      // Don't auto-play audio - let user click load button
                     }}
                   >
                     <div className="flex items-center gap-4">
@@ -414,6 +417,7 @@ const ClientAgentConversations = () => {
       <Dialog open={!!selectedConversation} onOpenChange={() => {
         setSelectedConversation(null);
         setAudioUrl(null);
+        setAudioLoadRequested(false);
       }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-background">
           <DialogHeader>
@@ -428,14 +432,27 @@ const ClientAgentConversations = () => {
               <Skeleton className="h-20 w-full" />
               <Skeleton className="h-40 w-full" />
             </div>
-          ) : !conversationDetails ? (
+          ) : detailsError ? (
             <div className="p-8 text-center text-muted-foreground">
-              <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Impossible de charger les détails de la conversation</p>
+              <MessageSquare className="h-12 w-12 mx-auto mb-4 text-destructive/50" />
+              <p className="text-destructive">Erreur lors du chargement des détails</p>
+              <p className="text-sm mt-2">{(detailsError as Error)?.message || 'Une erreur est survenue'}</p>
               <Button 
                 variant="outline" 
                 className="mt-4"
-                onClick={() => selectedConversation && handlePlayAudio(selectedConversation)}
+                onClick={() => refetchDetails()}
+              >
+                Réessayer
+              </Button>
+            </div>
+          ) : !conversationDetails ? (
+            <div className="p-8 text-center text-muted-foreground">
+              <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Aucun détail disponible pour cette conversation</p>
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => refetchDetails()}
               >
                 Réessayer
               </Button>
@@ -475,6 +492,50 @@ const ClientAgentConversations = () => {
                 </div>
               </div>
 
+              {/* Load Audio Button - Only show if audio not yet loaded */}
+              {!audioUrl && !audioMutation.isPending && (
+                <div className="p-4 bg-muted/50 rounded-lg text-center">
+                  <Button 
+                    onClick={() => {
+                      if (selectedConversation) {
+                        setAudioLoadRequested(true);
+                        handlePlayAudio(selectedConversation);
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <Volume2 className="h-4 w-4" />
+                    Charger l'audio
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Cliquez pour charger et écouter l'enregistrement
+                  </p>
+                </div>
+              )}
+
+              {/* Audio Loading State */}
+              {audioMutation.isPending && (
+                <div className="p-6 bg-muted rounded-lg text-center">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Chargement de l'audio...</p>
+                </div>
+              )}
+
+              {/* Audio Error State */}
+              {audioLoadRequested && !audioMutation.isPending && !audioUrl && audioMutation.isError && (
+                <div className="p-4 bg-destructive/10 rounded-lg text-center">
+                  <p className="text-sm text-destructive">Impossible de charger l'audio</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => selectedConversation && handlePlayAudio(selectedConversation)}
+                  >
+                    Réessayer
+                  </Button>
+                </div>
+              )}
+
               {/* Advanced Audio Player */}
               {audioUrl && selectedConversation && (
                 <AdvancedAudioPlayer
@@ -491,13 +552,6 @@ const ClientAgentConversations = () => {
                     timestamp: msg.time_in_call_secs ? msg.time_in_call_secs * 1000 : index * 5000,
                   }))}
                 />
-              )}
-
-              {audioMutation.isPending && (
-                <div className="p-6 bg-muted rounded-lg text-center">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">Chargement de l'audio...</p>
-                </div>
               )}
 
               {/* Transcript */}
