@@ -37,9 +37,21 @@ export default function Agents() {
 
       if (error) throw error;
       
-      // Fetch client names separately due to multiple FK relationships
+      // Fetch assigned clients from client_agent_assignments table
       const agentsWithClients = await Promise.all(
         (data || []).map(async (agent) => {
+          // First check client_agent_assignments (many-to-many relationship)
+          const { data: assignments } = await supabase
+            .from('client_agent_assignments')
+            .select('client:clients(id, name)')
+            .eq('agent_id', agent.id)
+            .limit(1);
+          
+          if (assignments && assignments.length > 0 && assignments[0].client) {
+            return { ...agent, client: assignments[0].client };
+          }
+          
+          // Fallback to direct client_id if exists
           if (agent.client_id) {
             const { data: clientData } = await supabase
               .from('clients')
@@ -48,6 +60,7 @@ export default function Agents() {
               .maybeSingle();
             return { ...agent, client: clientData };
           }
+          
           return { ...agent, client: null };
         })
       );
