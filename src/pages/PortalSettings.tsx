@@ -43,13 +43,13 @@ const PortalSettings = () => {
   const { session, hasEditAccess } = usePortal();
   const canEdit = hasEditAccess();
   
-  const agentId = session?.agentId;
-  const apiKey: string | null = null;
+  const agentId = session?.platformAgentId || session?.agentId;
+  const apiKey = session?.platformApiKey || null;
 
   const { data: config, isLoading, refetch } = useElevenLabsFullAgentConfig({
     agentId: agentId || null,
-    apiKey: apiKey || null,
-    enabled: !!agentId && canEdit,
+    apiKey: apiKey,
+    enabled: !!agentId && !!apiKey && canEdit,
   });
 
   const updateTTS = useUpdateTTSSettings();

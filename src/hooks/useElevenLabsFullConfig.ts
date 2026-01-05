@@ -54,7 +54,7 @@ export const useElevenLabsFullAgentConfig = ({ agentId, apiKey, enabled = true }
 // Fetch available voices
 export const useElevenLabsVoices = (apiKey?: string | null) => {
   return useQuery({
-    queryKey: ['elevenlabs-voices'],
+    queryKey: ['elevenlabs-voices', apiKey ? 'with-key' : 'no-key'],
     queryFn: async (): Promise<ElevenLabsVoice[]> => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
         body: { 
@@ -64,8 +64,13 @@ export const useElevenLabsVoices = (apiKey?: string | null) => {
       });
 
       if (error) throw error;
-      return data.voices || [];
+      if (data?.requiresSetup) {
+        console.warn('ElevenLabs setup required for voices');
+        return [];
+      }
+      return data?.voices || [];
     },
+    enabled: !!apiKey, // Only fetch when API key is available
     staleTime: 300000, // Cache for 5 minutes
   });
 };
