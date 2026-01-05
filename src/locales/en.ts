@@ -903,12 +903,14 @@ export const en = {
     labels: {
       fullName: 'Full name',
       email: 'Email',
+      identifier: 'Identifier',
       password: 'Password',
       newPassword: 'New password',
       confirmPassword: 'Confirm password',
     },
     placeholders: {
       email: 'you@example.com',
+      identifier: 'Your identifier',
       password: '••••••••',
       fullName: 'John Doe',
     },
@@ -926,9 +928,13 @@ export const en = {
       loading: 'Loading...',
       sending: 'Sending...',
     },
+    portalLogin: 'Portal Login',
+    enterCredentials: 'Enter your credentials to access your dashboard',
     errors: {
       passwordMismatch: 'Passwords do not match',
       enterCredentials: 'Please enter your credentials',
+      emptyFields: 'Please enter your identifier and password',
+      invalidCredentials: 'Invalid credentials',
     },
     legal: {
       prefix: 'By continuing, you agree to our',

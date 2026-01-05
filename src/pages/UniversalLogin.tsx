@@ -153,7 +153,7 @@ const UniversalLoginContent = () => {
                   disabled={isLoading}
                 >
                   {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  {t('auth.login')}
+                  {t('auth.buttons.login')}
                 </Button>
               </form>
 
@@ -162,7 +162,7 @@ const UniversalLoginContent = () => {
                   to="/client/forgot-password" 
                   className="text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
-                  {t('auth.forgotPassword')}
+                  {t('auth.buttons.forgotPassword')}
                 </Link>
               </div>
             </CardContent>
