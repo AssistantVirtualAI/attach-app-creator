@@ -9,12 +9,6 @@ import { Progress } from '@/components/ui/progress';
 import { AlertTriangle, Users, Crown, ShoppingCart, Infinity } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-// Super admin emails with unlimited client access
-const SUPER_ADMIN_EMAILS = [
-  'mhassoun@assistantvirtualai.com',
-  'amassaro@assistantvirtualai.com',
-];
-
 interface ClientLimitBannerProps {
   showProgress?: boolean;
   compact?: boolean;
@@ -25,8 +19,18 @@ export const ClientLimitBanner = ({ showProgress = true, compact = false }: Clie
   const { user } = useAuth();
   const { billingConfig, currentPlan, isLoading: billingLoading } = useBillingConfig();
 
-  // Check if user is a super admin with unlimited access
-  const isSuperAdmin = user?.email && SUPER_ADMIN_EMAILS.includes(user.email);
+  // Server-side super admin check
+  const { data: isSuperAdmin = false } = useQuery({
+    queryKey: ['is-super-admin', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return false;
+      const { data, error } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+      if (error) return false;
+      return data === true;
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const { data: clientCount = 0 } = useQuery({
     queryKey: ['client-count', selectedOrgId],
@@ -44,7 +48,7 @@ export const ClientLimitBanner = ({ showProgress = true, compact = false }: Clie
 
   if (billingLoading) return null;
 
-  // Super admins have unlimited access
+  // Super admins have unlimited access (server-validated)
   if (isSuperAdmin) {
     if (compact) {
       return (
@@ -164,8 +168,18 @@ export const useClientLimit = () => {
   const { user } = useAuth();
   const { currentPlan } = useBillingConfig();
 
-  // Check if user is a super admin with unlimited access
-  const isSuperAdmin = user?.email && SUPER_ADMIN_EMAILS.includes(user.email);
+  // Server-side super admin check
+  const { data: isSuperAdmin = false } = useQuery({
+    queryKey: ['is-super-admin', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return false;
+      const { data, error } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+      if (error) return false;
+      return data === true;
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const { data: clientCount = 0 } = useQuery({
     queryKey: ['client-count', selectedOrgId],
@@ -181,7 +195,7 @@ export const useClientLimit = () => {
     enabled: !!selectedOrgId,
   });
 
-  // Super admins have unlimited access
+  // Super admins have unlimited access (server-validated)
   if (isSuperAdmin) {
     return {
       clientCount,
