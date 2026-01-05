@@ -69,12 +69,25 @@ export const useAllAgentsConversations = (
 
       if (error) {
         console.error('Error fetching all agents conversations:', error);
+        // Check for auth errors - session may be expired
+        const errorMsg = (error as any)?.message || String(error);
+        if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
+          console.warn('Session expired, user should re-login');
+        }
         throw error;
       }
 
       return data as AllAgentsConversationsResponse;
     },
     refetchInterval: 60000, // Refetch every minute
+    retry: (failureCount, error) => {
+      // Don't retry on auth errors
+      const errorMsg = (error as any)?.message || String(error);
+      if (errorMsg.includes('401') || errorMsg.includes('Unauthorized')) {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
 };
 
