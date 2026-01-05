@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-// Super admin emails that can access portals without credentials
-const SUPER_ADMIN_EMAILS = [
-  'mhassoun@assistantvirtualai.com',
-  'amassaro@assistantvirtualai.com',
-];
-
 export interface PortalSession {
   clientId: string;
   clientName: string;
@@ -33,22 +27,50 @@ export interface PortalSession {
 
 const PORTAL_SESSION_KEY = 'ava_portal_session';
 
+// Check super admin status server-side using database function
+async function checkIsSuperAdmin(userId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('is_super_admin', { _user_id: userId });
+    if (error) return false;
+    return data === true;
+  } catch {
+    return false;
+  }
+}
+
 export const usePortalAuth = () => {
   const [session, setSession] = useState<PortalSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   // undefined = still checking, null = not logged in, user = logged in
   const [supabaseUser, setSupabaseUser] = useState<any | undefined>(undefined);
+  const [isSuperAdminUser, setIsSuperAdminUser] = useState(false);
 
   // Check Supabase auth on mount
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setSupabaseUser(user);
+      
+      // Check super admin status server-side
+      if (user?.id) {
+        const superAdmin = await checkIsSuperAdmin(user.id);
+        setIsSuperAdminUser(superAdmin);
+      } else {
+        setIsSuperAdminUser(false);
+      }
     };
     checkAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSupabaseUser(session?.user || null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const user = session?.user || null;
+      setSupabaseUser(user);
+      
+      if (user?.id) {
+        const superAdmin = await checkIsSuperAdmin(user.id);
+        setIsSuperAdminUser(superAdmin);
+      } else {
+        setIsSuperAdminUser(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -67,14 +89,14 @@ export const usePortalAuth = () => {
     setIsLoading(false);
   }, []);
 
-  // Check if current Supabase user is a super admin
+  // Check if current Supabase user is a super admin (server-side validated)
   const isSuperAdmin = useCallback(() => {
-    return supabaseUser?.email && SUPER_ADMIN_EMAILS.includes(supabaseUser.email);
-  }, [supabaseUser]);
+    return isSuperAdminUser;
+  }, [isSuperAdminUser]);
 
   // Auto-login for super admins
   const loginAsSuperAdmin = useCallback(async (agentSlug: string): Promise<PortalSession | null> => {
-    if (!supabaseUser?.email || !SUPER_ADMIN_EMAILS.includes(supabaseUser.email)) {
+    if (!supabaseUser?.id || !isSuperAdminUser) {
       return null;
     }
 
@@ -87,7 +109,6 @@ export const usePortalAuth = () => {
         .single();
 
       if (agentError || !agent) {
-        console.error('Agent not found:', agentError);
         return null;
       }
 
@@ -125,11 +146,10 @@ export const usePortalAuth = () => {
       localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(portalSession));
       setSession(portalSession);
       return portalSession;
-    } catch (error) {
-      console.error('Super admin login error:', error);
+    } catch {
       return null;
     }
-  }, [supabaseUser]);
+  }, [supabaseUser, isSuperAdminUser]);
 
   const login = useCallback(async (agentSlug: string, loginId: string, password: string) => {
     setIsLoading(true);
