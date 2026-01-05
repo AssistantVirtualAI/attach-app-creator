@@ -1243,6 +1243,48 @@ serve(async (req) => {
         );
       }
 
+      case "admin-set-password": {
+        // Admin action to set a client's password without requiring the old one
+        const { client_id, new_password } = params;
+
+        if (!client_id || !new_password) {
+          return new Response(
+            JSON.stringify({ error: "Client ID et nouveau mot de passe requis" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (new_password.length < 8) {
+          return new Response(
+            JSON.stringify({ error: "Le mot de passe doit contenir au moins 8 caractères" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const salt = bcrypt.genSaltSync(10);
+        const newHash = bcrypt.hashSync(new_password, salt);
+
+        const { error: updateError } = await supabase
+          .from("clients")
+          .update({ password_hash: newHash })
+          .eq("id", client_id);
+
+        if (updateError) {
+          console.error("Error updating password:", updateError);
+          return new Response(
+            JSON.stringify({ error: "Erreur lors de la mise à jour du mot de passe" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        console.log(`Password reset for client ${client_id}`);
+
+        return new Response(
+          JSON.stringify({ success: true, message: "Mot de passe défini avec succès" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       default:
         return new Response(
           JSON.stringify({ error: "Action non reconnue" }),
