@@ -22,10 +22,17 @@ const PortalLoginContent = () => {
   const { login, isLoading, isAuthenticated, session, isSuperAdmin, loginAsSuperAdmin, supabaseUser } = usePortal();
   const navigate = useNavigate();
 
+  // Guard against placeholder routes like /portal/:agentSlug
+  useEffect(() => {
+    if (agentSlug === ':agentSlug') {
+      navigate('/login', { replace: true });
+    }
+  }, [agentSlug, navigate]);
+
   // Check for super admin auto-login first
   useEffect(() => {
     const checkSuperAdminAccess = async () => {
-      if (!agentSlug) {
+      if (!agentSlug || agentSlug === ':agentSlug') {
         setCheckingSuperAdmin(false);
         return;
       }
@@ -51,7 +58,7 @@ const PortalLoginContent = () => {
 
   useEffect(() => {
     const loadAgent = async () => {
-      if (!agentSlug) return;
+      if (!agentSlug || agentSlug === ':agentSlug') return;
       
       const { data, error } = await supabase
         .from('agents')
