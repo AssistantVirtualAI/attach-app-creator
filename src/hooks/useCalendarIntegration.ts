@@ -12,8 +12,9 @@ export const useCalendarIntegration = () => {
     queryFn: async () => {
       if (!selectedOrg?.id) return null;
       
+      // Use the safe view that doesn't expose OAuth tokens
       const { data, error } = await supabase
-        .from('calendar_integrations')
+        .from('calendar_integrations_safe')
         .select('*')
         .eq('organization_id', selectedOrg.id)
         .eq('provider', 'google')
