@@ -67,13 +67,13 @@ export const Navbar = () => {
 
             <Button
               variant="ghost"
-              onClick={() => navigate('/auth')}
+              onClick={() => navigate('/login')}
             >
               {t('nav.login')}
             </Button>
             <Button
               className="bg-gradient-to-r from-primary to-secondary hover:opacity-90"
-              onClick={() => navigate('/auth')}
+              onClick={() => navigate('/login')}
             >
               {t('nav.getStarted')}
             </Button>
@@ -125,13 +125,13 @@ export const Navbar = () => {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => navigate('/auth')}
+                onClick={() => navigate('/login')}
               >
                 {t('nav.login')}
               </Button>
               <Button
                 className="w-full bg-gradient-to-r from-primary to-secondary"
-                onClick={() => navigate('/auth')}
+                onClick={() => navigate('/login')}
               >
                 {t('nav.getStarted')}
               </Button>
