@@ -5,6 +5,19 @@ import { useAuth } from '@/hooks/useAuth';
 export function useSuperAdminException() {
   const { user } = useAuth();
 
+  // Check super admin status server-side using database function
+  const { data: isSuperAdminData } = useQuery({
+    queryKey: ['is-super-admin', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return false;
+      const { data, error } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+      if (error) return false;
+      return data === true;
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data, isLoading } = useQuery({
     queryKey: ['super-admin-exception', user?.email],
     queryFn: async () => {
@@ -18,7 +31,6 @@ export function useSuperAdminException() {
         .maybeSingle();
 
       if (error) {
-        console.error('Error checking super admin exception:', error);
         return { hasException: false, unlimitedClients: false };
       }
 
@@ -35,8 +47,7 @@ export function useSuperAdminException() {
     hasException: data?.hasException || false,
     unlimitedClients: data?.unlimitedClients || false,
     isLoading,
-    // Check if user is a known super admin
-    isSuperAdmin: user?.email === 'mhassoun@assistantvirtualai.com' || 
-                  user?.email === 'amassaro@assistantvirtualai.com',
+    // Server-side validated super admin check
+    isSuperAdmin: isSuperAdminData || false,
   };
 }
