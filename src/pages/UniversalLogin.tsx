@@ -24,44 +24,36 @@ const UniversalLoginContent = () => {
     setError('');
     setIsLoading(true);
 
-    if (!loginId.trim() || !password.trim()) {
-      setError('Veuillez entrer votre identifiant et mot de passe');
-      setIsLoading(false);
-      return;
-    }
-
-    const trimmedLoginId = loginId.trim();
-
-    // 1. First, try client/member login (via edge function)
     try {
-      const session = await loginUniversal(trimmedLoginId, password);
-      // Success - redirect to the agent's portal dashboard
-      navigate(`/${session.agentSlug}/dashboard`);
-      return;
-    } catch (clientError: any) {
-      console.log('Client login failed, trying super admin...', clientError.message);
-    }
-
-    // 2. If client login fails, try super admin via Supabase Auth
-    // Super admins must use email as their identifier
-    try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email: trimmedLoginId,
-        password: password,
-      });
-
-      if (!authError && data.user) {
-        // Super admin authenticated successfully - redirect to admin dashboard
-        navigate('/dashboard');
+      if (!loginId.trim() || !password.trim()) {
+        setError('Veuillez entrer votre identifiant et mot de passe');
         return;
       }
-    } catch (authError: any) {
-      console.log('Super admin login failed:', authError.message);
-    }
 
-    // Both failed
-    setError('Identifiants invalides');
-    setIsLoading(false);
+      const trimmedLoginId = loginId.trim();
+      const looksLikeEmail = trimmedLoginId.includes('@');
+
+      // If it looks like an email, try admin auth first (avoids unnecessary 401 from client login)
+      if (looksLikeEmail) {
+        const { data, error: authError } = await supabase.auth.signInWithPassword({
+          email: trimmedLoginId,
+          password,
+        });
+
+        if (!authError && data.user) {
+          navigate('/dashboard');
+          return;
+        }
+      }
+
+      // Client / member universal login
+      const portalSession = await loginUniversal(trimmedLoginId, password);
+      navigate(`/${portalSession.agentSlug}/dashboard`);
+    } catch (err: any) {
+      setError(err?.message || 'Identifiants invalides');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const features = [
