@@ -994,14 +994,10 @@ serve(async (req) => {
 
         console.log(`Universal login attempt for: ${login_id}`);
 
-        // First try to find a client with this login_id
+        // First try to find a client with this login_id (simple query without join)
         const { data: client, error: clientError } = await supabase
           .from("clients")
-          .select(`
-            id, name, organization_id, theme, language, login_id, password_hash, status,
-            assigned_agent_id,
-            assigned_agent:agents!clients_assigned_agent_id_fkey(id, name, slug, organization_id, platform, platform_agent_id)
-          `)
+          .select("id, name, organization_id, theme, language, login_id, password_hash, status, assigned_agent_id")
           .eq("login_id", login_id)
           .maybeSingle();
 
@@ -1015,6 +1011,8 @@ serve(async (req) => {
 
         // If client found, validate password and return session
         if (client) {
+          console.log(`Found client: ${client.name}, status: ${client.status}, has_password: ${!!client.password_hash}`);
+          
           if (client.status !== "active") {
             return new Response(
               JSON.stringify({ error: "Ce compte est désactivé" }),
@@ -1031,17 +1029,32 @@ serve(async (req) => {
 
           const passwordMatch = bcrypt.compareSync(password, client.password_hash);
           if (!passwordMatch) {
+            console.log(`Password mismatch for client: ${client.name}`);
             return new Response(
               JSON.stringify({ error: "Identifiants invalides" }),
               { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
 
-          // Get assigned agent
-          const assignedAgent = client.assigned_agent as any;
-          if (!assignedAgent || !assignedAgent.id) {
+          // Check if client has assigned agent
+          if (!client.assigned_agent_id) {
             return new Response(
               JSON.stringify({ error: "Aucun agent assigné à ce compte. Contactez votre administrateur." }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // Fetch the assigned agent separately
+          const { data: assignedAgent, error: agentError } = await supabase
+            .from("agents")
+            .select("id, name, slug, organization_id, platform, platform_agent_id")
+            .eq("id", client.assigned_agent_id)
+            .maybeSingle();
+
+          if (agentError || !assignedAgent) {
+            console.error("Error finding assigned agent:", agentError);
+            return new Response(
+              JSON.stringify({ error: "Agent assigné non trouvé. Contactez votre administrateur." }),
               { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
@@ -1085,7 +1098,7 @@ serve(async (req) => {
             memberType: "client",
           };
 
-          console.log(`Client ${client.name} logged in universally to agent ${assignedAgent.name}`);
+          console.log(`Client ${client.name} logged in universally to agent ${assignedAgent.name} (slug: ${assignedAgent.slug})`);
 
           return new Response(
             JSON.stringify({ success: true, session }),
@@ -1137,14 +1150,10 @@ serve(async (req) => {
           );
         }
 
-        // Get parent client with assigned agent
+        // Get parent client info
         const { data: parentClient, error: parentError } = await supabase
           .from("clients")
-          .select(`
-            id, name, organization_id, theme, language,
-            assigned_agent_id,
-            assigned_agent:agents!clients_assigned_agent_id_fkey(id, name, slug, organization_id, platform, platform_agent_id)
-          `)
+          .select("id, name, organization_id, theme, language, assigned_agent_id")
           .eq("id", member.client_id)
           .maybeSingle();
 
@@ -1155,10 +1164,23 @@ serve(async (req) => {
           );
         }
 
-        const parentAssignedAgent = parentClient.assigned_agent as any;
-        if (!parentAssignedAgent || !parentAssignedAgent.id) {
+        if (!parentClient.assigned_agent_id) {
           return new Response(
             JSON.stringify({ error: "Aucun agent assigné au client. Contactez votre administrateur." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Fetch the assigned agent separately
+        const { data: parentAssignedAgent, error: parentAgentError } = await supabase
+          .from("agents")
+          .select("id, name, slug, organization_id, platform, platform_agent_id")
+          .eq("id", parentClient.assigned_agent_id)
+          .maybeSingle();
+
+        if (parentAgentError || !parentAssignedAgent) {
+          return new Response(
+            JSON.stringify({ error: "Agent assigné non trouvé. Contactez votre administrateur." }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
