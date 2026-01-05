@@ -11,6 +11,48 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const resendApiKey = Deno.env.get("RESEND_API_KEY");
 
+// Rate limiting for auth endpoints
+const rateLimiter = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(ip: string, maxRequests: number = 5, windowMs: number = 900000): boolean {
+  const now = Date.now();
+  const entry = rateLimiter.get(ip);
+  
+  // Clean up old entries periodically
+  if (rateLimiter.size > 10000) {
+    for (const [key, value] of rateLimiter.entries()) {
+      if (now > value.resetAt) {
+        rateLimiter.delete(key);
+      }
+    }
+  }
+  
+  if (!entry || now > entry.resetAt) {
+    rateLimiter.set(ip, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  
+  if (entry.count >= maxRequests) {
+    return false;
+  }
+  
+  entry.count++;
+  return true;
+}
+
+function getClientIP(req: Request): string {
+  return req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+         req.headers.get('cf-connecting-ip') || 
+         req.headers.get('x-real-ip') || 
+         'unknown';
+}
+
+// Actions that require rate limiting
+const RATE_LIMITED_ACTIONS = [
+  'login', 'login-by-agent-slug', 'login-member', 'login-universal', 
+  'reset-password', 'verify-reset-token'
+];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -19,8 +61,20 @@ serve(async (req) => {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { action, ...params } = await req.json();
+    const clientIP = getClientIP(req);
 
     console.log(`Client auth action: ${action}`);
+
+    // Apply rate limiting for sensitive auth actions
+    if (RATE_LIMITED_ACTIONS.includes(action)) {
+      if (!checkRateLimit(clientIP, 5, 900000)) { // 5 attempts per 15 minutes
+        console.log(`Rate limit exceeded for IP: ${clientIP} on action: ${action}`);
+        return new Response(
+          JSON.stringify({ error: "Trop de tentatives. Veuillez réessayer dans 15 minutes." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
 
     switch (action) {
       case "login": {
