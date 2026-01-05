@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortal, PortalProvider } from '@/hooks/usePortalAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Loader2, AlertTriangle, MessageSquare, BarChart3, BookOpen, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AvaLogo } from '@/components/shared/AvaLogo';
@@ -14,25 +15,53 @@ const UniversalLoginContent = () => {
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { loginUniversal, isLoading } = usePortal();
+  const [isLoading, setIsLoading] = useState(false);
+  const { loginUniversal } = usePortal();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
     if (!loginId.trim() || !password.trim()) {
       setError('Veuillez entrer votre identifiant et mot de passe');
+      setIsLoading(false);
       return;
     }
 
+    const trimmedLoginId = loginId.trim();
+
+    // 1. First, try client/member login (via edge function)
     try {
-      const session = await loginUniversal(loginId.trim(), password);
-      // Redirect to the agent's dashboard using the returned agentSlug
+      const session = await loginUniversal(trimmedLoginId, password);
+      // Success - redirect to the agent's portal dashboard
       navigate(`/${session.agentSlug}/dashboard`);
-    } catch (err: any) {
-      setError(err.message || 'Erreur de connexion');
+      return;
+    } catch (clientError: any) {
+      console.log('Client login failed, trying super admin...', clientError.message);
     }
+
+    // 2. If client login fails, try super admin via Supabase Auth
+    // Super admins must use email as their identifier
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: trimmedLoginId,
+        password: password,
+      });
+
+      if (!authError && data.user) {
+        // Super admin authenticated successfully - redirect to admin dashboard
+        navigate('/dashboard');
+        return;
+      }
+    } catch (authError: any) {
+      console.log('Super admin login failed:', authError.message);
+    }
+
+    // Both failed
+    setError('Identifiants invalides');
+    setIsLoading(false);
   };
 
   const features = [

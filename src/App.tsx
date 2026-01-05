@@ -115,11 +115,14 @@ const App = () => (
             <OrganizationProvider>
               <Suspense fallback={<div>Loading...</div>}>
               <Routes>
-                {/* Universal client login on root - redirects to /{agentSlug}/dashboard */}
-                <Route path="/" element={<UniversalLogin />} />
+                {/* Landing page on root */}
+                <Route path="/" element={<Landing />} />
                 
-                {/* Admin auth */}
-                <Route path="/auth" element={<AuthPage />} />
+                {/* Universal login - redirects based on user type */}
+                <Route path="/login" element={<UniversalLogin />} />
+                
+                {/* Admin auth (legacy, redirects to /login) */}
+                <Route path="/auth" element={<Navigate to="/login" replace />} />
                 
                 {/* Protected routes */}
                 <Route
