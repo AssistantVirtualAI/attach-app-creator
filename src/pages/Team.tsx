@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 
 const Team = () => {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const { members, isLoading, inviteMember, updateMemberRole, removeMember } = useTeamMembers();
+  const { members, isLoading, createMember, updateMemberRole, removeMember } = useTeamMembers();
   const { user } = useAuth();
   const { can } = usePermissions();
 
@@ -35,7 +35,7 @@ const Team = () => {
           {canManageMembers && (
             <Button onClick={() => setIsInviteModalOpen(true)} className="gap-2">
               <UserPlus className="h-4 w-4" />
-              Inviter un membre
+              Créer un membre
             </Button>
           )}
         </div>
@@ -114,8 +114,8 @@ const Team = () => {
       <InviteMemberModal
         isOpen={isInviteModalOpen}
         onClose={() => setIsInviteModalOpen(false)}
-        onInvite={(email, role) => inviteMember.mutateAsync({ email, role })}
-        isLoading={inviteMember.isPending}
+        onCreateMember={(data) => createMember.mutateAsync(data)}
+        isLoading={createMember.isPending}
       />
     </AppLayout>
   );

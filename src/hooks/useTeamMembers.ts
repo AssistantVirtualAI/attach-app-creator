@@ -64,6 +64,41 @@ export const useTeamMembers = () => {
     enabled: !!selectedOrgId,
   });
 
+  // Create member directly (new approach)
+  const createMember = useMutation({
+    mutationFn: async ({ email, password, full_name, role }: { 
+      email: string; 
+      password: string;
+      full_name: string;
+      role: 'org_admin' | 'manager' | 'agent' | 'viewer' 
+    }) => {
+      if (!selectedOrgId) throw new Error('No organization selected');
+
+      const { data, error } = await supabase.functions.invoke('create-org-member', {
+        body: {
+          email,
+          password,
+          full_name,
+          organization_id: selectedOrgId,
+          role,
+        },
+      });
+
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['team-members'] });
+      toast({ title: 'Membre créé avec succès' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Legacy invite member (kept for backwards compatibility)
   const inviteMember = useMutation({
     mutationFn: async ({ email, role }: { email: string; role: 'org_admin' | 'manager' | 'agent' | 'viewer' }) => {
       if (!selectedOrgId) throw new Error('No organization selected');
@@ -179,6 +214,7 @@ export const useTeamMembers = () => {
   return {
     members: query.data || [],
     isLoading: query.isLoading,
+    createMember,
     inviteMember,
     updateMemberRole,
     removeMember,

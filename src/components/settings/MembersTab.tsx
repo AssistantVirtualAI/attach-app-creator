@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 
 export function MembersTab() {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const { members, isLoading, inviteMember, updateMemberRole, removeMember } = useTeamMembers();
+  const { members, isLoading, createMember, updateMemberRole, removeMember } = useTeamMembers();
   const { user } = useAuth();
   const { can } = usePermissions();
 
@@ -55,7 +55,7 @@ export function MembersTab() {
         {canManageMembers && (
           <Button onClick={() => setIsInviteModalOpen(true)} className="gap-2">
             <UserPlus className="h-4 w-4" />
-            Inviter un membre
+            Créer un membre
           </Button>
         )}
       </div>
@@ -79,7 +79,7 @@ export function MembersTab() {
                   className="mt-4"
                   variant="outline"
                 >
-                  Inviter le premier membre
+                  Créer le premier membre
                 </Button>
               )}
             </div>
@@ -98,8 +98,8 @@ export function MembersTab() {
       <InviteMemberModal
         isOpen={isInviteModalOpen}
         onClose={() => setIsInviteModalOpen(false)}
-        onInvite={(email, role) => inviteMember.mutateAsync({ email, role })}
-        isLoading={inviteMember.isPending}
+        onCreateMember={(data) => createMember.mutateAsync(data)}
+        isLoading={createMember.isPending}
       />
     </div>
   );
