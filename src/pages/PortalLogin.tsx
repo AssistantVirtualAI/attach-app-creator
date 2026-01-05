@@ -57,9 +57,12 @@ const PortalLoginContent = () => {
         .from('agents')
         .select('name, avatar_url')
         .eq('slug', agentSlug)
-        .single();
+        .maybeSingle();
 
-      if (error || !data) {
+      if (error) {
+        console.error('Error loading agent:', error);
+        setError('Erreur lors du chargement de l\'agent');
+      } else if (!data) {
         setError('Agent non trouvé');
       } else {
         setAgentInfo(data);

@@ -442,27 +442,31 @@ const App = () => (
                 </Route>
 
                 {/* New Portal Routes - Agent slug based directly at root */}
-                <Route path="/:agentSlug" element={<PortalLogin />} />
-                <Route path="/:agentSlug" element={<PortalLayout />}>
-                  <Route path="dashboard" element={<PortalDashboard />} />
-                  <Route path="conversations" element={<PortalConversations />} />
-                  <Route path="analytics" element={<PortalAnalytics />} />
-                  <Route path="knowledge" element={<PortalKnowledge />} />
-                  <Route path="prompt" element={<PortalPrompt />} />
-                  <Route path="settings" element={<PortalSettings />} />
-                  <Route path="profile" element={<PortalProfile />} />
+                <Route path="/:agentSlug">
+                  <Route index element={<PortalLogin />} />
+                  <Route element={<PortalLayout />}>
+                    <Route path="dashboard" element={<PortalDashboard />} />
+                    <Route path="conversations" element={<PortalConversations />} />
+                    <Route path="analytics" element={<PortalAnalytics />} />
+                    <Route path="knowledge" element={<PortalKnowledge />} />
+                    <Route path="prompt" element={<PortalPrompt />} />
+                    <Route path="settings" element={<PortalSettings />} />
+                    <Route path="profile" element={<PortalProfile />} />
+                  </Route>
                 </Route>
 
                 {/* Keep legacy portal routes for backward compatibility */}
-                <Route path="/portal/:agentSlug" element={<PortalLogin />} />
-                <Route path="/portal/:agentSlug" element={<PortalLayout />}>
-                  <Route path="dashboard" element={<PortalDashboard />} />
-                  <Route path="conversations" element={<PortalConversations />} />
-                  <Route path="analytics" element={<PortalAnalytics />} />
-                  <Route path="knowledge" element={<PortalKnowledge />} />
-                  <Route path="prompt" element={<PortalPrompt />} />
-                  <Route path="settings" element={<PortalSettings />} />
-                  <Route path="profile" element={<PortalProfile />} />
+                <Route path="/portal/:agentSlug">
+                  <Route index element={<PortalLogin />} />
+                  <Route element={<PortalLayout />}>
+                    <Route path="dashboard" element={<PortalDashboard />} />
+                    <Route path="conversations" element={<PortalConversations />} />
+                    <Route path="analytics" element={<PortalAnalytics />} />
+                    <Route path="knowledge" element={<PortalKnowledge />} />
+                    <Route path="prompt" element={<PortalPrompt />} />
+                    <Route path="settings" element={<PortalSettings />} />
+                    <Route path="profile" element={<PortalProfile />} />
+                  </Route>
                 </Route>
 
                 {/* Public Widget Routes - No authentication */}
