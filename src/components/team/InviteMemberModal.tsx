@@ -4,37 +4,61 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, UserPlus } from 'lucide-react';
+import { Loader2, UserPlus, Eye, EyeOff } from 'lucide-react';
 
 interface InviteMemberModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onInvite: (email: string, role: 'org_admin' | 'manager' | 'agent' | 'viewer') => Promise<void>;
+  onCreateMember: (data: { email: string; password: string; full_name: string; role: 'org_admin' | 'manager' | 'agent' | 'viewer' }) => Promise<void>;
   isLoading: boolean;
 }
 
-export const InviteMemberModal = ({ isOpen, onClose, onInvite, isLoading }: InviteMemberModalProps) => {
+export const InviteMemberModal = ({ isOpen, onClose, onCreateMember, isLoading }: InviteMemberModalProps) => {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<'org_admin' | 'manager' | 'agent' | 'viewer'>('agent');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onInvite(email, role);
+    await onCreateMember({ email, password, full_name: fullName, role });
     setEmail('');
+    setPassword('');
+    setFullName('');
+    setRole('agent');
+    onClose();
+  };
+
+  const handleClose = () => {
+    setEmail('');
+    setPassword('');
+    setFullName('');
     setRole('agent');
     onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5 text-primary" />
-            Inviter un membre
+            Créer un membre
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="fullName">Nom complet</Label>
+            <Input
+              id="fullName"
+              type="text"
+              placeholder="Jean Dupont"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+            />
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="email">Adresse email</Label>
             <Input
@@ -45,8 +69,32 @@ export const InviteMemberModal = ({ isOpen, onClose, onInvite, isLoading }: Invi
               onChange={(e) => setEmail(e.target.value)}
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password">Mot de passe</Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Minimum 8 caractères"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground">
-              L'utilisateur doit avoir un compte existant
+              Le membre pourra se connecter avec cet email et ce mot de passe
             </p>
           </div>
 
@@ -86,12 +134,12 @@ export const InviteMemberModal = ({ isOpen, onClose, onInvite, isLoading }: Invi
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={handleClose}>
               Annuler
             </Button>
-            <Button type="submit" disabled={isLoading || !email}>
+            <Button type="submit" disabled={isLoading || !email || password.length < 8}>
               {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Inviter
+              Créer le membre
             </Button>
           </DialogFooter>
         </form>
