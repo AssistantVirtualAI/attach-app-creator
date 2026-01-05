@@ -32,34 +32,30 @@ serve(async (req) => {
 
     console.log('[analyze-conversation] Request started', { requestId, t0 });
 
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
     const serviceClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    timings.auth = Date.now() - t0;
+    // Try to authenticate user if auth header is provided
+    let user = null;
+    let isAuthenticated = false;
+    
+    if (authHeader) {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
 
-    if (userError || !user) {
-      console.error('[analyze-conversation] Auth failed', { userError });
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      const { data: { user: authUser }, error: userError } = await supabaseClient.auth.getUser();
+      if (!userError && authUser) {
+        user = authUser;
+        isAuthenticated = true;
+      }
     }
+    
+    timings.auth = Date.now() - t0;
 
     const body = await req.json();
     const { 
