@@ -76,6 +76,7 @@ import PortalKnowledge from "./pages/PortalKnowledge";
 import PortalPrompt from "./pages/PortalPrompt";
 import PortalSettings from "./pages/PortalSettings";
 import PortalProfile from "./pages/PortalProfile";
+import UniversalLogin from "./pages/UniversalLogin";
 
 const queryClient = new QueryClient();
 
@@ -113,9 +114,11 @@ const App = () => (
           >
             <OrganizationProvider>
               <Suspense fallback={<div>Loading...</div>}>
-                <Routes>
-                {/* Public routes */}
-                <Route path="/" element={<Landing />} />
+              <Routes>
+                {/* Universal client login on root - redirects to /{agentSlug}/dashboard */}
+                <Route path="/" element={<UniversalLogin />} />
+                
+                {/* Admin auth */}
                 <Route path="/auth" element={<AuthPage />} />
                 
                 {/* Protected routes */}
@@ -435,7 +438,19 @@ const App = () => (
                   <Route path="endpoints" element={<ClientAgentEndpoints />} />
                 </Route>
 
-                {/* New Portal Routes - Agent slug based */}
+                {/* New Portal Routes - Agent slug based directly at root */}
+                <Route path="/:agentSlug" element={<PortalLogin />} />
+                <Route path="/:agentSlug" element={<PortalLayout />}>
+                  <Route path="dashboard" element={<PortalDashboard />} />
+                  <Route path="conversations" element={<PortalConversations />} />
+                  <Route path="analytics" element={<PortalAnalytics />} />
+                  <Route path="knowledge" element={<PortalKnowledge />} />
+                  <Route path="prompt" element={<PortalPrompt />} />
+                  <Route path="settings" element={<PortalSettings />} />
+                  <Route path="profile" element={<PortalProfile />} />
+                </Route>
+
+                {/* Keep legacy portal routes for backward compatibility */}
                 <Route path="/portal/:agentSlug" element={<PortalLogin />} />
                 <Route path="/portal/:agentSlug" element={<PortalLayout />}>
                   <Route path="dashboard" element={<PortalDashboard />} />

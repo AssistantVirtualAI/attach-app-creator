@@ -40,18 +40,22 @@ const PortalLayoutContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Detect if using legacy /portal/ route or new root route
+  const isLegacyRoute = location.pathname.startsWith('/portal/');
+  const baseRoute = isLegacyRoute ? `/portal/${agentSlug}` : `/${agentSlug}`;
+
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      navigate(`/portal/${agentSlug}`);
+      navigate(baseRoute);
     }
-  }, [isAuthenticated, isLoading, navigate, agentSlug]);
+  }, [isAuthenticated, isLoading, navigate, baseRoute]);
 
   useEffect(() => {
     if (!isLoading && session && session.agentSlug !== agentSlug) {
       logout();
-      navigate(`/portal/${agentSlug}`);
+      navigate(baseRoute);
     }
-  }, [session, agentSlug, isLoading, logout, navigate]);
+  }, [session, agentSlug, isLoading, logout, navigate, baseRoute]);
 
   if (isLoading) {
     return (
@@ -74,25 +78,29 @@ const PortalLayoutContent = () => {
 
   // Navigation items - show Configuration only to admins
   const navItems = [
-    { icon: LayoutDashboard, labelKey: 'clientPortal.sidebar.dashboard', href: `/portal/${agentSlug}/dashboard`, color: 'text-blue-400' },
-    { icon: MessageSquare, labelKey: 'clientPortal.sidebar.conversations', href: `/portal/${agentSlug}/conversations`, color: 'text-cyan-400' },
-    { icon: BarChart3, labelKey: 'clientPortal.sidebar.analytics', href: `/portal/${agentSlug}/analytics`, color: 'text-purple-400' },
-    { icon: BookOpen, labelKey: 'clientPortal.sidebar.knowledge', href: `/portal/${agentSlug}/knowledge`, color: 'text-green-400' },
-    { icon: FileCode, labelKey: 'clientPortal.sidebar.prompt', href: `/portal/${agentSlug}/prompt`, color: 'text-orange-400' },
+    { icon: LayoutDashboard, labelKey: 'clientPortal.sidebar.dashboard', href: `${baseRoute}/dashboard`, color: 'text-blue-400' },
+    { icon: MessageSquare, labelKey: 'clientPortal.sidebar.conversations', href: `${baseRoute}/conversations`, color: 'text-cyan-400' },
+    { icon: BarChart3, labelKey: 'clientPortal.sidebar.analytics', href: `${baseRoute}/analytics`, color: 'text-purple-400' },
+    { icon: BookOpen, labelKey: 'clientPortal.sidebar.knowledge', href: `${baseRoute}/knowledge`, color: 'text-green-400' },
+    { icon: FileCode, labelKey: 'clientPortal.sidebar.prompt', href: `${baseRoute}/prompt`, color: 'text-orange-400' },
   ];
 
   // Add settings for admins and super admins only
   if (hasEditAccess() || isSuperAdminSession) {
-    navItems.push({ icon: Settings, labelKey: 'clientPortal.sidebar.settings', href: `/portal/${agentSlug}/settings`, color: 'text-pink-400' });
+    navItems.push({ icon: Settings, labelKey: 'clientPortal.sidebar.settings', href: `${baseRoute}/settings`, color: 'text-pink-400' });
   }
 
   const handleLogout = () => {
     logout();
-    navigate(`/portal/${agentSlug}`);
+    navigate(baseRoute);
   };
 
   const handleBackToAdmin = () => {
     navigate('/agents');
+  };
+
+  const handleProfileClick = () => {
+    navigate(`${baseRoute}/profile`);
   };
 
   const getRoleBadge = () => {
@@ -248,7 +256,7 @@ const PortalLayoutContent = () => {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuItem onClick={() => navigate(`/portal/${agentSlug}/profile`)}>
+              <DropdownMenuItem onClick={handleProfileClick}>
                 <User className="h-4 w-4 mr-2" />
                 {t('clientPortal.actions.myProfile')}
               </DropdownMenuItem>

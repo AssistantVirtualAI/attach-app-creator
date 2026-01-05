@@ -981,6 +981,246 @@ serve(async (req) => {
         );
       }
 
+      // ========== UNIVERSAL LOGIN (without agent slug) ==========
+      case "login-universal": {
+        const { login_id, password } = params;
+        
+        if (!login_id || !password) {
+          return new Response(
+            JSON.stringify({ error: "Identifiant et mot de passe requis" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        console.log(`Universal login attempt for: ${login_id}`);
+
+        // First try to find a client with this login_id
+        const { data: client, error: clientError } = await supabase
+          .from("clients")
+          .select(`
+            id, name, organization_id, theme, language, login_id, password_hash, status,
+            assigned_agent_id,
+            assigned_agent:agents!clients_assigned_agent_id_fkey(id, name, slug, organization_id, platform, platform_agent_id)
+          `)
+          .eq("login_id", login_id)
+          .maybeSingle();
+
+        if (clientError) {
+          console.error("Error finding client:", clientError);
+          return new Response(
+            JSON.stringify({ error: "Erreur lors de la recherche" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // If client found, validate password and return session
+        if (client) {
+          if (client.status !== "active") {
+            return new Response(
+              JSON.stringify({ error: "Ce compte est désactivé" }),
+              { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          if (!client.password_hash) {
+            return new Response(
+              JSON.stringify({ error: "Aucun mot de passe défini. Contactez votre administrateur." }),
+              { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          const passwordMatch = bcrypt.compareSync(password, client.password_hash);
+          if (!passwordMatch) {
+            return new Response(
+              JSON.stringify({ error: "Identifiants invalides" }),
+              { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // Get assigned agent
+          const assignedAgent = client.assigned_agent as any;
+          if (!assignedAgent || !assignedAgent.id) {
+            return new Response(
+              JSON.stringify({ error: "Aucun agent assigné à ce compte. Contactez votre administrateur." }),
+              { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // Check if client has access via assignment table
+          const { data: assignment } = await supabase
+            .from("client_agent_assignments")
+            .select("role, can_edit_knowledge, can_edit_prompt")
+            .eq("client_id", client.id)
+            .eq("agent_id", assignedAgent.id)
+            .maybeSingle();
+
+          // Fetch platform API key
+          let platformApiKey: string | null = null;
+          if (assignedAgent.platform && assignedAgent.organization_id) {
+            const { data: integration } = await supabase
+              .from("organization_integrations")
+              .select("api_key")
+              .eq("organization_id", assignedAgent.organization_id)
+              .eq("platform", assignedAgent.platform)
+              .eq("is_active", true)
+              .maybeSingle();
+            platformApiKey = integration?.api_key || null;
+          }
+
+          const session = {
+            clientId: client.id,
+            clientName: client.name,
+            organizationId: client.organization_id,
+            agentId: assignedAgent.id,
+            agentName: assignedAgent.name,
+            agentSlug: assignedAgent.slug,
+            platform: assignedAgent.platform,
+            platformAgentId: assignedAgent.platform_agent_id || undefined,
+            platformApiKey: platformApiKey || undefined,
+            role: assignment?.role || "admin",
+            canEditKnowledge: assignment?.can_edit_knowledge ?? true,
+            canEditPrompt: assignment?.can_edit_prompt ?? true,
+            theme: client.theme || "dark",
+            language: client.language || "fr",
+            memberType: "client",
+          };
+
+          console.log(`Client ${client.name} logged in universally to agent ${assignedAgent.name}`);
+
+          return new Response(
+            JSON.stringify({ success: true, session }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // If no client found, try to find a member
+        const { data: member, error: memberError } = await supabase
+          .from("client_members")
+          .select("id, client_id, name, email, role, login_id, password_hash, status")
+          .eq("login_id", login_id)
+          .maybeSingle();
+
+        if (memberError) {
+          console.error("Error finding member:", memberError);
+          return new Response(
+            JSON.stringify({ error: "Erreur lors de la recherche" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (!member) {
+          return new Response(
+            JSON.stringify({ error: "Identifiants invalides" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (member.status !== "active") {
+          return new Response(
+            JSON.stringify({ error: "Ce compte est désactivé" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (!member.password_hash) {
+          return new Response(
+            JSON.stringify({ error: "Aucun mot de passe défini. Contactez votre administrateur." }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const memberPasswordMatch = bcrypt.compareSync(password, member.password_hash);
+        if (!memberPasswordMatch) {
+          return new Response(
+            JSON.stringify({ error: "Identifiants invalides" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Get parent client with assigned agent
+        const { data: parentClient, error: parentError } = await supabase
+          .from("clients")
+          .select(`
+            id, name, organization_id, theme, language,
+            assigned_agent_id,
+            assigned_agent:agents!clients_assigned_agent_id_fkey(id, name, slug, organization_id, platform, platform_agent_id)
+          `)
+          .eq("id", member.client_id)
+          .maybeSingle();
+
+        if (parentError || !parentClient) {
+          return new Response(
+            JSON.stringify({ error: "Client parent non trouvé" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const parentAssignedAgent = parentClient.assigned_agent as any;
+        if (!parentAssignedAgent || !parentAssignedAgent.id) {
+          return new Response(
+            JSON.stringify({ error: "Aucun agent assigné au client. Contactez votre administrateur." }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Get assignment
+        const { data: memberAssignment } = await supabase
+          .from("client_agent_assignments")
+          .select("role, can_edit_knowledge, can_edit_prompt")
+          .eq("client_id", parentClient.id)
+          .eq("agent_id", parentAssignedAgent.id)
+          .maybeSingle();
+
+        // Fetch platform API key for member
+        let memberPlatformApiKey: string | null = null;
+        if (parentAssignedAgent.platform && parentAssignedAgent.organization_id) {
+          const { data: integration } = await supabase
+            .from("organization_integrations")
+            .select("api_key")
+            .eq("organization_id", parentAssignedAgent.organization_id)
+            .eq("platform", parentAssignedAgent.platform)
+            .eq("is_active", true)
+            .maybeSingle();
+          memberPlatformApiKey = integration?.api_key || null;
+        }
+
+        // Update last login
+        await supabase
+          .from("client_members")
+          .update({ last_login_at: new Date().toISOString() })
+          .eq("id", member.id);
+
+        const isAdminMember = member.role === "admin";
+        const memberSession = {
+          clientId: parentClient.id,
+          clientName: parentClient.name,
+          organizationId: parentClient.organization_id,
+          agentId: parentAssignedAgent.id,
+          agentName: parentAssignedAgent.name,
+          agentSlug: parentAssignedAgent.slug,
+          platform: parentAssignedAgent.platform,
+          platformAgentId: parentAssignedAgent.platform_agent_id || undefined,
+          platformApiKey: memberPlatformApiKey || undefined,
+          role: isAdminMember ? (memberAssignment?.role || "admin") : "viewer",
+          canEditKnowledge: isAdminMember && (memberAssignment?.can_edit_knowledge ?? true),
+          canEditPrompt: isAdminMember && (memberAssignment?.can_edit_prompt ?? true),
+          theme: parentClient.theme || "dark",
+          language: parentClient.language || "fr",
+          memberType: "member",
+          memberId: member.id,
+          memberName: member.name,
+          memberEmail: member.email,
+          memberRole: member.role,
+        };
+
+        console.log(`Member ${member.name} logged in universally to agent ${parentAssignedAgent.name}`);
+
+        return new Response(
+          JSON.stringify({ success: true, session: memberSession }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       default:
         return new Response(
           JSON.stringify({ error: "Action non reconnue" }),
