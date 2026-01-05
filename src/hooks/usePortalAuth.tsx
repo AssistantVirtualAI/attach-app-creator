@@ -16,6 +16,7 @@ export interface PortalSession {
   agentSlug: string;
   platformAgentId?: string;
   platformApiKey?: string;
+  platform?: string;
   role: 'viewer' | 'admin' | 'super_admin';
   canEditKnowledge: boolean;
   canEditPrompt: boolean;
@@ -184,6 +185,35 @@ export const usePortalAuth = () => {
     }
   }, []);
 
+  // Universal login - finds the client's agent automatically
+  const loginUniversal = useCallback(async (loginId: string, password: string): Promise<PortalSession> => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('client-auth', {
+        body: { 
+          action: 'login-universal', 
+          login_id: loginId,
+          password
+        }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.session) throw new Error('Erreur de connexion');
+
+      const portalSession: PortalSession = {
+        ...data.session,
+        isSuperAdmin: false,
+        memberType: data.session.memberType || 'client',
+      };
+      localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(portalSession));
+      setSession(portalSession);
+      return portalSession;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem(PORTAL_SESSION_KEY);
     setSession(null);
@@ -194,6 +224,7 @@ export const usePortalAuth = () => {
     isLoading,
     isAuthenticated: !!session,
     login,
+    loginUniversal,
     loginAsSuperAdmin,
     logout,
     isSuperAdmin,
@@ -209,6 +240,7 @@ interface PortalContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (agentSlug: string, loginId: string, password: string) => Promise<PortalSession>;
+  loginUniversal: (loginId: string, password: string) => Promise<PortalSession>;
   loginAsSuperAdmin: (agentSlug: string) => Promise<PortalSession | null>;
   logout: () => void;
   isSuperAdmin: () => boolean;

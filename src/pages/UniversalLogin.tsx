@@ -1,112 +1,39 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortal, PortalProvider } from '@/hooks/usePortalAuth';
-import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Bot, AlertTriangle, MessageSquare, BarChart3, BookOpen, Zap } from 'lucide-react';
+import { Loader2, AlertTriangle, MessageSquare, BarChart3, BookOpen, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AvaLogo } from '@/components/shared/AvaLogo';
 
-const PortalLoginContent = () => {
-  const { agentSlug } = useParams<{ agentSlug: string }>();
+const UniversalLoginContent = () => {
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [agentInfo, setAgentInfo] = useState<{ name: string; avatar_url?: string } | null>(null);
-  const [loadingAgent, setLoadingAgent] = useState(true);
-  const [checkingSuperAdmin, setCheckingSuperAdmin] = useState(true);
-  const { login, isLoading, isAuthenticated, session, isSuperAdmin, loginAsSuperAdmin, supabaseUser } = usePortal();
+  const { loginUniversal, isLoading } = usePortal();
   const navigate = useNavigate();
-
-  // Check for super admin auto-login first
-  useEffect(() => {
-    const checkSuperAdminAccess = async () => {
-      if (!agentSlug) {
-        setCheckingSuperAdmin(false);
-        return;
-      }
-
-      // Wait for supabase auth to be checked
-      if (supabaseUser === undefined) return;
-
-      if (isSuperAdmin()) {
-        console.log('Super admin detected, auto-logging in...');
-        const superAdminSession = await loginAsSuperAdmin(agentSlug);
-        if (superAdminSession) {
-          // Check if we're on legacy /portal/ route or new root route
-          const isLegacyRoute = window.location.pathname.startsWith('/portal/');
-          navigate(isLegacyRoute ? `/portal/${agentSlug}/dashboard` : `/${agentSlug}/dashboard`);
-          return;
-        }
-      }
-      setCheckingSuperAdmin(false);
-    };
-
-    checkSuperAdminAccess();
-  }, [agentSlug, isSuperAdmin, loginAsSuperAdmin, supabaseUser, navigate]);
-
-  useEffect(() => {
-    const loadAgent = async () => {
-      if (!agentSlug) return;
-      
-      const { data, error } = await supabase
-        .from('agents')
-        .select('name, avatar_url')
-        .eq('slug', agentSlug)
-        .single();
-
-      if (error || !data) {
-        setError('Agent non trouvé');
-      } else {
-        setAgentInfo(data);
-      }
-      setLoadingAgent(false);
-    };
-
-    loadAgent();
-  }, [agentSlug]);
-
-  useEffect(() => {
-    if (isAuthenticated && session?.agentSlug === agentSlug) {
-      const isLegacyRoute = window.location.pathname.startsWith('/portal/');
-      navigate(isLegacyRoute ? `/portal/${agentSlug}/dashboard` : `/${agentSlug}/dashboard`);
-    }
-  }, [isAuthenticated, session, agentSlug, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!agentSlug) {
-      setError('Agent non spécifié');
+    if (!loginId.trim() || !password.trim()) {
+      setError('Veuillez entrer votre identifiant et mot de passe');
       return;
     }
 
     try {
-      await login(agentSlug, loginId, password);
-      const isLegacyRoute = window.location.pathname.startsWith('/portal/');
-      navigate(isLegacyRoute ? `/portal/${agentSlug}/dashboard` : `/${agentSlug}/dashboard`);
+      const session = await loginUniversal(loginId.trim(), password);
+      // Redirect to the agent's dashboard using the returned agentSlug
+      navigate(`/${session.agentSlug}/dashboard`);
     } catch (err: any) {
       setError(err.message || 'Erreur de connexion');
     }
   };
-
-  if (loadingAgent || checkingSuperAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-        >
-          <Loader2 className="h-8 w-8 text-primary" />
-        </motion.div>
-      </div>
-    );
-  }
 
   const features = [
     { icon: MessageSquare, title: 'Conversations', desc: 'Historique complet des échanges' },
@@ -140,25 +67,13 @@ const PortalLoginContent = () => {
                 transition={{ delay: 0.2 }}
                 className="mx-auto mb-4"
               >
-                {agentInfo?.avatar_url ? (
-                  <div className="w-24 h-24 rounded-2xl overflow-hidden ring-4 ring-primary/20 shadow-lg">
-                    <img 
-                      src={agentInfo.avatar_url} 
-                      alt={agentInfo.name} 
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-primary via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-primary/30">
-                    <Bot className="h-12 w-12 text-white" />
-                  </div>
-                )}
+                <AvaLogo size="lg" animated />
               </motion.div>
               <CardTitle className="text-2xl font-bold">
-                {agentInfo?.name || 'Portail Agent'}
+                Connexion au Portail
               </CardTitle>
               <p className="text-muted-foreground mt-2">
-                Connectez-vous pour accéder à votre tableau de bord
+                Entrez vos identifiants pour accéder à votre tableau de bord
               </p>
             </CardHeader>
             <CardContent className="pt-4">
@@ -181,9 +96,10 @@ const PortalLoginContent = () => {
                     id="loginId"
                     value={loginId}
                     onChange={(e) => setLoginId(e.target.value)}
-                    placeholder="Votre identifiant client"
+                    placeholder="Votre identifiant"
                     className="h-12 bg-muted/30 border-border/50 focus:border-primary focus:ring-primary/20"
                     required
+                    autoComplete="username"
                   />
                 </div>
 
@@ -197,6 +113,7 @@ const PortalLoginContent = () => {
                     placeholder="••••••••"
                     className="h-12 bg-muted/30 border-border/50 focus:border-primary focus:ring-primary/20"
                     required
+                    autoComplete="current-password"
                   />
                 </div>
 
@@ -287,10 +204,10 @@ const PortalLoginContent = () => {
   );
 };
 
-const PortalLogin = () => (
+const UniversalLogin = () => (
   <PortalProvider>
-    <PortalLoginContent />
+    <UniversalLoginContent />
   </PortalProvider>
 );
 
-export default PortalLogin;
+export default UniversalLogin;
