@@ -593,7 +593,7 @@ export default function Clients() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-slate-900 border-slate-700">
+                          <DropdownMenuContent align="end" className="bg-popover border-border">
                             <DropdownMenuItem onClick={() => handleOpenMembers(client)}>
                               <Users className="mr-2 h-4 w-4" />
                               Gérer les membres
@@ -606,11 +606,11 @@ export default function Clients() {
                               <Key className="mr-2 h-4 w-4" />
                               Réinitialiser mot de passe
                             </DropdownMenuItem>
-                            {client.assigned_agent && (client.assigned_agent as any).slug && (
+                            {client.assigned_agent && (
                               <>
-                                <DropdownMenuSeparator className="bg-slate-700" />
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem 
-                                  onClick={() => window.open(`/portal/${(client.assigned_agent as any).slug}`, '_blank')}
+                                  onClick={() => window.open(`/portal/${(client.assigned_agent as any).slug || (client.assigned_agent as any).id}`, '_blank')}
                                 >
                                   <ExternalLink className="mr-2 h-4 w-4" />
                                   Accéder au portail
@@ -627,7 +627,7 @@ export default function Clients() {
                             >
                               {client.status === 'active' ? 'Désactiver' : 'Activer'}
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator className="bg-slate-700" />
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => deleteClientMutation.mutate(client.id)}
