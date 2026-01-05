@@ -889,4 +889,83 @@ export const fr = {
     spanish: 'Espagnol',
     german: 'Allemand',
   },
+  
+  // Auth
+  auth: {
+    login: 'Connexion',
+    signup: 'Créer un compte',
+    resetPassword: 'Nouveau mot de passe',
+    description: {
+      login: 'Connectez-vous à votre compte',
+      signup: 'Créez votre compte pour commencer',
+      reset: 'Entrez votre nouveau mot de passe',
+    },
+    labels: {
+      fullName: 'Nom complet',
+      email: 'Email',
+      password: 'Mot de passe',
+      newPassword: 'Nouveau mot de passe',
+      confirmPassword: 'Confirmer le mot de passe',
+    },
+    placeholders: {
+      email: 'vous@exemple.com',
+      password: '••••••••',
+      fullName: 'John Doe',
+    },
+    buttons: {
+      login: 'Se connecter',
+      signup: "S'inscrire",
+      updatePassword: 'Mettre à jour le mot de passe',
+      continueWithGoogle: 'Continuer avec Google',
+      forgotPassword: 'Mot de passe oublié ?',
+      noAccount: "Pas encore de compte ? S'inscrire",
+      hasAccount: 'Déjà un compte ? Se connecter',
+      backToLogin: 'Retour à la connexion',
+      sendLink: 'Envoyer le lien',
+      cancel: 'Annuler',
+      loading: 'Chargement...',
+      sending: 'Envoi...',
+    },
+    errors: {
+      passwordMismatch: 'Les mots de passe ne correspondent pas',
+      enterCredentials: 'Veuillez entrer votre identifiant et mot de passe',
+    },
+    legal: {
+      prefix: 'En continuant, vous acceptez nos',
+      terms: "conditions d'utilisation",
+      and: 'et notre',
+      privacy: 'politique de confidentialité',
+    },
+    forgotDialog: {
+      title: 'Mot de passe oublié',
+      description: 'Entrez votre adresse email pour recevoir un lien de réinitialisation.',
+    },
+    features: {
+      realTimeAnalytics: {
+        title: 'Analytics en temps réel',
+        description: 'Suivez les performances de vos agents avec des tableaux de bord interactifs et des métriques détaillées.',
+      },
+      aiAgents: {
+        title: 'Agents IA Intelligents',
+        description: 'Créez des agents conversationnels puissants capables de comprendre et répondre naturellement.',
+      },
+      conversationManagement: {
+        title: 'Gestion des Conversations',
+        description: "Analysez chaque conversation avec l'IA : sentiment, satisfaction et recommandations automatiques.",
+      },
+      knowledgeBase: {
+        title: 'Base de Connaissances',
+        description: 'Enrichissez vos agents avec une base de connaissances personnalisée et évolutive.',
+      },
+      integrations: {
+        title: 'Intégrations Multiples',
+        description: "Connectez ElevenLabs, Vapi, Retell et bien d'autres plateformes en quelques clics.",
+      },
+      stats: {
+        secure: 'Sécurisé',
+        fast: 'Rapide',
+        scalable: 'Évolutif',
+      },
+    },
+  },
 };

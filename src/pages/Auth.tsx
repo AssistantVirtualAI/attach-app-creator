@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Activity, Mail, Lock, User, ArrowLeft, Chrome } from 'lucide-react';
+import { Activity, Mail, Lock, User, ArrowLeft, Chrome, Globe } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { AnimatedFeatures } from '@/components/auth/AnimatedFeatures';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useLanguage } from '@/context/LanguageContext';
 
 type AuthMode = 'login' | 'signup' | 'forgot' | 'reset';
 
@@ -31,6 +33,8 @@ const AuthPage = () => {
   
   const { signIn, signUp, signInWithGoogle, resetPassword, updatePassword, user } = useAuth();
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { language, toggleLanguage } = useLanguage();
 
   useEffect(() => {
     if (user && mode !== 'reset') {
@@ -99,18 +103,18 @@ const AuthPage = () => {
 
   const getTitle = () => {
     switch (mode) {
-      case 'login': return 'Connexion';
-      case 'signup': return 'Créer un compte';
-      case 'reset': return 'Nouveau mot de passe';
+      case 'login': return t('auth.login');
+      case 'signup': return t('auth.signup');
+      case 'reset': return t('auth.resetPassword');
       default: return 'AVA Statistics';
     }
   };
 
   const getDescription = () => {
     switch (mode) {
-      case 'login': return 'Connectez-vous à votre compte';
-      case 'signup': return 'Créez votre compte pour commencer';
-      case 'reset': return 'Entrez votre nouveau mot de passe';
+      case 'login': return t('auth.description.login');
+      case 'signup': return t('auth.description.signup');
+      case 'reset': return t('auth.description.reset');
       default: return '';
     }
   };
@@ -122,8 +126,19 @@ const AuthPage = () => {
         initial={{ opacity: 0, x: -50 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full lg:w-[45%] flex items-center justify-center p-8 bg-background"
+        className="w-full lg:w-[45%] flex items-center justify-center p-8 bg-background relative"
       >
+        {/* Language toggle */}
+        <motion.button
+          onClick={toggleLanguage}
+          className="absolute top-6 right-6 flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-sm font-medium text-muted-foreground hover:text-foreground"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <Globe className="w-4 h-4" />
+          <span>{language === 'fr' ? 'EN' : 'FR'}</span>
+        </motion.button>
+
         <div className="w-full max-w-md space-y-8">
           {/* Logo */}
           <motion.div 
@@ -163,7 +178,7 @@ const AuthPage = () => {
                   disabled={loading}
                 >
                   <Chrome className="w-5 h-5" />
-                  Continuer avec Google
+                  {t('auth.buttons.continueWithGoogle')}
                 </Button>
 
                 <div className="relative">
@@ -171,7 +186,7 @@ const AuthPage = () => {
                     <Separator className="w-full" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">ou</span>
+                    <span className="bg-background px-2 text-muted-foreground">{t('common.or')}</span>
                   </div>
                 </div>
               </>
@@ -186,12 +201,12 @@ const AuthPage = () => {
                 >
                   <Label htmlFor="fullName" className="flex items-center gap-2">
                     <User className="w-4 h-4" />
-                    Nom complet
+                    {t('auth.labels.fullName')}
                   </Label>
                   <Input
                     id="fullName"
                     type="text"
-                    placeholder="John Doe"
+                    placeholder={t('auth.placeholders.fullName')}
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     required
@@ -204,12 +219,12 @@ const AuthPage = () => {
                 <div className="space-y-2">
                   <Label htmlFor="email" className="flex items-center gap-2">
                     <Mail className="w-4 h-4" />
-                    Email
+                    {t('auth.labels.email')}
                   </Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="vous@exemple.com"
+                    placeholder={t('auth.placeholders.email')}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -221,12 +236,12 @@ const AuthPage = () => {
               <div className="space-y-2">
                 <Label htmlFor="password" className="flex items-center gap-2">
                   <Lock className="w-4 h-4" />
-                  {mode === 'reset' ? 'Nouveau mot de passe' : 'Mot de passe'}
+                  {mode === 'reset' ? t('auth.labels.newPassword') : t('auth.labels.password')}
                 </Label>
                 <Input
                   id="password"
                   type="password"
-                  placeholder="••••••••"
+                  placeholder={t('auth.placeholders.password')}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -243,12 +258,12 @@ const AuthPage = () => {
                 >
                   <Label htmlFor="confirmPassword" className="flex items-center gap-2">
                     <Lock className="w-4 h-4" />
-                    Confirmer le mot de passe
+                    {t('auth.labels.confirmPassword')}
                   </Label>
                   <Input
                     id="confirmPassword"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder={t('auth.placeholders.password')}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
@@ -256,7 +271,7 @@ const AuthPage = () => {
                     className="h-12 bg-card border-border focus:border-primary focus:ring-primary"
                   />
                   {password !== confirmPassword && confirmPassword && (
-                    <p className="text-sm text-destructive">Les mots de passe ne correspondent pas</p>
+                    <p className="text-sm text-destructive">{t('auth.errors.passwordMismatch')}</p>
                   )}
                 </motion.div>
               )}
@@ -269,7 +284,7 @@ const AuthPage = () => {
                     className="text-sm text-muted-foreground hover:text-primary p-0 h-auto"
                     onClick={() => setShowForgotDialog(true)}
                   >
-                    Mot de passe oublié ?
+                    {t('auth.buttons.forgotPassword')}
                   </Button>
                 </div>
               )}
@@ -279,10 +294,10 @@ const AuthPage = () => {
                 className="w-full h-12 bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white shadow-lg shadow-primary/25"
                 disabled={loading || (mode === 'reset' && password !== confirmPassword)}
               >
-                {loading ? 'Chargement...' : 
-                  mode === 'login' ? 'Se connecter' : 
-                  mode === 'signup' ? "S'inscrire" :
-                  'Mettre à jour le mot de passe'}
+                {loading ? t('auth.buttons.loading') : 
+                  mode === 'login' ? t('auth.buttons.login') : 
+                  mode === 'signup' ? t('auth.buttons.signup') :
+                  t('auth.buttons.updatePassword')}
               </Button>
 
               {mode !== 'reset' && (
@@ -293,7 +308,7 @@ const AuthPage = () => {
                     onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
                     className="text-primary hover:text-primary/80"
                   >
-                    {mode === 'login' ? "Pas encore de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
+                    {mode === 'login' ? t('auth.buttons.noAccount') : t('auth.buttons.hasAccount')}
                   </Button>
                 </div>
               )}
@@ -309,7 +324,7 @@ const AuthPage = () => {
                   className="w-full gap-2"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  Retour à la connexion
+                  {t('auth.buttons.backToLogin')}
                 </Button>
               )}
             </form>
@@ -323,10 +338,10 @@ const AuthPage = () => {
             className="text-center text-sm text-muted-foreground"
           >
             <p>
-              En continuant, vous acceptez nos{' '}
-              <a href="/legal" className="text-primary hover:underline">conditions d'utilisation</a>
-              {' '}et notre{' '}
-              <a href="/privacy" className="text-primary hover:underline">politique de confidentialité</a>
+              {t('auth.legal.prefix')}{' '}
+              <a href="/legal" className="text-primary hover:underline">{t('auth.legal.terms')}</a>
+              {' '}{t('auth.legal.and')}{' '}
+              <a href="/privacy" className="text-primary hover:underline">{t('auth.legal.privacy')}</a>
             </p>
           </motion.div>
         </div>
@@ -346,18 +361,18 @@ const AuthPage = () => {
       <Dialog open={showForgotDialog} onOpenChange={setShowForgotDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Mot de passe oublié</DialogTitle>
+            <DialogTitle>{t('auth.forgotDialog.title')}</DialogTitle>
             <DialogDescription>
-              Entrez votre adresse email pour recevoir un lien de réinitialisation.
+              {t('auth.forgotDialog.description')}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleForgotPassword} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="forgotEmail">Email</Label>
+              <Label htmlFor="forgotEmail">{t('auth.labels.email')}</Label>
               <Input
                 id="forgotEmail"
                 type="email"
-                placeholder="vous@exemple.com"
+                placeholder={t('auth.placeholders.email')}
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
                 required
@@ -370,10 +385,10 @@ const AuthPage = () => {
                 variant="outline"
                 onClick={() => setShowForgotDialog(false)}
               >
-                Annuler
+                {t('auth.buttons.cancel')}
               </Button>
               <Button type="submit" disabled={loading}>
-                {loading ? 'Envoi...' : 'Envoyer le lien'}
+                {loading ? t('auth.buttons.sending') : t('auth.buttons.sendLink')}
               </Button>
             </div>
           </form>

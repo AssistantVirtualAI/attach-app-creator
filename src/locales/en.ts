@@ -889,4 +889,83 @@ export const en = {
     spanish: 'Spanish',
     german: 'German',
   },
+  
+  // Auth
+  auth: {
+    login: 'Login',
+    signup: 'Create an account',
+    resetPassword: 'New password',
+    description: {
+      login: 'Sign in to your account',
+      signup: 'Create your account to get started',
+      reset: 'Enter your new password',
+    },
+    labels: {
+      fullName: 'Full name',
+      email: 'Email',
+      password: 'Password',
+      newPassword: 'New password',
+      confirmPassword: 'Confirm password',
+    },
+    placeholders: {
+      email: 'you@example.com',
+      password: '••••••••',
+      fullName: 'John Doe',
+    },
+    buttons: {
+      login: 'Sign in',
+      signup: 'Sign up',
+      updatePassword: 'Update password',
+      continueWithGoogle: 'Continue with Google',
+      forgotPassword: 'Forgot password?',
+      noAccount: "Don't have an account? Sign up",
+      hasAccount: 'Already have an account? Sign in',
+      backToLogin: 'Back to login',
+      sendLink: 'Send link',
+      cancel: 'Cancel',
+      loading: 'Loading...',
+      sending: 'Sending...',
+    },
+    errors: {
+      passwordMismatch: 'Passwords do not match',
+      enterCredentials: 'Please enter your credentials',
+    },
+    legal: {
+      prefix: 'By continuing, you agree to our',
+      terms: 'terms of service',
+      and: 'and',
+      privacy: 'privacy policy',
+    },
+    forgotDialog: {
+      title: 'Forgot password',
+      description: 'Enter your email address to receive a reset link.',
+    },
+    features: {
+      realTimeAnalytics: {
+        title: 'Real-time Analytics',
+        description: 'Track your agents performance with interactive dashboards and detailed metrics.',
+      },
+      aiAgents: {
+        title: 'Intelligent AI Agents',
+        description: 'Create powerful conversational agents that understand and respond naturally.',
+      },
+      conversationManagement: {
+        title: 'Conversation Management',
+        description: 'Analyze every conversation with AI: sentiment, satisfaction and automatic recommendations.',
+      },
+      knowledgeBase: {
+        title: 'Knowledge Base',
+        description: 'Enrich your agents with a customizable and scalable knowledge base.',
+      },
+      integrations: {
+        title: 'Multiple Integrations',
+        description: 'Connect ElevenLabs, Vapi, Retell and many other platforms in just a few clicks.',
+      },
+      stats: {
+        secure: 'Secure',
+        fast: 'Fast',
+        scalable: 'Scalable',
+      },
+    },
+  },
 };
