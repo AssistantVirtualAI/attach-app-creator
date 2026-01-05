@@ -1,179 +1,274 @@
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BarChart3, 
   Bot, 
   MessageSquare, 
   BookOpen, 
   Plug,
-  TrendingUp,
   Shield,
-  Zap
-} from "lucide-react";
-
-const features = [
-  {
-    icon: BarChart3,
-    title: "Analytics en temps réel",
-    description: "Suivez les performances de vos agents avec des tableaux de bord interactifs et des métriques détaillées.",
-    color: "from-blue-500 to-cyan-500",
-    bgColor: "bg-blue-500/20",
-  },
-  {
-    icon: Bot,
-    title: "Agents IA Intelligents",
-    description: "Créez des agents conversationnels puissants capables de comprendre et répondre naturellement.",
-    color: "from-purple-500 to-pink-500",
-    bgColor: "bg-purple-500/20",
-  },
-  {
-    icon: MessageSquare,
-    title: "Gestion des Conversations",
-    description: "Analysez chaque conversation avec l'IA : sentiment, satisfaction et recommandations automatiques.",
-    color: "from-emerald-500 to-teal-500",
-    bgColor: "bg-emerald-500/20",
-  },
-  {
-    icon: BookOpen,
-    title: "Base de Connaissances",
-    description: "Enrichissez vos agents avec une base de connaissances personnalisée et évolutive.",
-    color: "from-orange-500 to-amber-500",
-    bgColor: "bg-orange-500/20",
-  },
-  {
-    icon: Plug,
-    title: "Intégrations Multiples",
-    description: "Connectez ElevenLabs, Vapi, Retell et bien d'autres plateformes en quelques clics.",
-    color: "from-pink-500 to-rose-500",
-    bgColor: "bg-pink-500/20",
-  },
-];
+  Zap,
+  TrendingUp
+} from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export const AnimatedFeatures = () => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const { t } = useTranslation();
+  const [currentFeature, setCurrentFeature] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const features = [
+    {
+      icon: BarChart3,
+      title: t('auth.features.realTimeAnalytics.title'),
+      description: t('auth.features.realTimeAnalytics.description'),
+      color: 'from-blue-500 to-cyan-500',
+      bgColor: 'bg-blue-500/20',
+    },
+    {
+      icon: Bot,
+      title: t('auth.features.aiAgents.title'),
+      description: t('auth.features.aiAgents.description'),
+      color: 'from-purple-500 to-pink-500',
+      bgColor: 'bg-purple-500/20',
+    },
+    {
+      icon: MessageSquare,
+      title: t('auth.features.conversationManagement.title'),
+      description: t('auth.features.conversationManagement.description'),
+      color: 'from-emerald-500 to-teal-500',
+      bgColor: 'bg-emerald-500/20',
+    },
+    {
+      icon: BookOpen,
+      title: t('auth.features.knowledgeBase.title'),
+      description: t('auth.features.knowledgeBase.description'),
+      color: 'from-orange-500 to-amber-500',
+      bgColor: 'bg-orange-500/20',
+    },
+    {
+      icon: Plug,
+      title: t('auth.features.integrations.title'),
+      description: t('auth.features.integrations.description'),
+      color: 'from-pink-500 to-rose-500',
+      bgColor: 'bg-pink-500/20',
+    },
+  ];
 
   useEffect(() => {
+    if (isPaused) return;
+    
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % features.length);
+      setCurrentFeature((prev) => (prev + 1) % features.length);
     }, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [features.length, isPaused]);
 
-  const currentFeature = features[currentIndex];
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left - rect.width / 2) / rect.width;
+    const y = (e.clientY - rect.top - rect.height / 2) / rect.height;
+    setMousePosition({ x: x * 20, y: y * 20 });
+  };
+
+  const handleFeatureClick = (index: number) => {
+    setCurrentFeature(index);
+    setIsPaused(true);
+    setTimeout(() => setIsPaused(false), 8000);
+  };
+
+  const current = features[currentFeature];
 
   return (
-    <div className="relative h-full w-full flex flex-col items-center justify-center p-12">
+    <div 
+      ref={containerRef}
+      className="relative h-full w-full overflow-hidden"
+      onMouseMove={handleMouseMove}
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
       {/* Animated background gradient */}
-      <div className="absolute inset-0 overflow-hidden">
+      <AnimatePresence mode="wait">
         <motion.div
-          key={currentIndex}
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 1.2 }}
-          transition={{ duration: 0.8 }}
-          className={`absolute top-1/4 left-1/4 w-96 h-96 ${currentFeature.bgColor} rounded-full blur-[100px]`}
+          key={currentFeature}
+          initial={{ opacity: 0, scale: 1.1 }}
+          animate={{ opacity: 0.4, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          transition={{ duration: 0.8, ease: "easeInOut" }}
+          className={`absolute inset-0 bg-gradient-to-br ${current.color}`}
+          style={{
+            transform: `translate(${mousePosition.x}px, ${mousePosition.y}px)`,
+          }}
         />
-        <motion.div
-          initial={{ opacity: 0.5 }}
-          animate={{ opacity: [0.3, 0.6, 0.3] }}
-          transition={{ duration: 4, repeat: Infinity }}
-          className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-secondary/20 rounded-full blur-[80px]"
-        />
-      </div>
+      </AnimatePresence>
 
-      {/* Floating icons */}
+      {/* Floating icons with interactivity */}
       <div className="absolute inset-0">
         {features.map((feature, index) => {
           const Icon = feature.icon;
-          const angle = (index * 360) / features.length;
+          const angle = (index * 72 - 90) * (Math.PI / 180);
           const radius = 180;
-          const x = Math.cos((angle * Math.PI) / 180) * radius;
-          const y = Math.sin((angle * Math.PI) / 180) * radius;
+          const x = Math.cos(angle) * radius;
+          const y = Math.sin(angle) * radius;
+          const isActive = index === currentFeature;
           
           return (
             <motion.div
               key={index}
-              initial={{ opacity: 0.3, scale: 0.8 }}
+              className="absolute left-1/2 top-1/2 cursor-pointer group"
+              initial={false}
               animate={{
-                opacity: currentIndex === index ? 1 : 0.3,
-                scale: currentIndex === index ? 1.2 : 0.8,
-                x: `calc(50% + ${x}px - 24px)`,
-                y: `calc(50% + ${y}px - 24px)`,
+                x: x + mousePosition.x * 0.5,
+                y: y + mousePosition.y * 0.5,
+                scale: isActive ? 1.3 : 1,
+                opacity: isActive ? 1 : 0.5,
               }}
-              transition={{ duration: 0.5 }}
-              className={`absolute w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center shadow-lg`}
+              whileHover={{ scale: isActive ? 1.4 : 1.2, opacity: 1 }}
+              transition={{ 
+                type: "spring", 
+                stiffness: 300, 
+                damping: 20,
+                duration: 0.3
+              }}
+              onClick={() => handleFeatureClick(index)}
             >
-              <Icon className="w-6 h-6 text-white" />
+              <motion.div
+                className={`${feature.bgColor} p-4 rounded-2xl backdrop-blur-sm border border-white/10 relative`}
+                animate={{
+                  boxShadow: isActive 
+                    ? '0 0 30px rgba(255,255,255,0.3)' 
+                    : '0 0 10px rgba(255,255,255,0.1)',
+                }}
+              >
+                <Icon className="w-8 h-8 text-white" />
+                
+                {/* Tooltip on hover */}
+                <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-sm px-3 py-1.5 rounded-lg whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <span className="text-xs text-white font-medium">{feature.title}</span>
+                </div>
+              </motion.div>
+              
+              {/* Pulse animation for active icon */}
+              {isActive && (
+                <motion.div
+                  className={`absolute inset-0 ${feature.bgColor} rounded-2xl`}
+                  initial={{ scale: 1, opacity: 0.5 }}
+                  animate={{ scale: 1.5, opacity: 0 }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                />
+              )}
             </motion.div>
           );
         })}
       </div>
 
-      {/* Main content */}
-      <div className="relative z-10 text-center max-w-md">
+      {/* Center content with parallax */}
+      <motion.div 
+        className="absolute inset-0 flex flex-col items-center justify-center p-8"
+        style={{
+          transform: `translate(${mousePosition.x * 0.3}px, ${mousePosition.y * 0.3}px)`,
+        }}
+      >
         <AnimatePresence mode="wait">
           <motion.div
-            key={currentIndex}
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -30 }}
-            transition={{ duration: 0.5 }}
+            key={currentFeature}
+            initial={{ opacity: 0, y: 30, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -30, scale: 0.9 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="text-center max-w-md"
           >
-            {/* Icon */}
             <motion.div
-              className={`w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br ${currentFeature.color} flex items-center justify-center mb-8 shadow-2xl`}
-              animate={{ rotate: [0, 5, -5, 0] }}
-              transition={{ duration: 2, repeat: Infinity }}
+              className={`inline-flex p-5 rounded-3xl bg-gradient-to-br ${current.color} mb-6 shadow-2xl`}
+              whileHover={{ scale: 1.1, rotate: 5 }}
+              transition={{ type: "spring", stiffness: 400 }}
             >
-              <currentFeature.icon className="w-10 h-10 text-white" />
+              <current.icon className="w-12 h-12 text-white" />
             </motion.div>
-
-            {/* Title */}
-            <h3 className="text-2xl font-bold mb-4 text-white">
-              {currentFeature.title}
-            </h3>
-
-            {/* Description */}
-            <p className="text-white/70 text-lg leading-relaxed">
-              {currentFeature.description}
-            </p>
+            
+            <motion.h3 
+              className="text-2xl font-bold text-white mb-3"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+            >
+              {current.title}
+            </motion.h3>
+            
+            <motion.p 
+              className="text-white/70 text-base leading-relaxed"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              {current.description}
+            </motion.p>
           </motion.div>
         </AnimatePresence>
+      </motion.div>
 
-        {/* Progress indicators */}
-        <div className="flex justify-center gap-2 mt-12">
-          {features.map((_, index) => (
-            <motion.button
-              key={index}
-              onClick={() => setCurrentIndex(index)}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                index === currentIndex 
-                  ? "w-8 bg-white" 
-                  : "w-2 bg-white/30 hover:bg-white/50"
-              }`}
-            />
-          ))}
-        </div>
+      {/* Progress indicators */}
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex gap-3">
+        {features.map((_, index) => (
+          <motion.button
+            key={index}
+            onClick={() => handleFeatureClick(index)}
+            className={`relative h-2 rounded-full transition-all duration-300 ${
+              index === currentFeature ? 'w-10 bg-white' : 'w-2 bg-white/30 hover:bg-white/50'
+            }`}
+            whileHover={{ scale: 1.2 }}
+            whileTap={{ scale: 0.9 }}
+          >
+            {index === currentFeature && !isPaused && (
+              <motion.div
+                className="absolute inset-0 bg-white/50 rounded-full"
+                initial={{ scaleX: 0, originX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ duration: 4, ease: "linear" }}
+              />
+            )}
+          </motion.button>
+        ))}
       </div>
 
-      {/* Stats at bottom */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="absolute bottom-12 left-0 right-0 flex justify-center gap-12"
-      >
+      {/* Bottom stats */}
+      <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 flex gap-8">
         {[
-          { icon: Shield, label: "Sécurisé" },
-          { icon: Zap, label: "Rapide" },
-          { icon: TrendingUp, label: "Évolutif" },
+          { icon: Shield, label: t('auth.features.stats.secure') },
+          { icon: Zap, label: t('auth.features.stats.fast') },
+          { icon: TrendingUp, label: t('auth.features.stats.scalable') },
         ].map((stat, index) => (
-          <div key={stat.label} className="flex items-center gap-2 text-white/60">
+          <motion.div
+            key={index}
+            className="flex items-center gap-2 text-white/60 hover:text-white/90 transition-colors cursor-default"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 + index * 0.1 }}
+            whileHover={{ scale: 1.1 }}
+          >
             <stat.icon className="w-4 h-4" />
-            <span className="text-sm">{stat.label}</span>
-          </div>
+            <span className="text-sm font-medium">{stat.label}</span>
+          </motion.div>
         ))}
-      </motion.div>
+      </div>
+
+      {/* Pause indicator */}
+      <AnimatePresence>
+        {isPaused && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute top-4 right-4 text-white/40 text-xs flex items-center gap-1"
+          >
+            <div className="w-1.5 h-1.5 bg-white/40 rounded-full" />
+            <div className="w-1.5 h-1.5 bg-white/40 rounded-full" />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
