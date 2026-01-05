@@ -33,23 +33,59 @@ serve(async (req) => {
       format = 'mp3'
     } = await req.json();
 
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    const authHeaderRaw = req.headers.get('authorization') || req.headers.get('Authorization');
+    if (!authHeaderRaw) {
       return new Response(JSON.stringify({ error: 'Authorization required' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const match = authHeaderRaw.match(/Bearer\s+(.+)/i);
+    const token = match?.[1]?.trim();
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Invalid authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('Missing backend env vars', {
+        hasUrl: !!supabaseUrl,
+        hasAnonKey: !!supabaseAnonKey,
+      });
+      return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+
+    // Prefer header-based auth, fallback to explicit token for older clients
+    let user: any = null;
+    let userError: any = null;
+
+    const res1 = await supabase.auth.getUser();
+    user = res1.data?.user;
+    userError = res1.error;
+
     if (userError || !user) {
+      const res2 = await supabase.auth.getUser(token);
+      user = res2.data?.user;
+      userError = userError ?? res2.error;
+    }
+
+    if (userError || !user) {
+      console.error('Unauthorized: failed to resolve user from JWT', {
+        error: userError?.message ?? String(userError),
+      });
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
