@@ -158,12 +158,12 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-9 w-9 bg-slate-700 hover:bg-slate-600 border-slate-500 text-white hover:text-white shadow-md"
+                        className="h-9 w-9 bg-gradient-to-r from-purple-600/80 to-pink-600/80 hover:from-purple-500 hover:to-pink-500 border-purple-400/30 text-white shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition-all duration-200"
                       >
                         <MoreHorizontal className="h-5 w-5" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-slate-800 border-slate-600 shadow-2xl z-50 min-w-[180px]">
+                    <DropdownMenuContent align="end" className="bg-gradient-to-br from-slate-900 to-slate-800 border-purple-500/30 shadow-2xl shadow-purple-500/10 z-50 min-w-[180px]">
                       <DropdownMenuItem onClick={() => navigate(`/agent-settings/${agent.id}`)}>
                         <Settings className="h-4 w-4 mr-2" />
                         Paramètres
