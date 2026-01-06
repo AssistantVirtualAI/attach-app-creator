@@ -50,7 +50,7 @@ export const usePortalAuth = () => {
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setSupabaseUser(user);
-      
+
       // Check super admin status server-side
       if (user?.id) {
         const superAdmin = await checkIsSuperAdmin(user.id);
@@ -61,16 +61,21 @@ export const usePortalAuth = () => {
     };
     checkAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // IMPORTANT: keep this callback synchronous to avoid auth deadlocks
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const user = session?.user || null;
       setSupabaseUser(user);
-      
-      if (user?.id) {
+
+      if (!user?.id) {
+        setIsSuperAdminUser(false);
+        return;
+      }
+
+      // Defer any Supabase calls
+      setTimeout(async () => {
         const superAdmin = await checkIsSuperAdmin(user.id);
         setIsSuperAdminUser(superAdmin);
-      } else {
-        setIsSuperAdminUser(false);
-      }
+      }, 0);
     });
 
     return () => subscription.unsubscribe();
