@@ -2,11 +2,10 @@ import { useState, useMemo } from 'react';
 import { usePortal } from '@/hooks/usePortalAuth';
 import {
   usePortalKnowledgeBase,
-  usePortalKnowledgeBaseDocument,
+  usePortalKnowledgeDocument,
   usePortalAddKnowledgeDocument,
   usePortalDeleteKnowledgeDocument,
-  usePortalUpdateKnowledgeDocument,
-} from '@/hooks/usePortalElevenLabs';
+} from '@/hooks/usePortalKnowledgeBase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -32,7 +31,6 @@ import {
   Loader2,
   AlertCircle,
   Eye,
-  Edit,
   Link as LinkIcon,
   RefreshCw,
   Filter,
@@ -40,7 +38,6 @@ import {
 import { motion } from 'framer-motion';
 import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { GlowBadge } from '@/components/portal/GlowBadge';
-import { PlatformNotSupported } from '@/components/portal/PlatformNotSupported';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -48,37 +45,24 @@ import { toast } from 'sonner';
 const PortalKnowledge = () => {
   const { session } = usePortal();
 
-  // Knowledge base management is currently implemented only for ElevenLabs portal hooks.
-  if (session?.platform && session.platform !== 'elevenlabs') {
-    return (
-      <PlatformNotSupported
-        title="Base de connaissances indisponible pour cette plateforme"
-        description={`La gestion de la base de connaissances du portail est pour l’instant disponible uniquement pour ElevenLabs. Pour ${String(session.platform).toUpperCase()}, vous pouvez consulter les conversations et les analytics.`}
-        primaryCtaHref="/portal/conversations"
-      />
-    );
-  }
-
   const { data: kbData, isLoading, refetch } = usePortalKnowledgeBase();
   const addDocument = usePortalAddKnowledgeDocument();
   const deleteDocument = usePortalDeleteKnowledgeDocument();
-  const updateDocument = usePortalUpdateKnowledgeDocument();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newDocName, setNewDocName] = useState('');
   const [newDocContent, setNewDocContent] = useState('');
+  const [newDocUrl, setNewDocUrl] = useState('');
+  const [addType, setAddType] = useState<'text' | 'url'>('text');
 
-  // View/Edit modal state
+  // View modal state
   const [viewDocumentId, setViewDocumentId] = useState<string | null>(null);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editContent, setEditContent] = useState('');
 
   const { data: documentData, isLoading: isLoadingDocument } = usePortalKnowledgeDocument(viewDocumentId);
 
-  // Only admins can edit: super_admin, admin role, client principal, or member with admin role
+  // Only admins can edit
   const isAdmin =
     session?.role === 'super_admin' ||
     session?.role === 'admin' ||
@@ -104,12 +88,10 @@ const PortalKnowledge = () => {
     const docName = doc.name || doc.title || '';
     const docCategory = doc.category || doc.type || 'Général';
     
-    // Search filter
     if (searchTerm && !docName.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
     }
     
-    // Category filter
     if (categoryFilter !== 'all' && docCategory !== categoryFilter) {
       return false;
     }
@@ -167,26 +149,8 @@ const PortalKnowledge = () => {
     }
   };
 
-  const handleOpenView = (docId: string, docName: string) => {
+  const handleOpenView = (docId: string) => {
     setViewDocumentId(docId);
-    setIsEditMode(false);
-    setEditName(docName);
-    setEditContent('');
-  };
-
-  const handleStartEdit = () => {
-    if (documentData) {
-      setEditName(documentData.name || '');
-      setEditContent(documentData.content || '');
-    }
-    setIsEditMode(true);
-  };
-
-  const handleSaveEdit = async () => {
-    // Edit not supported for now in multi-platform mode
-    toast.info('La modification n\'est pas encore supportée pour cette plateforme');
-    setViewDocumentId(null);
-    setIsEditMode(false);
   };
 
   const getDocIcon = (type: string) => {
@@ -248,7 +212,6 @@ const PortalKnowledge = () => {
 
       {items.length > 0 && (
         <div className="space-y-4">
-          {/* Search and Filters */}
           <Card className="bg-card/50 backdrop-blur-sm border-border/30">
             <CardContent className="p-4">
               <div className="flex flex-col md:flex-row gap-4">
@@ -282,7 +245,6 @@ const PortalKnowledge = () => {
             </CardContent>
           </Card>
 
-          {/* Documents Grid */}
           <ScrollArea className="h-[calc(100vh-380px)]">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredDocuments.map((doc: any, index: number) => (
@@ -325,7 +287,7 @@ const PortalKnowledge = () => {
                           variant="ghost" 
                           size="sm" 
                           className="flex-1 gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => handleOpenView(doc.id, doc.name || doc.title || '')}
+                          onClick={() => handleOpenView(doc.id)}
                         >
                           <Eye className="h-3 w-3" />
                           Voir
@@ -361,16 +323,16 @@ const PortalKnowledge = () => {
         </div>
       )}
 
-      {/* View/Edit Document Modal */}
-      <Dialog open={!!viewDocumentId} onOpenChange={(open) => { if (!open) { setViewDocumentId(null); setIsEditMode(false); } }}>
+      {/* View Document Modal */}
+      <Dialog open={!!viewDocumentId} onOpenChange={(open) => { if (!open) setViewDocumentId(null); }}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              {isEditMode ? 'Modifier le document' : (documentData?.document?.name || 'Document')}
+              {documentData?.name || 'Document'}
             </DialogTitle>
             <DialogDescription>
-              {isEditMode ? 'Modifiez le contenu du document' : 'Contenu complet du document'}
+              Contenu complet du document
             </DialogDescription>
           </DialogHeader>
           
@@ -379,82 +341,32 @@ const PortalKnowledge = () => {
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
-            ) : isEditMode ? (
-              <div className="space-y-4 p-1">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Nom du document</label>
-                  <Input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Nom du document"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Contenu</label>
-                  <Textarea
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    placeholder="Contenu du document..."
-                    rows={12}
-                    className="font-mono text-sm"
-                  />
-                </div>
-              </div>
-            ) : documentData?.document?.content ? (
+            ) : documentData?.content ? (
               <div className="whitespace-pre-wrap text-sm p-4 bg-muted rounded-lg">
-                {documentData.document.content}
+                {documentData.content}
               </div>
-            ) : documentData?.document?.url ? (
+            ) : documentData?.url ? (
               <div className="p-4">
                 <p className="text-sm text-muted-foreground mb-2">Document lié à une URL :</p>
                 <a 
-                  href={documentData.document.url} 
+                  href={documentData.url} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-primary hover:underline flex items-center gap-1"
                 >
-                  {documentData.document.url}
+                  {documentData.url}
                   <ExternalLink className="h-3 w-3" />
                 </a>
-              </div>
-            ) : documentData?.document?.content_unavailable_reason ? (
-              <div className="p-4 text-center">
-                <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <p className="text-muted-foreground">
-                  {documentData.document.content_unavailable_reason === 'binary_or_not_extractible' 
-                    ? 'Ce fichier est binaire ou son contenu ne peut pas être extrait.'
-                    : 'Le contenu de ce document n\'est pas disponible.'}
-                </p>
               </div>
             ) : (
               <p className="text-muted-foreground p-4 text-center">Aucun contenu disponible</p>
             )}
           </ScrollArea>
 
-          <DialogFooter className="gap-2">
-            {isEditMode ? (
-              <>
-                <Button variant="outline" onClick={() => setIsEditMode(false)}>
-                  Annuler
-                </Button>
-                <Button onClick={handleSaveEdit} disabled={updateDocument.isPending} className="gap-2">
-                  {updateDocument.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Sauvegarder
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button variant="outline" onClick={() => setViewDocumentId(null)}>
-                  Fermer
-                </Button>
-                {canEdit && documentData?.document?.type !== 'url' && documentData?.document?.content && (
-                  <Button onClick={handleStartEdit} className="gap-2">
-                    <Edit className="h-4 w-4" />
-                    Modifier
-                  </Button>
-                )}
-              </>
-            )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewDocumentId(null)}>
+              Fermer
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -467,6 +379,18 @@ const PortalKnowledge = () => {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
+              <label className="text-sm font-medium">Type de document</label>
+              <Select value={addType} onValueChange={(v: 'text' | 'url') => setAddType(v)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="text">Texte</SelectItem>
+                  <SelectItem value="url">URL</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <label className="text-sm font-medium">Nom du document</label>
               <Input
                 value={newDocName}
@@ -474,15 +398,26 @@ const PortalKnowledge = () => {
                 placeholder="Ex: FAQ Produit"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Contenu</label>
-              <Textarea
-                value={newDocContent}
-                onChange={(e) => setNewDocContent(e.target.value)}
-                placeholder="Entrez le contenu du document..."
-                rows={8}
-              />
-            </div>
+            {addType === 'text' ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Contenu</label>
+                <Textarea
+                  value={newDocContent}
+                  onChange={(e) => setNewDocContent(e.target.value)}
+                  placeholder="Entrez le contenu du document..."
+                  rows={8}
+                />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">URL</label>
+                <Input
+                  value={newDocUrl}
+                  onChange={(e) => setNewDocUrl(e.target.value)}
+                  placeholder="https://example.com/document"
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
