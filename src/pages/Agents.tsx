@@ -97,7 +97,13 @@ export default function Agents() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="relative space-y-6">
+        {/* Background (subtle, non-black) */}
+        <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+          <div className="absolute -top-24 -right-24 h-80 w-80 rounded-full bg-primary/10 blur-3xl" />
+          <div className="absolute top-40 -left-24 h-96 w-96 rounded-full bg-secondary/10 blur-3xl" />
+          <div className="absolute bottom-0 right-16 h-72 w-72 rounded-full bg-accent/10 blur-3xl" />
+        </div>
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <PortalPageHeader
