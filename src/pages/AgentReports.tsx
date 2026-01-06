@@ -221,11 +221,8 @@ const AgentReports = () => {
     volume: Math.min(agent.totalConversations / 10, 10),
   })) || [];
 
-  // Prepare hourly distribution (mock data based on existing conversations)
-  const hourlyData = Array.from({ length: 24 }, (_, i) => ({
-    hour: `${i}h`,
-    conversations: Math.floor(Math.random() * 20 + (i >= 9 && i <= 18 ? 15 : 5)),
-  }));
+  // Use real hourly distribution from reports data
+  const hourlyData = reportsData?.hourlyDistribution || [];
 
   return (
     <AppLayout>
@@ -276,10 +273,10 @@ const AgentReports = () => {
         {/* Data Source Indicator */}
         {reportsData && (
           <div className="flex items-center gap-2 text-sm">
-            {reportsData.dataSource === 'elevenlabs' ? (
+            {reportsData.dataSource === 'platform' ? (
               <Badge variant="outline" className="gap-1 text-green-500 border-green-500/30">
                 <CheckCircle className="h-3 w-3" />
-                Connecté à ElevenLabs
+                Connecté aux plateformes
               </Badge>
             ) : (
               <Badge variant="outline" className="gap-1 text-muted-foreground">
@@ -519,19 +516,24 @@ const AgentReports = () => {
                 <CardDescription>Tendance sur les 7 derniers jours</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={Array.from({ length: 7 }, (_, i) => ({
-                    day: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'][i],
-                    conversations: Math.floor(Math.random() * 30 + 10),
-                    satisfaction: Math.random() * 2 + 7,
-                  }))}>
-                    <XAxis dataKey="day" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Area type="monotone" dataKey="conversations" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.2)" name="Conversations" />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {reportsData?.dailyTrends && reportsData.dailyTrends.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={reportsData.dailyTrends}>
+                      <XAxis dataKey="day" />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value, name) => [value, name === 'conversations' ? 'Conversations' : name]}
+                        labelFormatter={(label) => `${label}`}
+                      />
+                      <Legend />
+                      <Area type="monotone" dataKey="conversations" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.2)" name="Conversations" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    <p>Aucune donnée disponible pour cette période</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -541,17 +543,22 @@ const AgentReports = () => {
                 <CardDescription>Score moyen par jour</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <AreaChart data={Array.from({ length: 7 }, (_, i) => ({
-                    day: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'][i],
-                    satisfaction: Math.random() * 2 + 7,
-                  }))}>
-                    <XAxis dataKey="day" />
-                    <YAxis domain={[0, 10]} />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="satisfaction" stroke="#22c55e" fill="#22c55e20" name="Satisfaction" />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {reportsData?.dailyTrends && reportsData.dailyTrends.some(d => d.satisfaction > 0) ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <AreaChart data={reportsData.dailyTrends}>
+                      <XAxis dataKey="day" />
+                      <YAxis domain={[0, 10]} />
+                      <Tooltip 
+                        formatter={(value) => [`${value}/10`, 'Satisfaction']}
+                      />
+                      <Area type="monotone" dataKey="satisfaction" stroke="#22c55e" fill="#22c55e20" name="Satisfaction" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                    <p>Aucune donnée de satisfaction disponible</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -567,14 +574,20 @@ const AgentReports = () => {
                 <CardDescription>Nombre de conversations par heure</CardDescription>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={hourlyData}>
-                    <XAxis dataKey="hour" tick={{ fontSize: 10 }} />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="conversations" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {hourlyData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={hourlyData}>
+                      <XAxis dataKey="hour" tick={{ fontSize: 10 }} />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="conversations" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    <p>Aucune donnée disponible</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -584,7 +597,7 @@ const AgentReports = () => {
                   <CardTitle className="text-sm">Heure de Pointe</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-3xl font-bold">14h - 16h</p>
+                  <p className="text-3xl font-bold">{reportsData?.peakHour || '—'}</p>
                   <p className="text-sm text-muted-foreground">Plus d'activité</p>
                 </CardContent>
               </Card>
@@ -593,7 +606,7 @@ const AgentReports = () => {
                   <CardTitle className="text-sm">Heure Creuse</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-3xl font-bold">3h - 6h</p>
+                  <p className="text-3xl font-bold">{reportsData?.quietHour || '—'}</p>
                   <p className="text-sm text-muted-foreground">Moins d'activité</p>
                 </CardContent>
               </Card>
@@ -602,7 +615,7 @@ const AgentReports = () => {
                   <CardTitle className="text-sm">Jour le Plus Actif</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-3xl font-bold">Mardi</p>
+                  <p className="text-3xl font-bold">{reportsData?.busiestDay || '—'}</p>
                   <p className="text-sm text-muted-foreground">En moyenne</p>
                 </CardContent>
               </Card>

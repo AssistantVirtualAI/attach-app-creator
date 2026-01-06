@@ -15,6 +15,102 @@ interface ConversationFilters {
   minDuration?: number;
   maxDuration?: number;
   search?: string;
+  platform?: string;
+}
+
+interface NormalizedConversation {
+  conversation_id: string;
+  agent_id: string;
+  agent_name: string;
+  platform_agent_id: string;
+  platform: string;
+  start_time: string;
+  end_time?: string;
+  duration: number;
+  status: string;
+  transcript?: string;
+  metadata?: any;
+  analysis?: {
+    summary?: string;
+    satisfaction_score?: number;
+    sentiment?: string;
+    keywords?: string[];
+  };
+}
+
+// Normalize ElevenLabs conversation
+function normalizeElevenLabsConversation(conv: any, config: any): NormalizedConversation {
+  return {
+    conversation_id: conv.conversation_id,
+    agent_id: config.id,
+    agent_name: config.name,
+    platform_agent_id: config.agentId,
+    platform: 'elevenlabs',
+    start_time: conv.start_time || conv.created_at || conv.timestamp,
+    end_time: conv.end_time,
+    duration: conv.call_duration_secs || conv.duration || 0,
+    status: conv.status || 'completed',
+    transcript: conv.transcript,
+    metadata: conv.metadata,
+    analysis: conv.analysis,
+  };
+}
+
+// Normalize Retell call
+function normalizeRetellCall(call: any, config: any): NormalizedConversation {
+  const startTime = call.start_timestamp ? new Date(call.start_timestamp).toISOString() : undefined;
+  const endTime = call.end_timestamp ? new Date(call.end_timestamp).toISOString() : undefined;
+  const duration = call.end_timestamp && call.start_timestamp 
+    ? Math.round((call.end_timestamp - call.start_timestamp) / 1000) 
+    : 0;
+
+  return {
+    conversation_id: call.call_id,
+    agent_id: config.id,
+    agent_name: config.name,
+    platform_agent_id: config.agentId,
+    platform: 'retell',
+    start_time: startTime || call.created_at || new Date().toISOString(),
+    end_time: endTime,
+    duration: duration,
+    status: call.call_status || call.status || 'completed',
+    transcript: call.transcript,
+    metadata: call.metadata,
+    analysis: call.call_analysis ? {
+      summary: call.call_analysis.call_summary,
+      satisfaction_score: call.call_analysis.user_sentiment === 'Positive' ? 8 : 
+                          call.call_analysis.user_sentiment === 'Negative' ? 3 : 5,
+      sentiment: call.call_analysis.user_sentiment?.toLowerCase(),
+    } : undefined,
+  };
+}
+
+// Normalize Vapi call
+function normalizeVapiCall(call: any, config: any): NormalizedConversation {
+  const startTime = call.startedAt || call.createdAt;
+  const endTime = call.endedAt;
+  const duration = startTime && endTime 
+    ? Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 1000) 
+    : call.duration || 0;
+
+  return {
+    conversation_id: call.id,
+    agent_id: config.id,
+    agent_name: config.name,
+    platform_agent_id: config.agentId,
+    platform: 'vapi',
+    start_time: startTime || new Date().toISOString(),
+    end_time: endTime,
+    duration: duration,
+    status: call.status || 'completed',
+    transcript: call.transcript,
+    metadata: call.metadata,
+    analysis: call.analysis ? {
+      summary: call.analysis.summary,
+      satisfaction_score: call.analysis.successEvaluation === 'true' ? 8 : 5,
+      sentiment: call.analysis.successEvaluation === 'true' ? 'positive' : 'neutral',
+    } : undefined,
+  };
 }
 
 serve(async (req) => {
@@ -29,7 +125,6 @@ serve(async (req) => {
       filters = {} as ConversationFilters,
       action = 'list',
       conversationId,
-      agentId: specificAgentId,
       format = 'mp3'
     } = await req.json();
 
@@ -54,10 +149,7 @@ serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
     if (!supabaseUrl || !supabaseAnonKey) {
-      console.error('Missing backend env vars', {
-        hasUrl: !!supabaseUrl,
-        hasAnonKey: !!supabaseAnonKey,
-      });
+      console.error('Missing backend env vars');
       return new Response(JSON.stringify({ error: 'Server misconfigured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -68,24 +160,16 @@ serve(async (req) => {
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
 
-    // Prefer header-based auth, fallback to explicit token for older clients
+    // Auth user
     let user: any = null;
-    let userError: any = null;
-
     const res1 = await supabase.auth.getUser();
     user = res1.data?.user;
-    userError = res1.error;
-
-    if (userError || !user) {
+    if (!user) {
       const res2 = await supabase.auth.getUser(token);
       user = res2.data?.user;
-      userError = userError ?? res2.error;
     }
 
-    if (userError || !user) {
-      console.error('Unauthorized: failed to resolve user from JWT', {
-        error: userError?.message ?? String(userError),
-      });
+    if (!user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -106,56 +190,73 @@ serve(async (req) => {
       });
     }
 
-    // Get all ElevenLabs agents for the organization
+    // Get ALL agents for the organization (no platform filter)
     const { data: agents, error: agentsError } = await supabase
       .from('agents')
       .select('id, name, platform_agent_id, platform_api_key, platform, config')
-      .eq('organization_id', orgMember.organization_id)
-      .eq('platform', 'elevenlabs');
+      .eq('organization_id', orgMember.organization_id);
 
     if (agentsError) {
       console.error('Error fetching agents:', agentsError);
       throw new Error('Error fetching agents');
     }
 
-    // Get all ElevenLabs integrations (by org_id OR user_id)
+    // Get all integrations (for fallback API keys)
     const { data: integrations } = await supabase
       .from('organization_integrations')
-      .select('id, agent_id, api_key, additional_config')
-      .eq('platform', 'elevenlabs')
+      .select('id, agent_id, api_key, platform, additional_config')
       .eq('is_active', true)
       .or(`organization_id.eq.${orgMember.organization_id},user_id.eq.${user.id}`);
 
-    // Build a map of integration_id -> api_key
-    const integrationApiKeys: Record<string, string> = {};
+    // Build integration API keys map by platform
+    const integrationApiKeys: Record<string, Record<string, string>> = {
+      elevenlabs: {},
+      retell: {},
+      vapi: {}
+    };
+    
     if (integrations) {
       for (const integration of integrations) {
-        if (integration.api_key) {
-          integrationApiKeys[integration.id] = integration.api_key;
+        if (integration.api_key && integration.platform) {
+          integrationApiKeys[integration.platform] = integrationApiKeys[integration.platform] || {};
+          integrationApiKeys[integration.platform][integration.id] = integration.api_key;
+          // Also set a default key for the platform
+          integrationApiKeys[integration.platform]['_default'] = integration.api_key;
         }
       }
     }
 
-    // If no agents found, try organization_integrations as fallback
-    let agentConfigs: Array<{ id: string; name: string; agentId: string; apiKey: string }> = [];
+    // Build agent configs for all platforms
+    interface AgentConfig {
+      id: string;
+      name: string;
+      agentId: string;
+      apiKey: string;
+      platform: string;
+    }
+    
+    const agentConfigs: AgentConfig[] = [];
 
     if (agents && agents.length > 0) {
-      // Use agents from the agents table
       for (const agent of agents) {
-        // Get agent ID from platform_agent_id OR config.agent_id
         const agentId = agent.platform_agent_id || (agent.config as any)?.agent_id;
-        
         if (!agentId) {
           console.log(`Agent ${agent.name} has no agent_id configured`);
           continue;
         }
 
-        // Get API key from platform_api_key OR via integration_id in config
+        // Get API key from platform_api_key OR integration fallback
         let apiKey = agent.platform_api_key;
         
         if (!apiKey && (agent.config as any)?.integration_id) {
-          apiKey = integrationApiKeys[(agent.config as any).integration_id];
-          console.log(`Using API key from integration ${(agent.config as any).integration_id} for agent ${agent.name}`);
+          const platform = agent.platform || 'elevenlabs';
+          apiKey = integrationApiKeys[platform]?.[(agent.config as any).integration_id];
+        }
+        
+        // Fallback to default integration key for the platform
+        if (!apiKey) {
+          const platform = agent.platform || 'elevenlabs';
+          apiKey = integrationApiKeys[platform]?.['_default'];
         }
 
         if (apiKey) {
@@ -163,28 +264,28 @@ serve(async (req) => {
             id: agent.id,
             name: agent.name,
             agentId: agentId,
-            apiKey: apiKey
+            apiKey: apiKey,
+            platform: agent.platform || 'elevenlabs'
           });
-          console.log(`Added agent config for ${agent.name} with agentId ${agentId}`);
+          console.log(`Added agent config for ${agent.name} (${agent.platform}) with agentId ${agentId}`);
         } else {
           console.log(`Agent ${agent.name} has no API key available`);
         }
       }
     }
 
-    // Also add agents from integrations that have agent_id directly
-
+    // Also add agents from integrations with agent_id
     if (integrations) {
       for (const integration of integrations) {
         if (integration.agent_id && integration.api_key) {
-          // Check if this agent is already in our list
           const exists = agentConfigs.some(a => a.agentId === integration.agent_id);
           if (!exists) {
             agentConfigs.push({
               id: integration.id,
-              name: `Integration Agent`,
+              name: `${integration.platform} Agent`,
               agentId: integration.agent_id,
-              apiKey: integration.api_key
+              apiKey: integration.api_key,
+              platform: integration.platform
             });
           }
         }
@@ -195,7 +296,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           requiresSetup: true, 
-          message: 'Aucun agent ElevenLabs configuré. Veuillez créer un agent avec vos credentials ElevenLabs.',
+          message: 'Aucun agent configuré. Veuillez créer un agent avec vos credentials.',
           conversations: [],
           agents: [],
           total: 0
@@ -204,25 +305,33 @@ serve(async (req) => {
       );
     }
 
-    // Handle different actions
+    // Handle 'details' action
     if (action === 'details' && conversationId) {
-      // Find the right agent for this conversation
       for (const config of agentConfigs) {
         try {
-          const detailsResponse = await fetch(
-            `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`,
-            {
-              headers: {
-                'xi-api-key': config.apiKey,
-                'accept': 'application/json',
-              },
-            }
-          );
+          let detailsResponse;
+          
+          if (config.platform === 'elevenlabs') {
+            detailsResponse = await fetch(
+              `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`,
+              { headers: { 'xi-api-key': config.apiKey, 'accept': 'application/json' } }
+            );
+          } else if (config.platform === 'retell') {
+            detailsResponse = await fetch(
+              `https://api.retellai.com/get-call/${conversationId}`,
+              { headers: { 'Authorization': `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' } }
+            );
+          } else if (config.platform === 'vapi') {
+            detailsResponse = await fetch(
+              `https://api.vapi.ai/call/${conversationId}`,
+              { headers: { 'Authorization': `Bearer ${config.apiKey}` } }
+            );
+          }
 
-          if (detailsResponse.ok) {
+          if (detailsResponse?.ok) {
             const detailsData = await detailsResponse.json();
             return new Response(
-              JSON.stringify({ ...detailsData, agent_name: config.name }),
+              JSON.stringify({ ...detailsData, agent_name: config.name, platform: config.platform }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
@@ -231,16 +340,15 @@ serve(async (req) => {
         }
       }
       
-       return new Response(
-         JSON.stringify({ notFound: true, error: 'Conversation not found' }),
-         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-       );
+      return new Response(
+        JSON.stringify({ notFound: true, error: 'Conversation not found' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
+    // Handle 'audio' action (only for ElevenLabs)
     if (action === 'audio' && conversationId) {
-      // Find the right agent for this conversation
-      for (const config of agentConfigs) {
-        // Try multiple endpoints for audio retrieval
+      for (const config of agentConfigs.filter(c => c.platform === 'elevenlabs')) {
         const audioEndpoints = [
           `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}/audio?format=${format}`,
           `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}/audio`,
@@ -248,23 +356,13 @@ serve(async (req) => {
 
         for (const audioUrl of audioEndpoints) {
           try {
-            console.log(`Trying audio endpoint: ${audioUrl} for agent ${config.name}`);
-            
             const audioResponse = await fetch(audioUrl, {
-              headers: {
-                'xi-api-key': config.apiKey,
-                'accept': 'audio/mpeg',
-              },
+              headers: { 'xi-api-key': config.apiKey, 'accept': 'audio/mpeg' },
             });
-
-            console.log(`Audio response status: ${audioResponse.status}`);
 
             if (audioResponse.ok) {
               const audioBuffer = await audioResponse.arrayBuffer();
               const base64Audio = base64Encode(audioBuffer);
-
-              console.log(`Audio fetched successfully for ${conversationId}, size: ${audioBuffer.byteLength} bytes`);
-
               return new Response(
                 JSON.stringify({
                   audio_base64: base64Audio,
@@ -273,49 +371,24 @@ serve(async (req) => {
                 }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
               );
-            } else {
-              const errorText = await audioResponse.text().catch(() => '');
-              console.log(`Audio fetch failed for ${conversationId} (${audioUrl}): ${audioResponse.status} - ${errorText.substring(0, 200)}`);
-              
-              // If 401/403 auth error, return specific error
-              if (audioResponse.status === 401 || audioResponse.status === 403) {
-                return new Response(
-                  JSON.stringify({ 
-                    audio_base64: null,
-                    audio_url: null,
-                    format,
-                    notFound: false,
-                    error_code: 'AUDIO_AUTH_ERROR',
-                    error: 'Authentication error when fetching audio'
-                  }),
-                  { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-                );
-              }
             }
           } catch (e) {
-            console.log(`Audio fetch error for ${conversationId} (${audioUrl}):`, e);
+            console.log(`Audio fetch error for ${conversationId}:`, e);
           }
         }
       }
       
       return new Response(
-        JSON.stringify({ 
-          audio_base64: null,
-          audio_url: null,
-          format,
-          notFound: true,
-          error_code: 'AUDIO_NOT_FOUND',
-          error: 'Audio not found'
-        }),
+        JSON.stringify({ audio_base64: null, audio_url: null, format, notFound: true }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // List conversations from all agents
-    console.log(`Fetching conversations from ${agentConfigs.length} agents`);
+    // List conversations from all agents (multi-platform)
+    console.log(`Fetching conversations from ${agentConfigs.length} agents across all platforms`);
     
-    const allConversations: any[] = [];
-    const agentsList: Array<{ id: string; name: string; agentId: string; conversationCount: number }> = [];
+    const allConversations: NormalizedConversation[] = [];
+    const agentsList: Array<{ id: string; name: string; agentId: string; platform: string; conversationCount: number }> = [];
 
     // Filter by specific agent if requested
     const configsToProcess = filters.agentId 
@@ -324,61 +397,91 @@ serve(async (req) => {
 
     for (const config of configsToProcess) {
       try {
-        console.log(`Fetching conversations for agent ${config.name} (${config.agentId})`);
+        console.log(`Fetching conversations for ${config.platform} agent ${config.name} (${config.agentId})`);
         
-        const conversationsResponse = await fetch(
-          `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${config.agentId}&cursor=&limit=100`,
-          {
-            headers: {
-              'xi-api-key': config.apiKey,
-              'accept': 'application/json',
-            },
+        let conversations: NormalizedConversation[] = [];
+
+        if (config.platform === 'elevenlabs') {
+          const response = await fetch(
+            `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${config.agentId}&limit=100`,
+            { headers: { 'xi-api-key': config.apiKey, 'accept': 'application/json' } }
+          );
+
+          if (response.ok) {
+            const data = await response.json();
+            conversations = (data.conversations || []).map((conv: any) => 
+              normalizeElevenLabsConversation(conv, config)
+            );
           }
-        );
-
-        if (conversationsResponse.ok) {
-          const conversationsData = await conversationsResponse.json();
-          const conversations = conversationsData.conversations || [];
-          
-          // Add agent info to each conversation
-          const enrichedConversations = conversations.map((conv: any) => ({
-            ...conv,
-            agent_id: config.id,
-            agent_name: config.name,
-            platform_agent_id: config.agentId,
-          }));
-
-          allConversations.push(...enrichedConversations);
-          agentsList.push({
-            id: config.id,
-            name: config.name,
-            agentId: config.agentId,
-            conversationCount: conversations.length
+        } else if (config.platform === 'retell') {
+          const response = await fetch('https://api.retellai.com/list-calls', {
+            method: 'POST',
+            headers: { 
+              'Authorization': `Bearer ${config.apiKey}`, 
+              'Content-Type': 'application/json' 
+            },
+            body: JSON.stringify({
+              filter_criteria: { agent_id: [config.agentId] },
+              limit: 100,
+              sort_order: 'descending'
+            })
           });
-        } else {
-          const errorText = await conversationsResponse.text().catch(() => '');
-          console.error(`Error fetching for agent ${config.name}:`, conversationsResponse.status, errorText);
-          // Still show the agent in the UI
-          agentsList.push({
-            id: config.id,
-            name: config.name,
-            agentId: config.agentId,
-            conversationCount: 0
-          });
+
+          if (response.ok) {
+            const calls = await response.json();
+            conversations = (Array.isArray(calls) ? calls : []).map((call: any) => 
+              normalizeRetellCall(call, config)
+            );
+          }
+        } else if (config.platform === 'vapi') {
+          const response = await fetch(
+            `https://api.vapi.ai/call?assistantId=${config.agentId}&limit=100`,
+            { headers: { 'Authorization': `Bearer ${config.apiKey}` } }
+          );
+
+          if (response.ok) {
+            const calls = await response.json();
+            conversations = (Array.isArray(calls) ? calls : []).map((call: any) => 
+              normalizeVapiCall(call, config)
+            );
+          }
         }
+
+        allConversations.push(...conversations);
+        agentsList.push({
+          id: config.id,
+          name: config.name,
+          agentId: config.agentId,
+          platform: config.platform,
+          conversationCount: conversations.length
+        });
+
+        console.log(`Found ${conversations.length} conversations for ${config.name}`);
       } catch (error) {
         console.error(`Error fetching conversations for agent ${config.name}:`, error);
+        agentsList.push({
+          id: config.id,
+          name: config.name,
+          agentId: config.agentId,
+          platform: config.platform,
+          conversationCount: 0
+        });
       }
     }
 
     // Apply filters
     let filteredConversations = allConversations;
 
+    // Platform filter
+    if (filters.platform) {
+      filteredConversations = filteredConversations.filter(c => c.platform === filters.platform);
+    }
+
     // Date filter
     if (filters.dateFrom) {
       const fromDate = new Date(filters.dateFrom).getTime();
       filteredConversations = filteredConversations.filter(c => {
-        const convDate = new Date(c.start_time || c.created_at || c.timestamp).getTime();
+        const convDate = new Date(c.start_time).getTime();
         return convDate >= fromDate;
       });
     }
@@ -386,39 +489,34 @@ serve(async (req) => {
     if (filters.dateTo) {
       const toDate = new Date(filters.dateTo).getTime();
       filteredConversations = filteredConversations.filter(c => {
-        const convDate = new Date(c.start_time || c.created_at || c.timestamp).getTime();
+        const convDate = new Date(c.start_time).getTime();
         return convDate <= toDate;
       });
     }
 
     // Duration filter
     if (filters.minDuration) {
-      filteredConversations = filteredConversations.filter(c => 
-        (c.duration || c.call_duration_secs || 0) >= filters.minDuration!
-      );
+      filteredConversations = filteredConversations.filter(c => c.duration >= filters.minDuration!);
     }
 
     if (filters.maxDuration) {
-      filteredConversations = filteredConversations.filter(c => 
-        (c.duration || c.call_duration_secs || 0) <= filters.maxDuration!
-      );
+      filteredConversations = filteredConversations.filter(c => c.duration <= filters.maxDuration!);
     }
 
-    // Search filter (in transcript or summary)
+    // Search filter
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       filteredConversations = filteredConversations.filter(c => {
         const transcript = (c.transcript || '').toLowerCase();
         const summary = (c.analysis?.summary || '').toLowerCase();
-        const title = (c.title || '').toLowerCase();
-        return transcript.includes(searchLower) || summary.includes(searchLower) || title.includes(searchLower);
+        return transcript.includes(searchLower) || summary.includes(searchLower);
       });
     }
 
     // Sort by date descending
     filteredConversations.sort((a, b) => {
-      const dateA = new Date(a.start_time || a.created_at || a.timestamp).getTime();
-      const dateB = new Date(b.start_time || b.created_at || b.timestamp).getTime();
+      const dateA = new Date(a.start_time).getTime();
+      const dateB = new Date(b.start_time).getTime();
       return dateB - dateA;
     });
 
@@ -451,10 +549,7 @@ serve(async (req) => {
         agents: [],
         total: 0
       }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
