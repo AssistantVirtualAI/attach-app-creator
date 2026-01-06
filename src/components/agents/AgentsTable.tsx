@@ -77,7 +77,8 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
 
   return (
     <>
-      <div className="rounded-xl overflow-hidden border border-slate-700/50 bg-gradient-to-br from-slate-900/80 to-slate-800/80">
+      <div className="relative rounded-2xl overflow-hidden border border-border bg-card/50 backdrop-blur-xl shadow-lg">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10" />
         <Table>
           <TableHeader>
             <TableRow className="border-border/50 hover:bg-transparent">
@@ -97,14 +98,14 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="border-border/40 hover:bg-muted/30 transition-colors group"
+                className="border-border/40 hover:bg-muted/40 transition-colors group"
               >
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg blur opacity-40 group-hover:opacity-60 transition-opacity" />
-                      <div className="relative w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg flex items-center justify-center">
-                        <Bot className="h-5 w-5 text-white" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-primary to-secondary rounded-lg blur opacity-30 group-hover:opacity-50 transition-opacity" />
+                      <div className="relative w-10 h-10 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
+                        <Bot className="h-5 w-5 text-primary-foreground" />
                       </div>
                     </div>
                     <span className="font-medium text-foreground">{agent.name}</span>
@@ -120,7 +121,7 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-auto p-1 text-left font-normal text-xs text-slate-400 hover:text-purple-300"
+                          className="h-auto p-1 text-left font-normal text-xs text-muted-foreground hover:text-foreground hover:bg-muted/40"
                           onClick={() => handleOpenPrompt(agent)}
                         >
                           {getPromptSnippet(agent.config) || (
@@ -145,7 +146,7 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                   )}
                 </TableCell>
                 <TableCell>
-                  <code className="text-xs bg-muted px-2 py-1 rounded text-foreground font-mono">
+                  <code className="text-xs bg-muted/50 px-2 py-1 rounded text-foreground font-mono border border-border/50">
                     {agent.config?.agent_id || agent.platform_agent_id || 'N/A'}
                   </code>
                 </TableCell>
@@ -153,17 +154,17 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                   {format(new Date(agent.created_at), 'dd MMM yyyy', { locale: fr })}
                 </TableCell>
                 <TableCell className="text-right">
-                <DropdownMenu>
+                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-9 w-9 bg-gradient-to-r from-purple-600/80 to-pink-600/80 hover:from-purple-500 hover:to-pink-500 border-purple-400/30 text-white shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition-all duration-200"
+                        className="h-9 w-9 bg-card/60 hover:bg-card border-border text-foreground shadow-sm"
                       >
                         <MoreHorizontal className="h-5 w-5" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-gradient-to-br from-slate-900 to-slate-800 border-purple-500/30 shadow-2xl shadow-purple-500/10 z-50 min-w-[180px]">
+                    <DropdownMenuContent align="end" className="bg-popover border-border shadow-lg z-50 min-w-[180px]">
                       <DropdownMenuItem onClick={() => navigate(`/agent-settings/${agent.id}`)}>
                         <Settings className="h-4 w-4 mr-2" />
                         Paramètres
@@ -174,14 +175,14 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                       </DropdownMenuItem>
                       {getAgentSlug(agent) && (
                         <>
-                          <DropdownMenuSeparator className="bg-slate-700" />
+                          <DropdownMenuSeparator className="bg-border" />
                           <DropdownMenuItem onClick={() => handleOpenPortal(agent)}>
                             <ExternalLink className="h-4 w-4 mr-2" />
                             Ouvrir le portail
                           </DropdownMenuItem>
                         </>
                       )}
-                      <DropdownMenuSeparator className="bg-slate-700" />
+                      <DropdownMenuSeparator className="bg-border" />
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <DropdownMenuItem 
@@ -192,10 +193,10 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                             Supprimer
                           </DropdownMenuItem>
                         </AlertDialogTrigger>
-                        <AlertDialogContent className="bg-slate-900 border-slate-700">
+                        <AlertDialogContent className="bg-popover border-border">
                           <AlertDialogHeader>
-                            <AlertDialogTitle className="text-white">Supprimer l'agent ?</AlertDialogTitle>
-                            <AlertDialogDescription className="text-slate-400">
+                            <AlertDialogTitle className="text-foreground">Supprimer l'agent ?</AlertDialogTitle>
+                            <AlertDialogDescription className="text-muted-foreground">
                               Cette action est irréversible. L'agent "{agent.name}" sera définitivement supprimé.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
