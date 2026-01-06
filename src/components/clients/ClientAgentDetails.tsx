@@ -77,7 +77,12 @@ export const ClientAgentDetails = ({ agentId, onClose }: ClientAgentDetailsProps
 
         case 'retell': {
           const { data: agentData, error } = await supabase.functions.invoke('retell-proxy', {
-            body: { action: 'getAgent', retellAgentId: platformAgentId, apiKey }
+            body: { 
+              action: 'getAgent', 
+              retellAgentId: platformAgentId, 
+              apiKey,
+              organizationId: agent.organization_id
+            }
           });
           if (error) throw error;
           
@@ -91,7 +96,12 @@ export const ClientAgentDetails = ({ agentId, onClose }: ClientAgentDetailsProps
           if (llmId) {
             try {
               const { data: llmData } = await supabase.functions.invoke('retell-proxy', {
-                body: { action: 'getLlm', llmId, apiKey }
+                body: { 
+                  action: 'getLlm', 
+                  llmId, 
+                  apiKey,
+                  organizationId: agent.organization_id
+                }
               });
               if (llmData?.data) {
                 systemPrompt = llmData.data.general_prompt || systemPrompt;
@@ -114,7 +124,12 @@ export const ClientAgentDetails = ({ agentId, onClose }: ClientAgentDetailsProps
 
         case 'vapi': {
           const { data, error } = await supabase.functions.invoke('vapi-proxy', {
-            body: { action: 'getAssistant', assistantId: platformAgentId, apiKey }
+            body: { 
+              action: 'getAssistant', 
+              assistantId: platformAgentId, 
+              apiKey,
+              organizationId: agent.organization_id
+            }
           });
           if (error) throw error;
           
