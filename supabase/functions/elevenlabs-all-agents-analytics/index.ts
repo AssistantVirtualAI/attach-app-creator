@@ -55,45 +55,52 @@ serve(async (req) => {
       });
     }
 
-    // Get all ElevenLabs agents for the organization
+    // Get ALL agents for the organization (all platforms)
     const { data: agents } = await supabase
       .from('agents')
       .select('id, name, platform_agent_id, platform_api_key, platform, config')
-      .eq('organization_id', orgMember.organization_id)
-      .eq('platform', 'elevenlabs');
+      .eq('organization_id', orgMember.organization_id);
 
-    // Get all ElevenLabs integrations (by org_id OR user_id)
+    // Get all integrations for all platforms (by org_id OR user_id)
     const { data: integrations } = await supabase
       .from('organization_integrations')
-      .select('id, agent_id, api_key, additional_config')
-      .eq('platform', 'elevenlabs')
+      .select('id, agent_id, api_key, platform, additional_config')
       .eq('is_active', true)
       .or(`organization_id.eq.${orgMember.organization_id},user_id.eq.${user.id}`);
 
-    // Build a map of integration_id -> api_key
+    // Build a map of platform -> api_key from integrations
+    const platformApiKeys: Record<string, string> = {};
     const integrationApiKeys: Record<string, string> = {};
     if (integrations) {
       for (const integration of integrations) {
         if (integration.api_key) {
           integrationApiKeys[integration.id] = integration.api_key;
+          if (integration.platform) {
+            platformApiKeys[integration.platform] = integration.api_key;
+          }
         }
       }
     }
 
-    let agentConfigs: Array<{ id: string; name: string; agentId: string; apiKey: string }> = [];
+    let agentConfigs: Array<{ id: string; name: string; agentId: string; apiKey: string; platform: string }> = [];
 
     if (agents && agents.length > 0) {
       for (const agent of agents) {
         // Get agent ID from platform_agent_id OR config.agent_id
         const agentId = agent.platform_agent_id || (agent.config as any)?.agent_id;
+        const platform = agent.platform || 'elevenlabs';
         
         if (!agentId) continue;
 
-        // Get API key from platform_api_key OR via integration_id in config
+        // Get API key from platform_api_key OR via integration_id in config OR platform fallback
         let apiKey = agent.platform_api_key;
         
         if (!apiKey && (agent.config as any)?.integration_id) {
           apiKey = integrationApiKeys[(agent.config as any).integration_id];
+        }
+        
+        if (!apiKey) {
+          apiKey = platformApiKeys[platform];
         }
 
         if (apiKey) {
@@ -101,14 +108,14 @@ serve(async (req) => {
             id: agent.id,
             name: agent.name,
             agentId: agentId,
-            apiKey: apiKey
+            apiKey: apiKey,
+            platform: platform
           });
         }
       }
     }
 
     // Also add agents from integrations that have agent_id directly
-
     if (integrations) {
       for (const integration of integrations) {
         if (integration.agent_id && integration.api_key) {
@@ -118,7 +125,8 @@ serve(async (req) => {
               id: integration.id,
               name: `Integration Agent`,
               agentId: integration.agent_id,
-              apiKey: integration.api_key
+              apiKey: integration.api_key,
+              platform: integration.platform || 'elevenlabs'
             });
           }
         }
@@ -178,64 +186,123 @@ serve(async (req) => {
 
     for (const config of configsToProcess) {
       try {
-        console.log(`Fetching analytics for agent ${config.name} (${config.agentId})`);
+        console.log(`Fetching analytics for agent ${config.name} (${config.agentId}) on platform ${config.platform}`);
         
-        // Get conversations to calculate metrics
-         const conversationsResponse = await fetch(
-           `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${config.agentId}&cursor=&limit=100`,
-           {
-             headers: {
-               'xi-api-key': config.apiKey,
-               'accept': 'application/json',
-             },
-           }
-         );
-
-        if (conversationsResponse.ok) {
-          const conversationsData = await conversationsResponse.json();
-          const conversations = conversationsData.conversations || [];
-
-          // Calculate metrics from conversations
-          const agentTotal = conversations.length;
-          let agentDuration = 0;
-          let agentSatisfaction = 0;
-          let agentSatisfactionCount = 0;
-          let agentSuccessful = 0;
-
-          for (const conv of conversations) {
-            const duration = conv.call_duration_secs || conv.duration || 0;
-            agentDuration += duration;
-            totalDuration += duration;
-
-            if (conv.analysis?.satisfaction_score !== undefined) {
-              agentSatisfaction += conv.analysis.satisfaction_score;
-              agentSatisfactionCount++;
-              satisfactionSum += conv.analysis.satisfaction_score;
-              satisfactionCount++;
+        let conversations: any[] = [];
+        
+        // Platform-specific API calls
+        if (config.platform === 'elevenlabs') {
+          const conversationsResponse = await fetch(
+            `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${config.agentId}&cursor=&limit=100`,
+            {
+              headers: {
+                'xi-api-key': config.apiKey,
+                'accept': 'application/json',
+              },
             }
+          );
 
-            // Consider successful if duration > 30 seconds or has a good satisfaction score
-            if (duration > 30 || (conv.analysis?.satisfaction_score && conv.analysis.satisfaction_score > 0.6)) {
-              agentSuccessful++;
-              successfulConversations++;
+          if (conversationsResponse.ok) {
+            const conversationsData = await conversationsResponse.json();
+            conversations = conversationsData.conversations || [];
+          }
+        } else if (config.platform === 'retell') {
+          // Retell API - list calls
+          const retellResponse = await fetch(
+            'https://api.retellai.com/v2/list-calls',
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${config.apiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                filter_criteria: {
+                  agent_id: [config.agentId]
+                },
+                limit: 100
+              })
             }
+          );
+
+          if (retellResponse.ok) {
+            const retellData = await retellResponse.json();
+            // Normalize Retell calls to our format
+            conversations = (retellData || []).map((call: any) => ({
+              id: call.call_id,
+              call_duration_secs: call.end_timestamp && call.start_timestamp 
+                ? (call.end_timestamp - call.start_timestamp) / 1000 
+                : 0,
+              analysis: {
+                satisfaction_score: call.call_analysis?.user_sentiment === 'Positive' ? 0.8 :
+                                   call.call_analysis?.user_sentiment === 'Negative' ? 0.2 : 0.5
+              }
+            }));
+          }
+        } else if (config.platform === 'vapi') {
+          // Vapi API - list calls
+          const vapiResponse = await fetch(
+            `https://api.vapi.ai/call?assistantId=${config.agentId}&limit=100`,
+            {
+              headers: {
+                'Authorization': `Bearer ${config.apiKey}`,
+              },
+            }
+          );
+
+          if (vapiResponse.ok) {
+            const vapiData = await vapiResponse.json();
+            // Normalize Vapi calls to our format
+            conversations = (vapiData || []).map((call: any) => ({
+              id: call.id,
+              call_duration_secs: call.duration || 0,
+              analysis: {
+                satisfaction_score: call.analysis?.successEvaluation === 'true' ? 0.8 : 0.4
+              }
+            }));
+          }
+        }
+
+        // Calculate metrics from conversations
+        const agentTotal = conversations.length;
+        let agentDuration = 0;
+        let agentSatisfaction = 0;
+        let agentSatisfactionCount = 0;
+        let agentSuccessful = 0;
+
+        for (const conv of conversations) {
+          const duration = conv.call_duration_secs || conv.duration || 0;
+          agentDuration += duration;
+          totalDuration += duration;
+
+          if (conv.analysis?.satisfaction_score !== undefined) {
+            agentSatisfaction += conv.analysis.satisfaction_score;
+            agentSatisfactionCount++;
+            satisfactionSum += conv.analysis.satisfaction_score;
+            satisfactionCount++;
           }
 
-          totalConversations += agentTotal;
-          failedConversations += (agentTotal - agentSuccessful);
-
-          perAgentData.push({
-            id: config.id,
-            name: config.name,
-            agentId: config.agentId,
-            metrics: {
-              total_conversations: agentTotal,
-              avg_duration: agentTotal > 0 ? agentDuration / agentTotal : 0,
-              satisfaction_score: agentSatisfactionCount > 0 ? (agentSatisfaction / agentSatisfactionCount) * 5 : 0,
-              success_rate: agentTotal > 0 ? (agentSuccessful / agentTotal) * 100 : 0,
-            }
-          });
+          // Consider successful if duration > 30 seconds or has a good satisfaction score
+          if (duration > 30 || (conv.analysis?.satisfaction_score && conv.analysis.satisfaction_score > 0.6)) {
+            agentSuccessful++;
+            successfulConversations++;
+          }
         }
+
+        totalConversations += agentTotal;
+        failedConversations += (agentTotal - agentSuccessful);
+
+        perAgentData.push({
+          id: config.id,
+          name: config.name,
+          agentId: config.agentId,
+          metrics: {
+            total_conversations: agentTotal,
+            avg_duration: agentTotal > 0 ? agentDuration / agentTotal : 0,
+            satisfaction_score: agentSatisfactionCount > 0 ? (agentSatisfaction / agentSatisfactionCount) * 5 : 0,
+            success_rate: agentTotal > 0 ? (agentSuccessful / agentTotal) * 100 : 0,
+          }
+        });
       } catch (error) {
         console.error(`Error fetching analytics for agent ${config.name}:`, error);
       }
