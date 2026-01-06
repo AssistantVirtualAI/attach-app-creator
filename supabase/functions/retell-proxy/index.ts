@@ -20,6 +20,8 @@ serve(async (req) => {
 
     const { action, apiKey, organizationId, agentId, ...params } = await req.json();
 
+    console.log(`[Retell] Request received - Action: ${action}, OrganizationId: ${organizationId || 'NOT PROVIDED'}, AgentId: ${agentId || 'N/A'}`);
+
     if (!action) {
       throw new Error('Missing required parameter: action');
     }
@@ -27,7 +29,8 @@ serve(async (req) => {
     // Get API key from integration if not provided directly
     let retellApiKey = apiKey;
     if (!retellApiKey && organizationId) {
-      const { data: integration } = await supabase
+      console.log(`[Retell] Fetching API key for organization: ${organizationId}`);
+      const { data: integration, error: integrationError } = await supabase
         .from('organization_integrations')
         .select('api_key')
         .eq('organization_id', organizationId)
@@ -35,16 +38,25 @@ serve(async (req) => {
         .eq('is_active', true)
         .single();
 
-      if (integration) {
-        retellApiKey = integration.api_key;
+      if (integrationError) {
+        console.error(`[Retell] Integration query error:`, integrationError);
       }
+
+      if (integration) {
+        console.log(`[Retell] Found API key for organization`);
+        retellApiKey = integration.api_key;
+      } else {
+        console.log(`[Retell] No integration found for organization ${organizationId}`);
+      }
+    } else if (!organizationId) {
+      console.log(`[Retell] No organizationId provided in request`);
     }
 
     if (!retellApiKey) {
       throw new Error('API key not found. Please configure Retell integration.');
     }
 
-    console.log(`[Retell] Action: ${action}, AgentId: ${agentId || 'N/A'}`);
+    console.log(`[Retell] Processing action: ${action}`);
 
     let result;
     
