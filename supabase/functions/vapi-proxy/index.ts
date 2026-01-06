@@ -135,6 +135,58 @@ serve(async (req) => {
         result = await vapiRequest(vapiApiKey, 'POST', '/squad', undefined, params.config);
         break;
 
+      // Files / Knowledge Base
+      case 'listFiles':
+        result = await vapiRequest(vapiApiKey, 'GET', '/file');
+        break;
+      case 'getFile':
+        if (!params.fileId) throw new Error('fileId is required');
+        result = await vapiRequest(vapiApiKey, 'GET', `/file/${params.fileId}`);
+        break;
+      case 'createFile':
+        // Vapi requires multipart/form-data for file uploads, but we can create from text
+        // For text content, we'll use a workaround with base64
+        const filePayload: any = {
+          name: params.name || 'document.txt',
+          purpose: 'assistants',
+        };
+        if (params.content) {
+          // Create file from text content - encode as base64
+          const encoder = new TextEncoder();
+          const bytes = encoder.encode(params.content);
+          const base64 = btoa(String.fromCharCode(...bytes));
+          filePayload.bytes = base64;
+          filePayload.mimetype = 'text/plain';
+        }
+        if (params.url) {
+          filePayload.url = params.url;
+        }
+        result = await vapiRequest(vapiApiKey, 'POST', '/file', undefined, filePayload);
+        break;
+      case 'deleteFile':
+        if (!params.fileId) throw new Error('fileId is required');
+        result = await vapiRequest(vapiApiKey, 'DELETE', `/file/${params.fileId}`);
+        break;
+      
+      // Knowledge Bases
+      case 'listKnowledgeBases':
+        result = await vapiRequest(vapiApiKey, 'GET', '/knowledge-base');
+        break;
+      case 'getKnowledgeBase':
+        if (!params.knowledgeBaseId) throw new Error('knowledgeBaseId is required');
+        result = await vapiRequest(vapiApiKey, 'GET', `/knowledge-base/${params.knowledgeBaseId}`);
+        break;
+      case 'createKnowledgeBase':
+        result = await vapiRequest(vapiApiKey, 'POST', '/knowledge-base', undefined, {
+          name: params.name || 'New Knowledge Base',
+          ...(params.fileIds && { fileIds: params.fileIds }),
+        });
+        break;
+      case 'deleteKnowledgeBase':
+        if (!params.knowledgeBaseId) throw new Error('knowledgeBaseId is required');
+        result = await vapiRequest(vapiApiKey, 'DELETE', `/knowledge-base/${params.knowledgeBaseId}`);
+        break;
+
       // Analytics (computed from calls)
       case 'getAnalytics':
         const timeframe = params.timeframe || '7d';
