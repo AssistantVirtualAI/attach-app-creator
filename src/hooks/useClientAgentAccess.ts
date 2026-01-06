@@ -9,8 +9,10 @@ interface ClientAgentAccess {
   canEdit: boolean;
   apiKey: string | null;
   agentId: string | null;
+  platformAgentId: string | null;
   agentName: string | null;
   platform: Platform | null;
+  organizationId: string | null;
   isLoading: boolean;
 }
 
@@ -74,9 +76,11 @@ export const useClientAgentAccess = (clientId: string | undefined, agentId: stri
       return {
         role: assignment.role as 'admin' | 'viewer',
         apiKey: apiKey,
-        agentId: platformAgentId,
+        agentId: agentId,
+        platformAgentId: platformAgentId,
         agentName: agent.name,
         platform,
+        organizationId: agent.organization_id,
       };
     },
     enabled: !!clientId && !!agentId,
@@ -88,8 +92,10 @@ export const useClientAgentAccess = (clientId: string | undefined, agentId: stri
     canEdit: data?.role === 'admin',
     apiKey: data?.apiKey || null,
     agentId: data?.agentId || null,
+    platformAgentId: data?.platformAgentId || null,
     agentName: data?.agentName || null,
     platform: data?.platform || null,
+    organizationId: data?.organizationId || null,
     isLoading,
   };
 };

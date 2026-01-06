@@ -80,13 +80,13 @@ const StatCard = ({
 
 const ClientAgentAnalytics = () => {
   const { clientId, agentId } = useParams();
-  const { apiKey, agentId: elevenlabsAgentId, agentName } = useClientAgentAccess(clientId, agentId);
+  const { apiKey, platformAgentId, agentName } = useClientAgentAccess(clientId, agentId);
   const [timeframe, setTimeframe] = useState<Timeframe>('7d');
   const [isExporting, setIsExporting] = useState(false);
 
   const { data: analytics, isLoading } = useClientElevenLabsAnalytics({
     apiKey,
-    agentId: elevenlabsAgentId,
+    agentId: platformAgentId,
   }, timeframe);
 
   const metrics = analytics?.metrics || {};
