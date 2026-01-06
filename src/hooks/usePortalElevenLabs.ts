@@ -52,9 +52,9 @@ export const usePortalConversations = (page: number = 1, limit: number = 50) => 
   const { session } = usePortal();
 
   return useQuery({
-    queryKey: ['portal-conversations', session?.platformAgentId, page, limit],
+    queryKey: ['portal-conversations', session?.platformAgentId, session?.organizationId, page, limit],
     queryFn: async () => {
-      if (!session?.platformAgentId || !session?.platformApiKey) {
+      if (!session?.platformAgentId) {
         return { conversations: [], total: 0, has_more: false };
       }
 
@@ -63,6 +63,7 @@ export const usePortalConversations = (page: number = 1, limit: number = 50) => 
           action: 'list',
           agentId: session.platformAgentId,
           apiKey: session.platformApiKey,
+          organizationId: session.organizationId,
           page,
           limit,
         },
@@ -71,7 +72,7 @@ export const usePortalConversations = (page: number = 1, limit: number = 50) => 
       if (error) throw error;
       return data as PortalConversationsResponse;
     },
-    enabled: !!session?.platformAgentId && !!session?.platformApiKey,
+    enabled: !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
     staleTime: 30000,
   });
 };
@@ -81,9 +82,9 @@ export const usePortalConversationDetails = (conversationId: string | null) => {
   const { session } = usePortal();
 
   return useQuery({
-    queryKey: ['portal-conversation-details', conversationId],
+    queryKey: ['portal-conversation-details', conversationId, session?.organizationId],
     queryFn: async () => {
-      if (!conversationId || !session?.platformApiKey) {
+      if (!conversationId) {
         return null;
       }
 
@@ -91,14 +92,16 @@ export const usePortalConversationDetails = (conversationId: string | null) => {
         body: {
           action: 'details',
           conversationId,
-          apiKey: session.platformApiKey,
+          apiKey: session?.platformApiKey,
+          organizationId: session?.organizationId,
+          agentId: session?.platformAgentId,
         },
       });
 
       if (error) throw error;
       return data as PortalConversation;
     },
-    enabled: !!conversationId && !!session?.platformApiKey,
+    enabled: !!conversationId && !!(session?.platformApiKey || session?.organizationId),
   });
 };
 
@@ -107,9 +110,9 @@ export const usePortalAnalytics = (timeframe: string = '7days') => {
   const { session } = usePortal();
 
   return useQuery({
-    queryKey: ['portal-analytics', session?.platformAgentId, timeframe],
+    queryKey: ['portal-analytics', session?.platformAgentId, session?.organizationId, timeframe],
     queryFn: async () => {
-      if (!session?.platformAgentId || !session?.platformApiKey) {
+      if (!session?.platformAgentId) {
         return null;
       }
 
@@ -117,6 +120,7 @@ export const usePortalAnalytics = (timeframe: string = '7days') => {
         body: {
           agentId: session.platformAgentId,
           apiKey: session.platformApiKey,
+          organizationId: session.organizationId,
           timeframe,
           includeCharts: true,
         },
@@ -125,7 +129,7 @@ export const usePortalAnalytics = (timeframe: string = '7days') => {
       if (error) throw error;
       return data as PortalAnalytics;
     },
-    enabled: !!session?.platformAgentId && !!session?.platformApiKey,
+    enabled: !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
     staleTime: 60000,
   });
 };
@@ -135,9 +139,9 @@ export const usePortalKnowledgeBase = () => {
   const { session } = usePortal();
 
   return useQuery({
-    queryKey: ['portal-knowledge-base', session?.platformAgentId],
+    queryKey: ['portal-knowledge-base', session?.platformAgentId, session?.organizationId],
     queryFn: async () => {
-      if (!session?.platformAgentId || !session?.platformApiKey) {
+      if (!session?.platformAgentId) {
         return { documents: [], total: 0 };
       }
 
@@ -146,13 +150,14 @@ export const usePortalKnowledgeBase = () => {
           action: 'list',
           agentId: session.platformAgentId,
           apiKey: session.platformApiKey,
+          organizationId: session.organizationId,
         },
       });
 
       if (error) throw error;
       return data;
     },
-    enabled: !!session?.platformAgentId && !!session?.platformApiKey,
+    enabled: !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
   });
 };
 
@@ -161,9 +166,9 @@ export const usePortalKnowledgeBaseDocument = (documentId: string | null) => {
   const { session } = usePortal();
 
   return useQuery({
-    queryKey: ['portal-kb-document', documentId],
+    queryKey: ['portal-kb-document', documentId, session?.organizationId],
     queryFn: async () => {
-      if (!documentId || !session?.platformAgentId || !session?.platformApiKey) {
+      if (!documentId || !session?.platformAgentId) {
         return null;
       }
 
@@ -172,6 +177,7 @@ export const usePortalKnowledgeBaseDocument = (documentId: string | null) => {
           action: 'get_document',
           agentId: session.platformAgentId,
           apiKey: session.platformApiKey,
+          organizationId: session.organizationId,
           documentId,
         },
       });
@@ -179,7 +185,7 @@ export const usePortalKnowledgeBaseDocument = (documentId: string | null) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!documentId && !!session?.platformAgentId && !!session?.platformApiKey,
+    enabled: !!documentId && !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
   });
 };
 
@@ -190,7 +196,7 @@ export const usePortalAddKnowledgeDocument = () => {
 
   return useMutation({
     mutationFn: async ({ name, content }: { name: string; content: string }) => {
-      if (!session?.platformAgentId || !session?.platformApiKey) {
+      if (!session?.platformAgentId || !(session?.platformApiKey || session?.organizationId)) {
         throw new Error('Configuration manquante');
       }
 
@@ -199,6 +205,7 @@ export const usePortalAddKnowledgeDocument = () => {
           action: 'create_text',
           agentId: session.platformAgentId,
           apiKey: session.platformApiKey,
+          organizationId: session.organizationId,
           title: name,
           content,
         },
@@ -226,7 +233,7 @@ export const usePortalUpdateKnowledgeDocument = () => {
       content: string;
       deleteOld?: boolean;
     }) => {
-      if (!session?.platformAgentId || !session?.platformApiKey) {
+      if (!session?.platformAgentId || !(session?.platformApiKey || session?.organizationId)) {
         throw new Error('Configuration manquante');
       }
 
@@ -236,6 +243,7 @@ export const usePortalUpdateKnowledgeDocument = () => {
           action: 'create_text',
           agentId: session.platformAgentId,
           apiKey: session.platformApiKey,
+          organizationId: session.organizationId,
           title: name,
           content,
         },
@@ -252,6 +260,7 @@ export const usePortalUpdateKnowledgeDocument = () => {
               action: 'delete',
               agentId: session.platformAgentId,
               apiKey: session.platformApiKey,
+              organizationId: session.organizationId,
               documentId,
             },
           });
@@ -276,7 +285,7 @@ export const usePortalDeleteKnowledgeDocument = () => {
 
   return useMutation({
     mutationFn: async (documentId: string) => {
-      if (!session?.platformAgentId || !session?.platformApiKey) {
+      if (!session?.platformAgentId || !(session?.platformApiKey || session?.organizationId)) {
         throw new Error('Configuration manquante');
       }
 
@@ -285,6 +294,7 @@ export const usePortalDeleteKnowledgeDocument = () => {
           action: 'delete',
           agentId: session.platformAgentId,
           apiKey: session.platformApiKey,
+          organizationId: session.organizationId,
           documentId,
         },
       });
@@ -303,9 +313,9 @@ export const usePortalAgentConfig = () => {
   const { session } = usePortal();
 
   return useQuery({
-    queryKey: ['portal-agent-config', session?.platformAgentId],
+    queryKey: ['portal-agent-config', session?.platformAgentId, session?.organizationId],
     queryFn: async () => {
-      if (!session?.platformAgentId || !session?.platformApiKey) {
+      if (!session?.platformAgentId) {
         return null;
       }
 
@@ -314,13 +324,14 @@ export const usePortalAgentConfig = () => {
           action: 'get',
           agentId: session.platformAgentId,
           apiKey: session.platformApiKey,
+          organizationId: session.organizationId,
         },
       });
 
       if (error) throw error;
       return data;
     },
-    enabled: !!session?.platformAgentId && !!session?.platformApiKey,
+    enabled: !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
   });
 };
 
@@ -331,7 +342,7 @@ export const usePortalUpdatePrompt = () => {
 
   return useMutation({
     mutationFn: async ({ systemPrompt, firstMessage }: { systemPrompt?: string; firstMessage?: string }) => {
-      if (!session?.platformAgentId || !session?.platformApiKey) {
+      if (!session?.platformAgentId || !(session?.platformApiKey || session?.organizationId)) {
         throw new Error('Configuration manquante');
       }
 
@@ -340,7 +351,8 @@ export const usePortalUpdatePrompt = () => {
           action: 'update_prompt',
           agentId: session.platformAgentId,
           apiKey: session.platformApiKey,
-          systemPrompt,
+          organizationId: session.organizationId,
+          prompt: systemPrompt,
           firstMessage,
         },
       });
@@ -359,9 +371,9 @@ export const usePortalPhoneNumbers = () => {
   const { session } = usePortal();
 
   return useQuery({
-    queryKey: ['portal-phone-numbers', session?.platformAgentId],
+    queryKey: ['portal-phone-numbers', session?.platformAgentId, session?.organizationId],
     queryFn: async () => {
-      if (!session?.platformAgentId || !session?.platformApiKey) {
+      if (!session?.platformAgentId) {
         return { phone_numbers: [] };
       }
 
@@ -370,13 +382,14 @@ export const usePortalPhoneNumbers = () => {
           action: 'list',
           agentId: session.platformAgentId,
           apiKey: session.platformApiKey,
+          organizationId: session.organizationId,
         },
       });
 
       if (error) throw error;
       return data;
     },
-    enabled: !!session?.platformAgentId && !!session?.platformApiKey,
+    enabled: !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
   });
 };
 
@@ -387,7 +400,7 @@ export const usePortalSyncConversations = () => {
 
   return useMutation({
     mutationFn: async () => {
-      if (!session?.platformAgentId || !session?.platformApiKey) {
+      if (!session?.platformAgentId || !(session?.platformApiKey || session?.organizationId)) {
         throw new Error('Configuration manquante');
       }
 
@@ -396,6 +409,7 @@ export const usePortalSyncConversations = () => {
           action: 'sync',
           agentId: session.platformAgentId,
           apiKey: session.platformApiKey,
+          organizationId: session.organizationId,
           limit: 100,
         },
       });
@@ -415,7 +429,7 @@ export const usePortalConversationAudio = () => {
 
   return useMutation({
     mutationFn: async ({ conversationId, format = 'mp3' }: { conversationId: string; format?: string }) => {
-      if (!session?.platformApiKey) {
+      if (!(session?.platformApiKey || session?.organizationId)) {
         throw new Error('Configuration manquante');
       }
 
@@ -423,7 +437,9 @@ export const usePortalConversationAudio = () => {
         body: {
           action: 'audio',
           conversationId,
-          apiKey: session.platformApiKey,
+          apiKey: session?.platformApiKey,
+          organizationId: session?.organizationId,
+          agentId: session?.platformAgentId,
           format,
         },
       });
