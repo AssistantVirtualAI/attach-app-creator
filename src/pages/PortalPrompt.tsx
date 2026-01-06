@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { usePortal } from '@/hooks/usePortalAuth';
-import { usePortalAgentConfig, usePortalUpdatePrompt } from '@/hooks/usePortalElevenLabs';
+import { usePortalAgentConfig, usePortalUpdateAgentPrompt } from '@/hooks/usePortalAgentConfig';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,24 +8,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { FileCode, MessageSquare, Eye, Save, Loader2, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { PlatformNotSupported } from '@/components/portal/PlatformNotSupported';
 
 const PortalPrompt = () => {
   const { session } = usePortal();
 
-  // Prompt editing is currently implemented only for ElevenLabs portal hooks.
-  if (session?.platform && session.platform !== 'elevenlabs') {
-    return (
-      <PlatformNotSupported
-        title="Prompt indisponible pour cette plateforme"
-        description={`Le module Prompt du portail est pour l’instant disponible uniquement pour ElevenLabs. Pour ${String(session.platform).toUpperCase()}, vous pouvez consulter les conversations et les analytics.`}
-        primaryCtaHref="/portal/conversations"
-      />
-    );
-  }
-
   const { data: agentConfig, isLoading } = usePortalAgentConfig();
-  const updatePrompt = usePortalUpdatePrompt();
+  const updatePrompt = usePortalUpdateAgentPrompt();
 
   // Only admins can edit: super_admin, admin role, client principal, or member with admin role
   const isAdmin =
@@ -41,16 +29,8 @@ const PortalPrompt = () => {
 
   useEffect(() => {
     if (agentConfig) {
-      const prompt =
-        agentConfig.conversation_config?.agent?.prompt?.prompt ||
-        agentConfig.agent?.prompt?.prompt ||
-        '';
-      const first =
-        agentConfig.conversation_config?.agent?.first_message ||
-        agentConfig.agent?.first_message ||
-        '';
-      setSystemPrompt(prompt);
-      setFirstMessage(first);
+      setSystemPrompt(agentConfig.systemPrompt || '');
+      setFirstMessage(agentConfig.firstMessage || '');
     }
   }, [agentConfig]);
 
@@ -59,8 +39,8 @@ const PortalPrompt = () => {
       await updatePrompt.mutateAsync({ systemPrompt, firstMessage });
       toast.success('Prompt mis à jour avec succès');
       setHasChanges(false);
-    } catch {
-      toast.error('Erreur lors de la mise à jour');
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la mise à jour');
     }
   };
 
@@ -74,6 +54,8 @@ const PortalPrompt = () => {
     setHasChanges(true);
   };
 
+  const platformLabel = session?.platform?.toUpperCase() || 'Agent';
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <div className="flex items-center justify-between">
@@ -83,7 +65,10 @@ const PortalPrompt = () => {
           </div>
           <div>
             <h1 className="text-2xl font-bold">Prompt</h1>
-            <p className="text-muted-foreground">{session?.agentName}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-muted-foreground">{session?.agentName}</p>
+              <Badge variant="outline">{platformLabel}</Badge>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -117,7 +102,7 @@ const PortalPrompt = () => {
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">Configuration non disponible</h3>
             <p className="text-muted-foreground text-center max-w-md">
-              Vérifiez que l'agent ElevenLabs est correctement configuré.
+              Vérifiez que l'agent {platformLabel} est correctement configuré.
             </p>
           </CardContent>
         </Card>
@@ -177,4 +162,3 @@ const PortalPrompt = () => {
 };
 
 export default PortalPrompt;
-

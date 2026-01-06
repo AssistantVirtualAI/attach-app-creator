@@ -18,14 +18,14 @@ import {
   AlertCircle,
   Sparkles,
   FileText,
-  Plus,
-  ExternalLink
+  Plus
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AgentSettings } from '@/hooks/useAgentSettings';
 import { PromptTemplatesSection } from './PromptTemplatesSection';
+import { useAgentConfigByPlatform } from '@/hooks/usePortalAgentConfig';
 
 interface AgentKnowledgePromptTabProps {
   agent: AgentSettings;
@@ -42,52 +42,25 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
 
   const platformAgentId = (agent.config as Record<string, any>)?.agent_id || agent.platform_agent_id;
 
-  // Récupérer la configuration de l'agent depuis ElevenLabs
-  const { data: agentConfig, isLoading: isLoadingConfig, error: configError } = useQuery({
-    queryKey: ['elevenlabs-agent-config', agent.id, platformAgentId],
-    queryFn: async () => {
-      if (!platformAgentId || agent.platform !== 'elevenlabs') {
-        return null;
-      }
-
-      console.log('[AgentKnowledgePromptTab] Fetching config for agent:', platformAgentId);
-
-      const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
-        body: { 
-          action: 'get',
-          agentId: platformAgentId
-        }
-      });
-
-      if (error) {
-        console.error('[AgentKnowledgePromptTab] Error fetching config:', error);
-        throw error;
-      }
-      
-      console.log('[AgentKnowledgePromptTab] Config received:', data);
-      return data;
-    },
-    enabled: !!platformAgentId && agent.platform === 'elevenlabs',
-    retry: 1,
+  // Use unified multi-platform hook
+  const { data: agentConfig, isLoading: isLoadingConfig, error: configError } = useAgentConfigByPlatform({
+    id: agent.id,
+    platform: agent.platform,
+    platform_agent_id: agent.platform_agent_id,
+    platform_api_key: agent.platform_api_key,
+    config: agent.config as Record<string, any>,
   });
 
   // Initialiser les champs avec les valeurs récupérées
   useEffect(() => {
-    if (agentConfig?.agent) {
-      const agentData = agentConfig.agent;
-      const conversationConfig = agentData.conversation_config || {};
-      const agentConf = conversationConfig.agent || {};
-      
-      const newPrompt = agentConf.prompt?.prompt || '';
-      const newFirstMessage = agentConf.first_message || '';
-      
-      setPrompt(newPrompt);
-      setFirstMessage(newFirstMessage);
+    if (agentConfig) {
+      setPrompt(agentConfig.systemPrompt || '');
+      setFirstMessage(agentConfig.firstMessage || '');
       setHasChanges(false);
     }
   }, [agentConfig]);
 
-  // Récupérer la base de connaissances
+  // Récupérer la base de connaissances (ElevenLabs only for now)
   const { data: knowledgeBase, isLoading: isLoadingKB } = useQuery({
     queryKey: ['elevenlabs-knowledge-base', agent.id, platformAgentId],
     queryFn: async () => {
@@ -107,32 +80,97 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
         throw error;
       }
       
-      console.log('[AgentKnowledgePromptTab] KB received:', data);
       return data;
     },
     enabled: !!platformAgentId && agent.platform === 'elevenlabs',
     retry: 1,
   });
 
-  // Mutation pour mettre à jour le prompt
+  // Mutation pour mettre à jour le prompt (multi-plateforme)
   const updatePrompt = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
-        body: { 
-          action: 'update_prompt',
-          agentId: platformAgentId,
-          prompt,
-          firstMessage
+      const platform = agent.platform;
+      
+      switch (platform) {
+        case 'elevenlabs': {
+          const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
+            body: { 
+              action: 'update_prompt',
+              agentId: platformAgentId,
+              prompt,
+              firstMessage
+            }
+          });
+          if (error) throw error;
+          return data;
         }
-      });
-
-      if (error) throw error;
-      return data;
+        
+        case 'retell': {
+          // Get agent to find LLM ID
+          const { data: agentData } = await supabase.functions.invoke('retell-proxy', {
+            body: { action: 'getAgent', retellAgentId: platformAgentId, apiKey: agent.platform_api_key }
+          });
+          
+          const agentInfo = agentData?.data || agentData;
+          const llmId = agentInfo?.llm_websocket_url?.split('/').pop() || agentInfo?.response_engine?.llm_id;
+          
+          if (llmId) {
+            const { data, error } = await supabase.functions.invoke('retell-proxy', {
+              body: { 
+                action: 'updateLlm', 
+                llmId, 
+                apiKey: agent.platform_api_key,
+                config: {
+                  general_prompt: prompt,
+                  begin_message: firstMessage
+                }
+              }
+            });
+            if (error) throw error;
+            return data;
+          } else {
+            const { data, error } = await supabase.functions.invoke('retell-proxy', {
+              body: { 
+                action: 'updateAgent', 
+                retellAgentId: platformAgentId, 
+                apiKey: agent.platform_api_key,
+                config: {
+                  general_prompt: prompt,
+                  begin_message: firstMessage
+                }
+              }
+            });
+            if (error) throw error;
+            return data;
+          }
+        }
+        
+        case 'vapi': {
+          const { data, error } = await supabase.functions.invoke('vapi-proxy', {
+            body: { 
+              action: 'updateAssistant', 
+              assistantId: platformAgentId, 
+              apiKey: agent.platform_api_key,
+              config: {
+                firstMessage,
+                model: {
+                  systemMessage: prompt,
+                }
+              }
+            }
+          });
+          if (error) throw error;
+          return data;
+        }
+        
+        default:
+          throw new Error(`Platform ${platform} not supported for prompt update`);
+      }
     },
     onSuccess: () => {
-      toast.success('Prompt mis à jour et synchronisé avec ElevenLabs');
+      toast.success('Prompt mis à jour avec succès');
       setHasChanges(false);
-      queryClient.invalidateQueries({ queryKey: ['elevenlabs-agent-config', agent.id] });
+      queryClient.invalidateQueries({ queryKey: ['agent-config-by-platform', agent.id] });
     },
     onError: (error: any) => {
       console.error('[AgentKnowledgePromptTab] Update prompt error:', error);
@@ -140,7 +178,7 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
     }
   });
 
-  // Mutation pour ajouter du contenu à la base de connaissances
+  // Mutation pour ajouter du contenu à la base de connaissances (ElevenLabs only)
   const addKnowledgeBase = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
@@ -172,25 +210,21 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
   // Mutation pour synchroniser la KB depuis ElevenLabs vers la base locale
   const syncKnowledgeBase = useMutation({
     mutationFn: async () => {
-      // Fetch KB from ElevenLabs and save to local DB
       const kbItems = knowledgeBase?.knowledge_base?.items || [];
       
       if (kbItems.length === 0) {
         throw new Error('Aucun document à synchroniser');
       }
 
-      // Get user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Non authentifié');
 
-      // Get organization
       const { data: orgMember } = await supabase
         .from('organization_members')
         .select('organization_id')
         .eq('user_id', user.id)
         .single();
 
-      // Insert/update local KB items
       for (const item of kbItems) {
         const { error } = await supabase
           .from('knowledge_base_items')
@@ -233,21 +267,7 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
     setHasChanges(true);
   };
 
-  if (agent.platform !== 'elevenlabs') {
-    return (
-      <Card className="glass-card">
-        <CardContent className="pt-6 text-center">
-          <AlertCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">
-            La synchronisation Knowledge Base & Prompt est disponible uniquement pour les agents ElevenLabs.
-          </p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Pour les autres plateformes, configurez directement dans leur interface.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+  const platformLabel = agent.platform.toUpperCase();
 
   if (!platformAgentId) {
     return (
@@ -255,10 +275,10 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
         <CardContent className="pt-6 text-center">
           <AlertCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">
-            Veuillez configurer l'ID de l'agent ElevenLabs dans l'onglet Config.
+            Veuillez configurer l'ID de l'agent {platformLabel} dans l'onglet Config.
           </p>
           <p className="text-sm text-muted-foreground mt-2">
-            L'ID de l'agent se trouve dans votre dashboard ElevenLabs.
+            L'ID de l'agent se trouve dans votre dashboard {platformLabel}.
           </p>
         </CardContent>
       </Card>
@@ -267,27 +287,30 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
 
   return (
     <div className="space-y-6">
-      {/* Templates Section */}
-      <PromptTemplatesSection 
-        agentId={agent.id} 
-        platformAgentId={platformAgentId}
-        onApplied={() => queryClient.invalidateQueries({ queryKey: ['elevenlabs-agent-config', agent.id] })}
-      />
+      {/* Templates Section - ElevenLabs only */}
+      {agent.platform === 'elevenlabs' && (
+        <PromptTemplatesSection 
+          agentId={agent.id} 
+          platformAgentId={platformAgentId}
+          onApplied={() => queryClient.invalidateQueries({ queryKey: ['agent-config-by-platform', agent.id] })}
+        />
+      )}
+
       {/* Status Banner */}
       {configError ? (
         <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 flex items-center gap-3">
           <AlertCircle className="h-5 w-5 text-destructive" />
           <div>
-            <p className="font-medium text-destructive">Erreur de connexion à ElevenLabs</p>
+            <p className="font-medium text-destructive">Erreur de connexion à {platformLabel}</p>
             <p className="text-sm text-muted-foreground">Vérifiez la clé API et l'ID de l'agent dans la configuration.</p>
           </div>
         </div>
-      ) : agentConfig?.agent && (
+      ) : agentConfig && (
         <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 flex items-center gap-3">
           <CheckCircle className="h-5 w-5 text-green-500" />
           <div>
-            <p className="font-medium text-green-600 dark:text-green-400">Connecté à ElevenLabs</p>
-            <p className="text-sm text-muted-foreground">Agent: {agentConfig.agent.name || platformAgentId}</p>
+            <p className="font-medium text-green-600 dark:text-green-400">Connecté à {platformLabel}</p>
+            <p className="text-sm text-muted-foreground">Agent: {agentConfig.agentName || platformAgentId}</p>
           </div>
         </div>
       )}
@@ -298,9 +321,12 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
             <MessageSquare className="w-4 h-4" />
             Prompt & Premier Message
           </TabsTrigger>
-          <TabsTrigger value="knowledge" className="gap-2">
+          <TabsTrigger value="knowledge" className="gap-2" disabled={agent.platform !== 'elevenlabs'}>
             <BookOpen className="w-4 h-4" />
             Base de Connaissances
+            {agent.platform !== 'elevenlabs' && (
+              <Badge variant="outline" className="ml-1 text-xs">ElevenLabs</Badge>
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -310,6 +336,7 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-primary" />
                 Configuration du Prompt
+                <Badge variant="outline" className="ml-2">{platformLabel}</Badge>
                 {hasChanges && (
                   <Badge variant="outline" className="ml-2 text-yellow-500 border-yellow-500">
                     Non sauvegardé
@@ -318,7 +345,7 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
               </CardTitle>
               <CardDescription>
                 Modifiez le prompt système et le premier message de l'agent. 
-                Les modifications sont synchronisées avec ElevenLabs.
+                Les modifications sont synchronisées avec {platformLabel}.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -360,7 +387,7 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
                   <div className="flex justify-between items-center pt-4 border-t">
                     <Button
                       variant="outline"
-                      onClick={() => queryClient.invalidateQueries({ queryKey: ['elevenlabs-agent-config', agent.id] })}
+                      onClick={() => queryClient.invalidateQueries({ queryKey: ['agent-config-by-platform', agent.id] })}
                     >
                       <RefreshCw className="w-4 h-4 mr-2" />
                       Rafraîchir
@@ -384,139 +411,152 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
         </TabsContent>
 
         <TabsContent value="knowledge" className="space-y-4">
-          {/* Contenu existant de la KB */}
-          <Card className="glass-card">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <BookOpen className="w-5 h-5 text-primary" />
-                    Base de Connaissances
-                  </CardTitle>
-                  <CardDescription>
-                    Documents et informations que l'agent utilise pour répondre aux questions.
-                  </CardDescription>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => syncKnowledgeBase.mutate()}
-                  disabled={syncKnowledgeBase.isPending}
-                >
-                  {syncKnowledgeBase.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                  )}
-                  Sync depuis ElevenLabs
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isLoadingKB ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  <span className="ml-2 text-muted-foreground">Chargement de la base de connaissances...</span>
-                </div>
-              ) : (
-                <>
-                  {/* Liste des documents existants */}
-                  <div className="space-y-2">
-                    <Label>Documents existants ({knowledgeBase?.knowledge_base?.items?.length || 0})</Label>
-                    <ScrollArea className="h-48 border rounded-lg p-2">
-                      {knowledgeBase?.knowledge_base?.items?.length > 0 ? (
-                        <div className="space-y-2">
-                          {knowledgeBase.knowledge_base.items.map((item: any, index: number) => (
-                            <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                              <div className="flex items-center gap-2">
-                                <FileText className="w-4 h-4 text-muted-foreground" />
-                                <div>
-                                  <span className="font-medium">{item.name || item.title || `Document ${index + 1}`}</span>
-                                  {item.type && (
-                                    <span className="text-xs text-muted-foreground ml-2">({item.type})</span>
-                                  )}
-                                </div>
-                              </div>
-                              <Badge variant="outline">{item.metadata?.category || item.category || 'Général'}</Badge>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                          <BookOpen className="w-8 h-8 mb-2 opacity-50" />
-                          <p className="text-sm">Aucun document dans la base de connaissances</p>
-                        </div>
-                      )}
-                    </ScrollArea>
+          {agent.platform !== 'elevenlabs' ? (
+            <Card className="glass-card">
+              <CardContent className="pt-6 text-center">
+                <BookOpen className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">
+                  La gestion de la base de connaissances est disponible uniquement pour les agents ElevenLabs.
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Pour {platformLabel}, configurez la base de connaissances directement dans leur interface.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="glass-card">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="w-5 h-5 text-primary" />
+                      Base de Connaissances
+                    </CardTitle>
+                    <CardDescription>
+                      Documents et informations que l'agent utilise pour répondre aux questions.
+                    </CardDescription>
                   </div>
-
-                  {/* Formulaire d'ajout */}
-                  <div className="space-y-4 pt-4 border-t">
-                    <Label className="text-base font-semibold flex items-center gap-2">
-                      <Plus className="w-4 h-4" />
-                      Ajouter du contenu
-                    </Label>
-                    
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="kb-title">Titre</Label>
-                        <Input
-                          id="kb-title"
-                          value={kbTitle}
-                          onChange={(e) => setKbTitle(e.target.value)}
-                          placeholder="FAQ Produit, Guide d'utilisation..."
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="kb-category">Catégorie</Label>
-                        <Input
-                          id="kb-category"
-                          value={kbCategory}
-                          onChange={(e) => setKbCategory(e.target.value)}
-                          placeholder="Général, Produit, Support..."
-                        />
-                      </div>
-                    </div>
-
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => syncKnowledgeBase.mutate()}
+                    disabled={syncKnowledgeBase.isPending}
+                  >
+                    {syncKnowledgeBase.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    Sync depuis ElevenLabs
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isLoadingKB ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                    <span className="ml-2 text-muted-foreground">Chargement de la base de connaissances...</span>
+                  </div>
+                ) : (
+                  <>
+                    {/* Liste des documents existants */}
                     <div className="space-y-2">
-                      <Label htmlFor="kb-content">Contenu</Label>
-                      <Textarea
-                        id="kb-content"
-                        value={kbContent}
-                        onChange={(e) => setKbContent(e.target.value)}
-                        placeholder="Entrez le contenu que l'agent doit connaître. Vous pouvez inclure des FAQ, des guides, des informations produit..."
-                        className="min-h-[200px]"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Ce contenu sera utilisé par l'agent pour répondre aux questions des utilisateurs.
-                      </p>
+                      <Label>Documents existants ({knowledgeBase?.knowledge_base?.items?.length || 0})</Label>
+                      <ScrollArea className="h-48 border rounded-lg p-2">
+                        {knowledgeBase?.knowledge_base?.items?.length > 0 ? (
+                          <div className="space-y-2">
+                            {knowledgeBase.knowledge_base.items.map((item: any, index: number) => (
+                              <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="w-4 h-4 text-muted-foreground" />
+                                  <div>
+                                    <span className="font-medium">{item.name || item.title || `Document ${index + 1}`}</span>
+                                    {item.type && (
+                                      <span className="text-xs text-muted-foreground ml-2">({item.type})</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <Badge variant="outline">{item.metadata?.category || item.category || 'Général'}</Badge>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                            <BookOpen className="w-8 h-8 mb-2 opacity-50" />
+                            <p className="text-sm">Aucun document dans la base de connaissances</p>
+                          </div>
+                        )}
+                      </ScrollArea>
                     </div>
 
-                    <div className="flex justify-between items-center">
-                      <Button
-                        variant="outline"
-                        onClick={() => queryClient.invalidateQueries({ queryKey: ['elevenlabs-knowledge-base', agent.id] })}
-                      >
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Rafraîchir
-                      </Button>
-                      <Button
-                        onClick={() => addKnowledgeBase.mutate()}
-                        disabled={addKnowledgeBase.isPending || !kbTitle || !kbContent}
-                      >
-                        {addKnowledgeBase.isPending ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <Brain className="w-4 h-4 mr-2" />
-                        )}
-                        Ajouter & Sync
-                      </Button>
+                    {/* Formulaire d'ajout */}
+                    <div className="space-y-4 pt-4 border-t">
+                      <Label className="text-base font-semibold flex items-center gap-2">
+                        <Plus className="w-4 h-4" />
+                        Ajouter du contenu
+                      </Label>
+                      
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="kb-title">Titre</Label>
+                          <Input
+                            id="kb-title"
+                            value={kbTitle}
+                            onChange={(e) => setKbTitle(e.target.value)}
+                            placeholder="FAQ Produit, Guide d'utilisation..."
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="kb-category">Catégorie</Label>
+                          <Input
+                            id="kb-category"
+                            value={kbCategory}
+                            onChange={(e) => setKbCategory(e.target.value)}
+                            placeholder="Général, Produit, Support..."
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="kb-content">Contenu</Label>
+                        <Textarea
+                          id="kb-content"
+                          value={kbContent}
+                          onChange={(e) => setKbContent(e.target.value)}
+                          placeholder="Entrez le contenu que l'agent doit connaître. Vous pouvez inclure des FAQ, des guides, des informations produit..."
+                          className="min-h-[200px]"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Ce contenu sera utilisé par l'agent pour répondre aux questions des utilisateurs.
+                        </p>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <Button
+                          variant="outline"
+                          onClick={() => queryClient.invalidateQueries({ queryKey: ['elevenlabs-knowledge-base', agent.id] })}
+                        >
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Rafraîchir
+                        </Button>
+                        <Button
+                          onClick={() => addKnowledgeBase.mutate()}
+                          disabled={addKnowledgeBase.isPending || !kbTitle || !kbContent}
+                        >
+                          {addKnowledgeBase.isPending ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Brain className="w-4 h-4 mr-2" />
+                          )}
+                          Ajouter & Sync
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
