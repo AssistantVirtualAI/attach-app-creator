@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Save, RefreshCw, ExternalLink, AlertCircle } from 'lucide-react';
+import { Loader2, Save, RefreshCw, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,6 +17,15 @@ interface QuickPromptModalProps {
   platform: string;
   platformAgentId: string | null;
 }
+
+const getPlatformDisplayName = (platform: string): string => {
+  switch (platform) {
+    case 'elevenlabs': return 'ElevenLabs';
+    case 'retell': return 'Retell AI';
+    case 'vapi': return 'Vapi';
+    default: return platform;
+  }
+};
 
 export function QuickPromptModal({ 
   open, 
@@ -31,55 +40,122 @@ export function QuickPromptModal({
   const [firstMessage, setFirstMessage] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Fetch agent config from ElevenLabs
+  const supportedPlatforms = ['elevenlabs', 'retell', 'vapi'];
+  const isSupported = supportedPlatforms.includes(platform);
+
+  // Fetch agent config from platform
   const { data: agentConfig, isLoading, error } = useQuery({
-    queryKey: ['quick-prompt-config', agentId, platformAgentId],
+    queryKey: ['quick-prompt-config', agentId, platformAgentId, platform],
     queryFn: async () => {
-      if (!platformAgentId || platform !== 'elevenlabs') return null;
+      if (!platformAgentId) return null;
 
-      const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
-        body: { 
-          action: 'get',
-          agentId: platformAgentId
-        }
-      });
+      // ElevenLabs
+      if (platform === 'elevenlabs') {
+        const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
+          body: { action: 'get', agentId: platformAgentId }
+        });
+        if (error) throw error;
+        return { platform: 'elevenlabs', data };
+      }
 
-      if (error) throw error;
-      return data;
+      // Retell AI
+      if (platform === 'retell') {
+        const { data, error } = await supabase.functions.invoke('retell-proxy', {
+          body: { action: 'getAgent', retellAgentId: platformAgentId }
+        });
+        if (error) throw error;
+        return { platform: 'retell', data };
+      }
+
+      // Vapi
+      if (platform === 'vapi') {
+        const { data, error } = await supabase.functions.invoke('vapi-proxy', {
+          body: { action: 'getAssistant', assistantId: platformAgentId }
+        });
+        if (error) throw error;
+        return { platform: 'vapi', data };
+      }
+
+      return null;
     },
-    enabled: open && !!platformAgentId && platform === 'elevenlabs',
+    enabled: open && !!platformAgentId && isSupported,
   });
 
-  // Initialize form with fetched data
+  // Initialize form with fetched data based on platform
   useEffect(() => {
-    if (agentConfig?.agent) {
-      const agentData = agentConfig.agent;
-      const conversationConfig = agentData.conversation_config || {};
+    if (!agentConfig) return;
+
+    if (agentConfig.platform === 'elevenlabs') {
+      const agentData = agentConfig.data?.agent;
+      const conversationConfig = agentData?.conversation_config || {};
       const agentConf = conversationConfig.agent || {};
-      
       setPrompt(agentConf.prompt?.prompt || '');
       setFirstMessage(agentConf.first_message || '');
-      setHasChanges(false);
     }
+
+    if (agentConfig.platform === 'retell') {
+      const agent = agentConfig.data?.data || agentConfig.data;
+      // Retell stocke le prompt dans agent_prompt ou general_prompt
+      setPrompt(agent?.agent_prompt || agent?.general_prompt || agent?.llm?.general_prompt || '');
+      setFirstMessage(agent?.begin_message || agent?.llm?.begin_message || '');
+    }
+
+    if (agentConfig.platform === 'vapi') {
+      const assistant = agentConfig.data?.data || agentConfig.data;
+      // Vapi stocke le prompt dans model.messages
+      const systemMessage = assistant?.model?.messages?.find((m: any) => m.role === 'system');
+      setPrompt(systemMessage?.content || '');
+      setFirstMessage(assistant?.firstMessage || '');
+    }
+
+    setHasChanges(false);
   }, [agentConfig]);
 
-  // Update mutation
+  // Update mutation - multi-platform
   const updateMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
-        body: { 
-          action: 'update_prompt',
-          agentId: platformAgentId,
-          prompt,
-          firstMessage
-        }
-      });
+      // ElevenLabs
+      if (platform === 'elevenlabs') {
+        const { error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
+          body: { action: 'update_prompt', agentId: platformAgentId, prompt, firstMessage }
+        });
+        if (error) throw error;
+      }
 
-      if (error) throw error;
-      return data;
+      // Retell AI
+      if (platform === 'retell') {
+        const { error } = await supabase.functions.invoke('retell-proxy', {
+          body: { 
+            action: 'updateAgent', 
+            retellAgentId: platformAgentId,
+            config: { 
+              agent_prompt: prompt, 
+              begin_message: firstMessage || undefined 
+            }
+          }
+        });
+        if (error) throw error;
+      }
+
+      // Vapi
+      if (platform === 'vapi') {
+        const { error } = await supabase.functions.invoke('vapi-proxy', {
+          body: { 
+            action: 'updateAssistant', 
+            assistantId: platformAgentId,
+            config: { 
+              model: { 
+                messages: [{ role: 'system', content: prompt }] 
+              },
+              firstMessage: firstMessage || undefined 
+            }
+          }
+        });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
-      toast.success('Prompt synchronisé avec ElevenLabs');
+      toast.success(`Prompt synchronisé avec ${getPlatformDisplayName(platform)}`);
       setHasChanges(false);
       queryClient.invalidateQueries({ queryKey: ['quick-prompt-config', agentId] });
       queryClient.invalidateQueries({ queryKey: ['elevenlabs-agent-config', agentId] });
@@ -90,17 +166,21 @@ export function QuickPromptModal({
     }
   });
 
-  if (platform !== 'elevenlabs') {
+  // Plateforme non supportée
+  if (!isSupported) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
+        <DialogContent className="bg-card border-border">
           <DialogHeader>
             <DialogTitle>Modifier le Prompt - {agentName}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground">
-              La modification du prompt est disponible uniquement pour les agents ElevenLabs.
+              La modification du prompt n'est pas disponible pour la plateforme "{platform}".
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Plateformes supportées : ElevenLabs, Retell AI, Vapi
             </p>
           </div>
         </DialogContent>
@@ -110,10 +190,13 @@ export function QuickPromptModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-card border-border">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             Modifier le Prompt - {agentName}
+            <Badge variant="outline" className="ml-2 text-primary border-primary/50">
+              {getPlatformDisplayName(platform)}
+            </Badge>
             {hasChanges && (
               <Badge variant="outline" className="text-yellow-500 border-yellow-500">
                 Non sauvegardé
@@ -121,21 +204,21 @@ export function QuickPromptModal({
             )}
           </DialogTitle>
           <DialogDescription>
-            Modifiez le prompt et le premier message. Les modifications sont synchronisées avec ElevenLabs.
+            Modifiez le prompt et le premier message. Les modifications sont synchronisées avec {getPlatformDisplayName(platform)}.
           </DialogDescription>
         </DialogHeader>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-2 text-muted-foreground">Chargement...</span>
+            <span className="ml-2 text-muted-foreground">Chargement depuis {getPlatformDisplayName(platform)}...</span>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-            <p className="text-destructive">Erreur de connexion à ElevenLabs</p>
+            <p className="text-destructive">Erreur de connexion à {getPlatformDisplayName(platform)}</p>
             <p className="text-sm text-muted-foreground mt-2">
-              Vérifiez la configuration de l'agent.
+              Vérifiez la configuration de l'agent et la clé API.
             </p>
           </div>
         ) : (
@@ -150,7 +233,7 @@ export function QuickPromptModal({
                   setHasChanges(true);
                 }}
                 placeholder="Instructions pour l'agent..."
-                className="min-h-[200px] font-mono text-sm"
+                className="min-h-[200px] font-mono text-sm bg-muted/30 border-border"
               />
             </div>
 
@@ -164,11 +247,11 @@ export function QuickPromptModal({
                   setHasChanges(true);
                 }}
                 placeholder="Bonjour ! Comment puis-je vous aider ?"
-                className="min-h-[80px]"
+                className="min-h-[80px] bg-muted/30 border-border"
               />
             </div>
 
-            <div className="flex justify-between items-center pt-4 border-t">
+            <div className="flex justify-between items-center pt-4 border-t border-border">
               <Button
                 variant="outline"
                 onClick={() => queryClient.invalidateQueries({ queryKey: ['quick-prompt-config', agentId] })}
