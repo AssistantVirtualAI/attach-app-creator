@@ -41,6 +41,7 @@ export function QuickPromptModal({
   const [prompt, setPrompt] = useState('');
   const [firstMessage, setFirstMessage] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const [retellLlmId, setRetellLlmId] = useState<string | null>(null);
 
   const supportedPlatforms = ['elevenlabs', 'retell', 'vapi'];
   const isSupported = supportedPlatforms.includes(platform);
@@ -60,13 +61,30 @@ export function QuickPromptModal({
         return { platform: 'elevenlabs', data };
       }
 
-      // Retell AI
+      // Retell AI - fetch agent then LLM for prompt
       if (platform === 'retell') {
-        const { data, error } = await supabase.functions.invoke('retell-proxy', {
+        const { data: agentData, error: agentError } = await supabase.functions.invoke('retell-proxy', {
           body: { action: 'getAgent', retellAgentId: platformAgentId, organizationId }
         });
-        if (error) throw error;
-        return { platform: 'retell', data };
+        if (agentError) throw agentError;
+        
+        const agent = agentData?.data || agentData;
+        const llmId = agent?.response_engine?.llm_id || agent?.llm_id;
+        
+        // If agent has an LLM, fetch it to get the prompt
+        if (llmId) {
+          const { data: llmData, error: llmError } = await supabase.functions.invoke('retell-proxy', {
+            body: { action: 'getLlm', llmId, organizationId }
+          });
+          if (llmError) {
+            console.error('Failed to fetch LLM:', llmError);
+            // Return agent data with llmId for reference
+            return { platform: 'retell', data: agent, llmId, llmError: true };
+          }
+          return { platform: 'retell', data: agent, llm: llmData?.data || llmData, llmId };
+        }
+        
+        return { platform: 'retell', data: agent };
       }
 
       // Vapi
@@ -96,10 +114,23 @@ export function QuickPromptModal({
     }
 
     if (agentConfig.platform === 'retell') {
-      const agent = agentConfig.data?.data || agentConfig.data;
-      // Retell stocke le prompt dans agent_prompt ou general_prompt
-      setPrompt(agent?.agent_prompt || agent?.general_prompt || agent?.llm?.general_prompt || '');
-      setFirstMessage(agent?.begin_message || agent?.llm?.begin_message || '');
+      const agent = agentConfig.data;
+      const llm = agentConfig.llm;
+      
+      // Store LLM ID for saving later
+      if (agentConfig.llmId) {
+        setRetellLlmId(agentConfig.llmId);
+      }
+      
+      // Priority: LLM prompt > agent prompt fallbacks
+      if (llm) {
+        setPrompt(llm.general_prompt || '');
+        setFirstMessage(llm.begin_message || '');
+      } else {
+        // Fallback to agent fields if no LLM
+        setPrompt(agent?.agent_prompt || agent?.general_prompt || '');
+        setFirstMessage(agent?.begin_message || '');
+      }
     }
 
     if (agentConfig.platform === 'vapi') {
@@ -124,20 +155,37 @@ export function QuickPromptModal({
         if (error) throw error;
       }
 
-      // Retell AI
+      // Retell AI - update LLM if available, otherwise update agent
       if (platform === 'retell') {
-        const { error } = await supabase.functions.invoke('retell-proxy', {
-          body: { 
-            action: 'updateAgent', 
-            retellAgentId: platformAgentId,
-            organizationId,
-            config: { 
-              agent_prompt: prompt, 
-              begin_message: firstMessage || undefined 
+        if (retellLlmId) {
+          // Update the LLM (where the prompt is actually stored)
+          const { error } = await supabase.functions.invoke('retell-proxy', {
+            body: { 
+              action: 'updateLlm', 
+              llmId: retellLlmId,
+              organizationId,
+              config: { 
+                general_prompt: prompt, 
+                begin_message: firstMessage || null 
+              }
             }
-          }
-        });
-        if (error) throw error;
+          });
+          if (error) throw error;
+        } else {
+          // Fallback: update agent directly
+          const { error } = await supabase.functions.invoke('retell-proxy', {
+            body: { 
+              action: 'updateAgent', 
+              retellAgentId: platformAgentId,
+              organizationId,
+              config: { 
+                agent_prompt: prompt, 
+                begin_message: firstMessage || undefined 
+              }
+            }
+          });
+          if (error) throw error;
+        }
       }
 
       // Vapi
