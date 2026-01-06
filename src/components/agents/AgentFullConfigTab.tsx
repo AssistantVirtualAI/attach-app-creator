@@ -16,6 +16,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { VoiceSelector } from './VoiceSelector';
+import { RetellFullConfigTab } from './RetellFullConfigTab';
 import {
   useElevenLabsFullAgentConfig,
   useUpdateTTSSettings,
@@ -39,9 +40,43 @@ interface AgentFullConfigTabProps {
   agentId: string;
   platformAgentId: string | null;
   apiKey: string | null;
+  platform?: string;
+  organizationId?: string;
 }
 
-export function AgentFullConfigTab({ agentId, platformAgentId, apiKey }: AgentFullConfigTabProps) {
+export function AgentFullConfigTab({ agentId, platformAgentId, apiKey, platform, organizationId }: AgentFullConfigTabProps) {
+  // Route to platform-specific component
+  if (platform === 'retell' && organizationId) {
+    return (
+      <RetellFullConfigTab
+        agentId={agentId}
+        platformAgentId={platformAgentId}
+        organizationId={organizationId}
+        apiKey={apiKey}
+      />
+    );
+  }
+
+  if (platform === 'vapi') {
+    return (
+      <Card className="p-8 text-center">
+        <Settings2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+        <p className="text-muted-foreground">
+          La configuration avancée n'est pas encore disponible pour Vapi.
+        </p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Utilisez le dashboard Vapi pour configurer votre agent.
+        </p>
+      </Card>
+    );
+  }
+
+  // Default: ElevenLabs
+  return <ElevenLabsFullConfigTab agentId={agentId} platformAgentId={platformAgentId} apiKey={apiKey} />;
+}
+
+// ElevenLabs-specific config (original component logic)
+function ElevenLabsFullConfigTab({ agentId, platformAgentId, apiKey }: { agentId: string; platformAgentId: string | null; apiKey: string | null }) {
   const { data: config, isLoading, refetch } = useElevenLabsFullAgentConfig({
     agentId: platformAgentId,
     apiKey,
