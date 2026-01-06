@@ -6,6 +6,7 @@ interface UseClientPlatformParams {
   apiKey: string | null;
   agentId: string | null;
   platform: Platform | null;
+  organizationId?: string | null;
   enabled?: boolean;
 }
 
@@ -23,13 +24,14 @@ const unwrapProxy = <T,>(res: any): T => {
 
 // Unified analytics hook for all platforms
 export const useClientPlatformAnalytics = (
-  { apiKey, agentId, platform, enabled = true }: UseClientPlatformParams,
+  { apiKey, agentId, platform, organizationId, enabled = true }: UseClientPlatformParams,
   timeframe = '30d'
 ) => {
   return useQuery({
     queryKey: ['client-platform-analytics', platform, agentId, timeframe],
     queryFn: async () => {
-      if (!platform || !apiKey || !agentId) return null;
+      if (!platform || !agentId) return null;
+      if (!apiKey && !organizationId) return null;
 
       let data: any;
       let error: any;
@@ -37,20 +39,20 @@ export const useClientPlatformAnalytics = (
       switch (platform) {
         case 'elevenlabs':
           ({ data, error } = await supabase.functions.invoke('elevenlabs-convai-analytics', {
-            body: { apiKey, agentId, timeframe, includeRealtime: true, includeCharts: true }
+            body: { apiKey, agentId, organizationId, timeframe, includeRealtime: true, includeCharts: true }
           }));
           break;
 
         case 'vapi':
           ({ data, error } = await supabase.functions.invoke('vapi-proxy', {
-            body: { action: 'getAnalytics', apiKey, agentId, timeframe }
+            body: { action: 'getAnalytics', apiKey, organizationId, agentId, timeframe }
           }));
           data = normalizeVapiAnalytics(unwrapProxy<any>(data));
           break;
 
         case 'retell':
           ({ data, error } = await supabase.functions.invoke('retell-proxy', {
-            body: { action: 'getAnalytics', apiKey, agentId, timeframe }
+            body: { action: 'getAnalytics', apiKey, organizationId, agentId, timeframe }
           }));
           data = normalizeRetellAnalytics(unwrapProxy<any>(data));
           break;
@@ -62,20 +64,21 @@ export const useClientPlatformAnalytics = (
       if (error) throw error;
       return data;
     },
-    enabled: enabled && !!apiKey && !!agentId && !!platform,
+    enabled: enabled && !!agentId && !!platform && !!(apiKey || organizationId),
   });
 };
 
 // Unified conversations hook for all platforms
 export const useClientPlatformConversations = (
-  { apiKey, agentId, platform, enabled = true }: UseClientPlatformParams,
+  { apiKey, agentId, platform, organizationId, enabled = true }: UseClientPlatformParams,
   page = 1,
   limit = 50
 ) => {
   return useQuery({
     queryKey: ['client-platform-conversations', platform, agentId, page, limit],
     queryFn: async () => {
-      if (!platform || !apiKey || !agentId) return null;
+      if (!platform || !agentId) return null;
+      if (!apiKey && !organizationId) return null;
 
       let data: any;
       let error: any;
@@ -83,20 +86,20 @@ export const useClientPlatformConversations = (
       switch (platform) {
         case 'elevenlabs':
           ({ data, error } = await supabase.functions.invoke('elevenlabs-convai-conversations', {
-            body: { action: 'list', apiKey, agentId, page, limit }
+            body: { action: 'list', apiKey, organizationId, agentId, page, limit }
           }));
           break;
 
         case 'vapi':
           ({ data, error } = await supabase.functions.invoke('vapi-proxy', {
-            body: { action: 'listCalls', apiKey, agentId, assistantId: agentId, limit }
+            body: { action: 'listCalls', apiKey, organizationId, agentId, assistantId: agentId, limit }
           }));
           data = normalizeVapiConversations(unwrapProxy<any[]>(data) || []);
           break;
 
         case 'retell':
           ({ data, error } = await supabase.functions.invoke('retell-proxy', {
-            body: { action: 'listCalls', apiKey, agentId, limit }
+            body: { action: 'listCalls', apiKey, organizationId, agentId, limit }
           }));
           data = normalizeRetellConversations(unwrapProxy<any[]>(data) || []);
           break;
@@ -108,18 +111,19 @@ export const useClientPlatformConversations = (
       if (error) throw error;
       return data;
     },
-    enabled: enabled && !!apiKey && !!agentId && !!platform,
+    enabled: enabled && !!agentId && !!platform && !!(apiKey || organizationId),
   });
 };
 
 // Unified agent config hook for all platforms
 export const useClientPlatformAgentConfig = (
-  { apiKey, agentId, platform, enabled = true }: UseClientPlatformParams
+  { apiKey, agentId, platform, organizationId, enabled = true }: UseClientPlatformParams
 ) => {
   return useQuery({
     queryKey: ['client-platform-agent-config', platform, agentId],
     queryFn: async () => {
-      if (!platform || !apiKey || !agentId) return null;
+      if (!platform || !agentId) return null;
+      if (!apiKey && !organizationId) return null;
 
       let data: any;
       let error: any;
@@ -127,20 +131,20 @@ export const useClientPlatformAgentConfig = (
       switch (platform) {
         case 'elevenlabs':
           ({ data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
-            body: { action: 'get', apiKey, agentId }
+            body: { action: 'get', apiKey, organizationId, agentId }
           }));
           break;
 
         case 'vapi':
           ({ data, error } = await supabase.functions.invoke('vapi-proxy', {
-            body: { action: 'getAssistant', apiKey, assistantId: agentId }
+            body: { action: 'getAssistant', apiKey, organizationId, assistantId: agentId }
           }));
           data = normalizeVapiConfig(unwrapProxy<any>(data));
           break;
 
         case 'retell':
           ({ data, error } = await supabase.functions.invoke('retell-proxy', {
-            body: { action: 'getAgent', apiKey, agentId }
+            body: { action: 'getAgent', apiKey, organizationId, agentId }
           }));
           data = normalizeRetellConfig(unwrapProxy<any>(data));
           break;
@@ -152,7 +156,7 @@ export const useClientPlatformAgentConfig = (
       if (error) throw error;
       return data;
     },
-    enabled: enabled && !!apiKey && !!agentId && !!platform,
+    enabled: enabled && !!agentId && !!platform && !!(apiKey || organizationId),
   });
 };
 
