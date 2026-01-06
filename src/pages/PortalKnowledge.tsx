@@ -76,7 +76,7 @@ const PortalKnowledge = () => {
   const [editName, setEditName] = useState('');
   const [editContent, setEditContent] = useState('');
 
-  const { data: documentData, isLoading: isLoadingDocument } = usePortalKnowledgeBaseDocument(viewDocumentId);
+  const { data: documentData, isLoading: isLoadingDocument } = usePortalKnowledgeDocument(viewDocumentId);
 
   // Only admins can edit: super_admin, admin role, client principal, or member with admin role
   const isAdmin =
@@ -86,9 +86,9 @@ const PortalKnowledge = () => {
     session?.memberRole === 'admin';
   const canEdit = isAdmin;
 
-  // Read from knowledge_base.items structure
-  const items = kbData?.knowledge_base?.items || [];
-  const allDocumentsCount = kbData?.knowledge_base?.all_documents_count || items.length;
+  // Read from the unified knowledge base response
+  const items = kbData?.items || [];
+  const allDocumentsCount = kbData?.total || items.length;
 
   // Get unique categories
   const categories = useMemo(() => {
@@ -118,17 +118,31 @@ const PortalKnowledge = () => {
   });
 
   const handleAddDocument = async () => {
-    if (!newDocName.trim() || !newDocContent.trim()) {
-      toast.error('Veuillez remplir tous les champs');
+    if (!newDocName.trim()) {
+      toast.error('Veuillez remplir le nom du document');
+      return;
+    }
+    if (addType === 'text' && !newDocContent.trim()) {
+      toast.error('Veuillez remplir le contenu du document');
+      return;
+    }
+    if (addType === 'url' && !newDocUrl.trim()) {
+      toast.error('Veuillez remplir l\'URL du document');
       return;
     }
 
     try {
-      await addDocument.mutateAsync({ name: newDocName, content: newDocContent });
+      await addDocument.mutateAsync({ 
+        name: newDocName, 
+        content: addType === 'text' ? newDocContent : undefined,
+        url: addType === 'url' ? newDocUrl : undefined,
+      });
       toast.success('Document ajouté avec succès');
       setIsAddModalOpen(false);
       setNewDocName('');
       setNewDocContent('');
+      setNewDocUrl('');
+      setAddType('text');
     } catch (error: any) {
       if (error.message?.includes('403') || error.message?.includes('Accès refusé')) {
         toast.error('Accès refusé. Seuls les administrateurs peuvent ajouter des documents.');
@@ -161,36 +175,18 @@ const PortalKnowledge = () => {
   };
 
   const handleStartEdit = () => {
-    if (documentData?.document) {
-      setEditName(documentData.document.name || '');
-      setEditContent(documentData.document.content || '');
+    if (documentData) {
+      setEditName(documentData.name || '');
+      setEditContent(documentData.content || '');
     }
     setIsEditMode(true);
   };
 
   const handleSaveEdit = async () => {
-    if (!viewDocumentId || !editName.trim() || !editContent.trim()) {
-      toast.error('Veuillez remplir tous les champs');
-      return;
-    }
-
-    try {
-      await updateDocument.mutateAsync({
-        documentId: viewDocumentId,
-        name: editName,
-        content: editContent,
-        deleteOld: true,
-      });
-      toast.success('Document modifié avec succès');
-      setViewDocumentId(null);
-      setIsEditMode(false);
-    } catch (error: any) {
-      if (error.message?.includes('403') || error.message?.includes('Accès refusé')) {
-        toast.error('Accès refusé. Seuls les administrateurs peuvent modifier des documents.');
-      } else {
-        toast.error('Erreur lors de la modification');
-      }
-    }
+    // Edit not supported for now in multi-platform mode
+    toast.info('La modification n\'est pas encore supportée pour cette plateforme');
+    setViewDocumentId(null);
+    setIsEditMode(false);
   };
 
   const getDocIcon = (type: string) => {

@@ -130,6 +130,48 @@ serve(async (req) => {
         result = await retellRequest(retellApiKey, 'PATCH', `/update-phone-number/${encodeURIComponent(params.phoneNumber)}`, undefined, params.config);
         break;
 
+      // Knowledge Base
+      case 'listKnowledgeBases':
+        result = await retellRequest(retellApiKey, 'GET', '/list-knowledge-bases');
+        break;
+      case 'getKnowledgeBase':
+        if (!params.knowledgeBaseId) throw new Error('knowledgeBaseId is required');
+        result = await retellRequest(retellApiKey, 'GET', `/get-knowledge-base/${params.knowledgeBaseId}`);
+        break;
+      case 'createKnowledgeBase':
+        const kbPayload: any = {
+          knowledge_base_name: params.name || 'New Knowledge Base',
+        };
+        if (params.texts && params.texts.length > 0) {
+          kbPayload.knowledge_base_texts = params.texts.map((t: any) => ({
+            text: t.content || t.text,
+            title: t.title || t.name || 'Document',
+          }));
+        }
+        if (params.urls && params.urls.length > 0) {
+          kbPayload.knowledge_base_urls = params.urls;
+        }
+        result = await retellRequest(retellApiKey, 'POST', '/create-knowledge-base', undefined, kbPayload);
+        break;
+      case 'addKnowledgeBaseDocument':
+        if (!params.knowledgeBaseId) throw new Error('knowledgeBaseId is required');
+        const addDocPayload: any = {};
+        if (params.text) {
+          addDocPayload.knowledge_base_texts = [{
+            text: params.text,
+            title: params.title || 'Document',
+          }];
+        }
+        if (params.url) {
+          addDocPayload.knowledge_base_urls = [params.url];
+        }
+        result = await retellRequest(retellApiKey, 'PATCH', `/update-knowledge-base/${params.knowledgeBaseId}`, undefined, addDocPayload);
+        break;
+      case 'deleteKnowledgeBase':
+        if (!params.knowledgeBaseId) throw new Error('knowledgeBaseId is required');
+        result = await retellRequest(retellApiKey, 'DELETE', `/delete-knowledge-base/${params.knowledgeBaseId}`);
+        break;
+
       // LLMs
       case 'listLlms':
         result = await retellRequest(retellApiKey, 'GET', '/list-retell-llms');
