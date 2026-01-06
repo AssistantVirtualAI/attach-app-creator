@@ -13,8 +13,19 @@ import { useTranslation } from '@/hooks/useTranslation';
 const PortalDashboard = () => {
   const { t, language } = useTranslation();
   const { session } = usePortal();
-  const { data: analytics, isLoading: analyticsLoading } = usePortalPlatformAnalytics('7days');
-  const { data: conversationsData, isLoading: conversationsLoading } = usePortalPlatformConversations(1, 100);
+  const { data: analytics, isLoading: analyticsLoading, error: analyticsError } = usePortalPlatformAnalytics('7days');
+  const { data: conversationsData, isLoading: conversationsLoading, error: conversationsError } = usePortalPlatformConversations(1, 100);
+
+  // Debug logs
+  console.log('[PortalDashboard] Session:', session ? {
+    agentId: session.agentId,
+    agentName: session.agentName,
+    platform: session.platform,
+    platformAgentId: session.platformAgentId,
+    platformApiKey: session.platformApiKey ? '***SET***' : 'NOT SET',
+  } : 'null');
+  console.log('[PortalDashboard] Analytics:', { data: analytics, loading: analyticsLoading, error: analyticsError });
+  console.log('[PortalDashboard] Conversations:', { data: conversationsData, loading: conversationsLoading, error: conversationsError });
 
   const containerVariants = {
     hidden: { opacity: 0 },
