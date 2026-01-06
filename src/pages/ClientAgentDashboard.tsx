@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom';
 import { useClientAgentAccess } from '@/hooks/useClientAgentAccess';
-import { useClientElevenLabsAnalytics, useClientElevenLabsConversations } from '@/hooks/useClientElevenLabs';
+import { useClientPlatformAnalytics, useClientPlatformConversations } from '@/hooks/useClientPlatformData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -8,15 +8,15 @@ import {
   MessageSquare, 
   Clock, 
   TrendingUp, 
-  TrendingDown,
   Phone,
   Users,
   ThumbsUp,
   Star,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  AlertCircle
 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const StatCard = ({ 
   title, 
@@ -68,16 +68,18 @@ const StatCard = ({
 
 const ClientAgentDashboard = () => {
   const { clientId, agentId } = useParams();
-  const { apiKey, agentId: elevenlabsAgentId, agentName } = useClientAgentAccess(clientId, agentId);
+  const { apiKey, agentId: platformAgentId, agentName, platform, isLoading: accessLoading } = useClientAgentAccess(clientId, agentId);
   
-  const { data: analytics, isLoading: analyticsLoading } = useClientElevenLabsAnalytics({
+  const { data: analytics, isLoading: analyticsLoading } = useClientPlatformAnalytics({
     apiKey,
-    agentId: elevenlabsAgentId,
+    agentId: platformAgentId,
+    platform,
   }, '30d');
 
-  const { data: conversations, isLoading: conversationsLoading } = useClientElevenLabsConversations({
+  const { data: conversations, isLoading: conversationsLoading } = useClientPlatformConversations({
     apiKey,
-    agentId: elevenlabsAgentId,
+    agentId: platformAgentId,
+    platform,
   }, 1, 5);
 
   const metrics = analytics?.metrics || {};
@@ -85,23 +87,59 @@ const ClientAgentDashboard = () => {
   const chartData = analytics?.charts?.conversations_over_time || [];
   const recentConversations = conversations?.conversations || [];
 
-  // Calculate percentage changes
-  const getChangeValue = (direction: string, value: string) => {
-    if (!value) return undefined;
-    return value;
-  };
-
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}m ${secs}s`;
   };
 
+  // Show loading state while checking access
+  if (accessLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-48" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32" />)}
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if no platform or missing config
+  if (!platform || !apiKey || !platformAgentId) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold">{agentName || 'Dashboard'}</h1>
+          <p className="text-muted-foreground">Vue d'ensemble des performances de l'agent</p>
+        </div>
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+              <p className="text-muted-foreground">
+                Configuration {platform ? platform.toUpperCase() : 'plateforme'} manquante pour cet agent
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Vérifiez que l'agent dispose d'un ID de plateforme et d'une clé API valide.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">{agentName || 'Dashboard'}</h1>
-        <p className="text-muted-foreground">Vue d'ensemble des performances de l'agent</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">{agentName || 'Dashboard'}</h1>
+          <p className="text-muted-foreground">Vue d'ensemble des performances de l'agent</p>
+        </div>
+        <Badge variant="outline" className="capitalize">
+          {platform}
+        </Badge>
       </div>
 
       {/* Stats Grid */}
@@ -111,7 +149,7 @@ const ClientAgentDashboard = () => {
           value={metrics.total_conversations || 0}
           icon={MessageSquare}
           trend={trends.conversations?.direction}
-          trendValue={getChangeValue(trends.conversations?.direction, trends.conversations?.value)}
+          trendValue={trends.conversations?.value}
           trendLabel="vs période précédente"
           isLoading={analyticsLoading}
         />
@@ -120,7 +158,7 @@ const ClientAgentDashboard = () => {
           value={metrics.avg_duration ? formatDuration(metrics.avg_duration) : '0m'}
           icon={Clock}
           trend={trends.duration?.direction}
-          trendValue={getChangeValue(trends.duration?.direction, trends.duration?.value)}
+          trendValue={trends.duration?.value}
           isLoading={analyticsLoading}
         />
         <StatCard
@@ -134,7 +172,7 @@ const ClientAgentDashboard = () => {
           value={metrics.avg_satisfaction ? `${Math.round(metrics.avg_satisfaction * 100)}%` : 'N/A'}
           icon={ThumbsUp}
           trend={trends.satisfaction?.direction}
-          trendValue={getChangeValue(trends.satisfaction?.direction, trends.satisfaction?.value)}
+          trendValue={trends.satisfaction?.value}
           isLoading={analyticsLoading}
         />
       </div>
@@ -248,10 +286,10 @@ const ClientAgentDashboard = () => {
                         }
                       </p>
                       <Badge 
-                        variant={conv.status === 'done' ? 'default' : 'secondary'}
+                        variant={conv.status === 'done' || conv.status === 'ended' ? 'default' : 'secondary'}
                         className="text-xs"
                       >
-                        {conv.status === 'done' ? 'Terminé' : conv.status}
+                        {conv.status === 'done' || conv.status === 'ended' ? 'Terminé' : conv.status}
                       </Badge>
                     </div>
                   </div>
