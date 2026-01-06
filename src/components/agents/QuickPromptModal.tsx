@@ -16,6 +16,7 @@ interface QuickPromptModalProps {
   agentName: string;
   platform: string;
   platformAgentId: string | null;
+  organizationId?: string;
 }
 
 const getPlatformDisplayName = (platform: string): string => {
@@ -33,7 +34,8 @@ export function QuickPromptModal({
   agentId, 
   agentName, 
   platform, 
-  platformAgentId 
+  platformAgentId,
+  organizationId
 }: QuickPromptModalProps) {
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState('');
@@ -61,7 +63,7 @@ export function QuickPromptModal({
       // Retell AI
       if (platform === 'retell') {
         const { data, error } = await supabase.functions.invoke('retell-proxy', {
-          body: { action: 'getAgent', retellAgentId: platformAgentId }
+          body: { action: 'getAgent', retellAgentId: platformAgentId, organizationId }
         });
         if (error) throw error;
         return { platform: 'retell', data };
@@ -70,7 +72,7 @@ export function QuickPromptModal({
       // Vapi
       if (platform === 'vapi') {
         const { data, error } = await supabase.functions.invoke('vapi-proxy', {
-          body: { action: 'getAssistant', assistantId: platformAgentId }
+          body: { action: 'getAssistant', assistantId: platformAgentId, organizationId }
         });
         if (error) throw error;
         return { platform: 'vapi', data };
@@ -128,6 +130,7 @@ export function QuickPromptModal({
           body: { 
             action: 'updateAgent', 
             retellAgentId: platformAgentId,
+            organizationId,
             config: { 
               agent_prompt: prompt, 
               begin_message: firstMessage || undefined 
@@ -143,6 +146,7 @@ export function QuickPromptModal({
           body: { 
             action: 'updateAssistant', 
             assistantId: platformAgentId,
+            organizationId,
             config: { 
               model: { 
                 messages: [{ role: 'system', content: prompt }] 
