@@ -96,7 +96,8 @@ const PortalLayoutContent = () => {
   };
 
   const handleBackToAdmin = () => {
-    navigate('/agents');
+    // Use full page reload to properly reset all contexts
+    window.location.href = '/agents';
   };
 
   const handleProfileClick = () => {
