@@ -6,14 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Plus, RefreshCw, BookOpen, FileText, Trash2, Link2, AlertCircle, CheckCircle2, Bot, File, Eye } from 'lucide-react';
+import { Search, Plus, RefreshCw, BookOpen, FileText, Trash2, Link2, AlertCircle, CheckCircle2, Bot, File, Eye, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { 
   useElevenLabsKnowledgeBase, 
   useDeleteKnowledgeBaseItem,
   type ElevenLabsKBItem
 } from '@/hooks/useElevenLabsKnowledgeBase';
-import { useElevenLabsAgents } from '@/hooks/useElevenLabsAgents';
+import { useAllAgents, getPlatformDisplayName, platformSupportsKnowledgeBase } from '@/hooks/useAllAgents';
 import { useQueryClient } from '@tanstack/react-query';
 import { KnowledgeDocumentViewer } from '@/components/knowledge/KnowledgeDocumentViewer';
 import { AddKnowledgeDocumentModal } from '@/components/knowledge/AddKnowledgeDocumentModal';
@@ -27,23 +27,33 @@ const KnowledgeBase = () => {
 
   const queryClient = useQueryClient();
 
-  // Get available ElevenLabs agents
-  const { data: agentsData, isLoading: isLoadingAgents } = useElevenLabsAgents();
+  // Get ALL agents (all platforms)
+  const { data: agentsData, isLoading: isLoadingAgents } = useAllAgents();
   const agents = agentsData?.agents || [];
-  const fallbackApiKey = agentsData?.fallbackApiKey;
+  const fallbackApiKeys = agentsData?.fallbackApiKeys || {};
 
-  // Get the selected agent (using internal UUID)
+  // Get the selected agent
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
-  const apiKey = selectedAgent?.platform_api_key || (selectedAgent?.config as any)?.api_key || fallbackApiKey;
+  const selectedPlatform = selectedAgent?.platform?.toLowerCase() || '';
+  const supportsKB = platformSupportsKnowledgeBase(selectedPlatform);
+  
+  // Get API key for the selected agent
+  const apiKey = selectedAgent?.platform_api_key || 
+    (selectedAgent?.config as any)?.api_key || 
+    fallbackApiKeys[selectedPlatform] || 
+    null;
   const platformAgentId = selectedAgent?.platform_agent_id;
 
-  // Fetch knowledge base for selected agent - pass internal UUID, function will look up platform_agent_id
+  // Fetch knowledge base for selected agent - only for ElevenLabs
   const { 
     data: kbData, 
     isLoading: isLoadingKB, 
     error: kbError,
     refetch 
-  } = useElevenLabsKnowledgeBase(selectedAgentId, apiKey);
+  } = useElevenLabsKnowledgeBase(
+    supportsKB ? selectedAgentId : null, 
+    supportsKB ? apiKey : null
+  );
 
   const deleteMutation = useDeleteKnowledgeBaseItem();
 
@@ -76,13 +86,13 @@ const KnowledgeBase = () => {
   };
 
   const handleRefresh = () => {
-    if (selectedAgentId) {
+    if (selectedAgentId && supportsKB) {
       queryClient.invalidateQueries({ queryKey: ['elevenlabs-knowledge-base', selectedAgentId] });
       refetch();
     }
   };
 
-  // Auto-select first agent if none selected (use internal ID, not platform_agent_id)
+  // Auto-select first agent if none selected
   if (!selectedAgentId && agents.length > 0 && !isLoadingAgents) {
     setSelectedAgentId(agents[0].id);
   }
@@ -93,6 +103,20 @@ const KnowledgeBase = () => {
       case 'file': 
       case 'document': return <File className="w-4 h-4" />;
       default: return <FileText className="w-4 h-4" />;
+    }
+  };
+
+  // Platform badge color
+  const getPlatformBadgeClass = (platform: string) => {
+    switch (platform.toLowerCase()) {
+      case 'elevenlabs':
+        return 'bg-primary/20 text-primary border-primary/30';
+      case 'retell':
+        return 'bg-blue-500/20 text-blue-500 border-blue-500/30';
+      case 'vapi':
+        return 'bg-purple-500/20 text-purple-500 border-purple-500/30';
+      default:
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -112,13 +136,13 @@ const KnowledgeBase = () => {
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="flex-1">
-                <Label className="text-sm text-muted-foreground mb-2 block">Sélectionner un agent ElevenLabs</Label>
+                <Label className="text-sm text-muted-foreground mb-2 block">Sélectionner un agent</Label>
                 <Select 
                   value={selectedAgentId || ''} 
                   onValueChange={setSelectedAgentId}
                   disabled={isLoadingAgents}
                 >
-                  <SelectTrigger className="w-full sm:w-80 bg-background border-border">
+                  <SelectTrigger className="w-full sm:w-96 bg-background border-border">
                     <SelectValue placeholder={isLoadingAgents ? "Chargement..." : "Sélectionner un agent"} />
                   </SelectTrigger>
                   <SelectContent className="bg-background border-border">
@@ -127,9 +151,9 @@ const KnowledgeBase = () => {
                         <div className="flex items-center gap-2">
                           <Bot className="w-4 h-4 text-primary" />
                           <span>{agent.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            ({agent.platform_agent_id.slice(0, 8)}...)
-                          </span>
+                          <Badge variant="outline" className={`text-xs ml-1 ${getPlatformBadgeClass(agent.platform)}`}>
+                            {getPlatformDisplayName(agent.platform)}
+                          </Badge>
                         </div>
                       </SelectItem>
                     ))}
@@ -138,7 +162,7 @@ const KnowledgeBase = () => {
               </div>
 
               {/* Connection Status */}
-              {selectedAgentId && (
+              {selectedAgentId && supportsKB && (
                 <div className="flex items-center gap-2">
                   {apiKey ? (
                     <Badge className="bg-success/20 text-success border-success/30">
@@ -163,7 +187,7 @@ const KnowledgeBase = () => {
         </Card>
 
         {/* Actions Bar */}
-        {selectedAgentId && apiKey && (
+        {selectedAgentId && supportsKB && apiKey && (
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -203,26 +227,42 @@ const KnowledgeBase = () => {
             <h3 className="text-lg font-semibold mb-2">Aucun agent sélectionné</h3>
             <p className="text-muted-foreground mb-4">
               {agents.length === 0 
-                ? 'Aucun agent ElevenLabs configuré. Créez un agent avec une API key ElevenLabs.'
+                ? 'Aucun agent configuré. Créez un agent avec une plateforme IA vocale.'
                 : 'Sélectionnez un agent pour voir sa base de connaissances.'}
             </p>
           </Card>
         )}
 
-        {/* No API Key State */}
-        {selectedAgentId && !apiKey && (
+        {/* Platform Not Supported State */}
+        {selectedAgentId && !supportsKB && (
+          <Card className="p-12 text-center border-border">
+            <Info className="w-16 h-16 mx-auto mb-4 text-blue-500" />
+            <h3 className="text-lg font-semibold mb-2">Base de connaissances non disponible</h3>
+            <p className="text-muted-foreground mb-4">
+              La gestion de base de connaissances n'est pas disponible pour la plateforme {getPlatformDisplayName(selectedPlatform)}.
+              <br />
+              Cette fonctionnalité est actuellement supportée uniquement pour ElevenLabs.
+            </p>
+            <Badge variant="outline" className={getPlatformBadgeClass(selectedPlatform)}>
+              {getPlatformDisplayName(selectedPlatform)}
+            </Badge>
+          </Card>
+        )}
+
+        {/* No API Key State - only for supported platforms */}
+        {selectedAgentId && supportsKB && !apiKey && (
           <Card className="p-12 text-center border-border">
             <AlertCircle className="w-16 h-16 mx-auto mb-4 text-warning" />
             <h3 className="text-lg font-semibold mb-2">API Key manquante</h3>
             <p className="text-muted-foreground mb-4">
-              Cet agent n'a pas d'API Key ElevenLabs configurée.
-              Veuillez ajouter une API Key dans les paramètres de l'agent.
+              Cet agent n'a pas d'API Key {getPlatformDisplayName(selectedPlatform)} configurée.
+              Veuillez ajouter une API Key dans les paramètres de l'agent ou les intégrations.
             </p>
           </Card>
         )}
 
         {/* Loading State */}
-        {isLoadingKB && selectedAgentId && apiKey && (
+        {isLoadingKB && selectedAgentId && supportsKB && apiKey && (
           <div className="text-center py-12">
             <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
             <p className="mt-4 text-muted-foreground">Chargement de la base de connaissances...</p>
@@ -230,7 +270,7 @@ const KnowledgeBase = () => {
         )}
 
         {/* Error State */}
-        {kbError && selectedAgentId && apiKey && (
+        {kbError && selectedAgentId && supportsKB && apiKey && (
           <Card className="p-12 text-center border-destructive">
             <AlertCircle className="w-16 h-16 mx-auto mb-4 text-destructive" />
             <h3 className="text-lg font-semibold mb-2">Erreur de chargement</h3>
@@ -245,7 +285,7 @@ const KnowledgeBase = () => {
         )}
 
         {/* Knowledge Base Items */}
-        {!isLoadingKB && !kbError && selectedAgentId && apiKey && (
+        {!isLoadingKB && !kbError && selectedAgentId && supportsKB && apiKey && (
           <>
             {filteredItems.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -341,7 +381,7 @@ const KnowledgeBase = () => {
         )}
 
         {/* Stats Footer */}
-        {selectedAgentId && apiKey && items.length > 0 && (
+        {selectedAgentId && supportsKB && apiKey && items.length > 0 && (
           <div className="mt-6 text-center text-sm text-muted-foreground">
             {items.length} document{items.length > 1 ? 's' : ''} dans la base de connaissances
           </div>

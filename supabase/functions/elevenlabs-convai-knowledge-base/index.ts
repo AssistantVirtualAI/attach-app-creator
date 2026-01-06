@@ -335,13 +335,14 @@ serve(async (req) => {
         
         let filteredDocs = allDocuments;
         if (platformAgentId) {
-          // Include documents linked to this agent OR documents with no agents (unassigned/global)
+          // STRICT FILTERING: Only include documents explicitly linked to this agent
+          // Do NOT include unassigned/orphan documents
           filteredDocs = allDocuments.filter((doc: any) => {
             const dependentAgents = doc.dependent_agents || [];
             
-            // Include unassigned documents (no dependent agents)
+            // Skip documents with no agents (don't show orphan docs when agent is selected)
             if (dependentAgents.length === 0) {
-              return true;
+              return false;
             }
             
             // Check if linked to this specific agent
@@ -353,7 +354,7 @@ serve(async (req) => {
             });
             return isLinked;
           });
-          console.log(`[KB] After filtering for agent ${platformAgentId}: ${filteredDocs.length} documents (including unassigned)`);
+          console.log(`[KB] After strict filtering for agent ${platformAgentId}: ${filteredDocs.length} documents (agent-specific only)`);
         }
         
         const items = filteredDocs.map((doc: any) => ({
