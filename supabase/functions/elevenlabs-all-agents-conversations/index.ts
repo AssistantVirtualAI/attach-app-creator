@@ -106,53 +106,43 @@ serve(async (req) => {
       });
     }
 
-    // Get ALL agents for the organization (not just ElevenLabs)
+    // Get all ElevenLabs agents for the organization
     const { data: agents, error: agentsError } = await supabase
       .from('agents')
-      .select('id, name, platform_agent_id, platform_api_key, platform, config, organization_id')
-      .eq('organization_id', orgMember.organization_id);
+      .select('id, name, platform_agent_id, platform_api_key, platform, config')
+      .eq('organization_id', orgMember.organization_id)
+      .eq('platform', 'elevenlabs');
 
     if (agentsError) {
       console.error('Error fetching agents:', agentsError);
       throw new Error('Error fetching agents');
     }
 
-    console.log(`Found ${agents?.length || 0} agents for organization`);
-
-    // Get all integrations (ElevenLabs, Retell, Vapi) by org_id OR user_id
+    // Get all ElevenLabs integrations (by org_id OR user_id)
     const { data: integrations } = await supabase
       .from('organization_integrations')
-      .select('id, agent_id, api_key, additional_config, platform')
+      .select('id, agent_id, api_key, additional_config')
+      .eq('platform', 'elevenlabs')
       .eq('is_active', true)
       .or(`organization_id.eq.${orgMember.organization_id},user_id.eq.${user.id}`);
 
-    // Build a map of platform -> integration_id -> api_key
-    const integrationApiKeysByPlatform: Record<string, Record<string, string>> = {};
+    // Build a map of integration_id -> api_key
+    const integrationApiKeys: Record<string, string> = {};
     if (integrations) {
       for (const integration of integrations) {
-        if (integration.api_key && integration.platform) {
-          if (!integrationApiKeysByPlatform[integration.platform]) {
-            integrationApiKeysByPlatform[integration.platform] = {};
-          }
-          integrationApiKeysByPlatform[integration.platform][integration.id] = integration.api_key;
+        if (integration.api_key) {
+          integrationApiKeys[integration.id] = integration.api_key;
         }
       }
     }
 
-    // Build agent configs for all platforms
-    interface AgentConfig {
-      id: string;
-      name: string;
-      agentId: string;
-      apiKey: string;
-      platform: string;
-      organizationId: string;
-    }
-    
-    let agentConfigs: AgentConfig[] = [];
+    // If no agents found, try organization_integrations as fallback
+    let agentConfigs: Array<{ id: string; name: string; agentId: string; apiKey: string }> = [];
 
     if (agents && agents.length > 0) {
+      // Use agents from the agents table
       for (const agent of agents) {
+        // Get agent ID from platform_agent_id OR config.agent_id
         const agentId = agent.platform_agent_id || (agent.config as any)?.agent_id;
         
         if (!agentId) {
@@ -164,18 +154,8 @@ serve(async (req) => {
         let apiKey = agent.platform_api_key;
         
         if (!apiKey && (agent.config as any)?.integration_id) {
-          const platformKeys = integrationApiKeysByPlatform[agent.platform] || {};
-          apiKey = platformKeys[(agent.config as any).integration_id];
-        }
-
-        // If still no API key, try to find one from integrations for this platform
-        if (!apiKey) {
-          const platformIntegration = integrations?.find(
-            (i) => i.platform === agent.platform && i.api_key
-          );
-          if (platformIntegration) {
-            apiKey = platformIntegration.api_key;
-          }
+          apiKey = integrationApiKeys[(agent.config as any).integration_id];
+          console.log(`Using API key from integration ${(agent.config as any).integration_id} for agent ${agent.name}`);
         }
 
         if (apiKey) {
@@ -183,31 +163,28 @@ serve(async (req) => {
             id: agent.id,
             name: agent.name,
             agentId: agentId,
-            apiKey: apiKey,
-            platform: agent.platform,
-            organizationId: agent.organization_id
+            apiKey: apiKey
           });
-          console.log(`Added ${agent.platform} agent: ${agent.name} (${agentId})`);
+          console.log(`Added agent config for ${agent.name} with agentId ${agentId}`);
         } else {
-          // Still add agent to the list but without conversations
-          console.log(`Agent ${agent.name} (${agent.platform}) has no API key - will show in list but no conversations`);
+          console.log(`Agent ${agent.name} has no API key available`);
         }
       }
     }
 
     // Also add agents from integrations that have agent_id directly
+
     if (integrations) {
       for (const integration of integrations) {
-        if (integration.agent_id && integration.api_key && integration.platform) {
+        if (integration.agent_id && integration.api_key) {
+          // Check if this agent is already in our list
           const exists = agentConfigs.some(a => a.agentId === integration.agent_id);
           if (!exists) {
             agentConfigs.push({
               id: integration.id,
-              name: `${integration.platform} Agent`,
+              name: `Integration Agent`,
               agentId: integration.agent_id,
-              apiKey: integration.api_key,
-              platform: integration.platform,
-              organizationId: orgMember.organization_id
+              apiKey: integration.api_key
             });
           }
         }
@@ -215,23 +192,12 @@ serve(async (req) => {
     }
 
     if (agentConfigs.length === 0) {
-      // Show all agents from DB even without API keys
-      const allAgentsList = (agents || []).map(a => ({
-        id: a.id,
-        name: a.name,
-        agentId: a.platform_agent_id || '',
-        conversationCount: 0,
-        platform: a.platform
-      }));
-      
       return new Response(
         JSON.stringify({ 
-          requiresSetup: allAgentsList.length === 0, 
-          message: allAgentsList.length === 0 
-            ? 'Aucun agent configuré. Veuillez créer un agent.'
-            : 'Agents trouvés mais clés API manquantes. Configurez les intégrations.',
+          requiresSetup: true, 
+          message: 'Aucun agent ElevenLabs configuré. Veuillez créer un agent avec vos credentials ElevenLabs.',
           conversations: [],
-          agents: allAgentsList,
+          agents: [],
           total: 0
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -349,7 +315,7 @@ serve(async (req) => {
     console.log(`Fetching conversations from ${agentConfigs.length} agents`);
     
     const allConversations: any[] = [];
-    const agentsList: Array<{ id: string; name: string; agentId: string; conversationCount: number; platform?: string }> = [];
+    const agentsList: Array<{ id: string; name: string; agentId: string; conversationCount: number }> = [];
 
     // Filter by specific agent if requested
     const configsToProcess = filters.agentId 
@@ -358,153 +324,50 @@ serve(async (req) => {
 
     for (const config of configsToProcess) {
       try {
-        console.log(`Fetching conversations for ${config.platform} agent: ${config.name} (${config.agentId})`);
+        console.log(`Fetching conversations for agent ${config.name} (${config.agentId})`);
         
-        let conversations: any[] = [];
-        
-        // ELEVENLABS
-        if (config.platform === 'elevenlabs') {
-          const conversationsResponse = await fetch(
-            `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${config.agentId}&cursor=&limit=100`,
-            {
-              headers: {
-                'xi-api-key': config.apiKey,
-                'accept': 'application/json',
-              },
-            }
-          );
-
-          if (conversationsResponse.ok) {
-            const conversationsData = await conversationsResponse.json();
-            conversations = (conversationsData.conversations || []).map((conv: any) => ({
-              ...conv,
-              agent_id: config.id,
-              agent_name: config.name,
-              platform_agent_id: config.agentId,
-              platform: 'elevenlabs',
-            }));
-          } else {
-            const errorText = await conversationsResponse.text().catch(() => '');
-            console.error(`ElevenLabs error for ${config.name}:`, conversationsResponse.status, errorText.substring(0, 200));
+        const conversationsResponse = await fetch(
+          `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${config.agentId}&cursor=&limit=100`,
+          {
+            headers: {
+              'xi-api-key': config.apiKey,
+              'accept': 'application/json',
+            },
           }
-        }
-        
-        // RETELL
-        else if (config.platform === 'retell') {
-          const retellResponse = await fetch(
-            'https://api.retellai.com/list-calls',
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${config.apiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                filter_criteria: {
-                  agent_id: [config.agentId]
-                },
-                limit: 100,
-                sort_order: 'descending'
-              }),
-            }
-          );
+        );
 
-          if (retellResponse.ok) {
-            const retellCalls = await retellResponse.json();
-            // Normalize Retell calls to match conversation format
-            conversations = (Array.isArray(retellCalls) ? retellCalls : []).map((call: any) => ({
-              conversation_id: call.call_id,
-              agent_id: config.id,
-              agent_name: config.name,
-              platform_agent_id: config.agentId,
-              platform: 'retell',
-              start_time: call.start_timestamp ? new Date(call.start_timestamp).toISOString() : null,
-              end_time: call.end_timestamp ? new Date(call.end_timestamp).toISOString() : null,
-              call_duration_secs: call.end_timestamp && call.start_timestamp 
-                ? Math.round((call.end_timestamp - call.start_timestamp) / 1000) 
-                : 0,
-              duration: call.end_timestamp && call.start_timestamp 
-                ? Math.round((call.end_timestamp - call.start_timestamp) / 1000) 
-                : 0,
-              status: call.call_status || call.status,
-              transcript: call.transcript || '',
-              analysis: {
-                summary: call.call_analysis?.call_summary || '',
-                sentiment: call.call_analysis?.user_sentiment || 'neutral',
-                satisfaction_score: call.call_analysis?.call_successful ? 0.8 : 0.4,
-              },
-              metadata: {
-                from_number: call.from_number,
-                to_number: call.to_number,
-                disconnection_reason: call.disconnection_reason,
-              },
-            }));
-          } else {
-            const errorText = await retellResponse.text().catch(() => '');
-            console.error(`Retell error for ${config.name}:`, retellResponse.status, errorText.substring(0, 200));
-          }
-        }
-        
-        // VAPI
-        else if (config.platform === 'vapi') {
-          const vapiResponse = await fetch(
-            `https://api.vapi.ai/call?assistantId=${config.agentId}&limit=100`,
-            {
-              headers: {
-                'Authorization': `Bearer ${config.apiKey}`,
-                'Content-Type': 'application/json',
-              },
-            }
-          );
+        if (conversationsResponse.ok) {
+          const conversationsData = await conversationsResponse.json();
+          const conversations = conversationsData.conversations || [];
+          
+          // Add agent info to each conversation
+          const enrichedConversations = conversations.map((conv: any) => ({
+            ...conv,
+            agent_id: config.id,
+            agent_name: config.name,
+            platform_agent_id: config.agentId,
+          }));
 
-          if (vapiResponse.ok) {
-            const vapiCalls = await vapiResponse.json();
-            // Normalize Vapi calls to match conversation format
-            conversations = (Array.isArray(vapiCalls) ? vapiCalls : []).map((call: any) => ({
-              conversation_id: call.id,
-              agent_id: config.id,
-              agent_name: config.name,
-              platform_agent_id: config.agentId,
-              platform: 'vapi',
-              start_time: call.startedAt || call.createdAt,
-              end_time: call.endedAt,
-              call_duration_secs: call.duration ? Math.round(call.duration) : 0,
-              duration: call.duration ? Math.round(call.duration) : 0,
-              status: call.status,
-              transcript: call.transcript || '',
-              analysis: {
-                summary: call.summary || '',
-                sentiment: 'neutral',
-                satisfaction_score: call.status === 'ended' ? 0.7 : 0.4,
-              },
-              metadata: call.metadata || {},
-            }));
-          } else {
-            const errorText = await vapiResponse.text().catch(() => '');
-            console.error(`Vapi error for ${config.name}:`, vapiResponse.status, errorText.substring(0, 200));
-          }
+          allConversations.push(...enrichedConversations);
+          agentsList.push({
+            id: config.id,
+            name: config.name,
+            agentId: config.agentId,
+            conversationCount: conversations.length
+          });
+        } else {
+          const errorText = await conversationsResponse.text().catch(() => '');
+          console.error(`Error fetching for agent ${config.name}:`, conversationsResponse.status, errorText);
+          // Still show the agent in the UI
+          agentsList.push({
+            id: config.id,
+            name: config.name,
+            agentId: config.agentId,
+            conversationCount: 0
+          });
         }
-
-        allConversations.push(...conversations);
-        agentsList.push({
-          id: config.id,
-          name: config.name,
-          agentId: config.agentId,
-          conversationCount: conversations.length,
-          platform: config.platform,
-        });
-        
-        console.log(`Found ${conversations.length} conversations for ${config.platform} agent ${config.name}`);
       } catch (error) {
         console.error(`Error fetching conversations for agent ${config.name}:`, error);
-        // Still add the agent to the list
-        agentsList.push({
-          id: config.id,
-          name: config.name,
-          agentId: config.agentId,
-          conversationCount: 0,
-          platform: config.platform,
-        });
       }
     }
 
