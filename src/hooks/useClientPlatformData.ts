@@ -9,6 +9,18 @@ interface UseClientPlatformParams {
   enabled?: boolean;
 }
 
+type ProxyResponse<T> = { success: boolean; data?: T; error?: string };
+
+const unwrapProxy = <T,>(res: any): T => {
+  // Proxy functions return { success, data }
+  if (res && typeof res === 'object' && 'success' in res) {
+    if (res.success === false) throw new Error(res.error || 'Proxy error');
+    return res.data as T;
+  }
+  // ElevenLabs functions return data directly
+  return res as T;
+};
+
 // Unified analytics hook for all platforms
 export const useClientPlatformAnalytics = (
   { apiKey, agentId, platform, enabled = true }: UseClientPlatformParams,
@@ -31,22 +43,16 @@ export const useClientPlatformAnalytics = (
 
         case 'vapi':
           ({ data, error } = await supabase.functions.invoke('vapi-proxy', {
-            body: { action: 'getAnalytics', apiKey, assistantId: agentId, timeframe }
+            body: { action: 'getAnalytics', apiKey, agentId, timeframe }
           }));
-          // Normalize Vapi response
-          if (data) {
-            data = normalizeVapiAnalytics(data, timeframe);
-          }
+          data = normalizeVapiAnalytics(unwrapProxy<any>(data));
           break;
 
         case 'retell':
           ({ data, error } = await supabase.functions.invoke('retell-proxy', {
             body: { action: 'getAnalytics', apiKey, agentId, timeframe }
           }));
-          // Normalize Retell response
-          if (data) {
-            data = normalizeRetellAnalytics(data, timeframe);
-          }
+          data = normalizeRetellAnalytics(unwrapProxy<any>(data));
           break;
 
         default:
@@ -83,22 +89,16 @@ export const useClientPlatformConversations = (
 
         case 'vapi':
           ({ data, error } = await supabase.functions.invoke('vapi-proxy', {
-            body: { action: 'listCalls', apiKey, assistantId: agentId, limit, offset: (page - 1) * limit }
+            body: { action: 'listCalls', apiKey, agentId, assistantId: agentId, limit }
           }));
-          // Normalize Vapi response
-          if (data?.calls) {
-            data = normalizeVapiConversations(data.calls);
-          }
+          data = normalizeVapiConversations(unwrapProxy<any[]>(data) || []);
           break;
 
         case 'retell':
           ({ data, error } = await supabase.functions.invoke('retell-proxy', {
-            body: { action: 'listCalls', apiKey, agentId, limit, offset: (page - 1) * limit }
+            body: { action: 'listCalls', apiKey, agentId, limit }
           }));
-          // Normalize Retell response
-          if (data?.calls) {
-            data = normalizeRetellConversations(data.calls);
-          }
+          data = normalizeRetellConversations(unwrapProxy<any[]>(data) || []);
           break;
 
         default:
@@ -135,20 +135,14 @@ export const useClientPlatformAgentConfig = (
           ({ data, error } = await supabase.functions.invoke('vapi-proxy', {
             body: { action: 'getAssistant', apiKey, assistantId: agentId }
           }));
-          // Normalize to common format
-          if (data) {
-            data = normalizeVapiConfig(data);
-          }
+          data = normalizeVapiConfig(unwrapProxy<any>(data));
           break;
 
         case 'retell':
           ({ data, error } = await supabase.functions.invoke('retell-proxy', {
             body: { action: 'getAgent', apiKey, agentId }
           }));
-          // Normalize to common format
-          if (data) {
-            data = normalizeRetellConfig(data);
-          }
+          data = normalizeRetellConfig(unwrapProxy<any>(data));
           break;
 
         default:
@@ -163,16 +157,17 @@ export const useClientPlatformAgentConfig = (
 };
 
 // Normalization helpers
-function normalizeVapiAnalytics(data: any, timeframe: string) {
-  const analytics = data.analytics || data;
+function normalizeVapiAnalytics(analytics: any) {
   return {
     metrics: {
       total_conversations: analytics.totalCalls || 0,
       avg_duration: analytics.avgDuration || 0,
-      today_conversations: analytics.callsByDay?.[new Date().toISOString().split('T')[0]] || 0,
+      today_conversations: (analytics.callsByDay || {})[new Date().toISOString().split('T')[0]] || 0,
       avg_satisfaction: analytics.successRate ? analytics.successRate / 100 : null,
       success_rate: analytics.successRate || 0,
       total_duration: analytics.totalDuration || 0,
+      successful_conversations: analytics.completedCalls || 0,
+      failed_conversations: (analytics.totalCalls || 0) - (analytics.completedCalls || 0),
     },
     trends: {},
     charts: {
@@ -180,20 +175,23 @@ function normalizeVapiAnalytics(data: any, timeframe: string) {
         date,
         count,
       })),
+      peak_hours: [],
+      satisfaction_trend: [],
     },
   };
 }
 
-function normalizeRetellAnalytics(data: any, timeframe: string) {
-  const analytics = data.analytics || data;
+function normalizeRetellAnalytics(analytics: any) {
   return {
     metrics: {
       total_conversations: analytics.totalCalls || 0,
       avg_duration: analytics.avgDuration || 0,
-      today_conversations: analytics.callsByDay?.[new Date().toISOString().split('T')[0]] || 0,
+      today_conversations: (analytics.callsByDay || {})[new Date().toISOString().split('T')[0]] || 0,
       avg_satisfaction: analytics.successRate ? analytics.successRate / 100 : null,
       success_rate: analytics.successRate || 0,
       total_duration: analytics.totalDuration || 0,
+      successful_conversations: analytics.completedCalls || 0,
+      failed_conversations: (analytics.totalCalls || 0) - (analytics.completedCalls || 0),
     },
     trends: {},
     charts: {
@@ -201,6 +199,8 @@ function normalizeRetellAnalytics(data: any, timeframe: string) {
         date,
         count,
       })),
+      peak_hours: [],
+      satisfaction_trend: [],
     },
   };
 }
@@ -209,9 +209,12 @@ function normalizeVapiConversations(calls: any[]) {
   return {
     conversations: calls.map(call => ({
       conversation_id: call.id,
-      start_time_unix_secs: call.startedAt ? new Date(call.startedAt).getTime() / 1000 : Date.now() / 1000,
-      call_duration_secs: call.duration || 0,
+      start_time_unix_secs: call.startedAt ? new Date(call.startedAt).getTime() / 1000 : (call.createdAt ? new Date(call.createdAt).getTime() / 1000 : Date.now() / 1000),
+      call_duration_secs: call.endedAt && call.startedAt
+        ? Math.max(0, Math.round((new Date(call.endedAt).getTime() - new Date(call.startedAt).getTime()) / 1000))
+        : 0,
       status: call.status || 'unknown',
+      message_count: 0,
       metadata: {
         caller_id: call.customer?.number || call.phoneNumber || 'Unknown',
       },
@@ -224,9 +227,10 @@ function normalizeRetellConversations(calls: any[]) {
   return {
     conversations: calls.map(call => ({
       conversation_id: call.call_id || call.id,
-      start_time_unix_secs: call.start_timestamp ? call.start_timestamp / 1000 : Date.now() / 1000,
+      start_time_unix_secs: call.start_timestamp ? call.start_timestamp / 1000 : (call.created_at ? new Date(call.created_at).getTime() / 1000 : Date.now() / 1000),
       call_duration_secs: call.call_length || call.duration || 0,
       status: call.call_status || call.status || 'unknown',
+      message_count: 0,
       metadata: {
         caller_id: call.from_number || call.caller_id || 'Unknown',
       },

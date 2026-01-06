@@ -1,5 +1,5 @@
 import { usePortal } from '@/hooks/usePortalAuth';
-import { usePortalAnalytics } from '@/hooks/usePortalElevenLabs';
+import { usePortalPlatformAnalytics } from '@/hooks/usePortalPlatformData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, TrendingUp, Clock, MessageSquare, Users, Zap, Loader2, AlertCircle, Brain, Target, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
@@ -16,8 +16,8 @@ import { useTranslation } from '@/hooks/useTranslation';
 const PortalAnalytics = () => {
   const { t, language } = useTranslation();
   const { session } = usePortal();
-  const { data: analytics, isLoading } = usePortalAnalytics('7days');
-  const { data: analytics30, isLoading: analytics30Loading } = usePortalAnalytics('30days');
+  const { data: analytics, isLoading } = usePortalPlatformAnalytics('7days');
+  const { data: analytics30, isLoading: analytics30Loading } = usePortalPlatformAnalytics('30days');
 
   const containerVariants = {
     hidden: { opacity: 0 },
