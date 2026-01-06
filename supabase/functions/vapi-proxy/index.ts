@@ -20,6 +20,8 @@ serve(async (req) => {
 
     const { action, apiKey, organizationId, agentId, ...params } = await req.json();
 
+    console.log(`[Vapi] Request received - Action: ${action}, OrganizationId: ${organizationId || 'NOT PROVIDED'}, AgentId: ${agentId || 'N/A'}`);
+
     if (!action) {
       throw new Error('Missing required parameter: action');
     }
@@ -27,7 +29,8 @@ serve(async (req) => {
     // Get API key from integration if not provided directly
     let vapiApiKey = apiKey;
     if (!vapiApiKey && organizationId) {
-      const { data: integration } = await supabase
+      console.log(`[Vapi] Fetching API key for organization: ${organizationId}`);
+      const { data: integration, error: integrationError } = await supabase
         .from('organization_integrations')
         .select('api_key')
         .eq('organization_id', organizationId)
@@ -35,16 +38,25 @@ serve(async (req) => {
         .eq('is_active', true)
         .single();
 
-      if (integration) {
-        vapiApiKey = integration.api_key;
+      if (integrationError) {
+        console.error(`[Vapi] Integration query error:`, integrationError);
       }
+
+      if (integration) {
+        console.log(`[Vapi] Found API key for organization`);
+        vapiApiKey = integration.api_key;
+      } else {
+        console.log(`[Vapi] No integration found for organization ${organizationId}`);
+      }
+    } else if (!organizationId) {
+      console.log(`[Vapi] No organizationId provided in request`);
     }
 
     if (!vapiApiKey) {
       throw new Error('API key not found. Please configure Vapi integration.');
     }
 
-    console.log(`[Vapi] Action: ${action}, AgentId: ${agentId || 'N/A'}`);
+    console.log(`[Vapi] Processing action: ${action}`);
 
     let result;
     
@@ -128,18 +140,28 @@ serve(async (req) => {
         const timeframe = params.timeframe || '7d';
         const startDate = getStartDate(timeframe);
         
-        const calls = await vapiRequest(vapiApiKey, 'GET', '/call', {
+        const callsQuery: any = {
           limit: 1000,
           createdAtGt: startDate.toISOString(),
-        });
+        };
+        
+        // Filter by assistant ID if provided
+        if (agentId || params.assistantId) {
+          callsQuery.assistantId = agentId || params.assistantId;
+        }
+        
+        const calls = await vapiRequest(vapiApiKey, 'GET', '/call', callsQuery);
         
         const callsArray = Array.isArray(calls) ? calls : [];
+        console.log(`[Vapi] Retrieved ${callsArray.length} calls for analytics`);
         result = computeAnalytics(callsArray);
         break;
 
       default:
         throw new Error(`Unsupported action: ${action}`);
     }
+
+    console.log(`[Vapi] Action ${action} completed successfully`);
 
     return new Response(
       JSON.stringify({ success: true, data: result }),
@@ -196,7 +218,15 @@ async function vapiRequest(
     throw new Error(`Vapi API error (${response.status}): ${errorText}`);
   }
 
-  return response.json();
+  // Handle empty responses
+  const text = await response.text();
+  if (!text) return { success: true };
+  
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { success: true, message: text };
+  }
 }
 
 function getStartDate(timeframe: string): Date {
@@ -206,9 +236,11 @@ function getStartDate(timeframe: string): Date {
       now.setHours(now.getHours() - 24);
       break;
     case '7d':
+    case '7days':
       now.setDate(now.getDate() - 7);
       break;
     case '30d':
+    case '30days':
       now.setDate(now.getDate() - 30);
       break;
     case '90d':

@@ -51,13 +51,22 @@ export const usePortalPlatformConversations = (page: number = 1, limit: number =
   const { session } = usePortal();
 
   return useQuery({
-    queryKey: ['portal-platform-conversations', session?.platform, session?.platformAgentId, page, limit],
+    queryKey: ['portal-platform-conversations', session?.platform, session?.platformAgentId, session?.organizationId, page, limit],
     queryFn: async () => {
-      if (!session?.platform || !session?.platformApiKey || !session?.platformAgentId) {
+      if (!session?.platform || !session?.platformAgentId) {
+        console.log('[Portal] Missing platform or platformAgentId for conversations');
+        return { conversations: [], total: 0 } as PortalPlatformConversationsResponse;
+      }
+
+      // Allow requests to proceed even without platformApiKey - the proxy will fetch from organization_integrations
+      const hasApiKeyOrOrg = session.platformApiKey || session.organizationId;
+      if (!hasApiKeyOrOrg) {
+        console.log('[Portal] No API key or organization ID available');
         return { conversations: [], total: 0 } as PortalPlatformConversationsResponse;
       }
 
       const platform = session.platform as Platform;
+      console.log(`[Portal] Fetching ${platform} conversations for agent: ${session.platformAgentId}`);
 
       // ElevenLabs
       if (platform === 'elevenlabs') {
@@ -66,11 +75,15 @@ export const usePortalPlatformConversations = (page: number = 1, limit: number =
             action: 'list',
             agentId: session.platformAgentId,
             apiKey: session.platformApiKey,
+            organizationId: session.organizationId,
             page,
             limit,
           },
         });
-        if (error) throw error;
+        if (error) {
+          console.error('[Portal] ElevenLabs conversations error:', error);
+          throw error;
+        }
         return data as PortalPlatformConversationsResponse;
       }
 
@@ -80,12 +93,16 @@ export const usePortalPlatformConversations = (page: number = 1, limit: number =
           body: {
             action: 'listCalls',
             apiKey: session.platformApiKey,
+            organizationId: session.organizationId,
             agentId: session.platformAgentId,
             assistantId: session.platformAgentId,
             limit,
           },
         });
-        if (error) throw error;
+        if (error) {
+          console.error('[Portal] Vapi conversations error:', error);
+          throw error;
+        }
         const calls = unwrapProxy<any[]>(data) || [];
         return normalizeVapiConversations(calls);
       }
@@ -96,18 +113,22 @@ export const usePortalPlatformConversations = (page: number = 1, limit: number =
           body: {
             action: 'listCalls',
             apiKey: session.platformApiKey,
+            organizationId: session.organizationId,
             agentId: session.platformAgentId,
             limit,
           },
         });
-        if (error) throw error;
+        if (error) {
+          console.error('[Portal] Retell conversations error:', error);
+          throw error;
+        }
         const calls = unwrapProxy<any[]>(data) || [];
         return normalizeRetellConversations(calls);
       }
 
       return { conversations: [], total: 0 };
     },
-    enabled: !!session?.platform && !!session?.platformApiKey && !!session?.platformAgentId,
+    enabled: !!session?.platform && !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
     staleTime: 30000,
   });
 };
@@ -116,24 +137,36 @@ export const usePortalPlatformAnalytics = (timeframe: string = '7d') => {
   const { session } = usePortal();
 
   return useQuery({
-    queryKey: ['portal-platform-analytics', session?.platform, session?.platformAgentId, timeframe],
+    queryKey: ['portal-platform-analytics', session?.platform, session?.platformAgentId, session?.organizationId, timeframe],
     queryFn: async () => {
-      if (!session?.platform || !session?.platformApiKey || !session?.platformAgentId) {
+      if (!session?.platform || !session?.platformAgentId) {
+        console.log('[Portal] Missing platform or platformAgentId for analytics');
+        return null;
+      }
+
+      const hasApiKeyOrOrg = session.platformApiKey || session.organizationId;
+      if (!hasApiKeyOrOrg) {
+        console.log('[Portal] No API key or organization ID available for analytics');
         return null;
       }
 
       const platform = session.platform as Platform;
+      console.log(`[Portal] Fetching ${platform} analytics for agent: ${session.platformAgentId}`);
 
       if (platform === 'elevenlabs') {
         const { data, error } = await supabase.functions.invoke('elevenlabs-convai-analytics', {
           body: {
             agentId: session.platformAgentId,
             apiKey: session.platformApiKey,
+            organizationId: session.organizationId,
             timeframe: normalizePortalTimeframeToElevenLabs(timeframe),
             includeCharts: true,
           },
         });
-        if (error) throw error;
+        if (error) {
+          console.error('[Portal] ElevenLabs analytics error:', error);
+          throw error;
+        }
         return data as PortalPlatformAnalytics;
       }
 
@@ -142,11 +175,15 @@ export const usePortalPlatformAnalytics = (timeframe: string = '7d') => {
           body: {
             action: 'getAnalytics',
             apiKey: session.platformApiKey,
+            organizationId: session.organizationId,
             agentId: session.platformAgentId,
             timeframe,
           },
         });
-        if (error) throw error;
+        if (error) {
+          console.error('[Portal] Vapi analytics error:', error);
+          throw error;
+        }
         return normalizeVapiAnalytics(unwrapProxy<any>(data));
       }
 
@@ -155,17 +192,21 @@ export const usePortalPlatformAnalytics = (timeframe: string = '7d') => {
           body: {
             action: 'getAnalytics',
             apiKey: session.platformApiKey,
+            organizationId: session.organizationId,
             agentId: session.platformAgentId,
             timeframe,
           },
         });
-        if (error) throw error;
+        if (error) {
+          console.error('[Portal] Retell analytics error:', error);
+          throw error;
+        }
         return normalizeRetellAnalytics(unwrapProxy<any>(data));
       }
 
       return null;
     },
-    enabled: !!session?.platform && !!session?.platformApiKey && !!session?.platformAgentId,
+    enabled: !!session?.platform && !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
     staleTime: 60000,
   });
 };
@@ -178,6 +219,11 @@ function normalizePortalTimeframeToElevenLabs(timeframe: string) {
 }
 
 function normalizeVapiConversations(calls: any[]): PortalPlatformConversationsResponse {
+  if (!Array.isArray(calls)) {
+    console.warn('[Portal] Vapi calls is not an array:', calls);
+    return { conversations: [], total: 0 };
+  }
+
   const conversations: PortalPlatformConversation[] = calls.map(call => ({
     conversation_id: call.id,
     start_time_unix_secs: call.startedAt
@@ -197,6 +243,11 @@ function normalizeVapiConversations(calls: any[]): PortalPlatformConversationsRe
 }
 
 function normalizeRetellConversations(calls: any[]): PortalPlatformConversationsResponse {
+  if (!Array.isArray(calls)) {
+    console.warn('[Portal] Retell calls is not an array:', calls);
+    return { conversations: [], total: 0 };
+  }
+
   const conversations: PortalPlatformConversation[] = calls.map(call => ({
     conversation_id: call.call_id || call.id,
     start_time_unix_secs: call.start_timestamp
@@ -214,6 +265,23 @@ function normalizeRetellConversations(calls: any[]): PortalPlatformConversations
 }
 
 function normalizeVapiAnalytics(analytics: any): PortalPlatformAnalytics {
+  if (!analytics) {
+    return {
+      metrics: {
+        total_conversations: 0,
+        successful_conversations: 0,
+        failed_conversations: 0,
+        avg_duration: 0,
+        total_duration: 0,
+        avg_satisfaction: null,
+        today_conversations: 0,
+        success_rate: 0,
+      },
+      trends: {},
+      charts: { conversations_over_time: [], peak_hours: [], satisfaction_trend: [] },
+    };
+  }
+
   return {
     metrics: {
       total_conversations: analytics.totalCalls || 0,
@@ -238,6 +306,23 @@ function normalizeVapiAnalytics(analytics: any): PortalPlatformAnalytics {
 }
 
 function normalizeRetellAnalytics(analytics: any): PortalPlatformAnalytics {
+  if (!analytics) {
+    return {
+      metrics: {
+        total_conversations: 0,
+        successful_conversations: 0,
+        failed_conversations: 0,
+        avg_duration: 0,
+        total_duration: 0,
+        avg_satisfaction: null,
+        today_conversations: 0,
+        success_rate: 0,
+      },
+      trends: {},
+      charts: { conversations_over_time: [], peak_hours: [], satisfaction_trend: [] },
+    };
+  }
+
   return {
     metrics: {
       total_conversations: analytics.totalCalls || 0,
