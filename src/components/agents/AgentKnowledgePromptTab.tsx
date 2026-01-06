@@ -97,6 +97,7 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
             body: { 
               action: 'update_prompt',
               agentId: platformAgentId,
+              organizationId: agent.organization_id,
               prompt,
               firstMessage
             }
@@ -108,7 +109,12 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
         case 'retell': {
           // Get agent to find LLM ID
           const { data: agentData } = await supabase.functions.invoke('retell-proxy', {
-            body: { action: 'getAgent', retellAgentId: platformAgentId, apiKey: agent.platform_api_key }
+            body: { 
+              action: 'getAgent', 
+              retellAgentId: platformAgentId, 
+              apiKey: agent.platform_api_key,
+              organizationId: agent.organization_id
+            }
           });
           
           const agentInfo = agentData?.data || agentData;
@@ -120,6 +126,7 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
                 action: 'updateLlm', 
                 llmId, 
                 apiKey: agent.platform_api_key,
+                organizationId: agent.organization_id,
                 config: {
                   general_prompt: prompt,
                   begin_message: firstMessage
@@ -134,6 +141,7 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
                 action: 'updateAgent', 
                 retellAgentId: platformAgentId, 
                 apiKey: agent.platform_api_key,
+                organizationId: agent.organization_id,
                 config: {
                   general_prompt: prompt,
                   begin_message: firstMessage
@@ -151,6 +159,7 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
               action: 'updateAssistant', 
               assistantId: platformAgentId, 
               apiKey: agent.platform_api_key,
+              organizationId: agent.organization_id,
               config: {
                 firstMessage,
                 model: {

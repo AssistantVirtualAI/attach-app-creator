@@ -96,7 +96,7 @@ export function usePortalAgentConfig() {
 
         case 'vapi': {
           const { data, error } = await supabase.functions.invoke('vapi-proxy', {
-            body: { action: 'getAssistant', assistantId: agentId, apiKey }
+            body: { action: 'getAssistant', assistantId: agentId, apiKey, organizationId }
           });
           if (error) throw error;
           
@@ -212,6 +212,7 @@ export function usePortalUpdateAgentPrompt() {
               action: 'updateAssistant', 
               assistantId: agentId, 
               apiKey,
+              organizationId,
               config: {
                 firstMessage,
                 model: {
@@ -325,7 +326,12 @@ export function useAgentConfigByPlatform(agent: {
 
         case 'vapi': {
           const { data, error } = await supabase.functions.invoke('vapi-proxy', {
-            body: { action: 'getAssistant', assistantId: platformAgentId, apiKey: agent.platform_api_key }
+            body: { 
+              action: 'getAssistant', 
+              assistantId: platformAgentId, 
+              apiKey: agent.platform_api_key,
+              organizationId: agent.organization_id
+            }
           });
           if (error) throw error;
           
