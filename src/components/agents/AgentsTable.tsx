@@ -74,7 +74,13 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
       toast.error('Aucun slug configuré pour cet agent. Allez dans Paramètres pour en définir un.');
       return;
     }
-    window.open(`/portal/${slug}`, '_blank');
+
+    const url = `/portal/${slug}`;
+    // Some browsers block window.open from menu interactions; fallback to in-app navigation.
+    const newTab = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!newTab) {
+      navigate(url);
+    }
   };
 
   return (
