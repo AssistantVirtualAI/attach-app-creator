@@ -229,7 +229,7 @@ function normalizeVapiAnalytics(analytics: any): PortalPlatformAnalytics {
     charts: {
       conversations_over_time: Object.entries(analytics.callsByDay || {}).map(([date, count]) => ({
         date,
-        count,
+        count: Number(count) || 0,
       })),
       peak_hours: [],
       satisfaction_trend: [],
@@ -253,7 +253,7 @@ function normalizeRetellAnalytics(analytics: any): PortalPlatformAnalytics {
     charts: {
       conversations_over_time: Object.entries(analytics.callsByDay || {}).map(([date, count]) => ({
         date,
-        count,
+        count: Number(count) || 0,
       })),
       peak_hours: [],
       satisfaction_trend: [],
