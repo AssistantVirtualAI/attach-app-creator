@@ -21,6 +21,7 @@ import { format } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useTranslation } from '@/hooks/useTranslation';
+import { usePortalConversationAnalysis } from '@/hooks/usePortalConversationAnalysis';
 
 const PortalConversations = () => {
   const { t, language } = useTranslation();
