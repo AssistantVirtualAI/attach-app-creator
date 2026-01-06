@@ -8,17 +8,31 @@ import { Textarea } from '@/components/ui/textarea';
 import { FileCode, MessageSquare, Eye, Save, Loader2, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { PlatformNotSupported } from '@/components/portal/PlatformNotSupported';
 
 const PortalPrompt = () => {
   const { session } = usePortal();
+
+  // Prompt editing is currently implemented only for ElevenLabs portal hooks.
+  if (session?.platform && session.platform !== 'elevenlabs') {
+    return (
+      <PlatformNotSupported
+        title="Prompt indisponible pour cette plateforme"
+        description={`Le module Prompt du portail est pour l’instant disponible uniquement pour ElevenLabs. Pour ${String(session.platform).toUpperCase()}, vous pouvez consulter les conversations et les analytics.`}
+        primaryCtaHref="/portal/conversations"
+      />
+    );
+  }
+
   const { data: agentConfig, isLoading } = usePortalAgentConfig();
   const updatePrompt = usePortalUpdatePrompt();
 
   // Only admins can edit: super_admin, admin role, client principal, or member with admin role
-  const isAdmin = session?.role === 'super_admin' || 
-                  session?.role === 'admin' || 
-                  session?.memberType === 'client' || 
-                  session?.memberRole === 'admin';
+  const isAdmin =
+    session?.role === 'super_admin' ||
+    session?.role === 'admin' ||
+    session?.memberType === 'client' ||
+    session?.memberRole === 'admin';
   const canEdit = isAdmin;
 
   const [systemPrompt, setSystemPrompt] = useState('');
@@ -27,10 +41,14 @@ const PortalPrompt = () => {
 
   useEffect(() => {
     if (agentConfig) {
-      const prompt = agentConfig.conversation_config?.agent?.prompt?.prompt || 
-                     agentConfig.agent?.prompt?.prompt || '';
-      const first = agentConfig.conversation_config?.agent?.first_message || 
-                    agentConfig.agent?.first_message || '';
+      const prompt =
+        agentConfig.conversation_config?.agent?.prompt?.prompt ||
+        agentConfig.agent?.prompt?.prompt ||
+        '';
+      const first =
+        agentConfig.conversation_config?.agent?.first_message ||
+        agentConfig.agent?.first_message ||
+        '';
       setSystemPrompt(prompt);
       setFirstMessage(first);
     }
@@ -41,7 +59,7 @@ const PortalPrompt = () => {
       await updatePrompt.mutateAsync({ systemPrompt, firstMessage });
       toast.success('Prompt mis à jour avec succès');
       setHasChanges(false);
-    } catch (error) {
+    } catch {
       toast.error('Erreur lors de la mise à jour');
     }
   };
@@ -69,13 +87,13 @@ const PortalPrompt = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {!canEdit && <Badge variant="secondary" className="gap-1"><Eye className="h-3 w-3" />Lecture seule</Badge>}
+          {!canEdit && (
+            <Badge variant="secondary" className="gap-1">
+              <Eye className="h-3 w-3" />Lecture seule
+            </Badge>
+          )}
           {canEdit && hasChanges && (
-            <Button 
-              onClick={handleSave} 
-              disabled={updatePrompt.isPending}
-              className="gap-2"
-            >
+            <Button onClick={handleSave} disabled={updatePrompt.isPending} className="gap-2">
               {updatePrompt.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
@@ -106,58 +124,57 @@ const PortalPrompt = () => {
       )}
 
       {agentConfig && (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileCode className="h-5 w-5 text-primary" />
-                  System Prompt
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {canEdit ? (
-                  <Textarea
-                    value={systemPrompt}
-                    onChange={(e) => handlePromptChange(e.target.value)}
-                    className="min-h-[300px] bg-muted/30 border-border/50 font-mono text-sm"
-                    placeholder="Entrez le prompt système..."
-                  />
-                ) : (
-                  <div className="min-h-[300px] p-4 rounded-lg bg-muted/30 border border-border/50 font-mono text-sm whitespace-pre-wrap">
-                    {systemPrompt || 'Aucun prompt configuré'}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileCode className="h-5 w-5 text-primary" />
+                System Prompt
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {canEdit ? (
+                <Textarea
+                  value={systemPrompt}
+                  onChange={(e) => handlePromptChange(e.target.value)}
+                  className="min-h-[300px] bg-muted/30 border-border/50 font-mono text-sm"
+                  placeholder="Entrez le prompt système..."
+                />
+              ) : (
+                <div className="min-h-[300px] p-4 rounded-lg bg-muted/30 border border-border/50 font-mono text-sm whitespace-pre-wrap">
+                  {systemPrompt || 'Aucun prompt configuré'}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-            <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-primary" />
-                  Premier Message
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {canEdit ? (
-                  <Textarea
-                    value={firstMessage}
-                    onChange={(e) => handleFirstMessageChange(e.target.value)}
-                    className="min-h-[300px] bg-muted/30 border-border/50"
-                    placeholder="Entrez le premier message de l'agent..."
-                  />
-                ) : (
-                  <div className="min-h-[300px] p-4 rounded-lg bg-muted/30 border border-border/50 whitespace-pre-wrap">
-                    {firstMessage || 'Aucun message configuré'}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </>
+          <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                Premier Message
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {canEdit ? (
+                <Textarea
+                  value={firstMessage}
+                  onChange={(e) => handleFirstMessageChange(e.target.value)}
+                  className="min-h-[300px] bg-muted/30 border-border/50"
+                  placeholder="Entrez le premier message de l'agent..."
+                />
+              ) : (
+                <div className="min-h-[300px] p-4 rounded-lg bg-muted/30 border border-border/50 whitespace-pre-wrap">
+                  {firstMessage || 'Aucun message configuré'}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
     </motion.div>
   );
 };
 
 export default PortalPrompt;
+

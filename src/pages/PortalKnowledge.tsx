@@ -1,29 +1,64 @@
 import { useState, useMemo } from 'react';
 import { usePortal } from '@/hooks/usePortalAuth';
-import { 
-  usePortalKnowledgeBase, 
+import {
+  usePortalKnowledgeBase,
   usePortalKnowledgeBaseDocument,
-  usePortalAddKnowledgeDocument, 
+  usePortalAddKnowledgeDocument,
   usePortalDeleteKnowledgeDocument,
-  usePortalUpdateKnowledgeDocument
+  usePortalUpdateKnowledgeDocument,
 } from '@/hooks/usePortalElevenLabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BookOpen, Search, FileText, Plus, Calendar, Trash2, ExternalLink, Loader2, AlertCircle, Eye, Edit, Link as LinkIcon, RefreshCw, Filter } from 'lucide-react';
+import {
+  BookOpen,
+  Search,
+  FileText,
+  Plus,
+  Calendar,
+  Trash2,
+  ExternalLink,
+  Loader2,
+  AlertCircle,
+  Eye,
+  Edit,
+  Link as LinkIcon,
+  RefreshCw,
+  Filter,
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { GlowBadge } from '@/components/portal/GlowBadge';
+import { PlatformNotSupported } from '@/components/portal/PlatformNotSupported';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 const PortalKnowledge = () => {
   const { session } = usePortal();
+
+  // Knowledge base management is currently implemented only for ElevenLabs portal hooks.
+  if (session?.platform && session.platform !== 'elevenlabs') {
+    return (
+      <PlatformNotSupported
+        title="Base de connaissances indisponible pour cette plateforme"
+        description={`La gestion de la base de connaissances du portail est pour l’instant disponible uniquement pour ElevenLabs. Pour ${String(session.platform).toUpperCase()}, vous pouvez consulter les conversations et les analytics.`}
+        primaryCtaHref="/portal/conversations"
+      />
+    );
+  }
+
   const { data: kbData, isLoading, refetch } = usePortalKnowledgeBase();
   const addDocument = usePortalAddKnowledgeDocument();
   const deleteDocument = usePortalDeleteKnowledgeDocument();
@@ -34,7 +69,7 @@ const PortalKnowledge = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [newDocName, setNewDocName] = useState('');
   const [newDocContent, setNewDocContent] = useState('');
-  
+
   // View/Edit modal state
   const [viewDocumentId, setViewDocumentId] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -44,16 +79,17 @@ const PortalKnowledge = () => {
   const { data: documentData, isLoading: isLoadingDocument } = usePortalKnowledgeBaseDocument(viewDocumentId);
 
   // Only admins can edit: super_admin, admin role, client principal, or member with admin role
-  const isAdmin = session?.role === 'super_admin' || 
-                  session?.role === 'admin' || 
-                  session?.memberType === 'client' || 
-                  session?.memberRole === 'admin';
+  const isAdmin =
+    session?.role === 'super_admin' ||
+    session?.role === 'admin' ||
+    session?.memberType === 'client' ||
+    session?.memberRole === 'admin';
   const canEdit = isAdmin;
-  
+
   // Read from knowledge_base.items structure
   const items = kbData?.knowledge_base?.items || [];
   const allDocumentsCount = kbData?.knowledge_base?.all_documents_count || items.length;
-  
+
   // Get unique categories
   const categories = useMemo(() => {
     const cats = new Set<string>();
