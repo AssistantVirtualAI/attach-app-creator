@@ -12,63 +12,114 @@ serve(async (req) => {
   }
 
   try {
-    const { action, agentId, conversationId, page = 1, limit = 50, filters, format = 'mp3', apiKey: providedApiKey } = await req.json();
+    const { action, agentId, conversationId, page = 1, limit = 50, filters, format = 'mp3', apiKey: providedApiKey, organizationId } = await req.json();
     
     let apiKey = providedApiKey;
     let targetAgentId = agentId;
     
-    // If no API key provided directly, try to get from user's integration
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    
+    // Create service client for fallback queries
+    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+    
+    console.log(`[conversations] Action: ${action}, agentId: ${agentId}, organizationId: ${organizationId}, hasApiKey: ${!!apiKey}`);
+    
+    // If no API key provided directly, try multiple fallback strategies
     if (!apiKey) {
-      const authHeader = req.headers.get('Authorization');
-      if (!authHeader) {
-        return new Response(JSON.stringify({ error: 'API key or authorization required' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      // Strategy 1: Try organizationId if provided (for portal usage)
+      if (organizationId) {
+        console.log(`[conversations] Looking up API key via organizationId: ${organizationId}`);
+        const { data: integration } = await supabaseService
+          .from('organization_integrations')
+          .select('api_key, agent_id')
+          .eq('organization_id', organizationId)
+          .eq('platform', 'elevenlabs')
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (integration?.api_key) {
+          apiKey = integration.api_key;
+          targetAgentId = agentId || integration.agent_id;
+          console.log(`[conversations] Got API key from organization_integrations via organizationId`);
+        }
       }
       
-      const token = authHeader.replace('Bearer ', '');
+      // Strategy 2: Try agentId to find agent's organization
+      if (!apiKey && agentId) {
+        console.log(`[conversations] Looking up API key via agentId: ${agentId}`);
+        const { data: agent } = await supabaseService
+          .from('agents')
+          .select('platform_agent_id, platform_api_key, organization_id, config')
+          .or(`id.eq.${agentId},platform_agent_id.eq.${agentId}`)
+          .maybeSingle();
+        
+        if (agent) {
+          targetAgentId = agent.platform_agent_id || agentId;
+          
+          if (agent.platform_api_key) {
+            apiKey = agent.platform_api_key;
+            console.log(`[conversations] Got API key from agent.platform_api_key`);
+          } else if ((agent.config as any)?.api_key) {
+            apiKey = (agent.config as any).api_key;
+            console.log(`[conversations] Got API key from agent.config.api_key`);
+          } else if (agent.organization_id) {
+            const { data: integration } = await supabaseService
+              .from('organization_integrations')
+              .select('api_key')
+              .eq('organization_id', agent.organization_id)
+              .eq('platform', 'elevenlabs')
+              .eq('is_active', true)
+              .maybeSingle();
+            
+            if (integration?.api_key) {
+              apiKey = integration.api_key;
+              console.log(`[conversations] Got API key from organization_integrations via agent's org`);
+            }
+          }
+        }
+      }
       
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { global: { headers: { Authorization: authHeader } } }
-      );
+      // Strategy 3: Try user authentication as last resort
+      if (!apiKey) {
+        const authHeader = req.headers.get('Authorization');
+        if (authHeader) {
+          const token = authHeader.replace('Bearer ', '');
+          const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+            global: { headers: { Authorization: authHeader } }
+          });
 
-      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-      if (userError || !user) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+          const { data: { user } } = await supabaseAuth.auth.getUser(token);
+          if (user) {
+            const { data: integration } = await supabaseAuth
+              .from('organization_integrations')
+              .select('api_key, agent_id')
+              .eq('user_id', user.id)
+              .eq('platform', 'elevenlabs')
+              .eq('is_active', true)
+              .maybeSingle();
+
+            if (integration?.api_key) {
+              apiKey = integration.api_key;
+              targetAgentId = agentId || integration.agent_id;
+              console.log(`[conversations] Got API key from user's integration`);
+            }
+          }
+        }
       }
-
-      const { data: integration, error: integrationError } = await supabase
-        .from('organization_integrations')
-        .select('api_key, agent_id')
-        .eq('user_id', user.id)
-        .eq('platform', 'elevenlabs')
-        .eq('is_active', true)
-        .single();
-
-      if (integrationError || !integration) {
-        return new Response(
-          JSON.stringify({ 
-            requiresSetup: true, 
-            message: 'Configuration ElevenLabs requise' 
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      apiKey = integration.api_key;
-      targetAgentId = agentId || integration.agent_id;
     }
 
     if (!apiKey) {
+      console.log('[conversations] No API key found after all strategies');
       return new Response(
-        JSON.stringify({ error: 'API key required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          requiresSetup: true, 
+          message: 'Configuration ElevenLabs requise',
+          conversations: [],
+          total: 0
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
