@@ -135,6 +135,7 @@ export const usePortalAuth = () => {
         agentSlug: agent.slug || agentSlug,
         platformAgentId: agent.platform_agent_id || undefined,
         platformApiKey: platformApiKey || undefined,
+        platform: agent.platform || undefined,
         role: 'super_admin',
         canEditKnowledge: true,
         canEditPrompt: true,

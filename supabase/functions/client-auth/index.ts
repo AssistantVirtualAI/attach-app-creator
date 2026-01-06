@@ -267,6 +267,7 @@ serve(async (req) => {
           agentSlug: agent.slug,
           platformAgentId: agent.platform_agent_id || undefined,
           platformApiKey: platformApiKey || undefined,
+          platform: agent.platform || undefined,
           role: assignment.role || "viewer",
           canEditKnowledge: assignment.can_edit_knowledge || assignment.role === "admin",
           canEditPrompt: assignment.can_edit_prompt || assignment.role === "admin",
