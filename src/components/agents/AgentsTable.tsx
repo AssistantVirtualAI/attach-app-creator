@@ -80,14 +80,14 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
       <div className="rounded-xl overflow-hidden border border-slate-700/50 bg-gradient-to-br from-slate-900/80 to-slate-800/80">
         <Table>
           <TableHeader>
-            <TableRow className="border-slate-700/50 hover:bg-transparent">
-              <TableHead className="text-slate-400 font-medium">Agent</TableHead>
-              <TableHead className="text-slate-400 font-medium">Plateforme</TableHead>
-              <TableHead className="text-slate-400 font-medium">Prompt</TableHead>
-              <TableHead className="text-slate-400 font-medium">Client assigné</TableHead>
-              <TableHead className="text-slate-400 font-medium">Agent ID</TableHead>
-              <TableHead className="text-slate-400 font-medium">Date de création</TableHead>
-              <TableHead className="text-right text-slate-400 font-medium">Actions</TableHead>
+            <TableRow className="border-border/50 hover:bg-transparent">
+              <TableHead className="text-muted-foreground font-medium">Agent</TableHead>
+              <TableHead className="text-muted-foreground font-medium">Plateforme</TableHead>
+              <TableHead className="text-muted-foreground font-medium">Prompt</TableHead>
+              <TableHead className="text-muted-foreground font-medium">Client assigné</TableHead>
+              <TableHead className="text-muted-foreground font-medium">Agent ID</TableHead>
+              <TableHead className="text-muted-foreground font-medium">Date de création</TableHead>
+              <TableHead className="text-right text-muted-foreground font-medium">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -97,7 +97,7 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="border-slate-700/30 hover:bg-slate-800/30 transition-colors group"
+                className="border-border/40 hover:bg-muted/30 transition-colors group"
               >
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -107,7 +107,7 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                         <Bot className="h-5 w-5 text-white" />
                       </div>
                     </div>
-                    <span className="font-medium text-white">{agent.name}</span>
+                    <span className="font-medium text-foreground">{agent.name}</span>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -139,27 +139,31 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                 </TableCell>
                 <TableCell>
                   {agent.client ? (
-                    <span className="text-white">{agent.client.name}</span>
+                    <span className="text-foreground">{agent.client.name}</span>
                   ) : (
-                    <span className="text-slate-500">Non assigné</span>
+                    <span className="text-muted-foreground">Non assigné</span>
                   )}
                 </TableCell>
                 <TableCell>
-                  <code className="text-xs bg-slate-800 px-2 py-1 rounded text-purple-300 font-mono">
+                  <code className="text-xs bg-muted px-2 py-1 rounded text-foreground font-mono">
                     {agent.config?.agent_id || agent.platform_agent_id || 'N/A'}
                   </code>
                 </TableCell>
-                <TableCell className="text-slate-400">
+                <TableCell className="text-muted-foreground">
                   {format(new Date(agent.created_at), 'dd MMM yyyy', { locale: fr })}
                 </TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-white hover:bg-slate-700/50">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
+                      >
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-slate-900 border-slate-700 z-50">
+                    <DropdownMenuContent align="end" className="bg-popover border-border z-50">
                       <DropdownMenuItem onClick={() => navigate(`/agent-settings/${agent.id}`)}>
                         <Settings className="h-4 w-4 mr-2" />
                         Paramètres

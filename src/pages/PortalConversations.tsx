@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { usePortal } from '@/hooks/usePortalAuth';
+import PortalConversationsGeneric from '@/components/portal/PortalConversationsGeneric';
 import { usePortalConversations, usePortalConversationDetails, usePortalConversationAudio } from '@/hooks/usePortalElevenLabs';
-import { usePortalConversationAnalysis } from '@/hooks/usePortalConversationAnalysis';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,12 @@ import { useTranslation } from '@/hooks/useTranslation';
 const PortalConversations = () => {
   const { t, language } = useTranslation();
   const { session } = usePortal();
+
+  // For non-ElevenLabs platforms, show a simplified (but non-blocking) conversations view
+  if (session?.platform && session.platform !== 'elevenlabs') {
+    return <PortalConversationsGeneric />;
+  }
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
