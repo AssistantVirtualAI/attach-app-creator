@@ -2,40 +2,21 @@ import { useParams } from 'react-router-dom';
 import { useClientAgentAccess } from '@/hooks/useClientAgentAccess';
 import { PlatformEndpointsCard } from '@/components/shared/PlatformEndpointsCard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Copy, Check, Code } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/context/LanguageContext';
 import type { Platform } from '@/lib/connectors/endpoints-registry';
 
 const ClientAgentEndpoints = () => {
   const { clientId, agentId } = useParams();
-  const { apiKey, agentId: platformAgentId, agentName } = useClientAgentAccess(clientId, agentId);
+  const { apiKey, platformAgentId, agentName, platform: hookPlatform, organizationId } = useClientAgentAccess(clientId, agentId);
   const { language } = useLanguage();
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [platform, setPlatform] = useState<Platform>('elevenlabs');
-
-  useEffect(() => {
-    // Fetch the agent's platform
-    const fetchPlatform = async () => {
-      if (!agentId) return;
-      
-      const { data } = await supabase
-        .from('agents')
-        .select('platform')
-        .eq('id', agentId)
-        .single();
-      
-      if (data?.platform) {
-        setPlatform(data.platform as Platform);
-      }
-    };
-    
-    fetchPlatform();
-  }, [agentId]);
+  
+  // Use platform from hook instead of fetching separately
+  const platform: Platform = hookPlatform || 'elevenlabs';
 
   const handleCopy = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -169,6 +150,7 @@ const ClientAgentEndpoints = () => {
         platform={platform}
         agentId={platformAgentId || undefined}
         apiKey={apiKey || undefined}
+        organizationId={organizationId || undefined}
       />
     </div>
   );

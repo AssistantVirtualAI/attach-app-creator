@@ -107,7 +107,7 @@ const useClientUpdateKnowledgeDocument = () => {
 
 const ClientAgentKnowledge = () => {
   const { clientId, agentId } = useParams();
-  const { apiKey, agentId: elevenlabsAgentId, agentName, canEdit } = useClientAgentAccess(clientId, agentId);
+  const { apiKey, platformAgentId, agentName, canEdit } = useClientAgentAccess(clientId, agentId);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -123,11 +123,11 @@ const ClientAgentKnowledge = () => {
 
   const { data: knowledgeBase, isLoading, error, refetch } = useClientElevenLabsKnowledgeBase({
     apiKey,
-    agentId: elevenlabsAgentId,
+    agentId: platformAgentId,
   });
 
   const { data: documentData, isLoading: isLoadingDocument } = useClientElevenLabsKnowledgeBaseDocument(
-    { apiKey, agentId: elevenlabsAgentId },
+    { apiKey, agentId: platformAgentId },
     viewDocumentId
   );
 
@@ -149,7 +149,7 @@ const ClientAgentKnowledge = () => {
   });
 
   const handleAddItem = async () => {
-    if (!apiKey || !elevenlabsAgentId) return;
+    if (!apiKey || !platformAgentId) return;
     if (!newItem.title || !newItem.content) {
       toast.error('Veuillez remplir tous les champs');
       return;
@@ -158,7 +158,7 @@ const ClientAgentKnowledge = () => {
     try {
       await addMutation.mutateAsync({
         apiKey,
-        agentId: elevenlabsAgentId,
+        agentId: platformAgentId,
         title: newItem.title,
         content: newItem.content,
         category: newItem.category || 'Général',
@@ -172,12 +172,12 @@ const ClientAgentKnowledge = () => {
   };
 
   const handleDeleteItem = async () => {
-    if (!apiKey || !elevenlabsAgentId || !deleteDocumentId) return;
+    if (!apiKey || !platformAgentId || !deleteDocumentId) return;
 
     try {
       await deleteMutation.mutateAsync({
         apiKey,
-        agentId: elevenlabsAgentId,
+        agentId: platformAgentId,
         documentId: deleteDocumentId,
       });
       setDeleteDocumentId(null);
@@ -202,7 +202,7 @@ const ClientAgentKnowledge = () => {
   };
 
   const handleSaveEdit = async () => {
-    if (!apiKey || !elevenlabsAgentId || !viewDocumentId || !editName.trim() || !editContent.trim()) {
+    if (!apiKey || !platformAgentId || !viewDocumentId || !editName.trim() || !editContent.trim()) {
       toast.error('Veuillez remplir tous les champs');
       return;
     }
@@ -210,7 +210,7 @@ const ClientAgentKnowledge = () => {
     try {
       await updateMutation.mutateAsync({
         apiKey,
-        agentId: elevenlabsAgentId,
+        agentId: platformAgentId,
         documentId: viewDocumentId,
         name: editName,
         content: editContent,
@@ -286,7 +286,7 @@ const ClientAgentKnowledge = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {!apiKey || !elevenlabsAgentId ? (
+          {!apiKey || !platformAgentId ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground">Configuration ElevenLabs manquante pour cet agent</p>

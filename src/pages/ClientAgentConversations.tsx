@@ -42,7 +42,7 @@ import { toast } from 'sonner';
 
 const ClientAgentConversations = () => {
   const { clientId, agentId } = useParams();
-  const { apiKey, agentId: elevenlabsAgentId, agentName } = useClientAgentAccess(clientId, agentId);
+  const { apiKey, platformAgentId, agentName } = useClientAgentAccess(clientId, agentId);
   
   const [page, setPage] = useState(1);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
@@ -56,12 +56,12 @@ const ClientAgentConversations = () => {
 
   const { data: conversationsData, isLoading } = useClientElevenLabsConversations({
     apiKey,
-    agentId: elevenlabsAgentId,
+    agentId: platformAgentId,
   }, page, 20);
 
   const { data: conversationDetails, isLoading: detailsLoading, error: detailsError, refetch: refetchDetails } = useClientElevenLabsConversationDetails({
     apiKey,
-    agentId: elevenlabsAgentId,
+    agentId: platformAgentId,
   }, selectedConversation || undefined);
 
   const audioMutation = useClientElevenLabsAudio();
@@ -105,14 +105,14 @@ const ClientAgentConversations = () => {
   const [audioUnavailable, setAudioUnavailable] = useState(false);
 
   const handlePlayAudio = async (conversationId: string) => {
-    if (!apiKey || !elevenlabsAgentId) return;
+    if (!apiKey || !platformAgentId) return;
     
     setAudioUnavailable(false);
     
     try {
       const result = await audioMutation.mutateAsync({
         apiKey,
-        agentId: elevenlabsAgentId,
+        agentId: platformAgentId,
         conversationId,
         format: 'mp3'
       });

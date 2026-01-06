@@ -68,7 +68,7 @@ const StatCard = ({
 
 const ClientAgentDashboard = () => {
   const { clientId, agentId } = useParams();
-  const { apiKey, agentId: platformAgentId, agentName, platform, isLoading: accessLoading } = useClientAgentAccess(clientId, agentId);
+  const { apiKey, platformAgentId, agentName, platform, organizationId, isLoading: accessLoading } = useClientAgentAccess(clientId, agentId);
   
   const { data: analytics, isLoading: analyticsLoading } = useClientPlatformAnalytics({
     apiKey,

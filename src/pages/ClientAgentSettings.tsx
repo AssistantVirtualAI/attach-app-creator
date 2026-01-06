@@ -35,7 +35,7 @@ import { toast } from 'sonner';
 
 const ClientAgentSettings = () => {
   const { clientId, agentId } = useParams();
-  const { apiKey, agentId: platformAgentId, agentName, canEdit, platform, isLoading: accessLoading } = useClientAgentAccess(clientId, agentId);
+  const { apiKey, platformAgentId, agentName, canEdit, platform, isLoading: accessLoading } = useClientAgentAccess(clientId, agentId);
   
   // Prompt state
   const [prompt, setPrompt] = useState('');
