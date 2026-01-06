@@ -61,39 +61,20 @@ export const useApiKeys = () => {
     }): Promise<{ key: string; keyData: ApiKey }> => {
       if (!selectedOrgId) throw new Error('No organization selected');
 
-      // Generate a secure API key
-      const { data: generatedKey, error: keyError } = await supabase.rpc('generate_api_key');
-      if (keyError) throw keyError;
-
-      const keyPrefix = generatedKey.substring(0, 12);
-      
-      // Hash the key for storage (simple hash for demo - use bcrypt in production)
-      const keyHash = await crypto.subtle.digest(
-        'SHA-256',
-        new TextEncoder().encode(generatedKey)
-      );
-      const hashArray = Array.from(new Uint8Array(keyHash));
-      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-      const { data: { user } } = await supabase.auth.getUser();
-
-      const { data, error } = await supabase
-        .from('organization_api_keys')
-        .insert({
-          organization_id: selectedOrgId,
+      // Call edge function for secure key generation with bcrypt hashing
+      const { data, error } = await supabase.functions.invoke('create-api-key', {
+        body: {
           name,
-          key_prefix: keyPrefix,
-          key_hash: hashHex,
           scopes,
-          created_by: user?.id,
-          expires_at: expiresAt?.toISOString(),
-        })
-        .select()
-        .single();
+          expiresAt: expiresAt?.toISOString(),
+          organizationId: selectedOrgId,
+        },
+      });
 
       if (error) throw error;
+      if (data.error) throw new Error(data.error);
 
-      return { key: generatedKey, keyData: data };
+      return { key: data.key, keyData: data.keyData };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['api-keys'] });
