@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+export type Platform = 'elevenlabs' | 'vapi' | 'retell';
+
 interface ClientAgentAccess {
   hasAccess: boolean;
   role: 'admin' | 'viewer' | null;
@@ -8,6 +10,7 @@ interface ClientAgentAccess {
   apiKey: string | null;
   agentId: string | null;
   agentName: string | null;
+  platform: Platform | null;
   isLoading: boolean;
 }
 
@@ -32,10 +35,10 @@ export const useClientAgentAccess = (clientId: string | undefined, agentId: stri
 
       if (!assignment) return null;
 
-      // Get agent details with API key and platform_agent_id
+      // Get agent details with API key, platform_agent_id, and platform
       const { data: agent, error: agentError } = await supabase
         .from('agents')
-        .select('id, name, platform_api_key, platform_agent_id, organization_id, config')
+        .select('id, name, platform, platform_api_key, platform_agent_id, organization_id, config')
         .eq('id', agentId)
         .single();
 
@@ -45,6 +48,7 @@ export const useClientAgentAccess = (clientId: string | undefined, agentId: stri
       }
 
       const config = agent.config as Record<string, any> | null;
+      const platform = (agent.platform as Platform) || 'elevenlabs';
       
       // Priority: platform_agent_id > config.agent_id
       const platformAgentId = agent.platform_agent_id || config?.agent_id || null;
@@ -52,13 +56,13 @@ export const useClientAgentAccess = (clientId: string | undefined, agentId: stri
       // Priority: platform_api_key > config.api_key > organization_integrations
       let apiKey = agent.platform_api_key || config?.api_key || null;
       
-      // Fallback: try to get API key from organization_integrations
+      // Fallback: try to get API key from organization_integrations using the correct platform
       if (!apiKey && agent.organization_id) {
         const { data: integration } = await supabase
           .from('organization_integrations')
           .select('api_key')
           .eq('organization_id', agent.organization_id)
-          .eq('platform', 'elevenlabs')
+          .eq('platform', platform)
           .eq('is_active', true)
           .maybeSingle();
         
@@ -72,6 +76,7 @@ export const useClientAgentAccess = (clientId: string | undefined, agentId: stri
         apiKey: apiKey,
         agentId: platformAgentId,
         agentName: agent.name,
+        platform,
       };
     },
     enabled: !!clientId && !!agentId,
@@ -84,6 +89,7 @@ export const useClientAgentAccess = (clientId: string | undefined, agentId: stri
     apiKey: data?.apiKey || null,
     agentId: data?.agentId || null,
     agentName: data?.agentName || null,
+    platform: data?.platform || null,
     isLoading,
   };
 };

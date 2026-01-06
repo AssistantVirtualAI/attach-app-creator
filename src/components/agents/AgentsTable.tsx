@@ -155,11 +155,11 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 hover:text-white hover:bg-slate-700/50">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-slate-900 border-slate-700">
+                    <DropdownMenuContent align="end" className="bg-slate-900 border-slate-700 z-50">
                       <DropdownMenuItem onClick={() => navigate(`/agent-settings/${agent.id}`)}>
                         <Settings className="h-4 w-4 mr-2" />
                         Paramètres
