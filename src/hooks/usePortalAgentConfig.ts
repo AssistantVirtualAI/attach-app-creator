@@ -25,6 +25,7 @@ export function usePortalAgentConfig() {
   const platform = session?.platform;
   const agentId = session?.platformAgentId || session?.agentId;
   const apiKey = session?.platformApiKey;
+  const organizationId = session?.organizationId;
 
   return useQuery({
     queryKey: ['portal-agent-config', agentId, platform],
@@ -62,7 +63,7 @@ export function usePortalAgentConfig() {
         case 'retell': {
           // First get the agent to find the LLM ID
           const { data: agentData, error: agentError } = await supabase.functions.invoke('retell-proxy', {
-            body: { action: 'getAgent', agentId, apiKey }
+            body: { action: 'getAgent', agentId, apiKey, organizationId }
           });
           if (agentError) throw agentError;
           
@@ -75,7 +76,7 @@ export function usePortalAgentConfig() {
           // If there's an LLM, fetch its config for more detailed prompt
           if (llmId) {
             const { data: llmData } = await supabase.functions.invoke('retell-proxy', {
-              body: { action: 'getLlm', llmId, apiKey }
+              body: { action: 'getLlm', llmId, apiKey, organizationId }
             });
             if (llmData?.data) {
               systemPrompt = llmData.data.general_prompt || systemPrompt;
@@ -137,6 +138,7 @@ export function usePortalUpdateAgentPrompt() {
   const platform = session?.platform;
   const agentId = session?.platformAgentId || session?.agentId;
   const apiKey = session?.platformApiKey;
+  const organizationId = session?.organizationId;
 
   return useMutation({
     mutationFn: async ({ systemPrompt, firstMessage }: { systemPrompt: string; firstMessage?: string }) => {
@@ -163,7 +165,7 @@ export function usePortalUpdateAgentPrompt() {
           // For Retell, we need to update the LLM config
           // First get agent to find LLM ID
           const { data: agentData } = await supabase.functions.invoke('retell-proxy', {
-            body: { action: 'getAgent', agentId, apiKey }
+            body: { action: 'getAgent', agentId, apiKey, organizationId }
           });
           
           const agentInfo = agentData?.data || agentData;
@@ -176,6 +178,7 @@ export function usePortalUpdateAgentPrompt() {
                 action: 'updateLlm', 
                 llmId, 
                 apiKey,
+                organizationId,
                 config: {
                   general_prompt: systemPrompt,
                   ...(firstMessage && { begin_message: firstMessage })
@@ -191,6 +194,7 @@ export function usePortalUpdateAgentPrompt() {
                 action: 'updateAgent', 
                 retellAgentId: agentId, 
                 apiKey,
+                organizationId,
                 config: {
                   general_prompt: systemPrompt,
                   ...(firstMessage && { begin_message: firstMessage })
@@ -239,6 +243,7 @@ export function useAgentConfigByPlatform(agent: {
   platform: string; 
   platform_agent_id?: string | null;
   platform_api_key?: string | null;
+  organization_id?: string;
   config?: Record<string, any>;
 }) {
   const platformAgentId = agent.config?.agent_id || agent.platform_agent_id;
@@ -278,7 +283,12 @@ export function useAgentConfigByPlatform(agent: {
 
         case 'retell': {
           const { data: agentData, error } = await supabase.functions.invoke('retell-proxy', {
-            body: { action: 'getAgent', retellAgentId: platformAgentId, apiKey: agent.platform_api_key }
+            body: { 
+              action: 'getAgent', 
+              retellAgentId: platformAgentId, 
+              apiKey: agent.platform_api_key,
+              organizationId: agent.organization_id
+            }
           });
           if (error) throw error;
           
@@ -290,7 +300,12 @@ export function useAgentConfigByPlatform(agent: {
           
           if (llmId) {
             const { data: llmData } = await supabase.functions.invoke('retell-proxy', {
-              body: { action: 'getLlm', llmId, apiKey: agent.platform_api_key }
+              body: { 
+                action: 'getLlm', 
+                llmId, 
+                apiKey: agent.platform_api_key,
+                organizationId: agent.organization_id
+              }
             });
             if (llmData?.data) {
               systemPrompt = llmData.data.general_prompt || systemPrompt;
