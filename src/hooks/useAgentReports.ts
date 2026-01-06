@@ -1,10 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
+import { format, subDays, startOfDay, getHours, getDay } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 export interface AgentMetrics {
   agentId: string;
   agentName: string;
+  platform: string;
   totalConversations: number;
   avgSatisfaction: number;
   avgDuration: number;
@@ -18,7 +21,19 @@ export interface AgentMetrics {
   topTags: { tag: string; count: number }[];
   topImprovements: string[];
   recentTrend: 'up' | 'down' | 'stable';
-  dataSource: 'elevenlabs' | 'local' | 'mixed';
+  dataSource: 'platform' | 'local' | 'mixed';
+}
+
+export interface DailyTrend {
+  day: string;
+  date: string;
+  conversations: number;
+  satisfaction: number;
+}
+
+export interface HourlyDistribution {
+  hour: string;
+  conversations: number;
 }
 
 export interface AgentReportsData {
@@ -31,9 +46,16 @@ export interface AgentReportsData {
     bestPerformingAgent: string | null;
     worstPerformingAgent: string | null;
   };
-  dataSource: 'elevenlabs' | 'local' | 'mixed';
+  dailyTrends: DailyTrend[];
+  hourlyDistribution: HourlyDistribution[];
+  peakHour: string;
+  quietHour: string;
+  busiestDay: string;
+  dataSource: 'platform' | 'local' | 'mixed';
   lastSync?: string;
 }
+
+const DAY_NAMES = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
 export function useAgentReports(selectedAgentId?: string) {
   const { selectedOrg } = useOrganization();
@@ -60,28 +82,10 @@ export function useAgentReports(selectedAgentId?: string) {
         ? agents.filter(a => a.id === selectedAgentId)
         : agents;
 
-      // Try to fetch ElevenLabs analytics first
-      let elevenLabsData: any = null;
-      try {
-        const { data: analyticsData, error } = await supabase.functions.invoke('elevenlabs-all-agents-analytics', {
-          body: { 
-            timeframe: '30days',
-            agentId: selectedAgentId !== 'all' ? selectedAgentId : undefined,
-            includeCharts: true
-          }
-        });
-
-        if (!error && analyticsData && !analyticsData.requiresSetup) {
-          elevenLabsData = analyticsData;
-        }
-      } catch (e) {
-        console.log('ElevenLabs analytics not available, using local data');
-      }
-
-      // Also fetch local conversations and insights for enrichment
+      // Fetch local conversations
       let conversationsQuery = supabase
         .from('conversations')
-        .select('id, agent_id, satisfaction_score, sentiment, duration, smart_tags, resolution_status, created_at')
+        .select('id, agent_id, satisfaction_score, sentiment, duration, smart_tags, resolution_status, created_at, platform')
         .eq('organization_id', selectedOrg.id);
 
       if (selectedAgentId && selectedAgentId !== 'all') {
@@ -90,6 +94,7 @@ export function useAgentReports(selectedAgentId?: string) {
 
       const { data: conversations } = await conversationsQuery;
 
+      // Fetch insights
       let insightsQuery = supabase
         .from('agent_insights')
         .select('agent_id, satisfaction_score, overall_sentiment, improvements, smart_tags')
@@ -101,38 +106,37 @@ export function useAgentReports(selectedAgentId?: string) {
 
       const { data: insights } = await insightsQuery;
 
-      // Build agent metrics from both sources
-      const agentMetrics: AgentMetrics[] = targetAgents.map(agent => {
-        // Check if we have ElevenLabs data for this agent
-        const elAgent = elevenLabsData?.perAgent?.find((a: any) => 
-          a.id === agent.id || a.agentId === agent.platform_agent_id
-        );
+      // Calculate daily trends (last 7 days)
+      const dailyTrends = calculateDailyTrends(conversations || []);
 
-        // Local data
+      // Calculate hourly distribution
+      const { hourlyDistribution, peakHour, quietHour } = calculateHourlyDistribution(conversations || []);
+
+      // Calculate busiest day
+      const busiestDay = calculateBusiestDay(conversations || []);
+
+      // Build agent metrics
+      const agentMetrics: AgentMetrics[] = targetAgents.map(agent => {
         const agentConversations = conversations?.filter(c => c.agent_id === agent.id) || [];
         const agentInsights = insights?.filter(i => i.agent_id === agent.id) || [];
 
-        // Use ElevenLabs data if available, otherwise local
-        const totalConversations = elAgent?.metrics?.total_conversations || agentConversations.length;
+        const totalConversations = agentConversations.length;
         
-        // Calculate satisfaction from local data if not from ElevenLabs
-        let avgSatisfaction = elAgent?.metrics?.satisfaction_score || 0;
-        if (!avgSatisfaction && agentConversations.length > 0) {
+        // Calculate satisfaction
+        let avgSatisfaction = 0;
+        if (agentConversations.length > 0) {
           const scores = agentConversations.filter(c => c.satisfaction_score).map(c => Number(c.satisfaction_score));
           avgSatisfaction = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
         }
 
         // Duration
-        let avgDuration = elAgent?.metrics?.avg_duration || 0;
-        if (!avgDuration && agentConversations.length > 0) {
+        let avgDuration = 0;
+        if (agentConversations.length > 0) {
           const durations = agentConversations.filter(c => c.duration).map(c => c.duration as number);
           avgDuration = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
         }
 
-        // Success rate
-        const successRate = elAgent?.metrics?.success_rate || 0;
-
-        // Sentiment distribution from local data
+        // Sentiment distribution
         const sentimentCounts = { positive: 0, neutral: 0, negative: 0 };
         agentConversations.forEach(c => {
           const sentiment = c.sentiment?.toLowerCase() || 'neutral';
@@ -156,9 +160,14 @@ export function useAgentReports(selectedAgentId?: string) {
 
         // Resolution rate
         const resolved = agentConversations.filter(c => c.resolution_status === 'resolved').length;
-        const resolutionRate = agentConversations.length > 0 ? (resolved / agentConversations.length) * 100 : successRate;
+        const resolutionRate = agentConversations.length > 0 ? (resolved / agentConversations.length) * 100 : 0;
 
-        // Top tags from local
+        // Success rate based on positive sentiment
+        const successRate = totalConversations > 0 
+          ? ((sentimentCounts.positive / totalConversations) * 100) 
+          : 0;
+
+        // Top tags
         const tagCounts: Record<string, number> = {};
         agentConversations.forEach(c => {
           (c.smart_tags || []).forEach(tag => {
@@ -220,11 +229,10 @@ export function useAgentReports(selectedAgentId?: string) {
         if (recentAvgSat > prevAvgSat + 0.5) recentTrend = 'up';
         else if (recentAvgSat < prevAvgSat - 0.5) recentTrend = 'down';
 
-        const dataSource = elAgent ? 'elevenlabs' : (agentConversations.length > 0 ? 'local' : 'elevenlabs');
-
         return {
           agentId: agent.id,
           agentName: agent.name,
+          platform: agent.platform || 'unknown',
           totalConversations,
           avgSatisfaction,
           avgDuration,
@@ -234,33 +242,29 @@ export function useAgentReports(selectedAgentId?: string) {
           topTags,
           topImprovements,
           recentTrend,
-          dataSource,
+          dataSource: agentConversations.length > 0 ? 'local' : 'platform',
         };
       });
 
-      // Global metrics - prefer ElevenLabs if available
-      const totalConversations = elevenLabsData?.metrics?.total_conversations || 
-        agentMetrics.reduce((sum, a) => sum + a.totalConversations, 0);
+      // Global metrics
+      const totalConversations = agentMetrics.reduce((sum, a) => sum + a.totalConversations, 0);
       
-      const avgSatisfaction = elevenLabsData?.metrics?.satisfaction_score ||
-        (agentMetrics.length > 0 
-          ? agentMetrics.filter(a => a.avgSatisfaction > 0).reduce((sum, a) => sum + a.avgSatisfaction, 0) / 
-            (agentMetrics.filter(a => a.avgSatisfaction > 0).length || 1)
-          : 0);
+      const avgSatisfaction = agentMetrics.length > 0 
+        ? agentMetrics.filter(a => a.avgSatisfaction > 0).reduce((sum, a) => sum + a.avgSatisfaction, 0) / 
+          (agentMetrics.filter(a => a.avgSatisfaction > 0).length || 1)
+        : 0;
 
-      const totalVoiceMinutes = elevenLabsData?.metrics?.total_voice_minutes ||
-        Math.round(agentMetrics.reduce((sum, a) => sum + (a.avgDuration * a.totalConversations / 60), 0));
+      const totalVoiceMinutes = Math.round(agentMetrics.reduce((sum, a) => sum + (a.avgDuration * a.totalConversations / 60), 0));
 
-      const globalSuccessRate = elevenLabsData?.metrics?.success_rate ||
-        (agentMetrics.length > 0 ? agentMetrics.reduce((sum, a) => sum + a.successRate, 0) / agentMetrics.length : 0);
+      const globalSuccessRate = agentMetrics.length > 0 
+        ? agentMetrics.reduce((sum, a) => sum + a.successRate, 0) / agentMetrics.length 
+        : 0;
 
       const sortedByPerformance = [...agentMetrics].sort((a, b) => b.avgSatisfaction - a.avgSatisfaction);
       const bestPerformingAgent = sortedByPerformance[0]?.agentName || null;
       const worstPerformingAgent = sortedByPerformance.length > 1 
         ? sortedByPerformance[sortedByPerformance.length - 1]?.agentName 
         : null;
-
-      const dataSource = elevenLabsData ? 'elevenlabs' : 'local';
 
       return {
         agents: agentMetrics,
@@ -272,13 +276,121 @@ export function useAgentReports(selectedAgentId?: string) {
           bestPerformingAgent,
           worstPerformingAgent,
         },
-        dataSource,
+        dailyTrends,
+        hourlyDistribution,
+        peakHour,
+        quietHour,
+        busiestDay,
+        dataSource: 'local',
         lastSync: new Date().toISOString(),
       };
     },
     enabled: !!selectedOrg?.id,
     staleTime: 2 * 60 * 1000,
   });
+}
+
+function calculateDailyTrends(conversations: any[]): DailyTrend[] {
+  const trends: DailyTrend[] = [];
+  const now = new Date();
+
+  for (let i = 6; i >= 0; i--) {
+    const date = subDays(now, i);
+    const dayStart = startOfDay(date);
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+
+    const dayConversations = conversations.filter(c => {
+      const convDate = new Date(c.created_at);
+      return convDate >= dayStart && convDate < dayEnd;
+    });
+
+    const satisfactionScores = dayConversations
+      .filter(c => c.satisfaction_score)
+      .map(c => Number(c.satisfaction_score));
+
+    const avgSatisfaction = satisfactionScores.length > 0
+      ? satisfactionScores.reduce((a, b) => a + b, 0) / satisfactionScores.length
+      : 0;
+
+    trends.push({
+      day: DAY_NAMES[getDay(date)],
+      date: format(date, 'dd/MM', { locale: fr }),
+      conversations: dayConversations.length,
+      satisfaction: parseFloat(avgSatisfaction.toFixed(1)),
+    });
+  }
+
+  return trends;
+}
+
+function calculateHourlyDistribution(conversations: any[]): {
+  hourlyDistribution: HourlyDistribution[];
+  peakHour: string;
+  quietHour: string;
+} {
+  const hourlyCounts: Record<number, number> = {};
+  
+  // Initialize all hours
+  for (let i = 0; i < 24; i++) {
+    hourlyCounts[i] = 0;
+  }
+
+  // Count conversations by hour
+  conversations.forEach(c => {
+    const hour = getHours(new Date(c.created_at));
+    hourlyCounts[hour]++;
+  });
+
+  const hourlyDistribution: HourlyDistribution[] = Object.entries(hourlyCounts)
+    .map(([hour, count]) => ({
+      hour: `${hour}h`,
+      conversations: count,
+    }));
+
+  // Find peak and quiet hours
+  let peakHour = '12h';
+  let quietHour = '3h';
+  let maxCount = 0;
+  let minCount = Infinity;
+
+  Object.entries(hourlyCounts).forEach(([hour, count]) => {
+    if (count > maxCount) {
+      maxCount = count;
+      peakHour = `${hour}h`;
+    }
+    if (count < minCount) {
+      minCount = count;
+      quietHour = `${hour}h`;
+    }
+  });
+
+  return { hourlyDistribution, peakHour, quietHour };
+}
+
+function calculateBusiestDay(conversations: any[]): string {
+  const dayCounts: Record<number, number> = {};
+  
+  for (let i = 0; i < 7; i++) {
+    dayCounts[i] = 0;
+  }
+
+  conversations.forEach(c => {
+    const dayIndex = getDay(new Date(c.created_at));
+    dayCounts[dayIndex]++;
+  });
+
+  let busiestDayIndex = 0;
+  let maxCount = 0;
+
+  Object.entries(dayCounts).forEach(([day, count]) => {
+    if (count > maxCount) {
+      maxCount = count;
+      busiestDayIndex = parseInt(day);
+    }
+  });
+
+  const fullDayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+  return fullDayNames[busiestDayIndex];
 }
 
 function getEmptyReportsData(): AgentReportsData {
@@ -292,6 +404,11 @@ function getEmptyReportsData(): AgentReportsData {
       bestPerformingAgent: null, 
       worstPerformingAgent: null 
     },
+    dailyTrends: [],
+    hourlyDistribution: [],
+    peakHour: '—',
+    quietHour: '—',
+    busiestDay: '—',
     dataSource: 'local',
   };
 }
