@@ -227,6 +227,7 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
           agentName={selectedAgent.name}
           platform={selectedAgent.platform}
           platformAgentId={selectedAgent.config?.agent_id || selectedAgent.platform_agent_id}
+          organizationId={selectedAgent.organization_id}
         />
       )}
     </>
