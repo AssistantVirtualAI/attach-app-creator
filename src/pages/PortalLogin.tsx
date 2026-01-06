@@ -32,17 +32,38 @@ const PortalLoginContent = () => {
   // Check for super admin auto-login first
   useEffect(() => {
     const checkSuperAdminAccess = async () => {
+      console.log('[PortalLogin] Checking super admin access...', {
+        agentSlug,
+        supabaseUserId: supabaseUser?.id,
+        supabaseUserEmail: supabaseUser?.email,
+      });
+
       if (!agentSlug || agentSlug === ':agentSlug') {
+        console.log('[PortalLogin] No valid agentSlug, skipping super admin check');
         setCheckingSuperAdmin(false);
         return;
       }
 
       // Wait for supabase auth to be checked
-      if (supabaseUser === undefined) return;
+      if (supabaseUser === undefined) {
+        console.log('[PortalLogin] Waiting for supabase auth...');
+        return;
+      }
 
-      if (isSuperAdmin()) {
-        console.log('Super admin detected, auto-logging in...');
+      const isSuperAdminResult = isSuperAdmin();
+      console.log('[PortalLogin] isSuperAdmin() result:', isSuperAdminResult);
+
+      if (isSuperAdminResult) {
+        console.log('[PortalLogin] Super admin detected, auto-logging in...');
         const superAdminSession = await loginAsSuperAdmin(agentSlug);
+        console.log('[PortalLogin] loginAsSuperAdmin result:', superAdminSession ? {
+          agentId: superAdminSession.agentId,
+          agentName: superAdminSession.agentName,
+          platform: superAdminSession.platform,
+          platformAgentId: superAdminSession.platformAgentId,
+          platformApiKey: superAdminSession.platformApiKey ? '***SET***' : 'NOT SET',
+        } : 'null');
+        
         if (superAdminSession) {
           // Check if we're on legacy /portal/ route or new root route
           const isLegacyRoute = window.location.pathname.startsWith('/portal/');
