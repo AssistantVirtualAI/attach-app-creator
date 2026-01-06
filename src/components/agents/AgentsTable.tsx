@@ -70,9 +70,11 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
 
   const handleOpenPortal = (agent: Agent) => {
     const slug = getAgentSlug(agent);
-    if (slug) {
-      window.open(`/portal/${slug}`, '_blank');
+    if (!slug) {
+      toast.error('Aucun slug configuré pour cet agent. Allez dans Paramètres pour en définir un.');
+      return;
     }
+    window.open(`/portal/${slug}`, '_blank');
   };
 
   return (
@@ -173,15 +175,11 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                         <MessageSquare className="h-4 w-4 mr-2" />
                         Modifier Prompt
                       </DropdownMenuItem>
-                      {getAgentSlug(agent) && (
-                        <>
-                          <DropdownMenuSeparator className="bg-border" />
-                          <DropdownMenuItem onClick={() => handleOpenPortal(agent)}>
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            Ouvrir le portail
-                          </DropdownMenuItem>
-                        </>
-                      )}
+                      <DropdownMenuSeparator className="bg-border" />
+                      <DropdownMenuItem onClick={() => handleOpenPortal(agent)}>
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Ouvrir le portail
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator className="bg-border" />
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
