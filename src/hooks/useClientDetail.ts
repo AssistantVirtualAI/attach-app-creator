@@ -35,8 +35,6 @@ export const useClientDetail = (clientId: string | undefined) => {
 
       if (error) throw error;
       
-      // Check if password is defined (we can't access password_hash directly from client)
-      // We add a flag based on the existence of the hash
       return {
         ...data,
         hasPassword: !!data.password_hash
@@ -61,37 +59,62 @@ export const useClientDetail = (clientId: string | undefined) => {
     enabled: !!clientId,
   });
 
+  // Use client_agent_assignments table to get assigned agents
   const { data: assignedAgents } = useQuery({
     queryKey: ['client-agents', clientId],
     queryFn: async () => {
       if (!clientId) return [];
       
       const { data, error } = await supabase
-        .from('agents')
-        .select('*')
+        .from('client_agent_assignments')
+        .select(`
+          id,
+          role,
+          can_edit_knowledge,
+          can_edit_prompt,
+          agent:agents(*)
+        `)
         .eq('client_id', clientId);
 
       if (error) throw error;
-      return data;
+      
+      // Flatten to return agent objects with assignment info
+      return data?.map(assignment => ({
+        ...assignment.agent,
+        assignment_id: assignment.id,
+        assignment_role: assignment.role,
+        can_edit_knowledge: assignment.can_edit_knowledge,
+        can_edit_prompt: assignment.can_edit_prompt,
+      })) || [];
     },
     enabled: !!clientId,
   });
 
   const { data: availableAgents } = useQuery({
-    queryKey: ['available-agents', client?.organization_id],
+    queryKey: ['available-agents', client?.organization_id, clientId],
     queryFn: async () => {
-      if (!client?.organization_id) return [];
+      if (!client?.organization_id || !clientId) return [];
       
-      const { data, error } = await supabase
+      // Get agents in the organization that are NOT assigned to this client
+      const { data: allAgents, error: agentsError } = await supabase
         .from('agents')
         .select('*')
-        .eq('organization_id', client.organization_id)
-        .is('client_id', null);
+        .eq('organization_id', client.organization_id);
 
-      if (error) throw error;
-      return data;
+      if (agentsError) throw agentsError;
+
+      // Get already assigned agent IDs for this client
+      const { data: assignments } = await supabase
+        .from('client_agent_assignments')
+        .select('agent_id')
+        .eq('client_id', clientId);
+
+      const assignedAgentIds = new Set(assignments?.map(a => a.agent_id) || []);
+      
+      // Return agents not already assigned
+      return allAgents?.filter(agent => !assignedAgentIds.has(agent.id)) || [];
     },
-    enabled: !!client?.organization_id,
+    enabled: !!client?.organization_id && !!clientId,
   });
 
   const updateClientMutation = useMutation({
@@ -114,14 +137,18 @@ export const useClientDetail = (clientId: string | undefined) => {
     },
   });
 
+  // Assign agent using client_agent_assignments table
   const assignAgentMutation = useMutation({
     mutationFn: async (agentId: string) => {
       if (!clientId) throw new Error('No client ID');
       
       const { error } = await supabase
-        .from('agents')
-        .update({ client_id: clientId })
-        .eq('id', agentId);
+        .from('client_agent_assignments')
+        .insert({
+          client_id: clientId,
+          agent_id: agentId,
+          role: 'viewer',
+        });
 
       if (error) throw error;
     },
@@ -135,12 +162,16 @@ export const useClientDetail = (clientId: string | undefined) => {
     },
   });
 
+  // Unassign agent by removing from client_agent_assignments
   const unassignAgentMutation = useMutation({
     mutationFn: async (agentId: string) => {
+      if (!clientId) throw new Error('No client ID');
+      
       const { error } = await supabase
-        .from('agents')
-        .update({ client_id: null })
-        .eq('id', agentId);
+        .from('client_agent_assignments')
+        .delete()
+        .eq('client_id', clientId)
+        .eq('agent_id', agentId);
 
       if (error) throw error;
     },

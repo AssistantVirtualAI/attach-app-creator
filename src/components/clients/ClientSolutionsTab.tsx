@@ -14,6 +14,24 @@ const AVAILABLE_SOLUTIONS = [
   { id: 'slack', name: 'Slack', description: 'Notifications équipe', icon: '💬' },
 ];
 
+const getPlatformIcon = (platform: string) => {
+  switch (platform?.toLowerCase()) {
+    case 'elevenlabs': return '🎙️';
+    case 'retell': return '🤖';
+    case 'vapi': return '📞';
+    default: return '🤖';
+  }
+};
+
+const getPlatformLabel = (platform: string) => {
+  switch (platform?.toLowerCase()) {
+    case 'elevenlabs': return 'ElevenLabs';
+    case 'retell': return 'Retell AI';
+    case 'vapi': return 'Vapi';
+    default: return platform;
+  }
+};
+
 interface ClientSolutionsTabProps {
   clientId: string;
   assignedAgents: any[];
@@ -24,25 +42,23 @@ export const ClientSolutionsTab = ({ clientId, assignedAgents }: ClientSolutions
 
   // Determine active solutions based on assigned agents platforms
   const activePlatforms = new Set(assignedAgents?.map(a => a.platform?.toLowerCase()) || []);
-  
-  // Filter ElevenLabs agents
-  const elevenLabsAgents = assignedAgents?.filter(a => a.platform?.toLowerCase() === 'elevenlabs') || [];
 
   return (
     <div className="space-y-6">
-      {/* ElevenLabs Agents with Details */}
-      {elevenLabsAgents.length > 0 && (
+      {/* Active Agents - All Platforms */}
+      {assignedAgents && assignedAgents.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bot className="h-5 w-5" />
-              Agents ElevenLabs actifs
+              Agents actifs ({assignedAgents.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {elevenLabsAgents.map((agent) => {
+            {assignedAgents.map((agent) => {
               const config = agent.config as Record<string, any> || {};
               const agentId = config.agent_id || agent.platform_agent_id;
+              const platform = agent.platform?.toLowerCase();
               
               return (
                 <div
@@ -52,11 +68,12 @@ export const ClientSolutionsTab = ({ clientId, assignedAgents }: ClientSolutions
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-xl">🎙️</span>
+                        <span className="text-xl">{getPlatformIcon(platform)}</span>
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="font-medium">{agent.name}</h4>
+                          <Badge variant="outline">{getPlatformLabel(platform)}</Badge>
                           <Badge variant="default" className="flex items-center gap-1">
                             <CheckCircle className="h-3 w-3" />
                             Actif
@@ -76,15 +93,19 @@ export const ClientSolutionsTab = ({ clientId, assignedAgents }: ClientSolutions
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="text-right text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <BookOpen className="h-3 w-3" />
-                          <span>{config.knowledge_base_count || 0} docs</span>
-                        </div>
-                        {config.voice_id && (
-                          <div className="flex items-center gap-1 mt-1">
-                            <Volume2 className="h-3 w-3" />
-                            <span>Voice configurée</span>
-                          </div>
+                        {platform === 'elevenlabs' && (
+                          <>
+                            <div className="flex items-center gap-1">
+                              <BookOpen className="h-3 w-3" />
+                              <span>{config.knowledge_base_count || 0} docs</span>
+                            </div>
+                            {config.voice_id && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <Volume2 className="h-3 w-3" />
+                                <span>Voice configurée</span>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                       <Button 
@@ -100,6 +121,19 @@ export const ClientSolutionsTab = ({ clientId, assignedAgents }: ClientSolutions
                 </div>
               );
             })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No agents assigned message */}
+      {(!assignedAgents || assignedAgents.length === 0) && (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-lg font-medium mb-2">Aucun agent assigné</h3>
+            <p className="text-muted-foreground">
+              Assignez des agents à ce client dans l'onglet "Agents".
+            </p>
           </CardContent>
         </Card>
       )}
