@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate, Outlet, useParams, Link, useLocation } from 'react-router-dom';
 import { ClientProvider, useClient } from '@/context/ClientContext';
 import { useClientAgentAccess } from '@/hooks/useClientAgentAccess';
+import { supabase } from '@/integrations/supabase/client';
 import { AgentSelector } from '@/components/client-portal/AgentSelector';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -36,7 +37,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useLanguage } from '@/context/LanguageContext';
 
 const ClientAgentPortalContent = () => {
-  const { isAuthenticated, isLoading: authLoading, session, logout } = useClient();
+  const { isAuthenticated, isLoading: authLoading, session, logout, loginAsAdmin } = useClient();
   const { clientId, agentId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -46,10 +47,31 @@ const ClientAgentPortalContent = () => {
   const { hasAccess, role, agentName, platform, isLoading: accessLoading } = useClientAgentAccess(clientId, agentId);
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    const tryAdminAutoLogin = async () => {
+      if (authLoading || isAuthenticated) return;
+      if (!clientId) {
+        navigate('/client/login');
+        return;
+      }
+
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) {
+        navigate('/client/login');
+        return;
+      }
+
+      try {
+        const adminSession = await loginAsAdmin(clientId);
+        if (adminSession) return;
+      } catch {
+        // ignore
+      }
+
       navigate('/client/login');
-    }
-  }, [isAuthenticated, authLoading, navigate]);
+    };
+
+    tryAdminAutoLogin();
+  }, [authLoading, isAuthenticated, clientId, loginAsAdmin, navigate]);
 
   useEffect(() => {
     if (!accessLoading && !hasAccess && clientId && agentId) {

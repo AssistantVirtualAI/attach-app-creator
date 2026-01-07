@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useClientAgentAccess } from '@/hooks/useClientAgentAccess';
+import { ClientPlatformConversations } from '@/components/client-portal/ClientPlatformConversations';
 import { useClientElevenLabsConversations, useClientElevenLabsConversationDetails, useClientElevenLabsAudio } from '@/hooks/useClientElevenLabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,20 @@ import { toast } from 'sonner';
 
 const ClientAgentConversations = () => {
   const { clientId, agentId } = useParams();
-  const { apiKey, platformAgentId, agentName } = useClientAgentAccess(clientId, agentId);
+  const { apiKey, platformAgentId, agentName, platform, organizationId } = useClientAgentAccess(clientId, agentId);
+
+  // For Retell/Vapi, use unified platform conversations list
+  if (platform && platform !== 'elevenlabs') {
+    return (
+      <ClientPlatformConversations
+        platform={platform}
+        apiKey={apiKey}
+        platformAgentId={platformAgentId}
+        organizationId={organizationId}
+        agentName={agentName}
+      />
+    );
+  }
   
   const [page, setPage] = useState(1);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);

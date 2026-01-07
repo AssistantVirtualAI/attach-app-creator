@@ -31,17 +31,17 @@ export const useClientAuth = () => {
   const login = useCallback(async (loginId: string, password: string) => {
     setIsLoading(true);
     try {
-      // Call edge function for secure password verification
+      // Call backend function for secure password verification
       const { data, error } = await supabase.functions.invoke('client-auth', {
-        body: { 
-          action: 'login', 
+        body: {
+          action: 'login',
           login_id: loginId,
-          password
-        }
+          password,
+        },
       });
 
       if (error) throw error;
-      
+
       if (data?.error) {
         throw new Error(data.error);
       }
@@ -61,6 +61,29 @@ export const useClientAuth = () => {
     }
   }, []);
 
+  const loginAsAdmin = useCallback(async (clientId: string) => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('client-auth', {
+        body: {
+          action: 'admin-login',
+          client_id: clientId,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      if (!data?.session) return null;
+
+      const clientSession: ClientSession = data.session;
+      localStorage.setItem(CLIENT_SESSION_KEY, JSON.stringify(clientSession));
+      setSession(clientSession);
+      return clientSession;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem(CLIENT_SESSION_KEY);
     setSession(null);
@@ -71,6 +94,7 @@ export const useClientAuth = () => {
     isLoading,
     isAuthenticated: !!session,
     login,
+    loginAsAdmin,
     logout,
   };
 };
