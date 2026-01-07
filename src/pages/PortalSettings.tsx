@@ -65,19 +65,17 @@ const PortalSettings = () => {
           agentId={session.agentId}
           platformAgentId={session.platformAgentId || null}
           organizationId={session.organizationId}
-          apiKey={session.platformApiKey}
         />
       </motion.div>
     );
   }
 
   const agentId = session?.platformAgentId || session?.agentId;
-  const apiKey = session?.platformApiKey || null;
 
   const { data: config, isLoading, refetch } = useElevenLabsFullAgentConfig({
     agentId: agentId || null,
-    apiKey: apiKey,
-    enabled: !!agentId && !!apiKey && canEdit,
+    organizationId: session?.organizationId,
+    enabled: !!agentId && !!session?.organizationId && canEdit,
   });
 
   const updateTTS = useUpdateTTSSettings();

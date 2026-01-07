@@ -16,6 +16,8 @@ export interface NormalizedAgentConfig {
   raw?: any;
 }
 
+// SECURITY: All hooks now use organizationId for auth - API keys are fetched server-side
+
 /**
  * Hook unifié pour récupérer la configuration d'un agent sur toutes les plateformes
  * Supporte: ElevenLabs, Retell, Vapi
@@ -24,7 +26,6 @@ export function usePortalAgentConfig() {
   const { session } = usePortal();
   const platform = session?.platform;
   const agentId = session?.platformAgentId || session?.agentId;
-  const apiKey = session?.platformApiKey;
   const organizationId = session?.organizationId;
 
   return useQuery({
@@ -37,7 +38,7 @@ export function usePortalAgentConfig() {
       switch (platform) {
         case 'elevenlabs': {
           const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
-            body: { action: 'get', agentId, apiKey }
+            body: { action: 'get', agentId, organizationId }
           });
           if (error) throw error;
           
@@ -63,7 +64,7 @@ export function usePortalAgentConfig() {
         case 'retell': {
           // First get the agent to find the LLM ID
           const { data: agentData, error: agentError } = await supabase.functions.invoke('retell-proxy', {
-            body: { action: 'getAgent', agentId, apiKey, organizationId }
+            body: { action: 'getAgent', agentId, organizationId }
           });
           if (agentError) throw agentError;
           
@@ -76,7 +77,7 @@ export function usePortalAgentConfig() {
           // If there's an LLM, fetch its config for more detailed prompt
           if (llmId) {
             const { data: llmData } = await supabase.functions.invoke('retell-proxy', {
-              body: { action: 'getLlm', llmId, apiKey, organizationId }
+              body: { action: 'getLlm', llmId, organizationId }
             });
             if (llmData?.data) {
               systemPrompt = llmData.data.general_prompt || systemPrompt;
@@ -96,7 +97,7 @@ export function usePortalAgentConfig() {
 
         case 'vapi': {
           const { data, error } = await supabase.functions.invoke('vapi-proxy', {
-            body: { action: 'getAssistant', assistantId: agentId, apiKey, organizationId }
+            body: { action: 'getAssistant', assistantId: agentId, organizationId }
           });
           if (error) throw error;
           
@@ -137,7 +138,6 @@ export function usePortalUpdateAgentPrompt() {
   const queryClient = useQueryClient();
   const platform = session?.platform;
   const agentId = session?.platformAgentId || session?.agentId;
-  const apiKey = session?.platformApiKey;
   const organizationId = session?.organizationId;
 
   return useMutation({
@@ -152,7 +152,7 @@ export function usePortalUpdateAgentPrompt() {
             body: { 
               action: 'update_prompt', 
               agentId, 
-              apiKey,
+              organizationId,
               prompt: systemPrompt,
               firstMessage 
             }
@@ -165,7 +165,7 @@ export function usePortalUpdateAgentPrompt() {
           // For Retell, we need to update the LLM config
           // First get agent to find LLM ID
           const { data: agentData } = await supabase.functions.invoke('retell-proxy', {
-            body: { action: 'getAgent', agentId, apiKey, organizationId }
+            body: { action: 'getAgent', agentId, organizationId }
           });
           
           const agentInfo = agentData?.data || agentData;
@@ -177,7 +177,6 @@ export function usePortalUpdateAgentPrompt() {
               body: { 
                 action: 'updateLlm', 
                 llmId, 
-                apiKey,
                 organizationId,
                 config: {
                   general_prompt: systemPrompt,
@@ -193,7 +192,6 @@ export function usePortalUpdateAgentPrompt() {
               body: { 
                 action: 'updateAgent', 
                 retellAgentId: agentId, 
-                apiKey,
                 organizationId,
                 config: {
                   general_prompt: systemPrompt,
@@ -211,7 +209,6 @@ export function usePortalUpdateAgentPrompt() {
             body: { 
               action: 'updateAssistant', 
               assistantId: agentId, 
-              apiKey,
               organizationId,
               config: {
                 firstMessage,
@@ -243,12 +240,12 @@ export function useAgentConfigByPlatform(agent: {
   id: string; 
   platform: string; 
   platform_agent_id?: string | null;
-  platform_api_key?: string | null;
   organization_id?: string;
   config?: Record<string, any>;
 }) {
   const platformAgentId = agent.config?.agent_id || agent.platform_agent_id;
   const platform = agent.platform;
+  const organizationId = agent.organization_id;
 
   return useQuery({
     queryKey: ['agent-config-by-platform', agent.id, platformAgentId, platform],
@@ -260,7 +257,7 @@ export function useAgentConfigByPlatform(agent: {
       switch (platform) {
         case 'elevenlabs': {
           const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
-            body: { action: 'get', agentId: platformAgentId, api_key: agent.platform_api_key }
+            body: { action: 'get', agentId: platformAgentId, organizationId }
           });
           if (error) throw error;
           
@@ -287,8 +284,7 @@ export function useAgentConfigByPlatform(agent: {
             body: { 
               action: 'getAgent', 
               retellAgentId: platformAgentId, 
-              apiKey: agent.platform_api_key,
-              organizationId: agent.organization_id
+              organizationId
             }
           });
           if (error) throw error;
@@ -304,8 +300,7 @@ export function useAgentConfigByPlatform(agent: {
               body: { 
                 action: 'getLlm', 
                 llmId, 
-                apiKey: agent.platform_api_key,
-                organizationId: agent.organization_id
+                organizationId
               }
             });
             if (llmData?.data) {
@@ -329,8 +324,7 @@ export function useAgentConfigByPlatform(agent: {
             body: { 
               action: 'getAssistant', 
               assistantId: platformAgentId, 
-              apiKey: agent.platform_api_key,
-              organizationId: agent.organization_id
+              organizationId
             }
           });
           if (error) throw error;

@@ -47,6 +47,8 @@ export interface PortalPlatformAnalytics {
   };
 }
 
+// SECURITY: All hooks now use organizationId for auth - API keys are fetched server-side
+
 export const usePortalPlatformConversations = (page: number = 1, limit: number = 100) => {
   const { session } = usePortal();
 
@@ -58,10 +60,8 @@ export const usePortalPlatformConversations = (page: number = 1, limit: number =
         return { conversations: [], total: 0 } as PortalPlatformConversationsResponse;
       }
 
-      // Allow requests to proceed even without platformApiKey - the proxy will fetch from organization_integrations
-      const hasApiKeyOrOrg = session.platformApiKey || session.organizationId;
-      if (!hasApiKeyOrOrg) {
-        console.log('[Portal] No API key or organization ID available');
+      if (!session.organizationId) {
+        console.log('[Portal] No organization ID available');
         return { conversations: [], total: 0 } as PortalPlatformConversationsResponse;
       }
 
@@ -74,7 +74,6 @@ export const usePortalPlatformConversations = (page: number = 1, limit: number =
           body: {
             action: 'list',
             agentId: session.platformAgentId,
-            apiKey: session.platformApiKey,
             organizationId: session.organizationId,
             page,
             limit,
@@ -92,7 +91,6 @@ export const usePortalPlatformConversations = (page: number = 1, limit: number =
         const { data, error } = await supabase.functions.invoke('vapi-proxy', {
           body: {
             action: 'listCalls',
-            apiKey: session.platformApiKey,
             organizationId: session.organizationId,
             agentId: session.platformAgentId,
             assistantId: session.platformAgentId,
@@ -112,7 +110,6 @@ export const usePortalPlatformConversations = (page: number = 1, limit: number =
         const { data, error } = await supabase.functions.invoke('retell-proxy', {
           body: {
             action: 'listCalls',
-            apiKey: session.platformApiKey,
             organizationId: session.organizationId,
             agentId: session.platformAgentId,
             limit,
@@ -128,7 +125,7 @@ export const usePortalPlatformConversations = (page: number = 1, limit: number =
 
       return { conversations: [], total: 0 };
     },
-    enabled: !!session?.platform && !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
+    enabled: !!session?.platform && !!session?.platformAgentId && !!session?.organizationId,
     staleTime: 30000,
   });
 };
@@ -144,9 +141,8 @@ export const usePortalPlatformAnalytics = (timeframe: string = 'all') => {
         return null;
       }
 
-      const hasApiKeyOrOrg = session.platformApiKey || session.organizationId;
-      if (!hasApiKeyOrOrg) {
-        console.log('[Portal] No API key or organization ID available for analytics');
+      if (!session.organizationId) {
+        console.log('[Portal] No organization ID available for analytics');
         return null;
       }
 
@@ -157,7 +153,6 @@ export const usePortalPlatformAnalytics = (timeframe: string = 'all') => {
         const { data, error } = await supabase.functions.invoke('elevenlabs-convai-analytics', {
           body: {
             agentId: session.platformAgentId,
-            apiKey: session.platformApiKey,
             organizationId: session.organizationId,
             timeframe: normalizePortalTimeframeToElevenLabs(timeframe),
             includeCharts: true,
@@ -174,7 +169,6 @@ export const usePortalPlatformAnalytics = (timeframe: string = 'all') => {
         const { data, error } = await supabase.functions.invoke('vapi-proxy', {
           body: {
             action: 'getAnalytics',
-            apiKey: session.platformApiKey,
             organizationId: session.organizationId,
             agentId: session.platformAgentId,
             timeframe,
@@ -191,7 +185,6 @@ export const usePortalPlatformAnalytics = (timeframe: string = 'all') => {
         const { data, error } = await supabase.functions.invoke('retell-proxy', {
           body: {
             action: 'getAnalytics',
-            apiKey: session.platformApiKey,
             organizationId: session.organizationId,
             agentId: session.platformAgentId,
             timeframe,
@@ -206,7 +199,7 @@ export const usePortalPlatformAnalytics = (timeframe: string = 'all') => {
 
       return null;
     },
-    enabled: !!session?.platform && !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
+    enabled: !!session?.platform && !!session?.platformAgentId && !!session?.organizationId,
     staleTime: 60000,
   });
 };

@@ -69,7 +69,6 @@ const PortalLoginContent = () => {
           agentName: superAdminSession.agentName,
           platform: superAdminSession.platform,
           platformAgentId: superAdminSession.platformAgentId,
-          platformApiKey: superAdminSession.platformApiKey ? '***SET***' : 'NOT SET',
         } : 'null');
 
         if (superAdminSession) {
@@ -87,7 +86,6 @@ const PortalLoginContent = () => {
         agentName: adminSession.agentName,
         platform: adminSession.platform,
         platformAgentId: adminSession.platformAgentId,
-        platformApiKey: adminSession.platformApiKey ? '***SET***' : 'NOT SET',
       } : 'null');
 
       if (adminSession) {
