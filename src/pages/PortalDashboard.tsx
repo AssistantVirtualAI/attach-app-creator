@@ -53,24 +53,26 @@ const PortalDashboard = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const basePath = session?.agentSlug ? `/${session.agentSlug}` : '/portal';
+
   const quickActions = [
-    { 
-      icon: MessageSquare, 
-      label: t('clientPortal.dashboard.viewConversations'), 
-      href: '/portal/conversations',
-      gradient: 'from-blue-500 to-cyan-500'
+    {
+      icon: MessageSquare,
+      label: t('clientPortal.dashboard.viewConversations'),
+      href: `${basePath}/conversations`,
+      gradient: 'from-blue-500 to-cyan-500',
     },
-    { 
-      icon: BarChart3, 
-      label: t('clientPortal.dashboard.viewAnalytics'), 
-      href: '/portal/analytics',
-      gradient: 'from-purple-500 to-pink-500'
+    {
+      icon: BarChart3,
+      label: t('clientPortal.dashboard.viewAnalytics'),
+      href: `${basePath}/analytics`,
+      gradient: 'from-purple-500 to-pink-500',
     },
-    { 
-      icon: Headphones, 
-      label: t('clientPortal.dashboard.knowledgeBase'), 
-      href: '/portal/knowledge',
-      gradient: 'from-green-500 to-emerald-500'
+    {
+      icon: Headphones,
+      label: t('clientPortal.dashboard.knowledgeBase'),
+      href: `${basePath}/knowledge`,
+      gradient: 'from-green-500 to-emerald-500',
     },
   ];
 
