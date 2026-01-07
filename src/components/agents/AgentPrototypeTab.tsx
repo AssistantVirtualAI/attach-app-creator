@@ -153,8 +153,8 @@ export const AgentPrototypeTab = ({ agent }: AgentPrototypeTabProps) => {
             </div>
             <div className="flex justify-between py-2">
               <span className="text-muted-foreground">Status</span>
-              <span className={`font-medium ${agent.platform_api_key ? 'text-green-500' : 'text-yellow-500'}`}>
-                {agent.platform_api_key ? 'Configuré' : 'Non configuré'}
+              <span className={`font-medium ${agent.platform_agent_id ? 'text-green-500' : 'text-yellow-500'}`}>
+                {agent.platform_agent_id ? 'Configuré' : 'Non configuré'}
               </span>
             </div>
           </div>

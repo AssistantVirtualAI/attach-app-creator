@@ -144,7 +144,6 @@ const AgentSettingsPage = () => {
             <AgentFullConfigTab
               agentId={agentId!}
               platformAgentId={platformAgentId}
-              apiKey={agent.platform_api_key}
               platform={agent.platform}
               organizationId={agent.organization_id}
             />
@@ -167,7 +166,6 @@ const AgentSettingsPage = () => {
               <AgentRealtimeAnalytics 
                 agentId={agentId!}
                 platformAgentId={platformAgentId}
-                apiKey={agent.platform_api_key}
               />
               <AgentAnalyticsTab
                 conversations={conversations || []}

@@ -107,12 +107,11 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
         }
         
         case 'retell': {
-          // Get agent to find LLM ID
+          // Get agent to find LLM ID - API key fetched server-side via organizationId
           const { data: agentData } = await supabase.functions.invoke('retell-proxy', {
             body: { 
               action: 'getAgent', 
               retellAgentId: platformAgentId, 
-              apiKey: agent.platform_api_key,
               organizationId: agent.organization_id
             }
           });
@@ -125,7 +124,6 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
               body: { 
                 action: 'updateLlm', 
                 llmId, 
-                apiKey: agent.platform_api_key,
                 organizationId: agent.organization_id,
                 config: {
                   general_prompt: prompt,
@@ -140,7 +138,6 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
               body: { 
                 action: 'updateAgent', 
                 retellAgentId: platformAgentId, 
-                apiKey: agent.platform_api_key,
                 organizationId: agent.organization_id,
                 config: {
                   general_prompt: prompt,
@@ -158,7 +155,6 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
             body: { 
               action: 'updateAssistant', 
               assistantId: platformAgentId, 
-              apiKey: agent.platform_api_key,
               organizationId: agent.organization_id,
               config: {
                 firstMessage,
