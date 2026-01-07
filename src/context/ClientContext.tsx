@@ -6,6 +6,7 @@ interface ClientContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (loginId: string, password: string) => Promise<ClientSession>;
+  loginAsAdmin: (clientId: string) => Promise<ClientSession | null>;
   logout: () => void;
 }
 

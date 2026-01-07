@@ -148,6 +148,104 @@ serve(async (req) => {
         );
       }
 
+      case "admin-login": {
+        const { client_id } = params;
+
+        const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
+        const jwt = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
+
+        if (!jwt) {
+          return new Response(
+            JSON.stringify({ error: "Non autorisé" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (!client_id) {
+          return new Response(
+            JSON.stringify({ error: "Client ID requis" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const { data: userData, error: userError } = await supabase.auth.getUser(jwt);
+        const user = userData?.user;
+
+        if (userError || !user?.id) {
+          console.error("[admin-login] auth.getUser error:", userError);
+          return new Response(
+            JSON.stringify({ error: "Non autorisé" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Load client
+        const { data: client, error: clientError } = await supabase
+          .from("clients")
+          .select("id, name, organization_id, theme, language, status")
+          .eq("id", client_id)
+          .maybeSingle();
+
+        if (clientError || !client) {
+          console.error("[admin-login] client lookup error:", clientError);
+          return new Response(
+            JSON.stringify({ error: "Client non trouvé" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        if (client.status !== "active") {
+          return new Response(
+            JSON.stringify({ error: "Ce compte est désactivé" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Allow if user is super admin OR org member
+        let allowed = false;
+        try {
+          const { data: isSuperAdmin, error: saError } = await supabase.rpc("is_super_admin", { _user_id: user.id });
+          if (!saError && isSuperAdmin === true) allowed = true;
+        } catch {
+          // ignore
+        }
+
+        if (!allowed) {
+          const { data: membership, error: membershipError } = await supabase
+            .from("organization_members")
+            .select("id")
+            .eq("organization_id", client.organization_id)
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+          if (membershipError) {
+            console.error("[admin-login] membership lookup error:", membershipError);
+          }
+
+          allowed = !!membership;
+        }
+
+        if (!allowed) {
+          return new Response(
+            JSON.stringify({ error: "Accès refusé" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const session = {
+          clientId: client.id,
+          clientName: client.name,
+          organizationId: client.organization_id,
+          theme: client.theme || "light",
+          language: client.language || "fr",
+        };
+
+        return new Response(
+          JSON.stringify({ success: true, session }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       case "login-by-agent-slug": {
         const { agent_slug, login_id, password } = params;
         

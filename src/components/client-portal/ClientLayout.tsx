@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useClient } from '@/context/ClientContext';
 import { useClientAssignedAgents } from '@/hooks/useClientAgentAccess';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -25,7 +26,7 @@ import {
   Globe,
   Loader2
 } from 'lucide-react';
-import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
+import { Link, useLocation, useNavigate, Outlet, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AvaLogo } from '@/components/shared/AvaLogo';
 import { GlowBadge } from '@/components/portal/GlowBadge';
@@ -33,19 +34,36 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useLanguage } from '@/context/LanguageContext';
 
 export const ClientLayout = () => {
-  const { session, logout, isLoading: authLoading, isAuthenticated } = useClient();
+  const { session, logout, isLoading: authLoading, isAuthenticated, loginAsAdmin } = useClient();
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { language, setLanguage } = useLanguage();
 
+  const { clientId } = useParams();
+
   const { data: assignedAgents, isLoading: agentsLoading } = useClientAssignedAgents(session?.clientId);
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    const tryAdminAutoLogin = async () => {
+      if (authLoading || isAuthenticated) return;
+      if (!clientId) return;
+
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return;
+
+      try {
+        const adminSession = await loginAsAdmin(clientId);
+        if (adminSession) return;
+      } catch {
+        // fallthrough to regular login
+      }
+
       navigate('/client/login');
-    }
-  }, [isAuthenticated, authLoading, navigate]);
+    };
+
+    tryAdminAutoLogin();
+  }, [authLoading, isAuthenticated, clientId, loginAsAdmin, navigate]);
 
   if (authLoading) {
     return (
