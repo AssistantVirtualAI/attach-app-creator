@@ -115,7 +115,8 @@ serve(async (req) => {
       }
       case 'getCall':
         if (!params.callId) throw new Error('callId is required');
-        result = await retellRequest(retellApiKey, 'GET', `/get-call/${params.callId}`);
+        // NOTE: Retell's call detail endpoint is versioned under /v2
+        result = await retellRequest(retellApiKey, 'GET', `/v2/get-call/${params.callId}`);
         break;
       case 'createCall':
         result = await retellRequest(retellApiKey, 'POST', '/v2/create-phone-call', undefined, {
