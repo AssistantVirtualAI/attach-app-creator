@@ -44,9 +44,16 @@ const PortalLoginContent = () => {
         return;
       }
 
-      // Wait for supabase auth to be checked
+      // Wait for supabase auth to be checked (undefined means still loading)
       if (supabaseUser === undefined) {
         console.log('[PortalLogin] Waiting for supabase auth...');
+        return;
+      }
+
+      // If no supabase user, they need to login manually
+      if (supabaseUser === null) {
+        console.log('[PortalLogin] No Supabase user, showing login form');
+        setCheckingSuperAdmin(false);
         return;
       }
 

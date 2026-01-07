@@ -730,9 +730,11 @@ export const fr = {
     conversations: {
       filters: 'Filtres',
       advancedFilters: 'Filtres avancés',
+      date: 'Date',
       duration: 'Durée',
       startDate: 'Date de début',
       endDate: 'Date de fin',
+      caller: 'Appelant',
       noConversations: 'Aucune conversation',
       noConversationsDesc: 'Aucune conversation n\'a encore été enregistrée pour cet agent.',
       selectConversation: 'Sélectionnez une conversation pour voir les détails',
