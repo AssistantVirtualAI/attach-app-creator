@@ -402,19 +402,42 @@ serve(async (req) => {
         let conversations: NormalizedConversation[] = [];
 
         if (config.platform === 'elevenlabs') {
-          const response = await fetch(
-            `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${config.agentId}&limit=100`,
-            { headers: { 'xi-api-key': config.apiKey, 'accept': 'application/json' } }
-          );
+          // Fetch ALL conversations for ElevenLabs using pagination
+          let allElevenLabsConvs: any[] = [];
+          let cursor: string | undefined = undefined;
+          const pageLimit = 100;
+          
+          do {
+            const url = new URL('https://api.elevenlabs.io/v1/convai/conversations');
+            url.searchParams.set('agent_id', config.agentId);
+            url.searchParams.set('page_size', String(pageLimit));
+            if (cursor) {
+              url.searchParams.set('cursor', cursor);
+            }
+            
+            const response = await fetch(url.toString(), {
+              headers: { 'xi-api-key': config.apiKey, 'accept': 'application/json' }
+            });
 
-          if (response.ok) {
-            const data = await response.json();
-            conversations = (data.conversations || []).map((conv: any) => 
-              normalizeElevenLabsConversation(conv, config)
-            );
-          }
+            if (response.ok) {
+              const data = await response.json();
+              const convs = data.conversations || [];
+              allElevenLabsConvs.push(...convs);
+              cursor = data.next_cursor || data.cursor;
+              
+              // Break if no more pages or very large dataset (safety)
+              if (!cursor || allElevenLabsConvs.length >= 5000) break;
+            } else {
+              break;
+            }
+          } while (cursor);
+          
+          conversations = allElevenLabsConvs.map((conv: any) => 
+            normalizeElevenLabsConversation(conv, config)
+          );
         } else if (config.platform === 'retell') {
-          const response = await fetch('https://api.retellai.com/list-calls', {
+          // Fetch ALL calls from Retell (no time limit, max 1000)
+          const response = await fetch('https://api.retellai.com/v2/list-calls', {
             method: 'POST',
             headers: { 
               'Authorization': `Bearer ${config.apiKey}`, 
@@ -422,7 +445,7 @@ serve(async (req) => {
             },
             body: JSON.stringify({
               filter_criteria: { agent_id: [config.agentId] },
-              limit: 100,
+              limit: 1000,
               sort_order: 'descending'
             })
           });
@@ -434,8 +457,9 @@ serve(async (req) => {
             );
           }
         } else if (config.platform === 'vapi') {
+          // Fetch ALL calls from Vapi (no limit, max 1000)
           const response = await fetch(
-            `https://api.vapi.ai/call?assistantId=${config.agentId}&limit=100`,
+            `https://api.vapi.ai/call?assistantId=${config.agentId}&limit=1000`,
             { headers: { 'Authorization': `Bearer ${config.apiKey}` } }
           );
 
