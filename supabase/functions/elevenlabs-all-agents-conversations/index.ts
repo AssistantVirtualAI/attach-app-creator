@@ -116,29 +116,33 @@ function normalizeVapiCall(call: any, config: any): NormalizedConversation {
 async function fetchRetellCall(apiKey: string, callId: string): Promise<any | null> {
   const encoded = encodeURIComponent(callId);
 
-  // Primary: GET /get-call/{call_id}
-  const getRes = await fetch(`https://api.retellai.com/get-call/${encoded}`, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'accept': 'application/json',
-    },
-  });
+  const candidates: Array<{ method: 'GET' | 'POST'; url: string; body?: any }> = [
+    { method: 'GET', url: `https://api.retellai.com/get-call/${encoded}` },
+    { method: 'GET', url: `https://api.retellai.com/v2/get-call/${encoded}` },
+    { method: 'POST', url: `https://api.retellai.com/get-call`, body: { call_id: callId } },
+    { method: 'POST', url: `https://api.retellai.com/v2/get-call`, body: { call_id: callId } },
+  ];
 
-  if (getRes.ok) return await getRes.json();
+  for (const c of candidates) {
+    try {
+      const res = await fetch(c.url, {
+        method: c.method,
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'accept': 'application/json',
+          ...(c.method === 'POST' ? { 'Content-Type': 'application/json' } : {}),
+        },
+        ...(c.method === 'POST' ? { body: JSON.stringify(c.body ?? {}) } : {}),
+      });
 
-  // Fallback: some setups expect POST /get-call with a JSON body
-  const postRes = await fetch(`https://api.retellai.com/get-call`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'accept': 'application/json',
-    },
-    body: JSON.stringify({ call_id: callId }),
-  });
+      if (res.ok) return await res.json();
 
-  if (postRes.ok) return await postRes.json();
+      const text = await res.text().catch(() => '');
+      console.log(`[Retell][get-call] ${c.method} ${c.url} -> ${res.status} ${text?.slice(0, 200)}`);
+    } catch (e) {
+      console.log(`[Retell][get-call] ${c.method} ${c.url} -> error`, e);
+    }
+  }
 
   return null;
 }
@@ -519,27 +523,24 @@ serve(async (req) => {
       }
       
       // Try Retell - get recording_url from call details
-      for (const config of agentConfigs.filter(c => c.platform === 'retell')) {
+      const retellCandidates = platformAgentId
+        ? agentConfigs.filter((c) => c.platform === 'retell' && c.agentId === platformAgentId)
+        : agentConfigs.filter((c) => c.platform === 'retell');
+
+      for (const config of retellCandidates) {
         try {
-          const callResponse = await fetch(
-            `https://api.retellai.com/get-call/${conversationId}`,
-            { headers: { 'Authorization': `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' } }
-          );
-          
-          if (callResponse.ok) {
-            const callData = await callResponse.json();
-            if (callData.recording_url) {
-              // Retell provides a direct URL to the recording
-              return new Response(
-                JSON.stringify({
-                  audio_url: callData.recording_url,
-                  recording_url: callData.recording_url,
-                  format: 'wav', // Retell typically uses wav
-                  platform: 'retell',
-                }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-              );
-            }
+          const callData = await fetchRetellCall(config.apiKey, conversationId);
+          if (callData?.recording_url) {
+            // Retell provides a direct URL to the recording
+            return new Response(
+              JSON.stringify({
+                audio_url: callData.recording_url,
+                recording_url: callData.recording_url,
+                format: 'wav', // Retell typically uses wav
+                platform: 'retell',
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
           }
         } catch (e) {
           console.log(`Retell audio fetch error for ${conversationId}:`, e);

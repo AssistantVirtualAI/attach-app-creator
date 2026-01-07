@@ -115,6 +115,9 @@ export const useConversationDetails = (
         throw error;
       }
 
+      // Edge function returns {notFound:true} with 200
+      if ((data as any)?.notFound) return null;
+
       return data;
     },
     enabled: !!conversationId,
@@ -150,6 +153,10 @@ export const useConversationAudio = (
         }
         console.error('Error fetching conversation audio:', error);
         throw error;
+      }
+
+      if ((data as any)?.notFound) {
+        return { audio_url: null, audio_base64: null, notFound: true };
       }
 
       return data;
