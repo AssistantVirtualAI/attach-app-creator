@@ -33,7 +33,7 @@ export const usePortalKnowledgeBase = () => {
         case 'elevenlabs':
           return fetchElevenLabsKB(platformAgentId, platformApiKey, organizationId);
         case 'retell':
-          return fetchRetellKB(organizationId);
+          return fetchRetellKB(organizationId, platformAgentId);
         case 'vapi':
           return fetchVapiKB(organizationId);
         default:
@@ -75,10 +75,41 @@ async function fetchElevenLabsKB(
   };
 }
 
-// Fetch Retell knowledge bases
-async function fetchRetellKB(organizationId: string | undefined): Promise<KnowledgeBaseResponse> {
+// Fetch Retell knowledge bases (filtered to the agent when possible)
+async function fetchRetellKB(
+  organizationId: string | undefined,
+  agentId: string | undefined
+): Promise<KnowledgeBaseResponse> {
+  // Try to fetch agent config to detect which KB(s) are linked to this agent
+  let allowedKbIds: string[] | null = null;
+  if (agentId) {
+    try {
+      const { data: agentRes, error: agentErr } = await supabase.functions.invoke('retell-proxy', {
+        body: {
+          action: 'getAgent',
+          organizationId,
+          agentId,
+        },
+      });
+      if (!agentErr) {
+        const agent = agentRes?.data || agentRes;
+        const kbIds =
+          agent?.knowledge_base_ids ||
+          agent?.knowledge_base_id ||
+          agent?.knowledge_base_ids_list ||
+          agent?.knowledge_base ||
+          null;
+
+        if (Array.isArray(kbIds)) allowedKbIds = kbIds.filter(Boolean);
+        else if (typeof kbIds === 'string' && kbIds) allowedKbIds = [kbIds];
+      }
+    } catch {
+      // ignore – we'll fall back to unfiltered list
+    }
+  }
+
   const { data, error } = await supabase.functions.invoke('retell-proxy', {
-    body: { 
+    body: {
       action: 'listKnowledgeBases',
       organizationId,
     },
@@ -87,12 +118,18 @@ async function fetchRetellKB(organizationId: string | undefined): Promise<Knowle
   if (error) throw error;
 
   const kbs = data?.data || [];
-  // Flatten all knowledge bases into items
+  const filteredKbs = Array.isArray(allowedKbIds) && allowedKbIds.length > 0
+    ? kbs.filter((kb: any) => allowedKbIds.includes(kb.knowledge_base_id))
+    : kbs;
+
+  // Flatten KBs into items (texts/urls). If KB content isn't expanded, show KB entries.
   const items: KnowledgeItem[] = [];
-  
-  for (const kb of kbs) {
-    // Each KB can have texts, urls, files
-    if (kb.knowledge_base_texts) {
+
+  for (const kb of filteredKbs) {
+    const hasTexts = Array.isArray(kb.knowledge_base_texts) && kb.knowledge_base_texts.length > 0;
+    const hasUrls = Array.isArray(kb.knowledge_base_urls) && kb.knowledge_base_urls.length > 0;
+
+    if (hasTexts) {
       for (const text of kb.knowledge_base_texts) {
         items.push({
           id: `${kb.knowledge_base_id}_text_${text.title || items.length}`,
@@ -103,19 +140,20 @@ async function fetchRetellKB(organizationId: string | undefined): Promise<Knowle
         });
       }
     }
-    if (kb.knowledge_base_urls) {
+
+    if (hasUrls) {
       for (const url of kb.knowledge_base_urls) {
         items.push({
           id: `${kb.knowledge_base_id}_url_${url}`,
           name: url,
           type: 'url',
-          url: url,
+          url,
           created_at: kb.created_at,
         });
       }
     }
-    // If no items, add the KB itself
-    if (items.length === 0 || (!kb.knowledge_base_texts?.length && !kb.knowledge_base_urls?.length)) {
+
+    if (!hasTexts && !hasUrls) {
       items.push({
         id: kb.knowledge_base_id,
         name: kb.knowledge_base_name || 'Base de connaissances',

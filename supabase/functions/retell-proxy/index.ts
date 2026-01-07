@@ -82,21 +82,36 @@ serve(async (req) => {
         break;
 
       // Calls
-      case 'listCalls':
+      case 'listCalls': {
         const callFilters: any = {};
         const retellAgentIdForCalls = params.retellAgentId || agentId;
         if (retellAgentIdForCalls) callFilters.agent_id = [retellAgentIdForCalls];
         if (params.limit) callFilters.limit = params.limit;
         if (params.sortOrder) callFilters.sort_order = params.sortOrder;
-        
+
         console.log(`[Retell] listCalls - Filters:`, callFilters);
-        
-        result = await retellRequest(retellApiKey, 'POST', '/list-calls', undefined, 
+
+        const raw = await retellRequest(
+          retellApiKey,
+          'POST',
+          '/list-calls',
+          undefined,
           Object.keys(callFilters).length > 0 ? { filter_criteria: callFilters } : {}
         );
-        
-        console.log(`[Retell] listCalls - Got ${Array.isArray(result) ? result.length : 0} calls`);
+
+        // Retell responses can vary: sometimes array, sometimes an object containing the array.
+        const callsArray = Array.isArray(raw)
+          ? raw
+          : Array.isArray(raw?.calls)
+            ? raw.calls
+            : Array.isArray(raw?.call_details)
+              ? raw.call_details
+              : [];
+
+        console.log(`[Retell] listCalls - Got ${callsArray.length} calls`);
+        result = callsArray;
         break;
+      }
       case 'getCall':
         if (!params.callId) throw new Error('callId is required');
         result = await retellRequest(retellApiKey, 'GET', `/get-call/${params.callId}`);
