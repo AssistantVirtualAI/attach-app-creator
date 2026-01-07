@@ -19,7 +19,7 @@ const PortalLoginContent = () => {
   const [agentInfo, setAgentInfo] = useState<{ name: string; avatar_url?: string } | null>(null);
   const [loadingAgent, setLoadingAgent] = useState(true);
   const [checkingSuperAdmin, setCheckingSuperAdmin] = useState(true);
-  const { login, isLoading, isAuthenticated, session, isSuperAdmin, loginAsSuperAdmin, supabaseUser } = usePortal();
+  const { login, isLoading, isAuthenticated, session, isSuperAdmin, loginAsSuperAdmin, loginAsOrgAdmin, supabaseUser } = usePortal();
   const navigate = useNavigate();
 
   // Guard against placeholder routes like /portal/:agentSlug
@@ -29,34 +29,35 @@ const PortalLoginContent = () => {
     }
   }, [agentSlug, navigate]);
 
-  // Check for super admin auto-login first
+  // Check for super admin / org admin auto-login first
   useEffect(() => {
     const checkSuperAdminAccess = async () => {
-      console.log('[PortalLogin] Checking super admin access...', {
+      console.log('[PortalLogin] Checking admin access...', {
         agentSlug,
         supabaseUserId: supabaseUser?.id,
         supabaseUserEmail: supabaseUser?.email,
       });
 
       if (!agentSlug || agentSlug === ':agentSlug') {
-        console.log('[PortalLogin] No valid agentSlug, skipping super admin check');
+        console.log('[PortalLogin] No valid agentSlug, skipping admin check');
         setCheckingSuperAdmin(false);
         return;
       }
 
-      // Wait for supabase auth to be checked (undefined means still loading)
+      // Wait for auth to be checked (undefined means still loading)
       if (supabaseUser === undefined) {
-        console.log('[PortalLogin] Waiting for supabase auth...');
+        console.log('[PortalLogin] Waiting for auth...');
         return;
       }
 
-      // If no supabase user, they need to login manually
+      // If no authenticated main user, they need to login manually
       if (supabaseUser === null) {
-        console.log('[PortalLogin] No Supabase user, showing login form');
+        console.log('[PortalLogin] No authenticated user, showing login form');
         setCheckingSuperAdmin(false);
         return;
       }
 
+      // 1) Super admin shortcut
       const isSuperAdminResult = isSuperAdmin();
       console.log('[PortalLogin] isSuperAdmin() result:', isSuperAdminResult);
 
@@ -70,19 +71,36 @@ const PortalLoginContent = () => {
           platformAgentId: superAdminSession.platformAgentId,
           platformApiKey: superAdminSession.platformApiKey ? '***SET***' : 'NOT SET',
         } : 'null');
-        
+
         if (superAdminSession) {
-          // Check if we're on legacy /portal/ route or new root route
           const isLegacyRoute = window.location.pathname.startsWith('/portal/');
           navigate(isLegacyRoute ? `/portal/${agentSlug}/dashboard` : `/${agentSlug}/dashboard`);
           return;
         }
       }
+
+      // 2) Org admin shortcut (logged-in admin in main portal)
+      console.log('[PortalLogin] Trying org admin auto-login...');
+      const adminSession = await loginAsOrgAdmin(agentSlug);
+      console.log('[PortalLogin] loginAsOrgAdmin result:', adminSession ? {
+        agentId: adminSession.agentId,
+        agentName: adminSession.agentName,
+        platform: adminSession.platform,
+        platformAgentId: adminSession.platformAgentId,
+        platformApiKey: adminSession.platformApiKey ? '***SET***' : 'NOT SET',
+      } : 'null');
+
+      if (adminSession) {
+        const isLegacyRoute = window.location.pathname.startsWith('/portal/');
+        navigate(isLegacyRoute ? `/portal/${agentSlug}/dashboard` : `/${agentSlug}/dashboard`);
+        return;
+      }
+
       setCheckingSuperAdmin(false);
     };
 
     checkSuperAdminAccess();
-  }, [agentSlug, isSuperAdmin, loginAsSuperAdmin, supabaseUser, navigate]);
+  }, [agentSlug, isSuperAdmin, loginAsSuperAdmin, loginAsOrgAdmin, supabaseUser, navigate]);
 
   useEffect(() => {
     const loadAgent = async () => {

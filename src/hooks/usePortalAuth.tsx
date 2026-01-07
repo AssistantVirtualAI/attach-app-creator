@@ -31,9 +31,13 @@ const PORTAL_SESSION_KEY = 'ava_portal_session';
 async function checkIsSuperAdmin(userId: string): Promise<boolean> {
   try {
     const { data, error } = await supabase.rpc('is_super_admin', { _user_id: userId });
-    if (error) return false;
+    if (error) {
+      console.warn('[PortalAuth] is_super_admin RPC error:', error);
+      return false;
+    }
     return data === true;
-  } catch {
+  } catch (err) {
+    console.warn('[PortalAuth] is_super_admin RPC exception:', err);
     return false;
   }
 }
@@ -127,7 +131,7 @@ export const usePortalAuth = () => {
           .eq('platform', agent.platform)
           .eq('is_active', true)
           .maybeSingle();
-        
+
         platformApiKey = integration?.api_key || null;
       }
 
@@ -157,21 +161,87 @@ export const usePortalAuth = () => {
     }
   }, [supabaseUser, isSuperAdminUser]);
 
+  // Auto-login for authenticated admin users (from main portal)
+  const loginAsOrgAdmin = useCallback(async (agentSlug: string): Promise<PortalSession | null> => {
+    if (!supabaseUser?.id) return null;
+
+    try {
+      const { data: agent, error: agentError } = await supabase
+        .from('agents')
+        .select('id, name, organization_id, platform_agent_id, platform_api_key, platform, slug')
+        .eq('slug', agentSlug)
+        .single();
+
+      if (agentError || !agent) return null;
+
+      // Verify this user belongs to the agent's organization
+      const { data: membership, error: membershipError } = await supabase
+        .from('organization_members')
+        .select('id')
+        .eq('organization_id', agent.organization_id)
+        .eq('user_id', supabaseUser.id)
+        .maybeSingle();
+
+      if (membershipError || !membership) {
+        console.warn('[PortalAuth] User is not a member of this organization');
+        return null;
+      }
+
+      // Fetch API key from organization_integrations if not on agent
+      let platformApiKey: string | null = agent.platform_api_key || null;
+      if (!platformApiKey && agent.organization_id && agent.platform) {
+        const { data: integration } = await supabase
+          .from('organization_integrations')
+          .select('api_key')
+          .eq('organization_id', agent.organization_id)
+          .eq('platform', agent.platform)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        platformApiKey = integration?.api_key || null;
+      }
+
+      const portalSession: PortalSession = {
+        clientId: 'admin',
+        clientName: 'Admin',
+        organizationId: agent.organization_id,
+        agentId: agent.id,
+        agentName: agent.name,
+        agentSlug: agent.slug || agentSlug,
+        platformAgentId: agent.platform_agent_id || undefined,
+        platformApiKey: platformApiKey || undefined,
+        platform: agent.platform || undefined,
+        role: 'admin',
+        canEditKnowledge: true,
+        canEditPrompt: true,
+        theme: 'dark',
+        language: 'fr',
+        isSuperAdmin: false,
+      };
+
+      localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(portalSession));
+      setSession(portalSession);
+      return portalSession;
+    } catch {
+      return null;
+    }
+  }, [supabaseUser]);
+
   const login = useCallback(async (agentSlug: string, loginId: string, password: string) => {
     setIsLoading(true);
     try {
       // Try client login first
       const { data, error } = await supabase.functions.invoke('client-auth', {
-        body: { 
-          action: 'login-by-agent-slug', 
+        body: {
+          action: 'login-by-agent-slug',
           agent_slug: agentSlug,
           login_id: loginId,
-          password
-        }
+          password,
+        },
       });
 
       if (error) throw error;
-      
+
       // If client login failed, try member login
       if (data?.error) {
         const { data: memberData, error: memberError } = await supabase.functions.invoke('client-auth', {
@@ -179,14 +249,14 @@ export const usePortalAuth = () => {
             action: 'login-member',
             agent_slug: agentSlug,
             login_id: loginId,
-            password
-          }
+            password,
+          },
         });
-        
+
         if (memberError) throw memberError;
         if (memberData?.error) throw new Error(memberData.error);
         if (!memberData?.session) throw new Error('Erreur de connexion');
-        
+
         const portalSession: PortalSession = {
           ...memberData.session,
           isSuperAdmin: false,
@@ -195,7 +265,7 @@ export const usePortalAuth = () => {
         setSession(portalSession);
         return portalSession;
       }
-      
+
       if (!data?.session) throw new Error('Erreur de connexion');
 
       const portalSession: PortalSession = {
@@ -252,6 +322,7 @@ export const usePortalAuth = () => {
     login,
     loginUniversal,
     loginAsSuperAdmin,
+    loginAsOrgAdmin,
     logout,
     isSuperAdmin,
     supabaseUser,
@@ -268,6 +339,7 @@ interface PortalContextType {
   login: (agentSlug: string, loginId: string, password: string) => Promise<PortalSession>;
   loginUniversal: (loginId: string, password: string) => Promise<PortalSession>;
   loginAsSuperAdmin: (agentSlug: string) => Promise<PortalSession | null>;
+  loginAsOrgAdmin: (agentSlug: string) => Promise<PortalSession | null>;
   logout: () => void;
   isSuperAdmin: () => boolean;
   supabaseUser: any;
