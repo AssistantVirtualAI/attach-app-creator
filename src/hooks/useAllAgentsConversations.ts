@@ -91,17 +91,23 @@ export const useAllAgentsConversations = (
   });
 };
 
-export const useConversationDetails = (conversationId: string | null) => {
+export const useConversationDetails = (
+  conversationId: string | null,
+  options?: { platformAgentId?: string | null }
+) => {
+  const platformAgentId = options?.platformAgentId ?? null;
+
   return useQuery({
-    queryKey: ['conversation-details', conversationId],
+    queryKey: ['conversation-details', conversationId, platformAgentId],
     queryFn: async () => {
       if (!conversationId) return null;
 
       const { data, error } = await supabase.functions.invoke('elevenlabs-all-agents-conversations', {
-        body: { 
+        body: {
           action: 'details',
-          conversationId
-        }
+          conversationId,
+          platformAgentId,
+        },
       });
 
       if (error) {
@@ -115,18 +121,25 @@ export const useConversationDetails = (conversationId: string | null) => {
   });
 };
 
-export const useConversationAudio = (conversationId: string | null, format: string = 'mp3') => {
+export const useConversationAudio = (
+  conversationId: string | null,
+  format: string = 'mp3',
+  options?: { platformAgentId?: string | null }
+) => {
+  const platformAgentId = options?.platformAgentId ?? null;
+
   return useQuery({
-    queryKey: ['conversation-audio', conversationId, format],
+    queryKey: ['conversation-audio', conversationId, format, platformAgentId],
     queryFn: async () => {
       if (!conversationId) return null;
 
       const { data, error } = await supabase.functions.invoke('elevenlabs-all-agents-conversations', {
-        body: { 
+        body: {
           action: 'audio',
           conversationId,
-          format
-        }
+          format,
+          platformAgentId,
+        },
       });
 
       // If audio isn't available yet, don't crash the UI
