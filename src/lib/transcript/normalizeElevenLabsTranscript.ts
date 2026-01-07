@@ -114,7 +114,7 @@ export function deduplicateMessages(messages: TranscriptMessage[]): TranscriptMe
 }
 
 /**
- * Normalize transcript from any ElevenLabs conversation format
+ * Normalize transcript from any conversation format (ElevenLabs, Retell, Vapi)
  * Returns a clean, deduplicated array of messages in chronological order
  */
 export function normalizeTranscript(conversationData: {
@@ -122,14 +122,26 @@ export function normalizeTranscript(conversationData: {
   user_messages?: any[] | null;
   agent_messages?: any[] | null;
   transcript?: string | any[] | null;
+  transcript_object?: any[] | null;
+  platform?: string;
 }): TranscriptMessage[] {
   if (!conversationData) return [];
 
   const meta = conversationData.metadata as any;
   let messages: TranscriptMessage[] = [];
   
+  // Priority 0: Retell's transcript_object (structured array from Retell API)
+  if (conversationData.transcript_object && Array.isArray(conversationData.transcript_object)) {
+    messages = conversationData.transcript_object
+      .map((msg: any) => ({
+        role: (msg.role === 'agent' || msg.role === 'assistant') ? 'agent' as const : 'user' as const,
+        message: (msg.message || msg.content || msg.text || '').trim(),
+        time_in_call_secs: msg.time_in_call_secs || msg.words?.[0]?.start || undefined
+      }))
+      .filter((msg: TranscriptMessage) => msg.message.length > 0);
+  }
   // Priority 1: metadata.transcript (structured, most reliable from ElevenLabs)
-  if (meta?.transcript && Array.isArray(meta.transcript)) {
+  else if (meta?.transcript && Array.isArray(meta.transcript)) {
     messages = meta.transcript
       .map((msg: any) => ({
         role: (msg.role === 'agent' || msg.role === 'assistant') ? 'agent' as const : 'user' as const,

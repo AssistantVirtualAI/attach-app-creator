@@ -213,7 +213,9 @@ export function ElevenLabsConversationModal({
       metadata: conversationDetails.metadata,
       user_messages: conversationDetails.user_messages,
       agent_messages: conversationDetails.agent_messages,
-      transcript: conversationDetails.transcript
+      transcript: conversationDetails.transcript,
+      transcript_object: conversationDetails.transcript_object,
+      platform: conversationDetails.platform,
     });
   }, [conversationDetails]);
 
