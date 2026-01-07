@@ -450,9 +450,17 @@ export function ElevenLabsConversationModal({
                           </div>
                         ))}
                         {transcriptMessages.length > 4 && (
-                          <p className="text-xs text-muted-foreground text-center">
-                            +{transcriptMessages.length - 4} messages...
-                          </p>
+                          <div className="text-center">
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="sm"
+                              className="h-auto px-0 text-xs"
+                              onClick={() => setActiveTab('transcript')}
+                            >
+                              Voir les {transcriptMessages.length} messages
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </CardContent>
