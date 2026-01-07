@@ -75,97 +75,6 @@ async function fetchElevenLabsKB(
   };
 }
 
-// Fetch Retell knowledge bases (filtered to the agent when possible)
-async function fetchRetellKB(
-  organizationId: string | undefined,
-  agentId: string | undefined
-): Promise<KnowledgeBaseResponse> {
-  // Try to fetch agent config to detect which KB(s) are linked to this agent
-  let allowedKbIds: string[] | null = null;
-  if (agentId) {
-    try {
-      const { data: agentRes, error: agentErr } = await supabase.functions.invoke('retell-proxy', {
-        body: {
-          action: 'getAgent',
-          organizationId,
-          agentId,
-        },
-      });
-      if (!agentErr) {
-        const agent = agentRes?.data || agentRes;
-        const kbIds =
-          agent?.knowledge_base_ids ||
-          agent?.knowledge_base_id ||
-          agent?.knowledge_base_ids_list ||
-          agent?.knowledge_base ||
-          null;
-
-        if (Array.isArray(kbIds)) allowedKbIds = kbIds.filter(Boolean);
-        else if (typeof kbIds === 'string' && kbIds) allowedKbIds = [kbIds];
-      }
-    } catch {
-      // ignore – we'll fall back to unfiltered list
-    }
-  }
-
-  const { data, error } = await supabase.functions.invoke('retell-proxy', {
-    body: {
-      action: 'listKnowledgeBases',
-      organizationId,
-    },
-  });
-
-  if (error) throw error;
-
-  const kbs = data?.data || [];
-  const filteredKbs = Array.isArray(allowedKbIds) && allowedKbIds.length > 0
-    ? kbs.filter((kb: any) => allowedKbIds.includes(kb.knowledge_base_id))
-    : kbs;
-
-  // Flatten KBs into items (texts/urls). If KB content isn't expanded, show KB entries.
-  const items: KnowledgeItem[] = [];
-
-  for (const kb of filteredKbs) {
-    const hasTexts = Array.isArray(kb.knowledge_base_texts) && kb.knowledge_base_texts.length > 0;
-    const hasUrls = Array.isArray(kb.knowledge_base_urls) && kb.knowledge_base_urls.length > 0;
-
-    if (hasTexts) {
-      for (const text of kb.knowledge_base_texts) {
-        items.push({
-          id: `${kb.knowledge_base_id}_text_${text.title || items.length}`,
-          name: text.title || 'Document texte',
-          type: 'text',
-          content: text.text,
-          created_at: kb.created_at,
-        });
-      }
-    }
-
-    if (hasUrls) {
-      for (const url of kb.knowledge_base_urls) {
-        items.push({
-          id: `${kb.knowledge_base_id}_url_${url}`,
-          name: url,
-          type: 'url',
-          url,
-          created_at: kb.created_at,
-        });
-      }
-    }
-
-    if (!hasTexts && !hasUrls) {
-      items.push({
-        id: kb.knowledge_base_id,
-        name: kb.knowledge_base_name || 'Base de connaissances',
-        type: 'text',
-        created_at: kb.created_at,
-      });
-    }
-  }
-
-  return { items, total: items.length };
-}
-
 // Fetch Retell knowledge bases (filtered by the LLM knowledge_base_ids when available)
 async function fetchRetellKB(
   organizationId: string | undefined,
@@ -213,7 +122,6 @@ async function fetchRetellKB(
     ? kbs.filter((kb: any) => allowedKbIds!.includes(kb.knowledge_base_id))
     : kbs;
 
-  // NOTE: listKnowledgeBases returns KBs, but not always the KB sources. We display KB entries.
   const items: KnowledgeItem[] = filteredKbs.map((kb: any) => ({
     id: kb.knowledge_base_id,
     name: kb.knowledge_base_name || 'Base de connaissances',
@@ -222,6 +130,29 @@ async function fetchRetellKB(
   }));
 
   return { items, total: items.length };
+}
+
+// Fetch VAPI knowledge base
+async function fetchVapiKB(
+  organizationId: string | undefined
+): Promise<KnowledgeBaseResponse> {
+  const { data, error } = await supabase.functions.invoke('vapi-proxy', {
+    body: { action: 'listFiles', organizationId },
+  });
+
+  if (error) throw error;
+
+  const files = data?.data || data || [];
+  return {
+    items: files.map((file: any) => ({
+      id: file.id,
+      name: file.name || file.filename || 'Fichier',
+      type: file.type || 'file',
+      url: file.url,
+      created_at: file.created_at || file.createdAt,
+    })),
+    total: files.length,
+  };
 }
 
 // Add document mutation
