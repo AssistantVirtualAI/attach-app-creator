@@ -29,10 +29,10 @@ export const AgentRealtimeAnalytics = ({ agentId, platformAgentId, apiKey }: Age
     queryFn: async () => {
       if (!platformAgentId) return null;
 
+      // API key fetched server-side
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-analytics', {
         body: { 
           agent_id: platformAgentId,
-          api_key: apiKey,
           timeframe: period === 'day' ? '24h' : period === 'week' ? '7d' : '30d'
         }
       });

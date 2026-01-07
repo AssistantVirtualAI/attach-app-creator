@@ -23,10 +23,10 @@ export const useAgentsComparison = () => {
     queryFn: async () => {
       if (!selectedOrg?.id) return [];
 
-      // Get all agents
+      // Get all agents using safe view (excludes platform_api_key)
       const { data: agents, error: agentsError } = await supabase
-        .from('agents')
-        .select('id, name, platform, platform_agent_id, platform_api_key')
+        .from('agents_safe')
+        .select('id, name, platform, platform_agent_id')
         .eq('organization_id', selectedOrg.id);
 
       if (agentsError) throw agentsError;
@@ -47,13 +47,12 @@ export const useAgentsComparison = () => {
           sentimentNeutral: 0,
         };
 
-        // For ElevenLabs agents, fetch real analytics
+        // For ElevenLabs agents, fetch real analytics (API key fetched server-side)
         if (agent.platform === 'elevenlabs' && agent.platform_agent_id) {
           try {
             const { data, error } = await supabase.functions.invoke('elevenlabs-convai-analytics', {
               body: {
                 agent_id: agent.platform_agent_id,
-                api_key: agent.platform_api_key,
                 timeframe: '30d',
               }
             });

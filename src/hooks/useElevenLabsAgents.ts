@@ -5,7 +5,6 @@ export interface ElevenLabsAgent {
   id: string;
   name: string;
   platform_agent_id: string;
-  platform_api_key: string | null;
   description: string | null;
   config: Record<string, any> | null;
 }
@@ -17,10 +16,10 @@ export const useElevenLabsAgents = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Get agents with ElevenLabs platform
+      // Get agents with ElevenLabs platform using safe view (excludes platform_api_key)
       const { data: agents, error } = await supabase
-        .from('agents')
-        .select('id, name, platform_agent_id, platform_api_key, description, config')
+        .from('agents_safe')
+        .select('id, name, platform_agent_id, description, config')
         .eq('platform', 'elevenlabs')
         .not('platform_agent_id', 'is', null);
 

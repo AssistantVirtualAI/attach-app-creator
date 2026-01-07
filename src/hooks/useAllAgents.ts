@@ -6,7 +6,6 @@ export interface AgentWithPlatform {
   name: string;
   platform: string;
   platform_agent_id: string | null;
-  platform_api_key: string | null;
   description: string | null;
   config: Record<string, any> | null;
   organization_id: string;
@@ -30,10 +29,10 @@ export const useAllAgents = () => {
         return { agents: [], fallbackApiKey: null };
       }
 
-      // Get ALL agents for the organization (no platform filter)
+      // Get ALL agents for the organization using safe view (excludes platform_api_key)
       const { data: agents, error } = await supabase
-        .from('agents')
-        .select('id, name, platform, platform_agent_id, platform_api_key, description, config, organization_id')
+        .from('agents_safe')
+        .select('id, name, platform, platform_agent_id, description, config, organization_id')
         .eq('organization_id', orgMember.organization_id)
         .not('platform_agent_id', 'is', null);
 

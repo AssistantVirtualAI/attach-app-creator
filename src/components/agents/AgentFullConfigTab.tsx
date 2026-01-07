@@ -39,7 +39,7 @@ import type { TTSSettings, ASRSettings, TurnSettings, ConversationSettings, LLMS
 interface AgentFullConfigTabProps {
   agentId: string;
   platformAgentId: string | null;
-  apiKey: string | null;
+  apiKey?: string | null;
   platform?: string;
   organizationId?: string;
 }
@@ -52,7 +52,6 @@ export function AgentFullConfigTab({ agentId, platformAgentId, apiKey, platform,
         agentId={agentId}
         platformAgentId={platformAgentId}
         organizationId={organizationId}
-        apiKey={apiKey}
       />
     );
   }

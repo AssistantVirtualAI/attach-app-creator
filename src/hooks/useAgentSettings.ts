@@ -7,7 +7,6 @@ export interface AgentSettings {
   name: string;
   description: string | null;
   platform: string;
-  platform_api_key: string | null;
   platform_agent_id: string | null;
   organization_id: string;
   client_id: string | null;
@@ -41,8 +40,9 @@ export const useAgentSettings = (agentId: string | undefined) => {
     queryFn: async () => {
       if (!agentId) return null;
       
+      // Use agents_safe view to avoid exposing platform_api_key
       const { data, error } = await supabase
-        .from('agents')
+        .from('agents_safe')
         .select('*')
         .eq('id', agentId)
         .single();
@@ -160,8 +160,8 @@ export const useAgentSettings = (agentId: string | undefined) => {
 
   const testConnectionMutation = useMutation({
     mutationFn: async () => {
-      const apiKey = integration?.api_key || agent?.platform_api_key;
-      if (!apiKey) throw new Error('Aucune clé API configurée');
+      // API key is no longer available client-side - rely on integration or server-side fetch
+      if (!integration?.api_key) throw new Error('Aucune clé API configurée');
       
       const { data, error } = await supabase.functions.invoke('test-integration', {
         body: { platform: agent?.platform }

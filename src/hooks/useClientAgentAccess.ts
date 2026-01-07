@@ -7,7 +7,7 @@ interface ClientAgentAccess {
   hasAccess: boolean;
   role: 'admin' | 'viewer' | null;
   canEdit: boolean;
-  apiKey: string | null;
+  apiKey: string | null; // TODO: Remove once all client hooks use organizationId
   agentId: string | null;
   platformAgentId: string | null;
   agentName: string | null;
@@ -37,10 +37,10 @@ export const useClientAgentAccess = (clientId: string | undefined, agentId: stri
 
       if (!assignment) return null;
 
-      // Get agent details with API key, platform_agent_id, and platform
+      // Get agent details using safe view (excludes platform_api_key)
       const { data: agent, error: agentError } = await supabase
-        .from('agents')
-        .select('id, name, platform, platform_api_key, platform_agent_id, organization_id, config')
+        .from('agents_safe')
+        .select('id, name, platform, platform_agent_id, organization_id, config')
         .eq('id', agentId)
         .single();
 
@@ -55,27 +55,9 @@ export const useClientAgentAccess = (clientId: string | undefined, agentId: stri
       // Priority: platform_agent_id > config.agent_id
       const platformAgentId = agent.platform_agent_id || config?.agent_id || null;
       
-      // Priority: platform_api_key > config.api_key > organization_integrations
-      let apiKey = agent.platform_api_key || config?.api_key || null;
-      
-      // Fallback: try to get API key from organization_integrations using the correct platform
-      if (!apiKey && agent.organization_id) {
-        const { data: integration } = await supabase
-          .from('organization_integrations')
-          .select('api_key')
-          .eq('organization_id', agent.organization_id)
-          .eq('platform', platform)
-          .eq('is_active', true)
-          .maybeSingle();
-        
-        if (integration?.api_key) {
-          apiKey = integration.api_key;
-        }
-      }
-      
       return {
         role: assignment.role as 'admin' | 'viewer',
-        apiKey: apiKey,
+        apiKey: null, // API keys now fetched server-side via organizationId
         agentId: agentId,
         platformAgentId: platformAgentId,
         agentName: agent.name,
