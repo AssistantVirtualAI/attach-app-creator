@@ -117,7 +117,10 @@ async function fetchRetellKB(
 
   if (error) throw error;
 
-  const kbs = data?.data || [];
+  // Retell returns array directly or wrapped in data
+  const rawKbs = data?.data || data || [];
+  const kbs = Array.isArray(rawKbs) ? rawKbs : [];
+  
   const filteredKbs = Array.isArray(allowedKbIds) && allowedKbIds.length > 0
     ? kbs.filter((kb: any) => allowedKbIds!.includes(kb.knowledge_base_id))
     : kbs;
@@ -249,13 +252,12 @@ export const usePortalDeleteKnowledgeDocument = () => {
           return data;
 
         case 'retell':
-          // For Retell, the ID might be a KB ID or composite
-          const kbId = documentId.split('_')[0];
+          // For Retell, the documentId IS the knowledge_base_id directly
           const { data: retellData, error: retellError } = await supabase.functions.invoke('retell-proxy', {
             body: { 
               action: 'deleteKnowledgeBase',
               organizationId,
-              knowledgeBaseId: kbId,
+              knowledgeBaseId: documentId,
             },
           });
           if (retellError) throw retellError;
@@ -310,12 +312,12 @@ export const usePortalKnowledgeDocument = (documentId: string | null) => {
           return data?.document || data;
 
         case 'retell':
-          const kbId = documentId.split('_')[0];
+          // For Retell, the documentId IS the knowledge_base_id directly
           const { data: retellData, error: retellError } = await supabase.functions.invoke('retell-proxy', {
             body: { 
               action: 'getKnowledgeBase',
               organizationId,
-              knowledgeBaseId: kbId,
+              knowledgeBaseId: documentId,
             },
           });
           if (retellError) throw retellError;

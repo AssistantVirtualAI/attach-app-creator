@@ -328,6 +328,12 @@ function getStartDate(timeframe: string): Date {
     case '90d':
       now.setDate(now.getDate() - 90);
       break;
+    case 'all':
+      // Return a very old date to include all calls
+      return new Date(0);
+    default:
+      // Default to all time if unrecognized
+      return new Date(0);
   }
   return now;
 }

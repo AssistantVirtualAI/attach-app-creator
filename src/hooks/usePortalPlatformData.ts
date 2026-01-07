@@ -133,7 +133,7 @@ export const usePortalPlatformConversations = (page: number = 1, limit: number =
   });
 };
 
-export const usePortalPlatformAnalytics = (timeframe: string = '7d') => {
+export const usePortalPlatformAnalytics = (timeframe: string = 'all') => {
   const { session } = usePortal();
 
   return useQuery({
