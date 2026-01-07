@@ -83,18 +83,35 @@ export default function PortalConversationsGeneric() {
     return 'secondary' as const;
   };
 
-  // Normalize transcript for selected conversation
-  const transcriptMessages = useMemo(() => {
-    if (!selectedDetails) return [];
-    return normalizeTranscript({
-      transcript: selectedDetails.transcript,
-      transcript_object: selectedDetails.transcript_object,
-      platform: session?.platform,
-    });
-  }, [selectedDetails, session?.platform]);
+  // Get selected conversation from list (for fallback)
+  const selectedConversation = useMemo(() => {
+    return conversations.find(c => c.conversation_id === selectedConversationId);
+  }, [conversations, selectedConversationId]);
 
-  // Get audio URL
-  const audioUrl = selectedDetails?.recording_url || null;
+  // Normalize transcript for selected conversation - with fallback to list data
+  const transcriptMessages = useMemo(() => {
+    // Try details first
+    if (selectedDetails) {
+      const msgs = normalizeTranscript({
+        transcript: selectedDetails.transcript,
+        transcript_object: selectedDetails.transcript_object,
+        platform: session?.platform,
+      });
+      if (msgs.length > 0) return msgs;
+    }
+    // Fallback: try to use transcript from the conversation list
+    if (selectedConversation) {
+      return normalizeTranscript({
+        transcript: (selectedConversation as any).transcript,
+        transcript_object: (selectedConversation as any).transcript_object,
+        platform: session?.platform,
+      });
+    }
+    return [];
+  }, [selectedDetails, selectedConversation, session?.platform]);
+
+  // Get audio URL - with fallback to list data
+  const audioUrl = selectedDetails?.recording_url || (selectedConversation as any)?.recording_url || null;
 
   // Export CSV
   const exportToCSV = () => {
@@ -229,7 +246,7 @@ export default function PortalConversationsGeneric() {
               </div>
             )}
 
-            {selectedConversationId && !detailsLoading && selectedDetails && (
+            {selectedConversationId && !detailsLoading && (
               <div className="p-4">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                   <TabsList className="grid w-full grid-cols-3 mb-4">
@@ -243,18 +260,22 @@ export default function PortalConversationsGeneric() {
                       <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
                         <p className="text-xs text-muted-foreground">Durée</p>
                         <p className="font-medium">
-                          {formatDuration(selectedDetails.end_timestamp && selectedDetails.start_timestamp 
-                            ? Math.round((selectedDetails.end_timestamp - selectedDetails.start_timestamp) / 1000)
-                            : 0)}
+                          {formatDuration(
+                            selectedDetails?.end_timestamp && selectedDetails?.start_timestamp 
+                              ? Math.round((selectedDetails.end_timestamp - selectedDetails.start_timestamp) / 1000)
+                              : selectedConversation?.call_duration_secs || 0
+                          )}
                         </p>
                       </div>
                       <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
                         <p className="text-xs text-muted-foreground">Statut</p>
-                        <p className="font-medium capitalize">{selectedDetails.call_status}</p>
+                        <p className="font-medium capitalize">
+                          {selectedDetails?.call_status || selectedConversation?.status || 'N/A'}
+                        </p>
                       </div>
                     </div>
 
-                    {selectedDetails.call_analysis?.call_summary && (
+                    {(selectedDetails?.call_analysis?.call_summary || (selectedConversation as any)?.analysis?.summary) && (
                       <Card className="bg-muted/10 border-border/30">
                         <CardHeader className="py-3">
                           <CardTitle className="text-sm flex items-center gap-2">
@@ -263,7 +284,9 @@ export default function PortalConversationsGeneric() {
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="py-2">
-                          <p className="text-sm text-muted-foreground">{selectedDetails.call_analysis.call_summary}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {selectedDetails?.call_analysis?.call_summary || (selectedConversation as any)?.analysis?.summary}
+                          </p>
                         </CardContent>
                       </Card>
                     )}

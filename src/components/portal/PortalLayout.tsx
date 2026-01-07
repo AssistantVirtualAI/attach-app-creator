@@ -24,8 +24,11 @@ import {
   Sparkles,
   User,
   ChevronUp,
-  Globe
+  Globe,
+  Sun,
+  Moon
 } from 'lucide-react';
+import { useTheme } from '@/context/ThemeContext';
 import { motion } from 'framer-motion';
 import { AvaLogo } from '@/components/shared/AvaLogo';
 import { GlowBadge } from '@/components/portal/GlowBadge';
@@ -35,6 +38,7 @@ import { useLanguage } from '@/context/LanguageContext';
 const PortalLayoutContent = () => {
   const { t } = useTranslation();
   const { language, setLanguage } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
   const { isAuthenticated, isLoading, session, logout, hasEditAccess, isSuperAdmin } = usePortal();
   const { agentSlug } = useParams();
   const navigate = useNavigate();
@@ -144,28 +148,44 @@ const PortalLayoutContent = () => {
                 </span>
               </div>
             </div>
-            {/* Language Toggle */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Globe className="w-4 h-4 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem 
-                  onClick={() => setLanguage('en')}
-                  className={language === 'en' ? 'bg-primary/10' : ''}
-                >
-                  🇬🇧 English
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => setLanguage('fr')}
-                  className={language === 'fr' ? 'bg-primary/10' : ''}
-                >
-                  🇫🇷 Français
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-1">
+              {/* Theme Toggle */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8" 
+                onClick={toggleTheme}
+                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <Moon className="w-4 h-4 text-muted-foreground" />
+                )}
+              </Button>
+              {/* Language Toggle */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Globe className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem 
+                    onClick={() => setLanguage('en')}
+                    className={language === 'en' ? 'bg-primary/10' : ''}
+                  >
+                    🇬🇧 English
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setLanguage('fr')}
+                    className={language === 'fr' ? 'bg-primary/10' : ''}
+                  >
+                    🇫🇷 Français
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
           
           {/* Agent info */}
