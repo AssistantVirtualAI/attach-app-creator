@@ -19,13 +19,14 @@ import type {
 interface UseElevenLabsParams {
   agentId: string | null;
   apiKey?: string | null;
+  organizationId?: string | null;
   enabled?: boolean;
 }
 
 // ============= Fetch Hooks =============
 
 // Fetch complete agent configuration
-export const useElevenLabsFullAgentConfig = ({ agentId, apiKey, enabled = true }: UseElevenLabsParams) => {
+export const useElevenLabsFullAgentConfig = ({ agentId, apiKey, organizationId, enabled = true }: UseElevenLabsParams) => {
   return useQuery({
     queryKey: ['elevenlabs-full-config', agentId],
     queryFn: async (): Promise<ElevenLabsFullAgentConfig | null> => {
@@ -35,7 +36,8 @@ export const useElevenLabsFullAgentConfig = ({ agentId, apiKey, enabled = true }
         body: { 
           action: 'get',
           agentId,
-          apiKey: apiKey || undefined
+          apiKey: apiKey || undefined,
+          organizationId: organizationId || undefined
         }
       });
 

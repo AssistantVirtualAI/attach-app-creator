@@ -280,26 +280,26 @@ const PortalSettings = () => {
     setShowResetModal(true);
   };
 
-  // Settings handlers
+  // Settings handlers - use organizationId (API key fetched server-side)
   const handleSaveTTS = () => {
     if (!agentId) return;
-    updateTTS.mutate({ agentId, apiKey: apiKey || undefined, ttsSettings });
+    updateTTS.mutate({ agentId, ttsSettings });
   };
 
   const handleSaveASR = () => {
     if (!agentId) return;
     const keywordsArray = keywords.split(',').map(k => k.trim()).filter(Boolean);
-    updateASR.mutate({ agentId, apiKey: apiKey || undefined, asrSettings: { ...asrSettings, keywords: keywordsArray } });
+    updateASR.mutate({ agentId, asrSettings: { ...asrSettings, keywords: keywordsArray } });
   };
 
   const handleSaveTurn = () => {
     if (!agentId) return;
-    updateTurn.mutate({ agentId, apiKey: apiKey || undefined, turnSettings });
+    updateTurn.mutate({ agentId, turnSettings });
   };
 
   const handleSavePrompt = () => {
     if (!agentId) return;
-    updatePrompt.mutate({ agentId, apiKey: apiKey || undefined, prompt, firstMessage });
+    updatePrompt.mutate({ agentId, prompt, firstMessage });
   };
 
   if (!canEdit) {
@@ -358,7 +358,7 @@ const PortalSettings = () => {
               <CardContent className="space-y-6">
                 <div>
                   <Label className="text-base font-medium mb-4 block">Sélectionner une voix</Label>
-                  <VoiceSelector selectedVoiceId={ttsSettings.voice_id} onSelect={(voice) => setTtsSettings(prev => ({ ...prev, voice_id: voice.voice_id }))} apiKey={apiKey} />
+                  <VoiceSelector selectedVoiceId={ttsSettings.voice_id} onSelect={(voice) => setTtsSettings(prev => ({ ...prev, voice_id: voice.voice_id }))} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>

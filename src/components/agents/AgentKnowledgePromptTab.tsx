@@ -47,7 +47,7 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
     id: agent.id,
     platform: agent.platform,
     platform_agent_id: agent.platform_agent_id,
-    platform_api_key: agent.platform_api_key,
+    organization_id: agent.organization_id,
     config: agent.config as Record<string, any>,
   });
 
