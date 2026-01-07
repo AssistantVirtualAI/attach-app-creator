@@ -330,13 +330,118 @@ serve(async (req) => {
 
           if (detailsResponse?.ok) {
             const detailsData = await detailsResponse.json();
+            
+            // Normalize Retell response to match expected format
+            if (config.platform === 'retell') {
+              const retellData = detailsData;
+              
+              // Format transcript from Retell's transcript_object or transcript array
+              let formattedTranscript = '';
+              const transcriptMessages: any[] = [];
+              
+              if (retellData.transcript_object && Array.isArray(retellData.transcript_object)) {
+                for (const item of retellData.transcript_object) {
+                  const role = item.role === 'agent' ? 'Agent' : 'User';
+                  const content = item.content || item.text || '';
+                  formattedTranscript += `${role}: ${content}\n`;
+                  transcriptMessages.push({
+                    role: item.role,
+                    message: content,
+                    time_in_call_secs: item.words?.[0]?.start || 0
+                  });
+                }
+              } else if (retellData.transcript && typeof retellData.transcript === 'string') {
+                formattedTranscript = retellData.transcript;
+              }
+              
+              // Calculate duration
+              const duration = retellData.end_timestamp && retellData.start_timestamp 
+                ? Math.round((retellData.end_timestamp - retellData.start_timestamp) / 1000)
+                : 0;
+              
+              const normalizedRetell = {
+                conversation_id: retellData.call_id,
+                call_id: retellData.call_id,
+                agent_name: config.name,
+                platform: 'retell',
+                start_time: retellData.start_timestamp ? new Date(retellData.start_timestamp).toISOString() : undefined,
+                end_time: retellData.end_timestamp ? new Date(retellData.end_timestamp).toISOString() : undefined,
+                call_duration_secs: duration,
+                duration: duration,
+                status: retellData.call_status || 'completed',
+                transcript: formattedTranscript,
+                transcript_object: transcriptMessages.length > 0 ? transcriptMessages : retellData.transcript_object,
+                recording_url: retellData.recording_url,
+                audio_url: retellData.recording_url,
+                metadata: {
+                  ...retellData.metadata,
+                  from_number: retellData.from_number,
+                  to_number: retellData.to_number,
+                  call_type: retellData.call_type,
+                  disconnection_reason: retellData.disconnection_reason,
+                },
+                analysis: retellData.call_analysis ? {
+                  summary: retellData.call_analysis.call_summary,
+                  satisfaction_score: retellData.call_analysis.user_sentiment === 'Positive' ? 8 : 
+                                      retellData.call_analysis.user_sentiment === 'Negative' ? 3 : 5,
+                  sentiment: retellData.call_analysis.user_sentiment?.toLowerCase(),
+                  call_successful: retellData.call_analysis.call_successful,
+                  custom_analysis: retellData.call_analysis.custom_analysis_data,
+                } : undefined,
+                // Keep original data for reference
+                _raw: retellData,
+              };
+              
+              return new Response(
+                JSON.stringify(normalizedRetell),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+            
+            // Normalize Vapi response
+            if (config.platform === 'vapi') {
+              const vapiData = detailsData;
+              const startTime = vapiData.startedAt || vapiData.createdAt;
+              const endTime = vapiData.endedAt;
+              const duration = startTime && endTime 
+                ? Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 1000) 
+                : vapiData.duration || 0;
+              
+              const normalizedVapi = {
+                conversation_id: vapiData.id,
+                agent_name: config.name,
+                platform: 'vapi',
+                start_time: startTime,
+                end_time: endTime,
+                call_duration_secs: duration,
+                duration: duration,
+                status: vapiData.status || 'completed',
+                transcript: vapiData.transcript,
+                recording_url: vapiData.recordingUrl,
+                audio_url: vapiData.recordingUrl,
+                metadata: vapiData.metadata,
+                analysis: vapiData.analysis ? {
+                  summary: vapiData.analysis.summary,
+                  satisfaction_score: vapiData.analysis.successEvaluation === 'true' ? 8 : 5,
+                  sentiment: vapiData.analysis.successEvaluation === 'true' ? 'positive' : 'neutral',
+                } : undefined,
+                _raw: vapiData,
+              };
+              
+              return new Response(
+                JSON.stringify(normalizedVapi),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+            
+            // ElevenLabs - return as-is with platform info
             return new Response(
               JSON.stringify({ ...detailsData, agent_name: config.name, platform: config.platform }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
         } catch (e) {
-          console.log(`Conversation ${conversationId} not found for agent ${config.name}`);
+          console.log(`Conversation ${conversationId} not found for agent ${config.name}:`, e);
         }
       }
       
@@ -346,8 +451,9 @@ serve(async (req) => {
       );
     }
 
-    // Handle 'audio' action (only for ElevenLabs)
+    // Handle 'audio' action (for all platforms)
     if (action === 'audio' && conversationId) {
+      // Try ElevenLabs first
       for (const config of agentConfigs.filter(c => c.platform === 'elevenlabs')) {
         const audioEndpoints = [
           `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}/audio?format=${format}`,
@@ -368,13 +474,69 @@ serve(async (req) => {
                   audio_base64: base64Audio,
                   audio_url: `data:audio/mpeg;base64,${base64Audio}`,
                   format,
+                  platform: 'elevenlabs',
                 }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
               );
             }
           } catch (e) {
-            console.log(`Audio fetch error for ${conversationId}:`, e);
+            console.log(`ElevenLabs audio fetch error for ${conversationId}:`, e);
           }
+        }
+      }
+      
+      // Try Retell - get recording_url from call details
+      for (const config of agentConfigs.filter(c => c.platform === 'retell')) {
+        try {
+          const callResponse = await fetch(
+            `https://api.retellai.com/get-call/${conversationId}`,
+            { headers: { 'Authorization': `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' } }
+          );
+          
+          if (callResponse.ok) {
+            const callData = await callResponse.json();
+            if (callData.recording_url) {
+              // Retell provides a direct URL to the recording
+              return new Response(
+                JSON.stringify({
+                  audio_url: callData.recording_url,
+                  recording_url: callData.recording_url,
+                  format: 'wav', // Retell typically uses wav
+                  platform: 'retell',
+                }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+          }
+        } catch (e) {
+          console.log(`Retell audio fetch error for ${conversationId}:`, e);
+        }
+      }
+      
+      // Try Vapi - get recordingUrl from call details
+      for (const config of agentConfigs.filter(c => c.platform === 'vapi')) {
+        try {
+          const callResponse = await fetch(
+            `https://api.vapi.ai/call/${conversationId}`,
+            { headers: { 'Authorization': `Bearer ${config.apiKey}` } }
+          );
+          
+          if (callResponse.ok) {
+            const callData = await callResponse.json();
+            if (callData.recordingUrl) {
+              return new Response(
+                JSON.stringify({
+                  audio_url: callData.recordingUrl,
+                  recording_url: callData.recordingUrl,
+                  format: 'mp3',
+                  platform: 'vapi',
+                }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+          }
+        } catch (e) {
+          console.log(`Vapi audio fetch error for ${conversationId}:`, e);
         }
       }
       

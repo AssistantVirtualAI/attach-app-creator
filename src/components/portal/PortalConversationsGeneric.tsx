@@ -1,47 +1,79 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { usePortal } from '@/hooks/usePortalAuth';
 import { usePortalPlatformConversations } from '@/hooks/usePortalPlatformData';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, MessageSquare, Search, Clock, AlertCircle, Phone } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, MessageSquare, Search, Clock, AlertCircle, Phone, Volume2, Bot, User, TrendingUp, TrendingDown, Minus, Brain, Download, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { GlowBadge } from '@/components/portal/GlowBadge';
+import { AdvancedAudioPlayer } from '@/components/audio/AdvancedAudioPlayer';
 import { format } from 'date-fns';
-import { enUS } from 'date-fns/locale';
+import { enUS, fr } from 'date-fns/locale';
 import { useTranslation } from '@/hooks/useTranslation';
+import { normalizeTranscript, transcriptToAudioPlayerFormat } from '@/lib/transcript/normalizeElevenLabsTranscript';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 export default function PortalConversationsGeneric() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const { session } = usePortal();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
 
-  const { data: conversationsData, isLoading } = usePortalPlatformConversations(1, 200);
+  const { data: conversationsData, isLoading, refetch } = usePortalPlatformConversations(1, 500);
+  
+  // Fetch conversation details when selected
+  const { data: selectedDetails, isLoading: detailsLoading } = useQuery({
+    queryKey: ['portal-conversation-details', selectedConversationId, session?.platform, session?.organizationId],
+    queryFn: async () => {
+      if (!selectedConversationId || !session?.organizationId) return null;
+      
+      if (session?.platform === 'retell') {
+        const { data, error } = await supabase.functions.invoke('retell-proxy', {
+          body: {
+            action: 'getCall',
+            callId: selectedConversationId,
+            organizationId: session.organizationId,
+          },
+        });
+        if (error) throw error;
+        return data;
+      }
+      return null;
+    },
+    enabled: !!selectedConversationId && !!session?.organizationId,
+  });
+  
   const conversations = conversationsData?.conversations || [];
 
   const filtered = conversations.filter((c) =>
     !searchTerm || c.conversation_id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const selected = filtered.find((c) => c.conversation_id === selectedConversationId) || null;
+  const dateLocale = language === 'fr' ? fr : enUS;
 
   const formatTimestamp = (unixSecs: number | undefined) => {
     if (!unixSecs || isNaN(unixSecs)) return t('common.unknownDate');
     try {
       const date = new Date(unixSecs * 1000);
       if (isNaN(date.getTime())) return t('common.unknownDate');
-      return format(date, 'PPp', { locale: enUS });
+      return format(date, 'PPp', { locale: dateLocale });
     } catch {
       return t('common.unknownDate');
     }
   };
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor((seconds || 0) / 60);
-    const secs = (seconds || 0) % 60;
+  const formatDuration = (seconds: number | undefined) => {
+    if (!seconds) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -51,6 +83,38 @@ export default function PortalConversationsGeneric() {
     return 'secondary' as const;
   };
 
+  // Normalize transcript for selected conversation
+  const transcriptMessages = useMemo(() => {
+    if (!selectedDetails) return [];
+    return normalizeTranscript({
+      transcript: selectedDetails.transcript,
+      transcript_object: selectedDetails.transcript_object,
+      platform: session?.platform,
+    });
+  }, [selectedDetails, session?.platform]);
+
+  // Get audio URL
+  const audioUrl = selectedDetails?.recording_url || null;
+
+  // Export CSV
+  const exportToCSV = () => {
+    const headers = ['ID', 'Date', 'Duration', 'Status'];
+    const rows = filtered.map(c => [
+      c.conversation_id,
+      formatTimestamp(c.start_time_unix_secs),
+      formatDuration(c.call_duration_secs),
+      c.status,
+    ]);
+    
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `conversations_${session?.platform}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    toast.success('Export CSV téléchargé');
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <PortalPageHeader
@@ -58,6 +122,18 @@ export default function PortalConversationsGeneric() {
         title={t('clientPortal.nav.conversations')}
         description={session?.agentName}
         gradient="blue-purple"
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Actualiser
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportToCSV}>
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          </div>
+        }
       />
 
       {isLoading && (
@@ -71,15 +147,13 @@ export default function PortalConversationsGeneric() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">{t('clientPortal.conversations.noConversations')}</h3>
-            <p className="text-muted-foreground text-center max-w-md">
-              {t('clientPortal.conversations.noConversationsDesc')}
-            </p>
           </CardContent>
         </Card>
       )}
 
       {!isLoading && conversations.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Conversations List */}
           <Card className="lg:col-span-1 bg-card/50 backdrop-blur-sm border-border/30">
             <CardHeader className="pb-3">
               <div className="relative">
@@ -92,7 +166,7 @@ export default function PortalConversationsGeneric() {
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {filtered.length} {t('clientPortal.conversations.conversationsOf')} {conversations.length}
+                {filtered.length} / {conversations.length} conversations
               </p>
             </CardHeader>
             <CardContent className="p-0">
@@ -103,19 +177,17 @@ export default function PortalConversationsGeneric() {
                       key={conversation.conversation_id}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.02 }}
+                      transition={{ delay: index * 0.01 }}
                       onClick={() => setSelectedConversationId(conversation.conversation_id)}
                       className={`p-4 rounded-xl cursor-pointer transition-all border ${
                         selectedConversationId === conversation.conversation_id
-                          ? 'bg-primary/10 border-primary/30 shadow-lg shadow-primary/5'
-                          : 'bg-muted/20 border-border/30 hover:bg-muted/40 hover:border-border/50'
+                          ? 'bg-primary/10 border-primary/30'
+                          : 'bg-muted/20 border-border/30 hover:bg-muted/40'
                       }`}
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                            <Phone className="h-4 w-4 text-primary" />
-                          </div>
+                          <Phone className="h-4 w-4 text-primary" />
                           <div>
                             <p className="font-medium text-sm truncate max-w-[120px]">
                               {conversation.conversation_id.slice(0, 8)}...
@@ -134,10 +206,6 @@ export default function PortalConversationsGeneric() {
                           <Clock className="h-3 w-3" />
                           {formatDuration(conversation.call_duration_secs)}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <MessageSquare className="h-3 w-3" />
-                          {conversation.message_count} msgs
-                        </span>
                       </div>
                     </motion.div>
                   ))}
@@ -146,51 +214,109 @@ export default function PortalConversationsGeneric() {
             </CardContent>
           </Card>
 
+          {/* Conversation Details */}
           <Card className="lg:col-span-2 bg-card/50 backdrop-blur-sm border-border/30">
-            {!selected && (
+            {!selectedConversationId && (
               <div className="flex flex-col items-center justify-center h-[600px] text-muted-foreground">
                 <MessageSquare className="h-12 w-12 mb-4 opacity-50" />
                 <p>{t('clientPortal.conversations.selectConversation')}</p>
               </div>
             )}
 
-            {selected && (
-              <div className="p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold">{t('clientPortal.conversations.conversation')}</h3>
-                    <p className="text-sm text-muted-foreground">{selected.conversation_id}</p>
-                  </div>
-                  <Badge variant="outline" className="capitalize">
-                    {session?.platform}
-                  </Badge>
-                </div>
+            {selectedConversationId && detailsLoading && (
+              <div className="flex items-center justify-center h-[600px]">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            )}
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 rounded-xl bg-muted/20 border border-border/30">
-                    <p className="text-xs text-muted-foreground">{t('clientPortal.conversations.date')}</p>
-                    <p className="font-medium">{formatTimestamp(selected.start_time_unix_secs)}</p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-muted/20 border border-border/30">
-                    <p className="text-xs text-muted-foreground">{t('clientPortal.conversations.duration')}</p>
-                    <p className="font-medium">{formatDuration(selected.call_duration_secs)}</p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-muted/20 border border-border/30">
-                    <p className="text-xs text-muted-foreground">{t('clientPortal.conversations.status')}</p>
-                    <p className="font-medium">{selected.status}</p>
-                  </div>
-                </div>
+            {selectedConversationId && !detailsLoading && selectedDetails && (
+              <div className="p-4">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  <TabsList className="grid w-full grid-cols-3 mb-4">
+                    <TabsTrigger value="overview">Aperçu</TabsTrigger>
+                    <TabsTrigger value="audio">Audio</TabsTrigger>
+                    <TabsTrigger value="transcript">Transcript</TabsTrigger>
+                  </TabsList>
 
-                <div className="p-4 rounded-xl bg-muted/20 border border-border/30">
-                  <p className="text-xs text-muted-foreground mb-2">{t('clientPortal.conversations.caller')}</p>
-                  <p className="font-medium">{selected.metadata?.caller_id || '—'}</p>
-                </div>
+                  <TabsContent value="overview" className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
+                        <p className="text-xs text-muted-foreground">Durée</p>
+                        <p className="font-medium">
+                          {formatDuration(selectedDetails.end_timestamp && selectedDetails.start_timestamp 
+                            ? Math.round((selectedDetails.end_timestamp - selectedDetails.start_timestamp) / 1000)
+                            : 0)}
+                        </p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
+                        <p className="text-xs text-muted-foreground">Statut</p>
+                        <p className="font-medium capitalize">{selectedDetails.call_status}</p>
+                      </div>
+                    </div>
 
-                <div className="p-4 rounded-xl bg-muted/10 border border-border/30">
-                  <p className="text-sm text-muted-foreground">
-                    Les détails (transcript/audio/analyse) ne sont pas encore disponibles pour {String(session?.platform).toUpperCase()} dans ce portail.
-                  </p>
-                </div>
+                    {selectedDetails.call_analysis?.call_summary && (
+                      <Card className="bg-muted/10 border-border/30">
+                        <CardHeader className="py-3">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <Brain className="h-4 w-4 text-primary" />
+                            Résumé
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="py-2">
+                          <p className="text-sm text-muted-foreground">{selectedDetails.call_analysis.call_summary}</p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="audio">
+                    {audioUrl ? (
+                      <AdvancedAudioPlayer
+                        audioUrl={audioUrl}
+                        conversation={{
+                          conversation_id: selectedConversationId,
+                        }}
+                        transcript={transcriptToAudioPlayerFormat(transcriptMessages)}
+                      />
+                    ) : (
+                      <Card className="p-8 text-center bg-muted/10 border-border/30">
+                        <Volume2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                        <p className="text-muted-foreground">Audio non disponible</p>
+                      </Card>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="transcript">
+                    {transcriptMessages.length > 0 ? (
+                      <ScrollArea className="h-[400px] pr-4">
+                        <div className="space-y-3">
+                          {transcriptMessages.map((msg, index) => (
+                            <div
+                              key={index}
+                              className={`flex ${msg.role === 'agent' ? 'justify-start' : 'justify-end'}`}
+                            >
+                              <div className={`max-w-[80%] p-3 rounded-lg text-sm ${
+                                msg.role === 'agent' 
+                                  ? 'bg-primary/10 border border-primary/20' 
+                                  : 'bg-muted/30 border border-border/30'
+                              }`}>
+                                <span className="text-xs font-medium block mb-1">
+                                  {msg.role === 'agent' ? '🤖 Agent' : '👤 Client'}
+                                </span>
+                                {msg.message}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <Card className="p-8 text-center bg-muted/10 border-border/30">
+                        <MessageSquare className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                        <p className="text-muted-foreground">Transcript non disponible</p>
+                      </Card>
+                    )}
+                  </TabsContent>
+                </Tabs>
               </div>
             )}
           </Card>
