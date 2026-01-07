@@ -16,13 +16,14 @@ export interface KnowledgeBaseResponse {
   total: number;
 }
 
+// SECURITY: All hooks now use organizationId for auth - API keys are fetched server-side
+
 // Generic hook that works for all platforms
 export const usePortalKnowledgeBase = () => {
   const { session } = usePortal();
   const platform = session?.platform;
   const organizationId = session?.organizationId;
   const platformAgentId = session?.platformAgentId;
-  const platformApiKey = session?.platformApiKey;
 
   return useQuery({
     queryKey: ['portal-knowledge-base', platform, platformAgentId],
@@ -31,7 +32,7 @@ export const usePortalKnowledgeBase = () => {
 
       switch (platform) {
         case 'elevenlabs':
-          return fetchElevenLabsKB(platformAgentId, platformApiKey, organizationId);
+          return fetchElevenLabsKB(platformAgentId, organizationId);
         case 'retell':
           return fetchRetellKB(organizationId, platformAgentId);
         case 'vapi':
@@ -40,21 +41,19 @@ export const usePortalKnowledgeBase = () => {
           throw new Error(`Platform ${platform} not supported`);
       }
     },
-    enabled: !!platform && (!!organizationId || !!platformApiKey),
+    enabled: !!platform && !!organizationId,
   });
 };
 
 // Fetch ElevenLabs knowledge base
 async function fetchElevenLabsKB(
   agentId: string | undefined,
-  apiKey: string | undefined,
   organizationId: string | undefined
 ): Promise<KnowledgeBaseResponse> {
   const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
     body: { 
       action: 'list',
       agentId,
-      apiKey,
       organizationId,
     },
   });
@@ -165,7 +164,6 @@ export const usePortalAddKnowledgeDocument = () => {
   const platform = session?.platform;
   const organizationId = session?.organizationId;
   const platformAgentId = session?.platformAgentId;
-  const platformApiKey = session?.platformApiKey;
 
   return useMutation({
     mutationFn: async ({ name, content, url }: { name: string; content?: string; url?: string }) => {
@@ -177,7 +175,6 @@ export const usePortalAddKnowledgeDocument = () => {
             body: { 
               action: 'add',
               agentId: platformAgentId,
-              apiKey: platformApiKey,
               organizationId,
               name,
               content,
@@ -231,7 +228,6 @@ export const usePortalDeleteKnowledgeDocument = () => {
   const platform = session?.platform;
   const organizationId = session?.organizationId;
   const platformAgentId = session?.platformAgentId;
-  const platformApiKey = session?.platformApiKey;
 
   return useMutation({
     mutationFn: async (documentId: string) => {
@@ -243,7 +239,6 @@ export const usePortalDeleteKnowledgeDocument = () => {
             body: { 
               action: 'delete',
               agentId: platformAgentId,
-              apiKey: platformApiKey,
               organizationId,
               documentId,
             },
@@ -290,7 +285,6 @@ export const usePortalKnowledgeDocument = (documentId: string | null) => {
   const platform = session?.platform;
   const organizationId = session?.organizationId;
   const platformAgentId = session?.platformAgentId;
-  const platformApiKey = session?.platformApiKey;
 
   return useQuery({
     queryKey: ['portal-knowledge-document', platform, documentId],
@@ -303,7 +297,6 @@ export const usePortalKnowledgeDocument = (documentId: string | null) => {
             body: { 
               action: 'get',
               agentId: platformAgentId,
-              apiKey: platformApiKey,
               organizationId,
               documentId,
             },
@@ -338,6 +331,6 @@ export const usePortalKnowledgeDocument = (documentId: string | null) => {
           throw new Error(`Platform ${platform} not supported`);
       }
     },
-    enabled: !!platform && !!documentId && (!!organizationId || !!platformApiKey),
+    enabled: !!platform && !!documentId && !!organizationId,
   });
 };

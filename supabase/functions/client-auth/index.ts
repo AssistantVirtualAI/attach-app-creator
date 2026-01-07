@@ -340,22 +340,8 @@ serve(async (req) => {
           );
         }
 
-        // Fetch API key from organization integration
-        let platformApiKey: string | null = null;
-        if (agent.platform && agent.organization_id) {
-          const { data: integration } = await supabase
-            .from("organization_integrations")
-            .select("api_key")
-            .eq("organization_id", agent.organization_id)
-            .eq("platform", agent.platform)
-            .eq("is_active", true)
-            .maybeSingle();
-          
-          platformApiKey = integration?.api_key || null;
-          console.log(`Found integration for platform ${agent.platform}: ${platformApiKey ? 'yes' : 'no'}`);
-        }
-
-        // Return portal session data with platform credentials
+        // SECURITY: Do NOT return API keys to clients - use server-side proxy instead
+        // Return portal session data WITHOUT platform credentials
         const session = {
           clientId: client.id,
           clientName: client.name,
@@ -364,7 +350,6 @@ serve(async (req) => {
           agentName: agent.name,
           agentSlug: agent.slug,
           platformAgentId: agent.platform_agent_id || undefined,
-          platformApiKey: platformApiKey || undefined,
           platform: agent.platform || undefined,
           role: assignment.role || "viewer",
           canEditKnowledge: assignment.can_edit_knowledge || assignment.role === "admin",
@@ -695,19 +680,7 @@ serve(async (req) => {
           );
         }
 
-        // Fetch platform API key
-        let platformApiKey: string | null = null;
-        if (agent.platform && agent.organization_id) {
-          const { data: integration } = await supabase
-            .from("organization_integrations")
-            .select("api_key")
-            .eq("organization_id", agent.organization_id)
-            .eq("platform", agent.platform)
-            .eq("is_active", true)
-            .maybeSingle();
-          platformApiKey = integration?.api_key || null;
-        }
-
+        // SECURITY: Do NOT return API keys to clients - use server-side proxy instead
         // Update last login
         await supabase
           .from("client_members")
@@ -725,7 +698,7 @@ serve(async (req) => {
           agentName: agent.name,
           agentSlug: agent.slug,
           platformAgentId: agent.platform_agent_id || undefined,
-          platformApiKey: platformApiKey || undefined,
+          platform: agent.platform || undefined,
           role: isAdminMember ? assignment.role : "viewer",
           canEditKnowledge: isAdminMember && (assignment.can_edit_knowledge || assignment.role === "admin"),
           canEditPrompt: isAdminMember && (assignment.can_edit_prompt || assignment.role === "admin"),
@@ -1220,19 +1193,7 @@ serve(async (req) => {
             .eq("agent_id", assignedAgent.id)
             .maybeSingle();
 
-          // Fetch platform API key
-          let platformApiKey: string | null = null;
-          if (assignedAgent.platform && assignedAgent.organization_id) {
-            const { data: integration } = await supabase
-              .from("organization_integrations")
-              .select("api_key")
-              .eq("organization_id", assignedAgent.organization_id)
-              .eq("platform", assignedAgent.platform)
-              .eq("is_active", true)
-              .maybeSingle();
-            platformApiKey = integration?.api_key || null;
-          }
-
+          // SECURITY: Do NOT return API keys to clients - use server-side proxy instead
           const session = {
             clientId: client.id,
             clientName: client.name,
@@ -1242,7 +1203,6 @@ serve(async (req) => {
             agentSlug: assignedAgent.slug,
             platform: assignedAgent.platform,
             platformAgentId: assignedAgent.platform_agent_id || undefined,
-            platformApiKey: platformApiKey || undefined,
             role: assignment?.role || "admin",
             canEditKnowledge: assignment?.can_edit_knowledge ?? true,
             canEditPrompt: assignment?.can_edit_prompt ?? true,
@@ -1346,19 +1306,7 @@ serve(async (req) => {
           .eq("agent_id", parentAssignedAgent.id)
           .maybeSingle();
 
-        // Fetch platform API key for member
-        let memberPlatformApiKey: string | null = null;
-        if (parentAssignedAgent.platform && parentAssignedAgent.organization_id) {
-          const { data: integration } = await supabase
-            .from("organization_integrations")
-            .select("api_key")
-            .eq("organization_id", parentAssignedAgent.organization_id)
-            .eq("platform", parentAssignedAgent.platform)
-            .eq("is_active", true)
-            .maybeSingle();
-          memberPlatformApiKey = integration?.api_key || null;
-        }
-
+        // SECURITY: Do NOT return API keys to clients - use server-side proxy instead
         // Update last login
         await supabase
           .from("client_members")
@@ -1375,7 +1323,6 @@ serve(async (req) => {
           agentSlug: parentAssignedAgent.slug,
           platform: parentAssignedAgent.platform,
           platformAgentId: parentAssignedAgent.platform_agent_id || undefined,
-          platformApiKey: memberPlatformApiKey || undefined,
           role: isAdminMember ? (memberAssignment?.role || "admin") : "viewer",
           canEditKnowledge: isAdminMember && (memberAssignment?.can_edit_knowledge ?? true),
           canEditPrompt: isAdminMember && (memberAssignment?.can_edit_prompt ?? true),

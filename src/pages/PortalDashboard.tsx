@@ -22,7 +22,7 @@ const PortalDashboard = () => {
     agentName: session.agentName,
     platform: session.platform,
     platformAgentId: session.platformAgentId,
-    platformApiKey: session.platformApiKey ? '***SET***' : 'NOT SET',
+    organizationId: session.organizationId,
   } : 'null');
   console.log('[PortalDashboard] Analytics:', { data: analytics, loading: analyticsLoading, error: analyticsError });
   console.log('[PortalDashboard] Conversations:', { data: conversationsData, loading: conversationsLoading, error: conversationsError });

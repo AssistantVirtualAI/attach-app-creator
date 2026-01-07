@@ -9,7 +9,7 @@ export interface PortalSession {
   agentName: string;
   agentSlug: string;
   platformAgentId?: string;
-  platformApiKey?: string;
+  // SECURITY: platformApiKey removed - use client-portal-proxy edge function instead
   platform?: string;
   role: 'viewer' | 'admin' | 'super_admin';
   canEditKnowledge: boolean;
@@ -110,10 +110,10 @@ export const usePortalAuth = () => {
     }
 
     try {
-      // Fetch agent details
+      // Fetch agent details (no API key - use proxy instead)
       const { data: agent, error: agentError } = await supabase
         .from('agents')
-        .select('id, name, organization_id, platform_agent_id, platform_api_key, platform, slug')
+        .select('id, name, organization_id, platform_agent_id, platform, slug')
         .eq('slug', agentSlug)
         .single();
 
@@ -121,20 +121,7 @@ export const usePortalAuth = () => {
         return null;
       }
 
-      // Fetch API key from organization_integrations if not on agent
-      let platformApiKey: string | null = agent.platform_api_key || null;
-      if (!platformApiKey && agent.organization_id && agent.platform) {
-        const { data: integration } = await supabase
-          .from('organization_integrations')
-          .select('api_key')
-          .eq('organization_id', agent.organization_id)
-          .eq('platform', agent.platform)
-          .eq('is_active', true)
-          .maybeSingle();
-
-        platformApiKey = integration?.api_key || null;
-      }
-
+      // SECURITY: Do NOT fetch API keys client-side - use client-portal-proxy edge function
       const portalSession: PortalSession = {
         clientId: 'super-admin',
         clientName: 'Super Admin',
@@ -143,7 +130,6 @@ export const usePortalAuth = () => {
         agentName: agent.name,
         agentSlug: agent.slug || agentSlug,
         platformAgentId: agent.platform_agent_id || undefined,
-        platformApiKey: platformApiKey || undefined,
         platform: agent.platform || undefined,
         role: 'super_admin',
         canEditKnowledge: true,
@@ -168,7 +154,7 @@ export const usePortalAuth = () => {
     try {
       const { data: agent, error: agentError } = await supabase
         .from('agents')
-        .select('id, name, organization_id, platform_agent_id, platform_api_key, platform, slug')
+        .select('id, name, organization_id, platform_agent_id, platform, slug')
         .eq('slug', agentSlug)
         .single();
 
@@ -187,20 +173,7 @@ export const usePortalAuth = () => {
         return null;
       }
 
-      // Fetch API key from organization_integrations if not on agent
-      let platformApiKey: string | null = agent.platform_api_key || null;
-      if (!platformApiKey && agent.organization_id && agent.platform) {
-        const { data: integration } = await supabase
-          .from('organization_integrations')
-          .select('api_key')
-          .eq('organization_id', agent.organization_id)
-          .eq('platform', agent.platform)
-          .eq('is_active', true)
-          .maybeSingle();
-
-        platformApiKey = integration?.api_key || null;
-      }
-
+      // SECURITY: Do NOT fetch API keys client-side - use client-portal-proxy edge function
       const portalSession: PortalSession = {
         clientId: 'admin',
         clientName: 'Admin',
@@ -209,7 +182,6 @@ export const usePortalAuth = () => {
         agentName: agent.name,
         agentSlug: agent.slug || agentSlug,
         platformAgentId: agent.platform_agent_id || undefined,
-        platformApiKey: platformApiKey || undefined,
         platform: agent.platform || undefined,
         role: 'admin',
         canEditKnowledge: true,

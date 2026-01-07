@@ -47,6 +47,8 @@ export interface PortalAnalytics {
   };
 }
 
+// SECURITY: All hooks now use organizationId for auth - API keys are fetched server-side
+
 // Hook for portal conversations
 export const usePortalConversations = (page: number = 1, limit: number = 50) => {
   const { session } = usePortal();
@@ -62,7 +64,6 @@ export const usePortalConversations = (page: number = 1, limit: number = 50) => 
         body: {
           action: 'list',
           agentId: session.platformAgentId,
-          apiKey: session.platformApiKey,
           organizationId: session.organizationId,
           page,
           limit,
@@ -72,7 +73,7 @@ export const usePortalConversations = (page: number = 1, limit: number = 50) => 
       if (error) throw error;
       return data as PortalConversationsResponse;
     },
-    enabled: !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
+    enabled: !!session?.platformAgentId && !!session?.organizationId,
     staleTime: 30000,
   });
 };
@@ -92,7 +93,6 @@ export const usePortalConversationDetails = (conversationId: string | null) => {
         body: {
           action: 'details',
           conversationId,
-          apiKey: session?.platformApiKey,
           organizationId: session?.organizationId,
           agentId: session?.platformAgentId,
         },
@@ -101,7 +101,7 @@ export const usePortalConversationDetails = (conversationId: string | null) => {
       if (error) throw error;
       return data as PortalConversation;
     },
-    enabled: !!conversationId && !!(session?.platformApiKey || session?.organizationId),
+    enabled: !!conversationId && !!session?.organizationId,
   });
 };
 
@@ -119,7 +119,6 @@ export const usePortalAnalytics = (timeframe: string = '7days') => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-analytics', {
         body: {
           agentId: session.platformAgentId,
-          apiKey: session.platformApiKey,
           organizationId: session.organizationId,
           timeframe,
           includeCharts: true,
@@ -129,7 +128,7 @@ export const usePortalAnalytics = (timeframe: string = '7days') => {
       if (error) throw error;
       return data as PortalAnalytics;
     },
-    enabled: !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
+    enabled: !!session?.platformAgentId && !!session?.organizationId,
     staleTime: 60000,
   });
 };
@@ -149,7 +148,6 @@ export const usePortalKnowledgeBase = () => {
         body: {
           action: 'list',
           agentId: session.platformAgentId,
-          apiKey: session.platformApiKey,
           organizationId: session.organizationId,
         },
       });
@@ -157,7 +155,7 @@ export const usePortalKnowledgeBase = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
+    enabled: !!session?.platformAgentId && !!session?.organizationId,
   });
 };
 
@@ -176,7 +174,6 @@ export const usePortalKnowledgeBaseDocument = (documentId: string | null) => {
         body: {
           action: 'get_document',
           agentId: session.platformAgentId,
-          apiKey: session.platformApiKey,
           organizationId: session.organizationId,
           documentId,
         },
@@ -185,7 +182,7 @@ export const usePortalKnowledgeBaseDocument = (documentId: string | null) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!documentId && !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
+    enabled: !!documentId && !!session?.platformAgentId && !!session?.organizationId,
   });
 };
 
@@ -196,7 +193,7 @@ export const usePortalAddKnowledgeDocument = () => {
 
   return useMutation({
     mutationFn: async ({ name, content }: { name: string; content: string }) => {
-      if (!session?.platformAgentId || !(session?.platformApiKey || session?.organizationId)) {
+      if (!session?.platformAgentId || !session?.organizationId) {
         throw new Error('Configuration manquante');
       }
 
@@ -204,7 +201,6 @@ export const usePortalAddKnowledgeDocument = () => {
         body: {
           action: 'create_text',
           agentId: session.platformAgentId,
-          apiKey: session.platformApiKey,
           organizationId: session.organizationId,
           title: name,
           content,
@@ -233,7 +229,7 @@ export const usePortalUpdateKnowledgeDocument = () => {
       content: string;
       deleteOld?: boolean;
     }) => {
-      if (!session?.platformAgentId || !(session?.platformApiKey || session?.organizationId)) {
+      if (!session?.platformAgentId || !session?.organizationId) {
         throw new Error('Configuration manquante');
       }
 
@@ -242,7 +238,6 @@ export const usePortalUpdateKnowledgeDocument = () => {
         body: {
           action: 'create_text',
           agentId: session.platformAgentId,
-          apiKey: session.platformApiKey,
           organizationId: session.organizationId,
           title: name,
           content,
@@ -259,7 +254,6 @@ export const usePortalUpdateKnowledgeDocument = () => {
             body: {
               action: 'delete',
               agentId: session.platformAgentId,
-              apiKey: session.platformApiKey,
               organizationId: session.organizationId,
               documentId,
             },
@@ -285,7 +279,7 @@ export const usePortalDeleteKnowledgeDocument = () => {
 
   return useMutation({
     mutationFn: async (documentId: string) => {
-      if (!session?.platformAgentId || !(session?.platformApiKey || session?.organizationId)) {
+      if (!session?.platformAgentId || !session?.organizationId) {
         throw new Error('Configuration manquante');
       }
 
@@ -293,7 +287,6 @@ export const usePortalDeleteKnowledgeDocument = () => {
         body: {
           action: 'delete',
           agentId: session.platformAgentId,
-          apiKey: session.platformApiKey,
           organizationId: session.organizationId,
           documentId,
         },
@@ -323,7 +316,6 @@ export const usePortalAgentConfig = () => {
         body: {
           action: 'get',
           agentId: session.platformAgentId,
-          apiKey: session.platformApiKey,
           organizationId: session.organizationId,
         },
       });
@@ -331,7 +323,7 @@ export const usePortalAgentConfig = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
+    enabled: !!session?.platformAgentId && !!session?.organizationId,
   });
 };
 
@@ -342,7 +334,7 @@ export const usePortalUpdatePrompt = () => {
 
   return useMutation({
     mutationFn: async ({ systemPrompt, firstMessage }: { systemPrompt?: string; firstMessage?: string }) => {
-      if (!session?.platformAgentId || !(session?.platformApiKey || session?.organizationId)) {
+      if (!session?.platformAgentId || !session?.organizationId) {
         throw new Error('Configuration manquante');
       }
 
@@ -350,7 +342,6 @@ export const usePortalUpdatePrompt = () => {
         body: {
           action: 'update_prompt',
           agentId: session.platformAgentId,
-          apiKey: session.platformApiKey,
           organizationId: session.organizationId,
           prompt: systemPrompt,
           firstMessage,
@@ -381,7 +372,6 @@ export const usePortalPhoneNumbers = () => {
         body: {
           action: 'list',
           agentId: session.platformAgentId,
-          apiKey: session.platformApiKey,
           organizationId: session.organizationId,
         },
       });
@@ -389,7 +379,7 @@ export const usePortalPhoneNumbers = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!session?.platformAgentId && !!(session?.platformApiKey || session?.organizationId),
+    enabled: !!session?.platformAgentId && !!session?.organizationId,
   });
 };
 
@@ -400,7 +390,7 @@ export const usePortalSyncConversations = () => {
 
   return useMutation({
     mutationFn: async () => {
-      if (!session?.platformAgentId || !(session?.platformApiKey || session?.organizationId)) {
+      if (!session?.platformAgentId || !session?.organizationId) {
         throw new Error('Configuration manquante');
       }
 
@@ -408,7 +398,6 @@ export const usePortalSyncConversations = () => {
         body: {
           action: 'sync',
           agentId: session.platformAgentId,
-          apiKey: session.platformApiKey,
           organizationId: session.organizationId,
           limit: 100,
         },
@@ -429,7 +418,7 @@ export const usePortalConversationAudio = () => {
 
   return useMutation({
     mutationFn: async ({ conversationId, format = 'mp3' }: { conversationId: string; format?: string }) => {
-      if (!(session?.platformApiKey || session?.organizationId)) {
+      if (!session?.organizationId) {
         throw new Error('Configuration manquante');
       }
 
@@ -437,7 +426,6 @@ export const usePortalConversationAudio = () => {
         body: {
           action: 'audio',
           conversationId,
-          apiKey: session?.platformApiKey,
           organizationId: session?.organizationId,
           agentId: session?.platformAgentId,
           format,
