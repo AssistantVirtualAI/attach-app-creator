@@ -91,10 +91,11 @@ serve(async (req) => {
 
         console.log(`[Retell] listCalls - Filters:`, callFilters);
 
+        // NOTE: Retell's calls endpoints are versioned under /v2
         const raw = await retellRequest(
           retellApiKey,
           'POST',
-          '/list-calls',
+          '/v2/list-calls',
           undefined,
           Object.keys(callFilters).length > 0 ? { filter_criteria: callFilters } : {}
         );
@@ -117,7 +118,7 @@ serve(async (req) => {
         result = await retellRequest(retellApiKey, 'GET', `/get-call/${params.callId}`);
         break;
       case 'createCall':
-        result = await retellRequest(retellApiKey, 'POST', '/create-phone-call', undefined, {
+        result = await retellRequest(retellApiKey, 'POST', '/v2/create-phone-call', undefined, {
           from_number: params.from,
           to_number: params.to,
           agent_id: agentId || params.retellAgentId,
@@ -213,26 +214,34 @@ serve(async (req) => {
         break;
 
       // Analytics (computed from calls)
-      case 'getAnalytics':
+      case 'getAnalytics': {
         const timeframe = params.timeframe || '7d';
         const startDate = getStartDate(timeframe);
-        
-        const callsResult = await retellRequest(retellApiKey, 'POST', '/list-calls', undefined, {
+
+        const callsResult = await retellRequest(retellApiKey, 'POST', '/v2/list-calls', undefined, {
           filter_criteria: {
             ...(agentId && { agent_id: [agentId] }),
           },
           limit: 1000,
         });
-        
-        const callsArray = Array.isArray(callsResult) ? callsResult : [];
+
+        const callsArray = Array.isArray(callsResult)
+          ? callsResult
+          : Array.isArray((callsResult as any)?.calls)
+            ? (callsResult as any).calls
+            : Array.isArray((callsResult as any)?.call_details)
+              ? (callsResult as any).call_details
+              : [];
+
         // Filter by date client-side
         const filteredCalls = callsArray.filter((call: any) => {
           const callDate = new Date(call.start_timestamp || call.created_at);
           return callDate >= startDate;
         });
-        
+
         result = computeAnalytics(filteredCalls);
         break;
+      }
 
       default:
         throw new Error(`Unsupported action: ${action}`);

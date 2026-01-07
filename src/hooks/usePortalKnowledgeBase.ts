@@ -166,28 +166,62 @@ async function fetchRetellKB(
   return { items, total: items.length };
 }
 
-// Fetch Vapi files
-async function fetchVapiKB(organizationId: string | undefined): Promise<KnowledgeBaseResponse> {
-  const { data, error } = await supabase.functions.invoke('vapi-proxy', {
-    body: { 
-      action: 'listFiles',
-      organizationId,
-    },
+// Fetch Retell knowledge bases (filtered by the LLM knowledge_base_ids when available)
+async function fetchRetellKB(
+  organizationId: string | undefined,
+  agentId: string | undefined
+): Promise<KnowledgeBaseResponse> {
+  // Discover the KB ids attached to the agent (via its Retell LLM)
+  let allowedKbIds: string[] | null = null;
+
+  if (agentId) {
+    try {
+      const { data: agentRes, error: agentErr } = await supabase.functions.invoke('retell-proxy', {
+        body: { action: 'getAgent', organizationId, agentId },
+      });
+
+      if (!agentErr) {
+        const agent = agentRes?.data || agentRes;
+        const llmId = agent?.response_engine?.llm_id;
+
+        if (llmId) {
+          const { data: llmRes, error: llmErr } = await supabase.functions.invoke('retell-proxy', {
+            body: { action: 'getLlm', organizationId, llmId },
+          });
+
+          if (!llmErr) {
+            const llm = llmRes?.data || llmRes;
+            if (Array.isArray(llm?.knowledge_base_ids)) {
+              allowedKbIds = llm.knowledge_base_ids.filter(Boolean);
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore – we'll fall back to unfiltered list
+    }
+  }
+
+  const { data, error } = await supabase.functions.invoke('retell-proxy', {
+    body: { action: 'listKnowledgeBases', organizationId },
   });
 
   if (error) throw error;
 
-  const files = data?.data || [];
-  return {
-    items: files.map((file: any) => ({
-      id: file.id,
-      name: file.name || file.originalName || 'Fichier',
-      type: 'file',
-      url: file.url,
-      created_at: file.createdAt,
-    })),
-    total: files.length,
-  };
+  const kbs = data?.data || [];
+  const filteredKbs = Array.isArray(allowedKbIds) && allowedKbIds.length > 0
+    ? kbs.filter((kb: any) => allowedKbIds!.includes(kb.knowledge_base_id))
+    : kbs;
+
+  // NOTE: listKnowledgeBases returns KBs, but not always the KB sources. We display KB entries.
+  const items: KnowledgeItem[] = filteredKbs.map((kb: any) => ({
+    id: kb.knowledge_base_id,
+    name: kb.knowledge_base_name || 'Base de connaissances',
+    type: 'text',
+    created_at: kb.created_at,
+  }));
+
+  return { items, total: items.length };
 }
 
 // Add document mutation
