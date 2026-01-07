@@ -189,8 +189,12 @@ export function ElevenLabsConversationModal({
 }: ElevenLabsConversationModalProps) {
   const [activeTab, setActiveTab] = useState('overview');
   
-  const { data: conversationDetails, isLoading: isLoadingDetails } = useConversationDetails(conversationId);
-  const { data: audioData, isLoading: isLoadingAudio } = useConversationAudio(conversationId);
+  const { data: conversationDetails, isLoading: isLoadingDetails } = useConversationDetails(conversationId, {
+    platformAgentId,
+  });
+  const { data: audioData, isLoading: isLoadingAudio } = useConversationAudio(conversationId, 'mp3', {
+    platformAgentId,
+  });
   
   // Use the enhanced analysis hook with external conversation support
   const {

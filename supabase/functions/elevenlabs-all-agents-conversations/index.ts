@@ -113,6 +113,36 @@ function normalizeVapiCall(call: any, config: any): NormalizedConversation {
   };
 }
 
+async function fetchRetellCall(apiKey: string, callId: string): Promise<any | null> {
+  const encoded = encodeURIComponent(callId);
+
+  // Primary: GET /get-call/{call_id}
+  const getRes = await fetch(`https://api.retellai.com/get-call/${encoded}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'accept': 'application/json',
+    },
+  });
+
+  if (getRes.ok) return await getRes.json();
+
+  // Fallback: some setups expect POST /get-call with a JSON body
+  const postRes = await fetch(`https://api.retellai.com/get-call`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'accept': 'application/json',
+    },
+    body: JSON.stringify({ call_id: callId }),
+  });
+
+  if (postRes.ok) return await postRes.json();
+
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -125,6 +155,7 @@ serve(async (req) => {
       filters = {} as ConversationFilters,
       action = 'list',
       conversationId,
+      platformAgentId,
       format = 'mp3'
     } = await req.json();
 
@@ -307,38 +338,39 @@ serve(async (req) => {
 
     // Handle 'details' action
     if (action === 'details' && conversationId) {
-      for (const config of agentConfigs) {
+      const candidateConfigs = platformAgentId
+        ? agentConfigs.filter((c) => c.agentId === platformAgentId)
+        : agentConfigs;
+
+      for (const config of candidateConfigs) {
         try {
-          let detailsResponse;
-          
+          let detailsData: any | null = null;
+
           if (config.platform === 'elevenlabs') {
-            detailsResponse = await fetch(
+            const res = await fetch(
               `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`,
               { headers: { 'xi-api-key': config.apiKey, 'accept': 'application/json' } }
             );
+            if (res.ok) detailsData = await res.json();
           } else if (config.platform === 'retell') {
-            detailsResponse = await fetch(
-              `https://api.retellai.com/get-call/${conversationId}`,
-              { headers: { 'Authorization': `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' } }
-            );
+            detailsData = await fetchRetellCall(config.apiKey, conversationId);
           } else if (config.platform === 'vapi') {
-            detailsResponse = await fetch(
+            const res = await fetch(
               `https://api.vapi.ai/call/${conversationId}`,
               { headers: { 'Authorization': `Bearer ${config.apiKey}` } }
             );
+            if (res.ok) detailsData = await res.json();
           }
 
-          if (detailsResponse?.ok) {
-            const detailsData = await detailsResponse.json();
-            
+          if (detailsData) {
             // Normalize Retell response to match expected format
             if (config.platform === 'retell') {
               const retellData = detailsData;
-              
+
               // Format transcript from Retell's transcript_object or transcript array
               let formattedTranscript = '';
               const transcriptMessages: any[] = [];
-              
+
               if (retellData.transcript_object && Array.isArray(retellData.transcript_object)) {
                 for (const item of retellData.transcript_object) {
                   const role = item.role === 'agent' ? 'Agent' : 'User';
@@ -347,18 +379,20 @@ serve(async (req) => {
                   transcriptMessages.push({
                     role: item.role,
                     message: content,
-                    time_in_call_secs: item.words?.[0]?.start || 0
+                    time_in_call_secs: item.words?.[0]?.start || 0,
                   });
                 }
               } else if (retellData.transcript && typeof retellData.transcript === 'string') {
                 formattedTranscript = retellData.transcript;
               }
-              
+
               // Calculate duration
-              const duration = retellData.end_timestamp && retellData.start_timestamp 
+              const duration = retellData.end_timestamp && retellData.start_timestamp
                 ? Math.round((retellData.end_timestamp - retellData.start_timestamp) / 1000)
-                : 0;
-              
+                : retellData.duration_ms
+                  ? Math.round(retellData.duration_ms / 1000)
+                  : 0;
+
               const normalizedRetell = {
                 conversation_id: retellData.call_id,
                 call_id: retellData.call_id,
@@ -382,31 +416,30 @@ serve(async (req) => {
                 },
                 analysis: retellData.call_analysis ? {
                   summary: retellData.call_analysis.call_summary,
-                  satisfaction_score: retellData.call_analysis.user_sentiment === 'Positive' ? 8 : 
+                  satisfaction_score: retellData.call_analysis.user_sentiment === 'Positive' ? 8 :
                                       retellData.call_analysis.user_sentiment === 'Negative' ? 3 : 5,
                   sentiment: retellData.call_analysis.user_sentiment?.toLowerCase(),
                   call_successful: retellData.call_analysis.call_successful,
                   custom_analysis: retellData.call_analysis.custom_analysis_data,
                 } : undefined,
-                // Keep original data for reference
                 _raw: retellData,
               };
-              
+
               return new Response(
                 JSON.stringify(normalizedRetell),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
               );
             }
-            
+
             // Normalize Vapi response
             if (config.platform === 'vapi') {
               const vapiData = detailsData;
               const startTime = vapiData.startedAt || vapiData.createdAt;
               const endTime = vapiData.endedAt;
-              const duration = startTime && endTime 
-                ? Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 1000) 
+              const duration = startTime && endTime
+                ? Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 1000)
                 : vapiData.duration || 0;
-              
+
               const normalizedVapi = {
                 conversation_id: vapiData.id,
                 agent_name: config.name,
@@ -427,13 +460,13 @@ serve(async (req) => {
                 } : undefined,
                 _raw: vapiData,
               };
-              
+
               return new Response(
                 JSON.stringify(normalizedVapi),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
               );
             }
-            
+
             // ElevenLabs - return as-is with platform info
             return new Response(
               JSON.stringify({ ...detailsData, agent_name: config.name, platform: config.platform }),
@@ -444,7 +477,7 @@ serve(async (req) => {
           console.log(`Conversation ${conversationId} not found for agent ${config.name}:`, e);
         }
       }
-      
+
       return new Response(
         JSON.stringify({ notFound: true, error: 'Conversation not found' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
