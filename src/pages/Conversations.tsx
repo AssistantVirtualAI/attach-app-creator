@@ -39,6 +39,7 @@ const Conversations = () => {
     id: string;
     agentName: string;
     platformAgentId: string;
+    transcript?: string;
   } | null>(null);
   
   const { data, isLoading } = useAllAgentsConversations(page, pageSize, filters);
@@ -229,7 +230,8 @@ const Conversations = () => {
                     onClick={() => setSelectedConversation({
                       id: conversation.conversation_id,
                       agentName: conversation.agent_name,
-                      platformAgentId: conversation.platform_agent_id
+                      platformAgentId: conversation.platform_agent_id,
+                      transcript: conversation.transcript,
                     })}
                   >
                     <CardContent className="p-4">
@@ -372,6 +374,7 @@ const Conversations = () => {
           conversationId={selectedConversation?.id || null}
           agentName={selectedConversation?.agentName}
           platformAgentId={selectedConversation?.platformAgentId}
+          initialTranscript={selectedConversation?.transcript}
         />
       </div>
     </AppLayout>

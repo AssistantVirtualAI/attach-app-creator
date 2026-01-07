@@ -178,6 +178,7 @@ interface ElevenLabsConversationModalProps {
   conversationId: string | null;
   agentName?: string;
   platformAgentId?: string;
+  initialTranscript?: string;
 }
 
 export function ElevenLabsConversationModal({ 
@@ -185,7 +186,8 @@ export function ElevenLabsConversationModal({
   onClose, 
   conversationId,
   agentName,
-  platformAgentId
+  platformAgentId,
+  initialTranscript,
 }: ElevenLabsConversationModalProps) {
   const [activeTab, setActiveTab] = useState('overview');
   
@@ -212,7 +214,12 @@ export function ElevenLabsConversationModal({
 
   // Normalize transcript using the shared utility
   const transcriptMessages = useMemo(() => {
-    if (!conversationDetails) return [];
+    // If details couldn't be fetched (Retell get-call can be restricted), fall back to the list transcript string.
+    if (!conversationDetails) {
+      if (!initialTranscript) return [];
+      return normalizeTranscript({ transcript: initialTranscript });
+    }
+
     return normalizeTranscript({
       metadata: conversationDetails.metadata,
       user_messages: conversationDetails.user_messages,
@@ -221,7 +228,7 @@ export function ElevenLabsConversationModal({
       transcript_object: conversationDetails.transcript_object,
       platform: conversationDetails.platform,
     });
-  }, [conversationDetails]);
+  }, [conversationDetails, initialTranscript]);
 
   // Auto-generate analysis if not available (no infinite retry on auth errors)
   useEffect(() => {
@@ -306,9 +313,11 @@ export function ElevenLabsConversationModal({
     return `${mins}m ${secs}s`;
   };
 
-  // Display score from AI analysis or ElevenLabs data
+  // Display score from AI analysis or ElevenLabs/Retell data
   const displayScore = analysis?.satisfaction_score ?? conversationDetails?.analysis?.satisfaction_score;
   const displaySentiment = analysis?.sentiment ?? conversationDetails?.analysis?.sentiment;
+
+  const hasAnyData = !!conversationDetails || !!initialTranscript;
 
   if (!conversationId) return null;
 
@@ -340,7 +349,7 @@ export function ElevenLabsConversationModal({
             <Skeleton className="h-40 w-full" />
             <Skeleton className="h-60 w-full" />
           </div>
-        ) : conversationDetails ? (
+        ) : hasAnyData ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden">
             <TabsList className="grid w-full grid-cols-4 glass-card">
               <TabsTrigger value="overview">Aperçu</TabsTrigger>
@@ -366,7 +375,10 @@ export function ElevenLabsConversationModal({
                     <CardContent className="p-4">
                       <p className="text-sm text-muted-foreground">Durée</p>
                       <p className="font-semibold">
-                        {formatDuration(conversationDetails.call_duration_secs || conversationDetails.metadata?.call_duration_secs)}
+                        {formatDuration(
+                          conversationDetails?.call_duration_secs ||
+                            (conversationDetails as any)?.metadata?.call_duration_secs
+                        )}
                       </p>
                     </CardContent>
                   </Card>
@@ -404,7 +416,7 @@ export function ElevenLabsConversationModal({
                 </div>
 
                 {/* Summary */}
-                {(analysis?.summary || conversationDetails.analysis?.summary) && (
+                {(analysis?.summary || conversationDetails?.analysis?.summary) && (
                   <Card className="glass-card">
                     <CardHeader className="pb-2">
                       <CardTitle className="flex items-center gap-2 text-sm">
@@ -414,7 +426,7 @@ export function ElevenLabsConversationModal({
                     </CardHeader>
                     <CardContent>
                       <p className="text-muted-foreground">
-                        {analysis?.summary || conversationDetails.analysis?.summary}
+                        {analysis?.summary || conversationDetails?.analysis?.summary}
                       </p>
                     </CardContent>
                   </Card>
