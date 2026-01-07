@@ -27,8 +27,16 @@ export default function PortalConversationsGeneric() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
 
-  const { data: conversationsData, isLoading, refetch } = usePortalPlatformConversations(1, 500);
+  const { data: conversationsData, isLoading, error: conversationsError, refetch } = usePortalPlatformConversations(1, 500);
   
+  const unwrapProxy = <T,>(res: any): T => {
+    if (res && typeof res === 'object' && 'success' in res) {
+      if (res.success === false) throw new Error(res.error || 'Proxy error');
+      return res.data as T;
+    }
+    return res as T;
+  };
+
   // Fetch conversation details when selected
   const { data: selectedDetails, isLoading: detailsLoading } = useQuery({
     queryKey: ['portal-conversation-details', selectedConversationId, session?.platform, session?.organizationId],
@@ -44,7 +52,7 @@ export default function PortalConversationsGeneric() {
           },
         });
         if (error) throw error;
-        return data;
+        return unwrapProxy<any>(data);
       }
       return null;
     },
@@ -153,13 +161,21 @@ export default function PortalConversationsGeneric() {
         }
       />
 
+      {conversationsError && (
+        <Card className="bg-card/50 backdrop-blur-sm border-border/30">
+          <CardContent className="py-6 text-sm text-muted-foreground">
+            Impossible de charger les conversations. Vérifiez l'intégration et réessayez.
+          </CardContent>
+        </Card>
+      )}
+
       {isLoading && (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       )}
 
-      {!isLoading && conversations.length === 0 && (
+      {!isLoading && !conversationsError && conversations.length === 0 && (
         <Card className="bg-card/50 backdrop-blur-sm border-border/30">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
