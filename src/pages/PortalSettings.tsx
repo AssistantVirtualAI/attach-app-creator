@@ -18,7 +18,8 @@ import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { GlowBadge } from '@/components/portal/GlowBadge';
 import { VoiceSelector } from '@/components/agents/VoiceSelector';
 import { toast } from 'sonner';
-import { 
+import { RetellFullConfigTab } from '@/components/agents/RetellFullConfigTab';
+import {
   useElevenLabsFullAgentConfig,
   useUpdateTTSSettings,
   useUpdateASRSettings,
@@ -42,7 +43,34 @@ interface Member {
 const PortalSettings = () => {
   const { session, hasEditAccess } = usePortal();
   const canEdit = hasEditAccess();
-  
+
+  // Retell: use dedicated settings (voices + LLM prompt) backed by retell-proxy
+  if (session?.platform === 'retell' && session.organizationId) {
+    if (!canEdit) {
+      return (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-24">
+          <div className="w-24 h-24 rounded-2xl bg-muted/20 flex items-center justify-center mb-6">
+            <Settings className="h-12 w-12 text-muted-foreground/30" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Accès refusé</h2>
+          <p className="text-muted-foreground">Vous n'avez pas les permissions pour accéder à cette page</p>
+        </motion.div>
+      );
+    }
+
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+        <PortalPageHeader icon={Settings} title="Configuration" description={session?.agentName} gradient="pink-orange" />
+        <RetellFullConfigTab
+          agentId={session.agentId}
+          platformAgentId={session.platformAgentId || null}
+          organizationId={session.organizationId}
+          apiKey={session.platformApiKey}
+        />
+      </motion.div>
+    );
+  }
+
   const agentId = session?.platformAgentId || session?.agentId;
   const apiKey = session?.platformApiKey || null;
 
