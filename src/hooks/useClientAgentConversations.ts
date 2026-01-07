@@ -18,16 +18,16 @@ export const useClientAgentConversations = (clientId: string) => {
   return useQuery({
     queryKey: ['client-agent-conversations', clientId],
     queryFn: async () => {
-      // Get agents assigned to this client
+      // Get agents assigned to this client (using agents_safe to exclude API keys)
       const { data: assignments, error: assignmentsError } = await supabase
         .from('client_agent_assignments')
         .select(`
-          agent:agents(
+          agent:agents_safe(
             id,
             name,
             platform,
             platform_agent_id,
-            platform_api_key
+            organization_id
           )
         `)
         .eq('client_id', clientId);
@@ -46,7 +46,7 @@ export const useClientAgentConversations = (clientId: string) => {
             body: {
               action: 'list',
               agent_id: agent.platform_agent_id,
-              api_key: agent.platform_api_key,
+              organization_id: agent.organization_id,
             }
           });
 
