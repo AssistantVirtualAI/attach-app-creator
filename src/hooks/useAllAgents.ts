@@ -80,5 +80,7 @@ export const getPlatformDisplayName = (platform: string): string => {
 
 // Helper to check if platform supports knowledge base
 export const platformSupportsKnowledgeBase = (platform: string): boolean => {
-  return platform.toLowerCase() === 'elevenlabs';
+  const p = platform.toLowerCase();
+  return p === 'elevenlabs' || p === 'retell';
 };
+
