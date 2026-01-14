@@ -74,11 +74,31 @@ async function fetchElevenLabsKB(
   };
 }
 
-// Fetch Retell knowledge bases (unfiltered)
+// Fetch Retell knowledge bases - filtered by agent's linked KBs
 async function fetchRetellKB(
   organizationId: string | undefined,
-  _agentId: string | undefined
+  agentId: string | undefined
 ): Promise<KnowledgeBaseResponse> {
+  // First get the agent config to find linked knowledge_base_ids
+  let linkedKbIds: string[] = [];
+  
+  if (agentId) {
+    try {
+      const { data: agentData, error: agentError } = await supabase.functions.invoke('retell-proxy', {
+        body: { action: 'getAgent', organizationId, agentId },
+      });
+      
+      if (!agentError && agentData?.data) {
+        // Retell agent config has knowledge_base_ids array
+        linkedKbIds = agentData.data.knowledge_base_ids || [];
+        console.log('[RetellKB] Agent linked KB IDs:', linkedKbIds);
+      }
+    } catch (e) {
+      console.warn('[RetellKB] Could not fetch agent config for KB filtering:', e);
+    }
+  }
+
+  // Fetch all knowledge bases
   const { data, error } = await supabase.functions.invoke('retell-proxy', {
     body: { action: 'listKnowledgeBases', organizationId },
   });
@@ -89,7 +109,12 @@ async function fetchRetellKB(
   const rawKbs = data?.data || data || [];
   const kbs = Array.isArray(rawKbs) ? rawKbs : [];
 
-  const items: KnowledgeItem[] = kbs.map((kb: any) => ({
+  // Filter to only show KBs linked to this agent if we have linked IDs
+  const filteredKbs = linkedKbIds.length > 0 
+    ? kbs.filter((kb: any) => linkedKbIds.includes(kb.knowledge_base_id))
+    : kbs; // If no agent or no linked IDs, show all (fallback)
+
+  const items: KnowledgeItem[] = filteredKbs.map((kb: any) => ({
     id: kb.knowledge_base_id,
     name: kb.knowledge_base_name || 'Base de connaissances',
     type: 'text',

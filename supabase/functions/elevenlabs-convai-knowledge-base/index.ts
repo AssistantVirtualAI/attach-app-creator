@@ -311,7 +311,10 @@ serve(async (req) => {
         let fetchCount = 0;
         const maxFetches = 10; // Safety limit
         
-        console.log(`[KB] Fetching knowledge base list for agent ${platformAgentId || 'all'}`);
+        // Check if this is from client portal (has organizationId context)
+        const isPortalContext = !!body.organizationId;
+        
+        console.log(`[KB] Fetching knowledge base list for agent ${platformAgentId || 'all'}, portal context: ${isPortalContext}`);
         
         do {
           const params = new URLSearchParams();
@@ -335,15 +338,10 @@ serve(async (req) => {
         
         let filteredDocs = allDocuments;
         if (platformAgentId) {
-          // STRICT FILTERING: Only include documents explicitly linked to this agent
-          // Do NOT include unassigned/orphan documents
+          // For portal context: show documents linked to this agent OR orphan documents (available to all)
+          // For strict context (admin without organizationId): only show documents linked to this agent
           filteredDocs = allDocuments.filter((doc: any) => {
             const dependentAgents = doc.dependent_agents || [];
-            
-            // Skip documents with no agents (don't show orphan docs when agent is selected)
-            if (dependentAgents.length === 0) {
-              return false;
-            }
             
             // Check if linked to this specific agent
             const isLinked = dependentAgents.some((a: any) => {
@@ -352,9 +350,15 @@ serve(async (req) => {
                                      a.platform_agent_id === platformAgentId;
               return agentIdMatches;
             });
+            
+            // In portal context, also include orphan documents (no dependent agents = available to all)
+            if (isPortalContext && dependentAgents.length === 0) {
+              return true;
+            }
+            
             return isLinked;
           });
-          console.log(`[KB] After strict filtering for agent ${platformAgentId}: ${filteredDocs.length} documents (agent-specific only)`);
+          console.log(`[KB] After filtering for agent ${platformAgentId}: ${filteredDocs.length} documents (portal context: ${isPortalContext})`);
         }
         
         const items = filteredDocs.map((doc: any) => ({
