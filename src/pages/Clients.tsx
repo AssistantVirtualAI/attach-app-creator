@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Plus, Key, Trash2, Users, Edit, MoreHorizontal, ExternalLink, Building2, TrendingUp, UserCheck, Bot, Crown, Infinity } from 'lucide-react';
+import { Plus, Key, Trash2, Users, Edit, MoreHorizontal, ExternalLink, Building2, TrendingUp, UserCheck, Bot, Crown } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -271,179 +271,208 @@ export default function Clients() {
 
   return (
     <AppLayout>
-      <div className="p-8 space-y-8">
-        {/* Premium Header */}
+      <div className="p-6 lg:p-8 space-y-8 max-w-[1800px] mx-auto">
+        {/* Premium Executive Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 border border-primary/20 p-8"
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-card/95 via-card to-card/90 border border-border/50 shadow-2xl"
         >
-          <div className="absolute inset-0 bg-grid-white/5 [mask-image:linear-gradient(0deg,transparent,black)]" />
-          <div className="relative z-10 flex items-center justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-secondary shadow-lg">
-                  <Building2 className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                    Gestion Clientèle
-                  </h1>
-                  <p className="text-muted-foreground">
-                    {isSuperAdmin ? (
-                      <span className="flex items-center gap-2">
-                        <Crown className="h-4 w-4 text-primary" />
-                        Super Admin - Clients illimités
-                        <span className="text-primary font-medium">({clientCount} actifs)</span>
-                      </span>
-                    ) : (
-                      <>Gérez vos clients et leurs agents assignés ({clientCount}/{clientsIncluded === Infinity ? '∞' : clientsIncluded})</>
-                    )}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <ClientsExport clients={clients || []} />
-            
-            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-              <DialogTrigger asChild>
-              <Button className="gap-2 shadow-lg" disabled={!canCreateClient}>
-                  <Plus className="h-4 w-4" />
-                  {canCreateClient ? 'Nouvelle clientèle' : 'Limite atteinte'}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px]">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5 text-primary" />
-                    Créer un nouveau client
-                  </DialogTitle>
-                  <DialogDescription>
-                    Le client recevra un accès limité au dashboard de l'organisation
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 mt-4">
-                  <div>
-                    <Label htmlFor="name">Nom du client *</Label>
-                  <Input
-                    id="name"
-                    value={newClient.name}
-                    onChange={(e) =>
-                      setNewClient({
-                        ...newClient,
-                        name: e.target.value,
-                        username: e.target.value
-                          .toLowerCase()
-                          .replace(/[^a-z0-9]/g, ''),
-                      })
-                    }
-                    placeholder="Ex: Jean Dupont"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={newClient.email}
-                    onChange={(e) =>
-                      setNewClient({ ...newClient, email: e.target.value })
-                    }
-                    placeholder="jean.dupont@example.com"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="username">Nom d'utilisateur *</Label>
-                  <Input
-                    id="username"
-                    value={newClient.username}
-                    onChange={(e) =>
-                      setNewClient({ ...newClient, username: e.target.value })
-                    }
-                    placeholder="jeandupont"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Utilisé pour se connecter au dashboard
-                  </p>
-                </div>
-                <div>
-                  <Label htmlFor="password">Mot de passe *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={newClient.password}
-                    onChange={(e) =>
-                      setNewClient({ ...newClient, password: e.target.value })
-                    }
-                    placeholder="Minimum 8 caractères"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="language">Langue</Label>
-                    <Select
-                      value={newClient.language}
-                      onValueChange={(value) =>
-                        setNewClient({ ...newClient, language: value })
-                      }
-                    >
-                      <SelectTrigger id="language">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="fr">Français</SelectItem>
-                        <SelectItem value="en">English</SelectItem>
-                        <SelectItem value="es">Español</SelectItem>
-                        <SelectItem value="de">Deutsch</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="theme">Thème</Label>
-                    <Select
-                      value={newClient.theme}
-                      onValueChange={(value) =>
-                        setNewClient({ ...newClient, theme: value })
-                      }
-                    >
-                      <SelectTrigger id="theme">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="light">Clair</SelectItem>
-                        <SelectItem value="dark">Sombre</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="agent">Assigner à un agent (optionnel)</Label>
-                  <Select
-                    value={newClient.assignedAgentId}
-                    onValueChange={(value) =>
-                      setNewClient({ ...newClient, assignedAgentId: value })
-                    }
+          {/* Decorative background elements */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
+          <div className="absolute -right-20 -top-20 w-80 h-80 rounded-full bg-gradient-to-br from-primary/10 to-transparent blur-3xl" />
+          <div className="absolute -left-20 -bottom-20 w-60 h-60 rounded-full bg-gradient-to-tr from-secondary/10 to-transparent blur-3xl" />
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
+          
+          <div className="relative z-10 p-8 lg:p-10">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-4">
+                  <motion.div 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                    className="relative"
                   >
-                    <SelectTrigger id="agent">
-                      <SelectValue placeholder="Choisir un agent..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {agents?.map((agent) => (
-                        <SelectItem key={agent.id} value={agent.id}>
-                          {agent.platform.toUpperCase()} - {agent.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-primary via-primary to-secondary shadow-xl shadow-primary/25">
+                      <Building2 className="h-7 w-7 text-white" />
+                    </div>
+                    <div className="absolute -inset-1 bg-gradient-to-br from-primary to-secondary opacity-30 blur-lg rounded-2xl -z-10" />
+                  </motion.div>
+                  <div>
+                    <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
+                      <span className="bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent">
+                        Gestion Clientèle
+                      </span>
+                    </h1>
+                    <p className="text-muted-foreground mt-1">
+                      {isSuperAdmin ? (
+                        <span className="flex items-center gap-2">
+                          <Crown className="h-4 w-4 text-amber-500" />
+                          <span className="text-amber-600 dark:text-amber-400 font-medium">Super Admin</span>
+                          <span className="text-muted-foreground">• Clients illimités</span>
+                          <span className="px-2 py-0.5 bg-primary/10 text-primary text-sm font-semibold rounded-full">{clientCount} actifs</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          Gérez vos clients et leurs agents assignés
+                          <span className="px-2 py-0.5 bg-primary/10 text-primary text-sm font-semibold rounded-full">
+                            {clientCount}/{String(clientsIncluded)}
+                          </span>
+                        </span>
+                      )}
+                    </p>
+                  </div>
                 </div>
-                <Button onClick={handleCreate} className="w-full">
-                  Créer le client
-                </Button>
               </div>
-            </DialogContent>
-          </Dialog>
+
+              <div className="flex items-center gap-3">
+                <ClientsExport clients={clients || []} />
+              
+                <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      className="gap-2 h-12 px-6 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 shadow-lg shadow-primary/25 rounded-xl font-semibold transition-all duration-300 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5" 
+                      disabled={!canCreateClient}
+                    >
+                      <Plus className="h-5 w-5" />
+                      {canCreateClient ? 'Nouvelle clientèle' : 'Limite atteinte'}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[600px] rounded-2xl">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2 text-xl">
+                        <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20">
+                          <Users className="h-5 w-5 text-primary" />
+                        </div>
+                        Créer un nouveau client
+                      </DialogTitle>
+                      <DialogDescription>
+                        Le client recevra un accès limité au dashboard de l'organisation
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div>
+                        <Label htmlFor="name">Nom du client *</Label>
+                        <Input
+                          id="name"
+                          value={newClient.name}
+                          onChange={(e) =>
+                            setNewClient({
+                              ...newClient,
+                              name: e.target.value,
+                              username: e.target.value
+                                .toLowerCase()
+                                .replace(/[^a-z0-9]/g, ''),
+                            })
+                          }
+                          placeholder="Ex: Jean Dupont"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="email">Email *</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={newClient.email}
+                          onChange={(e) =>
+                            setNewClient({ ...newClient, email: e.target.value })
+                          }
+                          placeholder="jean.dupont@example.com"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="username">Nom d'utilisateur *</Label>
+                        <Input
+                          id="username"
+                          value={newClient.username}
+                          onChange={(e) =>
+                            setNewClient({ ...newClient, username: e.target.value })
+                          }
+                          placeholder="jeandupont"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Utilisé pour se connecter au dashboard
+                        </p>
+                      </div>
+                      <div>
+                        <Label htmlFor="password">Mot de passe *</Label>
+                        <Input
+                          id="password"
+                          type="password"
+                          value={newClient.password}
+                          onChange={(e) =>
+                            setNewClient({ ...newClient, password: e.target.value })
+                          }
+                          placeholder="Minimum 8 caractères"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="language">Langue</Label>
+                          <Select
+                            value={newClient.language}
+                            onValueChange={(value) =>
+                              setNewClient({ ...newClient, language: value })
+                            }
+                          >
+                            <SelectTrigger id="language">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="fr">Français</SelectItem>
+                              <SelectItem value="en">English</SelectItem>
+                              <SelectItem value="es">Español</SelectItem>
+                              <SelectItem value="de">Deutsch</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="theme">Thème</Label>
+                          <Select
+                            value={newClient.theme}
+                            onValueChange={(value) =>
+                              setNewClient({ ...newClient, theme: value })
+                            }
+                          >
+                            <SelectTrigger id="theme">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="light">Clair</SelectItem>
+                              <SelectItem value="dark">Sombre</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="agent">Assigner à un agent (optionnel)</Label>
+                        <Select
+                          value={newClient.assignedAgentId}
+                          onValueChange={(value) =>
+                            setNewClient({ ...newClient, assignedAgentId: value })
+                          }
+                        >
+                          <SelectTrigger id="agent">
+                            <SelectValue placeholder="Choisir un agent..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {agents?.map((agent) => (
+                              <SelectItem key={agent.id} value={agent.id}>
+                                {agent.platform.toUpperCase()} - {agent.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <Button onClick={handleCreate} className="w-full">
+                        Créer le client
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
           </div>
         </motion.div>
@@ -458,32 +487,43 @@ export default function Clients() {
         {/* Dashboard avec statistiques */}
         <ClientsDashboard />
 
-        <div className="glass-card p-6 space-y-6">
-          {/* Filters */}
-          <ClientFilters
-            search={search}
-            onSearchChange={setSearch}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            sortField={sortField}
-            sortOrder={sortOrder}
-            onSortChange={handleSortChange}
-            totalCount={clients?.length || 0}
-            filteredCount={filteredClients.length}
-          />
+        {/* Premium Table Section */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-card/95 via-card to-card/90 border border-border/50 shadow-xl p-6 space-y-6"
+        >
+          {/* Background decorations */}
+          <div className="absolute -right-10 -bottom-10 w-40 h-40 rounded-full bg-gradient-to-br from-primary/5 to-transparent blur-2xl" />
+          
+          <div className="relative z-10">
+            {/* Filters */}
+            <ClientFilters
+              search={search}
+              onSearchChange={setSearch}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+              sortField={sortField}
+              sortOrder={sortOrder}
+              onSortChange={handleSortChange}
+              totalCount={clients?.length || 0}
+              filteredCount={filteredClients.length}
+            />
+          </div>
 
           {/* Table */}
-          <div className="border rounded-lg overflow-hidden">
+          <div className="relative z-10 border border-border/30 rounded-xl overflow-hidden bg-card/50 backdrop-blur-sm shadow-inner">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Login ID</TableHead>
-                  <TableHead>Agent assigné</TableHead>
-                  <TableHead>Agent ID ElevenLabs</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Date de création</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow className="bg-muted/30 hover:bg-muted/30 border-b border-border/30">
+                  <TableHead className="font-semibold text-foreground/80">Client</TableHead>
+                  <TableHead className="font-semibold text-foreground/80">Login ID</TableHead>
+                  <TableHead className="font-semibold text-foreground/80">Agent assigné</TableHead>
+                  <TableHead className="font-semibold text-foreground/80">Agent ID ElevenLabs</TableHead>
+                  <TableHead className="font-semibold text-foreground/80">Statut</TableHead>
+                  <TableHead className="font-semibold text-foreground/80">Date de création</TableHead>
+                  <TableHead className="text-right font-semibold text-foreground/80">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -644,7 +684,7 @@ export default function Clients() {
               </TableBody>
             </Table>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* Client Members Modal */}
