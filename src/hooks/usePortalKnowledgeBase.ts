@@ -111,10 +111,13 @@ async function fetchRetellKB(
   const rawKbs = data?.data || data || [];
   const kbs = Array.isArray(rawKbs) ? rawKbs : [];
 
-  // Filter to only show KBs linked to this agent if we have linked IDs
+  // Filter to only show KBs linked to this agent
+  // If agent has no linked KBs, show empty list (not all org KBs)
   const filteredKbs = linkedKbIds.length > 0 
     ? kbs.filter((kb: any) => linkedKbIds.includes(kb.knowledge_base_id))
-    : kbs; // If no agent or no linked IDs, show all (fallback)
+    : []; // No linked KBs = empty list (not a fallback to all)
+
+  console.log('[RetellKB] Filtered KBs:', filteredKbs.length, 'out of', kbs.length);
 
   const items: KnowledgeItem[] = filteredKbs.map((kb: any) => ({
     id: kb.knowledge_base_id,
