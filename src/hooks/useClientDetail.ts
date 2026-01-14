@@ -28,7 +28,7 @@ export const useClientDetail = (clientId: string | undefined) => {
       if (!clientId) return null;
       
       const { data, error } = await supabase
-        .from('clients')
+        .from('clients_safe')
         .select('*')
         .eq('id', clientId)
         .single();
@@ -37,7 +37,7 @@ export const useClientDetail = (clientId: string | undefined) => {
       
       return {
         ...data,
-        hasPassword: !!data.password_hash
+        hasPassword: data.has_password || false
       } as ClientDetail & { hasPassword: boolean };
     },
     enabled: !!clientId,
@@ -49,7 +49,7 @@ export const useClientDetail = (clientId: string | undefined) => {
       if (!clientId) return [];
       
       const { data, error } = await supabase
-        .from('client_members')
+        .from('client_members_safe')
         .select('*')
         .eq('client_id', clientId);
 

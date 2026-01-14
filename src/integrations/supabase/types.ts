@@ -377,10 +377,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "agents_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "agents_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
             referencedColumns: ["id"]
           },
           {
@@ -586,6 +600,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
             referencedColumns: ["id"]
           },
           {
@@ -863,6 +884,13 @@ export type Database = {
             referencedRelation: "clients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "client_agent_assignments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       client_members: {
@@ -914,6 +942,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_members_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
             referencedColumns: ["id"]
           },
         ]
@@ -1159,6 +1194,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
             referencedColumns: ["id"]
           },
           {
@@ -1464,6 +1506,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
             referencedColumns: ["id"]
           },
           {
@@ -2426,10 +2475,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "agents_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "agents_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
             referencedColumns: ["id"]
           },
           {
@@ -2478,6 +2541,145 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "calendar_integrations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_members_safe: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          email: string | null
+          has_password: boolean | null
+          id: string | null
+          last_login_at: string | null
+          login_id: string | null
+          name: string | null
+          role: string | null
+          status: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          email?: string | null
+          has_password?: never
+          id?: string | null
+          last_login_at?: string | null
+          login_id?: string | null
+          name?: string | null
+          role?: string | null
+          status?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          email?: string | null
+          has_password?: never
+          id?: string | null
+          last_login_at?: string | null
+          login_id?: string | null
+          name?: string | null
+          role?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_members_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_members_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients_safe: {
+        Row: {
+          access_controls: Json | null
+          assigned_agent_id: string | null
+          assigned_agents: number | null
+          created_at: string | null
+          created_by: string | null
+          custom_css: string | null
+          email: string | null
+          has_password: boolean | null
+          id: string | null
+          language: string | null
+          login_id: string | null
+          name: string | null
+          organization_id: string | null
+          status: string | null
+          theme: string | null
+          updated_at: string | null
+          user_id: string | null
+          username: string | null
+        }
+        Insert: {
+          access_controls?: Json | null
+          assigned_agent_id?: string | null
+          assigned_agents?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          custom_css?: string | null
+          email?: string | null
+          has_password?: never
+          id?: string | null
+          language?: string | null
+          login_id?: string | null
+          name?: string | null
+          organization_id?: string | null
+          status?: string | null
+          theme?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          username?: string | null
+        }
+        Update: {
+          access_controls?: Json | null
+          assigned_agent_id?: string | null
+          assigned_agents?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          custom_css?: string | null
+          email?: string | null
+          has_password?: never
+          id?: string | null
+          language?: string | null
+          login_id?: string | null
+          name?: string | null
+          organization_id?: string | null
+          status?: string | null
+          theme?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_assigned_agent_id_fkey"
+            columns: ["assigned_agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_assigned_agent_id_fkey"
+            columns: ["assigned_agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
