@@ -338,8 +338,7 @@ serve(async (req) => {
         
         let filteredDocs = allDocuments;
         if (platformAgentId) {
-          // For portal context: show documents linked to this agent OR orphan documents (available to all)
-          // For strict context (admin without organizationId): only show documents linked to this agent
+          // Strict filtering: only show documents explicitly linked to this agent
           filteredDocs = allDocuments.filter((doc: any) => {
             const dependentAgents = doc.dependent_agents || [];
             
@@ -351,14 +350,9 @@ serve(async (req) => {
               return agentIdMatches;
             });
             
-            // In portal context, also include orphan documents (no dependent agents = available to all)
-            if (isPortalContext && dependentAgents.length === 0) {
-              return true;
-            }
-            
             return isLinked;
           });
-          console.log(`[KB] After filtering for agent ${platformAgentId}: ${filteredDocs.length} documents (portal context: ${isPortalContext})`);
+          console.log(`[KB] After strict filtering for agent ${platformAgentId}: ${filteredDocs.length} documents`);
         }
         
         const items = filteredDocs.map((doc: any) => ({
