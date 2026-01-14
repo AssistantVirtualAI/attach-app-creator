@@ -167,6 +167,53 @@ serve(async (req) => {
         if (!params.fileId) throw new Error('fileId is required');
         result = await vapiRequest(vapiApiKey, 'DELETE', `/file/${params.fileId}`);
         break;
+
+      case 'getFileContent': {
+        // Fetch file metadata to get URL, then download content
+        if (!params.fileId) throw new Error('fileId is required');
+        
+        const fileData = await vapiRequest(vapiApiKey, 'GET', `/file/${params.fileId}`);
+        const fileUrl = params.fileUrl || fileData?.url;
+        
+        if (!fileUrl) {
+          result = { content: null, contentUnavailableReason: 'no_url' };
+          break;
+        }
+        
+        try {
+          console.log(`[Vapi] Fetching file content from: ${fileUrl}`);
+          const contentResponse = await fetch(fileUrl);
+          
+          if (!contentResponse.ok) {
+            result = { content: null, contentUnavailableReason: 'fetch_failed' };
+            break;
+          }
+          
+          const contentType = contentResponse.headers.get('content-type') || '';
+          console.log(`[Vapi] File content-type: ${contentType}`);
+          
+          // Only extract text for text-based content types
+          if (contentType.includes('text/') || 
+              contentType.includes('application/json') || 
+              contentType.includes('application/xml') ||
+              contentType.includes('application/javascript')) {
+            const textContent = await contentResponse.text();
+            // Limit content size for safety
+            const truncatedContent = textContent.slice(0, 100000);
+            result = { 
+              content: truncatedContent, 
+              contentType,
+              truncated: textContent.length > 100000 
+            };
+          } else {
+            result = { content: null, contentUnavailableReason: 'binary_content', contentType };
+          }
+        } catch (fetchError) {
+          console.error('[Vapi] Error fetching file content:', fetchError);
+          result = { content: null, contentUnavailableReason: 'fetch_exception' };
+        }
+        break;
+      }
       
       // Knowledge Bases
       case 'listKnowledgeBases':
