@@ -553,29 +553,38 @@ export const usePortalKnowledgeDocument = (documentId: string | null) => {
           if (retellError) throw retellError;
 
           const kb = retellData?.data;
-          const texts = Array.isArray(kb?.knowledge_base_texts) ? kb.knowledge_base_texts : [];
-          const urls = Array.isArray(kb?.knowledge_base_urls) ? kb.knowledge_base_urls : [];
+          
+          // Parse knowledge_base_sources (new Retell API structure)
+          const sources = kb?.knowledge_base_sources || [];
+          const documents = sources.filter((s: any) => s.type === 'document');
+          const urls = sources.filter((s: any) => s.type === 'url');
 
           const contentParts: string[] = [];
-          if (texts.length > 0) {
+          
+          // Add documents (files)
+          if (documents.length > 0) {
             contentParts.push(
-              ...texts.map((t: any, idx: number) => {
-                const title = t?.title || `Document ${idx + 1}`;
-                const text = t?.text || '';
-                return `# ${title}\n\n${text}`.trim();
-              })
+              '## Documents\n' +
+              documents.map((doc: any) => 
+                `- **${doc.filename || 'Document'}**${doc.file_url ? ` ([Télécharger](${doc.file_url}))` : ''}`
+              ).join('\n')
             );
           }
+          
+          // Add URLs
           if (urls.length > 0) {
-            contentParts.push(`Liens:\n${urls.map((u: string) => `- ${u}`).join('\n')}`);
+            contentParts.push(
+              '## URLs\n' +
+              urls.map((u: any) => `- ${u.url}`).join('\n')
+            );
           }
 
           return {
             id: kb?.knowledge_base_id || documentId,
             name: kb?.knowledge_base_name || 'Base de connaissances',
             type: 'text',
-            content: contentParts.join('\n\n---\n\n') || undefined,
-            url: urls[0],
+            content: contentParts.join('\n\n') || 'Aucun contenu disponible',
+            url: urls.length > 0 ? urls[0].url : undefined,
             created_at: kb?.created_at,
           };
         }
