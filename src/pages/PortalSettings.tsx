@@ -358,7 +358,11 @@ const PortalSettings = () => {
               <CardContent className="space-y-6">
                 <div>
                   <Label className="text-base font-medium mb-4 block">Sélectionner une voix</Label>
-                  <VoiceSelector selectedVoiceId={ttsSettings.voice_id} onSelect={(voice) => setTtsSettings(prev => ({ ...prev, voice_id: voice.voice_id }))} />
+                  <VoiceSelector 
+                    selectedVoiceId={ttsSettings.voice_id} 
+                    onSelect={(voice) => setTtsSettings(prev => ({ ...prev, voice_id: voice.voice_id }))} 
+                    organizationId={session?.organizationId}
+                  />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>

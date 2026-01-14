@@ -13,10 +13,14 @@ interface VoiceSelectorProps {
   selectedVoiceId: string | null;
   onSelect: (voice: ElevenLabsVoice) => void;
   apiKey?: string | null;
+  organizationId?: string | null;
 }
 
-export function VoiceSelector({ selectedVoiceId, onSelect, apiKey }: VoiceSelectorProps) {
-  const { data: voices, isLoading } = useElevenLabsVoices(apiKey);
+export function VoiceSelector({ selectedVoiceId, onSelect, apiKey, organizationId }: VoiceSelectorProps) {
+  // Use organizationId if provided (for portal), otherwise use apiKey
+  const effectiveId = organizationId || apiKey;
+  const isOrganizationId = !!organizationId;
+  const { data: voices, isLoading } = useElevenLabsVoices(effectiveId, isOrganizationId);
   const [search, setSearch] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);

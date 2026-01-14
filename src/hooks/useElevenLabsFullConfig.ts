@@ -53,17 +53,20 @@ export const useElevenLabsFullAgentConfig = ({ agentId, apiKey, organizationId, 
   });
 };
 
-// Fetch available voices
-export const useElevenLabsVoices = (apiKey?: string | null) => {
+// Fetch available voices - supports both apiKey and organizationId
+export const useElevenLabsVoices = (apiKeyOrOrgId?: string | null, isOrganizationId = false) => {
   return useQuery({
-    queryKey: ['elevenlabs-voices', apiKey ? 'with-key' : 'no-key'],
+    queryKey: ['elevenlabs-voices', apiKeyOrOrgId ? (isOrganizationId ? 'org' : 'key') : 'none', apiKeyOrOrgId],
     queryFn: async (): Promise<ElevenLabsVoice[]> => {
-      const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
-        body: { 
-          action: 'get_voices',
-          apiKey: apiKey || undefined
-        }
-      });
+      const body: any = { action: 'get_voices' };
+      
+      if (isOrganizationId) {
+        body.organizationId = apiKeyOrOrgId;
+      } else {
+        body.apiKey = apiKeyOrOrgId || undefined;
+      }
+      
+      const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', { body });
 
       if (error) throw error;
       if (data?.requiresSetup) {
@@ -72,7 +75,7 @@ export const useElevenLabsVoices = (apiKey?: string | null) => {
       }
       return data?.voices || [];
     },
-    enabled: !!apiKey, // Only fetch when API key is available
+    enabled: !!apiKeyOrOrgId, // Only fetch when API key or organizationId is available
     staleTime: 300000, // Cache for 5 minutes
   });
 };
