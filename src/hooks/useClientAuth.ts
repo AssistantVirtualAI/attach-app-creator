@@ -64,10 +64,22 @@ export const useClientAuth = () => {
   const loginAsAdmin = useCallback(async (clientId: string) => {
     setIsLoading(true);
     try {
+      // Get the current Supabase session to include auth token
+      const { data: authData } = await supabase.auth.getSession();
+      const accessToken = authData?.session?.access_token;
+
+      if (!accessToken) {
+        console.log('No admin session found, cannot login as admin');
+        return null;
+      }
+
       const { data, error } = await supabase.functions.invoke('client-auth', {
         body: {
           action: 'admin-login',
           client_id: clientId,
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
         },
       });
 
