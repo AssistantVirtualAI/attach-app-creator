@@ -86,10 +86,10 @@ export default function Clients() {
       if (!selectedOrgId) return [];
       
       const { data, error } = await supabase
-        .from('clients')
+        .from('clients_safe')
         .select(`
           *,
-          assigned_agent:agents!clients_assigned_agent_id_fkey(id, name, platform, platform_agent_id, config, slug)
+          assigned_agent:agents_safe!clients_assigned_agent_id_fkey(id, name, platform, platform_agent_id, config)
         `)
         .eq('organization_id', selectedOrgId);
 

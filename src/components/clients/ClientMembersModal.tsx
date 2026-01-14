@@ -71,7 +71,7 @@ export const ClientMembersModal = ({
     queryKey: ["client-members", clientId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("client_members")
+        .from("client_members_safe")
         .select("*")
         .eq("client_id", clientId)
         .order("created_at", { ascending: false });
