@@ -62,13 +62,12 @@ const PortalKnowledge = () => {
 
   const { data: documentData, isLoading: isLoadingDocument } = usePortalKnowledgeDocument(viewDocumentId);
 
-  // Only admins can edit
-  const isAdmin =
+  // Permissions: modification uniquement si l'utilisateur a explicitement le droit
+  const canEdit =
     session?.role === 'super_admin' ||
     session?.role === 'admin' ||
-    session?.memberType === 'client' ||
+    session?.canEditKnowledge === true ||
     session?.memberRole === 'admin';
-  const canEdit = isAdmin;
 
   // Read from the unified knowledge base response
   const items = kbData?.items || [];
@@ -329,11 +328,9 @@ const PortalKnowledge = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              {documentData?.name || 'Document'}
+              {documentData?.name || documentData?.title || 'Document'}
             </DialogTitle>
-            <DialogDescription>
-              Contenu complet du document
-            </DialogDescription>
+            <DialogDescription>Contenu complet du document</DialogDescription>
           </DialogHeader>
           
           <ScrollArea className="max-h-[60vh]">
