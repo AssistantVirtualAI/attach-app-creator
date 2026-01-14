@@ -73,7 +73,8 @@ const PortalLoginContent = () => {
 
         if (superAdminSession) {
           const isLegacyRoute = window.location.pathname.startsWith('/portal/');
-          navigate(isLegacyRoute ? `/portal/${agentSlug}/dashboard` : `/${agentSlug}/dashboard`);
+          const canonical = superAdminSession.agentSlug;
+          navigate(isLegacyRoute ? `/portal/${canonical}/dashboard` : `/${canonical}/dashboard`);
           return;
         }
       }
@@ -90,7 +91,8 @@ const PortalLoginContent = () => {
 
       if (adminSession) {
         const isLegacyRoute = window.location.pathname.startsWith('/portal/');
-        navigate(isLegacyRoute ? `/portal/${agentSlug}/dashboard` : `/${agentSlug}/dashboard`);
+        const canonical = adminSession.agentSlug;
+        navigate(isLegacyRoute ? `/portal/${canonical}/dashboard` : `/${canonical}/dashboard`);
         return;
       }
 
@@ -104,11 +106,11 @@ const PortalLoginContent = () => {
     const loadAgent = async () => {
       if (!agentSlug || agentSlug === ':agentSlug') return;
       
-      const { data, error } = await supabase
-        .from('agents')
-        .select('name, avatar_url')
-        .eq('slug', agentSlug)
-        .maybeSingle();
+       const { data, error } = await supabase
+         .from('agents')
+         .select('name, avatar_url')
+         .or(`slug.eq.${agentSlug},id.eq.${agentSlug}`)
+         .maybeSingle();
 
       if (error) {
         console.error('Error loading agent:', error);
@@ -141,9 +143,10 @@ const PortalLoginContent = () => {
     }
 
     try {
-      await login(agentSlug, loginId, password);
+      const portalSession = await login(agentSlug, loginId, password);
       const isLegacyRoute = window.location.pathname.startsWith('/portal/');
-      navigate(isLegacyRoute ? `/portal/${agentSlug}/dashboard` : `/${agentSlug}/dashboard`);
+      const canonical = portalSession.agentSlug;
+      navigate(isLegacyRoute ? `/portal/${canonical}/dashboard` : `/${canonical}/dashboard`);
     } catch (err: any) {
       setError(err.message || 'Erreur de connexion');
     }

@@ -114,8 +114,8 @@ export const usePortalAuth = () => {
       const { data: agent, error: agentError } = await supabase
         .from('agents')
         .select('id, name, organization_id, platform_agent_id, platform, slug')
-        .eq('slug', agentSlug)
-        .single();
+        .or(`slug.eq.${agentSlug},id.eq.${agentSlug}`)
+        .maybeSingle();
 
       if (agentError || !agent) {
         return null;
@@ -155,8 +155,8 @@ export const usePortalAuth = () => {
       const { data: agent, error: agentError } = await supabase
         .from('agents')
         .select('id, name, organization_id, platform_agent_id, platform, slug')
-        .eq('slug', agentSlug)
-        .single();
+        .or(`slug.eq.${agentSlug},id.eq.${agentSlug}`)
+        .maybeSingle();
 
       if (agentError || !agent) return null;
 
