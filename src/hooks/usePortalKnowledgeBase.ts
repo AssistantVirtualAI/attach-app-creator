@@ -74,42 +74,11 @@ async function fetchElevenLabsKB(
   };
 }
 
-// Fetch Retell knowledge bases (filtered by the LLM knowledge_base_ids when available)
+// Fetch Retell knowledge bases (unfiltered)
 async function fetchRetellKB(
   organizationId: string | undefined,
-  agentId: string | undefined
+  _agentId: string | undefined
 ): Promise<KnowledgeBaseResponse> {
-  // Discover the KB ids attached to the agent (via its Retell LLM)
-  let allowedKbIds: string[] | null = null;
-
-  if (agentId) {
-    try {
-      const { data: agentRes, error: agentErr } = await supabase.functions.invoke('retell-proxy', {
-        body: { action: 'getAgent', organizationId, agentId },
-      });
-
-      if (!agentErr) {
-        const agent = agentRes?.data || agentRes;
-        const llmId = agent?.response_engine?.llm_id;
-
-        if (llmId) {
-          const { data: llmRes, error: llmErr } = await supabase.functions.invoke('retell-proxy', {
-            body: { action: 'getLlm', organizationId, llmId },
-          });
-
-          if (!llmErr) {
-            const llm = llmRes?.data || llmRes;
-            if (Array.isArray(llm?.knowledge_base_ids)) {
-              allowedKbIds = llm.knowledge_base_ids.filter(Boolean);
-            }
-          }
-        }
-      }
-    } catch {
-      // ignore – we'll fall back to unfiltered list
-    }
-  }
-
   const { data, error } = await supabase.functions.invoke('retell-proxy', {
     body: { action: 'listKnowledgeBases', organizationId },
   });
@@ -119,12 +88,8 @@ async function fetchRetellKB(
   // Retell returns array directly or wrapped in data
   const rawKbs = data?.data || data || [];
   const kbs = Array.isArray(rawKbs) ? rawKbs : [];
-  
-  const filteredKbs = Array.isArray(allowedKbIds) && allowedKbIds.length > 0
-    ? kbs.filter((kb: any) => allowedKbIds!.includes(kb.knowledge_base_id))
-    : kbs;
 
-  const items: KnowledgeItem[] = filteredKbs.map((kb: any) => ({
+  const items: KnowledgeItem[] = kbs.map((kb: any) => ({
     id: kb.knowledge_base_id,
     name: kb.knowledge_base_name || 'Base de connaissances',
     type: 'text',
@@ -304,17 +269,44 @@ export const usePortalKnowledgeDocument = (documentId: string | null) => {
           if (error) throw error;
           return data?.document || data;
 
-        case 'retell':
+        case 'retell': {
           // For Retell, the documentId IS the knowledge_base_id directly
           const { data: retellData, error: retellError } = await supabase.functions.invoke('retell-proxy', {
-            body: { 
+            body: {
               action: 'getKnowledgeBase',
               organizationId,
               knowledgeBaseId: documentId,
             },
           });
           if (retellError) throw retellError;
-          return retellData?.data;
+
+          const kb = retellData?.data;
+          const texts = Array.isArray(kb?.knowledge_base_texts) ? kb.knowledge_base_texts : [];
+          const urls = Array.isArray(kb?.knowledge_base_urls) ? kb.knowledge_base_urls : [];
+
+          const contentParts: string[] = [];
+          if (texts.length > 0) {
+            contentParts.push(
+              ...texts.map((t: any, idx: number) => {
+                const title = t?.title || `Document ${idx + 1}`;
+                const text = t?.text || '';
+                return `# ${title}\n\n${text}`.trim();
+              })
+            );
+          }
+          if (urls.length > 0) {
+            contentParts.push(`Liens:\n${urls.map((u: string) => `- ${u}`).join('\n')}`);
+          }
+
+          return {
+            id: kb?.knowledge_base_id || documentId,
+            name: kb?.knowledge_base_name || 'Base de connaissances',
+            type: 'text',
+            content: contentParts.join('\n\n---\n\n') || undefined,
+            url: urls[0],
+            created_at: kb?.created_at,
+          } as KnowledgeItem;
+        }
 
         case 'vapi':
           const { data: vapiData, error: vapiError } = await supabase.functions.invoke('vapi-proxy', {
