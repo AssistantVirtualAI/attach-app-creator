@@ -5,6 +5,7 @@ import {
   usePortalKnowledgeDocument,
   usePortalAddKnowledgeDocument,
   usePortalDeleteKnowledgeDocument,
+  usePortalUpdateKnowledgeDocument,
 } from '@/hooks/usePortalKnowledgeBase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -34,6 +35,7 @@ import {
   Link as LinkIcon,
   RefreshCw,
   Filter,
+  Edit,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
@@ -48,6 +50,7 @@ const PortalKnowledge = () => {
   const { data: kbData, isLoading, refetch } = usePortalKnowledgeBase();
   const addDocument = usePortalAddKnowledgeDocument();
   const deleteDocument = usePortalDeleteKnowledgeDocument();
+  const updateDocument = usePortalUpdateKnowledgeDocument();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -59,8 +62,16 @@ const PortalKnowledge = () => {
 
   // View modal state
   const [viewDocumentId, setViewDocumentId] = useState<string | null>(null);
+  
+  // Edit modal state
+  const [editDocumentId, setEditDocumentId] = useState<string | null>(null);
+  const [editDocName, setEditDocName] = useState('');
+  const [editDocContent, setEditDocContent] = useState('');
+  const [editDocUrl, setEditDocUrl] = useState('');
+  const [editDocType, setEditDocType] = useState<'text' | 'url'>('text');
 
   const { data: documentData, isLoading: isLoadingDocument } = usePortalKnowledgeDocument(viewDocumentId);
+  const { data: editDocumentData, isLoading: isLoadingEditDocument } = usePortalKnowledgeDocument(editDocumentId);
 
   // Permissions: modification uniquement si l'utilisateur a explicitement le droit
   const canEdit =
@@ -150,6 +161,63 @@ const PortalKnowledge = () => {
 
   const handleOpenView = (docId: string) => {
     setViewDocumentId(docId);
+  };
+
+  const handleOpenEdit = (doc: any) => {
+    setEditDocumentId(doc.id);
+    setEditDocName(doc.name || doc.title || '');
+    setEditDocType(doc.url && !doc.content ? 'url' : 'text');
+    setEditDocContent('');
+    setEditDocUrl(doc.url || '');
+  };
+
+  // Populate edit form when document data loads
+  useMemo(() => {
+    if (editDocumentData && editDocumentId) {
+      if (editDocumentData.content && !editDocContent) {
+        setEditDocContent(editDocumentData.content);
+      }
+      if (editDocumentData.url && !editDocUrl) {
+        setEditDocUrl(editDocumentData.url);
+      }
+    }
+  }, [editDocumentData, editDocumentId]);
+
+  const handleUpdateDocument = async () => {
+    if (!editDocumentId) return;
+    
+    if (!editDocName.trim()) {
+      toast.error('Veuillez remplir le nom du document');
+      return;
+    }
+    if (editDocType === 'text' && !editDocContent.trim()) {
+      toast.error('Veuillez remplir le contenu du document');
+      return;
+    }
+    if (editDocType === 'url' && !editDocUrl.trim()) {
+      toast.error('Veuillez remplir l\'URL du document');
+      return;
+    }
+
+    try {
+      await updateDocument.mutateAsync({
+        documentId: editDocumentId,
+        name: editDocName,
+        content: editDocType === 'text' ? editDocContent : undefined,
+        url: editDocType === 'url' ? editDocUrl : undefined,
+      });
+      toast.success('Document mis à jour avec succès');
+      setEditDocumentId(null);
+      setEditDocName('');
+      setEditDocContent('');
+      setEditDocUrl('');
+    } catch (error: any) {
+      if (error.message?.includes('403') || error.message?.includes('Accès refusé')) {
+        toast.error('Accès refusé. Seuls les administrateurs peuvent modifier des documents.');
+      } else {
+        toast.error('Erreur lors de la mise à jour du document');
+      }
+    }
   };
 
   const getDocIcon = (type: string) => {
@@ -291,6 +359,16 @@ const PortalKnowledge = () => {
                           <Eye className="h-3 w-3" />
                           Voir
                         </Button>
+                        {canEdit && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => handleOpenEdit(doc)}
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                        )}
                         {doc.url && (
                           <Button 
                             variant="ghost" 
@@ -355,14 +433,112 @@ const PortalKnowledge = () => {
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
+            ) : documentData?.contentUnavailableReason ? (
+              <div className="p-4 text-center">
+                <AlertCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-muted-foreground">
+                  {documentData.contentUnavailableReason === 'binary_content' || documentData.contentUnavailableReason === 'binary_or_not_extractible'
+                    ? 'Ce fichier est binaire et son contenu ne peut pas être affiché.'
+                    : 'Le contenu de ce document n\'est pas disponible.'}
+                </p>
+                {documentData.url && (
+                  <Button 
+                    variant="outline" 
+                    className="mt-4"
+                    onClick={() => window.open(documentData.url, '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Ouvrir le fichier
+                  </Button>
+                )}
+              </div>
             ) : (
               <p className="text-muted-foreground p-4 text-center">Aucun contenu disponible</p>
             )}
           </ScrollArea>
 
           <DialogFooter>
+            {canEdit && documentData && (
+              <Button variant="outline" onClick={() => { setViewDocumentId(null); handleOpenEdit(documentData); }}>
+                <Edit className="h-4 w-4 mr-2" />
+                Modifier
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setViewDocumentId(null)}>
               Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Document Modal */}
+      <Dialog open={!!editDocumentId} onOpenChange={(open) => { if (!open) { setEditDocumentId(null); setEditDocContent(''); setEditDocUrl(''); } }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Modifier le document</DialogTitle>
+            <DialogDescription>Mettez à jour le contenu du document</DialogDescription>
+          </DialogHeader>
+          
+          {isLoadingEditDocument ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Type de document</label>
+                <Select value={editDocType} onValueChange={(v: 'text' | 'url') => setEditDocType(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Texte</SelectItem>
+                    <SelectItem value="url">URL</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Nom du document</label>
+                <Input
+                  value={editDocName}
+                  onChange={(e) => setEditDocName(e.target.value)}
+                  placeholder="Ex: FAQ Produit"
+                />
+              </div>
+              {editDocType === 'text' ? (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Contenu</label>
+                  <Textarea
+                    value={editDocContent}
+                    onChange={(e) => setEditDocContent(e.target.value)}
+                    placeholder="Entrez le contenu du document..."
+                    rows={10}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">URL</label>
+                  <Input
+                    value={editDocUrl}
+                    onChange={(e) => setEditDocUrl(e.target.value)}
+                    placeholder="https://example.com/document"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setEditDocumentId(null); setEditDocContent(''); setEditDocUrl(''); }}>
+              Annuler
+            </Button>
+            <Button 
+              onClick={handleUpdateDocument} 
+              disabled={updateDocument.isPending || isLoadingEditDocument}
+              className="gap-2"
+            >
+              {updateDocument.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Enregistrer
             </Button>
           </DialogFooter>
         </DialogContent>

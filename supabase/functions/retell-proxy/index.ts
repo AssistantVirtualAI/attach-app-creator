@@ -189,6 +189,16 @@ serve(async (req) => {
         result = await retellRequest(retellApiKey, 'DELETE', `/delete-knowledge-base/${params.knowledgeBaseId}`);
         break;
 
+      case 'updateKnowledgeBase': {
+        if (!params.knowledgeBaseId) throw new Error('knowledgeBaseId is required');
+        const updateKbPayload: any = {};
+        if (params.knowledge_base_name) updateKbPayload.knowledge_base_name = params.knowledge_base_name;
+        if (params.knowledge_base_texts) updateKbPayload.knowledge_base_texts = params.knowledge_base_texts;
+        if (params.knowledge_base_urls) updateKbPayload.knowledge_base_urls = params.knowledge_base_urls;
+        result = await retellRequest(retellApiKey, 'PATCH', `/update-knowledge-base/${params.knowledgeBaseId}`, undefined, updateKbPayload);
+        break;
+      }
+
       // LLMs
       case 'listLlms':
         result = await retellRequest(retellApiKey, 'GET', '/list-retell-llms');
