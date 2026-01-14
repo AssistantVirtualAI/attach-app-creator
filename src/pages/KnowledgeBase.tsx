@@ -235,9 +235,17 @@ const KnowledgeBase = () => {
       });
       if (error) throw error;
       const kb = (data as any)?.data ?? data;
+      
+      // Parse knowledge_base_sources (new Retell API structure)
+      const sources = kb?.knowledge_base_sources || [];
+      const documents = sources.filter((s: any) => s.type === 'document');
+      const urls = sources.filter((s: any) => s.type === 'url');
+      
       return {
-        urls: kb?.urls || [],
-        texts: kb?.texts || [],
+        name: kb?.knowledge_base_name,
+        sources,
+        documents,
+        urls,
       };
     },
     enabled: isRetell && !!organizationId && !!selectedRetellKb?.id && retellViewerOpen,
@@ -645,7 +653,7 @@ const KnowledgeBase = () => {
       <Dialog open={retellViewerOpen} onOpenChange={setRetellViewerOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{selectedRetellKb?.name || 'Base de connaissances'}</DialogTitle>
+            <DialogTitle>{retellKbDetail?.name || selectedRetellKb?.name || 'Base de connaissances'}</DialogTitle>
             <DialogDescription>Contenu de la base de connaissances Retell</DialogDescription>
           </DialogHeader>
 
@@ -654,35 +662,61 @@ const KnowledgeBase = () => {
           ) : retellKbDetailError ? (
             <div className="py-6 text-center text-destructive">Erreur: {(retellKbDetailError as Error).message}</div>
           ) : (
-            <div className="space-y-4">
-              {retellKbDetail?.urls?.length ? (
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+              {/* Documents (PDFs, fichiers) */}
+              {retellKbDetail?.documents?.length > 0 && (
                 <div>
-                  <div className="text-sm font-medium mb-2">URLs</div>
-                  <div className="space-y-2">
-                    {retellKbDetail.urls.map((u: string) => (
-                      <a key={u} href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline inline-flex items-center gap-1">
-                        <ExternalLink className="w-3 h-3" />
-                        {u}
-                      </a>
-                    ))}
+                  <div className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <File className="w-4 h-4" />
+                    Documents ({retellKbDetail.documents.length})
                   </div>
-                </div>
-              ) : null}
-
-              {retellKbDetail?.texts?.length ? (
-                <div>
-                  <div className="text-sm font-medium mb-2">Textes</div>
-                  <div className="space-y-3">
-                    {retellKbDetail.texts.map((t: any, idx: number) => (
-                      <div key={idx} className="rounded-md border border-border p-3">
-                        <div className="text-sm font-semibold mb-1">{t.title || 'Texte'}</div>
-                        <div className="text-sm text-muted-foreground whitespace-pre-wrap">{t.content}</div>
+                  <div className="space-y-2">
+                    {retellKbDetail.documents.map((doc: any) => (
+                      <div key={doc.source_id || doc.filename} className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="flex-1 truncate text-sm">{doc.filename || 'Document'}</span>
+                        {doc.file_url && (
+                          <Button variant="ghost" size="sm" asChild>
+                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
                 </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">Aucun contenu.</div>
+              )}
+
+              {/* URLs */}
+              {retellKbDetail?.urls?.length > 0 && (
+                <div>
+                  <div className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <Link2 className="w-4 h-4" />
+                    URLs ({retellKbDetail.urls.length})
+                  </div>
+                  <div className="space-y-2">
+                    {retellKbDetail.urls.map((item: any) => (
+                      <a 
+                        key={item.source_id || item.url} 
+                        href={item.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-sm text-primary hover:underline flex items-center gap-1 p-2 bg-muted rounded-lg"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        {item.url}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Aucun contenu */}
+              {!retellKbDetail?.documents?.length && !retellKbDetail?.urls?.length && (
+                <div className="text-sm text-muted-foreground text-center py-4">
+                  Aucun contenu dans cette base de connaissances.
+                </div>
               )}
             </div>
           )}
