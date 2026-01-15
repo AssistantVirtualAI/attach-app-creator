@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action = 'sync', agentId, limit = 100, analyzeConversations = true, mode = 'recent' } = await req.json();
+    const { action = 'sync', agentId, limit = 100, analyzeConversations = true, mode = 'recent', language = 'fr' } = await req.json();
     
     // mode can be 'recent' (default) or 'all' for full historical sync
 
@@ -298,6 +298,7 @@ serve(async (req) => {
                       transcript: transcriptText,
                       agentId: agent.id,
                       organizationId: orgMember.organization_id,
+                      language,
                     }),
                   });
                   

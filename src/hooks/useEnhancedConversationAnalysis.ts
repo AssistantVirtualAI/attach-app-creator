@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useLanguage } from '@/context/LanguageContext';
 
 export interface SentimentPoint {
   time_percent: number;
@@ -51,6 +52,7 @@ export const useEnhancedConversationAnalysis = (
   }
 ) => {
   const queryClient = useQueryClient();
+  const { language } = useLanguage();
   const isExternal = options?.isExternal || false;
 
   // Récupérer l'analyse existante depuis agent_insights
@@ -101,19 +103,21 @@ export const useEnhancedConversationAnalysis = (
       }
 
       // Build the request body based on whether it's an external conversation
-      const body: AnalyzeConversationParams = isExternal
+      const body: AnalyzeConversationParams & { language: string } = isExternal
         ? {
             externalConversationId: conversationId,
             platformAgentId: options?.platformAgentId || params.platformAgentId,
             agentId: params.agentId,
             organizationId: params.organizationId,
             transcript: params.transcript,
+            language,
           }
         : {
             conversationId,
             agentId: params.agentId || conversation?.agent_id,
             organizationId: params.organizationId || conversation?.organization_id,
             transcript: params.transcript,
+            language,
           };
 
       const { data, error } = await supabase.functions.invoke('analyze-conversation', {
