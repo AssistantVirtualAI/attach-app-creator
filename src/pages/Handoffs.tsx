@@ -8,11 +8,13 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Users, Clock, CheckCircle, XCircle, MessageSquare, Phone, AlertCircle } from 'lucide-react';
 import { useHandoffs } from '@/hooks/useHandoffs';
+import { useTranslation } from '@/hooks/useTranslation';
 import { HandoffRequestCard } from '@/components/handoff/HandoffRequestCard';
 import { HandoffChatPanel } from '@/components/handoff/HandoffChatPanel';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
 
 export default function Handoffs() {
+  const { t } = useTranslation();
   const { handoffs, stats, isLoading, acceptHandoff, rejectHandoff, completeHandoff, isAvailable, setAvailability } = useHandoffs();
   const [selectedHandoff, setSelectedHandoff] = useState<string | null>(null);
 
@@ -26,7 +28,7 @@ export default function Handoffs() {
     return (
       <AppLayout>
         <div className="p-6 space-y-6">
-          <h1 className="text-3xl font-bold">Handoffs</h1>
+          <h1 className="text-3xl font-bold">{t('handoffs.title')}</h1>
           <TableSkeleton rows={5} />
         </div>
       </AppLayout>
@@ -38,9 +40,9 @@ export default function Handoffs() {
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Live Human Handoff</h1>
+            <h1 className="text-3xl font-bold">{t('handoffs.title')}</h1>
             <p className="text-muted-foreground mt-1">
-              Gérez les transferts de conversations vers des agents humains
+              {t('handoffs.description')}
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -51,12 +53,12 @@ export default function Handoffs() {
                 onCheckedChange={setAvailability}
               />
               <Label htmlFor="availability">
-                {isAvailable ? 'Disponible' : 'Indisponible'}
+                {isAvailable ? t('handoffs.available') : t('handoffs.unavailable')}
               </Label>
             </div>
             {pendingHandoffs.length > 0 && (
               <Badge variant="destructive" className="animate-pulse">
-                {pendingHandoffs.length} en attente
+                {pendingHandoffs.length} {t('handoffs.pending')}
               </Badge>
             )}
           </div>
@@ -72,7 +74,7 @@ export default function Handoffs() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{stats.pending}</p>
-                  <p className="text-xs text-muted-foreground">En attente</p>
+                  <p className="text-xs text-muted-foreground">{t('handoffs.stats.pending')}</p>
                 </div>
               </div>
             </CardContent>
@@ -85,7 +87,7 @@ export default function Handoffs() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{stats.active}</p>
-                  <p className="text-xs text-muted-foreground">En cours</p>
+                  <p className="text-xs text-muted-foreground">{t('handoffs.stats.active')}</p>
                 </div>
               </div>
             </CardContent>
@@ -98,7 +100,7 @@ export default function Handoffs() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{stats.completed}</p>
-                  <p className="text-xs text-muted-foreground">Terminés</p>
+                  <p className="text-xs text-muted-foreground">{t('handoffs.stats.completed')}</p>
                 </div>
               </div>
             </CardContent>
@@ -111,7 +113,7 @@ export default function Handoffs() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{stats.avgResponseTime}s</p>
-                  <p className="text-xs text-muted-foreground">Temps moyen</p>
+                  <p className="text-xs text-muted-foreground">{t('handoffs.stats.avgTime')}</p>
                 </div>
               </div>
             </CardContent>
@@ -124,10 +126,10 @@ export default function Handoffs() {
             <Tabs defaultValue="pending">
               <TabsList className="w-full">
                 <TabsTrigger value="pending" className="flex-1">
-                  En attente ({pendingHandoffs.length})
+                  {t('handoffs.tabs.pending')} ({pendingHandoffs.length})
                 </TabsTrigger>
                 <TabsTrigger value="active" className="flex-1">
-                  En cours ({activeHandoffs.length})
+                  {t('handoffs.tabs.active')} ({activeHandoffs.length})
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="pending" className="space-y-3 mt-4">
@@ -135,7 +137,7 @@ export default function Handoffs() {
                   <Card className="glass-card">
                     <CardContent className="p-6 text-center">
                       <CheckCircle className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-muted-foreground">Aucune demande en attente</p>
+                      <p className="text-muted-foreground">{t('handoffs.empty.noPending')}</p>
                     </CardContent>
                   </Card>
                 ) : (
@@ -159,7 +161,7 @@ export default function Handoffs() {
                   <Card className="glass-card">
                     <CardContent className="p-6 text-center">
                       <Users className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-muted-foreground">Aucune conversation active</p>
+                      <p className="text-muted-foreground">{t('handoffs.empty.noActive')}</p>
                     </CardContent>
                   </Card>
                 ) : (
@@ -191,9 +193,9 @@ export default function Handoffs() {
               <Card className="glass-card h-[600px] flex items-center justify-center">
                 <CardContent className="text-center">
                   <MessageSquare className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Sélectionnez une conversation</h3>
+                  <h3 className="text-lg font-medium mb-2">{t('handoffs.selectConversation')}</h3>
                   <p className="text-muted-foreground">
-                    Choisissez une demande de handoff pour commencer à chatter
+                    {t('handoffs.selectToChat')}
                   </p>
                 </CardContent>
               </Card>

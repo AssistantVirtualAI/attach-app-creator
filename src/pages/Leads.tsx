@@ -3,14 +3,16 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLeads } from '@/hooks/useLeads';
+import { useTranslation } from '@/hooks/useTranslation';
 import { LeadsTable } from '@/components/leads/LeadsTable';
 import { LeadFilters } from '@/components/leads/LeadFilters';
 import { LeadsCharts } from '@/components/leads/LeadsCharts';
 import { AddLeadModal } from '@/components/leads/AddLeadModal';
-import { Plus, Users, UserCheck, Phone, Trophy, XCircle, BarChart3 } from 'lucide-react';
+import { Plus, Users, UserCheck, Phone, Trophy, XCircle, BarChart3, UserPlus } from 'lucide-react';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
 
 export default function Leads() {
+  const { t } = useTranslation();
   const { leads, stats, isLoading } = useLeads();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showCharts, setShowCharts] = useState(false);
@@ -31,19 +33,19 @@ export default function Leads() {
   const sources = [...new Set(leads.map(l => l.source).filter(Boolean))];
 
   const statCards = [
-    { label: 'Total', value: stats.total, icon: Users, color: 'text-foreground' },
-    { label: 'Nouveaux', value: stats.new, icon: Plus, color: 'text-blue-500' },
-    { label: 'Qualifiés', value: stats.qualified, icon: UserCheck, color: 'text-yellow-500' },
-    { label: 'Contactés', value: stats.contacted, icon: Phone, color: 'text-purple-500' },
-    { label: 'Convertis', value: stats.converted, icon: Trophy, color: 'text-green-500' },
-    { label: 'Perdus', value: stats.lost, icon: XCircle, color: 'text-red-500' },
+    { label: t('leads.stats.total'), value: stats.total, icon: Users, color: 'text-foreground' },
+    { label: t('leads.stats.new'), value: stats.new, icon: UserPlus, color: 'text-blue-500' },
+    { label: t('leads.stats.qualified'), value: stats.qualified, icon: UserCheck, color: 'text-yellow-500' },
+    { label: t('leads.stats.contacted'), value: stats.contacted, icon: Phone, color: 'text-purple-500' },
+    { label: t('leads.stats.converted'), value: stats.converted, icon: Trophy, color: 'text-green-500' },
+    { label: t('leads.stats.lost'), value: stats.lost, icon: XCircle, color: 'text-red-500' },
   ];
 
   if (isLoading) {
     return (
       <AppLayout>
         <div className="p-6 space-y-6">
-          <h1 className="text-3xl font-bold">Leads</h1>
+          <h1 className="text-3xl font-bold">{t('leads.title')}</h1>
           <TableSkeleton rows={5} />
         </div>
       </AppLayout>
@@ -55,19 +57,19 @@ export default function Leads() {
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Leads</h1>
+            <h1 className="text-3xl font-bold">{t('leads.title')}</h1>
             <p className="text-muted-foreground mt-1">
-              Gérez vos prospects et suivez leur progression
+              {t('leads.description')}
             </p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setShowCharts(!showCharts)}>
               <BarChart3 className="mr-2 h-4 w-4" />
-              {showCharts ? 'Masquer' : 'Graphiques'}
+              {showCharts ? t('leads.hide') : t('leads.charts')}
             </Button>
             <Button onClick={() => setIsModalOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
-              Nouveau lead
+              {t('leads.newLead')}
             </Button>
           </div>
         </div>

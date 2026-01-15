@@ -823,23 +823,157 @@ export const en = {
     },
   },
 
+  // Team
+  team: {
+    title: 'Team',
+    description: 'Manage your organization members',
+    createMember: 'Create member',
+    rolesLegend: 'Roles legend',
+    noPermission: 'You do not have permission to access this page',
+    noMembers: 'No members in the team',
+    inviteFirst: 'Invite the first member',
+    members: 'Members',
+    roles: {
+      admin: 'Full access',
+      manager: 'Agent and conversation management',
+      agent: 'View and manage conversations',
+      viewer: 'Read only',
+    },
+  },
+
+  // API Keys
+  apiKeys: {
+    title: 'API Keys',
+    description: 'Manage your API access keys',
+    newKey: 'New key',
+    noPermission: 'You do not have permission to access this page',
+    yourKeys: 'Your API keys',
+    usage: 'API Usage',
+    usageInfo: 'API keys allow you to programmatically access your data. Keep them secret and never share them publicly.',
+    usageHint: 'Use your API key in the Authorization header of your requests:',
+  },
+
+  // Handoffs
+  handoffs: {
+    title: 'Live Human Handoff',
+    description: 'Manage conversation transfers to human agents',
+    available: 'Available',
+    unavailable: 'Unavailable',
+    pending: 'pending',
+    stats: {
+      pending: 'Pending',
+      active: 'In progress',
+      completed: 'Completed',
+      avgTime: 'Avg. time',
+    },
+    tabs: {
+      pending: 'Pending',
+      active: 'In progress',
+    },
+    empty: {
+      noPending: 'No pending requests',
+      noActive: 'No active conversations',
+    },
+    selectConversation: 'Select a conversation',
+    selectToChat: 'Choose a handoff request to start chatting',
+  },
+
+  // Campaigns
+  campaigns: {
+    title: 'Call Campaigns',
+    description: 'Manage your automated outbound call campaigns',
+    newCampaign: 'New campaign',
+    refresh: 'Refresh',
+    stats: {
+      activeCampaigns: 'Active Campaigns',
+      totalCalls: 'Total Calls',
+      successfulCalls: 'Successful Calls',
+      successRate: 'Success Rate',
+    },
+    noCampaigns: 'No campaigns',
+    createFirst: 'Create your first outbound call campaign',
+    table: {
+      campaign: 'Campaign',
+      status: 'Status',
+      progress: 'Progress',
+      calls: 'Calls',
+      success: 'Success',
+      createdAt: 'Created at',
+      actions: 'Actions',
+    },
+    modal: {
+      createTitle: 'Create a campaign',
+      createDesc: 'Configure your outbound call campaign',
+      campaignName: 'Campaign name',
+      description: 'Description (optional)',
+      phoneNumbers: 'Phone numbers (one per line)',
+      numbersCount: 'numbers',
+    },
+    details: {
+      title: 'Campaign Details',
+      description: 'Individual call tracking',
+      number: 'Number',
+      duration: 'Duration',
+      result: 'Result',
+      calledAt: 'Called at',
+    },
+  },
+
+  // Topics
+  topics: {
+    title: 'Topics',
+    description: 'NLP analysis of conversation topics',
+    searchPlaceholder: 'Search a topic...',
+    refresh: 'Refresh',
+    analyzeConversations: 'Analyze conversations',
+    stats: {
+      totalTopics: 'Total Topics',
+      totalMentions: 'Total Mentions',
+      categories: 'Categories',
+      positiveSentiment: 'Positive Sentiment',
+    },
+    tabs: {
+      trending: 'Trending',
+      categories: 'Categories',
+      recent: 'Recent',
+    },
+    popularTopics: 'Popular Topics',
+    mostMentioned: 'The most mentioned topics',
+    noTopics: 'No topics analyzed. Click "Analyze conversations" to start.',
+    mentions: 'mentions',
+    mentionDistribution: 'Mention Distribution',
+    top10Topics: 'Top 10 topics by volume',
+    noData: 'No data available',
+    categoryBreakdown: 'Category Breakdown',
+    categoryDistribution: 'Topic distribution by category',
+    categoryDetails: 'Category Details',
+    mentionsByCategory: 'Number of mentions by category',
+    recentlyAnalyzed: 'Recently Analyzed Topics',
+    lastTopicsExtracted: 'The last topics extracted from conversations',
+    noRecentTopics: 'No recent topics. Run an analysis to extract topics.',
+  },
+
   // Leads
   leads: {
     title: 'Leads',
-    description: 'Manage your leads and conversions',
+    description: 'Manage your prospects and track their progress',
     newLead: 'New lead',
+    charts: 'Charts',
+    hide: 'Hide',
     stats: {
-      total: 'Total leads',
+      total: 'Total',
+      new: 'New',
       qualified: 'Qualified',
+      contacted: 'Contacted',
       converted: 'Converted',
-      thisMonth: 'This month',
+      lost: 'Lost',
     },
   },
 
   // Appointments
   appointments: {
     title: 'Appointments',
-    description: 'Manage appointments scheduled by your agents',
+    description: 'Manage your appointments and calendar integrations',
     newAppointment: 'New appointment',
     stats: {
       total: 'Total',
@@ -852,24 +986,49 @@ export const en = {
   // Integrations
   integrations: {
     title: 'Integrations',
-    description: 'Connect your voice AI platforms',
+    description: 'Connect your favorite AI platforms',
+    configureIntegration: 'Configure an integration to create an agent',
+    backToAgents: 'Back to agents',
     platforms: {
-      elevenlabs: 'ElevenLabs',
-      vapi: 'Vapi',
-      retell: 'Retell AI',
+      openai: 'Connect your GPT models',
+      vapi: 'Intelligent voice agent',
+      retell: 'AI phone conversations',
+      elevenlabs: 'Advanced voice synthesis',
     },
     status: {
       connected: 'Connected',
       notConnected: 'Not connected',
       testing: 'Testing...',
       error: 'Error',
+      pending: 'Pending',
+      notTested: 'Not tested',
     },
     actions: {
       connect: 'Connect',
-      disconnect: 'Disconnect',
-      test: 'Test connection',
-      configure: 'Configure',
+      addIntegration: 'Add integration',
+      reconfigure: 'Reconfigure',
+      test: 'Test',
+      saveAndTest: 'Save and test',
     },
+    modal: {
+      configure: 'Configure',
+      apiKey: 'API Key',
+      agentId: 'Agent ID (optional)',
+    },
+    messages: {
+      saved: 'Integration saved',
+      testingConnection: 'Testing connection...',
+      connectionSuccess: 'Connection successful',
+      connectionWorking: 'The integration is working correctly',
+      connectionFailed: 'Connection failed',
+      testError: 'Test error',
+      cannotTest: 'Cannot test the connection',
+      saveError: 'Error',
+      cannotSave: 'Cannot save the integration',
+      fillRequired: 'Please fill all required fields',
+      mustBeLoggedIn: 'You must be logged in to add an integration',
+    },
+    configuredOn: 'Configured on',
   },
 
   // Endpoints
@@ -888,6 +1047,20 @@ export const en = {
       unified: 'Unified Endpoints',
       platformSpecific: 'Platform Specific',
     },
+  },
+
+  // Workflows
+  workflows: {
+    title: 'Workflows',
+    description: 'Automate your processes with workflows',
+    newWorkflow: 'New workflow',
+  },
+
+  // Phone Numbers
+  phoneNumbers: {
+    title: 'Phone Numbers',
+    description: 'Manage your phone numbers for voice agents',
+    noNumbers: 'No phone numbers configured',
   },
 
   // Languages

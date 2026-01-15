@@ -6,10 +6,12 @@ import { ApiKeysList } from '@/components/api-keys/ApiKeysList';
 import { CreateKeyModal } from '@/components/api-keys/CreateKeyModal';
 import { useApiKeys } from '@/hooks/useApiKeys';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Key, Plus, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const ApiKeys = () => {
+  const { t } = useTranslation();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { apiKeys, isLoading, createApiKey, revokeApiKey, deleteApiKey, availableScopes } = useApiKeys();
   const { can } = usePermissions();
@@ -23,7 +25,7 @@ const ApiKeys = () => {
           <Alert variant="destructive" className="max-w-md">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              Vous n'avez pas les permissions nécessaires pour accéder à cette page.
+              {t('apiKeys.noPermission')}
             </AlertDescription>
           </Alert>
         </div>
@@ -39,15 +41,15 @@ const ApiKeys = () => {
           <div>
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
               <Key className="h-8 w-8 text-primary" />
-              Clés API
+              {t('apiKeys.title')}
             </h1>
             <p className="text-muted-foreground mt-1">
-              Gérez vos clés d'accès à l'API
+              {t('apiKeys.description')}
             </p>
           </div>
           <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" />
-            Nouvelle clé
+            {t('apiKeys.newKey')}
           </Button>
         </div>
 
@@ -55,15 +57,14 @@ const ApiKeys = () => {
         <Alert>
           <Key className="h-4 w-4" />
           <AlertDescription>
-            Les clés API permettent d'accéder à vos données programmatiquement. 
-            Gardez-les secrètes et ne les partagez jamais publiquement.
+            {t('apiKeys.usageInfo')}
           </AlertDescription>
         </Alert>
 
         {/* API Keys List */}
         <Card className="bg-card/50 backdrop-blur-sm border-border/50">
           <CardHeader>
-            <CardTitle>Vos clés API</CardTitle>
+            <CardTitle>{t('apiKeys.yourKeys')}</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -85,11 +86,11 @@ const ApiKeys = () => {
         {/* API Documentation */}
         <Card className="bg-card/50 backdrop-blur-sm border-border/50">
           <CardHeader>
-            <CardTitle>Utilisation de l'API</CardTitle>
+            <CardTitle>{t('apiKeys.usage')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Utilisez votre clé API dans l'en-tête <code className="bg-muted px-1 rounded">Authorization</code> de vos requêtes :
+              {t('apiKeys.usageHint')}
             </p>
             <pre className="bg-muted p-4 rounded-lg overflow-x-auto">
               <code className="text-sm">
