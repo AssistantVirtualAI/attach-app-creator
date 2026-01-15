@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useWorkspaceMetrics } from '@/hooks/useWorkspaceMetrics';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Users, Bot, MessageSquare, Clock, CheckCircle, TrendingUp } from 'lucide-react';
 
 interface WorkspaceMetricsProps {
@@ -7,6 +8,7 @@ interface WorkspaceMetricsProps {
 }
 
 export const WorkspaceMetrics = ({ dateRange }: WorkspaceMetricsProps) => {
+  const { t } = useTranslation();
   const { data: metrics, isLoading } = useWorkspaceMetrics(dateRange || undefined);
 
   if (isLoading) {
@@ -23,42 +25,42 @@ export const WorkspaceMetrics = ({ dateRange }: WorkspaceMetricsProps) => {
 
   const metricsData = [
     {
-      title: "Clients actifs",
+      title: t('dashboard.workspace.activeClients'),
       value: metrics?.activeClients || 0,
       icon: Users,
       color: 'text-blue-500',
       bg: 'bg-blue-500/10',
     },
     {
-      title: "Agents",
+      title: t('dashboard.workspace.agents'),
       value: metrics?.activeAgents || 0,
       icon: Bot,
       color: 'text-purple-500',
       bg: 'bg-purple-500/10',
     },
     {
-      title: "Conversations",
+      title: t('dashboard.workspace.conversations'),
       value: metrics?.totalConversations || 0,
       icon: MessageSquare,
       color: 'text-green-500',
       bg: 'bg-green-500/10',
     },
     {
-      title: "Minutes totales",
+      title: t('dashboard.workspace.totalMinutes'),
       value: metrics?.totalMinutes || 0,
       icon: Clock,
       color: 'text-orange-500',
       bg: 'bg-orange-500/10',
     },
     {
-      title: "Taux de résolution",
+      title: t('dashboard.workspace.resolutionRate'),
       value: `${metrics?.resolutionRate || 0}%`,
       icon: CheckCircle,
       color: 'text-emerald-500',
       bg: 'bg-emerald-500/10',
     },
     {
-      title: "Interactions moy.",
+      title: t('dashboard.workspace.avgInteractions'),
       value: metrics?.avgInteractions || 0,
       icon: TrendingUp,
       color: 'text-cyan-500',
@@ -69,7 +71,7 @@ export const WorkspaceMetrics = ({ dateRange }: WorkspaceMetricsProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Métriques Workspace</CardTitle>
+        <CardTitle className="text-lg">{t('dashboard.workspace.title')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
