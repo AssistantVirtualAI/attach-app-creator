@@ -337,11 +337,16 @@ serve(async (req) => {
       }
     }
 
-    // Create report data
+    // Create report data with language and period info
+    const periodDays = days === 'all' ? 'all' : String(days);
     const reportData = {
       agent_id: agentId,
       organization_id: orgMember.organization_id,
       report_date: new Date().toISOString().split('T')[0],
+      language: language,
+      period_days: periodDays,
+      period_start: startDate?.toISOString() || null,
+      period_end: new Date().toISOString(),
       total_conversations: totalConversations,
       avg_satisfaction: avgSatisfaction || null,
       avg_duration_seconds: Math.round(avgDuration) || null,
@@ -359,10 +364,10 @@ serve(async (req) => {
       generated_at: new Date().toISOString(),
     };
 
-    // Upsert report
+    // Upsert report with new unique constraint (agent_id, report_date, language, period_days)
     const { data: savedReport, error: saveError } = await supabaseAdmin
       .from('agent_daily_reports')
-      .upsert(reportData, { onConflict: 'agent_id,report_date' })
+      .upsert(reportData, { onConflict: 'agent_id,report_date,language,period_days' })
       .select()
       .single();
 

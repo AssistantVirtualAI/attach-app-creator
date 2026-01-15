@@ -12,7 +12,9 @@ serve(async (req) => {
   }
 
   try {
-    const { action = 'sync', agentId, limit = 100, analyzeConversations = true } = await req.json();
+    const { action = 'sync', agentId, limit = 100, analyzeConversations = true, mode = 'recent' } = await req.json();
+    
+    // mode can be 'recent' (default) or 'all' for full historical sync
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -92,29 +94,52 @@ serve(async (req) => {
       }
 
       try {
-        console.log(`Syncing conversations for agent ${agent.name}`);
+        console.log(`Syncing conversations for agent ${agent.name} (mode: ${mode})`);
         
-        const response = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${agent.platform_agent_id}/conversations?limit=${limit}`,
-          {
+        let allConversations: any[] = [];
+        let cursor: string | null = null;
+        let pageCount = 0;
+        const maxPages = mode === 'all' ? 100 : 1; // For 'all' mode, paginate; otherwise just one page
+        const pageLimit = mode === 'all' ? 100 : limit;
+        
+        do {
+          const url = new URL(`https://api.elevenlabs.io/v1/convai/agents/${agent.platform_agent_id}/conversations`);
+          url.searchParams.set('limit', String(pageLimit));
+          if (cursor) {
+            url.searchParams.set('cursor', cursor);
+          }
+          
+          const response = await fetch(url.toString(), {
             headers: {
               'xi-api-key': agent.platform_api_key,
             },
+          });
+
+          if (!response.ok) {
+            console.error(`Error fetching conversations for ${agent.name}: ${response.status}`);
+            syncErrors.push(`Agent ${agent.name}: API error ${response.status}`);
+            break;
           }
-        );
 
-        if (!response.ok) {
-          console.error(`Error fetching conversations for ${agent.name}: ${response.status}`);
-          syncErrors.push(`Agent ${agent.name}: API error ${response.status}`);
-          continue;
-        }
+          const data = await response.json();
+          const conversations = data.conversations || [];
+          allConversations = allConversations.concat(conversations);
+          
+          // Get next page cursor
+          cursor = data.next_cursor || null;
+          pageCount++;
+          
+          console.log(`Page ${pageCount}: Got ${conversations.length} conversations, total so far: ${allConversations.length}`);
+          
+          // Stop if no more pages or reached limit
+          if (!cursor || pageCount >= maxPages || (mode !== 'all' && allConversations.length >= limit)) {
+            break;
+          }
+        } while (cursor);
 
-        const data = await response.json();
-        const conversations = data.conversations || [];
+        console.log(`Found ${allConversations.length} conversations for ${agent.name}`);
 
-        console.log(`Found ${conversations.length} conversations for ${agent.name}`);
-
-        for (const conv of conversations) {
+        for (const conv of allConversations) {
           // Check if conversation already exists using external_id
           const { data: existing } = await supabaseAdmin
             .from('conversations')

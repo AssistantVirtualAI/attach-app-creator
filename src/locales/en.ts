@@ -1663,6 +1663,8 @@ export const en = {
     allAgents: 'All agents',
     email: 'Email',
     sync: 'Sync',
+    syncAll: 'Sync all',
+    agents: 'Agents',
     connectedToPlatforms: 'Connected to platforms',
     localData: 'Local data',
     conversations: 'conversations',

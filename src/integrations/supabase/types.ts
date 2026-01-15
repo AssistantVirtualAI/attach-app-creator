@@ -86,7 +86,11 @@ export type Database = {
           generated_at: string | null
           id: string
           kb_suggestions: string[] | null
+          language: string
           organization_id: string | null
+          period_days: string
+          period_end: string | null
+          period_start: string | null
           priority_actions: Json | null
           prompt_suggestions: string[] | null
           recommendations: Json | null
@@ -107,7 +111,11 @@ export type Database = {
           generated_at?: string | null
           id?: string
           kb_suggestions?: string[] | null
+          language?: string
           organization_id?: string | null
+          period_days?: string
+          period_end?: string | null
+          period_start?: string | null
           priority_actions?: Json | null
           prompt_suggestions?: string[] | null
           recommendations?: Json | null
@@ -128,7 +136,11 @@ export type Database = {
           generated_at?: string | null
           id?: string
           kb_suggestions?: string[] | null
+          language?: string
           organization_id?: string | null
+          period_days?: string
+          period_end?: string | null
+          period_start?: string | null
           priority_actions?: Json | null
           prompt_suggestions?: string[] | null
           recommendations?: Json | null

@@ -302,12 +302,16 @@ const AgentReports = () => {
             </Button>
             <Button 
               variant="outline" 
-              onClick={() => syncConversations({ agentId: selectedAgent !== 'all' ? selectedAgent : undefined })}
+              onClick={() => syncConversations({ 
+                agentId: selectedAgent !== 'all' ? selectedAgent : undefined,
+                mode: 'all' // Sync all historical conversations
+              })}
               disabled={isSyncing}
               className="bg-card border-border/50"
+              title={t('reports.syncAll')}
             >
               {isSyncing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-              {t('reports.sync')}
+              {t('reports.syncAll')}
             </Button>
             <Button variant="outline" size="icon" onClick={() => refetch()} className="bg-card border-border/50">
               <RefreshCw className="h-4 w-4" />
