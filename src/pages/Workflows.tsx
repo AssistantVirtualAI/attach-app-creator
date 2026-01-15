@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTranslation } from "@/hooks/useTranslation";
 import { 
   Shield, 
   Zap, 
@@ -122,6 +123,7 @@ export default function Workflows() {
   const navigate = useNavigate();
   const { selectedOrg } = useOrganization();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [hipaaModalOpen, setHipaaModalOpen] = useState(false);
   const [selectedApp, setSelectedApp] = useState<MarketplaceApp | null>(null);
   const [hipaaAccepted, setHipaaAccepted] = useState(false);
@@ -183,13 +185,13 @@ export default function Workflows() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workflows'] });
-      toast({ title: "Application installée", description: "L'application a été ajoutée à vos workflows" });
+      toast({ title: t('workflows.appInstalled') });
       setHipaaModalOpen(false);
       setSelectedApp(null);
       setHipaaAccepted(false);
     },
     onError: () => {
-      toast({ title: "Erreur", description: "Impossible d'installer l'application", variant: "destructive" });
+      toast({ title: t('common.error'), description: t('workflows.installError'), variant: "destructive" });
     }
   });
 
@@ -204,7 +206,7 @@ export default function Workflows() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workflows'] });
-      toast({ title: "Application désinstallée" });
+      toast({ title: t('workflows.appUninstalled') });
     }
   });
 
@@ -262,14 +264,14 @@ export default function Workflows() {
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Workflows & Automatisations</h1>
+            <h1 className="text-2xl font-bold">{t('workflows.title')}</h1>
             <p className="text-muted-foreground">
-              Créez des automatisations visuelles ou connectez des applications tierces
+              {t('workflows.description')}
             </p>
           </div>
           <Button onClick={() => navigate('/workflow-builder/new')}>
             <Plus className="h-4 w-4 mr-2" />
-            Nouveau Workflow
+            {t('workflows.newWorkflow')}
           </Button>
         </div>
 
@@ -277,11 +279,11 @@ export default function Workflows() {
           <TabsList>
             <TabsTrigger value="visual" className="flex items-center gap-2">
               <GitBranch className="h-4 w-4" />
-              Visual Builder
+              {t('workflows.tabs.visual')}
             </TabsTrigger>
             <TabsTrigger value="marketplace" className="flex items-center gap-2">
               <Zap className="h-4 w-4" />
-              Marketplace
+              {t('workflows.tabs.marketplace')}
             </TabsTrigger>
           </TabsList>
 
@@ -291,13 +293,13 @@ export default function Workflows() {
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <GitBranch className="h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Aucun workflow créé</h3>
+                  <h3 className="text-lg font-medium mb-2">{t('workflows.noWorkflows')}</h3>
                   <p className="text-sm text-muted-foreground mb-4 text-center max-w-md">
-                    Créez des automatisations drag-and-drop avec des triggers natifs comme "Appel terminé" ou "Message reçu"
+                    {t('workflows.description')}
                   </p>
                   <Button onClick={() => navigate('/workflow-builder/new')}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Créer mon premier workflow
+                    {t('workflows.createFirst')}
                   </Button>
                 </CardContent>
               </Card>
@@ -315,14 +317,14 @@ export default function Workflows() {
                               <GitBranch className="h-5 w-5" />
                             </div>
                             <div>
-                              <p className="font-medium">{config?.name || 'Workflow sans nom'}</p>
+                              <p className="font-medium">{config?.name || t('workflows.noName')}</p>
                               <p className="text-xs text-muted-foreground">
-                                {nodeCount} node{nodeCount > 1 ? 's' : ''}
+                                {nodeCount} {t('workflows.nodes')}
                               </p>
                             </div>
                           </div>
                           <Badge variant={workflow.is_active ? "default" : "secondary"}>
-                            {workflow.is_active ? 'Actif' : 'Inactif'}
+                            {workflow.is_active ? t('workflows.active') : t('workflows.inactive')}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-2">
@@ -331,6 +333,14 @@ export default function Workflows() {
                             size="sm"
                             className="flex-1"
                             onClick={() => navigate(`/workflow-builder/${workflow.id}`)}
+                          >
+                            <Edit className="h-3 w-3 mr-1" />
+                            {t('workflows.edit')}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleMutation.mutate({ id: workflow.id, isActive: !workflow.is_active })}
                           >
                             <Edit className="h-3 w-3 mr-1" />
                             Éditer

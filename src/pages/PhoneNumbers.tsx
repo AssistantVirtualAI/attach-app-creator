@@ -13,8 +13,10 @@ import { Phone, Plus, Search, MoreHorizontal, Trash2, Settings, CheckCircle, Ref
 import { usePhoneNumbers } from '@/hooks/usePhoneNumbers';
 import { TableSkeleton } from '@/components/LoadingSkeleton';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function PhoneNumbers() {
+  const { t } = useTranslation();
   const { phoneNumbers, isLoading, searchNumbers, purchaseNumber, addSipNumber, deleteNumber, isSearching, searchResults } = usePhoneNumbers();
   const [isAddTwilioOpen, setIsAddTwilioOpen] = useState(false);
   const [isAddSipOpen, setIsAddSipOpen] = useState(false);
@@ -28,7 +30,7 @@ export default function PhoneNumbers() {
     try {
       await searchNumbers.mutateAsync({ country: searchCountry, areaCode: searchAreaCode });
     } catch (error) {
-      toast.error('Erreur lors de la recherche');
+      toast.error(t('phoneNumbers.searchError'));
     }
   };
 
@@ -36,15 +38,15 @@ export default function PhoneNumbers() {
     try {
       await purchaseNumber.mutateAsync({ phoneNumber });
       setIsAddTwilioOpen(false);
-      toast.success('Numéro acheté avec succès');
+      toast.success(t('phoneNumbers.purchaseSuccess'));
     } catch (error) {
-      toast.error('Erreur lors de l\'achat');
+      toast.error(t('phoneNumbers.purchaseError'));
     }
   };
 
   const handleAddSipNumber = async () => {
     if (!sipNumber || !sipProvider) {
-      toast.error('Veuillez remplir tous les champs');
+      toast.error(t('phoneNumbers.fillAllFields'));
       return;
     }
     try {
@@ -57,19 +59,19 @@ export default function PhoneNumbers() {
       setSipNumber('');
       setSipProvider('');
       setSipFriendlyName('');
-      toast.success('Numéro SIP ajouté');
+      toast.success(t('phoneNumbers.sipAdded'));
     } catch (error) {
-      toast.error('Erreur lors de l\'ajout');
+      toast.error(t('phoneNumbers.sipError'));
     }
   };
 
   const handleDeleteNumber = async (id: string) => {
-    if (confirm('Supprimer ce numéro ?')) {
+    if (confirm(t('phoneNumbers.deleteConfirm'))) {
       try {
         await deleteNumber.mutateAsync(id);
-        toast.success('Numéro supprimé');
+        toast.success(t('phoneNumbers.numberDeleted'));
       } catch (error) {
-        toast.error('Erreur lors de la suppression');
+        toast.error(t('phoneNumbers.deleteError'));
       }
     }
   };
@@ -78,7 +80,7 @@ export default function PhoneNumbers() {
     return (
       <AppLayout>
         <div className="p-6 space-y-6">
-          <h1 className="text-3xl font-bold">Numéros de téléphone</h1>
+          <h1 className="text-3xl font-bold">{t('phoneNumbers.title')}</h1>
           <TableSkeleton rows={5} />
         </div>
       </AppLayout>
@@ -90,9 +92,9 @@ export default function PhoneNumbers() {
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Numéros de téléphone</h1>
+            <h1 className="text-3xl font-bold">{t('phoneNumbers.title')}</h1>
             <p className="text-muted-foreground mt-1">
-              Gérez vos numéros Twilio et SIP pour les campagnes
+              {t('phoneNumbers.description')}
             </p>
           </div>
           <div className="flex gap-2">
@@ -100,16 +102,16 @@ export default function PhoneNumbers() {
               <DialogTrigger asChild>
                 <Button variant="outline">
                   <Globe className="mr-2 h-4 w-4" />
-                  Ajouter SIP
+                  {t('phoneNumbers.addSip')}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Ajouter un numéro SIP</DialogTitle>
+                  <DialogTitle>{t('phoneNumbers.addSipDialog')}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 pt-4">
                   <div className="space-y-2">
-                    <Label>Numéro de téléphone</Label>
+                    <Label>{t('phoneNumbers.phoneNumber')}</Label>
                     <Input
                       placeholder="+33 1 23 45 67 89"
                       value={sipNumber}
@@ -117,10 +119,10 @@ export default function PhoneNumbers() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Provider SIP</Label>
+                    <Label>{t('phoneNumbers.provider')}</Label>
                     <Select value={sipProvider} onValueChange={setSipProvider}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un provider" />
+                        <SelectValue placeholder={t('phoneNumbers.selectProvider')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="vonage">Vonage</SelectItem>
@@ -132,7 +134,7 @@ export default function PhoneNumbers() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Nom (optionnel)</Label>
+                    <Label>{t('phoneNumbers.name')} ({t('phoneNumbers.optional')})</Label>
                     <Input
                       placeholder="Ligne principale"
                       value={sipFriendlyName}
@@ -140,7 +142,7 @@ export default function PhoneNumbers() {
                     />
                   </div>
                   <Button onClick={handleAddSipNumber} className="w-full">
-                    Ajouter le numéro
+                    {t('common.add')}
                   </Button>
                 </div>
               </DialogContent>
@@ -150,17 +152,17 @@ export default function PhoneNumbers() {
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
-                  Acheter Twilio
+                  {t('phoneNumbers.buyTwilio')}
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                  <DialogTitle>Acheter un numéro Twilio</DialogTitle>
+                  <DialogTitle>{t('phoneNumbers.buyTwilioDialog')}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 pt-4">
                   <div className="flex gap-4">
                     <div className="flex-1 space-y-2">
-                      <Label>Pays</Label>
+                      <Label>{t('phoneNumbers.country')}</Label>
                       <Select value={searchCountry} onValueChange={setSearchCountry}>
                         <SelectTrigger>
                           <SelectValue />
@@ -175,7 +177,7 @@ export default function PhoneNumbers() {
                       </Select>
                     </div>
                     <div className="flex-1 space-y-2">
-                      <Label>Indicatif (optionnel)</Label>
+                      <Label>{t('phoneNumbers.areaCode')}</Label>
                       <Input
                         placeholder="415"
                         value={searchAreaCode}
@@ -198,9 +200,9 @@ export default function PhoneNumbers() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Numéro</TableHead>
-                            <TableHead>Capacités</TableHead>
-                            <TableHead>Prix/mois</TableHead>
+                            <TableHead>{t('phoneNumbers.phoneNumber')}</TableHead>
+                            <TableHead>{t('phoneNumbers.capabilities')}</TableHead>
+                            <TableHead>{t('phoneNumbers.pricePerMonth')}</TableHead>
                             <TableHead></TableHead>
                           </TableRow>
                         </TableHeader>
@@ -211,7 +213,11 @@ export default function PhoneNumbers() {
                               <TableCell>
                                 <div className="flex gap-1">
                                   {result.capabilities.voice && (
-                                    <Badge variant="secondary">Voix</Badge>
+                                    <Badge variant="secondary">{t('phoneNumbers.voice')}</Badge>
+                                  )}
+                                  {result.capabilities.sms && (
+                                    <Badge variant="secondary">{t('phoneNumbers.sms')}</Badge>
+                                  )}
                                   )}
                                   {result.capabilities.sms && (
                                     <Badge variant="secondary">SMS</Badge>
@@ -225,7 +231,7 @@ export default function PhoneNumbers() {
                                   onClick={() => handlePurchaseNumber(result.phoneNumber)}
                                   disabled={purchaseNumber.isPending}
                                 >
-                                  Acheter
+                                  {t('phoneNumbers.buy')}
                                 </Button>
                               </TableCell>
                             </TableRow>
@@ -237,7 +243,7 @@ export default function PhoneNumbers() {
 
                   {searchResults && searchResults.length === 0 && (
                     <p className="text-center text-muted-foreground py-8">
-                      Aucun numéro disponible
+                      {t('phoneNumbers.noAvailable')}
                     </p>
                   )}
                 </div>
@@ -250,28 +256,28 @@ export default function PhoneNumbers() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Phone className="h-5 w-5" />
-              Mes numéros ({phoneNumbers.length})
+              {t('phoneNumbers.myNumbers')} ({phoneNumbers.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {phoneNumbers.length === 0 ? (
               <div className="text-center py-12">
                 <Phone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Aucun numéro</h3>
+                <h3 className="text-lg font-medium mb-2">{t('phoneNumbers.noNumbers')}</h3>
                 <p className="text-muted-foreground mb-4">
-                  Achetez un numéro Twilio ou ajoutez un numéro SIP
+                  {t('phoneNumbers.buyOrAddSip')}
                 </p>
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Numéro</TableHead>
-                    <TableHead>Provider</TableHead>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Coût/mois</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t('phoneNumbers.phoneNumber')}</TableHead>
+                    <TableHead>{t('phoneNumbers.provider')}</TableHead>
+                    <TableHead>{t('phoneNumbers.name')}</TableHead>
+                    <TableHead>{t('phoneNumbers.status')}</TableHead>
+                    <TableHead>{t('phoneNumbers.monthlyCost')}</TableHead>
+                    <TableHead className="text-right">{t('common.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -290,12 +296,12 @@ export default function PhoneNumbers() {
                         {phone.status === 'active' ? (
                           <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
                             <CheckCircle className="mr-1 h-3 w-3" />
-                            Actif
+                            {t('phoneNumbers.active')}
                           </Badge>
                         ) : phone.status === 'pending' ? (
-                          <Badge variant="secondary">En attente</Badge>
+                          <Badge variant="secondary">{t('phoneNumbers.pending')}</Badge>
                         ) : (
-                          <Badge variant="destructive">Inactif</Badge>
+                          <Badge variant="destructive">{t('phoneNumbers.inactive')}</Badge>
                         )}
                       </TableCell>
                       <TableCell>
@@ -311,14 +317,14 @@ export default function PhoneNumbers() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem>
                               <Settings className="mr-2 h-4 w-4" />
-                              Configurer
+                              {t('phoneNumbers.configure')}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive"
                               onClick={() => handleDeleteNumber(phone.id)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
-                              Supprimer
+                              {t('phoneNumbers.delete')}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
