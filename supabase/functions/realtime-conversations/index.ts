@@ -17,6 +17,25 @@ interface ActiveConversation {
   duration_secs?: number;
 }
 
+// Fetch conversations from ElevenLabs with correct endpoint
+async function fetchAgentConversations(apiKey: string, platformAgentId: string, limit = 20) {
+  const url = new URL('https://api.elevenlabs.io/v1/convai/conversations');
+  url.searchParams.set('agent_id', platformAgentId);
+  url.searchParams.set('page_size', String(limit));
+
+  const response = await fetch(url.toString(), {
+    headers: { 'xi-api-key': apiKey },
+  });
+
+  if (!response.ok) {
+    console.error(`[realtime] API error for agent ${platformAgentId}: ${response.status}`);
+    return [];
+  }
+
+  const data = await response.json();
+  return data.conversations || [];
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -35,7 +54,7 @@ serve(async (req) => {
     let agentConfigs: Array<{ id: string; name: string; agentId: string; apiKey: string }> = [];
     
     socket.onopen = () => {
-      console.log('WebSocket connection opened');
+      console.log('[realtime] WebSocket connection opened');
     };
     
     socket.onmessage = async (event) => {
@@ -43,12 +62,17 @@ serve(async (req) => {
         const message = JSON.parse(event.data);
         
         if (message.type === 'auth') {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+          const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+          
           // Authenticate user
           const supabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
+            supabaseUrl,
             Deno.env.get('SUPABASE_ANON_KEY') ?? '',
             { global: { headers: { Authorization: `Bearer ${message.token}` } } }
           );
+          
+          const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
           
           const { data: { user }, error: userError } = await supabase.auth.getUser(message.token);
           
@@ -73,6 +97,17 @@ serve(async (req) => {
           
           organizationId = orgMember.organization_id;
           
+          // Get organization API key
+          const { data: orgIntegration } = await supabaseAdmin
+            .from('organization_integrations')
+            .select('api_key')
+            .eq('organization_id', organizationId)
+            .eq('platform', 'elevenlabs')
+            .eq('is_active', true)
+            .maybeSingle();
+          
+          const orgApiKey = orgIntegration?.api_key;
+          
           // Get all ElevenLabs agents
           const { data: agents } = await supabase
             .from('agents')
@@ -82,12 +117,13 @@ serve(async (req) => {
           
           if (agents) {
             for (const agent of agents) {
-              if (agent.platform_agent_id && agent.platform_api_key) {
+              const apiKey = agent.platform_api_key || orgApiKey;
+              if (agent.platform_agent_id && apiKey) {
                 agentConfigs.push({
                   id: agent.id,
                   name: agent.name,
                   agentId: agent.platform_agent_id,
-                  apiKey: agent.platform_api_key
+                  apiKey: apiKey
                 });
               }
             }
@@ -108,55 +144,41 @@ serve(async (req) => {
             
             for (const config of agentConfigs) {
               try {
-                // Fetch recent conversations (last 5 minutes)
-                const response = await fetch(
-                  `https://api.elevenlabs.io/v1/convai/agents/${config.agentId}/conversations?limit=20`,
-                  {
-                    headers: {
-                      'xi-api-key': config.apiKey,
-                    },
-                  }
-                );
+                const conversations = await fetchAgentConversations(config.apiKey, config.agentId, 20);
                 
-                if (response.ok) {
-                  const data = await response.json();
-                  const conversations = data.conversations || [];
+                for (const conv of conversations) {
+                  const startTime = new Date(conv.start_time || conv.created_at).getTime();
+                  const now = Date.now();
                   
-                  for (const conv of conversations) {
-                    const startTime = new Date(conv.start_time || conv.created_at).getTime();
-                    const now = Date.now();
-                    const duration = conv.call_duration_secs || conv.duration || 0;
-                    
-                    // Consider active if started within last 5 minutes and no end_time or very recent
-                    const isActive = conv.status === 'in_progress' || 
-                      (now - startTime < 5 * 60 * 1000 && !conv.end_time);
-                    
-                    if (isActive) {
-                      activeConversations.push({
-                        conversation_id: conv.conversation_id,
-                        agent_id: config.id,
-                        agent_name: config.name,
-                        platform_agent_id: config.agentId,
-                        start_time: conv.start_time || conv.created_at,
-                        status: 'active',
-                        caller_id: conv.caller_id || conv.metadata?.caller_id,
-                        duration_secs: Math.floor((now - startTime) / 1000)
-                      });
-                    }
-                    
-                    // Recent conversations (last 30 minutes)
-                    if (now - startTime < 30 * 60 * 1000) {
-                      recentConversations.push({
-                        ...conv,
-                        agent_id: config.id,
-                        agent_name: config.name,
-                        platform_agent_id: config.agentId,
-                      });
-                    }
+                  // Consider active if started within last 5 minutes and no end_time or very recent
+                  const isActive = conv.status === 'in_progress' || 
+                    (now - startTime < 5 * 60 * 1000 && !conv.end_time);
+                  
+                  if (isActive) {
+                    activeConversations.push({
+                      conversation_id: conv.conversation_id,
+                      agent_id: config.id,
+                      agent_name: config.name,
+                      platform_agent_id: config.agentId,
+                      start_time: conv.start_time || conv.created_at,
+                      status: 'active',
+                      caller_id: conv.caller_id || conv.metadata?.caller_id,
+                      duration_secs: Math.floor((now - startTime) / 1000)
+                    });
+                  }
+                  
+                  // Recent conversations (last 30 minutes)
+                  if (now - startTime < 30 * 60 * 1000) {
+                    recentConversations.push({
+                      ...conv,
+                      agent_id: config.id,
+                      agent_name: config.name,
+                      platform_agent_id: config.agentId,
+                    });
                   }
                 }
               } catch (error) {
-                console.error(`Error polling agent ${config.name}:`, error);
+                console.error(`[realtime] Error polling agent ${config.name}:`, error);
               }
             }
             
@@ -183,20 +205,20 @@ serve(async (req) => {
           pollingInterval = setInterval(pollActiveConversations, 5000);
         }
       } catch (error) {
-        console.error('WebSocket message error:', error);
+        console.error('[realtime] WebSocket message error:', error);
         socket.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
       }
     };
     
     socket.onclose = () => {
-      console.log('WebSocket connection closed');
+      console.log('[realtime] WebSocket connection closed');
       if (pollingInterval) {
         clearInterval(pollingInterval);
       }
     };
     
     socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      console.error('[realtime] WebSocket error:', error);
     };
     
     return response;
@@ -213,11 +235,16 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    
     const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
+      supabaseUrl,
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     );
+    
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) {
@@ -241,6 +268,17 @@ serve(async (req) => {
       });
     }
 
+    // Get organization API key
+    const { data: orgIntegration } = await supabaseAdmin
+      .from('organization_integrations')
+      .select('api_key')
+      .eq('organization_id', orgMember.organization_id)
+      .eq('platform', 'elevenlabs')
+      .eq('is_active', true)
+      .maybeSingle();
+    
+    const orgApiKey = orgIntegration?.api_key;
+
     // Get all ElevenLabs agents
     const { data: agents } = await supabase
       .from('agents')
@@ -252,12 +290,13 @@ serve(async (req) => {
     
     if (agents) {
       for (const agent of agents) {
-        if (agent.platform_agent_id && agent.platform_api_key) {
+        const apiKey = agent.platform_api_key || orgApiKey;
+        if (agent.platform_agent_id && apiKey) {
           agentConfigs.push({
             id: agent.id,
             name: agent.name,
             agentId: agent.platform_agent_id,
-            apiKey: agent.platform_api_key
+            apiKey: apiKey
           });
         }
       }
@@ -268,51 +307,39 @@ serve(async (req) => {
 
     for (const config of agentConfigs) {
       try {
-        const response = await fetch(
-          `https://api.elevenlabs.io/v1/convai/agents/${config.agentId}/conversations?limit=20`,
-          {
-            headers: {
-              'xi-api-key': config.apiKey,
-            },
+        const conversations = await fetchAgentConversations(config.apiKey, config.agentId, 20);
+
+        for (const conv of conversations) {
+          const startTime = new Date(conv.start_time || conv.created_at).getTime();
+          const now = Date.now();
+
+          const isActive = conv.status === 'in_progress' || 
+            (now - startTime < 5 * 60 * 1000 && !conv.end_time);
+
+          if (isActive) {
+            activeConversations.push({
+              conversation_id: conv.conversation_id,
+              agent_id: config.id,
+              agent_name: config.name,
+              platform_agent_id: config.agentId,
+              start_time: conv.start_time || conv.created_at,
+              status: 'active',
+              caller_id: conv.caller_id || conv.metadata?.caller_id,
+              duration_secs: Math.floor((now - startTime) / 1000)
+            });
           }
-        );
 
-        if (response.ok) {
-          const data = await response.json();
-          const conversations = data.conversations || [];
-
-          for (const conv of conversations) {
-            const startTime = new Date(conv.start_time || conv.created_at).getTime();
-            const now = Date.now();
-
-            const isActive = conv.status === 'in_progress' || 
-              (now - startTime < 5 * 60 * 1000 && !conv.end_time);
-
-            if (isActive) {
-              activeConversations.push({
-                conversation_id: conv.conversation_id,
-                agent_id: config.id,
-                agent_name: config.name,
-                platform_agent_id: config.agentId,
-                start_time: conv.start_time || conv.created_at,
-                status: 'active',
-                caller_id: conv.caller_id || conv.metadata?.caller_id,
-                duration_secs: Math.floor((now - startTime) / 1000)
-              });
-            }
-
-            if (now - startTime < 30 * 60 * 1000) {
-              recentConversations.push({
-                ...conv,
-                agent_id: config.id,
-                agent_name: config.name,
-                platform_agent_id: config.agentId,
-              });
-            }
+          if (now - startTime < 30 * 60 * 1000) {
+            recentConversations.push({
+              ...conv,
+              agent_id: config.id,
+              agent_name: config.name,
+              platform_agent_id: config.agentId,
+            });
           }
         }
       } catch (error) {
-        console.error(`Error fetching for agent ${config.name}:`, error);
+        console.error(`[realtime] Error fetching for agent ${config.name}:`, error);
       }
     }
 
@@ -333,7 +360,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Realtime conversations error:', error);
+    console.error('[realtime] Error:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
