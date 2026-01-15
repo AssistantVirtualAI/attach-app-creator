@@ -125,11 +125,18 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
 
       const { data: conversations } = await conversationsQuery;
 
-      // Fetch insights
+      // Fetch insights with date filtering
       let insightsQuery = supabase
         .from('agent_insights')
-        .select('agent_id, satisfaction_score, overall_sentiment, improvements, smart_tags')
+        .select('agent_id, satisfaction_score, overall_sentiment, improvements, smart_tags, analyzed_at')
         .eq('organization_id', selectedOrg.id);
+
+      // Apply date range filter to insights
+      if (dateRange) {
+        insightsQuery = insightsQuery
+          .gte('analyzed_at', dateRange.start.toISOString())
+          .lte('analyzed_at', dateRange.end.toISOString());
+      }
 
       if (selectedAgentId && selectedAgentId !== 'all') {
         insightsQuery = insightsQuery.eq('agent_id', selectedAgentId);
@@ -314,10 +321,20 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
           dataSource = agentConversations.length > 0 ? 'mixed' : 'platform';
         }
 
-        // Calculate satisfaction from local data
+        // Calculate satisfaction from local conversations first
         if (agentConversations.length > 0) {
           const scores = agentConversations.filter(c => c.satisfaction_score).map(c => Number(c.satisfaction_score));
           avgSatisfaction = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+        }
+
+        // Fallback: Use agent_insights satisfaction if no local conversation data or zero
+        if (avgSatisfaction === 0 && agentInsights.length > 0) {
+          const insightScores = agentInsights
+            .filter(i => i.satisfaction_score !== null && i.satisfaction_score !== undefined)
+            .map(i => Number(i.satisfaction_score));
+          if (insightScores.length > 0) {
+            avgSatisfaction = insightScores.reduce((a, b) => a + b, 0) / insightScores.length;
+          }
         }
 
         // Duration from local if not from platform
@@ -441,10 +458,15 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
       // Global metrics - sum from all agents
       const totalConversations = agentMetrics.reduce((sum, a) => sum + a.totalConversations, 0);
       
-      const avgSatisfaction = agentMetrics.length > 0 
-        ? agentMetrics.filter(a => a.avgSatisfaction > 0).reduce((sum, a) => sum + a.avgSatisfaction, 0) / 
-          (agentMetrics.filter(a => a.avgSatisfaction > 0).length || 1)
-        : 0;
+      // Calculate weighted average satisfaction based on conversation count
+      const agentsWithSatisfaction = agentMetrics.filter(a => a.avgSatisfaction > 0);
+      const totalWeightedSat = agentsWithSatisfaction.reduce(
+        (sum, a) => sum + (a.avgSatisfaction * Math.max(a.totalConversations, 1)), 0
+      );
+      const totalWeight = agentsWithSatisfaction.reduce(
+        (sum, a) => sum + Math.max(a.totalConversations, 1), 0
+      );
+      const avgSatisfaction = totalWeight > 0 ? totalWeightedSat / totalWeight : 0;
 
       // Calculate total voice minutes from platform data
       let totalVoiceMinutes = 0;
