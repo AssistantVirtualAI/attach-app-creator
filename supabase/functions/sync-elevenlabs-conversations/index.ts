@@ -67,7 +67,7 @@ serve(async (req) => {
       .maybeSingle();
 
     const orgApiKey = orgIntegration?.api_key;
-    console.log(`Organization has ElevenLabs integration: ${!!orgApiKey}`);
+    console.log(`[sync] Organization has ElevenLabs integration: ${!!orgApiKey}`);
 
     let agentsQuery = supabase
       .from('agents')
@@ -104,32 +104,36 @@ serve(async (req) => {
       const apiKey = agent.platform_api_key || orgApiKey;
       
       if (!agent.platform_agent_id) {
-        console.log(`Skipping agent ${agent.name} - missing platform_agent_id`);
+        console.log(`[sync] Skipping agent ${agent.name} - missing platform_agent_id`);
         syncErrors.push(`Agent ${agent.name}: missing platform_agent_id`);
         continue;
       }
 
       if (!apiKey) {
-        console.log(`Skipping agent ${agent.name} - no API key available (agent or org integration)`);
+        console.log(`[sync] Skipping agent ${agent.name} - no API key available (agent or org integration)`);
         syncErrors.push(`Agent ${agent.name}: no API key configured`);
         continue;
       }
 
       try {
-        console.log(`Syncing conversations for agent ${agent.name} (mode: ${mode})`);
+        console.log(`[sync] Syncing conversations for agent ${agent.name} (mode: ${mode})`);
         
         let allConversations: any[] = [];
         let cursor: string | null = null;
         let pageCount = 0;
-        const maxPages = mode === 'all' ? 100 : 1; // For 'all' mode, paginate; otherwise just one page
-        const pageLimit = mode === 'all' ? 100 : limit;
+        const maxPages = mode === 'all' ? 100 : 3; // For 'all' mode, paginate more; otherwise just a few pages
+        const pageLimit = Math.min(limit, 100);
         
         do {
-          const url = new URL(`https://api.elevenlabs.io/v1/convai/agents/${agent.platform_agent_id}/conversations`);
-          url.searchParams.set('limit', String(pageLimit));
+          // CORRECT API ENDPOINT: /v1/convai/conversations?agent_id=...
+          const url = new URL('https://api.elevenlabs.io/v1/convai/conversations');
+          url.searchParams.set('agent_id', agent.platform_agent_id);
+          url.searchParams.set('page_size', String(pageLimit));
           if (cursor) {
             url.searchParams.set('cursor', cursor);
           }
+          
+          console.log(`[sync] Fetching: ${url.toString()}`);
           
           const response = await fetch(url.toString(), {
             headers: {
@@ -138,7 +142,8 @@ serve(async (req) => {
           });
 
           if (!response.ok) {
-            console.error(`Error fetching conversations for ${agent.name}: ${response.status}`);
+            const errorText = await response.text();
+            console.error(`[sync] Error fetching conversations for ${agent.name}: ${response.status} - ${errorText}`);
             syncErrors.push(`Agent ${agent.name}: API error ${response.status}`);
             break;
           }
@@ -151,7 +156,7 @@ serve(async (req) => {
           cursor = data.next_cursor || null;
           pageCount++;
           
-          console.log(`Page ${pageCount}: Got ${conversations.length} conversations, total so far: ${allConversations.length}`);
+          console.log(`[sync] Page ${pageCount}: Got ${conversations.length} conversations, total so far: ${allConversations.length}`);
           
           // Stop if no more pages or reached limit
           if (!cursor || pageCount >= maxPages || (mode !== 'all' && allConversations.length >= limit)) {
@@ -159,7 +164,7 @@ serve(async (req) => {
           }
         } while (cursor);
 
-        console.log(`Found ${allConversations.length} conversations for ${agent.name}`);
+        console.log(`[sync] Found ${allConversations.length} conversations for ${agent.name}`);
 
         for (const conv of allConversations) {
           // Check if conversation already exists using external_id
@@ -184,7 +189,7 @@ serve(async (req) => {
               detailedConv = await detailResponse.json();
             }
           } catch (e) {
-            console.log(`Could not fetch details for ${conv.conversation_id}`);
+            console.log(`[sync] Could not fetch details for ${conv.conversation_id}`);
           }
 
           // Extract transcript from detailed response
@@ -201,9 +206,18 @@ serve(async (req) => {
           // Extract analysis from ElevenLabs if available
           const elevenLabsAnalysis = detailedConv.analysis || conv.analysis || {};
           const sentiment = elevenLabsAnalysis.user_sentiment || elevenLabsAnalysis.sentiment || null;
-          const satisfactionScore = elevenLabsAnalysis.call_successful === true ? 4 : 
-                                   elevenLabsAnalysis.call_successful === false ? 2 : 
-                                   elevenLabsAnalysis.satisfaction_score || null;
+          
+          // Map rating (1-5) to satisfaction score (1-10)
+          let satisfactionScore: number | null = null;
+          if (conv.rating && typeof conv.rating === 'number') {
+            satisfactionScore = conv.rating * 2; // 1-5 -> 2-10
+          } else if (elevenLabsAnalysis.call_successful === true) {
+            satisfactionScore = 8;
+          } else if (elevenLabsAnalysis.call_successful === false) {
+            satisfactionScore = 4;
+          } else if (elevenLabsAnalysis.satisfaction_score) {
+            satisfactionScore = elevenLabsAnalysis.satisfaction_score;
+          }
 
           const conversationData = {
             external_id: conv.conversation_id,
@@ -252,7 +266,7 @@ serve(async (req) => {
               .eq('id', existing.id);
 
             if (updateError) {
-              console.error(`Error updating conversation ${conv.conversation_id}:`, updateError);
+              console.error(`[sync] Error updating conversation ${conv.conversation_id}:`, updateError);
             } else {
               totalUpdated++;
             }
@@ -264,32 +278,48 @@ serve(async (req) => {
               .single();
 
             if (insertError) {
-              console.error(`Error inserting conversation ${conv.conversation_id}:`, insertError);
+              console.error(`[sync] Error inserting conversation ${conv.conversation_id}:`, insertError);
             } else {
               totalCreated++;
               
               // Trigger AI analysis for new conversations without satisfaction score
-              if (analyzeConversations && !satisfactionScore && inserted?.id) {
+              if (analyzeConversations && !satisfactionScore && inserted?.id && transcript.length > 0) {
                 try {
+                  const transcriptText = transcript.map((m: any) => `${m.role}: ${m.message}`).join('\n');
+                  
                   const analysisResponse = await fetch(`${supabaseUrl}/functions/v1/analyze-conversation`, {
                     method: 'POST',
                     headers: {
-                      'Authorization': authHeader,
+                      'Authorization': `Bearer ${supabaseServiceKey}`,
                       'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
                       conversationId: inserted.id,
-                      transcript: transcript.map((m: any) => `${m.role}: ${m.message}`).join('\n'),
+                      transcript: transcriptText,
                       agentId: agent.id,
+                      organizationId: orgMember.organization_id,
                     }),
                   });
                   
                   if (analysisResponse.ok) {
+                    const analysisResult = await analysisResponse.json();
                     totalAnalyzed++;
-                    console.log(`Analysis triggered for conversation ${inserted.id}`);
+                    console.log(`[sync] Analysis triggered for conversation ${inserted.id}, satisfaction: ${analysisResult?.analysis?.satisfaction_score}`);
+                    
+                    // Update conversation with analysis results
+                    if (analysisResult?.analysis?.satisfaction_score) {
+                      await supabaseAdmin
+                        .from('conversations')
+                        .update({
+                          satisfaction_score: analysisResult.analysis.satisfaction_score,
+                          sentiment: analysisResult.analysis.sentiment,
+                          smart_tags: analysisResult.analysis.smart_tags,
+                        })
+                        .eq('id', inserted.id);
+                    }
                   }
                 } catch (analysisError) {
-                  console.log(`Could not trigger analysis for ${inserted.id}:`, analysisError);
+                  console.log(`[sync] Could not trigger analysis for ${inserted.id}:`, analysisError);
                 }
               }
             }
@@ -298,10 +328,12 @@ serve(async (req) => {
           totalSynced++;
         }
       } catch (error) {
-        console.error(`Error syncing agent ${agent.name}:`, error);
+        console.error(`[sync] Error syncing agent ${agent.name}:`, error);
         syncErrors.push(`Agent ${agent.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
+
+    console.log(`[sync] Complete: synced=${totalSynced}, created=${totalCreated}, updated=${totalUpdated}, analyzed=${totalAnalyzed}`);
 
     return new Response(
       JSON.stringify({
@@ -317,7 +349,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Sync error:', error);
+    console.error('[sync] Error:', error);
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Unknown error',

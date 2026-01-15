@@ -34,8 +34,8 @@ GLOBAL METRICS:
 PERFORMANCE BY AGENT:
 ${data.agentPerformance}
 
-BEST AGENT: ${data.bestAgent?.agentName} (${data.bestAgent?.avgSatisfaction.toFixed(1)}/10)
-AGENT TO IMPROVE: ${data.worstAgent?.agentName} (${data.worstAgent?.avgSatisfaction.toFixed(1)}/10)
+BEST AGENT: ${data.bestAgent?.agentName || 'N/A'} (${data.bestAgent?.avgSatisfaction?.toFixed(1) || 'N/A'}/10)
+AGENT TO IMPROVE: ${data.worstAgent?.agentName || 'N/A'} (${data.worstAgent?.avgSatisfaction?.toFixed(1) || 'N/A'}/10)
 
 Generate a JSON report with this exact structure:
 {
@@ -49,8 +49,8 @@ Generate a JSON report with this exact structure:
     {"action": "Priority action 2", "agent": "All or specific agent name", "impact": "medium"}
   ],
   "agentRecommendations": {
-    "${data.bestAgent?.agentName}": "Specific advice for this agent",
-    "${data.worstAgent?.agentName}": "Specific advice for this agent"
+    "${data.bestAgent?.agentName || 'agent1'}": "Specific advice for this agent",
+    "${data.worstAgent?.agentName || 'agent2'}": "Specific advice for this agent"
   }
 }`;
   }
@@ -69,8 +69,8 @@ MÉTRIQUES GLOBALES:
 PERFORMANCE PAR AGENT:
 ${data.agentPerformance}
 
-MEILLEUR AGENT: ${data.bestAgent?.agentName} (${data.bestAgent?.avgSatisfaction.toFixed(1)}/10)
-AGENT À AMÉLIORER: ${data.worstAgent?.agentName} (${data.worstAgent?.avgSatisfaction.toFixed(1)}/10)
+MEILLEUR AGENT: ${data.bestAgent?.agentName || 'N/A'} (${data.bestAgent?.avgSatisfaction?.toFixed(1) || 'N/A'}/10)
+AGENT À AMÉLIORER: ${data.worstAgent?.agentName || 'N/A'} (${data.worstAgent?.avgSatisfaction?.toFixed(1) || 'N/A'}/10)
 
 Génère un rapport JSON avec cette structure exacte:
 {
@@ -84,11 +84,53 @@ Génère un rapport JSON avec cette structure exacte:
     {"action": "Action prioritaire 2", "agent": "Tous ou nom agent spécifique", "impact": "medium"}
   ],
   "agentRecommendations": {
-    "${data.bestAgent?.agentName}": "Conseil spécifique pour cet agent",
-    "${data.worstAgent?.agentName}": "Conseil spécifique pour cet agent"
+    "${data.bestAgent?.agentName || 'agent1'}": "Conseil spécifique pour cet agent",
+    "${data.worstAgent?.agentName || 'agent2'}": "Conseil spécifique pour cet agent"
   }
 }`;
 };
+
+// Fetch conversations from ElevenLabs API directly
+async function fetchElevenLabsConversations(apiKey: string, platformAgentId: string, startDate?: Date, maxConversations = 500) {
+  const allConversations: any[] = [];
+  let cursor: string | null = null;
+  let pageCount = 0;
+  const maxPages = 10;
+
+  do {
+    const url = new URL('https://api.elevenlabs.io/v1/convai/conversations');
+    url.searchParams.set('agent_id', platformAgentId);
+    url.searchParams.set('page_size', '100');
+    if (cursor) {
+      url.searchParams.set('cursor', cursor);
+    }
+    if (startDate) {
+      url.searchParams.set('call_start_after_unix', String(Math.floor(startDate.getTime() / 1000)));
+    }
+
+    const response = await fetch(url.toString(), {
+      headers: { 'xi-api-key': apiKey },
+    });
+
+    if (!response.ok) {
+      console.error(`[global-advice] ElevenLabs API error: ${response.status}`);
+      break;
+    }
+
+    const data = await response.json();
+    const conversations = data.conversations || [];
+    allConversations.push(...conversations);
+
+    cursor = data.next_cursor || null;
+    pageCount++;
+
+    if (!cursor || pageCount >= maxPages || allConversations.length >= maxConversations) {
+      break;
+    }
+  } while (cursor);
+
+  return allConversations;
+}
 
 // Fetch all conversations with pagination (no limit)
 async function fetchAllOrgConversations(supabaseAdmin: any, organizationId: string, startDate?: Date) {
@@ -112,7 +154,7 @@ async function fetchAllOrgConversations(supabaseAdmin: any, organizationId: stri
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error fetching conversations:', error);
+      console.error('[global-advice] Error fetching conversations:', error);
       break;
     }
 
@@ -134,7 +176,7 @@ serve(async (req) => {
   }
 
   try {
-    const { days = 7, language = 'en' } = await req.json().catch(() => ({}));
+    const { days = 7, language = 'en', forceRegenerate = false } = await req.json().catch(() => ({}));
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -179,12 +221,23 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Generating global advice for organization: ${orgMember.organization_id}, language: ${language}, days: ${days}`);
+    console.log(`[global-advice] Generating for organization: ${orgMember.organization_id}, language: ${language}, days: ${days}`);
+
+    // Get organization's ElevenLabs API key
+    const { data: orgIntegration } = await supabaseAdmin
+      .from('organization_integrations')
+      .select('api_key')
+      .eq('organization_id', orgMember.organization_id)
+      .eq('platform', 'elevenlabs')
+      .eq('is_active', true)
+      .maybeSingle();
+
+    const orgApiKey = orgIntegration?.api_key;
 
     // Get all agents
     const { data: agents } = await supabaseAdmin
       .from('agents')
-      .select('id, name, platform, platform_agent_id')
+      .select('id, name, platform, platform_agent_id, platform_api_key')
       .eq('organization_id', orgMember.organization_id);
 
     if (!agents || agents.length === 0) {
@@ -205,14 +258,70 @@ serve(async (req) => {
       startDate.setDate(startDate.getDate() - days);
     }
 
-    // Fetch ALL conversations (no limit)
-    const conversations = await fetchAllOrgConversations(supabaseAdmin, orgMember.organization_id, startDate);
+    // First try to fetch from local database
+    let conversations = await fetchAllOrgConversations(supabaseAdmin, orgMember.organization_id, startDate);
+    console.log(`[global-advice] Local DB conversations: ${conversations.length}`);
+
+    // If local DB is empty, try fetching directly from ElevenLabs
+    if (conversations.length === 0 && orgApiKey) {
+      console.log(`[global-advice] Local DB empty, fetching from ElevenLabs API...`);
+      
+      const elevenlabsAgents = agents.filter(a => a.platform === 'elevenlabs' && a.platform_agent_id);
+      
+      for (const agent of elevenlabsAgents) {
+        const apiKey = agent.platform_api_key || orgApiKey;
+        if (!apiKey) continue;
+
+        try {
+          const platformConvs = await fetchElevenLabsConversations(apiKey, agent.platform_agent_id!, startDate);
+          console.log(`[global-advice] Fetched ${platformConvs.length} from ElevenLabs for ${agent.name}`);
+          
+          // Map to local format
+          for (const conv of platformConvs) {
+            const analysis = conv.analysis || {};
+            conversations.push({
+              id: conv.conversation_id,
+              agent_id: agent.id,
+              title: `Conversation ${conv.conversation_id?.substring(0, 8) || 'unknown'}`,
+              duration: conv.call_duration_secs || conv.duration || 0,
+              satisfaction_score: conv.rating ? conv.rating * 2 : (analysis.call_successful === true ? 8 : analysis.call_successful === false ? 4 : null),
+              sentiment: analysis.user_sentiment || analysis.sentiment || null,
+              smart_tags: analysis.data_collection_results ? Object.keys(analysis.data_collection_results) : [],
+              created_at: conv.start_time || conv.created_at,
+              metadata: { summary: analysis.summary || analysis.transcript_summary },
+            });
+          }
+        } catch (e) {
+          console.error(`[global-advice] Error fetching from ElevenLabs for ${agent.name}:`, e);
+        }
+      }
+    }
+
+    // Also fetch from agent_insights for additional satisfaction data
+    const { data: insights } = await supabaseAdmin
+      .from('agent_insights')
+      .select('agent_id, satisfaction_score, overall_sentiment')
+      .eq('organization_id', orgMember.organization_id);
+
+    // Create a map of conversation satisfaction from insights
+    const insightMap = new Map();
+    insights?.forEach(i => {
+      if (!insightMap.has(i.agent_id)) {
+        insightMap.set(i.agent_id, { scores: [], sentiments: [] });
+      }
+      if (i.satisfaction_score) {
+        insightMap.get(i.agent_id).scores.push(i.satisfaction_score);
+      }
+      if (i.overall_sentiment) {
+        insightMap.get(i.agent_id).sentiments.push(i.overall_sentiment);
+      }
+    });
 
     // Calculate global metrics
     const totalConversations = conversations?.length || 0;
-    const avgSatisfaction = conversations && conversations.length > 0
-      ? conversations.filter(c => c.satisfaction_score).reduce((sum, c) => sum + Number(c.satisfaction_score), 0) /
-        conversations.filter(c => c.satisfaction_score).length || 0
+    const conversationsWithSatisfaction = conversations?.filter(c => c.satisfaction_score) || [];
+    const avgSatisfaction = conversationsWithSatisfaction.length > 0
+      ? conversationsWithSatisfaction.reduce((sum, c) => sum + Number(c.satisfaction_score), 0) / conversationsWithSatisfaction.length
       : 0;
     const avgDuration = conversations && conversations.length > 0
       ? conversations.filter(c => c.duration).reduce((sum, c) => sum + (c.duration || 0), 0) /
@@ -231,10 +340,18 @@ serve(async (req) => {
     // Calculate per-agent metrics
     const agentMetrics = agents.map(agent => {
       const agentConvs = conversations?.filter(c => c.agent_id === agent.id) || [];
-      const agentSatisfaction = agentConvs.length > 0
-        ? agentConvs.filter(c => c.satisfaction_score).reduce((sum, c) => sum + Number(c.satisfaction_score), 0) /
-          agentConvs.filter(c => c.satisfaction_score).length || 0
+      const agentInsights = insightMap.get(agent.id) || { scores: [], sentiments: [] };
+      
+      // Combine satisfaction from conversations and insights
+      const allScores = [
+        ...agentConvs.filter(c => c.satisfaction_score).map(c => Number(c.satisfaction_score)),
+        ...agentInsights.scores
+      ];
+      
+      const agentSatisfaction = allScores.length > 0
+        ? allScores.reduce((a, b) => a + b, 0) / allScores.length
         : 0;
+        
       const agentDuration = agentConvs.length > 0
         ? agentConvs.filter(c => c.duration).reduce((sum, c) => sum + (c.duration || 0), 0) /
           agentConvs.filter(c => c.duration).length || 0
@@ -245,6 +362,14 @@ serve(async (req) => {
         const s = (c.sentiment || '').toLowerCase();
         if (s.includes('positif') || s === 'positive') positive++;
         else if (s.includes('négatif') || s === 'negative') negative++;
+        else neutral++;
+      });
+      
+      // Also count from insights
+      agentInsights.sentiments.forEach((s: string) => {
+        const sl = (s || '').toLowerCase();
+        if (sl.includes('positif') || sl === 'positive') positive++;
+        else if (sl.includes('négatif') || sl === 'negative') negative++;
         else neutral++;
       });
 
@@ -270,14 +395,13 @@ serve(async (req) => {
       };
     }).sort((a, b) => b.totalConversations - a.totalConversations);
 
-    const bestAgent = agentMetrics.reduce((best, a) => 
-      a.avgSatisfaction > best.avgSatisfaction && a.totalConversations > 0 ? a : best, 
-      agentMetrics[0]
-    );
-    const worstAgent = agentMetrics.reduce((worst, a) => 
-      a.avgSatisfaction < worst.avgSatisfaction && a.totalConversations > 0 ? a : worst, 
-      agentMetrics[0]
-    );
+    const agentsWithConversations = agentMetrics.filter(a => a.totalConversations > 0);
+    const bestAgent = agentsWithConversations.length > 0
+      ? agentsWithConversations.reduce((best, a) => a.avgSatisfaction > best.avgSatisfaction ? a : best)
+      : null;
+    const worstAgent = agentsWithConversations.length > 0
+      ? agentsWithConversations.reduce((worst, a) => a.avgSatisfaction < worst.avgSatisfaction ? a : worst)
+      : null;
 
     // Generate global AI advice
     let globalAdvice = null;
@@ -326,38 +450,46 @@ serve(async (req) => {
             globalAdvice = JSON.parse(jsonMatch[0]);
           }
         } else if (aiResponse.status === 429) {
-          console.log('Rate limited');
+          console.log('[global-advice] Rate limited');
         } else if (aiResponse.status === 402) {
-          console.log('Credits exhausted');
+          console.log('[global-advice] Credits exhausted');
         }
       } catch (aiError) {
-        console.error('AI advice generation error:', aiError);
+        console.error('[global-advice] AI advice generation error:', aiError);
       }
     }
 
-    // Generate default advice if AI failed
+    // Generate default advice if AI failed or no conversations
     if (!globalAdvice) {
-      const summaryTemplate = language === 'en'
-        ? `${totalConversations} conversations analyzed across ${agents.length} agents. Average satisfaction of ${avgSatisfaction.toFixed(1)}/10.`
-        : `${totalConversations} conversations analysées sur ${agents.length} agents. Satisfaction moyenne de ${avgSatisfaction.toFixed(1)}/10.`;
+      const noDataMessage = language === 'en'
+        ? 'No conversation data available. Please sync conversations first using the "Sync All" button.'
+        : 'Aucune donnée de conversation disponible. Veuillez d\'abord synchroniser les conversations avec le bouton "Sync All".';
 
-      const insightTemplates = language === 'en' ? [
-        `${positiveCount} positive conversations (${((positiveCount / totalConversations) * 100).toFixed(0)}%)`,
+      const summaryTemplate = totalConversations > 0
+        ? (language === 'en'
+          ? `${totalConversations} conversations analyzed across ${agents.length} agents. Average satisfaction of ${avgSatisfaction.toFixed(1)}/10.`
+          : `${totalConversations} conversations analysées sur ${agents.length} agents. Satisfaction moyenne de ${avgSatisfaction.toFixed(1)}/10.`)
+        : noDataMessage;
+
+      const insightTemplates = totalConversations > 0 ? (language === 'en' ? [
+        `${positiveCount} positive conversations (${totalConversations > 0 ? ((positiveCount / totalConversations) * 100).toFixed(0) : 0}%)`,
         `Average duration of ${Math.round(avgDuration / 60)} minutes`,
         `${agents.length} active agents in the period`
       ] : [
-        `${positiveCount} conversations positives (${((positiveCount / totalConversations) * 100).toFixed(0)}%)`,
+        `${positiveCount} conversations positives (${totalConversations > 0 ? ((positiveCount / totalConversations) * 100).toFixed(0) : 0}%)`,
         `Durée moyenne de ${Math.round(avgDuration / 60)} minutes`,
         `${agents.length} agents actifs dans la période`
-      ];
+      ]) : [];
 
       globalAdvice = {
         globalSummary: summaryTemplate,
-        overallHealth: avgSatisfaction >= 7 ? 'good' : avgSatisfaction >= 5 ? 'warning' : 'critical',
+        overallHealth: totalConversations === 0 ? 'warning' : avgSatisfaction >= 7 ? 'good' : avgSatisfaction >= 5 ? 'warning' : 'critical',
         keyInsights: insightTemplates,
         globalStrengths: [],
         globalWeaknesses: [],
-        priorityActions: [],
+        priorityActions: totalConversations === 0 ? [
+          { action: language === 'en' ? 'Sync conversations from ElevenLabs' : 'Synchroniser les conversations depuis ElevenLabs', agent: 'All', impact: 'high' }
+        ] : [],
         agentRecommendations: {}
       };
     }
@@ -382,7 +514,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Generate global advice error:', error);
+    console.error('[global-advice] Error:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

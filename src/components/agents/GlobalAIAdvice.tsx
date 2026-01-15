@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { 
   Sparkles, 
   RefreshCw, 
@@ -19,7 +20,8 @@ import {
   Clock,
   ThumbsUp,
   Lightbulb,
-  Zap
+  Zap,
+  Download
 } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -56,6 +58,7 @@ interface GlobalAdviceData {
 export const GlobalAIAdvice = () => {
   const { t, language } = useTranslation();
   const [days, setDays] = useState<number | 'all'>(7);
+  const [syncProgress, setSyncProgress] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -67,6 +70,30 @@ export const GlobalAIAdvice = () => {
       if (error) throw error;
       return data;
     },
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      setSyncProgress(language === 'en' ? 'Syncing conversations...' : 'Synchronisation des conversations...');
+      const { data, error } = await supabase.functions.invoke('sync-elevenlabs-conversations', {
+        body: { mode: 'all', analyzeConversations: true }
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      const message = language === 'en' 
+        ? `Sync complete: ${data.synced} conversations (${data.created} new, ${data.analyzed} analyzed)`
+        : `Synchronisation terminée: ${data.synced} conversations (${data.created} nouvelles, ${data.analyzed} analysées)`;
+      toast.success(message);
+      setSyncProgress(null);
+      queryClient.invalidateQueries({ queryKey: ['global-agent-advice'] });
+    },
+    onError: (error) => {
+      console.error('Sync error:', error);
+      toast.error(language === 'en' ? 'Sync failed' : 'Échec de la synchronisation');
+      setSyncProgress(null);
+    }
   });
 
   const regenerateMutation = useMutation({
@@ -159,8 +186,22 @@ export const GlobalAIAdvice = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
+                onClick={() => syncMutation.mutate()}
+                disabled={syncMutation.isPending}
+                title={language === 'en' ? 'Sync & Analyze Conversations' : 'Synchroniser et Analyser'}
+              >
+                {syncMutation.isPending ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
                 onClick={() => regenerateMutation.mutate()}
                 disabled={regenerateMutation.isPending}
+                title={language === 'en' ? 'Regenerate Advice' : 'Régénérer les conseils'}
               >
                 {regenerateMutation.isPending ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />
@@ -172,6 +213,14 @@ export const GlobalAIAdvice = () => {
           </div>
         </CardHeader>
         <CardContent>
+          {syncProgress && (
+            <div className="mb-4 p-3 bg-primary/5 rounded-lg border border-primary/20">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+                <span className="text-sm text-primary">{syncProgress}</span>
+              </div>
+            </div>
+          )}
           <p className="text-lg">{globalAdvice.globalSummary}</p>
         </CardContent>
       </Card>
