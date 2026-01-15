@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export interface AgentDailyReport {
   id: string;
@@ -113,30 +114,34 @@ export function useLatestAgentAdvice(agentId: string) {
 
 export function useGenerateAgentAdvice() {
   const queryClient = useQueryClient();
+  const { language } = useTranslation();
 
   return useMutation({
-    mutationFn: async ({ agentId, days = 1 }: { agentId: string; days?: number }) => {
+    mutationFn: async ({ agentId, days = 1, language: langOverride }: { agentId: string; days?: number | 'all'; language?: string }) => {
       const { data, error } = await supabase.functions.invoke('generate-agent-advice', {
-        body: { agentId, days }
+        body: { agentId, days, language: langOverride || language }
       });
 
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
-      toast.success('Conseils IA générés avec succès');
+      const message = language === 'en' ? 'AI advice generated successfully' : 'Conseils IA générés avec succès';
+      toast.success(message);
       queryClient.invalidateQueries({ queryKey: ['agent-daily-reports'] });
       queryClient.invalidateQueries({ queryKey: ['agent-latest-advice'] });
     },
     onError: (error) => {
       console.error('Error generating advice:', error);
-      toast.error('Erreur lors de la génération des conseils');
+      const message = language === 'en' ? 'Error generating advice' : 'Erreur lors de la génération des conseils';
+      toast.error(message);
     }
   });
 }
 
 export function useSyncElevenLabsConversations() {
   const queryClient = useQueryClient();
+  const { language } = useTranslation();
 
   return useMutation({
     mutationFn: async ({ agentId, limit = 100 }: { agentId?: string; limit?: number }) => {
@@ -148,13 +153,17 @@ export function useSyncElevenLabsConversations() {
       return data;
     },
     onSuccess: (data) => {
-      toast.success(`Synchronisation terminée: ${data.synced} conversations (${data.created} nouvelles, ${data.updated} mises à jour)`);
+      const message = language === 'en' 
+        ? `Sync complete: ${data.synced} conversations (${data.created} new, ${data.updated} updated)`
+        : `Synchronisation terminée: ${data.synced} conversations (${data.created} nouvelles, ${data.updated} mises à jour)`;
+      toast.success(message);
       queryClient.invalidateQueries({ queryKey: ['agent-reports'] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
     onError: (error) => {
       console.error('Sync error:', error);
-      toast.error('Erreur lors de la synchronisation');
+      const message = language === 'en' ? 'Sync error' : 'Erreur lors de la synchronisation';
+      toast.error(message);
     }
   });
 }

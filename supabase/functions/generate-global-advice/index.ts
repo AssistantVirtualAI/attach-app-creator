@@ -6,13 +6,135 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Bilingual prompt templates
+const getSystemPrompt = (language: string) => {
+  if (language === 'en') {
+    return 'You are an expert in AI agent optimization. Respond only in valid JSON.';
+  }
+  return 'Tu es un expert en optimisation d\'agents IA. Réponds uniquement en JSON valide.';
+};
+
+const getGlobalAnalysisPrompt = (language: string, data: any) => {
+  const periodLabel = data.days === 'all' 
+    ? (language === 'en' ? 'All time' : 'Tout le temps') 
+    : `${data.days} ${language === 'en' ? 'day(s)' : 'jour(s)'}`;
+
+  if (language === 'en') {
+    return `You are an expert in AI conversational agent optimization. Analyze this data from ALL agents and generate a consolidated report.
+
+PERIOD: ${periodLabel}
+NUMBER OF AGENTS: ${data.agentCount}
+
+GLOBAL METRICS:
+- Total conversations: ${data.totalConversations}
+- Average satisfaction: ${data.avgSatisfaction.toFixed(1)}/10
+- Average duration: ${Math.round(data.avgDuration)}s
+- Global sentiment: ${data.positiveCount} positive, ${data.neutralCount} neutral, ${data.negativeCount} negative
+
+PERFORMANCE BY AGENT:
+${data.agentPerformance}
+
+BEST AGENT: ${data.bestAgent?.agentName} (${data.bestAgent?.avgSatisfaction.toFixed(1)}/10)
+AGENT TO IMPROVE: ${data.worstAgent?.agentName} (${data.worstAgent?.avgSatisfaction.toFixed(1)}/10)
+
+Generate a JSON report with this exact structure:
+{
+  "globalSummary": "Global summary in 3-4 sentences about all agents performance",
+  "overallHealth": "good|warning|critical",
+  "keyInsights": ["Key insight 1", "Key insight 2", "Key insight 3"],
+  "globalStrengths": ["Global strength 1", "Global strength 2"],
+  "globalWeaknesses": ["Global weakness 1", "Global weakness 2"],
+  "priorityActions": [
+    {"action": "Priority action 1", "agent": "All or specific agent name", "impact": "high"},
+    {"action": "Priority action 2", "agent": "All or specific agent name", "impact": "medium"}
+  ],
+  "agentRecommendations": {
+    "${data.bestAgent?.agentName}": "Specific advice for this agent",
+    "${data.worstAgent?.agentName}": "Specific advice for this agent"
+  }
+}`;
+  }
+  
+  return `Tu es un expert en optimisation d'agents IA conversationnels. Analyse ces données de TOUS les agents et génère un rapport consolidé.
+
+PÉRIODE: ${periodLabel}
+NOMBRE D'AGENTS: ${data.agentCount}
+
+MÉTRIQUES GLOBALES:
+- Total conversations: ${data.totalConversations}
+- Satisfaction moyenne: ${data.avgSatisfaction.toFixed(1)}/10
+- Durée moyenne: ${Math.round(data.avgDuration)}s
+- Sentiment global: ${data.positiveCount} positif, ${data.neutralCount} neutre, ${data.negativeCount} négatif
+
+PERFORMANCE PAR AGENT:
+${data.agentPerformance}
+
+MEILLEUR AGENT: ${data.bestAgent?.agentName} (${data.bestAgent?.avgSatisfaction.toFixed(1)}/10)
+AGENT À AMÉLIORER: ${data.worstAgent?.agentName} (${data.worstAgent?.avgSatisfaction.toFixed(1)}/10)
+
+Génère un rapport JSON avec cette structure exacte:
+{
+  "globalSummary": "Résumé global en 3-4 phrases sur la performance de tous les agents",
+  "overallHealth": "good|warning|critical",
+  "keyInsights": ["Insight clé 1", "Insight clé 2", "Insight clé 3"],
+  "globalStrengths": ["Force globale 1", "Force globale 2"],
+  "globalWeaknesses": ["Faiblesse globale 1", "Faiblesse globale 2"],
+  "priorityActions": [
+    {"action": "Action prioritaire 1", "agent": "Tous ou nom agent spécifique", "impact": "high"},
+    {"action": "Action prioritaire 2", "agent": "Tous ou nom agent spécifique", "impact": "medium"}
+  ],
+  "agentRecommendations": {
+    "${data.bestAgent?.agentName}": "Conseil spécifique pour cet agent",
+    "${data.worstAgent?.agentName}": "Conseil spécifique pour cet agent"
+  }
+}`;
+};
+
+// Fetch all conversations with pagination (no limit)
+async function fetchAllOrgConversations(supabaseAdmin: any, organizationId: string, startDate?: Date) {
+  const allConversations: any[] = [];
+  const pageSize = 1000;
+  let offset = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    let query = supabaseAdmin
+      .from('conversations')
+      .select('id, agent_id, title, transcript, sentiment, satisfaction_score, duration, smart_tags, resolution_status, created_at, metadata')
+      .eq('organization_id', organizationId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + pageSize - 1);
+
+    if (startDate) {
+      query = query.gte('created_at', startDate.toISOString());
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching conversations:', error);
+      break;
+    }
+
+    if (data && data.length > 0) {
+      allConversations.push(...data);
+      offset += pageSize;
+      hasMore = data.length === pageSize;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allConversations;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { days = 7 } = await req.json().catch(() => ({}));
+    const { days = 7, language = 'en' } = await req.json().catch(() => ({}));
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -57,7 +179,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Generating global advice for organization: ${orgMember.organization_id}`);
+    console.log(`Generating global advice for organization: ${orgMember.organization_id}, language: ${language}, days: ${days}`);
 
     // Get all agents
     const { data: agents } = await supabaseAdmin
@@ -76,17 +198,15 @@ serve(async (req) => {
       });
     }
 
-    // Get conversations from last N days
-    const daysAgo = new Date();
-    daysAgo.setDate(daysAgo.getDate() - days);
+    // Calculate start date (null for "all time")
+    let startDate: Date | undefined;
+    if (days !== 'all' && days > 0) {
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+    }
 
-    const { data: conversations } = await supabaseAdmin
-      .from('conversations')
-      .select('id, agent_id, title, transcript, sentiment, satisfaction_score, duration, smart_tags, resolution_status, created_at, metadata')
-      .eq('organization_id', orgMember.organization_id)
-      .gte('created_at', daysAgo.toISOString())
-      .order('created_at', { ascending: false })
-      .limit(200);
+    // Fetch ALL conversations (no limit)
+    const conversations = await fetchAllOrgConversations(supabaseAdmin, orgMember.organization_id, startDate);
 
     // Calculate global metrics
     const totalConversations = conversations?.length || 0;
@@ -163,39 +283,23 @@ serve(async (req) => {
     let globalAdvice = null;
     if (lovableApiKey && totalConversations > 0) {
       try {
-        const prompt = `Tu es un expert en optimisation d'agents IA conversationnels. Analyse ces données de TOUS les agents et génère un rapport consolidé.
+        const promptData = {
+          days,
+          agentCount: agents.length,
+          totalConversations,
+          avgSatisfaction,
+          avgDuration,
+          positiveCount,
+          neutralCount,
+          negativeCount,
+          agentPerformance: agentMetrics.map(a => 
+            `- ${a.agentName}: ${a.totalConversations} conv, ${a.avgSatisfaction.toFixed(1)}/10, ${a.sentiment.positive}+ ${a.sentiment.neutral}= ${a.sentiment.negative}-`
+          ).join('\n'),
+          bestAgent,
+          worstAgent,
+        };
 
-PÉRIODE: ${days} jour(s)
-NOMBRE D'AGENTS: ${agents.length}
-
-MÉTRIQUES GLOBALES:
-- Total conversations: ${totalConversations}
-- Satisfaction moyenne: ${avgSatisfaction.toFixed(1)}/10
-- Durée moyenne: ${Math.round(avgDuration)}s
-- Sentiment global: ${positiveCount} positif, ${neutralCount} neutre, ${negativeCount} négatif
-
-PERFORMANCE PAR AGENT:
-${agentMetrics.map(a => `- ${a.agentName}: ${a.totalConversations} conv, ${a.avgSatisfaction.toFixed(1)}/10, ${a.sentiment.positive}+ ${a.sentiment.neutral}= ${a.sentiment.negative}-`).join('\n')}
-
-MEILLEUR AGENT: ${bestAgent?.agentName} (${bestAgent?.avgSatisfaction.toFixed(1)}/10)
-AGENT À AMÉLIORER: ${worstAgent?.agentName} (${worstAgent?.avgSatisfaction.toFixed(1)}/10)
-
-Génère un rapport JSON avec cette structure exacte:
-{
-  "globalSummary": "Résumé global en 3-4 phrases sur la performance de tous les agents",
-  "overallHealth": "good|warning|critical",
-  "keyInsights": ["Insight clé 1", "Insight clé 2", "Insight clé 3"],
-  "globalStrengths": ["Force globale 1", "Force globale 2"],
-  "globalWeaknesses": ["Faiblesse globale 1", "Faiblesse globale 2"],
-  "priorityActions": [
-    {"action": "Action prioritaire 1", "agent": "Tous ou nom agent spécifique", "impact": "high"},
-    {"action": "Action prioritaire 2", "agent": "Tous ou nom agent spécifique", "impact": "medium"}
-  ],
-  "agentRecommendations": {
-    "${bestAgent?.agentName}": "Conseil spécifique pour cet agent",
-    "${worstAgent?.agentName}": "Conseil spécifique pour cet agent"
-  }
-}`;
+        const prompt = getGlobalAnalysisPrompt(language, promptData);
 
         const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
@@ -206,7 +310,7 @@ Génère un rapport JSON avec cette structure exacte:
           body: JSON.stringify({
             model: 'google/gemini-2.5-flash',
             messages: [
-              { role: 'system', content: 'Tu es un expert en optimisation d\'agents IA. Réponds uniquement en JSON valide.' },
+              { role: 'system', content: getSystemPrompt(language) },
               { role: 'user', content: prompt }
             ],
             temperature: 0.7,
@@ -233,14 +337,24 @@ Génère un rapport JSON avec cette structure exacte:
 
     // Generate default advice if AI failed
     if (!globalAdvice) {
+      const summaryTemplate = language === 'en'
+        ? `${totalConversations} conversations analyzed across ${agents.length} agents. Average satisfaction of ${avgSatisfaction.toFixed(1)}/10.`
+        : `${totalConversations} conversations analysées sur ${agents.length} agents. Satisfaction moyenne de ${avgSatisfaction.toFixed(1)}/10.`;
+
+      const insightTemplates = language === 'en' ? [
+        `${positiveCount} positive conversations (${((positiveCount / totalConversations) * 100).toFixed(0)}%)`,
+        `Average duration of ${Math.round(avgDuration / 60)} minutes`,
+        `${agents.length} active agents in the period`
+      ] : [
+        `${positiveCount} conversations positives (${((positiveCount / totalConversations) * 100).toFixed(0)}%)`,
+        `Durée moyenne de ${Math.round(avgDuration / 60)} minutes`,
+        `${agents.length} agents actifs dans la période`
+      ];
+
       globalAdvice = {
-        globalSummary: `${totalConversations} conversations analysées sur ${agents.length} agents. Satisfaction moyenne de ${avgSatisfaction.toFixed(1)}/10.`,
+        globalSummary: summaryTemplate,
         overallHealth: avgSatisfaction >= 7 ? 'good' : avgSatisfaction >= 5 ? 'warning' : 'critical',
-        keyInsights: [
-          `${positiveCount} conversations positives (${((positiveCount / totalConversations) * 100).toFixed(0)}%)`,
-          `Durée moyenne de ${Math.round(avgDuration / 60)} minutes`,
-          `${agents.length} agents actifs dans la période`
-        ],
+        keyInsights: insightTemplates,
         globalStrengths: [],
         globalWeaknesses: [],
         priorityActions: [],
@@ -251,7 +365,7 @@ Génère un rapport JSON avec cette structure exacte:
     return new Response(
       JSON.stringify({
         success: true,
-        period: { days, from: daysAgo.toISOString(), to: new Date().toISOString() },
+        period: { days, from: startDate?.toISOString() || null, to: new Date().toISOString() },
         globalMetrics: {
           totalConversations,
           avgSatisfaction,

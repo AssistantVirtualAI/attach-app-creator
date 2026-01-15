@@ -6,13 +6,137 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Bilingual prompt templates
+const getSystemPrompt = (language: string) => {
+  if (language === 'en') {
+    return 'You are an expert in AI agent optimization. Respond only in valid JSON.';
+  }
+  return 'Tu es un expert en optimisation d\'agents IA. Réponds uniquement en JSON valide.';
+};
+
+const getAnalysisPrompt = (language: string, agent: any, days: number | string, metrics: any, conversationSummaries: any[]) => {
+  const periodLabel = days === 'all' ? (language === 'en' ? 'All time' : 'Tout le temps') : `${days} ${language === 'en' ? 'day(s)' : 'jour(s)'}`;
+  
+  if (language === 'en') {
+    return `You are an expert in AI conversational agent optimization. Analyze this data and generate a structured report.
+
+AGENT: ${agent.name}
+PERIOD: ${periodLabel}
+
+METRICS:
+- Conversations: ${metrics.totalConversations}
+- Average satisfaction: ${metrics.avgSatisfaction.toFixed(1)}/10
+- Average duration: ${Math.round(metrics.avgDuration)}s
+- Resolution rate: ${metrics.successRate.toFixed(0)}%
+- Sentiment: ${metrics.positiveCount} positive, ${metrics.neutralCount} neutral, ${metrics.negativeCount} negative
+
+FREQUENT TAGS: ${metrics.topTags || 'None'}
+
+ALREADY IDENTIFIED IMPROVEMENTS: ${metrics.topImprovements || 'None'}
+
+CONVERSATION SAMPLES:
+${JSON.stringify(conversationSummaries, null, 2)}
+
+Generate a JSON report with this exact structure:
+{
+  "summary": "Summary in 2-3 sentences",
+  "strengths": ["Strength 1", "Strength 2", "Strength 3"],
+  "weaknesses": ["Weakness 1", "Weakness 2"],
+  "recommendations": [
+    {"priority": "high", "category": "prompt", "action": "Concrete action", "impact": "Expected impact"},
+    {"priority": "medium", "category": "knowledge", "action": "Concrete action", "impact": "Expected impact"}
+  ],
+  "prompt_suggestions": ["Prompt modification suggestion 1"],
+  "kb_suggestions": ["Add documentation about X"],
+  "priority_actions": [
+    {"action": "Priority action 1", "effort": "low", "impact": "high"},
+    {"action": "Priority action 2", "effort": "medium", "impact": "high"}
+  ]
+}`;
+  }
+  
+  return `Tu es un expert en optimisation d'agents IA conversationnels. Analyse ces données et génère un rapport structuré.
+
+AGENT: ${agent.name}
+PÉRIODE: ${periodLabel}
+
+MÉTRIQUES:
+- Conversations: ${metrics.totalConversations}
+- Satisfaction moyenne: ${metrics.avgSatisfaction.toFixed(1)}/10
+- Durée moyenne: ${Math.round(metrics.avgDuration)}s
+- Taux de résolution: ${metrics.successRate.toFixed(0)}%
+- Sentiment: ${metrics.positiveCount} positif, ${metrics.neutralCount} neutre, ${metrics.negativeCount} négatif
+
+TAGS FRÉQUENTS: ${metrics.topTags || 'Aucun'}
+
+AMÉLIORATIONS DÉJÀ IDENTIFIÉES: ${metrics.topImprovements || 'Aucune'}
+
+ÉCHANTILLON DE CONVERSATIONS:
+${JSON.stringify(conversationSummaries, null, 2)}
+
+Génère un rapport JSON avec cette structure exacte:
+{
+  "summary": "Résumé en 2-3 phrases",
+  "strengths": ["Force 1", "Force 2", "Force 3"],
+  "weaknesses": ["Faiblesse 1", "Faiblesse 2"],
+  "recommendations": [
+    {"priority": "high", "category": "prompt", "action": "Action concrète", "impact": "Impact attendu"},
+    {"priority": "medium", "category": "knowledge", "action": "Action concrète", "impact": "Impact attendu"}
+  ],
+  "prompt_suggestions": ["Suggestion modification prompt 1"],
+  "kb_suggestions": ["Ajouter documentation sur X"],
+  "priority_actions": [
+    {"action": "Action prioritaire 1", "effort": "low", "impact": "high"},
+    {"action": "Action prioritaire 2", "effort": "medium", "impact": "high"}
+  ]
+}`;
+};
+
+// Fetch all conversations with pagination (no limit)
+async function fetchAllConversations(supabaseAdmin: any, agentId: string, startDate?: Date) {
+  const allConversations: any[] = [];
+  const pageSize = 1000;
+  let offset = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    let query = supabaseAdmin
+      .from('conversations')
+      .select('id, title, transcript, sentiment, satisfaction_score, duration, smart_tags, resolution_status, created_at, metadata')
+      .eq('agent_id', agentId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + pageSize - 1);
+
+    if (startDate) {
+      query = query.gte('created_at', startDate.toISOString());
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching conversations:', error);
+      break;
+    }
+
+    if (data && data.length > 0) {
+      allConversations.push(...data);
+      offset += pageSize;
+      hasMore = data.length === pageSize;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  return allConversations;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { agentId, days = 1 } = await req.json();
+    const { agentId, days = 1, language = 'en' } = await req.json();
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -71,27 +195,29 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Generating advice for agent: ${agent.name}`);
+    console.log(`Generating advice for agent: ${agent.name}, language: ${language}, days: ${days}`);
 
-    // Get recent conversations
-    const daysAgo = new Date();
-    daysAgo.setDate(daysAgo.getDate() - days);
+    // Calculate start date (null for "all time")
+    let startDate: Date | undefined;
+    if (days !== 'all' && days > 0) {
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+    }
 
-    const { data: conversations } = await supabaseAdmin
-      .from('conversations')
-      .select('id, title, transcript, sentiment, satisfaction_score, duration, smart_tags, resolution_status, created_at, metadata')
-      .eq('agent_id', agentId)
-      .gte('created_at', daysAgo.toISOString())
-      .order('created_at', { ascending: false })
-      .limit(50);
+    // Fetch ALL conversations (no limit)
+    const conversations = await fetchAllConversations(supabaseAdmin, agentId, startDate);
 
-    // Get recent insights
-    const { data: insights } = await supabaseAdmin
+    // Fetch insights with pagination too
+    let insightsQuery = supabaseAdmin
       .from('agent_insights')
       .select('satisfaction_score, overall_sentiment, improvements, smart_tags')
-      .eq('agent_id', agentId)
-      .gte('created_at', daysAgo.toISOString())
-      .limit(50);
+      .eq('agent_id', agentId);
+
+    if (startDate) {
+      insightsQuery = insightsQuery.gte('created_at', startDate.toISOString());
+    }
+
+    const { data: insights } = await insightsQuery;
 
     // Calculate basic metrics
     const totalConversations = conversations?.length || 0;
@@ -148,8 +274,8 @@ serve(async (req) => {
       else neutralCount++;
     });
 
-    // Prepare conversation summaries for AI analysis
-    const conversationSummaries = conversations?.slice(0, 20).map(c => ({
+    // Prepare conversation summaries for AI analysis (sample for AI, but metrics use all)
+    const conversationSummaries = conversations?.slice(0, 50).map(c => ({
       sentiment: c.sentiment,
       satisfaction: c.satisfaction_score,
       duration: c.duration,
@@ -158,45 +284,23 @@ serve(async (req) => {
       summary: (c.metadata as any)?.summary || (c.metadata as any)?.aiAnalysis?.summary || null
     })) || [];
 
+    const metrics = {
+      totalConversations,
+      avgSatisfaction,
+      avgDuration,
+      successRate,
+      positiveCount,
+      neutralCount,
+      negativeCount,
+      topTags: Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([t, c]) => `${t} (${c})`).join(', '),
+      topImprovements: Object.entries(improvementCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([i, c]) => `${i} (${c}x)`).join('; '),
+    };
+
     // Generate AI advice
     let aiAdvice = null;
     if (lovableApiKey && totalConversations > 0) {
       try {
-        const prompt = `Tu es un expert en optimisation d'agents IA conversationnels. Analyse ces données et génère un rapport structuré.
-
-AGENT: ${agent.name}
-PÉRIODE: ${days} jour(s)
-
-MÉTRIQUES:
-- Conversations: ${totalConversations}
-- Satisfaction moyenne: ${avgSatisfaction.toFixed(1)}/10
-- Durée moyenne: ${Math.round(avgDuration)}s
-- Taux de résolution: ${successRate.toFixed(0)}%
-- Sentiment: ${positiveCount} positif, ${neutralCount} neutre, ${negativeCount} négatif
-
-TAGS FRÉQUENTS: ${Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([t, c]) => `${t} (${c})`).join(', ') || 'Aucun'}
-
-AMÉLIORATIONS DÉJÀ IDENTIFIÉES: ${Object.entries(improvementCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([i, c]) => `${i} (${c}x)`).join('; ') || 'Aucune'}
-
-ÉCHANTILLON DE CONVERSATIONS:
-${JSON.stringify(conversationSummaries, null, 2)}
-
-Génère un rapport JSON avec cette structure exacte:
-{
-  "summary": "Résumé en 2-3 phrases",
-  "strengths": ["Force 1", "Force 2", "Force 3"],
-  "weaknesses": ["Faiblesse 1", "Faiblesse 2"],
-  "recommendations": [
-    {"priority": "high", "category": "prompt", "action": "Action concrète", "impact": "Impact attendu"},
-    {"priority": "medium", "category": "knowledge", "action": "Action concrète", "impact": "Impact attendu"}
-  ],
-  "prompt_suggestions": ["Suggestion modification prompt 1"],
-  "kb_suggestions": ["Ajouter documentation sur X"],
-  "priority_actions": [
-    {"action": "Action prioritaire 1", "effort": "low", "impact": "high"},
-    {"action": "Action prioritaire 2", "effort": "medium", "impact": "high"}
-  ]
-}`;
+        const prompt = getAnalysisPrompt(language, agent, days, metrics, conversationSummaries);
 
         const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
@@ -207,7 +311,7 @@ Génère un rapport JSON avec cette structure exacte:
           body: JSON.stringify({
             model: 'google/gemini-2.5-flash',
             messages: [
-              { role: 'system', content: 'Tu es un expert en optimisation d\'agents IA. Réponds uniquement en JSON valide.' },
+              { role: 'system', content: getSystemPrompt(language) },
               { role: 'user', content: prompt }
             ],
             temperature: 0.7,
@@ -242,7 +346,9 @@ Génère un rapport JSON avec cette structure exacte:
       avg_satisfaction: avgSatisfaction || null,
       avg_duration_seconds: Math.round(avgDuration) || null,
       success_rate: successRate || null,
-      summary: aiAdvice?.summary || `${totalConversations} conversations analysées. Satisfaction moyenne: ${avgSatisfaction.toFixed(1)}/10.`,
+      summary: aiAdvice?.summary || (language === 'en' 
+        ? `${totalConversations} conversations analyzed. Average satisfaction: ${avgSatisfaction.toFixed(1)}/10.`
+        : `${totalConversations} conversations analysées. Satisfaction moyenne: ${avgSatisfaction.toFixed(1)}/10.`),
       strengths: aiAdvice?.strengths || [],
       weaknesses: aiAdvice?.weaknesses || [],
       recommendations: aiAdvice?.recommendations || [],
