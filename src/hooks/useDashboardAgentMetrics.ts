@@ -117,7 +117,7 @@ export const useAgentDashboardMetrics = (agentId: string | null) => {
           body: { agentId: agent.platform_agent_id, timeframe: '30d' }
         }).catch(() => ({ data: null })),
         supabase.functions.invoke('elevenlabs-convai-conversations', {
-          body: { agentId: agent.platform_agent_id, page: 1, limit: 100 }
+          body: { action: 'list', agentId: agent.platform_agent_id, page: 1, limit: 100 }
         }).catch(() => ({ data: null })),
         supabase
           .from('agent_insights')
