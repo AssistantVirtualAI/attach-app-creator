@@ -15,6 +15,7 @@ import { AgentAIAdvice } from '@/components/agents/AgentAIAdvice';
 import { GlobalAIAdvice } from '@/components/agents/GlobalAIAdvice';
 import { DateRangeSelector } from '@/components/dashboard/DateRangeSelector';
 import { ReportGenerator } from '@/components/reports/ReportGenerator';
+import { useTranslation } from '@/hooks/useTranslation';
 import { 
   RefreshCw, 
   TrendingUp,
@@ -36,9 +37,8 @@ import {
   CheckCircle,
   Database,
   Mail,
-  Calendar,
   Layers,
-  FileText
+  Zap
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,6 +52,7 @@ const SENTIMENT_COLORS = {
 };
 
 const AgentReports = () => {
+  const { t } = useTranslation();
   const { selectedOrg } = useOrganization();
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
@@ -92,54 +93,73 @@ const AgentReports = () => {
     }
   };
 
+  const getTrendLabel = (trend: 'up' | 'down' | 'stable') => {
+    switch (trend) {
+      case 'up': return t('reports.trends.up');
+      case 'down': return t('reports.trends.down');
+      default: return t('reports.trends.stable');
+    }
+  };
+
   const renderAgentCard = (agent: AgentMetrics) => {
     const sentimentData = [
-      { name: 'Positif', value: agent.sentimentDistribution.positive, color: SENTIMENT_COLORS.positive },
-      { name: 'Neutre', value: agent.sentimentDistribution.neutral, color: SENTIMENT_COLORS.neutral },
-      { name: 'Négatif', value: agent.sentimentDistribution.negative, color: SENTIMENT_COLORS.negative },
+      { name: t('reports.sentiment.positive'), value: agent.sentimentDistribution.positive, color: SENTIMENT_COLORS.positive },
+      { name: t('reports.sentiment.neutral'), value: agent.sentimentDistribution.neutral, color: SENTIMENT_COLORS.neutral },
+      { name: t('reports.sentiment.negative'), value: agent.sentimentDistribution.negative, color: SENTIMENT_COLORS.negative },
     ].filter(d => d.value > 0);
 
     return (
-      <Card key={agent.agentId} className="glass-card">
-        <CardHeader className="pb-2">
+      <Card key={agent.agentId} className="group relative overflow-hidden border-0 bg-gradient-to-br from-card to-card/80 shadow-lg hover:shadow-xl transition-all duration-300">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">{agent.agentName}</CardTitle>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-primary-foreground font-bold text-lg">
+                {agent.agentName.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <CardTitle className="text-lg">{agent.agentName}</CardTitle>
+                <Badge variant="secondary" className="text-xs mt-1">
+                  {agent.platform}
+                </Badge>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-muted/50">
               {getTrendIcon(agent.recentTrend)}
               <span className="text-xs text-muted-foreground">
-                {agent.recentTrend === 'up' ? 'En hausse' : agent.recentTrend === 'down' ? 'En baisse' : 'Stable'}
+                {getTrendLabel(agent.recentTrend)}
               </span>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Key Metrics */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Users className="h-3 w-3" />
-                Conversations
+          {/* Key Metrics Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-xl bg-muted/30 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Users className="h-3.5 w-3.5" />
+                {t('reports.metrics.conversations')}
               </div>
               <p className="text-2xl font-bold">{agent.totalConversations}</p>
             </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <ThumbsUp className="h-3 w-3" />
-                Satisfaction
+            <div className="p-3 rounded-xl bg-muted/30 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <ThumbsUp className="h-3.5 w-3.5" />
+                {t('reports.metrics.satisfaction')}
               </div>
               <p className="text-2xl font-bold">{agent.avgSatisfaction.toFixed(1)}<span className="text-sm text-muted-foreground">/10</span></p>
             </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                Durée moy.
+            <div className="p-3 rounded-xl bg-muted/30 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                {t('reports.metrics.avgDuration')}
               </div>
               <p className="text-lg font-semibold">{Math.round(agent.avgDuration / 60)}min</p>
             </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Target className="h-3 w-3" />
-                Résolution
+            <div className="p-3 rounded-xl bg-muted/30 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Target className="h-3.5 w-3.5" />
+                {t('reports.metrics.resolution')}
               </div>
               <p className="text-lg font-semibold">{agent.resolutionRate.toFixed(0)}%</p>
             </div>
@@ -147,31 +167,31 @@ const AgentReports = () => {
 
           {/* Sentiment Distribution */}
           {sentimentData.length > 0 && (
-            <div className="pt-2 border-t">
-              <p className="text-xs text-muted-foreground mb-2">Sentiment</p>
+            <div className="pt-3 border-t border-border/50">
+              <p className="text-xs text-muted-foreground mb-2">{t('reports.metrics.sentiment')}</p>
               <div className="flex items-center gap-2">
-                <div className="flex-1 flex gap-1">
+                <div className="flex-1 flex gap-0.5 h-2 rounded-full overflow-hidden bg-muted/30">
                   {agent.sentimentDistribution.positive > 0 && (
                     <div 
-                      className="h-2 bg-green-500 rounded-full" 
+                      className="bg-green-500 transition-all" 
                       style={{ width: `${(agent.sentimentDistribution.positive / agent.totalConversations) * 100}%` }}
                     />
                   )}
                   {agent.sentimentDistribution.neutral > 0 && (
                     <div 
-                      className="h-2 bg-yellow-500 rounded-full" 
+                      className="bg-yellow-500 transition-all" 
                       style={{ width: `${(agent.sentimentDistribution.neutral / agent.totalConversations) * 100}%` }}
                     />
                   )}
                   {agent.sentimentDistribution.negative > 0 && (
                     <div 
-                      className="h-2 bg-red-500 rounded-full" 
+                      className="bg-red-500 transition-all" 
                       style={{ width: `${(agent.sentimentDistribution.negative / agent.totalConversations) * 100}%` }}
                     />
                   )}
                 </div>
               </div>
-              <div className="flex justify-between text-xs mt-1">
+              <div className="flex justify-between text-xs mt-2">
                 <span className="text-green-500 flex items-center gap-1">
                   <Smile className="h-3 w-3" /> {agent.sentimentDistribution.positive}
                 </span>
@@ -187,13 +207,13 @@ const AgentReports = () => {
 
           {/* Top Tags */}
           {agent.topTags.length > 0 && (
-            <div className="pt-2 border-t">
+            <div className="pt-3 border-t border-border/50">
               <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-                <Tag className="h-3 w-3" /> Tags fréquents
+                <Tag className="h-3 w-3" /> {t('reports.frequentTags')}
               </p>
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1.5">
                 {agent.topTags.slice(0, 4).map(({ tag, count }) => (
-                  <Badge key={tag} variant="secondary" className="text-xs">
+                  <Badge key={tag} variant="outline" className="text-xs bg-muted/30">
                     {tag} ({count})
                   </Badge>
                 ))}
@@ -203,14 +223,14 @@ const AgentReports = () => {
 
           {/* Top Improvements */}
           {agent.topImprovements.length > 0 && (
-            <div className="pt-2 border-t">
+            <div className="pt-3 border-t border-border/50">
               <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-                <Lightbulb className="h-3 w-3" /> Améliorations suggérées
+                <Lightbulb className="h-3 w-3" /> {t('reports.suggestedImprovements')}
               </p>
-              <ul className="space-y-1">
+              <ul className="space-y-1.5">
                 {agent.topImprovements.slice(0, 3).map((imp, i) => (
-                  <li key={i} className="text-xs text-muted-foreground flex items-start gap-1">
-                    <span className="text-primary">•</span>
+                  <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
+                    <Zap className="h-3 w-3 text-primary mt-0.5 flex-shrink-0" />
                     <span className="line-clamp-1">{imp}</span>
                   </li>
                 ))}
@@ -225,9 +245,9 @@ const AgentReports = () => {
   // Prepare data for radar chart
   const radarData = reportsData?.agents.slice(0, 5).map(agent => ({
     agent: agent.agentName.slice(0, 10),
-    satisfaction: agent.avgSatisfaction,
-    resolution: agent.resolutionRate / 10,
-    volume: Math.min(agent.totalConversations / 10, 10),
+    [t('reports.metrics.satisfaction')]: agent.avgSatisfaction,
+    [t('reports.metrics.resolution')]: agent.resolutionRate / 10,
+    [t('reports.volume')]: Math.min(agent.totalConversations / 10, 10),
   })) || [];
 
   // Use real hourly distribution from reports data
@@ -236,11 +256,14 @@ const AgentReports = () => {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Rapports Agents</h1>
-            <p className="text-muted-foreground">
-              Statistiques et analyses IA de tous vos agents
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+              {t('reports.title')}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              {t('reports.description')}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -250,11 +273,11 @@ const AgentReports = () => {
               showQuickButtons={true}
             />
             <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Tous les agents" />
+              <SelectTrigger className="w-48 bg-card border-border/50">
+                <SelectValue placeholder={t('reports.allAgents')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les agents</SelectItem>
+                <SelectItem value="all">{t('reports.allAgents')}</SelectItem>
                 {agents?.map((agent) => (
                   <SelectItem key={agent.id} value={agent.id}>
                     {agent.name}
@@ -272,19 +295,21 @@ const AgentReports = () => {
               variant="outline" 
               onClick={() => sendWeeklyReport()}
               disabled={isSendingReport}
+              className="bg-card border-border/50"
             >
               {isSendingReport ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
-              Email
+              {t('reports.email')}
             </Button>
             <Button 
               variant="outline" 
               onClick={() => syncConversations({ agentId: selectedAgent !== 'all' ? selectedAgent : undefined })}
               disabled={isSyncing}
+              className="bg-card border-border/50"
             >
               {isSyncing ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-              Sync
+              {t('reports.sync')}
             </Button>
-            <Button variant="outline" size="icon" onClick={() => refetch()}>
+            <Button variant="outline" size="icon" onClick={() => refetch()} className="bg-card border-border/50">
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
@@ -292,21 +317,21 @@ const AgentReports = () => {
 
         {/* Data Source Indicator */}
         {reportsData && (
-          <div className="flex items-center gap-2 text-sm">
-            {reportsData.dataSource === 'platform' ? (
-              <Badge variant="outline" className="gap-1 text-green-500 border-green-500/30">
-                <CheckCircle className="h-3 w-3" />
-                Connecté aux plateformes
+          <div className="flex items-center gap-3 text-sm">
+            {reportsData.dataSource === 'platform' || reportsData.dataSource === 'mixed' ? (
+              <Badge className="gap-1.5 bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500/20">
+                <CheckCircle className="h-3.5 w-3.5" />
+                {t('reports.connectedToPlatforms')}
               </Badge>
             ) : (
-              <Badge variant="outline" className="gap-1 text-muted-foreground">
-                <Database className="h-3 w-3" />
-                Données locales
+              <Badge variant="outline" className="gap-1.5 text-muted-foreground">
+                <Database className="h-3.5 w-3.5" />
+                {t('reports.localData')}
               </Badge>
             )}
             {reportsData.globalMetrics.totalConversations > 0 && (
               <span className="text-muted-foreground">
-                {reportsData.globalMetrics.totalConversations} conversations • {reportsData.globalMetrics.totalVoiceMinutes} min vocales
+                {reportsData.globalMetrics.totalConversations} {t('reports.conversations')} • {reportsData.globalMetrics.totalVoiceMinutes} {t('reports.voiceMinutes')}
               </span>
             )}
           </div>
@@ -314,84 +339,88 @@ const AgentReports = () => {
 
         {/* Global Metrics */}
         {reportsData && (
-          <div className="grid gap-4 md:grid-cols-4">
-            <Card className="glass-card">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-blue-500/10 to-blue-600/5 shadow-lg">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-full blur-2xl" />
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Users className="h-4 w-4 text-primary" />
-                  Total Conversations
+                <CardTitle className="text-sm font-medium flex items-center gap-2 text-blue-500">
+                  <Users className="h-4 w-4" />
+                  {t('reports.totalConversations')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold">{reportsData.globalMetrics.totalConversations}</p>
+                <p className="text-4xl font-bold">{reportsData.globalMetrics.totalConversations}</p>
               </CardContent>
             </Card>
-            <Card className="glass-card">
+            <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-green-500/10 to-green-600/5 shadow-lg">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/10 rounded-full blur-2xl" />
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <ThumbsUp className="h-4 w-4 text-primary" />
-                  Satisfaction Moyenne
+                <CardTitle className="text-sm font-medium flex items-center gap-2 text-green-500">
+                  <ThumbsUp className="h-4 w-4" />
+                  {t('reports.avgSatisfaction')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold">
+                <p className="text-4xl font-bold">
                   {reportsData.globalMetrics.avgSatisfaction.toFixed(1)}
                   <span className="text-lg text-muted-foreground">/10</span>
                 </p>
               </CardContent>
             </Card>
-            <Card className="glass-card">
+            <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-purple-500/10 to-purple-600/5 shadow-lg">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/10 rounded-full blur-2xl" />
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-green-500" />
-                  Meilleur Agent
+                <CardTitle className="text-sm font-medium flex items-center gap-2 text-purple-500">
+                  <TrendingUp className="h-4 w-4" />
+                  {t('reports.bestAgent')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-lg font-semibold truncate">
+                <p className="text-xl font-semibold truncate">
                   {reportsData.globalMetrics.bestPerformingAgent || '—'}
                 </p>
               </CardContent>
             </Card>
-            <Card className="glass-card">
+            <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-orange-500/10 to-orange-600/5 shadow-lg">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-orange-500/10 rounded-full blur-2xl" />
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Activity className="h-4 w-4 text-primary" />
-                  Agents Actifs
+                <CardTitle className="text-sm font-medium flex items-center gap-2 text-orange-500">
+                  <Activity className="h-4 w-4" />
+                  {t('reports.activeAgents')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-3xl font-bold">{reportsData.agents.length}</p>
+                <p className="text-4xl font-bold">{reportsData.agents.length}</p>
               </CardContent>
             </Card>
           </div>
         )}
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="overview" className="gap-2">
+          <TabsList className="bg-muted/30 p-1">
+            <TabsTrigger value="overview" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <BarChart3 className="h-4 w-4" />
-              Vue d'ensemble
+              {t('reports.tabs.overview')}
             </TabsTrigger>
-            <TabsTrigger value="performance" className="gap-2">
+            <TabsTrigger value="performance" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Activity className="h-4 w-4" />
-              Performance
+              {t('reports.tabs.performance')}
             </TabsTrigger>
-            <TabsTrigger value="trends" className="gap-2">
+            <TabsTrigger value="trends" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <TrendingUp className="h-4 w-4" />
-              Tendances
+              {t('reports.tabs.trends')}
             </TabsTrigger>
-            <TabsTrigger value="hours" className="gap-2">
+            <TabsTrigger value="hours" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Clock className="h-4 w-4" />
-              Heures de pointe
+              {t('reports.tabs.peakHours')}
             </TabsTrigger>
-            <TabsTrigger value="comparison" className="gap-2">
+            <TabsTrigger value="comparison" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Layers className="h-4 w-4" />
-              Comparatif
+              {t('reports.tabs.comparison')}
             </TabsTrigger>
-            <TabsTrigger value="ai-advice" className="gap-2">
+            <TabsTrigger value="ai-advice" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Sparkles className="h-4 w-4" />
-              Conseils IA
+              {t('reports.tabs.aiAdvice')}
             </TabsTrigger>
           </TabsList>
 
@@ -400,15 +429,17 @@ const AgentReports = () => {
             {isLoadingReports ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-80 w-full" />
+                  <Skeleton key={i} className="h-80 w-full rounded-xl" />
                 ))}
               </div>
             ) : reportsData?.agents.length === 0 ? (
-              <Card className="glass-card">
-                <CardContent className="pt-6 text-center py-12">
-                  <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
-                  <p className="text-muted-foreground">Aucune donnée disponible</p>
-                  <p className="text-sm text-muted-foreground">Les statistiques apparaîtront après les premières conversations</p>
+              <Card className="border-0 bg-muted/30 shadow-lg">
+                <CardContent className="pt-6 text-center py-16">
+                  <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                    <BarChart3 className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-lg font-medium text-muted-foreground">{t('reports.noDataAvailable')}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{t('reports.statsAfterConversations')}</p>
                 </CardContent>
               </Card>
             ) : (
@@ -421,52 +452,54 @@ const AgentReports = () => {
           {/* Performance Tab */}
           <TabsContent value="performance" className="space-y-6">
             {isLoadingReports ? (
-              <Skeleton className="h-96 w-full" />
+              <Skeleton className="h-96 w-full rounded-xl" />
             ) : reportsData?.agents.length === 0 ? (
-              <Card className="glass-card">
-                <CardContent className="pt-6 text-center py-12">
-                  <Activity className="h-12 w-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
-                  <p className="text-muted-foreground">Aucune donnée de performance</p>
+              <Card className="border-0 bg-muted/30 shadow-lg">
+                <CardContent className="pt-6 text-center py-16">
+                  <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                    <Activity className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-lg font-medium text-muted-foreground">{t('reports.noPerformanceData')}</p>
                 </CardContent>
               </Card>
             ) : (
               <div className="grid gap-6 lg:grid-cols-2">
                 {/* Satisfaction Comparison Chart */}
-                <Card className="glass-card">
+                <Card className="border-0 bg-card shadow-lg">
                   <CardHeader>
-                    <CardTitle>Comparaison Satisfaction</CardTitle>
-                    <CardDescription>Score moyen par agent</CardDescription>
+                    <CardTitle>{t('reports.satisfactionComparison')}</CardTitle>
+                    <CardDescription>{t('reports.avgScoreByAgent')}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
                       <BarChart data={reportsData?.agents.map(a => ({
                         name: a.agentName.length > 12 ? a.agentName.slice(0, 12) + '...' : a.agentName,
-                        satisfaction: parseFloat(a.avgSatisfaction.toFixed(1)),
-                        resolution: parseFloat(a.resolutionRate.toFixed(0))
+                        [t('reports.metrics.satisfaction')]: parseFloat(a.avgSatisfaction.toFixed(1)),
+                        [t('reports.metrics.resolution')]: parseFloat(a.resolutionRate.toFixed(0))
                       }))}>
                         <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                         <YAxis domain={[0, 10]} />
                         <Tooltip />
                         <Legend />
-                        <Bar dataKey="satisfaction" name="Satisfaction (/10)" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey={t('reports.metrics.satisfaction')} fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
 
                 {/* Resolution Rate Chart */}
-                <Card className="glass-card">
+                <Card className="border-0 bg-card shadow-lg">
                   <CardHeader>
-                    <CardTitle>Taux de Résolution</CardTitle>
-                    <CardDescription>Pourcentage par agent</CardDescription>
+                    <CardTitle>{t('reports.resolutionRate')}</CardTitle>
+                    <CardDescription>{t('reports.percentageByAgent')}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
                       {reportsData?.agents.map(agent => (
-                        <div key={agent.agentId} className="space-y-1">
+                        <div key={agent.agentId} className="space-y-2">
                           <div className="flex justify-between text-sm">
-                            <span>{agent.agentName}</span>
-                            <span className="font-medium">{agent.resolutionRate.toFixed(0)}%</span>
+                            <span className="font-medium">{agent.agentName}</span>
+                            <span className="font-bold text-primary">{agent.resolutionRate.toFixed(0)}%</span>
                           </div>
                           <Progress value={agent.resolutionRate} className="h-2" />
                         </div>
@@ -476,25 +509,25 @@ const AgentReports = () => {
                 </Card>
 
                 {/* Global Sentiment Distribution */}
-                <Card className="glass-card lg:col-span-2">
+                <Card className="border-0 bg-card shadow-lg lg:col-span-2">
                   <CardHeader>
-                    <CardTitle>Distribution Globale des Sentiments</CardTitle>
-                    <CardDescription>Répartition sur tous les agents</CardDescription>
+                    <CardTitle>{t('reports.globalSentimentDistribution')}</CardTitle>
+                    <CardDescription>{t('reports.distributionAcrossAgents')}</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center justify-center gap-12">
-                      <ResponsiveContainer width={200} height={200}>
+                    <div className="flex items-center justify-center gap-12 flex-wrap">
+                      <ResponsiveContainer width={220} height={220}>
                         <PieChart>
                           <Pie
                             data={[
-                              { name: 'Positif', value: reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.positive, 0) || 0 },
-                              { name: 'Neutre', value: reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.neutral, 0) || 0 },
-                              { name: 'Négatif', value: reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.negative, 0) || 0 },
+                              { name: t('reports.sentiment.positive'), value: reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.positive, 0) || 0 },
+                              { name: t('reports.sentiment.neutral'), value: reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.neutral, 0) || 0 },
+                              { name: t('reports.sentiment.negative'), value: reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.negative, 0) || 0 },
                             ]}
                             cx="50%"
                             cy="50%"
-                            innerRadius={50}
-                            outerRadius={80}
+                            innerRadius={55}
+                            outerRadius={85}
                             dataKey="value"
                           >
                             <Cell fill={SENTIMENT_COLORS.positive} />
@@ -504,18 +537,18 @@ const AgentReports = () => {
                           <Tooltip />
                         </PieChart>
                       </ResponsiveContainer>
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-green-500" />
-                          <span>Positif: {reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.positive, 0)}</span>
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-4 h-4 rounded-full bg-green-500" />
+                          <span className="text-sm">{t('reports.sentiment.positive')}: <strong>{reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.positive, 0)}</strong></span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                          <span>Neutre: {reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.neutral, 0)}</span>
+                        <div className="flex items-center gap-3">
+                          <div className="w-4 h-4 rounded-full bg-yellow-500" />
+                          <span className="text-sm">{t('reports.sentiment.neutral')}: <strong>{reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.neutral, 0)}</strong></span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-red-500" />
-                          <span>Négatif: {reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.negative, 0)}</span>
+                        <div className="flex items-center gap-3">
+                          <div className="w-4 h-4 rounded-full bg-red-500" />
+                          <span className="text-sm">{t('reports.sentiment.negative')}: <strong>{reportsData?.agents.reduce((sum, a) => sum + a.sentimentDistribution.negative, 0)}</strong></span>
                         </div>
                       </div>
                     </div>
@@ -527,13 +560,13 @@ const AgentReports = () => {
 
           {/* Trends Tab */}
           <TabsContent value="trends" className="space-y-6">
-            <Card className="glass-card">
+            <Card className="border-0 bg-card shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-primary" />
-                  Évolution des Conversations
+                  {t('reports.conversationEvolution')}
                 </CardTitle>
-                <CardDescription>Tendance sur les 7 derniers jours</CardDescription>
+                <CardDescription>{t('reports.last7DaysTrend')}</CardDescription>
               </CardHeader>
               <CardContent>
                 {reportsData?.dailyTrends && reportsData.dailyTrends.length > 0 ? (
@@ -542,25 +575,25 @@ const AgentReports = () => {
                       <XAxis dataKey="day" />
                       <YAxis />
                       <Tooltip 
-                        formatter={(value, name) => [value, name === 'conversations' ? 'Conversations' : name]}
+                        formatter={(value, name) => [value, name === 'conversations' ? t('reports.conversations') : name]}
                         labelFormatter={(label) => `${label}`}
                       />
                       <Legend />
-                      <Area type="monotone" dataKey="conversations" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.2)" name="Conversations" />
+                      <Area type="monotone" dataKey="conversations" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.2)" name={t('reports.conversations')} />
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                    <p>Aucune donnée disponible pour cette période</p>
+                    <p>{t('reports.noDataForPeriod')}</p>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            <Card className="glass-card">
+            <Card className="border-0 bg-card shadow-lg">
               <CardHeader>
-                <CardTitle>Évolution de la Satisfaction</CardTitle>
-                <CardDescription>Score moyen par jour</CardDescription>
+                <CardTitle>{t('reports.satisfactionEvolution')}</CardTitle>
+                <CardDescription>{t('reports.avgScoreByDay')}</CardDescription>
               </CardHeader>
               <CardContent>
                 {reportsData?.dailyTrends && reportsData.dailyTrends.some(d => d.satisfaction > 0) ? (
@@ -569,14 +602,14 @@ const AgentReports = () => {
                       <XAxis dataKey="day" />
                       <YAxis domain={[0, 10]} />
                       <Tooltip 
-                        formatter={(value) => [`${value}/10`, 'Satisfaction']}
+                        formatter={(value) => [`${value}/10`, t('reports.metrics.satisfaction')]}
                       />
-                      <Area type="monotone" dataKey="satisfaction" stroke="#22c55e" fill="#22c55e20" name="Satisfaction" />
+                      <Area type="monotone" dataKey="satisfaction" stroke="#22c55e" fill="#22c55e20" name={t('reports.metrics.satisfaction')} />
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                    <p>Aucune donnée de satisfaction disponible</p>
+                    <p>{t('reports.noSatisfactionData')}</p>
                   </div>
                 )}
               </CardContent>
@@ -585,13 +618,13 @@ const AgentReports = () => {
 
           {/* Peak Hours Tab */}
           <TabsContent value="hours" className="space-y-6">
-            <Card className="glass-card">
+            <Card className="border-0 bg-card shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Clock className="h-5 w-5 text-primary" />
-                  Distribution Horaire
+                  {t('reports.hourlyDistribution')}
                 </CardTitle>
-                <CardDescription>Nombre de conversations par heure</CardDescription>
+                <CardDescription>{t('reports.conversationsByHour')}</CardDescription>
               </CardHeader>
               <CardContent>
                 {hourlyData.length > 0 ? (
@@ -600,43 +633,43 @@ const AgentReports = () => {
                       <XAxis dataKey="hour" tick={{ fontSize: 10 }} />
                       <YAxis />
                       <Tooltip />
-                      <Bar dataKey="conversations" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="conversations" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                    <p>Aucune donnée disponible</p>
+                    <p>{t('reports.noDataAvailable')}</p>
                   </div>
                 )}
               </CardContent>
             </Card>
 
             <div className="grid gap-4 md:grid-cols-3">
-              <Card className="glass-card">
+              <Card className="border-0 bg-gradient-to-br from-green-500/10 to-green-600/5 shadow-lg">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Heure de Pointe</CardTitle>
+                  <CardTitle className="text-sm text-green-600">{t('reports.peakHour')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-3xl font-bold">{reportsData?.peakHour || '—'}</p>
-                  <p className="text-sm text-muted-foreground">Plus d'activité</p>
+                  <p className="text-4xl font-bold">{reportsData?.peakHour || '—'}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{t('reports.mostActivity')}</p>
                 </CardContent>
               </Card>
-              <Card className="glass-card">
+              <Card className="border-0 bg-gradient-to-br from-blue-500/10 to-blue-600/5 shadow-lg">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Heure Creuse</CardTitle>
+                  <CardTitle className="text-sm text-blue-600">{t('reports.quietHour')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-3xl font-bold">{reportsData?.quietHour || '—'}</p>
-                  <p className="text-sm text-muted-foreground">Moins d'activité</p>
+                  <p className="text-4xl font-bold">{reportsData?.quietHour || '—'}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{t('reports.leastActivity')}</p>
                 </CardContent>
               </Card>
-              <Card className="glass-card">
+              <Card className="border-0 bg-gradient-to-br from-purple-500/10 to-purple-600/5 shadow-lg">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Jour le Plus Actif</CardTitle>
+                  <CardTitle className="text-sm text-purple-600">{t('reports.busiestDay')}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-3xl font-bold">{reportsData?.busiestDay || '—'}</p>
-                  <p className="text-sm text-muted-foreground">En moyenne</p>
+                  <p className="text-4xl font-bold">{reportsData?.busiestDay || '—'}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{t('reports.onAverage')}</p>
                 </CardContent>
               </Card>
             </div>
@@ -646,10 +679,10 @@ const AgentReports = () => {
           <TabsContent value="comparison" className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-2">
               {/* Radar Chart */}
-              <Card className="glass-card">
+              <Card className="border-0 bg-card shadow-lg">
                 <CardHeader>
-                  <CardTitle>Comparaison Multi-dimensionnelle</CardTitle>
-                  <CardDescription>Performance relative des agents</CardDescription>
+                  <CardTitle>{t('reports.multiDimensionalComparison')}</CardTitle>
+                  <CardDescription>{t('reports.relativePerformance')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
@@ -657,9 +690,9 @@ const AgentReports = () => {
                       <PolarGrid />
                       <PolarAngleAxis dataKey="agent" tick={{ fontSize: 10 }} />
                       <PolarRadiusAxis angle={30} domain={[0, 10]} />
-                      <Radar name="Satisfaction" dataKey="satisfaction" stroke="#22c55e" fill="#22c55e" fillOpacity={0.3} />
-                      <Radar name="Résolution" dataKey="resolution" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
-                      <Radar name="Volume" dataKey="volume" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.3} />
+                      <Radar name={t('reports.metrics.satisfaction')} dataKey={t('reports.metrics.satisfaction')} stroke="#22c55e" fill="#22c55e" fillOpacity={0.3} />
+                      <Radar name={t('reports.metrics.resolution')} dataKey={t('reports.metrics.resolution')} stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
+                      <Radar name={t('reports.volume')} dataKey={t('reports.volume')} stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.3} />
                       <Legend />
                     </RadarChart>
                   </ResponsiveContainer>
@@ -667,23 +700,23 @@ const AgentReports = () => {
               </Card>
 
               {/* Comparison Table */}
-              <Card className="glass-card">
+              <Card className="border-0 bg-card shadow-lg">
                 <CardHeader>
-                  <CardTitle>Tableau Comparatif</CardTitle>
-                  <CardDescription>Métriques détaillées par agent</CardDescription>
+                  <CardTitle>{t('reports.comparisonTable')}</CardTitle>
+                  <CardDescription>{t('reports.detailedMetricsByAgent')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {reportsData?.agents.map((agent, i) => (
-                      <div key={agent.agentId} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                      <div key={agent.agentId} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors">
                         <div className="flex items-center gap-3">
-                          <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
+                          <span className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-primary/60 text-primary-foreground flex items-center justify-center text-sm font-bold">
                             {i + 1}
                           </span>
                           <span className="font-medium">{agent.agentName}</span>
                         </div>
                         <div className="flex items-center gap-4 text-sm">
-                          <span className="text-muted-foreground">{agent.totalConversations} conv.</span>
+                          <span className="text-muted-foreground">{agent.totalConversations} {t('reports.conv')}</span>
                           <Badge variant={agent.avgSatisfaction >= 7 ? 'default' : agent.avgSatisfaction >= 5 ? 'secondary' : 'destructive'}>
                             {agent.avgSatisfaction.toFixed(1)}/10
                           </Badge>

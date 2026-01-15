@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { format, subDays, startOfDay, getHours, getDay } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { useLanguage } from '@/context/LanguageContext';
 
 export interface AgentMetrics {
   agentId: string;
@@ -55,31 +55,38 @@ export interface AgentReportsData {
   lastSync?: string;
 }
 
-const DAY_NAMES = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-
 interface DateRange {
   start: Date;
   end: Date;
 }
 
+const DAY_NAMES_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_NAMES_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+const FULL_DAY_NAMES_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const FULL_DAY_NAMES_FR = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+
 export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange) {
   const { selectedOrg } = useOrganization();
+  const { language } = useLanguage();
+
+  const dayNames = language === 'fr' ? DAY_NAMES_FR : DAY_NAMES_EN;
+  const fullDayNames = language === 'fr' ? FULL_DAY_NAMES_FR : FULL_DAY_NAMES_EN;
 
   return useQuery({
-    queryKey: ['agent-reports', selectedOrg?.id, selectedAgentId, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
+    queryKey: ['agent-reports', selectedOrg?.id, selectedAgentId, dateRange?.start?.toISOString(), dateRange?.end?.toISOString(), language],
     queryFn: async (): Promise<AgentReportsData> => {
       if (!selectedOrg?.id) {
-        return getEmptyReportsData();
+        return getEmptyReportsData(language);
       }
 
-      // Fetch agents
+      // Fetch agents with their platform info
       const { data: agents } = await supabase
         .from('agents')
-        .select('id, name, platform, platform_agent_id')
+        .select('id, name, platform, platform_agent_id, platform_api_key')
         .eq('organization_id', selectedOrg.id);
 
       if (!agents || agents.length === 0) {
-        return getEmptyReportsData();
+        return getEmptyReportsData(language);
       }
 
       // Filter by selected agent if provided
@@ -118,32 +125,74 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
 
       const { data: insights } = await insightsQuery;
 
+      // Fetch ElevenLabs analytics for each agent that has platform_agent_id
+      const elevenLabsAgents = targetAgents.filter(a => a.platform === 'elevenlabs' && a.platform_agent_id);
+      
+      const platformAnalyticsPromises = elevenLabsAgents.map(async (agent) => {
+        try {
+          const { data, error } = await supabase.functions.invoke('elevenlabs-convai-analytics', {
+            body: { 
+              agentId: agent.platform_agent_id,
+              timeframe: '7days',
+              includeCharts: true
+            }
+          });
+          
+          if (error) {
+            console.warn(`Failed to fetch ElevenLabs analytics for ${agent.name}:`, error);
+            return { agentId: agent.id, data: null };
+          }
+          
+          return { agentId: agent.id, data };
+        } catch (err) {
+          console.warn(`Error fetching ElevenLabs analytics for ${agent.name}:`, err);
+          return { agentId: agent.id, data: null };
+        }
+      });
+
+      const platformAnalyticsResults = await Promise.all(platformAnalyticsPromises);
+      const platformAnalyticsMap = new Map(
+        platformAnalyticsResults.map(r => [r.agentId, r.data])
+      );
+
       // Calculate daily trends (last 7 days)
-      const dailyTrends = calculateDailyTrends(conversations || []);
+      const dailyTrends = calculateDailyTrends(conversations || [], dayNames);
 
       // Calculate hourly distribution
       const { hourlyDistribution, peakHour, quietHour } = calculateHourlyDistribution(conversations || []);
 
       // Calculate busiest day
-      const busiestDay = calculateBusiestDay(conversations || []);
+      const busiestDay = calculateBusiestDay(conversations || [], fullDayNames);
 
-      // Build agent metrics
+      // Build agent metrics combining local + platform data
       const agentMetrics: AgentMetrics[] = targetAgents.map(agent => {
         const agentConversations = conversations?.filter(c => c.agent_id === agent.id) || [];
         const agentInsights = insights?.filter(i => i.agent_id === agent.id) || [];
+        const platformData = platformAnalyticsMap.get(agent.id);
 
-        const totalConversations = agentConversations.length;
-        
-        // Calculate satisfaction
+        // Use platform data if available, otherwise use local data
+        let totalConversations = agentConversations.length;
         let avgSatisfaction = 0;
+        let avgDuration = 0;
+        let successRate = 0;
+        let dataSource: 'platform' | 'local' | 'mixed' = 'local';
+
+        if (platformData?.metrics) {
+          // Merge platform data
+          totalConversations = Math.max(platformData.metrics.total_conversations || 0, agentConversations.length);
+          avgDuration = platformData.metrics.avg_duration || 0;
+          successRate = platformData.metrics.success_rate || 0;
+          dataSource = agentConversations.length > 0 ? 'mixed' : 'platform';
+        }
+
+        // Calculate satisfaction from local data
         if (agentConversations.length > 0) {
           const scores = agentConversations.filter(c => c.satisfaction_score).map(c => Number(c.satisfaction_score));
           avgSatisfaction = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
         }
 
-        // Duration
-        let avgDuration = 0;
-        if (agentConversations.length > 0) {
+        // Duration from local if not from platform
+        if (!platformData?.metrics && agentConversations.length > 0) {
           const durations = agentConversations.filter(c => c.duration).map(c => c.duration as number);
           avgDuration = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0;
         }
@@ -174,10 +223,12 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
         const resolved = agentConversations.filter(c => c.resolution_status === 'resolved').length;
         const resolutionRate = agentConversations.length > 0 ? (resolved / agentConversations.length) * 100 : 0;
 
-        // Success rate based on positive sentiment
-        const successRate = totalConversations > 0 
-          ? ((sentimentCounts.positive / totalConversations) * 100) 
-          : 0;
+        // Success rate based on positive sentiment if not from platform
+        if (!platformData?.metrics) {
+          successRate = totalConversations > 0 
+            ? ((sentimentCounts.positive / totalConversations) * 100) 
+            : 0;
+        }
 
         // Top tags
         const tagCounts: Record<string, number> = {};
@@ -254,7 +305,7 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
           topTags,
           topImprovements,
           recentTrend,
-          dataSource: agentConversations.length > 0 ? 'local' : 'platform',
+          dataSource,
         };
       });
 
@@ -278,6 +329,13 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
         ? sortedByPerformance[sortedByPerformance.length - 1]?.agentName 
         : null;
 
+      // Determine overall data source
+      const hasPlatformData = agentMetrics.some(a => a.dataSource === 'platform' || a.dataSource === 'mixed');
+      const hasLocalData = agentMetrics.some(a => a.dataSource === 'local' || a.dataSource === 'mixed');
+      const overallDataSource: 'platform' | 'local' | 'mixed' = 
+        hasPlatformData && hasLocalData ? 'mixed' : 
+        hasPlatformData ? 'platform' : 'local';
+
       return {
         agents: agentMetrics,
         globalMetrics: {
@@ -293,7 +351,7 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
         peakHour,
         quietHour,
         busiestDay,
-        dataSource: 'local',
+        dataSource: overallDataSource,
         lastSync: new Date().toISOString(),
       };
     },
@@ -302,7 +360,7 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
   });
 }
 
-function calculateDailyTrends(conversations: any[]): DailyTrend[] {
+function calculateDailyTrends(conversations: any[], dayNames: string[]): DailyTrend[] {
   const trends: DailyTrend[] = [];
   const now = new Date();
 
@@ -325,8 +383,8 @@ function calculateDailyTrends(conversations: any[]): DailyTrend[] {
       : 0;
 
     trends.push({
-      day: DAY_NAMES[getDay(date)],
-      date: format(date, 'dd/MM', { locale: fr }),
+      day: dayNames[getDay(date)],
+      date: format(date, 'dd/MM'),
       conversations: dayConversations.length,
       satisfaction: parseFloat(avgSatisfaction.toFixed(1)),
     });
@@ -379,7 +437,7 @@ function calculateHourlyDistribution(conversations: any[]): {
   return { hourlyDistribution, peakHour, quietHour };
 }
 
-function calculateBusiestDay(conversations: any[]): string {
+function calculateBusiestDay(conversations: any[], fullDayNames: string[]): string {
   const dayCounts: Record<number, number> = {};
   
   for (let i = 0; i < 7; i++) {
@@ -401,11 +459,10 @@ function calculateBusiestDay(conversations: any[]): string {
     }
   });
 
-  const fullDayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
   return fullDayNames[busiestDayIndex];
 }
 
-function getEmptyReportsData(): AgentReportsData {
+function getEmptyReportsData(language: string): AgentReportsData {
   return { 
     agents: [], 
     globalMetrics: { 
