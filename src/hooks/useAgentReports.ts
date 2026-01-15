@@ -125,11 +125,12 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
 
       const { data: conversations } = await conversationsQuery;
 
-      // Fetch insights with date filtering
+      // Fetch insights with date filtering and language filter
       let insightsQuery = supabase
         .from('agent_insights')
-        .select('agent_id, satisfaction_score, overall_sentiment, improvements, smart_tags, analyzed_at')
-        .eq('organization_id', selectedOrg.id);
+        .select('agent_id, satisfaction_score, overall_sentiment, improvements, smart_tags, analyzed_at, language')
+        .eq('organization_id', selectedOrg.id)
+        .eq('language', language); // Only fetch insights matching current UI language
 
       // Apply date range filter to insights
       if (dateRange) {

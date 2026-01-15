@@ -442,7 +442,7 @@ Réponds UNIQUEMENT en JSON valide avec cette structure:
         .eq('id', effectiveConversationId);
     }
 
-    // Save to agent_insights
+    // Save to agent_insights with language tag
     if (agentId && organizationId && effectiveConversationId) {
       await serviceClient
         .from('agent_insights')
@@ -455,7 +455,8 @@ Réponds UNIQUEMENT en JSON valide avec cette structure:
           overall_sentiment: analysis.sentiment,
           improvements: analysis.improvements,
           smart_tags: analysis.smart_tags,
-          analyzed_at: new Date().toISOString()
+          analyzed_at: new Date().toISOString(),
+          language: language // Store the language used for analysis
         }, {
           onConflict: 'conversation_id'
         });

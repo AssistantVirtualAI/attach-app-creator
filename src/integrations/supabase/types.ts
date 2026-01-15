@@ -261,6 +261,7 @@ export type Database = {
           created_at: string | null
           id: string
           improvements: Json | null
+          language: string
           organization_id: string | null
           overall_sentiment: string | null
           satisfaction_score: number | null
@@ -275,6 +276,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           improvements?: Json | null
+          language?: string
           organization_id?: string | null
           overall_sentiment?: string | null
           satisfaction_score?: number | null
@@ -289,6 +291,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           improvements?: Json | null
+          language?: string
           organization_id?: string | null
           overall_sentiment?: string | null
           satisfaction_score?: number | null
