@@ -13,15 +13,18 @@ import { PrivacyTab } from '@/components/settings/PrivacyTab';
 import { AuditLogsTab } from '@/components/settings/AuditLogsTab';
 import { SecurityStatus } from '@/components/settings/SecurityStatus';
 import { DocumentationTab } from '@/components/settings/DocumentationTab';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const Settings = () => {
+  const { t } = useTranslation();
+
   return (
     <AppLayout>
       <div className="container mx-auto px-6 py-8">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2 gradient-text">Paramètres</h1>
+          <h1 className="text-4xl font-bold mb-2 gradient-text">{t('settings.title')}</h1>
           <p className="text-muted-foreground text-lg">
-            Gérez votre organisation et vos préférences
+            {t('settings.description')}
           </p>
         </div>
 
@@ -29,47 +32,47 @@ const Settings = () => {
           <TabsList className="glass-card flex-wrap h-auto gap-1 p-2">
             <TabsTrigger value="agency" className="gap-2">
               <Building className="w-4 h-4" />
-              <span className="hidden sm:inline">Agence</span>
+              <span className="hidden sm:inline">{t('settings.tabs.agency')}</span>
             </TabsTrigger>
             <TabsTrigger value="whitelabel" className="gap-2">
               <Palette className="w-4 h-4" />
-              <span className="hidden sm:inline">Marque blanche</span>
+              <span className="hidden sm:inline">{t('settings.tabs.whitelabel')}</span>
             </TabsTrigger>
             <TabsTrigger value="members" className="gap-2">
               <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">Membres</span>
+              <span className="hidden sm:inline">{t('settings.tabs.members')}</span>
             </TabsTrigger>
             <TabsTrigger value="integrations" className="gap-2">
               <Plug className="w-4 h-4" />
-              <span className="hidden sm:inline">Intégrations</span>
+              <span className="hidden sm:inline">{t('settings.tabs.integrations')}</span>
             </TabsTrigger>
             <TabsTrigger value="webhooks" className="gap-2">
               <Webhook className="w-4 h-4" />
-              <span className="hidden sm:inline">Webhooks</span>
+              <span className="hidden sm:inline">{t('settings.tabs.webhooks')}</span>
             </TabsTrigger>
             <TabsTrigger value="subscription" className="gap-2">
               <CreditCard className="w-4 h-4" />
-              <span className="hidden sm:inline">Abonnement</span>
+              <span className="hidden sm:inline">{t('settings.tabs.subscription')}</span>
             </TabsTrigger>
             <TabsTrigger value="usage" className="gap-2">
               <BarChart3 className="w-4 h-4" />
-              <span className="hidden sm:inline">Usage</span>
+              <span className="hidden sm:inline">{t('settings.tabs.usage')}</span>
             </TabsTrigger>
             <TabsTrigger value="translation" className="gap-2">
               <Languages className="w-4 h-4" />
-              <span className="hidden sm:inline">Traduction</span>
+              <span className="hidden sm:inline">{t('settings.tabs.translation')}</span>
             </TabsTrigger>
             <TabsTrigger value="privacy" className="gap-2">
               <Shield className="w-4 h-4" />
-              <span className="hidden sm:inline">Confidentialité</span>
+              <span className="hidden sm:inline">{t('settings.tabs.privacy')}</span>
             </TabsTrigger>
             <TabsTrigger value="audit" className="gap-2">
               <FileText className="w-4 h-4" />
-              <span className="hidden sm:inline">Audit</span>
+              <span className="hidden sm:inline">{t('settings.tabs.audit')}</span>
             </TabsTrigger>
             <TabsTrigger value="documentation" className="gap-2">
               <BookOpen className="w-4 h-4" />
-              <span className="hidden sm:inline">Documentation</span>
+              <span className="hidden sm:inline">{t('settings.tabs.documentation')}</span>
             </TabsTrigger>
           </TabsList>
 

@@ -2,13 +2,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Globe } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useState, useEffect } from 'react';
+import { useLanguage } from '@/context/LanguageContext';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export const SUPPORTED_LANGUAGES = [
   { code: 'fr', name: 'Français', flag: '🇫🇷' },
   { code: 'en', name: 'English', flag: '🇬🇧' },
-  { code: 'es', name: 'Español', flag: '🇪🇸' },
-  { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
 ] as const;
 
 interface LanguageSelectorProps {
@@ -22,13 +21,11 @@ export const LanguageSelector = ({
   showLabel = true,
   className 
 }: LanguageSelectorProps) => {
-  const [currentLang, setCurrentLang] = useState(() => {
-    return localStorage.getItem('app-language') || 'fr';
-  });
+  const { language, setLanguage } = useLanguage();
+  const { t } = useTranslation();
 
   const handleLanguageChange = async (lang: string) => {
-    setCurrentLang(lang);
-    localStorage.setItem('app-language', lang);
+    setLanguage(lang as 'fr' | 'en');
     
     // Save to profile if user is logged in
     const { data: { user } } = await supabase.auth.getUser();
@@ -38,22 +35,20 @@ export const LanguageSelector = ({
         .update({ locale: lang })
         .eq('id', user.id);
     }
-    
-    // Reload to apply language changes
-    window.location.reload();
+    // No reload needed - React context handles the update
   };
 
   if (variant === 'buttons') {
     return (
       <div className={className}>
         {showLabel && (
-          <p className="text-sm font-medium mb-2">Langue</p>
+          <p className="text-sm font-medium mb-2">{t('settings.language')}</p>
         )}
         <div className="flex flex-wrap gap-2">
           {SUPPORTED_LANGUAGES.map((lang) => (
             <Button
               key={lang.code}
-              variant={currentLang === lang.code ? 'default' : 'outline'}
+              variant={language === lang.code ? 'default' : 'outline'}
               size="sm"
               onClick={() => handleLanguageChange(lang.code)}
               className="gap-2"
@@ -69,10 +64,10 @@ export const LanguageSelector = ({
 
   if (variant === 'dropdown') {
     return (
-      <Select value={currentLang} onValueChange={handleLanguageChange}>
+      <Select value={language} onValueChange={handleLanguageChange}>
         <SelectTrigger className={className || "w-[50px]"}>
           <span className="text-lg">
-            {SUPPORTED_LANGUAGES.find(l => l.code === currentLang)?.flag || '🌐'}
+            {SUPPORTED_LANGUAGES.find(l => l.code === language)?.flag || '🌐'}
           </span>
         </SelectTrigger>
         <SelectContent>
@@ -94,12 +89,12 @@ export const LanguageSelector = ({
       {showLabel && (
         <p className="text-sm font-medium mb-2 flex items-center gap-2">
           <Globe className="h-4 w-4" />
-          Langue
+          {t('settings.language')}
         </p>
       )}
-      <Select value={currentLang} onValueChange={handleLanguageChange}>
+      <Select value={language} onValueChange={handleLanguageChange}>
         <SelectTrigger className="w-full">
-          <SelectValue placeholder="Sélectionner la langue" />
+          <SelectValue placeholder={t('settings.selectLanguage')} />
         </SelectTrigger>
         <SelectContent>
           {SUPPORTED_LANGUAGES.map((lang) => (
