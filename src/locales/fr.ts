@@ -805,15 +805,21 @@ export const fr = {
   // Settings
   settings: {
     title: 'Paramètres',
+    description: 'Gérez votre organisation et vos préférences',
+    language: 'Langue',
+    selectLanguage: 'Sélectionner la langue',
     tabs: {
-      general: 'Général',
-      organization: 'Organisation',
-      team: 'Équipe',
-      billing: 'Facturation',
+      agency: 'Agence',
+      whitelabel: 'Marque blanche',
+      members: 'Membres',
       integrations: 'Intégrations',
       webhooks: 'Webhooks',
-      security: 'Sécurité',
+      subscription: 'Abonnement',
+      usage: 'Usage',
+      translation: 'Traduction',
       privacy: 'Confidentialité',
+      audit: 'Audit',
+      documentation: 'Documentation',
     },
   },
 

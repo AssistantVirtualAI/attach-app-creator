@@ -86,7 +86,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--gradient-hero)]">
-        <div className="text-2xl font-bold gradient-text">Chargement...</div>
+        <div className="text-2xl font-bold gradient-text">Loading...</div>
       </div>
     );
   }

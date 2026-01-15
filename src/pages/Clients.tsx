@@ -50,8 +50,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useToast } from '@/hooks/use-toast';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useLanguage } from '@/context/LanguageContext';
 
 export default function Clients() {
+  const { t } = useTranslation();
+  const { language } = useLanguage();
   const navigate = useNavigate();
   const { selectedOrgId } = useOrganization();
   const { toast: toastHook } = useToast();
@@ -170,10 +174,10 @@ export default function Clients() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
-      toast.success('Client supprimé');
+      toast.success(t('clients.messages.deleteSuccess'));
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Erreur lors de la suppression');
+      toast.error(error.message || t('clients.messages.deleteError'));
     },
   });
 
@@ -187,7 +191,7 @@ export default function Clients() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
-      toast.success('Statut mis à jour');
+      toast.success(t('clients.messages.statusUpdated'));
     },
   });
 
@@ -196,8 +200,8 @@ export default function Clients() {
 
     if (!name || !email || !username || !password) {
       toastHook({
-        title: 'Erreur',
-        description: 'Nom, email, nom d\'utilisateur et mot de passe sont requis',
+        title: t('common.error'),
+        description: t('clients.messages.requiredFields'),
         variant: 'destructive',
       });
       return;
@@ -205,8 +209,8 @@ export default function Clients() {
 
     if (password.length < 8) {
       toastHook({
-        title: 'Erreur',
-        description: 'Le mot de passe doit contenir au moins 8 caractères',
+        title: t('common.error'),
+        description: t('clients.messages.passwordTooShort'),
         variant: 'destructive',
       });
       return;
@@ -214,7 +218,7 @@ export default function Clients() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Utilisateur non authentifié');
+      if (!user) throw new Error(t('common.error'));
 
       // Create client entry
       const { data: newClientData, error: clientError } = await supabase
@@ -237,8 +241,8 @@ export default function Clients() {
       if (clientError) throw clientError;
 
       toastHook({
-        title: 'Succès',
-        description: `Client ${name} créé avec succès`,
+        title: t('common.success'),
+        description: t('clients.messages.createSuccess').replace('{name}', name),
       });
 
       setCreateOpen(false);
@@ -250,10 +254,10 @@ export default function Clients() {
         navigate(`/clients/${newClientData.id}`);
       }
     } catch (error: any) {
-      console.error('Erreur création client:', error);
+      console.error('Error creating client:', error);
       toastHook({
-        title: 'Erreur',
-        description: error.message || 'Erreur lors de la création du client',
+        title: t('common.error'),
+        description: error.message || t('clients.messages.createError'),
         variant: 'destructive',
       });
     }
@@ -303,20 +307,20 @@ export default function Clients() {
                   <div>
                     <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
                       <span className="bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent">
-                        Gestion Clientèle
+                        {t('clients.title')}
                       </span>
                     </h1>
                     <p className="text-muted-foreground mt-1">
                       {isSuperAdmin ? (
                         <span className="flex items-center gap-2">
                           <Crown className="h-4 w-4 text-amber-500" />
-                          <span className="text-amber-600 dark:text-amber-400 font-medium">Super Admin</span>
-                          <span className="text-muted-foreground">• Clients illimités</span>
-                          <span className="px-2 py-0.5 bg-primary/10 text-primary text-sm font-semibold rounded-full">{clientCount} actifs</span>
+                          <span className="text-amber-600 dark:text-amber-400 font-medium">{t('roles.superAdmin')}</span>
+                          <span className="text-muted-foreground">• {t('clients.superAdminDescription')}</span>
+                          <span className="px-2 py-0.5 bg-primary/10 text-primary text-sm font-semibold rounded-full">{clientCount} {t('clients.activeClients')}</span>
                         </span>
                       ) : (
                         <span className="flex items-center gap-2">
-                          Gérez vos clients et leurs agents assignés
+                          {t('clients.description')}
                           <span className="px-2 py-0.5 bg-primary/10 text-primary text-sm font-semibold rounded-full">
                             {clientCount}/{String(clientsIncluded)}
                           </span>
@@ -337,7 +341,7 @@ export default function Clients() {
                       disabled={!canCreateClient}
                     >
                       <Plus className="h-5 w-5" />
-                      {canCreateClient ? 'Nouvelle clientèle' : 'Limite atteinte'}
+                      {canCreateClient ? t('clients.newClient') : t('clients.limitReached')}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[600px] rounded-2xl">
@@ -346,15 +350,15 @@ export default function Clients() {
                         <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20">
                           <Users className="h-5 w-5 text-primary" />
                         </div>
-                        Créer un nouveau client
+                        {t('clients.modal.createTitle')}
                       </DialogTitle>
                       <DialogDescription>
-                        Le client recevra un accès limité au dashboard de l'organisation
+                        {t('clients.modal.createDescription')}
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 mt-4">
                       <div>
-                        <Label htmlFor="name">Nom du client *</Label>
+                        <Label htmlFor="name">{t('clients.modal.clientName')} *</Label>
                         <Input
                           id="name"
                           value={newClient.name}
@@ -371,7 +375,7 @@ export default function Clients() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="email">Email *</Label>
+                        <Label htmlFor="email">{t('clients.modal.email')} *</Label>
                         <Input
                           id="email"
                           type="email"
@@ -383,7 +387,7 @@ export default function Clients() {
                         />
                       </div>
                       <div>
-                        <Label htmlFor="username">Nom d'utilisateur *</Label>
+                        <Label htmlFor="username">{t('clients.modal.username')} *</Label>
                         <Input
                           id="username"
                           value={newClient.username}
@@ -393,11 +397,11 @@ export default function Clients() {
                           placeholder="jeandupont"
                         />
                         <p className="text-xs text-muted-foreground mt-1">
-                          Utilisé pour se connecter au dashboard
+                          {t('clients.modal.usernameHint')}
                         </p>
                       </div>
                       <div>
-                        <Label htmlFor="password">Mot de passe *</Label>
+                        <Label htmlFor="password">{t('clients.modal.password')} *</Label>
                         <Input
                           id="password"
                           type="password"
@@ -405,12 +409,12 @@ export default function Clients() {
                           onChange={(e) =>
                             setNewClient({ ...newClient, password: e.target.value })
                           }
-                          placeholder="Minimum 8 caractères"
+                          placeholder={t('clients.modal.passwordHint')}
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="language">Langue</Label>
+                          <Label htmlFor="language">{t('clients.modal.language')}</Label>
                           <Select
                             value={newClient.language}
                             onValueChange={(value) =>
@@ -421,15 +425,13 @@ export default function Clients() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="fr">Français</SelectItem>
-                              <SelectItem value="en">English</SelectItem>
-                              <SelectItem value="es">Español</SelectItem>
-                              <SelectItem value="de">Deutsch</SelectItem>
+                              <SelectItem value="fr">{t('languages.french')}</SelectItem>
+                              <SelectItem value="en">{t('languages.english')}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                         <div>
-                          <Label htmlFor="theme">Thème</Label>
+                          <Label htmlFor="theme">{t('clients.modal.theme')}</Label>
                           <Select
                             value={newClient.theme}
                             onValueChange={(value) =>
@@ -440,14 +442,14 @@ export default function Clients() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="light">Clair</SelectItem>
-                              <SelectItem value="dark">Sombre</SelectItem>
+                              <SelectItem value="light">{t('clients.modal.themeLight')}</SelectItem>
+                              <SelectItem value="dark">{t('clients.modal.themeDark')}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                       </div>
                       <div>
-                        <Label htmlFor="agent">Assigner à un agent (optionnel)</Label>
+                        <Label htmlFor="agent">{t('clients.modal.assignAgent')}</Label>
                         <Select
                           value={newClient.assignedAgentId}
                           onValueChange={(value) =>
@@ -455,7 +457,7 @@ export default function Clients() {
                           }
                         >
                           <SelectTrigger id="agent">
-                            <SelectValue placeholder="Choisir un agent..." />
+                            <SelectValue placeholder={t('clients.modal.chooseAgent')} />
                           </SelectTrigger>
                           <SelectContent>
                             {agents?.map((agent) => (
@@ -467,7 +469,7 @@ export default function Clients() {
                         </Select>
                       </div>
                       <Button onClick={handleCreate} className="w-full">
-                        Créer le client
+                        {t('clients.modal.createButton')}
                       </Button>
                     </div>
                   </DialogContent>
@@ -517,13 +519,13 @@ export default function Clients() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30 hover:bg-muted/30 border-b border-border/30">
-                  <TableHead className="font-semibold text-foreground/80">Client</TableHead>
-                  <TableHead className="font-semibold text-foreground/80">Login ID</TableHead>
-                  <TableHead className="font-semibold text-foreground/80">Agent assigné</TableHead>
-                  <TableHead className="font-semibold text-foreground/80">Agent ID ElevenLabs</TableHead>
-                  <TableHead className="font-semibold text-foreground/80">Statut</TableHead>
-                  <TableHead className="font-semibold text-foreground/80">Date de création</TableHead>
-                  <TableHead className="text-right font-semibold text-foreground/80">Actions</TableHead>
+                  <TableHead className="font-semibold text-foreground/80">{t('clients.table.client')}</TableHead>
+                  <TableHead className="font-semibold text-foreground/80">{t('clients.table.loginId')}</TableHead>
+                  <TableHead className="font-semibold text-foreground/80">{t('clients.table.assignedAgent')}</TableHead>
+                  <TableHead className="font-semibold text-foreground/80">{t('clients.table.agentIdElevenlabs')}</TableHead>
+                  <TableHead className="font-semibold text-foreground/80">{t('clients.table.status')}</TableHead>
+                  <TableHead className="font-semibold text-foreground/80">{t('clients.table.createdAt')}</TableHead>
+                  <TableHead className="text-right font-semibold text-foreground/80">{t('clients.table.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -532,7 +534,7 @@ export default function Clients() {
                     <TableCell colSpan={7} className="text-center py-12">
                       <div className="flex items-center justify-center gap-2 text-muted-foreground">
                         <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
-                        Chargement...
+                        {t('clients.loading')}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -541,8 +543,8 @@ export default function Clients() {
                     <TableCell colSpan={7} className="text-center py-12">
                       <div className="text-muted-foreground">
                         {clients?.length === 0
-                          ? 'Aucun client. Créez votre premier client !'
-                          : 'Aucun client ne correspond à vos critères'}
+                          ? t('clients.empty.description')
+                          : t('common.noResults')}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -585,7 +587,7 @@ export default function Clients() {
                         ) : (
                           <Badge variant="outline" className="text-muted-foreground border-dashed">
                             <Bot className="h-3 w-3 mr-1" />
-                            Non assigné
+                            {t('common.noData')}
                           </Badge>
                         )}
                       </TableCell>
@@ -612,11 +614,11 @@ export default function Clients() {
                           }
                         >
                           <span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${client.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-                          {client.status === 'active' ? 'Actif' : 'Inactif'}
+                          {client.status === 'active' ? t('common.active') : t('common.inactive')}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {new Date(client.created_at).toLocaleDateString('fr-FR', {
+                        {new Date(client.created_at).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', {
                           day: 'numeric',
                           month: 'short',
                           year: 'numeric',
@@ -636,15 +638,15 @@ export default function Clients() {
                           <DropdownMenuContent align="end" className="bg-popover border-border">
                             <DropdownMenuItem onClick={() => handleOpenMembers(client)}>
                               <Users className="mr-2 h-4 w-4" />
-                              Gérer les membres
+                              {t('clients.actions.manageMembers')}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}`)}>
                               <Edit className="mr-2 h-4 w-4" />
-                              Modifier
+                              {t('common.edit')}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => navigate(`/clients/${client.id}?tab=access`)}>
                               <Key className="mr-2 h-4 w-4" />
-                              Réinitialiser mot de passe
+                              {t('auth.buttons.forgotPassword')}
                             </DropdownMenuItem>
                             {client.assigned_agent && (
                               <>
@@ -653,7 +655,7 @@ export default function Clients() {
                                   onClick={() => window.open(`/portal/${(client.assigned_agent as any).slug || (client.assigned_agent as any).id}`, '_blank')}
                                 >
                                   <ExternalLink className="mr-2 h-4 w-4" />
-                                  Accéder au portail
+                                  {t('clients.actions.accessPortal')}
                                 </DropdownMenuItem>
                               </>
                             )}
@@ -665,7 +667,7 @@ export default function Clients() {
                                 })
                               }
                             >
-                              {client.status === 'active' ? 'Désactiver' : 'Activer'}
+                              {client.status === 'active' ? t('clients.actions.deactivate') : t('clients.actions.activate')}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -673,7 +675,7 @@ export default function Clients() {
                               onClick={() => deleteClientMutation.mutate(client.id)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
-                              Supprimer
+                              {t('clients.actions.delete')}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
