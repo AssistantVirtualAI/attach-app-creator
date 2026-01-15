@@ -57,6 +57,18 @@ serve(async (req) => {
       });
     }
 
+    // Fetch organization-level ElevenLabs API key from organization_integrations
+    const { data: orgIntegration } = await supabaseAdmin
+      .from('organization_integrations')
+      .select('api_key')
+      .eq('organization_id', orgMember.organization_id)
+      .eq('platform', 'elevenlabs')
+      .eq('is_active', true)
+      .maybeSingle();
+
+    const orgApiKey = orgIntegration?.api_key;
+    console.log(`Organization has ElevenLabs integration: ${!!orgApiKey}`);
+
     let agentsQuery = supabase
       .from('agents')
       .select('id, name, platform_agent_id, platform_api_key')
@@ -88,8 +100,18 @@ serve(async (req) => {
     const syncErrors: string[] = [];
 
     for (const agent of agents) {
-      if (!agent.platform_agent_id || !agent.platform_api_key) {
-        console.log(`Skipping agent ${agent.name} - missing credentials`);
+      // Use agent's API key if available, otherwise fallback to organization integration
+      const apiKey = agent.platform_api_key || orgApiKey;
+      
+      if (!agent.platform_agent_id) {
+        console.log(`Skipping agent ${agent.name} - missing platform_agent_id`);
+        syncErrors.push(`Agent ${agent.name}: missing platform_agent_id`);
+        continue;
+      }
+
+      if (!apiKey) {
+        console.log(`Skipping agent ${agent.name} - no API key available (agent or org integration)`);
+        syncErrors.push(`Agent ${agent.name}: no API key configured`);
         continue;
       }
 
@@ -111,7 +133,7 @@ serve(async (req) => {
           
           const response = await fetch(url.toString(), {
             headers: {
-              'xi-api-key': agent.platform_api_key,
+              'xi-api-key': apiKey,
             },
           });
 
@@ -154,7 +176,7 @@ serve(async (req) => {
               `https://api.elevenlabs.io/v1/convai/conversations/${conv.conversation_id}`,
               {
                 headers: {
-                  'xi-api-key': agent.platform_api_key,
+                  'xi-api-key': apiKey,
                 },
               }
             );

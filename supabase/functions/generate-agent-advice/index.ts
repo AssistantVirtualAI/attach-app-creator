@@ -92,42 +92,70 @@ Génère un rapport JSON avec cette structure exacte:
 }`;
 };
 
-// Fetch all conversations with pagination (no limit)
-async function fetchAllConversations(supabaseAdmin: any, agentId: string, startDate?: Date) {
+// Fetch conversations from ElevenLabs API directly
+async function fetchElevenLabsConversations(apiKey: string, platformAgentId: string, startDate?: Date, maxConversations = 500) {
   const allConversations: any[] = [];
-  const pageSize = 1000;
-  let offset = 0;
-  let hasMore = true;
-
-  while (hasMore) {
-    let query = supabaseAdmin
-      .from('conversations')
-      .select('id, title, transcript, sentiment, satisfaction_score, duration, smart_tags, resolution_status, created_at, metadata')
-      .eq('agent_id', agentId)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + pageSize - 1);
-
-    if (startDate) {
-      query = query.gte('created_at', startDate.toISOString());
+  let cursor: string | null = null;
+  let pageCount = 0;
+  const maxPages = 50;
+  
+  do {
+    const url = new URL(`https://api.elevenlabs.io/v1/convai/agents/${platformAgentId}/conversations`);
+    url.searchParams.set('limit', '100');
+    if (cursor) {
+      url.searchParams.set('cursor', cursor);
     }
+    
+    const response = await fetch(url.toString(), {
+      headers: { 'xi-api-key': apiKey },
+    });
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching conversations:', error);
+    if (!response.ok) {
+      console.error(`ElevenLabs API error: ${response.status}`);
       break;
     }
 
-    if (data && data.length > 0) {
-      allConversations.push(...data);
-      offset += pageSize;
-      hasMore = data.length === pageSize;
-    } else {
-      hasMore = false;
+    const data = await response.json();
+    const conversations = data.conversations || [];
+    
+    // Filter by start date if provided
+    const filteredConversations = startDate 
+      ? conversations.filter((c: any) => new Date(c.start_time || c.created_at) >= startDate)
+      : conversations;
+    
+    allConversations.push(...filteredConversations);
+    
+    cursor = data.next_cursor || null;
+    pageCount++;
+    
+    // Stop if we have enough or reached date limit
+    if (!cursor || pageCount >= maxPages || allConversations.length >= maxConversations) {
+      break;
     }
-  }
+    
+    // If we filtered out conversations due to date, we might have reached the cutoff
+    if (startDate && filteredConversations.length < conversations.length) {
+      break;
+    }
+  } while (cursor);
 
   return allConversations;
+}
+
+// Fetch conversation details from ElevenLabs
+async function fetchConversationDetails(apiKey: string, conversationId: string) {
+  try {
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/convai/conversations/${conversationId}`,
+      { headers: { 'xi-api-key': apiKey } }
+    );
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (e) {
+    console.log(`Could not fetch details for ${conversationId}`);
+  }
+  return null;
 }
 
 serve(async (req) => {
@@ -136,7 +164,7 @@ serve(async (req) => {
   }
 
   try {
-    const { agentId, days = 1, language = 'en' } = await req.json();
+    const { agentId, days = 7, language = 'en' } = await req.json();
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -184,7 +212,7 @@ serve(async (req) => {
     // Get agent info
     const { data: agent, error: agentError } = await supabaseAdmin
       .from('agents')
-      .select('id, name, platform, platform_agent_id, config')
+      .select('id, name, platform, platform_agent_id, platform_api_key, config')
       .eq('id', agentId)
       .single();
 
@@ -195,7 +223,22 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Generating advice for agent: ${agent.name}, language: ${language}, days: ${days}`);
+    console.log(`Generating advice for agent: ${agent.name}, platform: ${agent.platform}, language: ${language}, days: ${days}`);
+
+    // Get API key from agent or organization integration
+    let apiKey = agent.platform_api_key;
+    
+    if (!apiKey) {
+      const { data: orgIntegration } = await supabaseAdmin
+        .from('organization_integrations')
+        .select('api_key')
+        .eq('organization_id', orgMember.organization_id)
+        .eq('platform', agent.platform)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      apiKey = orgIntegration?.api_key;
+    }
 
     // Calculate start date (null for "all time")
     let startDate: Date | undefined;
@@ -204,33 +247,83 @@ serve(async (req) => {
       startDate.setDate(startDate.getDate() - days);
     }
 
-    // Fetch ALL conversations (no limit)
-    const conversations = await fetchAllConversations(supabaseAdmin, agentId, startDate);
+    let platformConversations: any[] = [];
+    let totalConversations = 0;
+    let avgDuration = 0;
+    let successfulCount = 0;
 
-    // Fetch insights with pagination too
-    let insightsQuery = supabaseAdmin
-      .from('agent_insights')
-      .select('satisfaction_score, overall_sentiment, improvements, smart_tags')
-      .eq('agent_id', agentId);
-
-    if (startDate) {
-      insightsQuery = insightsQuery.gte('created_at', startDate.toISOString());
+    // Fetch conversations from platform API directly
+    if (agent.platform === 'elevenlabs' && apiKey && agent.platform_agent_id) {
+      console.log('Fetching conversations directly from ElevenLabs API...');
+      
+      platformConversations = await fetchElevenLabsConversations(
+        apiKey,
+        agent.platform_agent_id,
+        startDate,
+        500
+      );
+      
+      totalConversations = platformConversations.length;
+      console.log(`Fetched ${totalConversations} conversations from ElevenLabs`);
+      
+      // Calculate metrics from platform data
+      const durations = platformConversations
+        .map(c => c.call_duration_secs || c.duration || 0)
+        .filter(d => d > 0);
+      avgDuration = durations.length > 0 
+        ? durations.reduce((a, b) => a + b, 0) / durations.length 
+        : 0;
+      
+      // Count successful conversations based on status
+      successfulCount = platformConversations.filter(c => 
+        c.status === 'done' || 
+        c.analysis?.call_successful === true
+      ).length;
     }
 
-    const { data: insights } = await insightsQuery;
+    // Fetch local conversations and insights for satisfaction data
+    const { data: localConversations } = await supabaseAdmin
+      .from('conversations')
+      .select('id, satisfaction_score, sentiment, smart_tags, resolution_status, duration, metadata')
+      .eq('agent_id', agentId)
+      .gte('created_at', startDate?.toISOString() || '1970-01-01');
 
-    // Calculate basic metrics
-    const totalConversations = conversations?.length || 0;
-    const avgSatisfaction = conversations && conversations.length > 0
-      ? conversations.filter(c => c.satisfaction_score).reduce((sum, c) => sum + Number(c.satisfaction_score), 0) / 
-        conversations.filter(c => c.satisfaction_score).length
+    const { data: insights } = await supabaseAdmin
+      .from('agent_insights')
+      .select('satisfaction_score, overall_sentiment, improvements, smart_tags')
+      .eq('agent_id', agentId)
+      .gte('created_at', startDate?.toISOString() || '1970-01-01');
+
+    // Use platform total if available, otherwise local
+    if (totalConversations === 0) {
+      totalConversations = localConversations?.length || 0;
+    }
+
+    // Calculate satisfaction from local data (agent_insights)
+    const satisfactionScores = [
+      ...(insights?.filter(i => i.satisfaction_score).map(i => i.satisfaction_score) || []),
+      ...(localConversations?.filter(c => c.satisfaction_score).map(c => c.satisfaction_score) || [])
+    ].filter(s => s !== null && s !== undefined);
+
+    const avgSatisfaction = satisfactionScores.length > 0
+      ? satisfactionScores.reduce((a, b) => a + Number(b), 0) / satisfactionScores.length
       : 0;
-    const avgDuration = conversations && conversations.length > 0
-      ? conversations.filter(c => c.duration).reduce((sum, c) => sum + (c.duration || 0), 0) / 
-        conversations.filter(c => c.duration).length
+
+    // Use local duration if platform didn't provide
+    if (avgDuration === 0 && localConversations?.length) {
+      const localDurations = localConversations
+        .map(c => c.duration || 0)
+        .filter(d => d > 0);
+      avgDuration = localDurations.length > 0
+        ? localDurations.reduce((a, b) => a + b, 0) / localDurations.length
+        : 0;
+    }
+
+    // Calculate success rate
+    const resolvedCount = localConversations?.filter(c => c.resolution_status === 'resolved').length || 0;
+    const successRate = totalConversations > 0 
+      ? ((successfulCount || resolvedCount) / totalConversations) * 100 
       : 0;
-    const resolvedCount = conversations?.filter(c => c.resolution_status === 'resolved').length || 0;
-    const successRate = totalConversations > 0 ? (resolvedCount / totalConversations) * 100 : 0;
 
     // Collect all improvements and tags
     const allImprovements: string[] = [];
@@ -248,7 +341,7 @@ serve(async (req) => {
       }
     });
 
-    conversations?.forEach(c => {
+    localConversations?.forEach(c => {
       if (Array.isArray(c.smart_tags)) {
         allTags.push(...c.smart_tags);
       }
@@ -265,24 +358,51 @@ serve(async (req) => {
       tagCounts[tag] = (tagCounts[tag] || 0) + 1;
     });
 
-    // Sentiment distribution
+    // Sentiment distribution from insights
     let positiveCount = 0, neutralCount = 0, negativeCount = 0;
-    conversations?.forEach(c => {
+    
+    insights?.forEach(i => {
+      const s = (i.overall_sentiment || '').toLowerCase();
+      if (s.includes('positif') || s === 'positive') positiveCount++;
+      else if (s.includes('négatif') || s === 'negative') negativeCount++;
+      else neutralCount++;
+    });
+
+    localConversations?.forEach(c => {
       const s = (c.sentiment || '').toLowerCase();
       if (s.includes('positif') || s === 'positive') positiveCount++;
       else if (s.includes('négatif') || s === 'negative') negativeCount++;
       else neutralCount++;
     });
 
-    // Prepare conversation summaries for AI analysis (sample for AI, but metrics use all)
-    const conversationSummaries = conversations?.slice(0, 50).map(c => ({
-      sentiment: c.sentiment,
-      satisfaction: c.satisfaction_score,
-      duration: c.duration,
-      tags: c.smart_tags,
-      resolution: c.resolution_status,
-      summary: (c.metadata as any)?.summary || (c.metadata as any)?.aiAnalysis?.summary || null
-    })) || [];
+    // Prepare conversation summaries for AI analysis
+    const conversationSummaries: any[] = [];
+    
+    // Add summaries from platform conversations (first 30)
+    for (const conv of platformConversations.slice(0, 30)) {
+      const details = apiKey ? await fetchConversationDetails(apiKey, conv.conversation_id) : null;
+      conversationSummaries.push({
+        sentiment: details?.analysis?.user_sentiment || conv.analysis?.user_sentiment,
+        satisfaction: null, // ElevenLabs doesn't provide this directly
+        duration: conv.call_duration_secs || conv.duration,
+        tags: details?.analysis?.data_collection_results ? Object.keys(details.analysis.data_collection_results) : [],
+        resolution: conv.status === 'done' ? 'completed' : conv.status,
+        summary: details?.analysis?.transcript_summary || details?.analysis?.summary || null,
+        call_successful: details?.analysis?.call_successful
+      });
+    }
+
+    // Add local summaries
+    localConversations?.slice(0, 20).forEach(c => {
+      conversationSummaries.push({
+        sentiment: c.sentiment,
+        satisfaction: c.satisfaction_score,
+        duration: c.duration,
+        tags: c.smart_tags,
+        resolution: c.resolution_status,
+        summary: (c.metadata as any)?.summary || (c.metadata as any)?.aiAnalysis?.summary || null
+      });
+    });
 
     const metrics = {
       totalConversations,
@@ -296,11 +416,13 @@ serve(async (req) => {
       topImprovements: Object.entries(improvementCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([i, c]) => `${i} (${c}x)`).join('; '),
     };
 
+    console.log('Metrics:', metrics);
+
     // Generate AI advice
     let aiAdvice = null;
     if (lovableApiKey && totalConversations > 0) {
       try {
-        const prompt = getAnalysisPrompt(language, agent, days, metrics, conversationSummaries);
+        const prompt = getAnalysisPrompt(language, agent, days, metrics, conversationSummaries.slice(0, 50));
 
         const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
@@ -352,15 +474,15 @@ serve(async (req) => {
       avg_duration_seconds: Math.round(avgDuration) || null,
       success_rate: successRate || null,
       summary: aiAdvice?.summary || (language === 'en' 
-        ? `${totalConversations} conversations analyzed. Average satisfaction: ${avgSatisfaction.toFixed(1)}/10.`
-        : `${totalConversations} conversations analysées. Satisfaction moyenne: ${avgSatisfaction.toFixed(1)}/10.`),
+        ? `${totalConversations} conversations analyzed. Average satisfaction: ${avgSatisfaction > 0 ? avgSatisfaction.toFixed(1) + '/10' : 'N/A'}.`
+        : `${totalConversations} conversations analysées. Satisfaction moyenne: ${avgSatisfaction > 0 ? avgSatisfaction.toFixed(1) + '/10' : 'N/A'}.`),
       strengths: aiAdvice?.strengths || [],
       weaknesses: aiAdvice?.weaknesses || [],
       recommendations: aiAdvice?.recommendations || [],
       prompt_suggestions: aiAdvice?.prompt_suggestions || [],
       kb_suggestions: aiAdvice?.kb_suggestions || [],
       priority_actions: aiAdvice?.priority_actions || [],
-      conversations_analyzed: totalConversations,
+      conversations_analyzed: conversationSummaries.length,
       generated_at: new Date().toISOString(),
     };
 
@@ -387,6 +509,7 @@ serve(async (req) => {
           sentimentDistribution: { positive: positiveCount, neutral: neutralCount, negative: negativeCount },
           topTags: Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 10),
           topImprovements: Object.entries(improvementCounts).sort((a, b) => b[1] - a[1]).slice(0, 5),
+          dataSource: apiKey ? 'platform+local' : 'local'
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
