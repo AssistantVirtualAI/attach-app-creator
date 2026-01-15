@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface AIInsightsWidgetProps {
   compact?: boolean;
@@ -24,6 +24,7 @@ interface AIInsightsWidgetProps {
 
 export const AIInsightsWidget = ({ compact = false }: AIInsightsWidgetProps) => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['dashboard-ai-insights'],
@@ -78,6 +79,15 @@ export const AIInsightsWidget = ({ compact = false }: AIInsightsWidgetProps) => 
     }
   };
 
+  const getHealthLabel = (health: string) => {
+    switch (health) {
+      case 'good': return t('dashboard.insights.excellent');
+      case 'warning': return t('dashboard.insights.attention');
+      case 'critical': return t('dashboard.insights.critical');
+      default: return t('dashboard.insights.analyzing');
+    }
+  };
+
   if (isLoading) {
     return (
       <Card className="glass-card overflow-hidden">
@@ -100,10 +110,10 @@ export const AIInsightsWidget = ({ compact = false }: AIInsightsWidgetProps) => 
       <Card className="glass-card">
         <CardContent className="pt-6 text-center py-8">
           <AlertTriangle className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
-          <p className="text-sm text-muted-foreground mb-3">Impossible de charger les insights</p>
+          <p className="text-sm text-muted-foreground mb-3">{t('dashboard.insights.unableToLoad')}</p>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-3 w-3 mr-1" />
-            Réessayer
+            {t('dashboard.insights.retry')}
           </Button>
         </CardContent>
       </Card>
@@ -129,7 +139,7 @@ export const AIInsightsWidget = ({ compact = false }: AIInsightsWidgetProps) => 
             >
               <Brain className="h-5 w-5 text-primary" />
             </motion.div>
-            Insights IA
+            {t('dashboard.insights.title')}
           </CardTitle>
           <Button 
             variant="ghost" 
@@ -186,12 +196,11 @@ export const AIInsightsWidget = ({ compact = false }: AIInsightsWidgetProps) => 
                 {globalAdvice?.overallHealth === 'good' && <CheckCircle className="h-3 w-3 mr-1" />}
                 {globalAdvice?.overallHealth === 'warning' && <AlertTriangle className="h-3 w-3 mr-1" />}
                 {globalAdvice?.overallHealth === 'critical' && <AlertTriangle className="h-3 w-3 mr-1" />}
-                {globalAdvice?.overallHealth === 'good' ? 'Excellent' : 
-                 globalAdvice?.overallHealth === 'warning' ? 'Attention' : 'Critique'}
+                {getHealthLabel(globalAdvice?.overallHealth)}
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground line-clamp-2">
-              {globalAdvice?.globalSummary || 'Analyse en cours...'}
+              {globalAdvice?.globalSummary || t('dashboard.insights.analyzing')}
             </p>
           </div>
         </div>
@@ -201,7 +210,7 @@ export const AIInsightsWidget = ({ compact = false }: AIInsightsWidgetProps) => 
           <div className="space-y-2">
             <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
               <Lightbulb className="h-3 w-3" />
-              Insights clés
+              {t('dashboard.insights.keyInsights')}
             </h4>
             <div className="space-y-1.5">
               {globalAdvice.keyInsights.slice(0, 3).map((insight: string, i: number) => (
@@ -225,15 +234,15 @@ export const AIInsightsWidget = ({ compact = false }: AIInsightsWidgetProps) => 
           <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/50">
             <div className="text-center">
               <p className="text-lg font-bold">{globalMetrics.totalConversations || 0}</p>
-              <p className="text-xs text-muted-foreground">Conversations</p>
+              <p className="text-xs text-muted-foreground">{t('dashboard.insights.conversations')}</p>
             </div>
             <div className="text-center">
               <p className="text-lg font-bold">{globalMetrics.avgSatisfaction?.toFixed(1) || 'N/A'}</p>
-              <p className="text-xs text-muted-foreground">Satisfaction</p>
+              <p className="text-xs text-muted-foreground">{t('dashboard.insights.satisfaction')}</p>
             </div>
             <div className="text-center">
               <p className="text-lg font-bold">{globalMetrics.agentCount || 0}</p>
-              <p className="text-xs text-muted-foreground">Agents</p>
+              <p className="text-xs text-muted-foreground">{t('dashboard.insights.agents')}</p>
             </div>
           </div>
         )}
@@ -243,7 +252,7 @@ export const AIInsightsWidget = ({ compact = false }: AIInsightsWidgetProps) => 
           <Button variant="ghost" size="sm" className="w-full justify-between group">
             <span className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
-              Voir tous les insights
+              {t('dashboard.insights.viewAll')}
             </span>
             <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
           </Button>

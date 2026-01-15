@@ -4,9 +4,10 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, ChevronDown } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export type PeriodPreset = 'today' | '7days' | '30days' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'custom';
 
@@ -23,8 +24,11 @@ export const DateRangeSelector = ({
   className,
   showQuickButtons = true 
 }: DateRangeSelectorProps) => {
+  const { t, language } = useTranslation();
   const [preset, setPreset] = useState<PeriodPreset>('7days');
   const [isCustomOpen, setIsCustomOpen] = useState(false);
+
+  const dateLocale = language === 'fr' ? fr : enUS;
 
   const handlePresetChange = (newPreset: PeriodPreset) => {
     setPreset(newPreset);
@@ -41,7 +45,7 @@ export const DateRangeSelector = ({
         onChange({ start: subDays(new Date(), 30), end: new Date() });
         break;
       case 'thisWeek':
-        onChange({ start: startOfWeek(now, { locale: fr }), end: endOfWeek(now, { locale: fr }) });
+        onChange({ start: startOfWeek(now, { locale: dateLocale }), end: endOfWeek(now, { locale: dateLocale }) });
         break;
       case 'thisMonth':
         onChange({ start: startOfMonth(now), end: endOfMonth(now) });
@@ -57,25 +61,25 @@ export const DateRangeSelector = ({
   };
 
   const quickButtons = [
-    { id: '7days' as PeriodPreset, label: '7j' },
-    { id: '30days' as PeriodPreset, label: '30j' },
-    { id: 'thisMonth' as PeriodPreset, label: 'Ce mois' },
-    { id: 'lastMonth' as PeriodPreset, label: 'Mois -1' },
+    { id: '7days' as PeriodPreset, label: t('dashboard.dateRange.days7') },
+    { id: '30days' as PeriodPreset, label: t('dashboard.dateRange.days30') },
+    { id: 'thisMonth' as PeriodPreset, label: t('dashboard.dateRange.thisMonth') },
+    { id: 'lastMonth' as PeriodPreset, label: t('dashboard.dateRange.lastMonth') },
   ];
 
   const getPresetLabel = () => {
     switch (preset) {
-      case 'today': return "Aujourd'hui";
-      case '7days': return '7 derniers jours';
-      case '30days': return '30 derniers jours';
-      case 'thisWeek': return 'Cette semaine';
-      case 'thisMonth': return 'Ce mois';
-      case 'lastMonth': return 'Mois dernier';
+      case 'today': return t('dashboard.dateRange.today');
+      case '7days': return t('dashboard.dateRange.last7days');
+      case '30days': return t('dashboard.dateRange.last30days');
+      case 'thisWeek': return t('dashboard.dateRange.thisWeek');
+      case 'thisMonth': return t('dashboard.dateRange.thisMonth');
+      case 'lastMonth': return t('dashboard.dateRange.lastMonth');
       case 'custom': 
         return value 
-          ? `${format(value.start, 'dd/MM', { locale: fr })} - ${format(value.end, 'dd/MM', { locale: fr })}`
-          : 'Personnalisé';
-      default: return 'Période';
+          ? `${format(value.start, 'dd/MM', { locale: dateLocale })} - ${format(value.end, 'dd/MM', { locale: dateLocale })}`
+          : t('dashboard.dateRange.custom');
+      default: return t('dashboard.dateRange.period');
     }
   };
 
@@ -122,12 +126,12 @@ export const DateRangeSelector = ({
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
           <div className="p-3 border-b">
-            <p className="text-sm font-medium">Période personnalisée</p>
-            <p className="text-xs text-muted-foreground">Sélectionnez une plage de dates</p>
+            <p className="text-sm font-medium">{t('dashboard.dateRange.customPeriod')}</p>
+            <p className="text-xs text-muted-foreground">{t('dashboard.dateRange.selectDateRange')}</p>
           </div>
           <div className="flex gap-2 p-4">
             <div>
-              <p className="text-xs font-medium mb-2 text-muted-foreground">Du</p>
+              <p className="text-xs font-medium mb-2 text-muted-foreground">{t('dashboard.dateRange.from')}</p>
               <Calendar
                 mode="single"
                 selected={value?.start}
@@ -139,12 +143,12 @@ export const DateRangeSelector = ({
                     });
                   }
                 }}
-                locale={fr}
+                locale={dateLocale}
                 className="pointer-events-auto"
               />
             </div>
             <div>
-              <p className="text-xs font-medium mb-2 text-muted-foreground">Au</p>
+              <p className="text-xs font-medium mb-2 text-muted-foreground">{t('dashboard.dateRange.to')}</p>
               <Calendar
                 mode="single"
                 selected={value?.end}
@@ -156,7 +160,7 @@ export const DateRangeSelector = ({
                     });
                   }
                 }}
-                locale={fr}
+                locale={dateLocale}
                 disabled={(date) => value?.start ? date < value.start : false}
                 className="pointer-events-auto"
               />
@@ -166,13 +170,13 @@ export const DateRangeSelector = ({
             <div className="text-xs text-muted-foreground">
               {value && (
                 <>
-                  {format(value.start, 'dd MMM yyyy', { locale: fr })} →{' '}
-                  {format(value.end, 'dd MMM yyyy', { locale: fr })}
+                  {format(value.start, 'dd MMM yyyy', { locale: dateLocale })} →{' '}
+                  {format(value.end, 'dd MMM yyyy', { locale: dateLocale })}
                 </>
               )}
             </div>
             <Button size="sm" onClick={() => setIsCustomOpen(false)}>
-              Appliquer
+              {t('dashboard.dateRange.apply')}
             </Button>
           </div>
         </PopoverContent>

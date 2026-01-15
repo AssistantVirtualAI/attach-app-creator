@@ -10,6 +10,7 @@ import {
 import { DashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { motion } from 'framer-motion';
 import { SimpleAnimatedCounter } from '@/components/ui/animated-counter';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface QuickStatsBannerProps {
   metrics: DashboardMetrics;
@@ -17,6 +18,8 @@ interface QuickStatsBannerProps {
 }
 
 export const QuickStatsBanner = ({ metrics, isLoading }: QuickStatsBannerProps) => {
+  const { t } = useTranslation();
+
   if (isLoading) {
     return (
       <Card className="bg-gradient-to-r from-primary/10 via-secondary/5 to-accent/10 border-primary/20">
@@ -40,8 +43,8 @@ export const QuickStatsBanner = ({ metrics, isLoading }: QuickStatsBannerProps) 
   const stats = [
     {
       icon: Activity,
-      label: 'Statut',
-      value: isActive ? 'En direct' : 'Calme',
+      label: t('dashboard.quickStats.status'),
+      value: isActive ? t('dashboard.quickStats.live') : t('dashboard.quickStats.quiet'),
       numericValue: undefined,
       isLive: isActive,
       color: isActive ? 'emerald' : 'muted',
@@ -51,7 +54,7 @@ export const QuickStatsBanner = ({ metrics, isLoading }: QuickStatsBannerProps) 
     },
     {
       icon: MessageSquare,
-      label: "Aujourd'hui",
+      label: t('dashboard.quickStats.today'),
       value: undefined,
       numericValue: metrics.conversationsToday,
       isLive: false,
@@ -62,7 +65,7 @@ export const QuickStatsBanner = ({ metrics, isLoading }: QuickStatsBannerProps) 
     },
     {
       icon: Star,
-      label: 'Satisfaction',
+      label: t('dashboard.quickStats.satisfaction'),
       value: metrics.avgSatisfaction > 0 ? undefined : 'N/A',
       numericValue: metrics.avgSatisfaction > 0 ? metrics.avgSatisfaction : undefined,
       suffix: '/5',
@@ -78,7 +81,7 @@ export const QuickStatsBanner = ({ metrics, isLoading }: QuickStatsBannerProps) 
     },
     {
       icon: metrics.conversationsTrend >= 0 ? TrendingUp : TrendingDown,
-      label: 'Tendance',
+      label: t('dashboard.quickStats.trend'),
       value: metrics.conversationsTrend !== 0 
         ? `${metrics.conversationsTrend > 0 ? '+' : ''}${metrics.conversationsTrend}%` 
         : '—',
