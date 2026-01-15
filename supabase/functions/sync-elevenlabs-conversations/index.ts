@@ -12,9 +12,18 @@ serve(async (req) => {
   }
 
   try {
-    const { action = 'sync', agentId, limit = 100, analyzeConversations = true, mode = 'recent', language = 'fr' } = await req.json();
-    
+    const {
+      action = 'sync',
+      agentId,
+      limit = 100,
+      analyzeConversations = true,
+      mode = 'recent',
+      language = 'fr',
+      cursor: startCursor,
+    } = await req.json();
+
     // mode can be 'recent' (default) or 'all' for full historical sync
+    // When mode='all', this function is intentionally chunked to avoid timeouts.
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -99,6 +108,10 @@ serve(async (req) => {
     let totalAnalyzed = 0;
     const syncErrors: string[] = [];
 
+    // Paging is only supported for single-agent sync (agentId provided)
+    let nextCursor: string | null = null;
+    let hasMore = false;
+
     for (const agent of agents) {
       // Use agent's API key if available, otherwise fallback to organization integration
       const apiKey = agent.platform_api_key || orgApiKey;
@@ -116,25 +129,32 @@ serve(async (req) => {
       }
 
       try {
-        console.log(`[sync] Syncing conversations for agent ${agent.name} (mode: ${mode})`);
-        
+        // Hard cap to keep requests fast/stable (caller can page using cursor)
+        const totalLimit = Math.max(1, Math.min(Number(limit) || 100, 500));
+
+        console.log(`[sync] Syncing conversations for agent ${agent.name} (mode: ${mode}, limit: ${totalLimit})`);
+
         let allConversations: any[] = [];
-        let cursor: string | null = null;
+        let cursor: string | null = agentId && typeof startCursor === 'string' && startCursor.length > 0 ? startCursor : null;
         let pageCount = 0;
-        const maxPages = mode === 'all' ? 100 : 3; // For 'all' mode, paginate more; otherwise just a few pages
-        const pageLimit = Math.min(limit, 100);
-        
+        const pageLimit = 100;
+
+        // In 'recent' mode we only fetch a few pages.
+        const maxPages = mode === 'all' ? 100 : 3;
+
         do {
-          // CORRECT API ENDPOINT: /v1/convai/conversations?agent_id=...
+          const remaining = totalLimit - allConversations.length;
+          if (remaining <= 0) break;
+
           const url = new URL('https://api.elevenlabs.io/v1/convai/conversations');
           url.searchParams.set('agent_id', agent.platform_agent_id);
-          url.searchParams.set('page_size', String(pageLimit));
+          url.searchParams.set('page_size', String(Math.min(pageLimit, remaining)));
           if (cursor) {
             url.searchParams.set('cursor', cursor);
           }
-          
+
           console.log(`[sync] Fetching: ${url.toString()}`);
-          
+
           const response = await fetch(url.toString(), {
             headers: {
               'xi-api-key': apiKey,
@@ -151,20 +171,31 @@ serve(async (req) => {
           const data = await response.json();
           const conversations = data.conversations || [];
           allConversations = allConversations.concat(conversations);
-          
-          // Get next page cursor
+
           cursor = data.next_cursor || null;
           pageCount++;
-          
+
           console.log(`[sync] Page ${pageCount}: Got ${conversations.length} conversations, total so far: ${allConversations.length}`);
-          
-          // Stop if no more pages or reached limit
-          if (!cursor || pageCount >= maxPages || (mode !== 'all' && allConversations.length >= limit)) {
+
+          // Stop if no more pages, reached maxPages, or reached our requested totalLimit
+          if (!cursor || pageCount >= maxPages || allConversations.length >= totalLimit) {
+            break;
+          }
+
+          // Also stop early in 'recent' mode once we reached caller limit
+          if (mode !== 'all' && allConversations.length >= totalLimit) {
             break;
           }
         } while (cursor);
 
-        console.log(`[sync] Found ${allConversations.length} conversations for ${agent.name}`);
+        const agentHasMore = mode === 'all' && !!cursor && allConversations.length >= totalLimit;
+        if (agentId) {
+          hasMore = agentHasMore;
+          nextCursor = cursor;
+        }
+        console.log(`[sync] Found ${allConversations.length} conversations for ${agent.name} (hasMore: ${agentHasMore})`);
+
+
 
         for (const conv of allConversations) {
           // Check if conversation already exists using external_id
@@ -354,7 +385,9 @@ serve(async (req) => {
         updated: totalUpdated,
         analyzed: totalAnalyzed,
         errors: syncErrors,
-        timestamp: new Date().toISOString()
+        hasMore,
+        nextCursor,
+        timestamp: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

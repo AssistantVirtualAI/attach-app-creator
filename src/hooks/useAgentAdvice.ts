@@ -153,16 +153,46 @@ export function useSyncElevenLabsConversations() {
   const { language } = useTranslation();
 
   return useMutation({
-    mutationFn: async ({ agentId, limit = 100, mode = 'recent' }: { agentId?: string; limit?: number; mode?: 'recent' | 'all' }) => {
-      const { data, error } = await supabase.functions.invoke('sync-elevenlabs-conversations', {
-        body: { action: 'sync', agentId, limit, mode }
-      });
+    mutationFn: async ({
+      agentId,
+      limit = 100,
+      mode = 'recent',
+    }: {
+      agentId?: string;
+      limit?: number;
+      mode?: 'recent' | 'all';
+    }) => {
+      // In "all" mode, sync in chunks to avoid request timeouts.
+      let cursor: string | undefined = undefined;
+      let total = { synced: 0, created: 0, updated: 0, analyzed: 0 };
 
-      if (error) throw error;
-      return data;
+      // Safety cap: don’t loop forever if API cursor misbehaves
+      const maxIterations = mode === 'all' ? 50 : 1;
+
+      for (let i = 0; i < maxIterations; i++) {
+        const { data, error } = await supabase.functions.invoke('sync-elevenlabs-conversations', {
+          body: { action: 'sync', agentId, limit, mode, language, cursor },
+        });
+
+        if (error) throw error;
+
+        total.synced += Number(data?.synced || 0);
+        total.created += Number(data?.created || 0);
+        total.updated += Number(data?.updated || 0);
+        total.analyzed += Number(data?.analyzed || 0);
+
+        // If the function supports paging, it should return nextCursor + hasMore
+        if (mode !== 'all' || !data?.hasMore || !data?.nextCursor) {
+          return { ...data, ...total };
+        }
+
+        cursor = data.nextCursor;
+      }
+
+      return total;
     },
     onSuccess: (data) => {
-      const message = language === 'en' 
+      const message = language === 'en'
         ? `Sync complete: ${data.synced} conversations (${data.created} new, ${data.updated} updated)`
         : `Synchronisation terminée: ${data.synced} conversations (${data.created} nouvelles, ${data.updated} mises à jour)`;
       toast.success(message);
