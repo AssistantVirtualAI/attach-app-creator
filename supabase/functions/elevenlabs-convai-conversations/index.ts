@@ -12,7 +12,10 @@ serve(async (req) => {
   }
 
   try {
-    const { action, agentId, conversationId, page = 1, limit = 50, filters, format = 'mp3', apiKey: providedApiKey, organizationId } = await req.json();
+    const body = await req.json();
+    const { agentId, conversationId, page = 1, limit = 50, filters, format = 'mp3', apiKey: providedApiKey, organizationId } = body;
+    // Default action to 'list' if not provided for backward compatibility
+    const action = body.action || 'list';
     
     let apiKey = providedApiKey;
     let targetAgentId = agentId;
