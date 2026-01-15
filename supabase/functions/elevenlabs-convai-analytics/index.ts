@@ -23,7 +23,7 @@ serve(async (req) => {
     
     const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
     
-    console.log(`[analytics] agentId: ${agentId}, organizationId: ${organizationId}, hasApiKey: ${!!apiKey}`);
+    console.log(`[analytics] agentId: ${agentId}, organizationId: ${organizationId}, timeframe: ${timeframe}, hasApiKey: ${!!apiKey}`);
     
     // If no API key provided directly, try multiple fallback strategies
     if (!apiKey) {
@@ -163,73 +163,115 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Fetching analytics for agent ${targetAgentId} via conversations`);
+    // Calculate start date based on timeframe
+    const now = new Date();
+    let startDate: Date;
+    switch (timeframe) {
+      case '24hours':
+        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case '7days':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30days':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90days':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      case 'all':
+        startDate = new Date(0); // Beginning of time
+        break;
+      default:
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    }
+
+    console.log(`[analytics] Fetching conversations for agent ${targetAgentId} since ${startDate.toISOString()}`);
     
-    // ElevenLabs doesn't have a dedicated analytics endpoint
-    // We need to fetch conversations and calculate analytics from them
-    const conversationsResponse = await fetch(
-      `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${targetAgentId}&page_size=100`,
-      {
+    // Paginate through ALL conversations using cursor
+    const allConversations: any[] = [];
+    let cursor: string | undefined;
+    let hasMore = true;
+    const maxPages = 100; // Safety limit
+    let pageCount = 0;
+
+    while (hasMore && pageCount < maxPages) {
+      let url = `https://api.elevenlabs.io/v1/convai/conversations?agent_id=${targetAgentId}&page_size=100`;
+      if (cursor) {
+        url += `&cursor=${cursor}`;
+      }
+
+      console.log(`[analytics] Fetching page ${pageCount + 1}, cursor: ${cursor || 'none'}`);
+
+      const conversationsResponse = await fetch(url, {
         method: 'GET',
         headers: {
           'xi-api-key': apiKey,
           'Content-Type': 'application/json',
         },
-      }
-    );
+      });
 
-    if (!conversationsResponse.ok) {
-      const errorText = await conversationsResponse.text();
-      console.error('ElevenLabs API error:', conversationsResponse.status, errorText);
-      
-      if (conversationsResponse.status === 401) {
-        return new Response(
-          JSON.stringify({ 
-            requiresSetup: true, 
-            message: 'API Key invalide. Veuillez vérifier votre configuration.' 
-          }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      if (!conversationsResponse.ok) {
+        const errorText = await conversationsResponse.text();
+        console.error('ElevenLabs API error:', conversationsResponse.status, errorText);
+        
+        if (conversationsResponse.status === 401) {
+          return new Response(
+            JSON.stringify({ 
+              requiresSetup: true, 
+              message: 'API Key invalide. Veuillez vérifier votre configuration.' 
+            }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        if (conversationsResponse.status === 404) {
+          console.log('No conversations found, returning empty analytics');
+          break;
+        }
+        
+        throw new Error(`ElevenLabs API error: ${conversationsResponse.status} - ${errorText}`);
       }
+
+      const data = await conversationsResponse.json();
+      const pageConversations = data.conversations || [];
       
-      // If 404, return empty analytics instead of error
-      if (conversationsResponse.status === 404) {
-        console.log('No conversations found, returning empty analytics');
-        return new Response(
-          JSON.stringify({
-            metrics: {
-              total_conversations: 0,
-              successful_conversations: 0,
-              failed_conversations: 0,
-              avg_duration: 0,
-              total_duration: 0,
-              avg_satisfaction: 0,
-              today_conversations: 0,
-              success_rate: 0,
-            },
-            trends: {},
-            charts: includeCharts ? {
-              conversations_over_time: [],
-              satisfaction_trend: [],
-              peak_hours: [],
-            } : undefined,
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      console.log(`[analytics] Page ${pageCount + 1} returned ${pageConversations.length} conversations`);
+      
+      if (pageConversations.length === 0) {
+        hasMore = false;
+        break;
       }
-      
-      throw new Error(`ElevenLabs API error: ${conversationsResponse.status} - ${errorText}`);
+
+      // Filter by timeframe and add to collection
+      let reachedOldData = false;
+      for (const conv of pageConversations) {
+        const convDate = new Date(conv.start_time_unix_secs ? conv.start_time_unix_secs * 1000 : conv.created_at);
+        
+        if (convDate >= startDate) {
+          allConversations.push(conv);
+        } else {
+          // Conversation is older than our timeframe, stop paginating
+          reachedOldData = true;
+        }
+      }
+
+      // Check if we should continue
+      if (reachedOldData && timeframe !== 'all') {
+        console.log(`[analytics] Reached data older than timeframe, stopping pagination`);
+        hasMore = false;
+      } else if (data.has_more && data.next_cursor) {
+        cursor = data.next_cursor;
+        pageCount++;
+      } else {
+        hasMore = false;
+      }
     }
-
-    const conversationsData = await conversationsResponse.json();
-    const conversations = conversationsData.conversations || [];
     
-    console.log(`Retrieved ${conversations.length} conversations for analytics`);
+    console.log(`[analytics] Total conversations fetched: ${allConversations.length} across ${pageCount + 1} pages`);
 
     // Calculate analytics from conversations
-    const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     
     let totalDuration = 0;
     let todayConversations = 0;
@@ -238,7 +280,7 @@ serve(async (req) => {
     const dailyStats: Record<string, number> = {};
     const hourlyStats: Record<number, number> = {};
     
-    for (const conv of conversations) {
+    for (const conv of allConversations) {
       // Calculate duration
       const duration = conv.call_duration_secs || conv.duration || 0;
       totalDuration += duration;
@@ -255,7 +297,6 @@ serve(async (req) => {
       } else if (conv.status === 'failed' || conv.status === 'error') {
         failedConversations++;
       } else {
-        // Consider others as successful for now
         successfulConversations++;
       }
       
@@ -268,20 +309,46 @@ serve(async (req) => {
       hourlyStats[hour] = (hourlyStats[hour] || 0) + 1;
     }
     
-    const totalConversations = conversations.length;
+    const totalConversations = allConversations.length;
     const avgDuration = totalConversations > 0 ? Math.round(totalDuration / totalConversations) : 0;
     const successRate = totalConversations > 0 ? Math.round((successfulConversations / totalConversations) * 100) : 0;
     
-    // Build charts data
-    const conversationsOverTime = Object.entries(dailyStats)
+    // Build charts data - return all days for the timeframe
+    const sortedDailyStats = Object.entries(dailyStats)
       .map(([date, count]) => ({ date, count }))
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(-14); // Last 14 days
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // For "all time", aggregate by week/month if too many points
+    let conversationsOverTime = sortedDailyStats;
+    if (timeframe === 'all' && sortedDailyStats.length > 90) {
+      // Aggregate by month
+      const monthlyStats: Record<string, number> = {};
+      for (const { date, count } of sortedDailyStats) {
+        const monthKey = date.substring(0, 7); // YYYY-MM
+        monthlyStats[monthKey] = (monthlyStats[monthKey] || 0) + count;
+      }
+      conversationsOverTime = Object.entries(monthlyStats)
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+    } else if (sortedDailyStats.length > 30) {
+      // Aggregate by week
+      const weeklyStats: Record<string, number> = {};
+      for (const { date, count } of sortedDailyStats) {
+        const d = new Date(date);
+        const weekStart = new Date(d.setDate(d.getDate() - d.getDay()));
+        const weekKey = weekStart.toISOString().split('T')[0];
+        weeklyStats[weekKey] = (weeklyStats[weekKey] || 0) + count;
+      }
+      conversationsOverTime = Object.entries(weeklyStats)
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+    }
     
-    const peakHours = Object.entries(hourlyStats)
-      .map(([hour, count]) => ({ hour: parseInt(hour), count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+    // Build full hourly distribution (0-23)
+    const peakHours: { hour: number; count: number }[] = [];
+    for (let h = 0; h < 24; h++) {
+      peakHours.push({ hour: h, count: hourlyStats[h] || 0 });
+    }
 
     const normalizedData = {
       metrics: {
@@ -290,7 +357,7 @@ serve(async (req) => {
         failed_conversations: failedConversations,
         avg_duration: avgDuration,
         total_duration: totalDuration,
-        avg_satisfaction: 0, // Not available from ElevenLabs directly
+        avg_satisfaction: 0,
         today_conversations: todayConversations,
         success_rate: successRate,
       },
@@ -318,6 +385,12 @@ serve(async (req) => {
         satisfaction_trend: [],
         peak_hours: peakHours,
       } : undefined,
+      data_range: {
+        start: startDate.toISOString(),
+        end: now.toISOString(),
+        timeframe,
+      },
+      source: 'elevenlabs',
     };
 
     return new Response(
