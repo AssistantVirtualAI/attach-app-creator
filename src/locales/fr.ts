@@ -1706,6 +1706,8 @@ export const fr = {
     volume: 'Volume',
     frequentTags: 'Tags fréquents',
     suggestedImprovements: 'Améliorations suggérées',
+    dataInFrench: 'Données en français',
+    dataInEnglish: 'Données en anglais',
     actions: {
       generateReport: 'Générer un rapport',
       exportPdf: 'Exporter PDF',

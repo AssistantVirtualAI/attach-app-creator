@@ -38,6 +38,7 @@ import {
   Database,
   Mail,
   Layers,
+  AlertTriangle,
   Zap
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
@@ -341,6 +342,12 @@ const AgentReports = () => {
               <Badge variant="outline" className="gap-1.5 text-muted-foreground">
                 <Database className="h-3.5 w-3.5" />
                 {t('reports.localData')}
+              </Badge>
+            )}
+            {reportsData.usingFallbackLanguage && (
+              <Badge variant="outline" className="gap-1.5 text-amber-600 border-amber-500/30 bg-amber-500/10">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {reportsData.dataLanguage === 'fr' ? t('reports.dataInFrench') : t('reports.dataInEnglish')}
               </Badge>
             )}
             {reportsData.globalMetrics.totalConversations > 0 && (

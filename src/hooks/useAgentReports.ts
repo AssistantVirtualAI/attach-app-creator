@@ -54,6 +54,8 @@ export interface AgentReportsData {
   busiestDay: string;
   dataSource: 'platform' | 'local' | 'mixed';
   lastSync?: string;
+  usingFallbackLanguage?: boolean;
+  dataLanguage?: string;
 }
 
 interface DateRange {
@@ -125,12 +127,11 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
 
       const { data: conversations } = await conversationsQuery;
 
-      // Fetch insights with date filtering and language filter
+      // Fetch all insights (we'll prioritize by language in processing)
       let insightsQuery = supabase
         .from('agent_insights')
         .select('agent_id, satisfaction_score, overall_sentiment, improvements, smart_tags, analyzed_at, language')
-        .eq('organization_id', selectedOrg.id)
-        .eq('language', language); // Only fetch insights matching current UI language
+        .eq('organization_id', selectedOrg.id);
 
       // Apply date range filter to insights
       if (dateRange) {
@@ -143,7 +144,16 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
         insightsQuery = insightsQuery.eq('agent_id', selectedAgentId);
       }
 
-      const { data: insights } = await insightsQuery;
+      const { data: allInsights } = await insightsQuery;
+
+      // Separate insights by language preference
+      const preferredLangInsights = allInsights?.filter(i => i.language === language) || [];
+      const fallbackInsights = allInsights?.filter(i => i.language !== language) || [];
+      
+      // Use preferred language insights first, fallback to others if none
+      const insights = preferredLangInsights.length > 0 ? preferredLangInsights : fallbackInsights;
+      const usingFallbackLanguage = preferredLangInsights.length === 0 && fallbackInsights.length > 0;
+      const dataLanguage = usingFallbackLanguage ? (fallbackInsights[0]?.language || 'fr') : language;
 
       const timeframe = getTimeframe(dateRange);
 
@@ -515,6 +525,8 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
         busiestDay,
         dataSource: overallDataSource,
         lastSync: new Date().toISOString(),
+        usingFallbackLanguage,
+        dataLanguage,
       };
     },
     enabled: !!selectedOrg?.id,
