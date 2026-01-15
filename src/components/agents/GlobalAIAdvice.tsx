@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -20,6 +21,7 @@ import {
   Lightbulb,
   Zap
 } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface GlobalAdviceData {
   globalMetrics: {
@@ -52,14 +54,15 @@ interface GlobalAdviceData {
 }
 
 export const GlobalAIAdvice = () => {
-  const [days, setDays] = useState(7);
+  const { t, language } = useTranslation();
+  const [days, setDays] = useState<number | 'all'>(7);
   const queryClient = useQueryClient();
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['global-agent-advice', days],
+    queryKey: ['global-agent-advice', days, language],
     queryFn: async (): Promise<GlobalAdviceData> => {
       const { data, error } = await supabase.functions.invoke('generate-global-advice', {
-        body: { days }
+        body: { days, language }
       });
       if (error) throw error;
       return data;
@@ -69,7 +72,7 @@ export const GlobalAIAdvice = () => {
   const regenerateMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('generate-global-advice', {
-        body: { days, forceRegenerate: true }
+        body: { days, language, forceRegenerate: true }
       });
       if (error) throw error;
       return data;
@@ -114,10 +117,10 @@ export const GlobalAIAdvice = () => {
       <Card className="glass-card">
         <CardContent className="pt-6 text-center py-12">
           <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-destructive opacity-50" />
-          <p className="text-muted-foreground">Erreur lors du chargement des conseils</p>
+          <p className="text-muted-foreground">{t('aiAdvice.errorLoading')}</p>
           <Button variant="outline" onClick={() => refetch()} className="mt-4">
             <RefreshCw className="h-4 w-4 mr-2" />
-            Réessayer
+            {t('aiAdvice.retry')}
           </Button>
         </CardContent>
       </Card>
@@ -135,20 +138,24 @@ export const GlobalAIAdvice = () => {
             <div className="flex items-center gap-3">
               {getHealthIcon(globalAdvice.overallHealth)}
               <div>
-                <CardTitle>Conseils IA Globaux</CardTitle>
-                <CardDescription>Analyse de tous les agents - {days} derniers jours</CardDescription>
+                <CardTitle>{t('aiAdvice.globalTitle')}</CardTitle>
+                <CardDescription>
+                  {t('aiAdvice.globalDescription')} - {days === 'all' ? t('aiAdvice.periodAll') : `${days} ${language === 'en' ? 'days' : 'jours'}`}
+                </CardDescription>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <select 
-                value={days} 
-                onChange={(e) => setDays(Number(e.target.value))}
-                className="bg-background border rounded-md px-3 py-1 text-sm"
-              >
-                <option value={1}>24h</option>
-                <option value={7}>7 jours</option>
-                <option value={30}>30 jours</option>
-              </select>
+              <Select value={days.toString()} onValueChange={(v) => setDays(v === 'all' ? 'all' : Number(v))}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">{t('aiAdvice.period24h')}</SelectItem>
+                  <SelectItem value="7">{t('aiAdvice.period7d')}</SelectItem>
+                  <SelectItem value="30">{t('aiAdvice.period30d')}</SelectItem>
+                  <SelectItem value="all">{t('aiAdvice.periodAll')}</SelectItem>
+                </SelectContent>
+              </Select>
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -175,7 +182,7 @@ export const GlobalAIAdvice = () => {
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
               <Users className="h-4 w-4" />
-              Conversations
+              {t('aiAdvice.conversations')}
             </div>
             <p className="text-3xl font-bold">{globalMetrics.totalConversations}</p>
           </CardContent>
@@ -184,7 +191,7 @@ export const GlobalAIAdvice = () => {
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
               <ThumbsUp className="h-4 w-4" />
-              Satisfaction
+              {t('aiAdvice.satisfaction')}
             </div>
             <p className="text-3xl font-bold">
               {globalMetrics.avgSatisfaction.toFixed(1)}
@@ -196,7 +203,7 @@ export const GlobalAIAdvice = () => {
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
               <Clock className="h-4 w-4" />
-              Durée moyenne
+              {t('aiAdvice.avgDuration')}
             </div>
             <p className="text-3xl font-bold">
               {Math.round(globalMetrics.avgDuration / 60)}
@@ -208,7 +215,7 @@ export const GlobalAIAdvice = () => {
           <CardContent className="pt-4">
             <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
               <Target className="h-4 w-4" />
-              Agents
+              {t('reports.agents')}
             </div>
             <p className="text-3xl font-bold">{globalMetrics.agentCount}</p>
           </CardContent>
@@ -221,7 +228,7 @@ export const GlobalAIAdvice = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Lightbulb className="h-5 w-5 text-primary" />
-              Insights Clés
+              {t('aiAdvice.keyInsights')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -243,7 +250,7 @@ export const GlobalAIAdvice = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-green-500">
                 <TrendingUp className="h-5 w-5" />
-                Points Forts
+                {t('aiAdvice.strengths')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -264,7 +271,7 @@ export const GlobalAIAdvice = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-yellow-500">
                 <TrendingDown className="h-5 w-5" />
-                Points à Améliorer
+                {t('aiAdvice.weaknesses')}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -287,7 +294,7 @@ export const GlobalAIAdvice = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Zap className="h-5 w-5 text-primary" />
-              Actions Prioritaires
+              {t('aiAdvice.priorityActions')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -300,11 +307,13 @@ export const GlobalAIAdvice = () => {
                     </span>
                     <div>
                       <p className="font-medium">{action.action}</p>
-                      <p className="text-sm text-muted-foreground">Agent: {action.agent}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {language === 'en' ? 'Agent:' : 'Agent:'} {action.agent}
+                      </p>
                     </div>
                   </div>
                   <Badge variant={action.impact === 'high' ? 'default' : 'secondary'}>
-                    Impact {action.impact}
+                    {language === 'en' ? 'Impact' : 'Impact'} {action.impact}
                   </Badge>
                 </div>
               ))}
@@ -316,8 +325,8 @@ export const GlobalAIAdvice = () => {
       {/* Agent Comparison */}
       <Card className="glass-card">
         <CardHeader>
-          <CardTitle>Comparaison des Agents</CardTitle>
-          <CardDescription>Performance relative de chaque agent</CardDescription>
+          <CardTitle>{t('aiAdvice.agentComparison')}</CardTitle>
+          <CardDescription>{t('aiAdvice.relativePerformance')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -328,17 +337,17 @@ export const GlobalAIAdvice = () => {
                     <span className="font-medium">{agent.agentName}</span>
                     {globalMetrics.bestAgent?.name === agent.agentName && (
                       <Badge variant="outline" className="text-green-500 border-green-500/30">
-                        Meilleur
+                        {t('aiAdvice.best')}
                       </Badge>
                     )}
                     {globalAdvice.agentRecommendations[agent.agentName] && (
                       <Badge variant="outline" className="text-yellow-500 border-yellow-500/30">
-                        À améliorer
+                        {t('aiAdvice.needsImprovement')}
                       </Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span>{agent.totalConversations} conv.</span>
+                    <span>{agent.totalConversations} {t('aiAdvice.conv')}</span>
                     <span>{agent.avgSatisfaction.toFixed(1)}/10</span>
                   </div>
                 </div>

@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 import { useLatestAgentAdvice, useGenerateAgentAdvice, AgentDailyReport } from '@/hooks/useAgentAdvice';
 import { formatDistanceToNow } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS } from 'date-fns/locale';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface AgentAIAdviceProps {
   agentId: string;
@@ -41,12 +42,36 @@ const effortImpactBadge = (effort: string, impact: string) => {
 };
 
 export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
-  const [days, setDays] = useState<number>(1);
+  const { t, language } = useTranslation();
+  const [days, setDays] = useState<number | 'all'>(7);
   const { data: advice, isLoading } = useLatestAgentAdvice(agentId);
   const { mutate: generateAdvice, isPending: isGenerating } = useGenerateAgentAdvice();
 
+  const dateLocale = language === 'fr' ? fr : enUS;
+
   const handleGenerate = () => {
-    generateAdvice({ agentId, days });
+    generateAdvice({ agentId, days, language });
+  };
+
+  const getImpactLabel = (impact: string) => {
+    if (language === 'en') {
+      return impact === 'high' ? 'High impact' : impact === 'medium' ? 'Medium impact' : 'Low impact';
+    }
+    return impact === 'high' ? 'Impact fort' : impact === 'medium' ? 'Impact moyen' : 'Impact faible';
+  };
+
+  const getEffortLabel = (effort: string) => {
+    if (language === 'en') {
+      return effort === 'low' ? 'Low effort' : effort === 'medium' ? 'Medium effort' : 'High effort';
+    }
+    return effort === 'low' ? 'Effort faible' : effort === 'medium' ? 'Effort moyen' : 'Effort élevé';
+  };
+
+  const getPriorityLabel = (priority: string) => {
+    if (language === 'en') {
+      return priority === 'high' ? 'High priority' : priority === 'medium' ? 'Medium priority' : 'Low priority';
+    }
+    return priority === 'high' ? 'Priorité haute' : priority === 'medium' ? 'Priorité moyenne' : 'Priorité basse';
   };
 
   if (isLoading) {
@@ -66,21 +91,22 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
         <div>
           <h3 className="text-xl font-semibold flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
-            Conseils IA pour {agentName}
+            {t('aiAdvice.titleFor')} {agentName}
           </h3>
           <p className="text-sm text-muted-foreground">
-            Analyse automatique des conversations et recommandations d'optimisation
+            {t('aiAdvice.description')}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={days.toString()} onValueChange={(v) => setDays(parseInt(v))}>
+          <Select value={days.toString()} onValueChange={(v) => setDays(v === 'all' ? 'all' : parseInt(v))}>
             <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1">24 heures</SelectItem>
-              <SelectItem value="7">7 jours</SelectItem>
-              <SelectItem value="30">30 jours</SelectItem>
+              <SelectItem value="1">{t('aiAdvice.period24h')}</SelectItem>
+              <SelectItem value="7">{t('aiAdvice.period7d')}</SelectItem>
+              <SelectItem value="30">{t('aiAdvice.period30d')}</SelectItem>
+              <SelectItem value="all">{t('aiAdvice.periodAll')}</SelectItem>
             </SelectContent>
           </Select>
           <Button onClick={handleGenerate} disabled={isGenerating}>
@@ -89,7 +115,7 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
             ) : (
               <Sparkles className="h-4 w-4 mr-2" />
             )}
-            Générer conseils
+            {t('aiAdvice.generateAdvice')}
           </Button>
         </div>
       </div>
@@ -98,12 +124,12 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
         <Card className="glass-card">
           <CardContent className="pt-6 text-center py-12">
             <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
-            <p className="text-muted-foreground">Aucun rapport disponible</p>
+            <p className="text-muted-foreground">{t('aiAdvice.noReportAvailable')}</p>
             <p className="text-sm text-muted-foreground mb-4">
-              Cliquez sur "Générer conseils" pour analyser les conversations récentes
+              {t('aiAdvice.clickToGenerate')}
             </p>
             <Button onClick={handleGenerate} disabled={isGenerating}>
-              {isGenerating ? 'Analyse en cours...' : 'Générer le premier rapport'}
+              {isGenerating ? t('aiAdvice.generating') : t('aiAdvice.generateFirstReport')}
             </Button>
           </CardContent>
         </Card>
@@ -115,11 +141,11 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Target className="h-5 w-5 text-primary" />
-                  Résumé
+                  {t('aiAdvice.summary')}
                 </CardTitle>
                 <div className="text-xs text-muted-foreground">
                   <Clock className="h-3 w-3 inline mr-1" />
-                  {formatDistanceToNow(new Date(advice.generated_at), { addSuffix: true, locale: fr })}
+                  {formatDistanceToNow(new Date(advice.generated_at), { addSuffix: true, locale: dateLocale })}
                 </div>
               </div>
             </CardHeader>
@@ -128,19 +154,19 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
               <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t">
                 <div className="text-center">
                   <p className="text-2xl font-bold">{advice.total_conversations}</p>
-                  <p className="text-xs text-muted-foreground">Conversations</p>
+                  <p className="text-xs text-muted-foreground">{t('aiAdvice.conversations')}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold">{advice.avg_satisfaction?.toFixed(1) || '—'}</p>
-                  <p className="text-xs text-muted-foreground">Satisfaction</p>
+                  <p className="text-xs text-muted-foreground">{t('aiAdvice.satisfaction')}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold">{advice.success_rate?.toFixed(0) || '—'}%</p>
-                  <p className="text-xs text-muted-foreground">Résolution</p>
+                  <p className="text-xs text-muted-foreground">{t('aiAdvice.resolution')}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold">{advice.avg_duration_seconds ? Math.round(advice.avg_duration_seconds / 60) : '—'}m</p>
-                  <p className="text-xs text-muted-foreground">Durée moy.</p>
+                  <p className="text-xs text-muted-foreground">{t('aiAdvice.avgDuration')}</p>
                 </div>
               </div>
             </CardContent>
@@ -152,7 +178,7 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2 text-green-500">
                   <CheckCircle className="h-5 w-5" />
-                  Points forts
+                  {t('aiAdvice.strengths')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -166,7 +192,7 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Aucun point fort identifié</p>
+                  <p className="text-sm text-muted-foreground">{t('aiAdvice.noStrengths')}</p>
                 )}
               </CardContent>
             </Card>
@@ -175,7 +201,7 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2 text-yellow-500">
                   <AlertTriangle className="h-5 w-5" />
-                  Points à améliorer
+                  {t('aiAdvice.weaknesses')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -189,7 +215,7 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Aucun point faible identifié</p>
+                  <p className="text-sm text-muted-foreground">{t('aiAdvice.noWeaknesses')}</p>
                 )}
               </CardContent>
             </Card>
@@ -201,9 +227,9 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Zap className="h-5 w-5 text-primary" />
-                  Actions prioritaires
+                  {t('aiAdvice.priorityActions')}
                 </CardTitle>
-                <CardDescription>Triées par impact/effort</CardDescription>
+                <CardDescription>{t('aiAdvice.sortedByImpact')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
@@ -214,9 +240,7 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
                         <span className="text-sm">{action.action}</span>
                       </div>
                       <Badge className={effortImpactBadge(action.effort, action.impact)}>
-                        {action.impact === 'high' ? 'Impact fort' : action.impact === 'medium' ? 'Impact moyen' : 'Impact faible'}
-                        {' / '}
-                        {action.effort === 'low' ? 'Effort faible' : action.effort === 'medium' ? 'Effort moyen' : 'Effort élevé'}
+                        {getImpactLabel(action.impact)} / {getEffortLabel(action.effort)}
                       </Badge>
                     </div>
                   ))}
@@ -231,7 +255,7 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Lightbulb className="h-5 w-5 text-primary" />
-                  Recommandations détaillées
+                  {t('aiAdvice.recommendations')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -240,7 +264,7 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
                     <div key={i} className="p-4 rounded-lg border bg-card">
                       <div className="flex items-start justify-between mb-2">
                         <Badge className={priorityColors[rec.priority]}>
-                          {rec.priority === 'high' ? 'Priorité haute' : rec.priority === 'medium' ? 'Priorité moyenne' : 'Priorité basse'}
+                          {getPriorityLabel(rec.priority)}
                         </Badge>
                         <Badge variant="outline">{rec.category}</Badge>
                       </div>
@@ -260,7 +284,7 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <MessageSquare className="h-5 w-5 text-primary" />
-                    Suggestions de prompt
+                    {t('aiAdvice.promptSuggestions')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -280,7 +304,7 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <BookOpen className="h-5 w-5 text-primary" />
-                    Suggestions Knowledge Base
+                    {t('aiAdvice.kbSuggestions')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
