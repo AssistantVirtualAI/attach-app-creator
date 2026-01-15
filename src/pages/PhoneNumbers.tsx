@@ -218,10 +218,6 @@ export default function PhoneNumbers() {
                                   {result.capabilities.sms && (
                                     <Badge variant="secondary">{t('phoneNumbers.sms')}</Badge>
                                   )}
-                                  )}
-                                  {result.capabilities.sms && (
-                                    <Badge variant="secondary">SMS</Badge>
-                                  )}
                                 </div>
                               </TableCell>
                               <TableCell>${result.monthlyPrice?.toFixed(2) || '1.15'}</TableCell>
