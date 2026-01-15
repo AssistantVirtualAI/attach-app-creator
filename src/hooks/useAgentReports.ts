@@ -27,6 +27,7 @@ export interface AgentMetrics {
 export interface DailyTrend {
   day: string;
   date: string;
+  dateKey: string; // YYYY-MM-DD for sorting/grouping
   conversations: number;
   satisfaction: number;
 }
@@ -245,21 +246,25 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
         // Use aggregated platform data
         dailyTrends = Object.entries(aggregatedDailyData)
           .sort((a, b) => a[0].localeCompare(b[0]))
-          .map(([date, count]) => ({
-            day: dayNames[new Date(date).getDay()],
-            date: new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
-            conversations: count,
-            satisfaction: 0,
-          }));
+          .map(([dateStr, count]) => {
+            const d = new Date(dateStr);
+            return {
+              day: dayNames[d.getDay()],
+              date: d.toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { day: '2-digit', month: '2-digit' }),
+              dateKey: dateStr,
+              conversations: count,
+              satisfaction: 0,
+            };
+          });
         
-        // Keep only last entries based on timeframe
-        const maxPoints = timeframe === 'all' ? 30 : timeframe === '90days' ? 14 : 7;
+        // Keep only last entries based on timeframe - more points for longer periods
+        const maxPoints = timeframe === 'all' ? 60 : timeframe === '90days' ? 30 : timeframe === '30days' ? 30 : 7;
         if (dailyTrends.length > maxPoints) {
           dailyTrends = dailyTrends.slice(-maxPoints);
         }
       } else if (conversations && conversations.length > 0) {
-        // Use local data
-        dailyTrends = calculateDailyTrends(conversations, dayNames);
+        // Use local data - calculate based on actual date range
+        dailyTrends = calculateDailyTrends(conversations, dayNames, language, dateRange);
       }
 
       if (Object.keys(aggregatedHourlyData).length > 0) {
@@ -494,11 +499,18 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
   });
 }
 
-function calculateDailyTrends(conversations: any[], dayNames: string[]): DailyTrend[] {
+function calculateDailyTrends(conversations: any[], dayNames: string[], language: string, dateRange?: DateRange): DailyTrend[] {
   const trends: DailyTrend[] = [];
   const now = new Date();
+  
+  // Calculate number of days to show based on date range
+  let daysToShow = 7;
+  if (dateRange) {
+    const diffDays = Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24));
+    daysToShow = Math.min(diffDays, 60); // Cap at 60 days for performance
+  }
 
-  for (let i = 6; i >= 0; i--) {
+  for (let i = daysToShow - 1; i >= 0; i--) {
     const date = subDays(now, i);
     const dayStart = startOfDay(date);
     const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
@@ -519,6 +531,7 @@ function calculateDailyTrends(conversations: any[], dayNames: string[]): DailyTr
     trends.push({
       day: dayNames[getDay(date)],
       date: format(date, 'dd/MM'),
+      dateKey: format(date, 'yyyy-MM-dd'),
       conversations: dayConversations.length,
       satisfaction: parseFloat(avgSatisfaction.toFixed(1)),
     });

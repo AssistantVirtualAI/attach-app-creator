@@ -55,7 +55,8 @@ export const DateRangeSelector = ({
         onChange({ start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) });
         break;
       case 'allTime':
-        onChange({ start: new Date('2020-01-01'), end: new Date() });
+        // Use epoch start for true "all time"
+        onChange({ start: new Date(0), end: new Date() });
         break;
       case 'custom':
         setIsCustomOpen(true);
