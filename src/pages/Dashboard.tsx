@@ -10,31 +10,42 @@ import { QuickStatsBanner } from '@/components/dashboard/QuickStatsBanner';
 import { AIPriorityActions } from '@/components/dashboard/AIPriorityActions';
 import { AlertsSection } from '@/components/dashboard/AlertsSection';
 import { AgentSelector } from '@/components/dashboard/AgentSelector';
+import { DateRangeSelector } from '@/components/dashboard/DateRangeSelector';
+import { ReportGenerator } from '@/components/reports/ReportGenerator';
 import { useDashboardMetrics, DashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { useDashboardAgents, useAgentDashboardMetrics } from '@/hooks/useDashboardAgentMetrics';
+import { useAgentReports } from '@/hooks/useAgentReports';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Plus, Settings, Zap, ArrowRight, Sparkles, Brain, Bot } from 'lucide-react';
+import { RefreshCw, Plus, Settings, Zap, ArrowRight, Sparkles, Brain, Bot, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { subDays } from 'date-fns';
 
 const Dashboard = () => {
   const { t } = useTranslation();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
+    start: subDays(new Date(), 7),
+    end: new Date()
+  });
   
   // Fetch all agents for the selector
   const { data: agents = [], isLoading: isLoadingAgents } = useDashboardAgents();
   
-  // Fetch global metrics (all agents)
-  const { data: globalMetrics, isLoading: isLoadingGlobal, refetch: refetchGlobal } = useDashboardMetrics();
+  // Fetch global metrics (all agents) with date range
+  const { data: globalMetrics, isLoading: isLoadingGlobal, refetch: refetchGlobal } = useDashboardMetrics(dateRange);
   
   // Fetch agent-specific metrics when an agent is selected
-  const { data: agentMetrics, isLoading: isLoadingAgent, refetch: refetchAgent } = useAgentDashboardMetrics(selectedAgentId);
+  const { data: agentMetrics, isLoading: isLoadingAgent, refetch: refetchAgent } = useAgentDashboardMetrics(selectedAgentId, dateRange);
+  
+  // Fetch reports data for report generator
+  const { data: reportsData } = useAgentReports(selectedAgentId || undefined, dateRange);
 
   // Use agent-specific metrics if an agent is selected, otherwise use global
   const isLoading = selectedAgentId ? isLoadingAgent : isLoadingGlobal;
@@ -159,6 +170,13 @@ const Dashboard = () => {
               </div>
               
               <div className="flex items-center gap-2 flex-wrap">
+                <ReportGenerator
+                  reportsData={reportsData}
+                  dashboardMetrics={currentMetrics}
+                  agents={agents.map(a => ({ id: a.id, name: a.name }))}
+                  dateRange={dateRange}
+                  onDateRangeChange={setDateRange}
+                />
                 <Button
                   variant="outline"
                   size="sm"
@@ -185,6 +203,15 @@ const Dashboard = () => {
                   </Button>
                 </Link>
               </div>
+            </div>
+
+            {/* Date Range Selector Row */}
+            <div className="flex items-center justify-between border-t border-border/50 pt-4">
+              <DateRangeSelector 
+                value={dateRange}
+                onChange={setDateRange}
+                showQuickButtons={true}
+              />
             </div>
 
             {/* Agent Selector Row */}

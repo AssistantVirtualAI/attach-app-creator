@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
-import { DashboardMetrics } from './useDashboardMetrics';
+import { DashboardMetrics, DateRange } from './useDashboardMetrics';
+import { format } from 'date-fns';
 
 export interface AgentWithStats {
   id: string;
@@ -91,11 +92,21 @@ export const useDashboardAgents = () => {
   });
 };
 
-export const useAgentDashboardMetrics = (agentId: string | null) => {
+export const useAgentDashboardMetrics = (agentId: string | null, dateRange?: DateRange) => {
   const { selectedOrgId } = useOrganization();
 
+  // Calculate timeframe based on dateRange
+  const getTimeframe = () => {
+    if (!dateRange) return '30d';
+    const diffDays = Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays <= 1) return '1d';
+    if (diffDays <= 7) return '7d';
+    if (diffDays <= 30) return '30d';
+    return '90d';
+  };
+
   return useQuery({
-    queryKey: ['agent-dashboard-metrics', selectedOrgId, agentId],
+    queryKey: ['agent-dashboard-metrics', selectedOrgId, agentId, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
     queryFn: async (): Promise<DashboardMetrics> => {
       if (!selectedOrgId) return defaultMetrics;
       
@@ -111,13 +122,17 @@ export const useAgentDashboardMetrics = (agentId: string | null) => {
 
       if (!agent?.platform_agent_id) return defaultMetrics;
 
+      const timeframe = getTimeframe();
+      const startDate = dateRange ? format(dateRange.start, 'yyyy-MM-dd') : undefined;
+      const endDate = dateRange ? format(dateRange.end, 'yyyy-MM-dd') : undefined;
+
       // Fetch agent-specific analytics
       const [analyticsRes, conversationsRes, insightsRes] = await Promise.all([
         supabase.functions.invoke('elevenlabs-convai-analytics', {
-          body: { agentId: agent.platform_agent_id, timeframe: '30d' }
+          body: { agentId: agent.platform_agent_id, timeframe, startDate, endDate }
         }).catch(() => ({ data: null })),
         supabase.functions.invoke('elevenlabs-convai-conversations', {
-          body: { action: 'list', agentId: agent.platform_agent_id, page: 1, limit: 100 }
+          body: { action: 'list', agentId: agent.platform_agent_id, page: 1, limit: 100, startDate, endDate }
         }).catch(() => ({ data: null })),
         supabase
           .from('agent_insights')
