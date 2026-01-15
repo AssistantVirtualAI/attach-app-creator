@@ -823,23 +823,157 @@ export const fr = {
     },
   },
 
+  // Team
+  team: {
+    title: 'Équipe',
+    description: 'Gérez les membres de votre organisation',
+    createMember: 'Créer un membre',
+    rolesLegend: 'Légende des rôles',
+    noPermission: 'Vous n\'avez pas les permissions nécessaires pour accéder à cette page',
+    noMembers: 'Aucun membre dans l\'équipe',
+    inviteFirst: 'Inviter le premier membre',
+    members: 'Membres',
+    roles: {
+      admin: 'Accès complet',
+      manager: 'Gestion des agents et conversations',
+      agent: 'Voir et gérer les conversations',
+      viewer: 'Lecture seule',
+    },
+  },
+
+  // API Keys
+  apiKeys: {
+    title: 'Clés API',
+    description: 'Gérez vos clés d\'accès à l\'API',
+    newKey: 'Nouvelle clé',
+    noPermission: 'Vous n\'avez pas les permissions nécessaires pour accéder à cette page',
+    yourKeys: 'Vos clés API',
+    usage: 'Utilisation de l\'API',
+    usageInfo: 'Les clés API permettent d\'accéder à vos données programmatiquement. Gardez-les secrètes et ne les partagez jamais publiquement.',
+    usageHint: 'Utilisez votre clé API dans l\'en-tête Authorization de vos requêtes :',
+  },
+
+  // Handoffs
+  handoffs: {
+    title: 'Transferts Humain',
+    description: 'Gérez les transferts de conversations vers des agents humains',
+    available: 'Disponible',
+    unavailable: 'Indisponible',
+    pending: 'en attente',
+    stats: {
+      pending: 'En attente',
+      active: 'En cours',
+      completed: 'Terminés',
+      avgTime: 'Temps moyen',
+    },
+    tabs: {
+      pending: 'En attente',
+      active: 'En cours',
+    },
+    empty: {
+      noPending: 'Aucune demande en attente',
+      noActive: 'Aucune conversation active',
+    },
+    selectConversation: 'Sélectionnez une conversation',
+    selectToChat: 'Choisissez une demande de handoff pour commencer à chatter',
+  },
+
+  // Campaigns
+  campaigns: {
+    title: 'Campagnes d\'Appels',
+    description: 'Gérez vos campagnes d\'appels sortants automatisés',
+    newCampaign: 'Nouvelle campagne',
+    refresh: 'Actualiser',
+    stats: {
+      activeCampaigns: 'Campagnes Actives',
+      totalCalls: 'Appels Totaux',
+      successfulCalls: 'Appels Réussis',
+      successRate: 'Taux de Succès',
+    },
+    noCampaigns: 'Aucune campagne',
+    createFirst: 'Créez votre première campagne d\'appels sortants',
+    table: {
+      campaign: 'Campagne',
+      status: 'Statut',
+      progress: 'Progression',
+      calls: 'Appels',
+      success: 'Succès',
+      createdAt: 'Créée le',
+      actions: 'Actions',
+    },
+    modal: {
+      createTitle: 'Créer une campagne',
+      createDesc: 'Configurez votre campagne d\'appels sortants',
+      campaignName: 'Nom de la campagne',
+      description: 'Description (optionnel)',
+      phoneNumbers: 'Numéros de téléphone (un par ligne)',
+      numbersCount: 'numéros',
+    },
+    details: {
+      title: 'Détails de la Campagne',
+      description: 'Suivi des appels individuels',
+      number: 'Numéro',
+      duration: 'Durée',
+      result: 'Résultat',
+      calledAt: 'Appelé le',
+    },
+  },
+
+  // Topics
+  topics: {
+    title: 'Topics',
+    description: 'Analyse NLP des sujets de conversation',
+    searchPlaceholder: 'Rechercher un sujet...',
+    refresh: 'Actualiser',
+    analyzeConversations: 'Analyser les conversations',
+    stats: {
+      totalTopics: 'Total Sujets',
+      totalMentions: 'Mentions Totales',
+      categories: 'Catégories',
+      positiveSentiment: 'Sentiment Positif',
+    },
+    tabs: {
+      trending: 'Tendances',
+      categories: 'Catégories',
+      recent: 'Récents',
+    },
+    popularTopics: 'Sujets Populaires',
+    mostMentioned: 'Les sujets les plus mentionnés',
+    noTopics: 'Aucun sujet analysé. Cliquez sur "Analyser les conversations" pour commencer.',
+    mentions: 'mentions',
+    mentionDistribution: 'Distribution des Mentions',
+    top10Topics: 'Top 10 sujets par volume',
+    noData: 'Aucune donnée disponible',
+    categoryBreakdown: 'Répartition par Catégorie',
+    categoryDistribution: 'Distribution des sujets par catégorie',
+    categoryDetails: 'Détail des Catégories',
+    mentionsByCategory: 'Nombre de mentions par catégorie',
+    recentlyAnalyzed: 'Sujets Récemment Analysés',
+    lastTopicsExtracted: 'Les derniers sujets extraits des conversations',
+    noRecentTopics: 'Aucun sujet récent. Lancez une analyse pour extraire les sujets.',
+  },
+
   // Leads
   leads: {
     title: 'Leads',
-    description: 'Gérez vos leads et conversions',
+    description: 'Gérez vos prospects et suivez leur progression',
     newLead: 'Nouveau lead',
+    charts: 'Graphiques',
+    hide: 'Masquer',
     stats: {
-      total: 'Total leads',
+      total: 'Total',
+      new: 'Nouveaux',
       qualified: 'Qualifiés',
+      contacted: 'Contactés',
       converted: 'Convertis',
-      thisMonth: 'Ce mois',
+      lost: 'Perdus',
     },
   },
 
   // Appointments
   appointments: {
     title: 'Rendez-vous',
-    description: 'Gérez les rendez-vous planifiés par vos agents',
+    description: 'Gérez vos rendez-vous et intégrations calendrier',
     newAppointment: 'Nouveau rendez-vous',
     stats: {
       total: 'Total',
@@ -852,24 +986,49 @@ export const fr = {
   // Integrations
   integrations: {
     title: 'Intégrations',
-    description: 'Connectez vos plateformes vocales IA',
+    description: 'Connectez vos plateformes d\'IA préférées',
+    configureIntegration: 'Configurez une intégration pour pouvoir créer un agent',
+    backToAgents: 'Retour aux agents',
     platforms: {
-      elevenlabs: 'ElevenLabs',
-      vapi: 'Vapi',
-      retell: 'Retell AI',
+      openai: 'Connectez vos modèles GPT',
+      vapi: 'Agent vocal intelligent',
+      retell: 'Conversations téléphoniques IA',
+      elevenlabs: 'Synthèse vocale avancée',
     },
     status: {
       connected: 'Connecté',
       notConnected: 'Non connecté',
       testing: 'Test en cours...',
       error: 'Erreur',
+      pending: 'En attente',
+      notTested: 'Non testé',
     },
     actions: {
       connect: 'Connecter',
-      disconnect: 'Déconnecter',
-      test: 'Tester la connexion',
-      configure: 'Configurer',
+      addIntegration: 'Ajouter une intégration',
+      reconfigure: 'Reconfigurer',
+      test: 'Tester',
+      saveAndTest: 'Sauvegarder et tester',
     },
+    modal: {
+      configure: 'Configurer',
+      apiKey: 'Clé API',
+      agentId: 'Agent ID (optionnel)',
+    },
+    messages: {
+      saved: 'Intégration sauvegardée',
+      testingConnection: 'Test de connexion en cours...',
+      connectionSuccess: 'Connexion réussie',
+      connectionWorking: 'L\'intégration fonctionne correctement',
+      connectionFailed: 'Échec de la connexion',
+      testError: 'Erreur de test',
+      cannotTest: 'Impossible de tester la connexion',
+      saveError: 'Erreur',
+      cannotSave: 'Impossible de sauvegarder l\'intégration',
+      fillRequired: 'Veuillez remplir tous les champs requis',
+      mustBeLoggedIn: 'Vous devez être connecté pour ajouter une intégration',
+    },
+    configuredOn: 'Configuré le',
   },
 
   // Endpoints
@@ -888,6 +1047,20 @@ export const fr = {
       unified: 'Endpoints Unifiés',
       platformSpecific: 'Spécifiques à la Plateforme',
     },
+  },
+
+  // Workflows
+  workflows: {
+    title: 'Workflows',
+    description: 'Automatisez vos processus avec des workflows',
+    newWorkflow: 'Nouveau workflow',
+  },
+
+  // Phone Numbers
+  phoneNumbers: {
+    title: 'Numéros de téléphone',
+    description: 'Gérez vos numéros de téléphone pour les agents vocaux',
+    noNumbers: 'Aucun numéro de téléphone configuré',
   },
 
   // Languages
