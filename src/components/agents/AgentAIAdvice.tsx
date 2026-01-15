@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
 import { 
   Sparkles, 
   RefreshCw, 
@@ -15,16 +16,20 @@ import {
   BookOpen,
   TrendingUp,
   Clock,
-  Zap
+  Zap,
+  Download,
+  Play
 } from 'lucide-react';
-import { useLatestAgentAdvice, useGenerateAgentAdvice, AgentDailyReport } from '@/hooks/useAgentAdvice';
+import { useLatestAgentAdvice, useGenerateAgentAdvice, useSyncElevenLabsConversations, AgentDailyReport } from '@/hooks/useAgentAdvice';
 import { formatDistanceToNow } from 'date-fns';
 import { fr, enUS } from 'date-fns/locale';
 import { useTranslation } from '@/hooks/useTranslation';
+import { toast } from 'sonner';
 
 interface AgentAIAdviceProps {
   agentId: string;
   agentName: string;
+  platform?: string;
 }
 
 const priorityColors = {
@@ -41,13 +46,60 @@ const effortImpactBadge = (effort: string, impact: string) => {
   return 'bg-muted text-muted-foreground';
 };
 
-export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
+export function AgentAIAdvice({ agentId, agentName, platform = 'elevenlabs' }: AgentAIAdviceProps) {
   const { t, language } = useTranslation();
   const [days, setDays] = useState<number | 'all'>(7);
+  const [syncProgress, setSyncProgress] = useState<{ step: string; progress: number } | null>(null);
+  
   const { data: advice, isLoading, refetch } = useLatestAgentAdvice(agentId, days);
   const { mutate: generateAdvice, isPending: isGenerating } = useGenerateAgentAdvice();
+  const { mutateAsync: syncConversations, isPending: isSyncing } = useSyncElevenLabsConversations();
 
   const dateLocale = language === 'fr' ? fr : enUS;
+
+  const handleSyncAndGenerate = async () => {
+    try {
+      // Step 1: Sync conversations
+      setSyncProgress({ 
+        step: language === 'en' ? 'Syncing conversations...' : 'Synchronisation des conversations...', 
+        progress: 20 
+      });
+      
+      await syncConversations({ 
+        agentId, 
+        limit: 100, 
+        mode: days === 'all' ? 'all' : 'recent' 
+      });
+
+      // Step 2: Generate advice
+      setSyncProgress({ 
+        step: language === 'en' ? 'Analyzing and generating advice...' : 'Analyse et génération des conseils...', 
+        progress: 60 
+      });
+      
+      await new Promise<void>((resolve, reject) => {
+        generateAdvice(
+          { agentId, days, language },
+          {
+            onSuccess: () => resolve(),
+            onError: (err) => reject(err)
+          }
+        );
+      });
+
+      setSyncProgress({ 
+        step: language === 'en' ? 'Complete!' : 'Terminé!', 
+        progress: 100 
+      });
+      
+      setTimeout(() => setSyncProgress(null), 2000);
+      
+    } catch (error) {
+      console.error('Sync and generate error:', error);
+      setSyncProgress(null);
+      toast.error(language === 'en' ? 'Error during sync' : 'Erreur lors de la synchronisation');
+    }
+  };
 
   const handleGenerate = () => {
     generateAdvice({ agentId, days, language });
@@ -90,6 +142,8 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
     );
   }
 
+  const isProcessing = isSyncing || isGenerating || syncProgress !== null;
+
   return (
     <div className="space-y-6">
       {/* Header with Generate Button */}
@@ -115,7 +169,27 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
               <SelectItem value="all">{t('aiAdvice.periodAll')}</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={handleGenerate} disabled={isGenerating}>
+          
+          {/* Sync & Generate button - recommended workflow */}
+          <Button 
+            onClick={handleSyncAndGenerate} 
+            disabled={isProcessing}
+            variant="default"
+          >
+            {isProcessing ? (
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4 mr-2" />
+            )}
+            {language === 'en' ? 'Sync & Analyze' : 'Sync & Analyser'}
+          </Button>
+          
+          {/* Quick generate (uses existing data) */}
+          <Button 
+            onClick={handleGenerate} 
+            disabled={isProcessing}
+            variant="outline"
+          >
             {isGenerating ? (
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
             ) : (
@@ -126,16 +200,41 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
         </div>
       </div>
 
+      {/* Sync Progress */}
+      {syncProgress && (
+        <Card className="glass-card border-primary/30">
+          <CardContent className="py-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+                  {syncProgress.step}
+                </span>
+                <span className="text-muted-foreground">{syncProgress.progress}%</span>
+              </div>
+              <Progress value={syncProgress.progress} className="h-2" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {!advice ? (
         <Card className="glass-card">
           <CardContent className="pt-6 text-center py-12">
             <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
             <p className="text-muted-foreground">{t('aiAdvice.noReportAvailable')}</p>
             <p className="text-sm text-muted-foreground mb-4">
-              {t('aiAdvice.clickToGenerate')}
+              {language === 'en' 
+                ? 'Click "Sync & Analyze" to fetch conversations and generate AI advice'
+                : 'Cliquez sur "Sync & Analyser" pour récupérer les conversations et générer des conseils IA'}
             </p>
-            <Button onClick={handleGenerate} disabled={isGenerating}>
-              {isGenerating ? t('aiAdvice.generating') : t('aiAdvice.generateFirstReport')}
+            <Button onClick={handleSyncAndGenerate} disabled={isProcessing}>
+              {isProcessing ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4 mr-2" />
+              )}
+              {language === 'en' ? 'Sync & Generate First Report' : 'Sync & Générer le premier rapport'}
             </Button>
           </CardContent>
         </Card>
@@ -163,15 +262,27 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
                   <p className="text-xs text-muted-foreground">{t('aiAdvice.conversations')}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold">{advice.avg_satisfaction?.toFixed(1) || '—'}</p>
+                  <p className="text-2xl font-bold">
+                    {advice.avg_satisfaction && advice.avg_satisfaction > 0 
+                      ? advice.avg_satisfaction.toFixed(1) 
+                      : '—'}
+                  </p>
                   <p className="text-xs text-muted-foreground">{t('aiAdvice.satisfaction')}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold">{advice.success_rate?.toFixed(0) || '—'}%</p>
+                  <p className="text-2xl font-bold">
+                    {advice.success_rate && advice.success_rate > 0 
+                      ? `${advice.success_rate.toFixed(0)}%` 
+                      : '—'}
+                  </p>
                   <p className="text-xs text-muted-foreground">{t('aiAdvice.resolution')}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold">{advice.avg_duration_seconds ? Math.round(advice.avg_duration_seconds / 60) : '—'}m</p>
+                  <p className="text-2xl font-bold">
+                    {advice.avg_duration_seconds 
+                      ? Math.round(advice.avg_duration_seconds / 60) 
+                      : '—'}m
+                  </p>
                   <p className="text-xs text-muted-foreground">{t('aiAdvice.avgDuration')}</p>
                 </div>
               </div>
