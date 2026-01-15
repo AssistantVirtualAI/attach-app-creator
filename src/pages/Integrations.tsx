@@ -20,36 +20,38 @@ import { useOrganization } from '@/context/OrganizationContext';
 import { useToast } from '@/hooks/use-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS } from 'date-fns/locale';
+import { useTranslation } from '@/hooks/useTranslation';
 
-const platforms = [
+const getPlatforms = (t: (key: string) => string) => [
   {
     name: 'OpenAI',
     value: 'openai',
-    description: 'Connectez vos modèles GPT',
+    description: t('integrations.platforms.openai'),
     icon: '🤖',
   },
   {
     name: 'Vapi',
     value: 'vapi',
-    description: 'Agent vocal intelligent',
+    description: t('integrations.platforms.vapi'),
     icon: '🎙️',
   },
   {
     name: 'Retell',
     value: 'retell',
-    description: 'Conversations téléphoniques IA',
+    description: t('integrations.platforms.retell'),
     icon: '📞',
   },
   {
     name: 'ElevenLabs',
     value: 'elevenlabs',
-    description: 'Synthèse vocale avancée',
+    description: t('integrations.platforms.elevenlabs'),
     icon: '🔊',
   },
 ];
 
 export default function Integrations() {
+  const { t, language } = useTranslation();
   const { selectedOrgId } = useOrganization();
   const { toast } = useToast();
   const location = useLocation();
@@ -62,6 +64,8 @@ export default function Integrations() {
 
   const searchParams = new URLSearchParams(location.search);
   const fromAgents = searchParams.get('from') === 'agents';
+  const platforms = getPlatforms(t);
+  const dateLocale = language === 'fr' ? fr : enUS;
 
   // Fetch integrations - works with or without organization
   const { data: integrations = [], refetch } = useQuery({
@@ -98,21 +102,21 @@ export default function Integrations() {
 
       if (data?.success) {
         toast({
-          title: 'Connexion réussie',
-          description: `L'intégration ${platform} fonctionne correctement`,
+          title: t('integrations.messages.connectionSuccess'),
+          description: t('integrations.messages.connectionWorking'),
         });
       } else {
         toast({
-          title: 'Échec de la connexion',
-          description: data?.error || 'La connexion a échoué',
+          title: t('integrations.messages.connectionFailed'),
+          description: data?.error || t('integrations.messages.connectionFailed'),
           variant: 'destructive',
         });
       }
     } catch (error: any) {
       console.error('Test integration error:', error);
       toast({
-        title: 'Erreur de test',
-        description: error.message || 'Impossible de tester la connexion',
+        title: t('integrations.messages.testError'),
+        description: error.message || t('integrations.messages.cannotTest'),
         variant: 'destructive',
       });
     } finally {
@@ -123,8 +127,8 @@ export default function Integrations() {
   const handleSave = async () => {
     if (!selectedPlatform || !apiKey) {
       toast({
-        title: 'Erreur',
-        description: 'Veuillez remplir tous les champs requis',
+        title: t('common.error'),
+        description: t('integrations.messages.fillRequired'),
         variant: 'destructive',
       });
       return;
@@ -136,8 +140,8 @@ export default function Integrations() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast({
-          title: 'Erreur',
-          description: 'Vous devez être connecté pour ajouter une intégration',
+          title: t('common.error'),
+          description: t('integrations.messages.mustBeLoggedIn'),
           variant: 'destructive',
         });
         return;
@@ -182,8 +186,8 @@ export default function Integrations() {
       }
 
       toast({
-        title: 'Intégration sauvegardée',
-        description: 'Test de connexion en cours...',
+        title: t('integrations.messages.saved'),
+        description: t('integrations.messages.testingConnection'),
       });
 
       setSelectedPlatform(null);
@@ -197,8 +201,8 @@ export default function Integrations() {
     } catch (error: any) {
       console.error('Integration save error:', error);
       toast({
-        title: 'Erreur',
-        description: error.message || 'Impossible de sauvegarder l\'intégration',
+        title: t('integrations.messages.saveError'),
+        description: error.message || t('integrations.messages.cannotSave'),
         variant: 'destructive',
       });
     } finally {
@@ -213,13 +217,13 @@ export default function Integrations() {
   const getTestStatusBadge = (status: string | null) => {
     switch (status) {
       case 'success':
-        return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Connecté</Badge>;
+        return <Badge className="bg-green-500/10 text-green-500 border-green-500/20">{t('integrations.status.connected')}</Badge>;
       case 'failed':
-        return <Badge variant="destructive">Échec</Badge>;
+        return <Badge variant="destructive">{t('integrations.status.error')}</Badge>;
       case 'pending':
-        return <Badge variant="secondary">En attente</Badge>;
+        return <Badge variant="secondary">{t('integrations.status.pending')}</Badge>;
       default:
-        return <Badge variant="outline">Non testé</Badge>;
+        return <Badge variant="outline">{t('integrations.status.notTested')}</Badge>;
     }
   };
 
@@ -236,23 +240,23 @@ export default function Integrations() {
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription className="flex items-center justify-between">
-              <span>Configurez une intégration pour pouvoir créer un agent</span>
+              <span>{t('integrations.configureIntegration')}</span>
               <Button 
                 variant="outline" 
                 size="sm"
                 onClick={() => navigate('/agents')}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Retour aux agents
+                {t('integrations.backToAgents')}
               </Button>
             </AlertDescription>
           </Alert>
         )}
 
         <div>
-          <h1 className="text-3xl font-bold gradient-text mb-2">Intégrations</h1>
+          <h1 className="text-3xl font-bold gradient-text mb-2">{t('integrations.title')}</h1>
           <p className="text-muted-foreground">
-            Connectez vos plateformes d'IA préférées
+            {t('integrations.description')}
           </p>
         </div>
 
@@ -298,7 +302,7 @@ export default function Integrations() {
                         <p className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           <span>
-                            Configuré le {format(new Date(integration.updated_at || integration.created_at), 'dd MMM yyyy à HH:mm', { locale: fr })}
+                            {t('integrations.configuredOn')} {format(new Date(integration.updated_at || integration.created_at), 'dd MMM yyyy', { locale: dateLocale })}
                           </span>
                         </p>
                       </div>
@@ -314,7 +318,7 @@ export default function Integrations() {
                           ) : (
                             <TestTube className="w-4 h-4 mr-1" />
                           )}
-                          Tester
+                          {t('integrations.actions.test')}
                         </Button>
                         <Button
                           variant="outline"
@@ -324,7 +328,7 @@ export default function Integrations() {
                             setAgentId(integration.agent_id || '');
                           }}
                         >
-                          Reconfigurer
+                          {t('integrations.actions.reconfigure')}
                         </Button>
                       </div>
                     </div>
@@ -334,7 +338,7 @@ export default function Integrations() {
                       className="w-full gap-2"
                     >
                       <Plus className="w-4 h-4" />
-                      Ajouter une intégration
+                      {t('integrations.actions.addIntegration')}
                     </Button>
                   )}
                 </CardContent>
@@ -350,12 +354,12 @@ export default function Integrations() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                Configurer {platforms.find((p) => p.value === selectedPlatform)?.name}
+                {t('integrations.modal.configure')} {platforms.find((p) => p.value === selectedPlatform)?.name}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 mt-4">
               <div>
-                <Label htmlFor="apiKey">Clé API *</Label>
+                <Label htmlFor="apiKey">{t('integrations.modal.apiKey')} *</Label>
                 <Input
                   id="apiKey"
                   type="password"
@@ -365,7 +369,7 @@ export default function Integrations() {
                 />
               </div>
               <div>
-                <Label htmlFor="agentId">Agent ID (optionnel)</Label>
+                <Label htmlFor="agentId">{t('integrations.modal.agentId')}</Label>
                 <Input
                   id="agentId"
                   value={agentId}
@@ -382,10 +386,10 @@ export default function Integrations() {
                   {saving ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Sauvegarde...
+                      {t('common.loading')}
                     </>
                   ) : (
-                    'Sauvegarder et tester'
+                    t('integrations.actions.saveAndTest')
                   )}
                 </Button>
               </div>

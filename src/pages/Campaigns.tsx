@@ -15,18 +15,20 @@ import { useFeatureAccess } from '@/hooks/useFeatureAccess';
 import { FeatureGate } from '@/components/billing/FeatureGate';
 import { Plus, Play, Pause, StopCircle, Phone, Users, Clock, CheckCircle, XCircle, RefreshCw, Trash2, Eye } from 'lucide-react';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS } from 'date-fns/locale';
+import { useTranslation } from '@/hooks/useTranslation';
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  draft: { label: 'Brouillon', color: 'bg-muted text-muted-foreground', icon: Clock },
-  scheduled: { label: 'Planifiée', color: 'bg-blue-500/20 text-blue-500', icon: Clock },
-  running: { label: 'En cours', color: 'bg-emerald-500/20 text-emerald-500', icon: Play },
-  paused: { label: 'En pause', color: 'bg-yellow-500/20 text-yellow-500', icon: Pause },
-  completed: { label: 'Terminée', color: 'bg-primary/20 text-primary', icon: CheckCircle },
-  cancelled: { label: 'Annulée', color: 'bg-destructive/20 text-destructive', icon: XCircle },
-};
+const getStatusConfig = (t: (key: string) => string): Record<string, { label: string; color: string; icon: React.ElementType }> => ({
+  draft: { label: t('common.pending'), color: 'bg-muted text-muted-foreground', icon: Clock },
+  scheduled: { label: t('common.pending'), color: 'bg-blue-500/20 text-blue-500', icon: Clock },
+  running: { label: t('common.active'), color: 'bg-emerald-500/20 text-emerald-500', icon: Play },
+  paused: { label: t('common.pending'), color: 'bg-yellow-500/20 text-yellow-500', icon: Pause },
+  completed: { label: t('common.success'), color: 'bg-primary/20 text-primary', icon: CheckCircle },
+  cancelled: { label: t('common.error'), color: 'bg-destructive/20 text-destructive', icon: XCircle },
+});
 
 const Campaigns = () => {
+  const { t, language } = useTranslation();
   const { campaigns, isLoading, createCampaign, controlCampaign, deleteCampaign, refetch } = useOutboundCampaigns();
   const { canAccessFeature } = useFeatureAccess();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -36,6 +38,8 @@ const Campaigns = () => {
     description: '',
     phone_numbers: '',
   });
+  const STATUS_CONFIG = getStatusConfig(t);
+  const dateLocale = language === 'fr' ? fr : enUS;
 
   const { data: campaignCalls } = useCampaignCalls(selectedCampaign);
 
@@ -82,9 +86,9 @@ const Campaigns = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Campagnes d'Appels</h1>
+            <h1 className="text-3xl font-bold text-foreground">{t('campaigns.title')}</h1>
             <p className="text-muted-foreground mt-1">
-              Gérez vos campagnes d'appels sortants automatisés
+              {t('campaigns.description')}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -95,25 +99,25 @@ const Campaigns = () => {
               disabled={isLoading}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Actualiser
+              {t('campaigns.refresh')}
             </Button>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-2">
                   <Plus className="h-4 w-4" />
-                  Nouvelle campagne
+                  {t('campaigns.newCampaign')}
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Créer une campagne</DialogTitle>
+                  <DialogTitle>{t('campaigns.modal.createTitle')}</DialogTitle>
                   <DialogDescription>
-                    Configurez votre campagne d'appels sortants
+                    {t('campaigns.modal.createDesc')}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Nom de la campagne</Label>
+                    <Label>{t('campaigns.modal.campaignName')}</Label>
                     <Input
                       placeholder="Ex: Campagne de relance Q1"
                       value={newCampaign.name}
@@ -121,15 +125,15 @@ const Campaigns = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Description (optionnel)</Label>
+                    <Label>{t('campaigns.modal.description')}</Label>
                     <Input
-                      placeholder="Description de la campagne"
+                      placeholder={t('campaigns.modal.description')}
                       value={newCampaign.description}
                       onChange={(e) => setNewCampaign(prev => ({ ...prev, description: e.target.value }))}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Numéros de téléphone (un par ligne)</Label>
+                    <Label>{t('campaigns.modal.phoneNumbers')}</Label>
                     <Textarea
                       placeholder="+33612345678&#10;+33698765432&#10;..."
                       rows={6}
@@ -137,19 +141,19 @@ const Campaigns = () => {
                       onChange={(e) => setNewCampaign(prev => ({ ...prev, phone_numbers: e.target.value }))}
                     />
                     <p className="text-xs text-muted-foreground">
-                      {newCampaign.phone_numbers.split('\n').filter(p => p.trim()).length} numéros
+                      {newCampaign.phone_numbers.split('\n').filter(p => p.trim()).length} {t('campaigns.modal.numbersCount')}
                     </p>
                   </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                    Annuler
+                    {t('common.cancel')}
                   </Button>
                   <Button 
                     onClick={handleCreate}
                     disabled={createCampaign.isPending || !newCampaign.name}
                   >
-                    Créer la campagne
+                    {t('common.create')}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -163,7 +167,7 @@ const Campaigns = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Campagnes Actives</p>
+                  <p className="text-sm text-muted-foreground">{t('campaigns.stats.activeCampaigns')}</p>
                   <p className="text-3xl font-bold">
                     {campaigns.filter(c => c.status === 'running').length}
                   </p>
@@ -178,7 +182,7 @@ const Campaigns = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Appels Totaux</p>
+                  <p className="text-sm text-muted-foreground">{t('campaigns.stats.totalCalls')}</p>
                   <p className="text-3xl font-bold">
                     {campaigns.reduce((sum, c) => sum + c.total_calls, 0)}
                   </p>
@@ -193,7 +197,7 @@ const Campaigns = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Appels Réussis</p>
+                  <p className="text-sm text-muted-foreground">{t('campaigns.stats.successfulCalls')}</p>
                   <p className="text-3xl font-bold">
                     {campaigns.reduce((sum, c) => sum + c.successful_calls, 0)}
                   </p>
@@ -208,7 +212,7 @@ const Campaigns = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Taux de Succès</p>
+                  <p className="text-sm text-muted-foreground">{t('campaigns.stats.successRate')}</p>
                   <p className="text-3xl font-bold">
                     {(() => {
                       const total = campaigns.reduce((sum, c) => sum + c.completed_calls, 0);
@@ -228,33 +232,33 @@ const Campaigns = () => {
         {/* Campaigns Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Toutes les Campagnes</CardTitle>
-            <CardDescription>Gérez et suivez vos campagnes d'appels</CardDescription>
+            <CardTitle>{t('campaigns.title')}</CardTitle>
+            <CardDescription>{t('campaigns.description')}</CardDescription>
           </CardHeader>
           <CardContent>
             {campaigns.length === 0 ? (
               <div className="text-center py-12">
                 <Phone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="font-semibold text-lg mb-2">Aucune campagne</h3>
+                <h3 className="font-semibold text-lg mb-2">{t('campaigns.noCampaigns')}</h3>
                 <p className="text-muted-foreground mb-4">
-                  Créez votre première campagne d'appels sortants
+                  {t('campaigns.createFirst')}
                 </p>
                 <Button onClick={() => setIsCreateOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Nouvelle campagne
+                  {t('campaigns.newCampaign')}
                 </Button>
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Campagne</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Progression</TableHead>
-                    <TableHead>Appels</TableHead>
-                    <TableHead>Succès</TableHead>
-                    <TableHead>Créée le</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{t('campaigns.table.campaign')}</TableHead>
+                    <TableHead>{t('campaigns.table.status')}</TableHead>
+                    <TableHead>{t('campaigns.table.progress')}</TableHead>
+                    <TableHead>{t('campaigns.table.calls')}</TableHead>
+                    <TableHead>{t('campaigns.table.success')}</TableHead>
+                    <TableHead>{t('campaigns.table.createdAt')}</TableHead>
+                    <TableHead className="text-right">{t('campaigns.table.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -292,7 +296,7 @@ const Campaigns = () => {
                           )}
                         </TableCell>
                         <TableCell>
-                          {format(new Date(campaign.created_at), 'dd MMM yyyy', { locale: fr })}
+                          {format(new Date(campaign.created_at), 'dd MMM yyyy', { locale: dateLocale })}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -363,20 +367,20 @@ const Campaigns = () => {
         <Dialog open={!!selectedCampaign} onOpenChange={() => setSelectedCampaign(null)}>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Détails de la Campagne</DialogTitle>
+              <DialogTitle>{t('campaigns.details.title')}</DialogTitle>
               <DialogDescription>
-                Suivi des appels individuels
+                {t('campaigns.details.description')}
               </DialogDescription>
             </DialogHeader>
             <div className="max-h-96 overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Numéro</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Durée</TableHead>
-                    <TableHead>Résultat</TableHead>
-                    <TableHead>Appelé le</TableHead>
+                    <TableHead>{t('campaigns.details.number')}</TableHead>
+                    <TableHead>{t('campaigns.table.status')}</TableHead>
+                    <TableHead>{t('campaigns.details.duration')}</TableHead>
+                    <TableHead>{t('campaigns.details.result')}</TableHead>
+                    <TableHead>{t('campaigns.details.calledAt')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
