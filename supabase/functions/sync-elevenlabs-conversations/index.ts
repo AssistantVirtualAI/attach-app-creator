@@ -219,6 +219,16 @@ serve(async (req) => {
             satisfactionScore = elevenLabsAnalysis.satisfaction_score;
           }
 
+          const normalizeConversationStatus = (raw: unknown): string => {
+            const s = typeof raw === 'string' ? raw.toLowerCase() : '';
+            // DB constraint doesn't accept ElevenLabs "done"; map to our canonical statuses.
+            if (s === 'done' || s === 'completed' || s === 'complete') return 'completed';
+            if (s === 'pending' || s === 'queued') return 'pending';
+            if (s === 'active' || s === 'in_progress' || s === 'in-progress' || s === 'running') return 'active';
+            // Default to completed to avoid constraint failures blocking sync.
+            return 'completed';
+          };
+
           const conversationData = {
             external_id: conv.conversation_id,
             title: `Conversation ${conv.conversation_id.substring(0, 8)}`,
@@ -226,7 +236,7 @@ serve(async (req) => {
             organization_id: orgMember.organization_id,
             user_id: user.id,
             platform: 'elevenlabs',
-            status: conv.status || 'completed',
+            status: normalizeConversationStatus(conv.status),
             duration: detailedConv.call_duration_secs || conv.call_duration_secs || conv.duration || 0,
             created_at: conv.start_time || conv.created_at || new Date().toISOString(),
             transcript: JSON.stringify(transcript),
