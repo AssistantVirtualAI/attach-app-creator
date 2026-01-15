@@ -6,6 +6,7 @@ import {
 import { DashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { motion } from 'framer-motion';
 import { SimpleAnimatedCounter } from '@/components/ui/animated-counter';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface MetricsGridProps {
   metrics: DashboardMetrics;
@@ -184,6 +185,8 @@ const MetricCard = ({
 };
 
 export const MetricsGrid = ({ metrics, isLoading }: MetricsGridProps) => {
+  const { t } = useTranslation();
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -248,9 +251,9 @@ export const MetricsGrid = ({ metrics, isLoading }: MetricsGridProps) => {
         }}
       >
         <MetricCard
-          title="Total Conversations"
+          title={t('dashboard.metrics.totalConversations')}
           numericValue={metrics.totalConversations}
-          subValue={`${metrics.conversationsToday} aujourd'hui`}
+          subValue={`${metrics.conversationsToday} ${t('dashboard.metrics.today')}`}
           icon={MessageSquare}
           trend={getTrend(metrics.conversationsTrend)}
           trendValue={metrics.conversationsTrend !== 0 ? formatTrendValue(metrics.conversationsTrend) : undefined}
@@ -259,20 +262,20 @@ export const MetricsGrid = ({ metrics, isLoading }: MetricsGridProps) => {
           isImportant={true}
         />
         <MetricCard
-          title="Cette Semaine"
+          title={t('dashboard.metrics.thisWeek')}
           numericValue={metrics.conversationsThisWeek}
-          subValue="7 derniers jours"
+          subValue={t('dashboard.metrics.last7days')}
           icon={TrendingUp}
           accentColor="emerald"
           delay={0.08}
           isImportant={metrics.conversationsThisWeek > 100}
         />
         <MetricCard
-          title="Satisfaction"
+          title={t('dashboard.metrics.satisfaction')}
           numericValue={metrics.avgSatisfaction}
           suffix="/5"
           decimals={1}
-          subValue="score moyen"
+          subValue={t('dashboard.metrics.avgScore')}
           icon={Star}
           trend={metrics.avgSatisfaction >= 4 ? 'up' : metrics.avgSatisfaction >= 3 ? 'neutral' : 'down'}
           accentColor="amber"
@@ -280,10 +283,10 @@ export const MetricsGrid = ({ metrics, isLoading }: MetricsGridProps) => {
           isImportant={true}
         />
         <MetricCard
-          title="Taux Résolution"
+          title={t('dashboard.metrics.resolutionRate')}
           numericValue={metrics.resolutionRate}
           suffix="%"
-          subValue={`${metrics.resolvedConversations} résolues`}
+          subValue={`${metrics.resolvedConversations} ${t('dashboard.metrics.resolved')}`}
           icon={CheckCircle}
           trend={metrics.resolutionRate >= 80 ? 'up' : metrics.resolutionRate >= 60 ? 'neutral' : 'down'}
           accentColor="emerald"
@@ -291,19 +294,19 @@ export const MetricsGrid = ({ metrics, isLoading }: MetricsGridProps) => {
           isImportant={metrics.resolutionRate >= 80}
         />
         <MetricCard
-          title="Sentiment Positif"
+          title={t('dashboard.metrics.positiveSentiment')}
           numericValue={positivePercent}
           suffix="%"
-          subValue={`${metrics.sentimentBreakdown.positive} positifs`}
+          subValue={`${metrics.sentimentBreakdown.positive} ${t('dashboard.metrics.positive')}`}
           icon={Smile}
           trend={positivePercent >= 60 ? 'up' : positivePercent >= 40 ? 'neutral' : 'down'}
           accentColor="cyan"
           delay={0.32}
         />
         <MetricCard
-          title="Durée Moyenne"
+          title={t('dashboard.metrics.avgDuration')}
           value={formatDuration(metrics.avgDuration)}
-          subValue="par conversation"
+          subValue={t('dashboard.metrics.perConversation')}
           icon={Clock}
           accentColor="purple"
           delay={0.40}
@@ -320,25 +323,25 @@ export const MetricsGrid = ({ metrics, isLoading }: MetricsGridProps) => {
         }}
       >
         <MetricCard
-          title="Clients Actifs"
+          title={t('dashboard.metrics.activeClients')}
           numericValue={metrics.activeClients}
-          subValue="comptes actifs"
+          subValue={t('dashboard.metrics.activeAccounts')}
           icon={Users}
           accentColor="orange"
           delay={0.48}
         />
         <MetricCard
-          title="Agents IA"
+          title={t('dashboard.metrics.aiAgents')}
           numericValue={metrics.totalAgents}
-          subValue="configurés"
+          subValue={t('dashboard.metrics.configured')}
           icon={Bot}
           accentColor="purple"
           delay={0.56}
         />
         <MetricCard
-          title="Utilisateurs"
+          title={t('dashboard.metrics.users')}
           numericValue={metrics.uniqueUsers}
-          subValue="cette semaine"
+          subValue={t('dashboard.metrics.thisWeek')}
           icon={UserCheck}
           trend={getTrend(metrics.usersTrend)}
           trendValue={metrics.usersTrend !== 0 ? formatTrendValue(metrics.usersTrend) : undefined}
@@ -346,11 +349,11 @@ export const MetricsGrid = ({ metrics, isLoading }: MetricsGridProps) => {
           delay={0.64}
         />
         <MetricCard
-          title="Score Qualité"
+          title={t('dashboard.metrics.qualityScore')}
           numericValue={metrics.qualityScore > 0 ? metrics.qualityScore : 0}
           suffix={metrics.qualityScore > 0 ? "%" : ""}
           value={metrics.qualityScore <= 0 ? "N/A" : undefined}
-          subValue="performance IA"
+          subValue={t('dashboard.metrics.aiPerformance')}
           icon={Activity}
           trend={metrics.qualityScore >= 80 ? 'up' : metrics.qualityScore >= 60 ? 'neutral' : 'down'}
           accentColor="pink"
