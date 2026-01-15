@@ -128,12 +128,23 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
       // Fetch ElevenLabs analytics for each agent that has platform_agent_id
       const elevenLabsAgents = targetAgents.filter(a => a.platform === 'elevenlabs' && a.platform_agent_id);
       
+      // Calculate dynamic timeframe based on date range
+      const getTimeframe = () => {
+        if (!dateRange) return '7days';
+        const diffDays = Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 1) return '24hours';
+        if (diffDays <= 7) return '7days';
+        if (diffDays <= 30) return '30days';
+        if (diffDays <= 90) return '90days';
+        return 'all';
+      };
+
       const platformAnalyticsPromises = elevenLabsAgents.map(async (agent) => {
         try {
           const { data, error } = await supabase.functions.invoke('elevenlabs-convai-analytics', {
             body: { 
               agentId: agent.platform_agent_id,
-              timeframe: '7days',
+              timeframe: getTimeframe(),
               includeCharts: true
             }
           });
@@ -155,11 +166,56 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
         platformAnalyticsResults.map(r => [r.agentId, r.data])
       );
 
-      // Calculate daily trends (last 7 days)
-      const dailyTrends = calculateDailyTrends(conversations || [], dayNames);
+      // Try to use platform charts when local conversations are empty
+      let dailyTrends: DailyTrend[] = calculateDailyTrends(conversations || [], dayNames);
+      let hourlyDistribution: HourlyDistribution[] = [];
+      let peakHour = '—';
+      let quietHour = '—';
 
-      // Calculate hourly distribution
-      const { hourlyDistribution, peakHour, quietHour } = calculateHourlyDistribution(conversations || []);
+      // If local data is empty, try to use platform charts
+      if ((conversations?.length || 0) === 0 && platformAnalyticsResults.length > 0) {
+        // Aggregate platform chart data
+        const platformWithCharts = platformAnalyticsResults.filter(r => r.data?.charts);
+        
+        if (platformWithCharts.length > 0) {
+          // Use conversations_over_time from first available platform
+          const firstPlatformCharts = platformWithCharts[0].data.charts;
+          
+          if (firstPlatformCharts?.conversations_over_time) {
+            dailyTrends = firstPlatformCharts.conversations_over_time.slice(-7).map((point: any) => ({
+              day: dayNames[new Date(point.date || point.timestamp).getDay()],
+              date: new Date(point.date || point.timestamp).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
+              conversations: point.count || point.value || 0,
+              satisfaction: point.avg_satisfaction || 0,
+            }));
+          }
+          
+          if (firstPlatformCharts?.peak_hours) {
+            hourlyDistribution = firstPlatformCharts.peak_hours.map((point: any) => ({
+              hour: `${point.hour}h`,
+              conversations: point.count || point.value || 0,
+            }));
+            
+            // Find peak and quiet hours from platform data
+            const peakData = firstPlatformCharts.peak_hours.reduce((max: any, h: any) => 
+              (h.count || h.value || 0) > (max.count || max.value || 0) ? h : max, 
+              firstPlatformCharts.peak_hours[0]
+            );
+            const quietData = firstPlatformCharts.peak_hours.reduce((min: any, h: any) => 
+              (h.count || h.value || 0) < (min.count || min.value || 0) ? h : min, 
+              firstPlatformCharts.peak_hours[0]
+            );
+            peakHour = `${peakData?.hour}h`;
+            quietHour = `${quietData?.hour}h`;
+          }
+        }
+      } else {
+        // Use local data
+        const hourlyResult = calculateHourlyDistribution(conversations || []);
+        hourlyDistribution = hourlyResult.hourlyDistribution;
+        peakHour = hourlyResult.peakHour;
+        quietHour = hourlyResult.quietHour;
+      }
 
       // Calculate busiest day
       const busiestDay = calculateBusiestDay(conversations || [], fullDayNames);

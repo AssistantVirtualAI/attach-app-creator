@@ -74,19 +74,28 @@ export function useAgentDailyReports(agentId?: string) {
   });
 }
 
-export function useLatestAgentAdvice(agentId: string) {
+export function useLatestAgentAdvice(agentId: string, period?: number | 'all') {
   const { selectedOrg } = useOrganization();
+  const { language } = useTranslation();
 
   return useQuery({
-    queryKey: ['agent-latest-advice', selectedOrg?.id, agentId],
+    queryKey: ['agent-latest-advice', selectedOrg?.id, agentId, language, period],
     queryFn: async (): Promise<AgentDailyReport | null> => {
       if (!selectedOrg?.id || !agentId) return null;
 
-      const { data, error } = await supabase
+      // Build query to get latest report matching language and period if specified
+      let query = supabase
         .from('agent_daily_reports')
         .select('*')
         .eq('organization_id', selectedOrg.id)
         .eq('agent_id', agentId)
+        .eq('language', language);
+      
+      if (period !== undefined) {
+        query = query.eq('period_days', period === 'all' ? 'all' : String(period));
+      }
+
+      const { data, error } = await query
         .order('report_date', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -144,9 +153,9 @@ export function useSyncElevenLabsConversations() {
   const { language } = useTranslation();
 
   return useMutation({
-    mutationFn: async ({ agentId, limit = 100 }: { agentId?: string; limit?: number }) => {
+    mutationFn: async ({ agentId, limit = 100, mode = 'recent' }: { agentId?: string; limit?: number; mode?: 'recent' | 'all' }) => {
       const { data, error } = await supabase.functions.invoke('sync-elevenlabs-conversations', {
-        body: { action: 'sync', agentId, limit }
+        body: { action: 'sync', agentId, limit, mode }
       });
 
       if (error) throw error;

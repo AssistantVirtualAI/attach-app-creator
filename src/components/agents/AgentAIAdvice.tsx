@@ -44,13 +44,19 @@ const effortImpactBadge = (effort: string, impact: string) => {
 export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
   const { t, language } = useTranslation();
   const [days, setDays] = useState<number | 'all'>(7);
-  const { data: advice, isLoading } = useLatestAgentAdvice(agentId);
+  const { data: advice, isLoading, refetch } = useLatestAgentAdvice(agentId, days);
   const { mutate: generateAdvice, isPending: isGenerating } = useGenerateAgentAdvice();
 
   const dateLocale = language === 'fr' ? fr : enUS;
 
   const handleGenerate = () => {
     generateAdvice({ agentId, days, language });
+  };
+
+  // Refetch when language or period changes
+  const handlePeriodChange = (value: string) => {
+    const newDays = value === 'all' ? 'all' : parseInt(value);
+    setDays(newDays);
   };
 
   const getImpactLabel = (impact: string) => {
@@ -98,7 +104,7 @@ export function AgentAIAdvice({ agentId, agentName }: AgentAIAdviceProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={days.toString()} onValueChange={(v) => setDays(v === 'all' ? 'all' : parseInt(v))}>
+          <Select value={days.toString()} onValueChange={handlePeriodChange}>
             <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>

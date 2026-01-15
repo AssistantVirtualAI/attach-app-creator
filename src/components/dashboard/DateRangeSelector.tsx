@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { useTranslation } from '@/hooks/useTranslation';
 
-export type PeriodPreset = 'today' | '7days' | '30days' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'custom';
+export type PeriodPreset = 'today' | '7days' | '30days' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'allTime' | 'custom';
 
 interface DateRangeSelectorProps {
   value: { start: Date; end: Date } | null;
@@ -54,6 +54,9 @@ export const DateRangeSelector = ({
         const lastMonth = subMonths(now, 1);
         onChange({ start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) });
         break;
+      case 'allTime':
+        onChange({ start: new Date('2020-01-01'), end: new Date() });
+        break;
       case 'custom':
         setIsCustomOpen(true);
         break;
@@ -64,7 +67,7 @@ export const DateRangeSelector = ({
     { id: '7days' as PeriodPreset, label: t('dashboard.dateRange.days7') },
     { id: '30days' as PeriodPreset, label: t('dashboard.dateRange.days30') },
     { id: 'thisMonth' as PeriodPreset, label: t('dashboard.dateRange.thisMonth') },
-    { id: 'lastMonth' as PeriodPreset, label: t('dashboard.dateRange.lastMonth') },
+    { id: 'allTime' as PeriodPreset, label: t('common.allTime') },
   ];
 
   const getPresetLabel = () => {
@@ -75,6 +78,7 @@ export const DateRangeSelector = ({
       case 'thisWeek': return t('dashboard.dateRange.thisWeek');
       case 'thisMonth': return t('dashboard.dateRange.thisMonth');
       case 'lastMonth': return t('dashboard.dateRange.lastMonth');
+      case 'allTime': return t('common.allTime');
       case 'custom': 
         return value 
           ? `${format(value.start, 'dd/MM', { locale: dateLocale })} - ${format(value.end, 'dd/MM', { locale: dateLocale })}`
