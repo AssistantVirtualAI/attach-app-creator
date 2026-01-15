@@ -1706,6 +1706,8 @@ export const en = {
     volume: 'Volume',
     frequentTags: 'Frequent tags',
     suggestedImprovements: 'Suggested improvements',
+    dataInFrench: 'Data in French',
+    dataInEnglish: 'Data in English',
     actions: {
       generateReport: 'Generate Report',
       exportPdf: 'Export PDF',
