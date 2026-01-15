@@ -10,6 +10,7 @@ import { useTopics } from '@/hooks/useTopics';
 import { Search, RefreshCw, TrendingUp, MessageSquare, Sparkles, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const CATEGORY_COLORS: Record<string, string> = {
   'Support': 'hsl(var(--primary))',
@@ -29,6 +30,7 @@ const SENTIMENT_COLORS = {
 };
 
 const Topics = () => {
+  const { t } = useTranslation();
   const { aggregates, recentTopics, isLoading, analyzeTopics, refetch } = useTopics();
   const [searchQuery, setSearchQuery] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -37,10 +39,10 @@ const Topics = () => {
     setIsAnalyzing(true);
     try {
       const result = await analyzeTopics();
-      toast.success(`${result.topics?.length || 0} sujets analysés`);
+      toast.success(`${result.topics?.length || 0} ${t('topics.title').toLowerCase()}`);
       refetch();
     } catch (error) {
-      toast.error("Erreur lors de l'analyse");
+      toast.error(t('common.error'));
     } finally {
       setIsAnalyzing(false);
     }
@@ -76,16 +78,16 @@ const Topics = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Topics</h1>
+            <h1 className="text-3xl font-bold text-foreground">{t('topics.title')}</h1>
             <p className="text-muted-foreground mt-1">
-              Analyse NLP des sujets de conversation
+              {t('topics.description')}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher un sujet..."
+                placeholder={t('topics.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 w-64"
@@ -98,7 +100,7 @@ const Topics = () => {
               disabled={isLoading}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              Actualiser
+              {t('topics.refresh')}
             </Button>
             <Button
               size="sm"
@@ -107,7 +109,7 @@ const Topics = () => {
               className="gap-2"
             >
               <Sparkles className={`h-4 w-4 ${isAnalyzing ? 'animate-pulse' : ''}`} />
-              Analyser les conversations
+              {t('topics.analyzeConversations')}
             </Button>
           </div>
         </div>
@@ -118,7 +120,7 @@ const Topics = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Sujets</p>
+                  <p className="text-sm text-muted-foreground">{t('topics.stats.totalTopics')}</p>
                   <p className="text-3xl font-bold">{aggregates.length}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10">
@@ -131,7 +133,7 @@ const Topics = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Mentions Totales</p>
+                  <p className="text-sm text-muted-foreground">{t('topics.stats.totalMentions')}</p>
                   <p className="text-3xl font-bold">{totalTopics}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10">
@@ -144,7 +146,7 @@ const Topics = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Catégories</p>
+                  <p className="text-sm text-muted-foreground">{t('topics.stats.categories')}</p>
                   <p className="text-3xl font-bold">{categoryData.length}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10">
@@ -157,7 +159,7 @@ const Topics = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Sentiment Positif</p>
+                  <p className="text-sm text-muted-foreground">{t('topics.stats.positiveSentiment')}</p>
                   <p className="text-3xl font-bold">
                     {recentTopics.length > 0 
                       ? Math.round((sentimentBreakdown.positive || 0) / recentTopics.length * 100)
@@ -174,9 +176,9 @@ const Topics = () => {
 
         <Tabs defaultValue="trending" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="trending">Tendances</TabsTrigger>
-            <TabsTrigger value="categories">Catégories</TabsTrigger>
-            <TabsTrigger value="recent">Récents</TabsTrigger>
+            <TabsTrigger value="trending">{t('topics.tabs.trending')}</TabsTrigger>
+            <TabsTrigger value="categories">{t('topics.tabs.categories')}</TabsTrigger>
+            <TabsTrigger value="recent">{t('topics.tabs.recent')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="trending" className="space-y-4">
@@ -184,13 +186,13 @@ const Topics = () => {
               {/* Top Topics */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Sujets Populaires</CardTitle>
-                  <CardDescription>Les sujets les plus mentionnés</CardDescription>
+                  <CardTitle>{t('topics.popularTopics')}</CardTitle>
+                  <CardDescription>{t('topics.mostMentioned')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {topTopics.length === 0 ? (
                     <p className="text-muted-foreground text-center py-8">
-                      Aucun sujet analysé. Cliquez sur "Analyser les conversations" pour commencer.
+                      {t('topics.noTopics')}
                     </p>
                   ) : (
                     <div className="space-y-4">
@@ -215,10 +217,10 @@ const Topics = () => {
                               )}
                             </div>
                             <span className="text-sm text-muted-foreground">
-                              {topic.total_mentions} mentions
+                              {topic.total_mentions} {t('topics.mentions')}
                             </span>
                           </div>
-                          <Progress 
+                          <Progress
                             value={(topic.total_mentions / (topTopics[0]?.total_mentions || 1)) * 100} 
                             className="h-2"
                           />
@@ -232,13 +234,13 @@ const Topics = () => {
               {/* Top Topics Bar Chart */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Distribution des Mentions</CardTitle>
-                  <CardDescription>Top 10 sujets par volume</CardDescription>
+                  <CardTitle>{t('topics.mentionDistribution')}</CardTitle>
+                  <CardDescription>{t('topics.top10Topics')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {topTopics.length === 0 ? (
                     <p className="text-muted-foreground text-center py-8">
-                      Aucune donnée disponible
+                      {t('topics.noData')}
                     </p>
                   ) : (
                     <ResponsiveContainer width="100%" height={300}>
@@ -269,13 +271,13 @@ const Topics = () => {
               {/* Category Pie Chart */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Répartition par Catégorie</CardTitle>
-                  <CardDescription>Distribution des sujets par catégorie</CardDescription>
+                  <CardTitle>{t('topics.categoryBreakdown')}</CardTitle>
+                  <CardDescription>{t('topics.categoryDistribution')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {categoryData.length === 0 ? (
                     <p className="text-muted-foreground text-center py-8">
-                      Aucune donnée disponible
+                      {t('topics.noData')}
                     </p>
                   ) : (
                     <ResponsiveContainer width="100%" height={300}>
@@ -307,8 +309,8 @@ const Topics = () => {
               {/* Category List */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Détail des Catégories</CardTitle>
-                  <CardDescription>Nombre de mentions par catégorie</CardDescription>
+                  <CardTitle>{t('topics.categoryDetails')}</CardTitle>
+                  <CardDescription>{t('topics.mentionsByCategory')}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -321,7 +323,7 @@ const Topics = () => {
                           />
                           <span className="font-medium">{cat.name}</span>
                         </div>
-                        <Badge variant="secondary">{cat.value} mentions</Badge>
+                        <Badge variant="secondary">{cat.value} {t('topics.mentions')}</Badge>
                       </div>
                     ))}
                   </div>
@@ -333,13 +335,13 @@ const Topics = () => {
           <TabsContent value="recent" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Sujets Récemment Analysés</CardTitle>
-                <CardDescription>Les derniers sujets extraits des conversations</CardDescription>
+                <CardTitle>{t('topics.recentlyAnalyzed')}</CardTitle>
+                <CardDescription>{t('topics.lastTopicsExtracted')}</CardDescription>
               </CardHeader>
               <CardContent>
                 {recentTopics.length === 0 ? (
                   <p className="text-muted-foreground text-center py-8">
-                    Aucun sujet récent. Lancez une analyse pour extraire les sujets.
+                    {t('topics.noRecentTopics')}
                   </p>
                 ) : (
                   <div className="flex flex-wrap gap-3">
