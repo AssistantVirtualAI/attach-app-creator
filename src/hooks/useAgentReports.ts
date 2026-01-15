@@ -65,6 +65,17 @@ const DAY_NAMES_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 const FULL_DAY_NAMES_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const FULL_DAY_NAMES_FR = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
+// Helper to calculate timeframe string from date range
+function getTimeframe(dateRange?: DateRange): string {
+  if (!dateRange) return '7days';
+  const diffDays = Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays <= 1) return '24hours';
+  if (diffDays <= 7) return '7days';
+  if (diffDays <= 30) return '30days';
+  if (diffDays <= 90) return '90days';
+  return 'all';
+}
+
 export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange) {
   const { selectedOrg } = useOrganization();
   const { language } = useLanguage();
@@ -125,93 +136,149 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
 
       const { data: insights } = await insightsQuery;
 
-      // Fetch ElevenLabs analytics for each agent that has platform_agent_id
-      const elevenLabsAgents = targetAgents.filter(a => a.platform === 'elevenlabs' && a.platform_agent_id);
-      
-      // Calculate dynamic timeframe based on date range
-      const getTimeframe = () => {
-        if (!dateRange) return '7days';
-        const diffDays = Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24));
-        if (diffDays <= 1) return '24hours';
-        if (diffDays <= 7) return '7days';
-        if (diffDays <= 30) return '30days';
-        if (diffDays <= 90) return '90days';
-        return 'all';
-      };
+      const timeframe = getTimeframe(dateRange);
 
-      const platformAnalyticsPromises = elevenLabsAgents.map(async (agent) => {
+      // Fetch analytics for each agent based on their platform
+      const platformAnalyticsPromises = targetAgents.map(async (agent) => {
         try {
-          const { data, error } = await supabase.functions.invoke('elevenlabs-convai-analytics', {
-            body: { 
-              agentId: agent.platform_agent_id,
-              timeframe: getTimeframe(),
-              includeCharts: true
+          if (agent.platform === 'elevenlabs' && agent.platform_agent_id) {
+            const { data, error } = await supabase.functions.invoke('elevenlabs-convai-analytics', {
+              body: { 
+                agentId: agent.platform_agent_id,
+                timeframe,
+                includeCharts: true,
+                organizationId: selectedOrg.id
+              }
+            });
+            
+            if (error) {
+              console.warn(`Failed to fetch ElevenLabs analytics for ${agent.name}:`, error);
+              return { agentId: agent.id, platform: 'elevenlabs', data: null };
             }
-          });
-          
-          if (error) {
-            console.warn(`Failed to fetch ElevenLabs analytics for ${agent.name}:`, error);
-            return { agentId: agent.id, data: null };
+            
+            return { agentId: agent.id, platform: 'elevenlabs', data };
+          } else if (agent.platform === 'retell' && agent.platform_agent_id) {
+            const { data, error } = await supabase.functions.invoke('retell-proxy', {
+              body: { 
+                action: 'getAnalytics',
+                agentId: agent.platform_agent_id,
+                timeframe: timeframe === '24hours' ? '24h' : timeframe === '7days' ? '7d' : timeframe === '30days' ? '30d' : timeframe === '90days' ? '90d' : 'all',
+                organizationId: selectedOrg.id
+              }
+            });
+            
+            if (error) {
+              console.warn(`Failed to fetch Retell analytics for ${agent.name}:`, error);
+              return { agentId: agent.id, platform: 'retell', data: null };
+            }
+            
+            // Normalize Retell analytics to match ElevenLabs structure
+            const retellData = data?.data || data;
+            return { 
+              agentId: agent.id, 
+              platform: 'retell', 
+              data: {
+                metrics: {
+                  total_conversations: retellData?.totalCalls || 0,
+                  successful_conversations: retellData?.completedCalls || 0,
+                  failed_conversations: (retellData?.totalCalls || 0) - (retellData?.completedCalls || 0),
+                  avg_duration: retellData?.avgDuration || 0,
+                  total_duration: retellData?.totalDuration || 0,
+                  success_rate: retellData?.successRate || 0,
+                },
+                charts: {
+                  conversations_over_time: retellData?.callsByDay 
+                    ? Object.entries(retellData.callsByDay).map(([date, count]) => ({ date, count }))
+                    : [],
+                  peak_hours: [],
+                }
+              }
+            };
+          } else if (agent.platform === 'vapi' && agent.platform_agent_id) {
+            // Add VAPI support if needed
+            return { agentId: agent.id, platform: 'vapi', data: null };
           }
           
-          return { agentId: agent.id, data };
+          return { agentId: agent.id, platform: agent.platform, data: null };
         } catch (err) {
-          console.warn(`Error fetching ElevenLabs analytics for ${agent.name}:`, err);
-          return { agentId: agent.id, data: null };
+          console.warn(`Error fetching analytics for ${agent.name}:`, err);
+          return { agentId: agent.id, platform: agent.platform, data: null };
         }
       });
 
       const platformAnalyticsResults = await Promise.all(platformAnalyticsPromises);
       const platformAnalyticsMap = new Map(
-        platformAnalyticsResults.map(r => [r.agentId, r.data])
+        platformAnalyticsResults.map(r => [r.agentId, r])
       );
 
-      // Try to use platform charts when local conversations are empty
-      let dailyTrends: DailyTrend[] = calculateDailyTrends(conversations || [], dayNames);
+      // Aggregate charts from all platforms
+      let aggregatedDailyData: Record<string, number> = {};
+      let aggregatedHourlyData: Record<number, number> = {};
+      
+      // First, try to use platform data for charts
+      for (const result of platformAnalyticsResults) {
+        if (result.data?.charts?.conversations_over_time) {
+          for (const point of result.data.charts.conversations_over_time) {
+            const date = point.date || point.timestamp;
+            if (date) {
+              aggregatedDailyData[date] = (aggregatedDailyData[date] || 0) + (point.count || point.value || 0);
+            }
+          }
+        }
+        if (result.data?.charts?.peak_hours) {
+          for (const point of result.data.charts.peak_hours) {
+            const hour = point.hour;
+            if (hour !== undefined) {
+              aggregatedHourlyData[hour] = (aggregatedHourlyData[hour] || 0) + (point.count || point.value || 0);
+            }
+          }
+        }
+      }
+
+      // If no platform data, fall back to local conversations
+      let dailyTrends: DailyTrend[] = [];
       let hourlyDistribution: HourlyDistribution[] = [];
       let peakHour = '—';
       let quietHour = '—';
 
-      // If local data is empty, try to use platform charts
-      if ((conversations?.length || 0) === 0 && platformAnalyticsResults.length > 0) {
-        // Aggregate platform chart data
-        const platformWithCharts = platformAnalyticsResults.filter(r => r.data?.charts);
+      if (Object.keys(aggregatedDailyData).length > 0) {
+        // Use aggregated platform data
+        dailyTrends = Object.entries(aggregatedDailyData)
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([date, count]) => ({
+            day: dayNames[new Date(date).getDay()],
+            date: new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
+            conversations: count,
+            satisfaction: 0,
+          }));
         
-        if (platformWithCharts.length > 0) {
-          // Use conversations_over_time from first available platform
-          const firstPlatformCharts = platformWithCharts[0].data.charts;
-          
-          if (firstPlatformCharts?.conversations_over_time) {
-            dailyTrends = firstPlatformCharts.conversations_over_time.slice(-7).map((point: any) => ({
-              day: dayNames[new Date(point.date || point.timestamp).getDay()],
-              date: new Date(point.date || point.timestamp).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
-              conversations: point.count || point.value || 0,
-              satisfaction: point.avg_satisfaction || 0,
-            }));
-          }
-          
-          if (firstPlatformCharts?.peak_hours) {
-            hourlyDistribution = firstPlatformCharts.peak_hours.map((point: any) => ({
-              hour: `${point.hour}h`,
-              conversations: point.count || point.value || 0,
-            }));
-            
-            // Find peak and quiet hours from platform data
-            const peakData = firstPlatformCharts.peak_hours.reduce((max: any, h: any) => 
-              (h.count || h.value || 0) > (max.count || max.value || 0) ? h : max, 
-              firstPlatformCharts.peak_hours[0]
-            );
-            const quietData = firstPlatformCharts.peak_hours.reduce((min: any, h: any) => 
-              (h.count || h.value || 0) < (min.count || min.value || 0) ? h : min, 
-              firstPlatformCharts.peak_hours[0]
-            );
-            peakHour = `${peakData?.hour}h`;
-            quietHour = `${quietData?.hour}h`;
-          }
+        // Keep only last entries based on timeframe
+        const maxPoints = timeframe === 'all' ? 30 : timeframe === '90days' ? 14 : 7;
+        if (dailyTrends.length > maxPoints) {
+          dailyTrends = dailyTrends.slice(-maxPoints);
         }
-      } else {
+      } else if (conversations && conversations.length > 0) {
         // Use local data
-        const hourlyResult = calculateHourlyDistribution(conversations || []);
+        dailyTrends = calculateDailyTrends(conversations, dayNames);
+      }
+
+      if (Object.keys(aggregatedHourlyData).length > 0) {
+        // Use aggregated platform data for hourly distribution
+        hourlyDistribution = [];
+        for (let h = 0; h < 24; h++) {
+          hourlyDistribution.push({
+            hour: `${h}h`,
+            conversations: aggregatedHourlyData[h] || 0,
+          });
+        }
+        
+        // Find peak and quiet hours
+        const maxHour = Object.entries(aggregatedHourlyData).reduce((max, [h, c]) => c > max.count ? { hour: parseInt(h), count: c } : max, { hour: 0, count: 0 });
+        const minHour = Object.entries(aggregatedHourlyData).reduce((min, [h, c]) => c < min.count ? { hour: parseInt(h), count: c } : min, { hour: 0, count: Infinity });
+        peakHour = `${maxHour.hour}h`;
+        quietHour = `${minHour.hour}h`;
+      } else if (conversations && conversations.length > 0) {
+        const hourlyResult = calculateHourlyDistribution(conversations);
         hourlyDistribution = hourlyResult.hourlyDistribution;
         peakHour = hourlyResult.peakHour;
         quietHour = hourlyResult.quietHour;
@@ -224,7 +291,8 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
       const agentMetrics: AgentMetrics[] = targetAgents.map(agent => {
         const agentConversations = conversations?.filter(c => c.agent_id === agent.id) || [];
         const agentInsights = insights?.filter(i => i.agent_id === agent.id) || [];
-        const platformData = platformAnalyticsMap.get(agent.id);
+        const platformResult = platformAnalyticsMap.get(agent.id);
+        const platformData = platformResult?.data;
 
         // Use platform data if available, otherwise use local data
         let totalConversations = agentConversations.length;
@@ -234,8 +302,8 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
         let dataSource: 'platform' | 'local' | 'mixed' = 'local';
 
         if (platformData?.metrics) {
-          // Merge platform data
-          totalConversations = Math.max(platformData.metrics.total_conversations || 0, agentConversations.length);
+          // Prefer platform data for totals
+          totalConversations = platformData.metrics.total_conversations || 0;
           avgDuration = platformData.metrics.avg_duration || 0;
           successRate = platformData.metrics.success_rate || 0;
           dataSource = agentConversations.length > 0 ? 'mixed' : 'platform';
@@ -365,7 +433,7 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
         };
       });
 
-      // Global metrics
+      // Global metrics - sum from all agents
       const totalConversations = agentMetrics.reduce((sum, a) => sum + a.totalConversations, 0);
       
       const avgSatisfaction = agentMetrics.length > 0 
@@ -373,7 +441,17 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
           (agentMetrics.filter(a => a.avgSatisfaction > 0).length || 1)
         : 0;
 
-      const totalVoiceMinutes = Math.round(agentMetrics.reduce((sum, a) => sum + (a.avgDuration * a.totalConversations / 60), 0));
+      // Calculate total voice minutes from platform data
+      let totalVoiceMinutes = 0;
+      for (const result of platformAnalyticsResults) {
+        if (result.data?.metrics?.total_duration) {
+          totalVoiceMinutes += Math.round(result.data.metrics.total_duration / 60);
+        }
+      }
+      // Fallback to calculated from agent metrics
+      if (totalVoiceMinutes === 0) {
+        totalVoiceMinutes = Math.round(agentMetrics.reduce((sum, a) => sum + (a.avgDuration * a.totalConversations / 60), 0));
+      }
 
       const globalSuccessRate = agentMetrics.length > 0 
         ? agentMetrics.reduce((sum, a) => sum + a.successRate, 0) / agentMetrics.length 
@@ -454,80 +532,57 @@ function calculateHourlyDistribution(conversations: any[]): {
   peakHour: string;
   quietHour: string;
 } {
-  const hourlyCounts: Record<number, number> = {};
+  const hourCounts: Record<number, number> = {};
   
-  // Initialize all hours
   for (let i = 0; i < 24; i++) {
-    hourlyCounts[i] = 0;
+    hourCounts[i] = 0;
   }
 
-  // Count conversations by hour
-  conversations.forEach(c => {
-    const hour = getHours(new Date(c.created_at));
-    hourlyCounts[hour]++;
+  conversations.forEach(conv => {
+    const hour = getHours(new Date(conv.created_at));
+    hourCounts[hour]++;
   });
 
-  const hourlyDistribution: HourlyDistribution[] = Object.entries(hourlyCounts)
-    .map(([hour, count]) => ({
-      hour: `${hour}h`,
-      conversations: count,
-    }));
+  const hourlyDistribution: HourlyDistribution[] = Object.entries(hourCounts).map(([hour, count]) => ({
+    hour: `${hour}h`,
+    conversations: count,
+  }));
 
-  // Find peak and quiet hours
-  let peakHour = '12h';
-  let quietHour = '3h';
-  let maxCount = 0;
-  let minCount = Infinity;
-
-  Object.entries(hourlyCounts).forEach(([hour, count]) => {
-    if (count > maxCount) {
-      maxCount = count;
-      peakHour = `${hour}h`;
-    }
-    if (count < minCount) {
-      minCount = count;
-      quietHour = `${hour}h`;
-    }
-  });
+  const sortedByCount = Object.entries(hourCounts).sort((a, b) => b[1] - a[1]);
+  const peakHour = sortedByCount[0] ? `${sortedByCount[0][0]}h` : '—';
+  const quietHour = sortedByCount[sortedByCount.length - 1] ? `${sortedByCount[sortedByCount.length - 1][0]}h` : '—';
 
   return { hourlyDistribution, peakHour, quietHour };
 }
 
 function calculateBusiestDay(conversations: any[], fullDayNames: string[]): string {
-  const dayCounts: Record<number, number> = {};
-  
-  for (let i = 0; i < 7; i++) {
-    dayCounts[i] = 0;
-  }
+  if (conversations.length === 0) return '—';
 
-  conversations.forEach(c => {
-    const dayIndex = getDay(new Date(c.created_at));
-    dayCounts[dayIndex]++;
+  const dayCounts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
+
+  conversations.forEach(conv => {
+    const day = getDay(new Date(conv.created_at));
+    dayCounts[day]++;
   });
 
-  let busiestDayIndex = 0;
-  let maxCount = 0;
+  const maxDay = Object.entries(dayCounts).reduce((max, [day, count]) => 
+    count > max.count ? { day: parseInt(day), count } : max, 
+    { day: 0, count: 0 }
+  );
 
-  Object.entries(dayCounts).forEach(([day, count]) => {
-    if (count > maxCount) {
-      maxCount = count;
-      busiestDayIndex = parseInt(day);
-    }
-  });
-
-  return fullDayNames[busiestDayIndex];
+  return fullDayNames[maxDay.day] || '—';
 }
 
 function getEmptyReportsData(language: string): AgentReportsData {
-  return { 
-    agents: [], 
-    globalMetrics: { 
-      totalConversations: 0, 
-      avgSatisfaction: 0, 
+  return {
+    agents: [],
+    globalMetrics: {
+      totalConversations: 0,
+      avgSatisfaction: 0,
       totalVoiceMinutes: 0,
       successRate: 0,
-      bestPerformingAgent: null, 
-      worstPerformingAgent: null 
+      bestPerformingAgent: null,
+      worstPerformingAgent: null,
     },
     dailyTrends: [],
     hourlyDistribution: [],
