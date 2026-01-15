@@ -65,8 +65,11 @@ serve(async (req) => {
       organizationId: providedOrgId, 
       transcript: externalTranscript,
       platformAgentId,
-      forceRegenerate = false
+      forceRegenerate = false,
+      language = 'fr' // Default to French for backward compatibility
     } = body;
+    
+    const isEnglish = language === 'en';
 
     // Input validation
     if (conversationId && !isValidUUID(conversationId)) {
@@ -253,7 +256,46 @@ serve(async (req) => {
       });
     }
 
-    const analysisPrompt = `Analyse cette conversation client/agent et fournis une évaluation JSON.
+    const analysisPrompt = isEnglish 
+      ? `Analyze this customer/agent conversation and provide a JSON evaluation.
+
+Conversation:
+${optimizedTranscript}
+
+Respond ONLY with valid JSON using this structure:
+{
+  "satisfaction_score": <1.0-10.0>,
+  "satisfaction_reason": "<short justification max 20 words>",
+  "sentiment": "positive" | "negative" | "neutral",
+  "confidence": <0.0-1.0>,
+  "sentiment_timeline": [
+    {"time_percent": 0, "sentiment": "neutral", "reason": "Start"},
+    {"time_percent": 50, "sentiment": "...", "reason": "..."},
+    {"time_percent": 100, "sentiment": "...", "reason": "End"}
+  ],
+  "topics": ["topic1", "topic2"],
+  "intentions": ["intention1"],
+  "smart_tags": ["complaint" | "info_request" | "purchase" | "technical_support" | "appointment" | "billing" | "callback" | "other"],
+  "key_moments": [
+    {"time_percent": <0-100>, "quote": "<short quote>", "significance": "..."}
+  ],
+  "callMetrics": {
+    "talkTime": <0-100>,
+    "silenceTime": <0-100>,
+    "interruptionCount": <number>,
+    "wordsPerMinute": <number>
+  },
+  "summary": "<max 2 sentences>",
+  "improvements": [
+    {
+      "category": "tone" | "response_speed" | "knowledge" | "clarity" | "problem_solving" | "handoff",
+      "priority": "high" | "medium" | "low",
+      "suggestion": "...",
+      "recommended_action": "..."
+    }
+  ]
+}`
+      : `Analyse cette conversation client/agent et fournis une évaluation JSON.
 
 Conversation:
 ${optimizedTranscript}
@@ -305,7 +347,9 @@ Réponds UNIQUEMENT en JSON valide avec cette structure:
         messages: [
           { 
             role: 'system', 
-            content: 'Tu es un expert en analyse de conversations service client. Réponds uniquement en JSON valide.' 
+            content: isEnglish 
+              ? 'You are an expert in customer service conversation analysis. Respond only in valid JSON.'
+              : 'Tu es un expert en analyse de conversations service client. Réponds uniquement en JSON valide.' 
           },
           { role: 'user', content: analysisPrompt }
         ],

@@ -76,7 +76,7 @@ export const GlobalAIAdvice = () => {
     mutationFn: async () => {
       setSyncProgress(language === 'en' ? 'Syncing conversations...' : 'Synchronisation des conversations...');
       const { data, error } = await supabase.functions.invoke('sync-elevenlabs-conversations', {
-        body: { mode: 'all', analyzeConversations: true }
+        body: { mode: 'all', analyzeConversations: true, language }
       });
       if (error) throw error;
       return data;

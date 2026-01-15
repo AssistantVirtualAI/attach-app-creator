@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useLanguage } from '@/context/LanguageContext';
 
 export interface ConversationAnalysis {
   sentiment: 'positive' | 'negative' | 'neutral';
@@ -18,6 +19,7 @@ export interface ConversationAnalysis {
 
 export const useConversationAnalysis = (conversationId: string) => {
   const queryClient = useQueryClient();
+  const { language } = useLanguage();
 
   // Vérifier si l'analyse existe déjà dans les métadonnées
   const { data: conversation } = useQuery({
@@ -41,7 +43,7 @@ export const useConversationAnalysis = (conversationId: string) => {
   const generateAnalysis = useMutation({
     mutationFn: async (conversationId: string) => {
       const { data, error } = await supabase.functions.invoke('analyze-conversation', {
-        body: { conversationId }
+        body: { conversationId, language }
       });
 
       if (error) throw error;
