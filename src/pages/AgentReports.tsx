@@ -147,7 +147,12 @@ const AgentReports = () => {
                 <ThumbsUp className="h-3.5 w-3.5" />
                 {t('reports.metrics.satisfaction')}
               </div>
-              <p className="text-2xl font-bold">{agent.avgSatisfaction.toFixed(1)}<span className="text-sm text-muted-foreground">/10</span></p>
+              <p className="text-2xl font-bold">
+                {agent.avgSatisfaction > 0 
+                  ? <>{agent.avgSatisfaction.toFixed(1)}<span className="text-sm text-muted-foreground">/10</span></>
+                  : <span className="text-muted-foreground text-lg">N/A</span>
+                }
+              </p>
             </div>
             <div className="p-3 rounded-xl bg-muted/30 space-y-1">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -159,9 +164,14 @@ const AgentReports = () => {
             <div className="p-3 rounded-xl bg-muted/30 space-y-1">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Target className="h-3.5 w-3.5" />
-                {t('reports.metrics.resolution')}
+                {agent.resolutionRate > 0 ? t('reports.metrics.resolution') : 'Success'}
               </div>
-              <p className="text-lg font-semibold">{agent.resolutionRate.toFixed(0)}%</p>
+              <p className="text-lg font-semibold">
+                {(agent.resolutionRate > 0 ? agent.resolutionRate : agent.successRate) > 0 
+                  ? `${(agent.resolutionRate > 0 ? agent.resolutionRate : agent.successRate).toFixed(0)}%`
+                  : <span className="text-muted-foreground">N/A</span>
+                }
+              </p>
             </div>
           </div>
 
@@ -468,7 +478,7 @@ const AgentReports = () => {
               </Card>
             ) : (
               <div className="grid gap-6 lg:grid-cols-2">
-                {/* Satisfaction Comparison Chart */}
+                {/* Satisfaction vs Success Rate Comparison Chart */}
                 <Card className="border-0 bg-card shadow-lg">
                   <CardHeader>
                     <CardTitle>{t('reports.satisfactionComparison')}</CardTitle>
@@ -478,20 +488,27 @@ const AgentReports = () => {
                     <ResponsiveContainer width="100%" height={300}>
                       <BarChart data={reportsData?.agents.map(a => ({
                         name: a.agentName.length > 12 ? a.agentName.slice(0, 12) + '...' : a.agentName,
-                        [t('reports.metrics.satisfaction')]: parseFloat(a.avgSatisfaction.toFixed(1)),
-                        [t('reports.metrics.resolution')]: parseFloat(a.resolutionRate.toFixed(0))
+                        // Show satisfaction if available, otherwise show success rate as proxy
+                        [t('reports.metrics.satisfaction')]: a.avgSatisfaction > 0 ? parseFloat(a.avgSatisfaction.toFixed(1)) : null,
+                        'Success Rate': a.successRate > 0 ? parseFloat((a.successRate / 10).toFixed(1)) : null, // Normalize to /10 scale
                       }))}>
                         <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                         <YAxis domain={[0, 10]} />
-                        <Tooltip />
+                        <Tooltip 
+                          formatter={(value, name) => {
+                            if (value === null) return ['N/A', name];
+                            return [name === 'Success Rate' ? `${((value as number) * 10).toFixed(0)}%` : `${value}/10`, name];
+                          }}
+                        />
                         <Legend />
                         <Bar dataKey={t('reports.metrics.satisfaction')} fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
+                        <Bar dataKey="Success Rate" fill="hsl(var(--chart-2))" radius={[6, 6, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
                 </Card>
 
-                {/* Resolution Rate Chart */}
+                {/* Resolution/Success Rate Chart */}
                 <Card className="border-0 bg-card shadow-lg">
                   <CardHeader>
                     <CardTitle>{t('reports.resolutionRate')}</CardTitle>
@@ -499,15 +516,25 @@ const AgentReports = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {reportsData?.agents.map(agent => (
-                        <div key={agent.agentId} className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="font-medium">{agent.agentName}</span>
-                            <span className="font-bold text-primary">{agent.resolutionRate.toFixed(0)}%</span>
+                      {reportsData?.agents.map(agent => {
+                        // Use resolution rate if available, otherwise use success rate from platform
+                        const displayRate = agent.resolutionRate > 0 ? agent.resolutionRate : agent.successRate;
+                        const rateLabel = agent.resolutionRate > 0 ? 'resolution' : 'success';
+                        return (
+                          <div key={agent.agentId} className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="font-medium">{agent.agentName}</span>
+                              <span className="font-bold text-primary">
+                                {displayRate > 0 ? `${displayRate.toFixed(0)}%` : 'N/A'}
+                                {displayRate > 0 && rateLabel === 'success' && (
+                                  <span className="text-xs text-muted-foreground ml-1">(success)</span>
+                                )}
+                              </span>
+                            </div>
+                            <Progress value={displayRate > 0 ? displayRate : 0} className="h-2" />
                           </div>
-                          <Progress value={agent.resolutionRate} className="h-2" />
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </CardContent>
                 </Card>
@@ -570,17 +597,31 @@ const AgentReports = () => {
                   <TrendingUp className="h-5 w-5 text-primary" />
                   {t('reports.conversationEvolution')}
                 </CardTitle>
-                <CardDescription>{t('reports.last7DaysTrend')}</CardDescription>
+                <CardDescription>
+                  {reportsData?.dailyTrends && reportsData.dailyTrends.length > 0 
+                    ? `${reportsData.dailyTrends.length} ${t('reports.daysOfData')}`
+                    : t('reports.last7DaysTrend')}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {reportsData?.dailyTrends && reportsData.dailyTrends.length > 0 ? (
                   <ResponsiveContainer width="100%" height={300}>
                     <AreaChart data={reportsData.dailyTrends}>
-                      <XAxis dataKey="day" />
+                      {/* Use date for longer periods, day for 7 days or less */}
+                      <XAxis 
+                        dataKey={reportsData.dailyTrends.length > 7 ? "date" : "day"} 
+                        tick={{ fontSize: 11 }}
+                        interval={reportsData.dailyTrends.length > 14 ? Math.floor(reportsData.dailyTrends.length / 10) : 0}
+                      />
                       <YAxis />
                       <Tooltip 
                         formatter={(value, name) => [value, name === 'conversations' ? t('reports.conversations') : name]}
-                        labelFormatter={(label) => `${label}`}
+                        labelFormatter={(label, payload) => {
+                          if (payload && payload[0]?.payload) {
+                            return `${payload[0].payload.day} ${payload[0].payload.date}`;
+                          }
+                          return label;
+                        }}
                       />
                       <Legend />
                       <Area type="monotone" dataKey="conversations" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.2)" name={t('reports.conversations')} />
@@ -603,7 +644,11 @@ const AgentReports = () => {
                 {reportsData?.dailyTrends && reportsData.dailyTrends.some(d => d.satisfaction > 0) ? (
                   <ResponsiveContainer width="100%" height={250}>
                     <AreaChart data={reportsData.dailyTrends}>
-                      <XAxis dataKey="day" />
+                      <XAxis 
+                        dataKey={reportsData.dailyTrends.length > 7 ? "date" : "day"} 
+                        tick={{ fontSize: 11 }}
+                        interval={reportsData.dailyTrends.length > 14 ? Math.floor(reportsData.dailyTrends.length / 10) : 0}
+                      />
                       <YAxis domain={[0, 10]} />
                       <Tooltip 
                         formatter={(value) => [`${value}/10`, t('reports.metrics.satisfaction')]}
@@ -612,8 +657,9 @@ const AgentReports = () => {
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                  <div className="h-[250px] flex items-center justify-center flex-col gap-2 text-muted-foreground">
                     <p>{t('reports.noSatisfactionData')}</p>
+                    <p className="text-xs">{t('reports.satisfactionFromLocalData')}</p>
                   </div>
                 )}
               </CardContent>
