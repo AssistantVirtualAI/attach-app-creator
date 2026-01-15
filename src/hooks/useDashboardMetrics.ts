@@ -1,6 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
+import { format } from 'date-fns';
+
+export interface DateRange {
+  start: Date;
+  end: Date;
+}
 
 export interface DashboardMetrics {
   totalConversations: number;
@@ -44,6 +50,14 @@ export interface DashboardMetrics {
   analysisCoverageRate: number;
   topSmartTags: { tag: string; count: number }[];
   topImprovements: { category: string; suggestion: string; count: number }[];
+  // Period comparison
+  periodLabel?: string;
+  previousPeriodLabel?: string;
+  periodComparison?: {
+    conversationsChange: number;
+    satisfactionChange: number;
+    durationChange: number;
+  };
 }
 
 const defaultMetrics: DashboardMetrics = {
@@ -84,15 +98,29 @@ const defaultMetrics: DashboardMetrics = {
   topImprovements: [],
 };
 
-export const useDashboardMetrics = () => {
+export const useDashboardMetrics = (dateRange?: DateRange) => {
   const { selectedOrgId } = useOrganization();
 
+  // Calculate timeframe based on dateRange
+  const getTimeframe = () => {
+    if (!dateRange) return '30d';
+    const diffDays = Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays <= 1) return '1d';
+    if (diffDays <= 7) return '7d';
+    if (diffDays <= 30) return '30d';
+    return '90d';
+  };
+
   return useQuery({
-    queryKey: ['dashboard-metrics', selectedOrgId],
+    queryKey: ['dashboard-metrics', selectedOrgId, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
     queryFn: async (): Promise<DashboardMetrics> => {
       if (!selectedOrgId) {
         return defaultMetrics;
       }
+
+      const timeframe = getTimeframe();
+      const startDate = dateRange ? format(dateRange.start, 'yyyy-MM-dd') : undefined;
+      const endDate = dateRange ? format(dateRange.end, 'yyyy-MM-dd') : undefined;
 
       // Fetch ElevenLabs analytics, conversations, AI insights, and local data in parallel
       const [
@@ -103,12 +131,14 @@ export const useDashboardMetrics = () => {
         agentsRes,
       ] = await Promise.all([
         supabase.functions.invoke('elevenlabs-all-agents-analytics', {
-          body: { timeframe: '30d', includeCharts: true }
+          body: { timeframe, includeCharts: true, startDate, endDate }
         }).catch(() => ({ data: null, error: 'Failed' })),
         supabase.functions.invoke('elevenlabs-all-agents-conversations', {
-          body: { page: 1, limit: 100, action: 'list' }
+          body: { page: 1, limit: 100, action: 'list', startDate, endDate }
         }).catch(() => ({ data: null, error: 'Failed' })),
-        supabase.functions.invoke('dashboard-insights', {}).catch(() => ({ data: null, error: 'Failed' })),
+        supabase.functions.invoke('dashboard-insights', {
+          body: { startDate, endDate }
+        }).catch(() => ({ data: null, error: 'Failed' })),
         supabase
           .from('clients')
           .select('*', { count: 'exact', head: true })

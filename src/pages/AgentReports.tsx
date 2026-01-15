@@ -13,6 +13,8 @@ import { useSendWeeklyReport } from '@/hooks/useWeeklyReport';
 import { useOrganization } from '@/context/OrganizationContext';
 import { AgentAIAdvice } from '@/components/agents/AgentAIAdvice';
 import { GlobalAIAdvice } from '@/components/agents/GlobalAIAdvice';
+import { DateRangeSelector } from '@/components/dashboard/DateRangeSelector';
+import { ReportGenerator } from '@/components/reports/ReportGenerator';
 import { 
   RefreshCw, 
   TrendingUp,
@@ -35,10 +37,12 @@ import {
   Database,
   Mail,
   Calendar,
-  Layers
+  Layers,
+  FileText
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { subDays } from 'date-fns';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 
 const SENTIMENT_COLORS = {
@@ -50,9 +54,14 @@ const SENTIMENT_COLORS = {
 const AgentReports = () => {
   const { selectedOrg } = useOrganization();
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
+  const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
+    start: subDays(new Date(), 7),
+    end: new Date()
+  });
   
   const { data: reportsData, isLoading: isLoadingReports, refetch } = useAgentReports(
-    selectedAgent !== 'all' ? selectedAgent : undefined
+    selectedAgent !== 'all' ? selectedAgent : undefined,
+    dateRange
   );
 
   const { mutate: syncConversations, isPending: isSyncing } = useSyncElevenLabsConversations();
@@ -234,7 +243,12 @@ const AgentReports = () => {
               Statistiques et analyses IA de tous vos agents
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <DateRangeSelector 
+              value={dateRange}
+              onChange={setDateRange}
+              showQuickButtons={true}
+            />
             <Select value={selectedAgent} onValueChange={setSelectedAgent}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Tous les agents" />
@@ -248,13 +262,19 @@ const AgentReports = () => {
                 ))}
               </SelectContent>
             </Select>
+            <ReportGenerator
+              reportsData={reportsData}
+              agents={agents || []}
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+            />
             <Button 
               variant="outline" 
               onClick={() => sendWeeklyReport()}
               disabled={isSendingReport}
             >
               {isSendingReport ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
-              Envoyer rapport
+              Email
             </Button>
             <Button 
               variant="outline" 

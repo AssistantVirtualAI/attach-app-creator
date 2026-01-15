@@ -21,6 +21,18 @@ serve(async (req) => {
       });
     }
 
+    // Parse request body for date range
+    let startDate: string | undefined;
+    let endDate: string | undefined;
+    
+    try {
+      const body = await req.json();
+      startDate = body.startDate;
+      endDate = body.endDate;
+    } catch {
+      // No body or invalid JSON, use defaults
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -56,43 +68,67 @@ serve(async (req) => {
 
     const organizationId = orgMember.organization_id;
 
-    // Get date ranges
+    // Calculate date ranges based on input or defaults
     const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const periodEnd = endDate ? new Date(endDate) : now;
+    const periodStart = startDate 
+      ? new Date(startDate) 
+      : new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    
+    // Calculate previous period for comparison
+    const periodDuration = periodEnd.getTime() - periodStart.getTime();
+    const previousPeriodEnd = periodStart;
+    const previousPeriodStart = new Date(periodStart.getTime() - periodDuration);
 
-    // Fetch insights from last 30 days
-    const { data: insights, error: insightsError } = await serviceClient
+    // Fetch insights for current period
+    const { data: currentInsights, error: currentError } = await serviceClient
       .from('agent_insights')
       .select('*')
       .eq('organization_id', organizationId)
-      .gte('analyzed_at', thirtyDaysAgo)
+      .gte('analyzed_at', periodStart.toISOString())
+      .lte('analyzed_at', periodEnd.toISOString())
       .order('analyzed_at', { ascending: false });
 
-    if (insightsError) {
-      console.error('Error fetching insights:', insightsError);
-      throw insightsError;
+    // Fetch insights for previous period (comparison)
+    const { data: previousInsights } = await serviceClient
+      .from('agent_insights')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .gte('analyzed_at', previousPeriodStart.toISOString())
+      .lt('analyzed_at', previousPeriodEnd.toISOString());
+
+    if (currentError) {
+      console.error('Error fetching insights:', currentError);
+      throw currentError;
     }
 
-    // Fetch total conversations count
-    const { count: totalConversations } = await serviceClient
+    // Fetch total conversations count for current period
+    const { count: currentConversations } = await serviceClient
       .from('conversations')
       .select('*', { count: 'exact', head: true })
       .eq('organization_id', organizationId)
-      .gte('created_at', thirtyDaysAgo);
+      .gte('created_at', periodStart.toISOString())
+      .lte('created_at', periodEnd.toISOString());
 
-    const allInsights = insights || [];
-    const recentInsights = allInsights.filter(i => 
-      new Date(i.analyzed_at || '').getTime() >= new Date(sevenDaysAgo).getTime()
-    );
+    // Fetch total conversations count for previous period
+    const { count: previousConversations } = await serviceClient
+      .from('conversations')
+      .select('*', { count: 'exact', head: true })
+      .eq('organization_id', organizationId)
+      .gte('created_at', previousPeriodStart.toISOString())
+      .lt('created_at', previousPeriodEnd.toISOString());
 
-    // Calculate metrics
+    const allInsights = currentInsights || [];
+    const prevInsights = previousInsights || [];
+
+    // Calculate metrics for a period
     const calcMetrics = (data: typeof allInsights) => {
       if (data.length === 0) {
         return {
           avgSatisfaction: 0,
           sentimentBreakdown: { positive: 0, neutral: 0, negative: 0 },
-          count: 0
+          count: 0,
+          totalDuration: 0
         };
       }
 
@@ -106,11 +142,20 @@ serve(async (req) => {
         negative: data.filter(i => i.overall_sentiment === 'negative').length,
       };
 
-      return { avgSatisfaction, sentimentBreakdown, count: data.length };
+      return { avgSatisfaction, sentimentBreakdown, count: data.length, totalDuration: 0 };
     };
 
-    const metrics7d = calcMetrics(recentInsights);
-    const metrics30d = calcMetrics(allInsights);
+    const currentMetrics = calcMetrics(allInsights);
+    const previousMetrics = calcMetrics(prevInsights);
+
+    // Calculate period comparison
+    const conversationsChange = previousConversations && previousConversations > 0
+      ? Math.round(((currentConversations || 0) - previousConversations) / previousConversations * 100)
+      : 0;
+    
+    const satisfactionChange = previousMetrics.avgSatisfaction > 0
+      ? Math.round((currentMetrics.avgSatisfaction - previousMetrics.avgSatisfaction) * 10) / 10
+      : 0;
 
     // Aggregate smart tags
     const tagCounts: Record<string, number> = {};
@@ -128,7 +173,6 @@ serve(async (req) => {
 
     // Aggregate improvements by category
     const improvementCounts: Record<string, number> = {};
-    const topImprovements: Array<{ category: string; suggestion: string; count: number }> = [];
     const improvementMap: Record<string, { suggestion: string; count: number }> = {};
 
     allInsights.forEach(insight => {
@@ -156,26 +200,50 @@ serve(async (req) => {
       }));
 
     // Coverage rate
-    const coverageRate = totalConversations ? 
-      Math.round((allInsights.length / totalConversations) * 100) : 0;
+    const coverageRate = currentConversations ? 
+      Math.round((allInsights.length / currentConversations) * 100) : 0;
+
+    // Determine overall health based on metrics
+    let overallHealth: 'good' | 'warning' | 'critical' = 'good';
+    if (currentMetrics.avgSatisfaction < 5 || currentMetrics.sentimentBreakdown.negative > currentMetrics.sentimentBreakdown.positive) {
+      overallHealth = 'critical';
+    } else if (currentMetrics.avgSatisfaction < 7 || conversationsChange < -20) {
+      overallHealth = 'warning';
+    }
 
     const response = {
+      // Current period metrics
       period7d: {
-        avgSatisfaction: Math.round(metrics7d.avgSatisfaction * 10) / 10,
-        sentimentBreakdown: metrics7d.sentimentBreakdown,
-        analyzedCount: metrics7d.count
+        avgSatisfaction: Math.round(currentMetrics.avgSatisfaction * 10) / 10,
+        sentimentBreakdown: currentMetrics.sentimentBreakdown,
+        analyzedCount: currentMetrics.count
       },
+      // Full period metrics (same as 7d for custom range)
       period30d: {
-        avgSatisfaction: Math.round(metrics30d.avgSatisfaction * 10) / 10,
-        sentimentBreakdown: metrics30d.sentimentBreakdown,
-        analyzedCount: metrics30d.count
+        avgSatisfaction: Math.round(currentMetrics.avgSatisfaction * 10) / 10,
+        sentimentBreakdown: currentMetrics.sentimentBreakdown,
+        analyzedCount: currentMetrics.count
       },
+      // Period comparison
+      periodComparison: {
+        conversationsChange,
+        satisfactionChange,
+        previousConversations: previousConversations || 0,
+        previousSatisfaction: Math.round(previousMetrics.avgSatisfaction * 10) / 10,
+      },
+      // Top insights
       topTags,
       topImprovements: sortedImprovements,
       improvementsByCategory: improvementCounts,
       coverageRate,
-      totalConversations: totalConversations || 0,
-      lastAnalyzedAt: allInsights[0]?.analyzed_at || null
+      totalConversations: currentConversations || 0,
+      lastAnalyzedAt: allInsights[0]?.analyzed_at || null,
+      // Date range info
+      periodStart: periodStart.toISOString(),
+      periodEnd: periodEnd.toISOString(),
+      // Health indicators
+      overallHealth,
+      healthScore: Math.round((currentMetrics.avgSatisfaction / 10) * 100),
     };
 
     return new Response(JSON.stringify(response), {

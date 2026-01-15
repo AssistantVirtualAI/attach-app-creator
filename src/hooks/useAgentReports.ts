@@ -57,11 +57,16 @@ export interface AgentReportsData {
 
 const DAY_NAMES = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
-export function useAgentReports(selectedAgentId?: string) {
+interface DateRange {
+  start: Date;
+  end: Date;
+}
+
+export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange) {
   const { selectedOrg } = useOrganization();
 
   return useQuery({
-    queryKey: ['agent-reports', selectedOrg?.id, selectedAgentId],
+    queryKey: ['agent-reports', selectedOrg?.id, selectedAgentId, dateRange?.start?.toISOString(), dateRange?.end?.toISOString()],
     queryFn: async (): Promise<AgentReportsData> => {
       if (!selectedOrg?.id) {
         return getEmptyReportsData();
@@ -82,11 +87,18 @@ export function useAgentReports(selectedAgentId?: string) {
         ? agents.filter(a => a.id === selectedAgentId)
         : agents;
 
-      // Fetch local conversations
+      // Fetch local conversations with date filtering
       let conversationsQuery = supabase
         .from('conversations')
         .select('id, agent_id, satisfaction_score, sentiment, duration, smart_tags, resolution_status, created_at, platform')
         .eq('organization_id', selectedOrg.id);
+
+      // Apply date range filter
+      if (dateRange) {
+        conversationsQuery = conversationsQuery
+          .gte('created_at', dateRange.start.toISOString())
+          .lte('created_at', dateRange.end.toISOString());
+      }
 
       if (selectedAgentId && selectedAgentId !== 'all') {
         conversationsQuery = conversationsQuery.eq('agent_id', selectedAgentId);
