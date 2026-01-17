@@ -12,14 +12,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS } from 'date-fns/locale';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const BAAgreement = () => {
+  const { t, language } = useTranslation();
   const { selectedOrg } = useOrganization();
   const { user } = useAuth();
   const [isAgreed, setIsAgreed] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
   const [baaData, setBaaData] = useState<{ baa_signed_at: string | null; baa_signed_by: string | null; hipaa_enabled: boolean } | null>(null);
+
+  const dateLocale = language === 'fr' ? fr : enUS;
 
   useEffect(() => {
     if (selectedOrg) {
@@ -52,25 +56,24 @@ const BAAgreement = () => {
 
       if (error) throw error;
 
-      toast.success('BAA signé avec succès');
+      toast.success(t('messages.baaSignedSuccess'));
       fetchBaaStatus();
     } catch (error) {
       console.error('Error signing BAA:', error);
-      toast.error('Erreur lors de la signature du BAA');
+      toast.error(t('messages.baaSignedError'));
     } finally {
       setIsSigning(false);
     }
   };
 
   const handleDownloadBaa = () => {
-    // Generate a simple BAA PDF (in production, use a proper PDF template)
     const baaContent = `
 BUSINESS ASSOCIATE AGREEMENT (BAA)
 
 This Business Associate Agreement ("Agreement") is entered into by and between:
 
 Organization: ${selectedOrg?.name || 'N/A'}
-Date: ${baaData?.baa_signed_at ? format(new Date(baaData.baa_signed_at), 'dd MMMM yyyy', { locale: fr }) : 'Not signed'}
+Date: ${baaData?.baa_signed_at ? format(new Date(baaData.baa_signed_at), 'dd MMMM yyyy', { locale: dateLocale }) : 'Not signed'}
 
 HIPAA COMPLIANCE TERMS
 
@@ -115,15 +118,14 @@ This agreement is electronically signed and legally binding.
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="w-5 h-5" />
-                Business Associate Agreement (BAA)
+                {t('pages.baa.title')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  Le BAA est disponible uniquement avec l'add-on HIPAA Compliance. 
-                  Activez HIPAA dans la configuration SaaS pour accéder à cette fonctionnalité.
+                  {t('pages.baa.hipaaOnly')}
                 </AlertDescription>
               </Alert>
             </CardContent>
@@ -137,9 +139,9 @@ This agreement is electronically signed and legally binding.
     <AppLayout>
       <div className="container mx-auto px-6 py-8">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2 gradient-text">Business Associate Agreement</h1>
+          <h1 className="text-4xl font-bold mb-2 gradient-text">{t('pages.baa.title')}</h1>
           <p className="text-muted-foreground text-lg">
-            Accord de partenariat commercial pour la conformité HIPAA
+            {t('pages.baa.subtitle')}
           </p>
         </div>
 
@@ -149,20 +151,20 @@ This agreement is electronically signed and legally binding.
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-green-600">
                   <CheckCircle2 className="w-5 h-5" />
-                  BAA Signé
+                  {t('pages.baa.signed')}
                 </CardTitle>
                 <Badge variant="outline" className="text-green-600 border-green-600">
-                  Conforme HIPAA
+                  {t('pages.baa.hipaaCompliant')}
                 </Badge>
               </div>
               <CardDescription>
-                Signé le {format(new Date(baaData.baa_signed_at), 'dd MMMM yyyy à HH:mm', { locale: fr })}
+                {t('pages.baa.signedOn')} {format(new Date(baaData.baa_signed_at), 'dd MMMM yyyy', { locale: dateLocale })}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button variant="outline" onClick={handleDownloadBaa} className="gap-2">
                 <Download className="w-4 h-4" />
-                Télécharger le BAA
+                {t('pages.baa.downloadBaa')}
               </Button>
             </CardContent>
           </Card>
@@ -171,41 +173,44 @@ This agreement is electronically signed and legally binding.
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="w-5 h-5" />
-                Signer le BAA
+                {t('pages.baa.signBaa')}
               </CardTitle>
               <CardDescription>
-                Ce document définit les obligations de protection des données de santé (PHI)
+                {t('pages.baa.documentDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="prose prose-sm dark:prose-invert max-w-none bg-muted/50 p-6 rounded-lg max-h-96 overflow-y-auto">
                 <h3>BUSINESS ASSOCIATE AGREEMENT</h3>
                 
-                <h4>1. DÉFINITIONS</h4>
+                <h4>1. {language === 'fr' ? 'DÉFINITIONS' : 'DEFINITIONS'}</h4>
                 <p>
-                  "Protected Health Information" ou "PHI" désigne les informations de santé 
-                  individuellement identifiables transmises ou maintenues sous toute forme.
+                  {language === 'fr' 
+                    ? '"Protected Health Information" ou "PHI" désigne les informations de santé individuellement identifiables transmises ou maintenues sous toute forme.'
+                    : '"Protected Health Information" or "PHI" means individually identifiable health information transmitted or maintained in any form.'}
                 </p>
 
-                <h4>2. OBLIGATIONS DU BUSINESS ASSOCIATE</h4>
+                <h4>2. {language === 'fr' ? 'OBLIGATIONS DU BUSINESS ASSOCIATE' : 'OBLIGATIONS OF BUSINESS ASSOCIATE'}</h4>
                 <ul>
-                  <li>Ne pas utiliser ou divulguer les PHI autrement que permis par cet Accord</li>
-                  <li>Utiliser des mesures de protection appropriées pour prévenir l'utilisation non autorisée</li>
-                  <li>Signaler toute utilisation ou divulgation non autorisée</li>
-                  <li>S'assurer que les sous-traitants acceptent les mêmes restrictions</li>
+                  <li>{language === 'fr' ? 'Ne pas utiliser ou divulguer les PHI autrement que permis par cet Accord' : 'Not use or disclose PHI other than as permitted by this Agreement'}</li>
+                  <li>{language === 'fr' ? 'Utiliser des mesures de protection appropriées pour prévenir l\'utilisation non autorisée' : 'Use appropriate safeguards to prevent unauthorized use'}</li>
+                  <li>{language === 'fr' ? 'Signaler toute utilisation ou divulgation non autorisée' : 'Report any unauthorized use or disclosure'}</li>
+                  <li>{language === 'fr' ? 'S\'assurer que les sous-traitants acceptent les mêmes restrictions' : 'Ensure subcontractors agree to the same restrictions'}</li>
                 </ul>
 
-                <h4>3. MESURES DE SÉCURITÉ</h4>
+                <h4>3. {language === 'fr' ? 'MESURES DE SÉCURITÉ' : 'SECURITY MEASURES'}</h4>
                 <ul>
-                  <li>Chiffrement au repos (AES-256)</li>
-                  <li>Chiffrement en transit (TLS 1.3)</li>
-                  <li>Journalisation d'audit de tous les accès aux PHI</li>
-                  <li>Contrôles d'accès et authentification</li>
+                  <li>{language === 'fr' ? 'Chiffrement au repos (AES-256)' : 'Encryption at rest (AES-256)'}</li>
+                  <li>{language === 'fr' ? 'Chiffrement en transit (TLS 1.3)' : 'Encryption in transit (TLS 1.3)'}</li>
+                  <li>{language === 'fr' ? 'Journalisation d\'audit de tous les accès aux PHI' : 'Audit logging of all PHI access'}</li>
+                  <li>{language === 'fr' ? 'Contrôles d\'accès et authentification' : 'Access controls and authentication'}</li>
                 </ul>
 
-                <h4>4. RÉSILIATION</h4>
+                <h4>4. {language === 'fr' ? 'RÉSILIATION' : 'TERMINATION'}</h4>
                 <p>
-                  À la résiliation, le Business Associate devra retourner ou détruire tous les PHI.
+                  {language === 'fr' 
+                    ? 'À la résiliation, le Business Associate devra retourner ou détruire tous les PHI.'
+                    : 'Upon termination, Business Associate shall return or destroy all PHI.'}
                 </p>
               </div>
 
@@ -216,19 +221,18 @@ This agreement is electronically signed and legally binding.
                   onCheckedChange={(checked) => setIsAgreed(checked as boolean)}
                 />
                 <Label htmlFor="agree" className="text-sm leading-relaxed cursor-pointer">
-                  J'ai lu et j'accepte les termes du Business Associate Agreement. Je comprends que 
-                  cette signature électronique est juridiquement contraignante et engage mon organisation.
+                  {t('pages.baa.agreementText')}
                 </Label>
               </div>
 
               <div className="flex gap-4">
                 <Button onClick={handleSignBaa} disabled={!isAgreed || isSigning} className="gap-2">
                   {isSigning ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                  Signer le BAA
+                  {t('pages.baa.signBaa')}
                 </Button>
                 <Button variant="outline" onClick={handleDownloadBaa} className="gap-2">
                   <Download className="w-4 h-4" />
-                  Télécharger (non signé)
+                  {t('pages.baa.downloadUnsigned')}
                 </Button>
               </div>
             </CardContent>

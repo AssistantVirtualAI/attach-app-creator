@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Check, Loader2, Sparkles } from 'lucide-react';
 import { PLANS, useBillingConfig } from '@/hooks/useBillingConfig';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface PricingCardsProps {
   currentPlanId: string;
@@ -14,6 +15,7 @@ interface PricingCardsProps {
 }
 
 export const PricingCards = ({ currentPlanId, onSelectPlan, isLoading }: PricingCardsProps) => {
+  const { t, language } = useTranslation();
   const [isAnnual, setIsAnnual] = useState(true);
   const { getAnnualSavings } = useBillingConfig();
 
@@ -21,15 +23,17 @@ export const PricingCards = ({ currentPlanId, onSelectPlan, isLoading }: Pricing
     <div className="space-y-6">
       {/* Billing toggle */}
       <div className="flex items-center justify-center gap-4">
-        <span className={cn("text-sm", !isAnnual && "font-semibold")}>Mensuel</span>
+        <span className={cn("text-sm", !isAnnual && "font-semibold")}>
+          {language === 'fr' ? 'Mensuel' : 'Monthly'}
+        </span>
         <Switch
           checked={isAnnual}
           onCheckedChange={setIsAnnual}
         />
         <span className={cn("text-sm", isAnnual && "font-semibold")}>
-          Annuel
+          {language === 'fr' ? 'Annuel' : 'Annual'}
           <Badge variant="secondary" className="ml-2 bg-green-500/10 text-green-600">
-            Économisez jusqu'à 20%
+            {language === 'fr' ? 'Économisez jusqu\'à 20%' : 'Save up to 20%'}
           </Badge>
         </span>
       </div>
@@ -55,12 +59,12 @@ export const PricingCards = ({ currentPlanId, onSelectPlan, isLoading }: Pricing
               {plan.popular && (
                 <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary">
                   <Sparkles className="h-3 w-3 mr-1" />
-                  Plus populaire
+                  {language === 'fr' ? 'Plus populaire' : 'Most Popular'}
                 </Badge>
               )}
               {isCurrent && (
                 <Badge className="absolute -top-3 right-4 bg-green-500">
-                  Plan actuel
+                  {language === 'fr' ? 'Plan actuel' : 'Current Plan'}
                 </Badge>
               )}
 
@@ -68,21 +72,25 @@ export const PricingCards = ({ currentPlanId, onSelectPlan, isLoading }: Pricing
                 <CardTitle className="text-xl">{plan.name}</CardTitle>
                 <CardDescription>
                   {plan.price === 0 ? (
-                    <span className="text-4xl font-bold text-foreground">Gratuit</span>
+                    <span className="text-4xl font-bold text-foreground">
+                      {language === 'fr' ? 'Gratuit' : 'Free'}
+                    </span>
                   ) : (
                     <>
                       <span className="text-4xl font-bold text-foreground">
                         ${isAnnual ? Math.round(price / 12) : price}
                       </span>
-                      <span className="text-muted-foreground">/mois</span>
+                      <span className="text-muted-foreground">
+                        {language === 'fr' ? '/mois' : '/month'}
+                      </span>
                       {isAnnual && price > 0 && (
                         <div className="mt-1">
                           <span className="text-xs text-muted-foreground">
-                            ${price}/an
+                            ${price}{language === 'fr' ? '/an' : '/year'}
                           </span>
                           {savings > 0 && (
                             <Badge variant="outline" className="ml-2 text-xs text-green-600 border-green-600/30">
-                              Économisez ${savings}
+                              {language === 'fr' ? 'Économisez' : 'Save'} ${savings}
                             </Badge>
                           )}
                         </div>
@@ -97,10 +105,10 @@ export const PricingCards = ({ currentPlanId, onSelectPlan, isLoading }: Pricing
                 {plan.clientsIncluded > 0 && (
                   <div className="text-center p-2 bg-muted/50 rounded-lg">
                     <span className="text-2xl font-bold text-primary">{plan.clientsIncluded}</span>
-                    <span className="text-sm text-muted-foreground"> clients inclus</span>
+                    <span className="text-sm text-muted-foreground"> {language === 'fr' ? 'clients inclus' : 'clients included'}</span>
                     {plan.additionalClientPrice && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        +${plan.additionalClientPrice}/client additionnel
+                        +${plan.additionalClientPrice}/{language === 'fr' ? 'client additionnel' : 'additional client'}
                       </p>
                     )}
                   </div>
@@ -124,13 +132,13 @@ export const PricingCards = ({ currentPlanId, onSelectPlan, isLoading }: Pricing
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : isCurrent ? (
-                    'Plan actuel'
+                    language === 'fr' ? 'Plan actuel' : 'Current Plan'
                   ) : plan.price === 0 ? (
-                    'Plan gratuit'
+                    language === 'fr' ? 'Plan gratuit' : 'Free Plan'
                   ) : isUpgrade ? (
-                    'Passer à ce plan'
+                    language === 'fr' ? 'Passer à ce plan' : 'Upgrade to this plan'
                   ) : (
-                    'Sélectionner'
+                    language === 'fr' ? 'Sélectionner' : 'Select'
                   )}
                 </Button>
               </CardContent>
