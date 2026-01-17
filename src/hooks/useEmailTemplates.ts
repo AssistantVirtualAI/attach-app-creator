@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export interface EmailTemplate {
   id: string;
@@ -15,27 +16,28 @@ export interface EmailTemplate {
 }
 
 export const TEMPLATE_TYPES = [
-  { value: 'welcome', label: 'Bienvenue', description: 'Email envoyé aux nouveaux utilisateurs' },
-  { value: 'password_reset', label: 'Réinitialisation mot de passe', description: 'Email de réinitialisation' },
-  { value: '2fa', label: 'Authentification 2FA', description: 'Code OTP pour authentification à deux facteurs' },
-  { value: 'invitation', label: 'Invitation', description: 'Invitation à rejoindre l\'organisation' },
-  { value: 'notification', label: 'Notification', description: 'Notifications générales' },
-  { value: 'report', label: 'Rapport', description: 'Rapports périodiques' },
+  { value: 'welcome', label: 'Welcome', description: 'Email sent to new users' },
+  { value: 'password_reset', label: 'Password Reset', description: 'Password reset email' },
+  { value: '2fa', label: '2FA Authentication', description: 'OTP code for two-factor authentication' },
+  { value: 'invitation', label: 'Invitation', description: 'Invitation to join the organization' },
+  { value: 'notification', label: 'Notification', description: 'General notifications' },
+  { value: 'report', label: 'Report', description: 'Periodic reports' },
 ];
 
 export const TEMPLATE_VARIABLES = [
-  { variable: '{{name}}', description: 'Nom du destinataire' },
-  { variable: '{{email}}', description: 'Email du destinataire' },
-  { variable: '{{company}}', description: 'Nom de l\'entreprise' },
-  { variable: '{{link}}', description: 'Lien d\'action' },
-  { variable: '{{date}}', description: 'Date actuelle' },
-  { variable: '{{otp_code}}', description: 'Code OTP à 6 chiffres' },
-  { variable: '{{token}}', description: 'Token de validation' },
+  { variable: '{{name}}', description: 'Recipient name' },
+  { variable: '{{email}}', description: 'Recipient email' },
+  { variable: '{{company}}', description: 'Company name' },
+  { variable: '{{link}}', description: 'Action link' },
+  { variable: '{{date}}', description: 'Current date' },
+  { variable: '{{otp_code}}', description: '6-digit OTP code' },
+  { variable: '{{token}}', description: 'Validation token' },
 ];
 
 export function useEmailTemplates() {
   const { selectedOrg: selectedOrganization } = useOrganization();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ['email-templates', selectedOrganization?.id],
@@ -56,7 +58,7 @@ export function useEmailTemplates() {
 
   const createTemplate = useMutation({
     mutationFn: async (template: Partial<EmailTemplate>) => {
-      if (!selectedOrganization?.id) throw new Error('No organization selected');
+      if (!selectedOrganization?.id) throw new Error(t('messages.noOrganization'));
 
       const { data, error } = await supabase
         .from('email_templates')
@@ -75,10 +77,10 @@ export function useEmailTemplates() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['email-templates'] });
-      toast.success('Template créé avec succès');
+      toast.success(t('messages.templateCreated'));
     },
     onError: (error: Error) => {
-      toast.error('Erreur: ' + error.message);
+      toast.error(`${t('common.error')}: ${error.message}`);
     },
   });
 
@@ -96,10 +98,10 @@ export function useEmailTemplates() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['email-templates'] });
-      toast.success('Template mis à jour');
+      toast.success(t('messages.templateUpdated'));
     },
     onError: (error: Error) => {
-      toast.error('Erreur: ' + error.message);
+      toast.error(`${t('common.error')}: ${error.message}`);
     },
   });
 
@@ -114,10 +116,10 @@ export function useEmailTemplates() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['email-templates'] });
-      toast.success('Template supprimé');
+      toast.success(t('messages.templateDeleted'));
     },
     onError: (error: Error) => {
-      toast.error('Erreur: ' + error.message);
+      toast.error(`${t('common.error')}: ${error.message}`);
     },
   });
 

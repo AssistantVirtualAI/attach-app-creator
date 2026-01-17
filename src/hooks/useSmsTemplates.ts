@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrganization } from "@/context/OrganizationContext";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export interface SmsTemplate {
   id: string;
@@ -17,6 +18,7 @@ export interface SmsTemplate {
 
 export function useSmsTemplates() {
   const { selectedOrg } = useOrganization();
+  const { t } = useTranslation();
   const [templates, setTemplates] = useState<SmsTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -35,7 +37,7 @@ export function useSmsTemplates() {
       setTemplates((data as SmsTemplate[]) || []);
     } catch (error) {
       console.error("Error fetching SMS templates:", error);
-      toast.error("Erreur lors du chargement des templates");
+      toast.error(t('messages.templateLoadError'));
     } finally {
       setIsLoading(false);
     }
@@ -59,11 +61,11 @@ export function useSmsTemplates() {
       }]);
 
       if (error) throw error;
-      toast.success("Template créé avec succès");
+      toast.success(t('messages.templateCreated'));
       fetchTemplates();
     } catch (error) {
       console.error("Error creating SMS template:", error);
-      toast.error("Erreur lors de la création du template");
+      toast.error(t('messages.createError'));
     }
   };
 
@@ -75,11 +77,11 @@ export function useSmsTemplates() {
         .eq("id", id);
 
       if (error) throw error;
-      toast.success("Template mis à jour");
+      toast.success(t('messages.templateUpdated'));
       fetchTemplates();
     } catch (error) {
       console.error("Error updating SMS template:", error);
-      toast.error("Erreur lors de la mise à jour");
+      toast.error(t('messages.updateError'));
     }
   };
 
@@ -91,11 +93,11 @@ export function useSmsTemplates() {
         .eq("id", id);
 
       if (error) throw error;
-      toast.success("Template supprimé");
+      toast.success(t('messages.templateDeleted'));
       fetchTemplates();
     } catch (error) {
       console.error("Error deleting SMS template:", error);
-      toast.error("Erreur lors de la suppression");
+      toast.error(t('messages.deleteError'));
     }
   };
 

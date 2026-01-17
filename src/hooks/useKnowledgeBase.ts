@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export interface KnowledgeBaseItem {
   id: string;
@@ -17,7 +18,7 @@ export interface KnowledgeBaseItem {
   updated_at: string;
 }
 
-// Récupérer tous les articles
+// Fetch all articles
 export const useKnowledgeBase = () => {
   return useQuery({
     queryKey: ['knowledge-base'],
@@ -33,7 +34,7 @@ export const useKnowledgeBase = () => {
   });
 };
 
-// Récupérer les catégories uniques
+// Fetch unique categories
 export const useKnowledgeBaseCategories = () => {
   return useQuery({
     queryKey: ['knowledge-base-categories'],
@@ -51,7 +52,7 @@ export const useKnowledgeBaseCategories = () => {
   });
 };
 
-// Recherche full-text
+// Full-text search
 export const useKnowledgeBaseSearch = (searchTerm: string, category: string = 'all') => {
   return useQuery({
     queryKey: ['knowledge-base-search', searchTerm, category],
@@ -60,12 +61,12 @@ export const useKnowledgeBaseSearch = (searchTerm: string, category: string = 'a
         .from('knowledge_base_items')
         .select('*');
 
-      // Filtre par catégorie
+      // Filter by category
       if (category !== 'all') {
         query = query.eq('category', category);
       }
 
-      // Recherche full-text si terme présent
+      // Full-text search if term is present
       if (searchTerm) {
         query = query.textSearch('search_vector', searchTerm, {
           type: 'websearch',
@@ -82,14 +83,15 @@ export const useKnowledgeBaseSearch = (searchTerm: string, category: string = 'a
   });
 };
 
-// Créer un article
+// Create an article
 export const useCreateKnowledgeBaseItem = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: async (item: Omit<KnowledgeBaseItem, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'usage_count' | 'is_synced' | 'last_synced_at' | 'elevenlabs_id'>) => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Non authentifié');
+      if (!user) throw new Error(t('messages.notAuthenticated'));
 
       const { data, error } = await supabase
         .from('knowledge_base_items')
@@ -106,17 +108,18 @@ export const useCreateKnowledgeBaseItem = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['knowledge-base'] });
       queryClient.invalidateQueries({ queryKey: ['knowledge-base-categories'] });
-      toast.success('Article créé avec succès');
+      toast.success(t('messages.articleCreated'));
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Erreur lors de la création');
+      toast.error(error.message || t('messages.createError'));
     },
   });
 };
 
-// Mettre à jour un article
+// Update an article
 export const useUpdateKnowledgeBaseItem = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<KnowledgeBaseItem> & { id: string }) => {
@@ -132,17 +135,18 @@ export const useUpdateKnowledgeBaseItem = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['knowledge-base'] });
-      toast.success('Article mis à jour');
+      toast.success(t('messages.articleUpdated'));
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Erreur lors de la mise à jour');
+      toast.error(error.message || t('messages.updateError'));
     },
   });
 };
 
-// Supprimer un article
+// Delete an article
 export const useDeleteKnowledgeBaseItem = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -155,21 +159,22 @@ export const useDeleteKnowledgeBaseItem = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['knowledge-base'] });
-      toast.success('Article supprimé');
+      toast.success(t('messages.articleDeleted'));
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Erreur lors de la suppression');
+      toast.error(error.message || t('messages.deleteError'));
     },
   });
 };
 
-// Synchroniser avec ElevenLabs
+// Sync with ElevenLabs
 export const useSyncKnowledgeBase = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: async () => {
-      // Récupérer tous les articles non synchronisés
+      // Fetch all unsynchronized articles
       const { data: items } = await supabase
         .from('knowledge_base_items')
         .select('*')
@@ -179,7 +184,7 @@ export const useSyncKnowledgeBase = () => {
         return { synced: 0 };
       }
 
-      // Appeler l'Edge Function pour synchroniser
+      // Call Edge Function to sync
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
         body: { 
           action: 'sync',
@@ -194,7 +199,7 @@ export const useSyncKnowledgeBase = () => {
 
       if (error) throw error;
 
-      // Marquer les articles comme synchronisés
+      // Mark articles as synchronized
       const { error: updateError } = await supabase
         .from('knowledge_base_items')
         .update({ 
@@ -209,10 +214,10 @@ export const useSyncKnowledgeBase = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['knowledge-base'] });
-      toast.success(`${data.synced || 0} articles synchronisés avec ElevenLabs`);
+      toast.success(`${data.synced || 0} ${t('messages.syncedToElevenlabs')}`);
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Erreur lors de la synchronisation');
+      toast.error(error.message || t('messages.syncError'));
     },
   });
 };

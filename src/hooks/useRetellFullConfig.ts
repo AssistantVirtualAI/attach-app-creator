@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export interface RetellAgentConfig {
   agent_id: string;
@@ -123,6 +124,7 @@ export function useRetellVoices({ organizationId, apiKey }: { organizationId: st
 // Update agent settings
 export function useUpdateRetellAgent() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: async ({
@@ -153,10 +155,10 @@ export function useUpdateRetellAgent() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['retell-full-config', variables.agentId] });
-      toast.success('Configuration agent mise à jour');
+      toast.success(t('messages.agentConfigUpdated'));
     },
     onError: (error: Error) => {
-      toast.error(`Erreur: ${error.message}`);
+      toast.error(`${t('common.error')}: ${error.message}`);
     },
   });
 }
@@ -164,6 +166,7 @@ export function useUpdateRetellAgent() {
 // Update LLM settings (prompt, temperature, etc.)
 export function useUpdateRetellLLM() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: async ({
@@ -196,10 +199,10 @@ export function useUpdateRetellLLM() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['retell-full-config', variables.agentId] });
-      toast.success('Configuration LLM mise à jour');
+      toast.success(t('messages.llmSettingsUpdated'));
     },
     onError: (error: Error) => {
-      toast.error(`Erreur: ${error.message}`);
+      toast.error(`${t('common.error')}: ${error.message}`);
     },
   });
 }

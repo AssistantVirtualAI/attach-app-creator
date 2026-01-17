@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export interface Lead {
   id: string;
@@ -25,6 +26,7 @@ export interface Lead {
 export function useLeads() {
   const { selectedOrg } = useOrganization();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const { data: leads, isLoading } = useQuery({
     queryKey: ['leads', selectedOrg?.id],
@@ -45,7 +47,7 @@ export function useLeads() {
 
   const createLead = useMutation({
     mutationFn: async (lead: Partial<Lead>) => {
-      if (!selectedOrg?.id) throw new Error('No organization selected');
+      if (!selectedOrg?.id) throw new Error(t('messages.noOrganization'));
 
       const { data, error } = await supabase
         .from('leads')
@@ -70,7 +72,7 @@ export function useLeads() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      toast.success('Lead créé');
+      toast.success(t('messages.leadCreated'));
     }
   });
 
@@ -94,7 +96,7 @@ export function useLeads() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      toast.success('Lead mis à jour');
+      toast.success(t('messages.leadUpdated'));
     }
   });
 
@@ -109,7 +111,7 @@ export function useLeads() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      toast.success('Lead supprimé');
+      toast.success(t('messages.leadDeleted'));
     }
   });
 

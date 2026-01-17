@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export interface WebhookEndpoint {
   id: string;
@@ -46,6 +47,7 @@ const generateSecret = () => {
 export const useWebhookEndpoints = () => {
   const { selectedOrgId } = useOrganization();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const endpointsQuery = useQuery({
     queryKey: ['webhook-endpoints', selectedOrgId],
@@ -87,7 +89,7 @@ export const useWebhookEndpoints = () => {
 
   const createEndpoint = useMutation({
     mutationFn: async ({ url, events }: { url: string; events: string[] }) => {
-      if (!selectedOrgId) throw new Error('No organization selected');
+      if (!selectedOrgId) throw new Error(t('messages.noOrganization'));
       
       const secret = generateSecret();
       
@@ -108,10 +110,10 @@ export const useWebhookEndpoints = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhook-endpoints'] });
-      toast.success('Webhook endpoint créé');
+      toast.success(t('messages.webhookCreated'));
     },
     onError: (error) => {
-      toast.error('Erreur lors de la création du webhook');
+      toast.error(t('messages.createError'));
       console.error(error);
     },
   });
@@ -130,10 +132,10 @@ export const useWebhookEndpoints = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhook-endpoints'] });
-      toast.success('Webhook endpoint mis à jour');
+      toast.success(t('messages.webhookUpdated'));
     },
     onError: (error) => {
-      toast.error('Erreur lors de la mise à jour');
+      toast.error(t('messages.updateError'));
       console.error(error);
     },
   });
@@ -149,10 +151,10 @@ export const useWebhookEndpoints = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhook-endpoints'] });
-      toast.success('Webhook endpoint supprimé');
+      toast.success(t('messages.webhookDeleted'));
     },
     onError: (error) => {
-      toast.error('Erreur lors de la suppression');
+      toast.error(t('messages.deleteError'));
       console.error(error);
     },
   });
@@ -173,10 +175,10 @@ export const useWebhookEndpoints = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhook-endpoints'] });
-      toast.success('Secret régénéré');
+      toast.success(t('messages.secretRegenerated'));
     },
     onError: (error) => {
-      toast.error('Erreur lors de la régénération');
+      toast.error(t('messages.updateError'));
       console.error(error);
     },
   });

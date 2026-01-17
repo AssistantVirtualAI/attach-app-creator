@@ -2,10 +2,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export const useCalendarIntegration = () => {
   const { selectedOrg } = useOrganization();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const { data: integration, isLoading } = useQuery({
     queryKey: ['calendar-integration', selectedOrg?.id],
@@ -28,7 +30,7 @@ export const useCalendarIntegration = () => {
 
   const connectGoogle = useMutation({
     mutationFn: async () => {
-      if (!selectedOrg?.id) throw new Error('No organization selected');
+      if (!selectedOrg?.id) throw new Error(t('messages.noOrganization'));
 
       const redirectUri = `${window.location.origin}/settings?tab=integrations&callback=google`;
       
@@ -50,13 +52,13 @@ export const useCalendarIntegration = () => {
       window.location.href = data.authUrl;
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to initiate Google Calendar connection');
+      toast.error(error.message || t('messages.calendarError'));
     }
   });
 
   const exchangeCode = useMutation({
     mutationFn: async (code: string) => {
-      if (!selectedOrg?.id) throw new Error('No organization selected');
+      if (!selectedOrg?.id) throw new Error(t('messages.noOrganization'));
 
       const redirectUri = `${window.location.origin}/settings?tab=integrations&callback=google`;
 
@@ -76,16 +78,16 @@ export const useCalendarIntegration = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['calendar-integration'] });
-      toast.success('Google Calendar connecté avec succès');
+      toast.success(t('messages.calendarConnected'));
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to connect Google Calendar');
+      toast.error(error.message || t('messages.calendarError'));
     }
   });
 
   const disconnect = useMutation({
     mutationFn: async () => {
-      if (!selectedOrg?.id) throw new Error('No organization selected');
+      if (!selectedOrg?.id) throw new Error(t('messages.noOrganization'));
 
       const { data, error } = await supabase.functions.invoke('google-calendar-auth', {
         body: {
@@ -99,10 +101,10 @@ export const useCalendarIntegration = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['calendar-integration'] });
-      toast.success('Google Calendar déconnecté');
+      toast.success(t('messages.calendarDisconnected'));
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to disconnect calendar');
+      toast.error(error.message || t('messages.calendarError'));
     }
   });
 

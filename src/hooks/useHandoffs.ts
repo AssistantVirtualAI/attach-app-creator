@@ -4,6 +4,7 @@ import { useOrganization } from '@/context/OrganizationContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export interface HandoffRequest {
   id: string;
@@ -31,6 +32,7 @@ export function useHandoffs() {
   const { selectedOrg } = useOrganization();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [isAvailable, setIsAvailableState] = useState(true);
 
   const { data: handoffs, isLoading } = useQuery({
@@ -78,8 +80,8 @@ export function useHandoffs() {
           queryClient.invalidateQueries({ queryKey: ['handoffs'] });
           
           if (payload.eventType === 'INSERT') {
-            toast.info('Nouvelle demande de handoff', {
-              description: 'Un client demande à parler à un agent humain'
+            toast.info(t('handoffs.newRequest'), {
+              description: t('handoffs.customerWantsHuman')
             });
           }
         }
@@ -89,7 +91,7 @@ export function useHandoffs() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedOrg?.id, queryClient]);
+  }, [selectedOrg?.id, queryClient, t]);
 
   const acceptHandoff = useMutation({
     mutationFn: async (id: string) => {
@@ -106,7 +108,7 @@ export function useHandoffs() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['handoffs'] });
-      toast.success('Handoff accepté');
+      toast.success(t('handoffs.accepted'));
     }
   });
 
@@ -121,7 +123,7 @@ export function useHandoffs() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['handoffs'] });
-      toast.success('Handoff rejeté');
+      toast.success(t('handoffs.rejected'));
     }
   });
 
@@ -139,7 +141,7 @@ export function useHandoffs() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['handoffs'] });
-      toast.success('Handoff terminé');
+      toast.success(t('handoffs.completed'));
     }
   });
 
@@ -186,7 +188,7 @@ export function useHandoffs() {
 
   const setAvailability = (available: boolean) => {
     setIsAvailableState(available);
-    toast.success(available ? 'Vous êtes maintenant disponible' : 'Vous êtes maintenant indisponible');
+    toast.success(available ? t('handoffs.nowAvailable') : t('handoffs.nowUnavailable'));
   };
 
   return {

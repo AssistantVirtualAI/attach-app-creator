@@ -3,15 +3,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { toast } from 'sonner';
 import { useBillingConfig } from './useBillingConfig';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export function useStripeSubscription() {
   const { selectedOrg: selectedOrganization } = useOrganization();
   const { refetch } = useBillingConfig();
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
 
   const createCheckoutSession = async (priceId: string) => {
     if (!selectedOrganization?.id) {
-      toast.error('Aucune organisation sélectionnée');
+      toast.error(t('messages.noOrganization'));
       return;
     }
 
@@ -33,7 +35,7 @@ export function useStripeSubscription() {
       }
     } catch (error: any) {
       console.error('Checkout error:', error);
-      toast.error('Erreur lors de la création du paiement');
+      toast.error(t('messages.paymentError'));
     } finally {
       setIsLoading(false);
     }
@@ -41,7 +43,7 @@ export function useStripeSubscription() {
 
   const openCustomerPortal = async () => {
     if (!selectedOrganization?.id) {
-      toast.error('Aucune organisation sélectionnée');
+      toast.error(t('messages.noOrganization'));
       return;
     }
 
@@ -61,7 +63,7 @@ export function useStripeSubscription() {
       }
     } catch (error: any) {
       console.error('Portal error:', error);
-      toast.error('Erreur lors de l\'accès au portail');
+      toast.error(t('messages.portalError'));
     } finally {
       setIsLoading(false);
     }
