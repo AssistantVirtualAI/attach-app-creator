@@ -9,13 +9,17 @@ import { Download, Trash2, AlertTriangle, Shield, FileText, Loader2 } from 'luci
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export const PrivacyTab = () => {
   const { user } = useAuth();
+  const { t, language } = useTranslation();
   const [isExporting, setIsExporting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const deleteConfirmWord = language === 'fr' ? 'SUPPRIMER' : 'DELETE';
 
   const handleExportData = async () => {
     if (!user) return;
@@ -30,23 +34,23 @@ export const PrivacyTab = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `mes-donnees-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `${language === 'fr' ? 'mes-donnees' : 'my-data'}-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success('Vos données ont été exportées avec succès');
+      toast.success(t('messages.dataExported'));
     } catch (error) {
       console.error('Export error:', error);
-      toast.error("Erreur lors de l'export des données");
+      toast.error(t('messages.dataExportError'));
     } finally {
       setIsExporting(false);
     }
   };
 
   const handleDeleteAccount = async () => {
-    if (!user || deleteConfirmation !== 'SUPPRIMER') return;
+    if (!user || deleteConfirmation !== deleteConfirmWord) return;
     setIsDeleting(true);
 
     try {
@@ -54,11 +58,11 @@ export const PrivacyTab = () => {
       
       if (error) throw error;
 
-      toast.success('Votre demande de suppression a été enregistrée. Vous recevrez un email de confirmation.');
+      toast.success(t('messages.deletionRequested'));
       setShowDeleteDialog(false);
     } catch (error) {
       console.error('Delete error:', error);
-      toast.error('Erreur lors de la demande de suppression');
+      toast.error(t('messages.deletionError'));
     } finally {
       setIsDeleting(false);
     }
@@ -70,33 +74,33 @@ export const PrivacyTab = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="w-5 h-5" />
-            Vos droits RGPD
+            {t('pages.privacy.gdprRights')}
           </CardTitle>
           <CardDescription>
-            Conformément au Règlement Général sur la Protection des Données (RGPD), vous disposez de droits sur vos données personnelles.
+            {t('pages.privacy.gdprDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <Card className="p-4">
-              <h4 className="font-medium mb-2">Droit d'accès</h4>
+              <h4 className="font-medium mb-2">{t('pages.privacy.accessRight')}</h4>
               <p className="text-sm text-muted-foreground mb-4">
-                Vous pouvez demander une copie de toutes vos données personnelles que nous détenons.
+                {t('pages.privacy.accessDescription')}
               </p>
               <Button onClick={handleExportData} disabled={isExporting} className="gap-2">
                 {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                Exporter mes données
+                {t('pages.privacy.exportMyData')}
               </Button>
             </Card>
 
             <Card className="p-4">
-              <h4 className="font-medium mb-2">Droit à l'effacement</h4>
+              <h4 className="font-medium mb-2">{t('pages.privacy.erasureRight')}</h4>
               <p className="text-sm text-muted-foreground mb-4">
-                Vous pouvez demander la suppression de votre compte et de toutes vos données.
+                {t('pages.privacy.erasureDescription')}
               </p>
               <Button variant="destructive" onClick={() => setShowDeleteDialog(true)} className="gap-2">
                 <Trash2 className="w-4 h-4" />
-                Supprimer mon compte
+                {t('pages.privacy.deleteAccount')}
               </Button>
             </Card>
           </div>
@@ -107,16 +111,16 @@ export const PrivacyTab = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" />
-            Documents légaux
+            {t('pages.privacy.legalDocuments')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-4">
             <Button variant="outline" asChild>
-              <a href="/privacy" target="_blank">Politique de confidentialité</a>
+              <a href="/privacy" target="_blank">{t('pages.privacy.privacyPolicy')}</a>
             </Button>
             <Button variant="outline" asChild>
-              <a href="/terms" target="_blank">Conditions d'utilisation</a>
+              <a href="/terms" target="_blank">{t('pages.privacy.termsOfUse')}</a>
             </Button>
           </div>
         </CardContent>
@@ -127,40 +131,40 @@ export const PrivacyTab = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="w-5 h-5" />
-              Supprimer votre compte
+              {t('pages.privacy.deleteAccountTitle')}
             </DialogTitle>
             <DialogDescription>
-              Cette action est irréversible. Toutes vos données seront supprimées après une période de grâce de 30 jours.
+              {t('pages.privacy.deleteWarning')}
             </DialogDescription>
           </DialogHeader>
 
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              Vous perdrez l'accès à toutes vos conversations, agents, et configurations. Les données liées à votre organisation seront anonymisées.
+              {t('pages.privacy.deleteConsequences')}
             </AlertDescription>
           </Alert>
 
           <div className="space-y-2">
-            <Label>Tapez SUPPRIMER pour confirmer</Label>
+            <Label>{t('pages.privacy.typeToConfirm')}</Label>
             <Input 
               value={deleteConfirmation}
               onChange={(e) => setDeleteConfirmation(e.target.value)}
-              placeholder="SUPPRIMER"
+              placeholder={deleteConfirmWord}
             />
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-              Annuler
+              {t('common.cancel')}
             </Button>
             <Button 
               variant="destructive" 
               onClick={handleDeleteAccount}
-              disabled={deleteConfirmation !== 'SUPPRIMER' || isDeleting}
+              disabled={deleteConfirmation !== deleteConfirmWord || isDeleting}
             >
               {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Confirmer la suppression
+              {t('pages.privacy.confirmDeletion')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -41,6 +41,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ClientAvatar } from "./ClientAvatar";
 import { toast } from "sonner";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface ClientMembersModalProps {
   open: boolean;
@@ -64,6 +65,7 @@ export const ClientMembersModal = ({
   enforceMemberLimit = false,
 }: ClientMembersModalProps) => {
   const queryClient = useQueryClient();
+  const { t, language } = useTranslation();
   const [newMember, setNewMember] = useState({ email: "", name: "", role: "member" });
   const [showRequestDialog, setShowRequestDialog] = useState(false);
 
@@ -90,7 +92,7 @@ export const ClientMembersModal = ({
     mutationFn: async (member: { email: string; name: string; role: string }) => {
       // Check limit before adding (only for client portal)
       if (enforceMemberLimit && currentMemberCount >= CLIENT_MEMBER_LIMIT) {
-        throw new Error("Limite de membres atteinte. Veuillez contacter l'administrateur pour ajouter plus de membres.");
+        throw new Error(t('messages.memberLimitReached'));
       }
 
       const { error } = await supabase.from("client_members").insert({
@@ -104,10 +106,10 @@ export const ClientMembersModal = ({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["client-members", clientId] });
       setNewMember({ email: "", name: "", role: "member" });
-      toast.success("Membre ajouté avec succès");
+      toast.success(t('messages.memberAdded'));
     },
     onError: (error: any) => {
-      toast.error(error.message || "Erreur lors de l'ajout du membre");
+      toast.error(error.message || t('messages.memberAddError'));
     },
   });
 
@@ -121,16 +123,16 @@ export const ClientMembersModal = ({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["client-members", clientId] });
-      toast.success("Membre supprimé");
+      toast.success(t('messages.memberRemoved'));
     },
     onError: (error: any) => {
-      toast.error(error.message || "Erreur lors de la suppression");
+      toast.error(error.message || t('messages.memberRemoveError'));
     },
   });
 
   const handleAddMember = () => {
     if (!newMember.email || !newMember.name) {
-      toast.error("Email et nom requis");
+      toast.error(t('messages.emailAndNameRequired'));
       return;
     }
 
@@ -145,7 +147,7 @@ export const ClientMembersModal = ({
 
   const handleRequestMoreMembers = () => {
     // This could send a notification to super admin - for now just show a toast
-    toast.info("Demande envoyée à l'administrateur pour augmenter la limite de membres.");
+    toast.info(t('messages.requestSent'));
     setShowRequestDialog(false);
   };
 
@@ -156,13 +158,13 @@ export const ClientMembersModal = ({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserPlus className="w-5 h-5" />
-              Membres de {clientName}
+              {t('pages.members.title')} {clientName}
             </DialogTitle>
             <DialogDescription>
-              Gérez les membres qui ont accès à ce compte client
+              {t('pages.members.description')}
               {enforceMemberLimit && (
                 <span className="ml-2 text-xs">
-                  ({currentMemberCount}/{CLIENT_MEMBER_LIMIT} membres)
+                  ({currentMemberCount}/{CLIENT_MEMBER_LIMIT} {t('pages.members.membersCount')})
                 </span>
               )}
             </DialogDescription>
@@ -173,8 +175,7 @@ export const ClientMembersModal = ({
             <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
               <AlertTriangle className="h-4 w-4 text-amber-500" />
               <AlertDescription className="text-amber-600 dark:text-amber-400">
-                Vous avez atteint la limite de {CLIENT_MEMBER_LIMIT} membres. 
-                Contactez l'administrateur pour ajouter plus de membres.
+                {t('pages.members.limitWarning').replace('{limit}', String(CLIENT_MEMBER_LIMIT))}
               </AlertDescription>
             </Alert>
           )}
@@ -182,17 +183,17 @@ export const ClientMembersModal = ({
           {/* Add new member form */}
           <div className="border rounded-lg p-4 bg-muted/30 space-y-4">
             <div className="flex items-center justify-between">
-              <h4 className="font-medium text-sm">Ajouter un membre</h4>
+              <h4 className="font-medium text-sm">{t('pages.members.addMember')}</h4>
               {isClientAdmin && enforceMemberLimit && (
                 <Badge variant="outline" className="gap-1">
                   <Shield className="w-3 h-3" />
-                  Admin Client
+                  {t('pages.members.clientAdmin')}
                 </Badge>
               )}
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <Label htmlFor="memberName" className="text-xs">Nom</Label>
+                <Label htmlFor="memberName" className="text-xs">{t('pages.members.memberName')}</Label>
                 <Input
                   id="memberName"
                   placeholder="Jean Dupont"
@@ -202,7 +203,7 @@ export const ClientMembersModal = ({
                 />
               </div>
               <div>
-                <Label htmlFor="memberEmail" className="text-xs">Email</Label>
+                <Label htmlFor="memberEmail" className="text-xs">{t('pages.members.memberEmail')}</Label>
                 <Input
                   id="memberEmail"
                   type="email"
@@ -213,7 +214,7 @@ export const ClientMembersModal = ({
                 />
               </div>
               <div>
-                <Label htmlFor="memberRole" className="text-xs">Rôle</Label>
+                <Label htmlFor="memberRole" className="text-xs">{t('pages.members.memberRole')}</Label>
                 <Select
                   value={newMember.role}
                   onValueChange={(value) => setNewMember({ ...newMember, role: value })}
@@ -223,8 +224,8 @@ export const ClientMembersModal = ({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="member">Membre</SelectItem>
+                    <SelectItem value="admin">{t('pages.members.admin')}</SelectItem>
+                    <SelectItem value="member">{t('pages.members.member')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -237,7 +238,7 @@ export const ClientMembersModal = ({
                 className="gap-2"
               >
                 <Plus className="w-4 h-4" />
-                {isAtLimit && enforceMemberLimit ? "Demander autorisation" : "Ajouter"}
+                {isAtLimit && enforceMemberLimit ? t('pages.members.requestAuthorization') : t('common.add')}
               </Button>
             </div>
           </div>
@@ -247,10 +248,10 @@ export const ClientMembersModal = ({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Membre</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Rôle</TableHead>
-                  <TableHead>Ajouté le</TableHead>
+                  <TableHead>{t('pages.members.member')}</TableHead>
+                  <TableHead>{t('pages.members.memberEmail')}</TableHead>
+                  <TableHead>{t('pages.members.memberRole')}</TableHead>
+                  <TableHead>{t('pages.members.addedOn')}</TableHead>
                   <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -258,13 +259,13 @@ export const ClientMembersModal = ({
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      Chargement...
+                      {t('pages.members.loading')}
                     </TableCell>
                   </TableRow>
                 ) : members?.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      Aucun membre pour l'instant
+                      {t('pages.members.noMembers')}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -279,11 +280,11 @@ export const ClientMembersModal = ({
                       <TableCell className="text-muted-foreground">{member.email}</TableCell>
                       <TableCell>
                         <Badge variant={member.role === "admin" ? "default" : "secondary"}>
-                          {member.role === "admin" ? "Admin" : "Membre"}
+                          {member.role === "admin" ? t('pages.members.admin') : t('pages.members.member')}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
-                        {new Date(member.created_at).toLocaleDateString("fr-FR")}
+                        {new Date(member.created_at).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US')}
                       </TableCell>
                       <TableCell>
                         <Button
@@ -308,16 +309,15 @@ export const ClientMembersModal = ({
       <AlertDialog open={showRequestDialog} onOpenChange={setShowRequestDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Limite de membres atteinte</AlertDialogTitle>
+            <AlertDialogTitle>{t('pages.members.limitReachedTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Vous avez atteint la limite de {CLIENT_MEMBER_LIMIT} membres pour votre compte. 
-              Souhaitez-vous demander l'autorisation à l'administrateur pour ajouter plus de membres ?
+              {t('pages.members.limitReachedDescription').replace('{limit}', String(CLIENT_MEMBER_LIMIT))}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleRequestMoreMembers}>
-              Envoyer la demande
+              {t('pages.members.sendRequest')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

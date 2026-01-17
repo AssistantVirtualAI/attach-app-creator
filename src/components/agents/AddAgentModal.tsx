@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { PlatformBadge } from './PlatformBadge';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const PLATFORMS = [
   { value: 'voiceflow', label: 'Voiceflow' },
@@ -36,6 +37,7 @@ interface AddAgentModalProps {
 export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalProps) {
   const navigate = useNavigate();
   const { selectedOrgId } = useOrganization();
+  const { t, language } = useTranslation();
   const [step, setStep] = useState(1);
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [selectedIntegration, setSelectedIntegration] = useState('');
@@ -108,7 +110,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
 
   const handleCreateAgent = async () => {
     if (!selectedOrgId || !selectedIntegration || !agentId.trim()) {
-      toast.error('Veuillez remplir tous les champs requis');
+      toast.error(t('messages.requiredFields'));
       return;
     }
 
@@ -135,7 +137,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
 
       if (error) throw error;
 
-      toast.success('Agent créé avec succès !');
+      toast.success(t('messages.agentCreated'));
       handleClose();
       onSuccess();
       
@@ -144,19 +146,23 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
         navigate(`/agent-settings/${newAgent.id}`);
       }
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la création de l\'agent');
+      toast.error(error.message || t('messages.agentCreateError'));
     } finally {
       setIsCreating(false);
     }
   };
 
+  const getPlatformLabel = () => {
+    return PLATFORMS.find(p => p.value === selectedPlatform)?.label || selectedPlatform;
+  };
+
   const renderStep1 = () => (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="platform">Sélectionnez une plateforme</Label>
+        <Label htmlFor="platform">{t('pages.addAgent.selectPlatform')}</Label>
         <Select value={selectedPlatform} onValueChange={setSelectedPlatform}>
           <SelectTrigger id="platform">
-            <SelectValue placeholder="Choisir une plateforme..." />
+            <SelectValue placeholder={t('pages.addAgent.choosePlatform')} />
           </SelectTrigger>
           <SelectContent>
             {PLATFORMS.map((platform) => (
@@ -172,7 +178,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
         disabled={!selectedPlatform}
         className="w-full"
       >
-        Suivant
+        {t('common.next')}
         <ChevronRight className="ml-2 h-4 w-4" />
       </Button>
     </div>
@@ -188,12 +194,12 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
             <Info className="h-4 w-4" />
             <AlertDescription>
               <div className="space-y-2">
-                <p>Aucune intégration {PLATFORMS.find(p => p.value === selectedPlatform)?.label} configurée.</p>
-                <p className="text-sm">Veuillez d'abord ajouter une intégration dans la page Intégrations.</p>
+                <p>{t('pages.addAgent.noIntegration').replace('{platform}', getPlatformLabel())}</p>
+                <p className="text-sm">{t('pages.addAgent.addIntegrationFirst')}</p>
                 <Link to="/integrations?from=agents">
                   <Button variant="outline" size="sm" className="mt-2">
                     <ExternalLink className="mr-2 h-4 w-4" />
-                    Aller aux Intégrations
+                    {t('pages.addAgent.goToIntegrations')}
                   </Button>
                 </Link>
               </div>
@@ -201,15 +207,15 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
           </Alert>
         ) : (
           <div className="space-y-2">
-            <Label htmlFor="integration">Sélectionnez une intégration</Label>
+            <Label htmlFor="integration">{t('pages.addAgent.selectIntegration')}</Label>
             <Select value={selectedIntegration} onValueChange={setSelectedIntegration}>
               <SelectTrigger id="integration">
-                <SelectValue placeholder="Choisir une intégration..." />
+                <SelectValue placeholder={t('pages.addAgent.chooseIntegration')} />
               </SelectTrigger>
                   <SelectContent>
                     {integrations.map((integration) => (
                       <SelectItem key={integration.id} value={integration.id}>
-                        {integration.platform.toUpperCase()} - {new Date(integration.created_at).toLocaleDateString('fr-FR')}
+                        {integration.platform.toUpperCase()} - {new Date(integration.created_at).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US')}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -224,7 +230,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
             className="flex-1"
           >
             <ChevronLeft className="mr-2 h-4 w-4" />
-            Retour
+            {t('common.back')}
           </Button>
           {hasIntegrations && (
             <Button
@@ -232,7 +238,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
               disabled={!selectedIntegration}
               className="flex-1"
             >
-              Suivant
+              {t('common.next')}
               <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
           )}
@@ -244,7 +250,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
   const renderStep3 = () => (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="agentName">Nom de l'agent (optionnel)</Label>
+        <Label htmlFor="agentName">{t('pages.addAgent.agentNameOptional')}</Label>
         <Input
           id="agentName"
           placeholder="Ex: AVA Assistant Client"
@@ -255,7 +261,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
 
       <div className="space-y-2">
         <Label htmlFor="agentId">
-          Agent ID <span className="text-destructive">*</span>
+          {t('pages.addAgent.agentId')} <span className="text-destructive">*</span>
         </Label>
         <Input
           id="agentId"
@@ -265,21 +271,21 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
           required
         />
         <p className="text-xs text-muted-foreground">
-          Trouvez cet ID dans le dashboard de {PLATFORMS.find(p => p.value === selectedPlatform)?.label}
+          {t('pages.addAgent.agentIdHelp').replace('{platform}', getPlatformLabel())}
         </p>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="clientId">Assigner à un client (optionnel)</Label>
+        <Label htmlFor="clientId">{t('pages.addAgent.assignToClientOptional')}</Label>
         <Select
           value={selectedClientId}
           onValueChange={(v) => setSelectedClientId(v === 'none' ? undefined : v)}
         >
           <SelectTrigger id="clientId">
-            <SelectValue placeholder="Aucun client assigné" />
+            <SelectValue placeholder={t('pages.addAgent.noClientAssigned')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">Aucun</SelectItem>
+            <SelectItem value="none">{t('pages.agentBuilder.noClient')}</SelectItem>
             {clients?.map((client) => (
               <SelectItem key={client.id} value={client.id}>
                 {client.name}
@@ -297,14 +303,14 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
           disabled={isCreating}
         >
           <ChevronLeft className="mr-2 h-4 w-4" />
-          Retour
+          {t('common.back')}
         </Button>
         <Button
           onClick={handleCreateAgent}
           disabled={!agentId.trim() || isCreating}
           className="flex-1"
         >
-          {isCreating ? 'Création...' : 'Créer l\'agent'}
+          {isCreating ? t('pages.addAgent.creating') : t('pages.agentBuilder.createTheAgent')}
         </Button>
       </div>
     </div>
@@ -315,7 +321,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
-            Nouvel Agent - Étape {step}/3
+            {t('pages.addAgent.title')} {step}/3
           </DialogTitle>
         </DialogHeader>
         

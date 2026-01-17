@@ -7,10 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Lock, CheckCircle, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const ClientResetPassword = () => {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -22,12 +24,12 @@ const ClientResetPassword = () => {
     setError('');
 
     if (password !== confirmPassword) {
-      setError('Les mots de passe ne correspondent pas');
+      setError(t('messages.passwordsDoNotMatch'));
       return;
     }
 
     if (password.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères');
+      setError(t('messages.passwordTooShort'));
       return;
     }
 
@@ -52,7 +54,7 @@ const ClientResetPassword = () => {
 
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Une erreur est survenue');
+      setError(err instanceof Error ? err.message : t('messages.unknownError'));
     } finally {
       setIsLoading(false);
     }
@@ -66,14 +68,14 @@ const ClientResetPassword = () => {
             <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
               <CheckCircle className="h-6 w-6 text-green-600" />
             </div>
-            <CardTitle>Mot de passe réinitialisé</CardTitle>
+            <CardTitle>{t('pages.resetPassword.successTitle')}</CardTitle>
             <CardDescription>
-              Votre mot de passe a été modifié avec succès. Vous pouvez maintenant vous connecter.
+              {t('pages.resetPassword.successMessage')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button className="w-full" onClick={() => navigate('/client/login')}>
-              Se connecter
+              {t('pages.resetPassword.login')}
             </Button>
           </CardContent>
         </Card>
@@ -88,9 +90,9 @@ const ClientResetPassword = () => {
           <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
             <Lock className="h-6 w-6 text-primary" />
           </div>
-          <CardTitle>Nouveau mot de passe</CardTitle>
+          <CardTitle>{t('pages.resetPassword.title')}</CardTitle>
           <CardDescription>
-            Choisissez un nouveau mot de passe pour votre compte.
+            {t('pages.resetPassword.subtitle')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -102,7 +104,7 @@ const ClientResetPassword = () => {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="password">Nouveau mot de passe</Label>
+              <Label htmlFor="password">{t('pages.resetPassword.newPassword')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -116,7 +118,7 @@ const ClientResetPassword = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
+              <Label htmlFor="confirmPassword">{t('pages.resetPassword.confirmPassword')}</Label>
               <Input
                 id="confirmPassword"
                 type="password"
@@ -130,17 +132,17 @@ const ClientResetPassword = () => {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Le mot de passe doit contenir au moins 8 caractères.
+              {t('pages.resetPassword.passwordHint')}
             </p>
 
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Réinitialisation...' : 'Réinitialiser le mot de passe'}
+              {isLoading ? t('pages.resetPassword.resetting') : t('pages.resetPassword.reset')}
             </Button>
 
             <Link to="/client/login">
               <Button variant="ghost" className="w-full">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Retour à la connexion
+                {t('pages.resetPassword.backToLogin')}
               </Button>
             </Link>
           </form>
