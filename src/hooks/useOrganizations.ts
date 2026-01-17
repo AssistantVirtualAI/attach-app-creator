@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrganization } from '@/context/OrganizationContext';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface InviteMemberParams {
   email: string;
@@ -24,14 +25,15 @@ interface UpdateOrganizationParams {
 export const useOrganizations = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const { refreshOrganization, selectedOrgId } = useOrganization();
   const [isLoading, setIsLoading] = useState(false);
 
   const inviteMember = async ({ email, organizationId, role }: InviteMemberParams) => {
     if (!user) {
       toast({
-        title: 'Erreur',
-        description: 'Vous devez être connecté',
+        title: t('common.error'),
+        description: t('messages.notAuthenticated'),
         variant: 'destructive',
       });
       return { success: false };
@@ -40,9 +42,6 @@ export const useOrganizations = () => {
     try {
       setIsLoading(true);
 
-      // Check if user exists (by email)
-      // Note: In production, you'd want to send an invitation email
-      // For now, we'll just check if the email exists in auth.users
       const { data: invitedUser, error: userError } = await supabase
         .from('profiles')
         .select('id, email')
@@ -53,8 +52,8 @@ export const useOrganizations = () => {
 
       if (!invitedUser) {
         toast({
-          title: 'Utilisateur introuvable',
-          description: 'Cet utilisateur n\'existe pas. Invitez-le à créer un compte.',
+          title: t('team.userNotFound'),
+          description: t('team.inviteToCreateAccount'),
           variant: 'destructive',
         });
         return { success: false };
@@ -70,8 +69,8 @@ export const useOrganizations = () => {
 
       if (existingMember) {
         toast({
-          title: 'Membre existant',
-          description: 'Cet utilisateur est déjà membre de l\'organisation',
+          title: t('team.alreadyMember'),
+          description: t('team.userAlreadyInOrg'),
           variant: 'destructive',
         });
         return { success: false };
@@ -101,16 +100,16 @@ export const useOrganizations = () => {
       if (roleError) throw roleError;
 
       toast({
-        title: 'Membre ajouté',
-        description: `${email} a été ajouté avec le rôle ${role}`,
+        title: t('team.memberAdded'),
+        description: `${email} ${t('team.addedWithRole')} ${role}`,
       });
 
       return { success: true };
     } catch (error: any) {
       console.error('Error inviting member:', error);
       toast({
-        title: 'Erreur',
-        description: error.message || 'Impossible d\'inviter le membre',
+        title: t('common.error'),
+        description: error.message || t('team.inviteError'),
         variant: 'destructive',
       });
       return { success: false };
@@ -142,16 +141,16 @@ export const useOrganizations = () => {
       if (memberError) throw memberError;
 
       toast({
-        title: 'Membre retiré',
-        description: 'Le membre a été retiré de l\'organisation',
+        title: t('team.memberRemoved'),
+        description: t('team.memberRemovedFromOrg'),
       });
 
       return { success: true };
     } catch (error: any) {
       console.error('Error removing member:', error);
       toast({
-        title: 'Erreur',
-        description: error.message || 'Impossible de retirer le membre',
+        title: t('common.error'),
+        description: error.message || t('team.removeError'),
         variant: 'destructive',
       });
       return { success: false };
@@ -177,16 +176,16 @@ export const useOrganizations = () => {
       if (error) throw error;
 
       toast({
-        title: 'Rôle mis à jour',
-        description: `Le rôle a été changé en ${newRole}`,
+        title: t('messages.updateSuccess'),
+        description: `${t('team.roleChangedTo')} ${newRole}`,
       });
 
       return { success: true };
     } catch (error: any) {
       console.error('Error updating role:', error);
       toast({
-        title: 'Erreur',
-        description: error.message || 'Impossible de mettre à jour le rôle',
+        title: t('common.error'),
+        description: error.message || t('team.roleUpdateError'),
         variant: 'destructive',
       });
       return { success: false };
@@ -207,8 +206,8 @@ export const useOrganizations = () => {
       if (error) throw error;
 
       toast({
-        title: 'Organisation mise à jour',
-        description: 'Les modifications ont été enregistrées',
+        title: t('messages.updateSuccess'),
+        description: t('settings.changesSaved'),
       });
 
       await refreshOrganization();
@@ -216,8 +215,8 @@ export const useOrganizations = () => {
     } catch (error: any) {
       console.error('Error updating organization:', error);
       toast({
-        title: 'Erreur',
-        description: error.message || 'Impossible de mettre à jour l\'organisation',
+        title: t('common.error'),
+        description: error.message || t('settings.updateError'),
         variant: 'destructive',
       });
       return { success: false };

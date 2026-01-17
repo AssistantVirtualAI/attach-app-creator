@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export interface TeamMember {
   id: string;
@@ -23,6 +24,7 @@ export interface TeamMember {
 export const useTeamMembers = () => {
   const { selectedOrgId } = useOrganization();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const query = useQuery({
@@ -72,7 +74,7 @@ export const useTeamMembers = () => {
       full_name: string;
       role: 'org_admin' | 'manager' | 'agent' | 'viewer' 
     }) => {
-      if (!selectedOrgId) throw new Error('No organization selected');
+      if (!selectedOrgId) throw new Error(t('messages.noOrganization'));
 
       const { data, error } = await supabase.functions.invoke('create-org-member', {
         body: {
@@ -91,17 +93,17 @@ export const useTeamMembers = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['team-members'] });
-      toast({ title: 'Membre créé avec succès' });
+      toast({ title: t('messages.createSuccess') });
     },
     onError: (error: Error) => {
-      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+      toast({ title: t('common.error'), description: error.message, variant: 'destructive' });
     },
   });
 
   // Legacy invite member (kept for backwards compatibility)
   const inviteMember = useMutation({
     mutationFn: async ({ email, role }: { email: string; role: 'org_admin' | 'manager' | 'agent' | 'viewer' }) => {
-      if (!selectedOrgId) throw new Error('No organization selected');
+      if (!selectedOrgId) throw new Error(t('messages.noOrganization'));
 
       // Check if user exists
       const { data: existingProfile } = await supabase
@@ -111,7 +113,7 @@ export const useTeamMembers = () => {
         .maybeSingle();
 
       if (!existingProfile) {
-        throw new Error('Utilisateur non trouvé. L\'utilisateur doit d\'abord créer un compte.');
+        throw new Error(t('team.userNotFound'));
       }
 
       // Check if already a member
@@ -123,7 +125,7 @@ export const useTeamMembers = () => {
         .maybeSingle();
 
       if (existingMember) {
-        throw new Error('Cet utilisateur est déjà membre de l\'organisation.');
+        throw new Error(t('team.alreadyMember'));
       }
 
       // Get current user
@@ -154,16 +156,16 @@ export const useTeamMembers = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['team-members'] });
-      toast({ title: 'Membre invité avec succès' });
+      toast({ title: t('messages.createSuccess') });
     },
     onError: (error: Error) => {
-      toast({ title: 'Erreur', description: error.message, variant: 'destructive' });
+      toast({ title: t('common.error'), description: error.message, variant: 'destructive' });
     },
   });
 
   const updateMemberRole = useMutation({
     mutationFn: async ({ userId, newRole }: { userId: string; newRole: 'org_admin' | 'manager' | 'agent' | 'viewer' }) => {
-      if (!selectedOrgId) throw new Error('No organization selected');
+      if (!selectedOrgId) throw new Error(t('messages.noOrganization'));
 
       const { error } = await supabase
         .from('user_roles')
@@ -175,16 +177,16 @@ export const useTeamMembers = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['team-members'] });
-      toast({ title: 'Rôle mis à jour' });
+      toast({ title: t('messages.updateSuccess') });
     },
     onError: () => {
-      toast({ title: 'Erreur lors de la mise à jour du rôle', variant: 'destructive' });
+      toast({ title: t('messages.updateError'), variant: 'destructive' });
     },
   });
 
   const removeMember = useMutation({
     mutationFn: async (userId: string) => {
-      if (!selectedOrgId) throw new Error('No organization selected');
+      if (!selectedOrgId) throw new Error(t('messages.noOrganization'));
 
       // Remove role first
       await supabase
@@ -204,10 +206,10 @@ export const useTeamMembers = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['team-members'] });
-      toast({ title: 'Membre retiré' });
+      toast({ title: t('messages.deleteSuccess') });
     },
     onError: () => {
-      toast({ title: 'Erreur lors de la suppression', variant: 'destructive' });
+      toast({ title: t('messages.deleteError'), variant: 'destructive' });
     },
   });
 

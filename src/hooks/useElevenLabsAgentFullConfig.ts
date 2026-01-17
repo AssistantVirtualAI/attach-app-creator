@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export interface LLMSettings {
   temperature?: number;
@@ -41,6 +42,8 @@ export interface AgentFullConfig {
 
 // Fetch complete agent configuration
 export const useElevenLabsAgentFullConfig = (agentId: string | null, apiKey: string | null) => {
+  const { t } = useTranslation();
+  
   return useQuery({
     queryKey: ['elevenlabs-agent-full-config', agentId],
     queryFn: async (): Promise<AgentFullConfig | null> => {
@@ -56,7 +59,7 @@ export const useElevenLabsAgentFullConfig = (agentId: string | null, apiKey: str
 
       if (error) throw error;
       if (data.requiresSetup) {
-        throw new Error(data.message || 'Configuration ElevenLabs requise');
+        throw new Error(data.message || t('integrations.messages.fillRequired'));
       }
       
       return data.agent as AgentFullConfig;
@@ -69,6 +72,7 @@ export const useElevenLabsAgentFullConfig = (agentId: string | null, apiKey: str
 // Update prompt (system prompt + optional first message)
 export const useUpdateAgentPrompt = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: async ({ 
@@ -93,15 +97,15 @@ export const useUpdateAgentPrompt = () => {
       });
 
       if (error) throw error;
-      if (!data.success) throw new Error(data.error || 'Échec de la mise à jour');
+      if (!data.success) throw new Error(data.error || t('messages.updateError'));
       return data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['elevenlabs-agent-full-config', variables.agentId] });
-      toast.success('Prompt mis à jour avec succès');
+      toast.success(t('messages.promptUpdated'));
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Erreur lors de la mise à jour du prompt');
+      toast.error(error.message || t('messages.updateError'));
     },
   });
 };
@@ -109,6 +113,7 @@ export const useUpdateAgentPrompt = () => {
 // Update first message only
 export const useUpdateAgentFirstMessage = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: async ({ 
@@ -130,15 +135,15 @@ export const useUpdateAgentFirstMessage = () => {
       });
 
       if (error) throw error;
-      if (!data.success) throw new Error(data.error || 'Échec de la mise à jour');
+      if (!data.success) throw new Error(data.error || t('messages.updateError'));
       return data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['elevenlabs-agent-full-config', variables.agentId] });
-      toast.success('Premier message mis à jour');
+      toast.success(t('messages.firstMessageUpdated'));
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Erreur lors de la mise à jour');
+      toast.error(error.message || t('messages.updateError'));
     },
   });
 };
@@ -146,6 +151,7 @@ export const useUpdateAgentFirstMessage = () => {
 // Update voice settings
 export const useUpdateAgentVoice = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: async ({ 
@@ -167,15 +173,15 @@ export const useUpdateAgentVoice = () => {
       });
 
       if (error) throw error;
-      if (!data.success) throw new Error(data.error || 'Échec de la mise à jour');
+      if (!data.success) throw new Error(data.error || t('messages.updateError'));
       return data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['elevenlabs-agent-full-config', variables.agentId] });
-      toast.success('Paramètres vocaux mis à jour');
+      toast.success(t('messages.voiceSettingsUpdated'));
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Erreur lors de la mise à jour des paramètres vocaux');
+      toast.error(error.message || t('messages.updateError'));
     },
   });
 };
@@ -183,6 +189,7 @@ export const useUpdateAgentVoice = () => {
 // Update LLM settings (temperature, max_tokens, model)
 export const useUpdateAgentLLM = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: async ({ 
@@ -204,15 +211,15 @@ export const useUpdateAgentLLM = () => {
       });
 
       if (error) throw error;
-      if (!data.success) throw new Error(data.error || 'Échec de la mise à jour');
+      if (!data.success) throw new Error(data.error || t('messages.updateError'));
       return data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['elevenlabs-agent-full-config', variables.agentId] });
-      toast.success('Paramètres LLM mis à jour');
+      toast.success(t('messages.llmSettingsUpdated'));
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Erreur lors de la mise à jour des paramètres LLM');
+      toast.error(error.message || t('messages.updateError'));
     },
   });
 };
@@ -220,6 +227,7 @@ export const useUpdateAgentLLM = () => {
 // Full config update (for advanced users)
 export const useUpdateAgentFullConfig = () => {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   return useMutation({
     mutationFn: async ({ 
@@ -241,15 +249,15 @@ export const useUpdateAgentFullConfig = () => {
       });
 
       if (error) throw error;
-      if (!data.success) throw new Error(data.error || 'Échec de la mise à jour');
+      if (!data.success) throw new Error(data.error || t('messages.updateError'));
       return data;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['elevenlabs-agent-full-config', variables.agentId] });
-      toast.success('Configuration agent mise à jour');
+      toast.success(t('messages.agentConfigUpdated'));
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Erreur lors de la mise à jour de la configuration');
+      toast.error(error.message || t('messages.updateError'));
     },
   });
 };

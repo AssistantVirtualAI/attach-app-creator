@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { t } from '@/lib/i18n';
 
 export interface ClientSession {
   clientId: string;
@@ -47,7 +48,7 @@ export const useClientAuth = () => {
       }
 
       if (!data?.session) {
-        throw new Error('Erreur de connexion');
+        throw new Error(t('messages.connectionError'));
       }
 
       const clientSession: ClientSession = data.session;
