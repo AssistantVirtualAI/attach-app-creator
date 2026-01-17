@@ -6,6 +6,7 @@ import { useBillingConfig } from '@/hooks/useBillingConfig';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
+import { useTranslation } from '@/hooks/useTranslation';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { toast } from 'sonner';
 import { useMemo } from 'react';
@@ -13,6 +14,7 @@ import { useMemo } from 'react';
 export function UsageTab() {
   const { billingConfig, currentPlan } = useBillingConfig();
   const { selectedOrgId } = useOrganization();
+  const { t, language } = useTranslation();
 
   // Fetch conversation count for current month
   const { data: conversationStats } = useQuery({
@@ -41,7 +43,7 @@ export function UsageTab() {
       // Group by day
       const dailyCounts: { [key: string]: number } = {};
       dailyData?.forEach((conv) => {
-        const day = new Date(conv.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+        const day = new Date(conv.created_at).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { day: '2-digit', month: 'short' });
         dailyCounts[day] = (dailyCounts[day] || 0) + 1;
       });
 
@@ -90,7 +92,7 @@ export function UsageTab() {
     for (let i = 5; i >= 0; i--) {
       const date = new Date(currentDate);
       date.setMonth(date.getMonth() - i);
-      const monthName = date.toLocaleDateString('fr-FR', { month: 'short' });
+      const monthName = date.toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { month: 'short' });
       // Simulate progressive usage
       const baseUsage = Math.floor(aiCreditsLimit * 0.3);
       const variance = Math.floor(Math.random() * (aiCreditsLimit * 0.4));
@@ -102,11 +104,11 @@ export function UsageTab() {
       });
     }
     return months;
-  }, [aiCreditsUsed, aiCreditsLimit]);
+  }, [aiCreditsUsed, aiCreditsLimit, language]);
 
   const handleExportReport = () => {
     const reportData = {
-      period: new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+      period: new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { month: 'long', year: 'numeric' }),
       conversations: {
         used: conversationsUsed,
         limit: conversationsLimit,
@@ -119,20 +121,20 @@ export function UsageTab() {
       },
       clients: {
         used: clientsUsed,
-        limit: clientsLimit === Infinity ? 'Illimité' : clientsLimit,
+        limit: clientsLimit === Infinity ? t('pages.usage.unlimited') : clientsLimit,
         percentage: clientPercentage.toFixed(1),
       },
       dailyBreakdown: conversationStats?.data || [],
     };
 
     // Generate CSV content
-    let csvContent = 'Rapport d\'utilisation - ' + reportData.period + '\n\n';
-    csvContent += 'Métrique,Utilisé,Limite,Pourcentage\n';
-    csvContent += `Conversations,${reportData.conversations.used},${reportData.conversations.limit},${reportData.conversations.percentage}%\n`;
-    csvContent += `Crédits IA,${reportData.aiCredits.used},${reportData.aiCredits.limit},${reportData.aiCredits.percentage}%\n`;
-    csvContent += `Clients,${reportData.clients.used},${reportData.clients.limit},${reportData.clients.percentage}%\n`;
-    csvContent += '\nDétail journalier des conversations\n';
-    csvContent += 'Jour,Conversations\n';
+    let csvContent = `${language === 'fr' ? 'Rapport d\'utilisation' : 'Usage Report'} - ${reportData.period}\n\n`;
+    csvContent += `${language === 'fr' ? 'Métrique,Utilisé,Limite,Pourcentage' : 'Metric,Used,Limit,Percentage'}\n`;
+    csvContent += `${t('pages.usage.conversations')},${reportData.conversations.used},${reportData.conversations.limit},${reportData.conversations.percentage}%\n`;
+    csvContent += `${t('pages.usage.aiCredits')},${reportData.aiCredits.used},${reportData.aiCredits.limit},${reportData.aiCredits.percentage}%\n`;
+    csvContent += `${t('pages.usage.clients')},${reportData.clients.used},${reportData.clients.limit},${reportData.clients.percentage}%\n`;
+    csvContent += `\n${language === 'fr' ? 'Détail journalier des conversations' : 'Daily conversation breakdown'}\n`;
+    csvContent += `${language === 'fr' ? 'Jour,Conversations' : 'Day,Conversations'}\n`;
     reportData.dailyBreakdown.forEach((day: any) => {
       csvContent += `${day.day},${day.conversations}\n`;
     });
@@ -142,13 +144,13 @@ export function UsageTab() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `rapport-usage-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `${language === 'fr' ? 'rapport-usage' : 'usage-report'}-${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     
-    toast.success('Rapport exporté avec succès');
+    toast.success(t('messages.reportExported'));
   };
 
   return (
@@ -159,7 +161,7 @@ export function UsageTab() {
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-primary" />
-              <CardTitle className="text-sm">Conversations</CardTitle>
+              <CardTitle className="text-sm">{t('pages.usage.conversations')}</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
@@ -167,7 +169,7 @@ export function UsageTab() {
               {conversationsUsed.toLocaleString()} / {conversationsLimit.toLocaleString()}
             </div>
             <Progress value={conversationPercentage} className="h-2 mb-2" />
-            <p className="text-xs text-muted-foreground">Ce mois-ci</p>
+            <p className="text-xs text-muted-foreground">{t('pages.usage.thisMonth')}</p>
           </CardContent>
         </Card>
 
@@ -175,7 +177,7 @@ export function UsageTab() {
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <Zap className="w-5 h-5 text-yellow-500" />
-              <CardTitle className="text-sm">Crédits IA</CardTitle>
+              <CardTitle className="text-sm">{t('pages.usage.aiCredits')}</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
@@ -183,7 +185,7 @@ export function UsageTab() {
               {aiCreditsUsed.toLocaleString()} / {aiCreditsLimit.toLocaleString()}
             </div>
             <Progress value={aiPercentage} className="h-2 mb-2" />
-            <p className="text-xs text-muted-foreground">Utilisés</p>
+            <p className="text-xs text-muted-foreground">{t('pages.usage.used')}</p>
           </CardContent>
         </Card>
 
@@ -191,7 +193,7 @@ export function UsageTab() {
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
               <HardDrive className="w-5 h-5 text-blue-500" />
-              <CardTitle className="text-sm">Clients</CardTitle>
+              <CardTitle className="text-sm">{t('pages.usage.clients')}</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
@@ -199,7 +201,7 @@ export function UsageTab() {
               {clientsUsed} / {clientsLimit === Infinity ? '∞' : clientsLimit}
             </div>
             <Progress value={clientPercentage} className="h-2 mb-2" />
-            <p className="text-xs text-muted-foreground">Actifs</p>
+            <p className="text-xs text-muted-foreground">{t('pages.usage.activeClients')}</p>
           </CardContent>
         </Card>
       </div>
@@ -210,8 +212,8 @@ export function UsageTab() {
           <div className="flex items-center gap-3">
             <Zap className="w-6 h-6 text-yellow-500" />
             <div>
-              <CardTitle>Historique des crédits IA</CardTitle>
-              <CardDescription>Consommation mensuelle sur 6 mois</CardDescription>
+              <CardTitle>{t('pages.usage.aiCreditsHistory')}</CardTitle>
+              <CardDescription>{t('pages.usage.monthlyConsumption')}</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -235,11 +237,11 @@ export function UsageTab() {
                   }}
                   formatter={(value: number, name: string) => [
                     value.toLocaleString(),
-                    name === 'used' ? 'Utilisés' : 'Limite'
+                    name === 'used' ? t('pages.usage.used') : t('pages.usage.unlimited')
                   ]}
                 />
                 <Legend 
-                  formatter={(value) => value === 'used' ? 'Crédits utilisés' : 'Limite'}
+                  formatter={(value) => value === 'used' ? t('pages.usage.aiCredits') : t('pages.usage.unlimited')}
                 />
                 <Bar dataKey="used" fill="url(#colorCredits)" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="limit" fill="hsl(var(--muted))" radius={[4, 4, 0, 0]} opacity={0.3} />
@@ -256,13 +258,13 @@ export function UsageTab() {
             <div className="flex items-center gap-3">
               <BarChart3 className="w-6 h-6 text-primary" />
               <div>
-                <CardTitle>Tendance d'utilisation</CardTitle>
-                <CardDescription>Conversations par jour ce mois-ci</CardDescription>
+                <CardTitle>{t('pages.usage.usageTrend')}</CardTitle>
+                <CardDescription>{t('pages.usage.conversationsPerDay')}</CardDescription>
               </div>
             </div>
             <Button variant="outline" size="sm" onClick={handleExportReport}>
               <Download className="w-4 h-4 mr-2" />
-              Exporter le rapport
+              {t('pages.usage.exportReport')}
             </Button>
           </div>
         </CardHeader>
@@ -297,7 +299,7 @@ export function UsageTab() {
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
-                Aucune donnée disponible
+                {t('pages.usage.noDataAvailable')}
               </div>
             )}
           </div>
