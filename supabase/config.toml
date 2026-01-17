@@ -143,3 +143,6 @@ verify_jwt = false
 
 [functions.retell-proxy]
 verify_jwt = false
+
+[functions.send-contact-sales]
+verify_jwt = false

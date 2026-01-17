@@ -1,22 +1,29 @@
+import { useState } from 'react';
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Check, Sparkles, Zap, Crown } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Check, Sparkles, Zap, Crown, MessageSquare, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
+import { PLANS } from "@/hooks/useBillingConfig";
+import { ContactSalesModal } from "@/components/billing/ContactSalesModal";
 
-const planIcons = [Zap, Sparkles, Crown];
+const planIcons = [Zap, Zap, Sparkles, Crown, Crown];
 const planColors = [
+  'from-gray-500 to-gray-600',
   'from-blue-500 to-cyan-500',
   'from-purple-500 to-pink-500',
   'from-orange-500 to-amber-500',
+  'from-indigo-600 to-purple-700',
 ];
-const planPrices = ['69', '199', null]; // null for custom
 
 export const PricingSection = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  const [showContactModal, setShowContactModal] = useState(false);
 
-  const planKeys = ['starter', 'pro', 'enterprise'] as const;
+  // Show only main plans for landing page
+  const displayPlans = PLANS.filter(p => ['starter', 'growth', 'ultimate', 'enterprise'].includes(p.id));
 
   return (
     <section className="py-32 relative overflow-hidden">
@@ -48,25 +55,37 @@ export const PricingSection = () => {
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             {t('pricing.subtitle')}
           </p>
+
+          {/* Trial badge */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.3 }}
+            className="mt-6"
+          >
+            <Badge variant="secondary" className="bg-green-500/10 text-green-600 text-sm px-4 py-2">
+              🎉 {language === 'fr' ? 'Essai gratuit de 14 jours • Aucune carte de crédit requise' : '14-day free trial • No credit card required'}
+            </Badge>
+          </motion.div>
         </motion.div>
 
         {/* Pricing cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {planKeys.map((key, index) => {
-            const Icon = planIcons[index];
-            const isPopular = index === 1;
-            const price = planPrices[index];
-            const features = t(`pricing.${key}.features`);
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+          {displayPlans.map((plan, index) => {
+            const Icon = planIcons[index + 1];
+            const isPopular = plan.popular;
+            const isEnterprise = plan.isCustom;
 
             return (
               <motion.div
-                key={key}
+                key={plan.id}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 whileHover={{ y: -10 }}
-                className={`relative rounded-3xl p-8 ${
+                className={`relative rounded-3xl p-6 ${
                   isPopular 
                     ? "bg-gradient-to-b from-primary/20 to-card border-2 border-primary shadow-xl shadow-primary/20" 
                     : "bg-card/50 backdrop-blur-xl border border-border/50 hover:border-primary/50"
@@ -84,50 +103,98 @@ export const PricingSection = () => {
                 )}
 
                 {/* Icon */}
-                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${planColors[index]} flex items-center justify-center mb-6 shadow-lg`}>
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${planColors[index + 1]} flex items-center justify-center mb-6 shadow-lg`}>
                   <Icon className="w-7 h-7 text-white" />
                 </div>
 
                 {/* Plan info */}
-                <h3 className="text-2xl font-bold mb-2">{t(`pricing.${key}.name`)}</h3>
-                <p className="text-muted-foreground mb-6">{t(`pricing.${key}.description`)}</p>
+                <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
+                <p className="text-muted-foreground mb-4 text-sm min-h-[40px]">
+                  {plan.isCustom 
+                    ? (language === 'fr' ? 'Solution personnalisée pour votre entreprise' : 'Custom solution for your business')
+                    : `${plan.clientsIncluded} ${language === 'fr' ? 'clients inclus' : 'clients included'}`
+                  }
+                </p>
 
                 {/* Price */}
-                <div className="mb-8">
-                  {price ? (
+                <div className="mb-6">
+                  {plan.isCustom ? (
+                    <span className="text-3xl font-bold">{language === 'fr' ? 'Sur mesure' : 'Custom'}</span>
+                  ) : (
                     <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold">${price}</span>
+                      <span className="text-4xl font-bold">${plan.price}</span>
                       <span className="text-muted-foreground text-sm">CAD{t('pricing.perMonth')}</span>
                     </div>
-                  ) : (
-                    <span className="text-3xl font-bold">{t('pricing.custom')}</span>
                   )}
+                  {plan.additionalClientPrice && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      +${plan.additionalClientPrice}/{language === 'fr' ? 'client additionnel' : 'additional client'}
+                    </p>
+                  )}
+                </div>
+
+                {/* Key metrics */}
+                <div className="grid grid-cols-2 gap-2 mb-6">
+                  <div className="text-center p-2 bg-muted/50 rounded-lg">
+                    <div className="text-sm font-bold text-primary">{plan.conversationsPerMonth}</div>
+                    <div className="text-xs text-muted-foreground">{language === 'fr' ? 'Conv./mois' : 'Conv./month'}</div>
+                  </div>
+                  <div className="text-center p-2 bg-muted/50 rounded-lg">
+                    <div className="text-sm font-bold text-primary">{plan.agentsIncluded}</div>
+                    <div className="text-xs text-muted-foreground">{language === 'fr' ? 'Agents' : 'Agents'}</div>
+                  </div>
                 </div>
 
                 {/* CTA */}
                 <Button
-                  className={`w-full h-12 mb-8 ${
+                  className={`w-full h-12 mb-6 ${
                     isPopular 
                       ? "bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-lg shadow-primary/25" 
                       : ""
                   }`}
                   variant={isPopular ? "default" : "outline"}
-                  onClick={() => navigate("/auth")}
+                  onClick={() => isEnterprise ? setShowContactModal(true) : navigate("/auth")}
                 >
-                  {price ? t('pricing.cta') : t('pricing.ctaContact')}
+                  {isEnterprise ? (
+                    <>
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      {t('pricing.ctaContact')}
+                    </>
+                  ) : (
+                    t('pricing.cta')
+                  )}
                 </Button>
 
                 {/* Features */}
-                <ul className="space-y-3">
-                  {(Array.isArray(features) ? features : []).map((feature: string, i: number) => (
-                    <li key={i} className="flex items-center gap-3">
-                      <div className={`w-5 h-5 rounded-full bg-gradient-to-br ${planColors[index]} flex items-center justify-center flex-shrink-0`}>
+                <ul className="space-y-2">
+                  {plan.features.slice(0, 6).map((feature: string, i: number) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <div className={`w-5 h-5 rounded-full bg-gradient-to-br ${planColors[index + 1]} flex items-center justify-center flex-shrink-0`}>
                         <Check className="w-3 h-3 text-white" />
                       </div>
                       <span className="text-sm">{feature}</span>
                     </li>
                   ))}
+                  {plan.features.length > 6 && (
+                    <li className="text-xs text-muted-foreground text-center pt-2">
+                      +{plan.features.length - 6} {language === 'fr' ? 'fonctionnalités' : 'more features'}
+                    </li>
+                  )}
                 </ul>
+
+                {/* Limitations */}
+                {plan.limitations && plan.limitations.length > 0 && (
+                  <div className="border-t mt-4 pt-4">
+                    <ul className="space-y-1">
+                      {plan.limitations.slice(0, 2).map((limitation, i) => (
+                        <li key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <X className="w-3 h-3 flex-shrink-0" />
+                          <span>{limitation}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </motion.div>
             );
           })}
@@ -140,9 +207,13 @@ export const PricingSection = () => {
           viewport={{ once: true }}
           className="text-center text-muted-foreground mt-12"
         >
-          {t('pricing.trial')}
+          {language === 'fr' 
+            ? 'Tous les plans incluent un essai gratuit de 14 jours. Annulez à tout moment.'
+            : 'All plans include a 14-day free trial. Cancel anytime.'}
         </motion.p>
       </div>
+
+      <ContactSalesModal open={showContactModal} onOpenChange={setShowContactModal} />
     </section>
   );
 };
