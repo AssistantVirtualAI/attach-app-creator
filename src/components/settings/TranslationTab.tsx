@@ -57,7 +57,7 @@ const languages = [
 export function TranslationTab() {
   const { t, language: currentLang } = useTranslation();
   type LangCode = 'fr' | 'en' | 'es' | 'de';
-  const [selectedLang, setSelectedLang] = useState(currentLang);
+  const [selectedLang, setSelectedLang] = useState<LangCode>(currentLang as LangCode);
   const [translations, setTranslations] = useState(defaultTranslations);
   const [newKey, setNewKey] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -145,7 +145,7 @@ export function TranslationTab() {
                   key={lang.code}
                   variant={selectedLang === lang.code ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setSelectedLang(lang.code)}
+                  onClick={() => setSelectedLang(lang.code as LangCode)}
                   className="gap-2"
                 >
                   <span>{lang.flag}</span>
