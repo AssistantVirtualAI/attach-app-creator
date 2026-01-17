@@ -20,8 +20,9 @@ import { PerformanceBillingTab } from '@/components/billing/PerformanceBillingTa
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface Invoice {
   id: string;
@@ -43,6 +44,7 @@ interface PaymentMethod {
 }
 
 export default function StripeBilling() {
+  const { t, language } = useTranslation();
   const [searchParams] = useSearchParams();
   const { selectedOrg } = useOrganization();
   const { billingConfig, currentPlan, isLoading } = useBillingConfig();
@@ -54,13 +56,14 @@ export default function StripeBilling() {
   const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(false);
 
   const isStripeConnected = !!billingConfig?.stripe_customer_id;
+  const dateLocale = language === 'fr' ? fr : enUS;
 
   useEffect(() => {
     if (searchParams.get('success') === 'true') {
-      toast.success('Paiement réussi ! Votre abonnement a été mis à jour.');
+      toast.success(t('messages.paymentSuccess'));
       refreshSubscription();
     } else if (searchParams.get('canceled') === 'true') {
-      toast.info('Paiement annulé.');
+      toast.info(t('messages.paymentCanceled'));
     }
   }, [searchParams]);
 
@@ -82,7 +85,6 @@ export default function StripeBilling() {
       setInvoices(data?.invoices || []);
     } catch (error) {
       console.error('Error fetching invoices:', error);
-      // Mock data for demo
       setInvoices([]);
     } finally {
       setLoadingInvoices(false);
@@ -100,7 +102,6 @@ export default function StripeBilling() {
       setPaymentMethods(data?.paymentMethods || []);
     } catch (error) {
       console.error('Error fetching payment methods:', error);
-      // Mock data for demo
       setPaymentMethods([]);
     } finally {
       setLoadingPaymentMethods(false);
@@ -108,12 +109,11 @@ export default function StripeBilling() {
   };
 
   const handleConnectStripe = async () => {
-    // Redirect to first plan checkout to connect Stripe
     await createCheckoutSession('starter');
   };
 
   const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('fr-FR', {
+    return new Intl.NumberFormat(language === 'fr' ? 'fr-FR' : 'en-US', {
       style: 'currency',
       currency: currency.toUpperCase(),
     }).format(amount / 100);
@@ -124,10 +124,10 @@ export default function StripeBilling() {
       <div className="p-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold gradient-text mb-2">
-            Facturation
+            {t('pages.billing.title')}
           </h1>
           <p className="text-muted-foreground">
-            Gérez votre abonnement et vos paiements
+            {t('pages.billing.subtitle')}
           </p>
         </div>
 
@@ -135,7 +135,7 @@ export default function StripeBilling() {
           <Alert className="mb-6 bg-green-500/10 border-green-500/50">
             <CheckCircle className="w-4 h-4 text-green-500" />
             <AlertDescription className="text-green-500">
-              Votre paiement a été traité avec succès !
+              {t('messages.paymentProcessed')}
             </AlertDescription>
           </Alert>
         )}
@@ -144,7 +144,7 @@ export default function StripeBilling() {
           <Alert className="mb-6 bg-yellow-500/10 border-yellow-500/50">
             <XCircle className="w-4 h-4 text-yellow-500" />
             <AlertDescription className="text-yellow-500">
-              Le paiement a été annulé.
+              {t('messages.paymentCanceled')}
             </AlertDescription>
           </Alert>
         )}
@@ -159,15 +159,15 @@ export default function StripeBilling() {
                     <Link2 className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-lg">Connectez-vous à Stripe</h3>
+                    <h3 className="font-semibold text-lg">{t('pages.billing.connectStripe')}</h3>
                     <p className="text-muted-foreground text-sm">
-                      Souscrivez à un plan pour activer les fonctionnalités premium
+                      {t('pages.billing.subscribeToActivate')}
                     </p>
                   </div>
                 </div>
                 <Button onClick={handleConnectStripe} disabled={isActionLoading}>
                   <CreditCard className="w-4 h-4 mr-2" />
-                  Commencer
+                  {t('pages.billing.getStarted')}
                 </Button>
               </div>
             </CardContent>
@@ -176,13 +176,13 @@ export default function StripeBilling() {
 
         <Tabs defaultValue="subscription" className="space-y-6">
           <TabsList className="flex-wrap">
-            <TabsTrigger value="subscription">Abonnement</TabsTrigger>
-            <TabsTrigger value="plans">Plans</TabsTrigger>
-            <TabsTrigger value="performance">Performance</TabsTrigger>
-            <TabsTrigger value="addons">Add-ons</TabsTrigger>
-            <TabsTrigger value="history">Historique</TabsTrigger>
-            <TabsTrigger value="payment-methods">Moyens de paiement</TabsTrigger>
-            <TabsTrigger value="tutorial">Tutoriel</TabsTrigger>
+            <TabsTrigger value="subscription">{t('pages.billing.subscription')}</TabsTrigger>
+            <TabsTrigger value="plans">{t('pages.billing.plans')}</TabsTrigger>
+            <TabsTrigger value="performance">{t('pages.billing.performance')}</TabsTrigger>
+            <TabsTrigger value="addons">{t('pages.billing.addons')}</TabsTrigger>
+            <TabsTrigger value="history">{t('pages.billing.history')}</TabsTrigger>
+            <TabsTrigger value="payment-methods">{t('pages.billing.paymentMethods')}</TabsTrigger>
+            <TabsTrigger value="tutorial">{t('pages.billing.tutorial')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="subscription" className="space-y-6">
@@ -204,9 +204,9 @@ export default function StripeBilling() {
 
           <TabsContent value="plans" className="space-y-6">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold mb-2">Choisissez votre plan</h2>
+              <h2 className="text-2xl font-bold mb-2">{t('pages.billing.choosePlan')}</h2>
               <p className="text-muted-foreground">
-                Sélectionnez le plan qui correspond à vos besoins
+                {t('pages.billing.selectPlanDescription')}
               </p>
             </div>
 
@@ -231,9 +231,9 @@ export default function StripeBilling() {
                 <div className="flex items-center gap-3">
                   <CreditCard className="w-6 h-6 text-primary" />
                   <div>
-                    <CardTitle>Add-ons disponibles</CardTitle>
+                    <CardTitle>{t('pages.billing.availableAddons')}</CardTitle>
                     <CardDescription>
-                      Ajoutez des fonctionnalités supplémentaires à votre abonnement
+                      {t('pages.billing.addExtraFeatures')}
                     </CardDescription>
                   </div>
                 </div>
@@ -243,7 +243,7 @@ export default function StripeBilling() {
                   <div className="text-center py-8">
                     <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                     <p className="text-muted-foreground">
-                      Souscrivez à un plan pour accéder aux add-ons
+                      {t('pages.billing.subscribeForAddons')}
                     </p>
                   </div>
                 ) : (
@@ -263,7 +263,7 @@ export default function StripeBilling() {
                             <div className="flex items-center justify-between">
                               <div>
                                 <span className="text-2xl font-bold">${addon.price}</span>
-                                <span className="text-muted-foreground">/mois</span>
+                                <span className="text-muted-foreground">/{language === 'fr' ? 'mois' : 'month'}</span>
                               </div>
                               {isAvailable ? (
                                 <Button 
@@ -281,16 +281,16 @@ export default function StripeBilling() {
                                       if (error) throw error;
                                       if (data?.url) window.location.href = data.url;
                                     } catch (err: any) {
-                                      toast.error(err.message || 'Erreur lors de l\'achat');
+                                      toast.error(err.message || t('messages.purchaseError'));
                                     }
                                   }}
                                   disabled={isActionLoading}
                                 >
-                                  Ajouter
+                                  {t('pages.billing.add')}
                                 </Button>
                               ) : (
                                 <Badge variant="secondary">
-                                  {addon.availableFor.join(', ')} uniquement
+                                  {addon.availableFor.join(', ')} {t('pages.billing.onlyFor')}
                                 </Badge>
                               )}
                             </div>
@@ -310,9 +310,9 @@ export default function StripeBilling() {
                 <div className="flex items-center gap-3">
                   <Receipt className="w-6 h-6 text-primary" />
                   <div>
-                    <CardTitle>Historique des paiements</CardTitle>
+                    <CardTitle>{t('pages.billing.paymentHistory')}</CardTitle>
                     <CardDescription>
-                      Consultez vos factures et paiements passés
+                      {t('pages.billing.viewInvoices')}
                     </CardDescription>
                   </div>
                 </div>
@@ -322,7 +322,7 @@ export default function StripeBilling() {
                   <div className="text-center py-8">
                     <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                     <p className="text-muted-foreground">
-                      Connectez-vous à Stripe pour voir votre historique de paiements
+                      {t('pages.billing.connectForHistory')}
                     </p>
                   </div>
                 ) : loadingInvoices ? (
@@ -334,7 +334,7 @@ export default function StripeBilling() {
                 ) : invoices.length === 0 ? (
                   <div className="text-center py-8">
                     <Receipt className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">Aucune facture pour le moment</p>
+                    <p className="text-muted-foreground">{t('pages.billing.noInvoices')}</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -352,13 +352,13 @@ export default function StripeBilling() {
                               {formatCurrency(invoice.amount_paid, invoice.currency)}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              {format(new Date(invoice.created * 1000), 'dd MMMM yyyy', { locale: fr })}
+                              {format(new Date(invoice.created * 1000), 'dd MMMM yyyy', { locale: dateLocale })}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
                           <Badge variant={invoice.status === 'paid' ? 'default' : 'secondary'}>
-                            {invoice.status === 'paid' ? 'Payée' : invoice.status}
+                            {invoice.status === 'paid' ? t('pages.billing.paid') : invoice.status}
                           </Badge>
                           {invoice.hosted_invoice_url && (
                             <Button
@@ -379,7 +379,7 @@ export default function StripeBilling() {
                   <div className="mt-4 pt-4 border-t">
                     <Button variant="outline" onClick={openCustomerPortal}>
                       <ExternalLink className="w-4 h-4 mr-2" />
-                      Voir toutes les factures sur Stripe
+                      {t('pages.billing.viewAllInvoices')}
                     </Button>
                   </div>
                 )}
@@ -393,9 +393,9 @@ export default function StripeBilling() {
                 <div className="flex items-center gap-3">
                   <Wallet className="w-6 h-6 text-primary" />
                   <div>
-                    <CardTitle>Moyens de paiement</CardTitle>
+                    <CardTitle>{t('pages.billing.paymentMethods')}</CardTitle>
                     <CardDescription>
-                      Gérez vos cartes et méthodes de paiement
+                      {t('pages.billing.managePaymentMethods')}
                     </CardDescription>
                   </div>
                 </div>
@@ -405,7 +405,7 @@ export default function StripeBilling() {
                   <div className="text-center py-8">
                     <AlertCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                     <p className="text-muted-foreground">
-                      Connectez-vous à Stripe pour gérer vos moyens de paiement
+                      {t('pages.billing.connectForPaymentMethods')}
                     </p>
                   </div>
                 ) : loadingPaymentMethods ? (
@@ -417,45 +417,39 @@ export default function StripeBilling() {
                 ) : paymentMethods.length === 0 ? (
                   <div className="text-center py-8">
                     <CreditCard className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground mb-4">Aucun moyen de paiement enregistré</p>
+                    <p className="text-muted-foreground mb-4">{t('pages.billing.noPaymentMethods')}</p>
                     <Button variant="outline" onClick={openCustomerPortal}>
-                      Ajouter une carte
+                      {t('pages.billing.addPaymentMethod')}
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {paymentMethods.map((method) => (
-                      <div 
+                      <div
                         key={method.id}
                         className="flex items-center justify-between p-4 rounded-lg border"
                       >
                         <div className="flex items-center gap-4">
-                          <div className="p-2 bg-muted rounded-lg">
-                            <CreditCard className="w-5 h-5" />
+                          <div className="p-3 bg-muted rounded-lg">
+                            <CreditCard className="w-6 h-6" />
                           </div>
                           <div>
-                            <p className="font-medium flex items-center gap-2">
-                              {method.brand.toUpperCase()} •••• {method.last4}
-                              {method.is_default && (
-                                <Badge variant="secondary" className="text-xs">Par défaut</Badge>
-                              )}
+                            <p className="font-medium capitalize">
+                              {method.brand} •••• {method.last4}
                             </p>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              Expire {method.exp_month.toString().padStart(2, '0')}/{method.exp_year}
+                            <p className="text-sm text-muted-foreground">
+                              {t('pages.billing.expiresOn')} {method.exp_month}/{method.exp_year}
                             </p>
                           </div>
                         </div>
+                        {method.is_default && (
+                          <Badge>{t('pages.billing.defaultCard')}</Badge>
+                        )}
                       </div>
                     ))}
-                  </div>
-                )}
-                
-                {isStripeConnected && (
-                  <div className="mt-4 pt-4 border-t">
-                    <Button variant="outline" onClick={openCustomerPortal}>
+                    <Button variant="outline" className="w-full" onClick={openCustomerPortal}>
                       <ExternalLink className="w-4 h-4 mr-2" />
-                      Gérer les moyens de paiement
+                      {t('pages.billing.viewAllInvoices')}
                     </Button>
                   </div>
                 )}
@@ -466,47 +460,23 @@ export default function StripeBilling() {
           <TabsContent value="tutorial" className="space-y-6">
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle>Guide de facturation</CardTitle>
-                <CardDescription>
-                  Découvrez comment gérer votre abonnement
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="aspect-video bg-card rounded-lg flex items-center justify-center border">
-                  <div className="text-center space-y-4">
-                    <Play className="w-16 h-16 text-primary mx-auto" />
-                    <p className="text-muted-foreground">
-                      Tutoriel vidéo - Gestion de l'abonnement
-                    </p>
-                    <Button variant="outline">
-                      Regarder sur YouTube
-                    </Button>
+                <div className="flex items-center gap-3">
+                  <Play className="w-6 h-6 text-primary" />
+                  <div>
+                    <CardTitle>{t('pages.billing.tutorial')}</CardTitle>
+                    <CardDescription>
+                      {language === 'fr' ? 'Apprenez à utiliser les fonctionnalités de facturation' : 'Learn how to use billing features'}
+                    </CardDescription>
                   </div>
                 </div>
-
-                <div className="mt-6 space-y-4">
-                  <h3 className="font-semibold text-lg">FAQ Facturation</h3>
-                  <div className="space-y-3">
-                    <div className="p-4 rounded-lg bg-muted/30">
-                      <p className="font-medium">Comment changer de plan ?</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Allez dans l'onglet "Plans" et sélectionnez le nouveau plan souhaité. 
-                        Le changement sera effectif immédiatement.
-                      </p>
-                    </div>
-                    <div className="p-4 rounded-lg bg-muted/30">
-                      <p className="font-medium">Comment annuler mon abonnement ?</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Cliquez sur "Gérer l'abonnement" pour accéder au portail client Stripe 
-                        où vous pourrez annuler votre abonnement.
-                      </p>
-                    </div>
-                    <div className="p-4 rounded-lg bg-muted/30">
-                      <p className="font-medium">Quand serai-je facturé ?</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        La facturation est mensuelle, à la date anniversaire de votre abonnement.
-                      </p>
-                    </div>
+              </CardHeader>
+              <CardContent>
+                <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
+                  <div className="text-center">
+                    <Play className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">
+                      {language === 'fr' ? 'Tutoriel vidéo à venir' : 'Video tutorial coming soon'}
+                    </p>
                   </div>
                 </div>
               </CardContent>

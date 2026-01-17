@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Languages, Save, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const defaultTranslations = {
   fr: {
@@ -55,7 +55,9 @@ const languages = [
 ];
 
 export function TranslationTab() {
-  const [selectedLang, setSelectedLang] = useState('fr');
+  const { t, language: currentLang } = useTranslation();
+  type LangCode = 'fr' | 'en' | 'es' | 'de';
+  const [selectedLang, setSelectedLang] = useState(currentLang);
   const [translations, setTranslations] = useState(defaultTranslations);
   const [newKey, setNewKey] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -90,7 +92,7 @@ export function TranslationTab() {
     });
     
     setNewKey('');
-    toast.success('Clé ajoutée');
+    toast.success(t('messages.createSuccess'));
   };
 
   const handleDeleteKey = (key: string) => {
@@ -103,7 +105,7 @@ export function TranslationTab() {
       });
       return updated;
     });
-    toast.success('Clé supprimée');
+    toast.success(t('messages.deleteSuccess'));
   };
 
   const handleSave = async () => {
@@ -111,9 +113,9 @@ export function TranslationTab() {
     try {
       // Here you would save to Supabase
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      toast.success('Traductions sauvegardées');
+      toast.success(t('messages.saveSuccess'));
     } catch (error) {
-      toast.error('Erreur lors de la sauvegarde');
+      toast.error(t('messages.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -128,15 +130,15 @@ export function TranslationTab() {
               <Languages className="w-6 h-6 text-white" />
             </div>
             <div>
-              <CardTitle>Personnalisation des traductions</CardTitle>
-              <CardDescription>Adaptez les textes de l'interface à votre marque</CardDescription>
+              <CardTitle>{currentLang === 'fr' ? 'Personnalisation des traductions' : 'Translation Customization'}</CardTitle>
+              <CardDescription>{currentLang === 'fr' ? 'Adaptez les textes de l\'interface à votre marque' : 'Adapt interface texts to your brand'}</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Language Selector */}
           <div className="flex items-center gap-4">
-            <Label>Langue :</Label>
+            <Label>{currentLang === 'fr' ? 'Langue :' : 'Language:'}</Label>
             <div className="flex gap-2">
               {languages.map((lang) => (
                 <Button
@@ -156,14 +158,14 @@ export function TranslationTab() {
           {/* Add New Key */}
           <div className="flex gap-2">
             <Input
-              placeholder="Nouvelle clé (ex: welcome_message)"
+              placeholder={currentLang === 'fr' ? 'Nouvelle clé (ex: welcome_message)' : 'New key (e.g., welcome_message)'}
               value={newKey}
               onChange={(e) => setNewKey(e.target.value)}
               className="flex-1"
             />
             <Button onClick={handleAddKey} disabled={!newKey.trim()}>
               <Plus className="w-4 h-4 mr-2" />
-              Ajouter
+              {t('common.add')}
             </Button>
           </div>
 
@@ -178,7 +180,7 @@ export function TranslationTab() {
                   value={value as string}
                   onChange={(e) => handleTranslationChange(key, e.target.value)}
                   className="flex-1 bg-background/50"
-                  placeholder={`Traduction pour "${key}"`}
+                  placeholder={`${currentLang === 'fr' ? 'Traduction pour' : 'Translation for'} "${key}"`}
                 />
                 <Button
                   variant="ghost"
@@ -194,7 +196,7 @@ export function TranslationTab() {
 
           <Button onClick={handleSave} disabled={isSaving} className="w-full">
             <Save className="w-4 h-4 mr-2" />
-            {isSaving ? 'Enregistrement...' : 'Enregistrer les traductions'}
+            {isSaving ? t('common.loading') : t('common.save')}
           </Button>
         </CardContent>
       </Card>

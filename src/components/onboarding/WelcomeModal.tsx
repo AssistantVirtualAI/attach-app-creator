@@ -22,24 +22,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-
-const STEPS = [
-  { id: 1, title: 'Bienvenue', icon: Sparkles },
-  { id: 2, title: 'Apparence', icon: Palette },
-  { id: 3, title: 'Premier Client', icon: Users },
-  { id: 4, title: 'Premier Agent', icon: Bot },
-];
+import { useTranslation } from '@/hooks/useTranslation';
 
 const COLOR_PRESETS = [
   { name: 'Violet', value: '#8B5CF6' },
-  { name: 'Bleu', value: '#3B82F6' },
+  { name: 'Blue', value: '#3B82F6' },
   { name: 'Cyan', value: '#06B6D4' },
-  { name: 'Vert', value: '#10B981' },
-  { name: 'Rose', value: '#EC4899' },
+  { name: 'Green', value: '#10B981' },
+  { name: 'Pink', value: '#EC4899' },
   { name: 'Orange', value: '#F97316' },
 ];
 
 export function WelcomeModal() {
+  const { t, language } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showWelcomeModal, currentStep, setCurrentStep, completeOnboarding, skipOnboarding } = useOnboarding();
@@ -60,6 +55,13 @@ export function WelcomeModal() {
   const [agentPlatform, setAgentPlatform] = useState('elevenlabs');
   const [agentName, setAgentName] = useState('');
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
+
+  const STEPS = [
+    { id: 1, title: language === 'fr' ? 'Bienvenue' : 'Welcome', icon: Sparkles },
+    { id: 2, title: language === 'fr' ? 'Apparence' : 'Appearance', icon: Palette },
+    { id: 3, title: language === 'fr' ? 'Premier Client' : 'First Client', icon: Users },
+    { id: 4, title: language === 'fr' ? 'Premier Agent' : 'First Agent', icon: Bot },
+  ];
 
   const progress = (currentStep / STEPS.length) * 100;
 
@@ -83,9 +85,9 @@ export function WelcomeModal() {
         .getPublicUrl(fileName);
 
       setLogoUrl(publicUrl);
-      toast.success('Logo téléchargé !');
+      toast.success(language === 'fr' ? 'Logo téléchargé !' : 'Logo uploaded!');
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors du téléchargement');
+      toast.error(error.message || t('messages.unknownError'));
     } finally {
       setIsUploading(false);
     }
@@ -106,23 +108,23 @@ export function WelcomeModal() {
       if (error) throw error;
       
       await refreshOrganization();
-      toast.success('Apparence sauvegardée !');
+      toast.success(t('messages.saveSuccess'));
       setCurrentStep(3);
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la sauvegarde');
+      toast.error(error.message || t('messages.saveError'));
     }
   };
 
   const handleCreateClient = async () => {
     if (!clientName.trim() || !clientEmail.trim() || !selectedOrgId) {
-      toast.error('Nom et email requis');
+      toast.error(t('messages.requiredFields'));
       return;
     }
 
     setIsCreatingClient(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Non authentifié');
+      if (!user) throw new Error(t('messages.notAuthenticated'));
 
       const username = clientName.toLowerCase().replace(/[^a-z0-9]/g, '');
 
@@ -145,10 +147,10 @@ export function WelcomeModal() {
 
       setCreatedClientId(data.id);
       queryClient.invalidateQueries({ queryKey: ['clients'] });
-      toast.success('Client créé !');
+      toast.success(t('messages.createSuccess'));
       setCurrentStep(4);
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la création');
+      toast.error(error.message || t('messages.createError'));
     } finally {
       setIsCreatingClient(false);
     }
@@ -156,7 +158,7 @@ export function WelcomeModal() {
 
   const handleCreateAgent = async () => {
     if (!agentName.trim() || !selectedOrgId) {
-      toast.error('Nom de l\'agent requis');
+      toast.error(t('messages.requiredFields'));
       return;
     }
 
@@ -175,11 +177,11 @@ export function WelcomeModal() {
       if (error) throw error;
 
       queryClient.invalidateQueries({ queryKey: ['agents'] });
-      toast.success('Agent créé !');
+      toast.success(t('messages.agentCreated'));
       await completeOnboarding();
       navigate('/agents');
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la création');
+      toast.error(error.message || t('messages.agentCreateError'));
     } finally {
       setIsCreatingAgent(false);
     }
@@ -195,18 +197,19 @@ export function WelcomeModal() {
             </div>
             <div>
               <h3 className="text-2xl font-bold mb-2">
-                Bienvenue sur AVA Statistics !
+                {language === 'fr' ? 'Bienvenue sur AVA Statistics !' : 'Welcome to AVA Statistics!'}
               </h3>
               <p className="text-muted-foreground max-w-md mx-auto">
-                Configurons votre agence en quelques étapes simples. 
-                Vous pourrez personnaliser votre plateforme, créer votre premier client et configurer votre premier agent IA.
+                {language === 'fr' 
+                  ? 'Configurons votre agence en quelques étapes simples. Vous pourrez personnaliser votre plateforme, créer votre premier client et configurer votre premier agent IA.'
+                  : 'Let\'s set up your agency in a few simple steps. You can customize your platform, create your first client, and configure your first AI agent.'}
               </p>
             </div>
             <div className="bg-accent/10 rounded-lg p-4 text-sm text-muted-foreground">
-              <p>🎉 Votre essai gratuit de <strong>7 jours</strong> est activé !</p>
+              <p>🎉 {language === 'fr' ? 'Votre essai gratuit de' : 'Your free'} <strong>7 {language === 'fr' ? 'jours' : 'day'}</strong> {language === 'fr' ? 'est activé !' : 'trial is activated!'}</p>
             </div>
             <Button onClick={() => setCurrentStep(2)} className="gap-2">
-              Commencer
+              {language === 'fr' ? 'Commencer' : 'Get Started'}
               <ArrowRight className="w-4 h-4" />
             </Button>
           </div>
@@ -217,7 +220,7 @@ export function WelcomeModal() {
           <div className="space-y-6">
             <div className="space-y-4">
               <div>
-                <Label>Logo de l'agence</Label>
+                <Label>{language === 'fr' ? 'Logo de l\'agence' : 'Agency Logo'}</Label>
                 <div className="mt-2 flex items-center gap-4">
                   {logoUrl ? (
                     <img src={logoUrl} alt="Logo" className="w-16 h-16 rounded-lg object-cover" />
@@ -235,14 +238,14 @@ export function WelcomeModal() {
                       disabled={isUploading}
                     />
                     <Button variant="outline" size="sm" asChild disabled={isUploading}>
-                      <span>{isUploading ? 'Téléchargement...' : 'Choisir un fichier'}</span>
+                      <span>{isUploading ? (language === 'fr' ? 'Téléchargement...' : 'Uploading...') : (language === 'fr' ? 'Choisir un fichier' : 'Choose a file')}</span>
                     </Button>
                   </label>
                 </div>
               </div>
 
               <div>
-                <Label>Couleur principale</Label>
+                <Label>{language === 'fr' ? 'Couleur principale' : 'Primary Color'}</Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {COLOR_PRESETS.map((color) => (
                     <button
@@ -270,10 +273,10 @@ export function WelcomeModal() {
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setCurrentStep(1)} className="flex-1">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Retour
+                {language === 'fr' ? 'Retour' : 'Back'}
               </Button>
               <Button onClick={handleSaveAppearance} className="flex-1">
-                Continuer
+                {language === 'fr' ? 'Continuer' : 'Continue'}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
@@ -284,17 +287,19 @@ export function WelcomeModal() {
         return (
           <div className="space-y-6">
             <p className="text-sm text-muted-foreground">
-              Créez votre premier client. Il aura accès à un portail dédié pour voir ses conversations et analytics.
+              {language === 'fr' 
+                ? 'Créez votre premier client. Il aura accès à un portail dédié pour voir ses conversations et analytics.'
+                : 'Create your first client. They will have access to a dedicated portal to view their conversations and analytics.'}
             </p>
             
             <div className="space-y-4">
               <div>
-                <Label htmlFor="clientName">Nom du client *</Label>
+                <Label htmlFor="clientName">{language === 'fr' ? 'Nom du client' : 'Client Name'} *</Label>
                 <Input
                   id="clientName"
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
-                  placeholder="Ex: Entreprise ABC"
+                  placeholder={language === 'fr' ? 'Ex: Entreprise ABC' : 'E.g., ABC Company'}
                 />
               </div>
 
@@ -305,12 +310,12 @@ export function WelcomeModal() {
                   type="email"
                   value={clientEmail}
                   onChange={(e) => setClientEmail(e.target.value)}
-                  placeholder="contact@entreprise.com"
+                  placeholder={language === 'fr' ? 'contact@entreprise.com' : 'contact@company.com'}
                 />
               </div>
 
               <div>
-                <Label htmlFor="clientLanguage">Langue</Label>
+                <Label htmlFor="clientLanguage">{language === 'fr' ? 'Langue' : 'Language'}</Label>
                 <Select value={clientLanguage} onValueChange={setClientLanguage}>
                   <SelectTrigger id="clientLanguage">
                     <SelectValue />
@@ -328,14 +333,14 @@ export function WelcomeModal() {
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setCurrentStep(2)} className="flex-1">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Retour
+                {language === 'fr' ? 'Retour' : 'Back'}
               </Button>
               <Button 
                 onClick={handleCreateClient} 
                 disabled={isCreatingClient || !clientName.trim() || !clientEmail.trim()}
                 className="flex-1"
               >
-                {isCreatingClient ? 'Création...' : 'Créer le client'}
+                {isCreatingClient ? (language === 'fr' ? 'Création...' : 'Creating...') : (language === 'fr' ? 'Créer le client' : 'Create Client')}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
@@ -346,12 +351,14 @@ export function WelcomeModal() {
         return (
           <div className="space-y-6">
             <p className="text-sm text-muted-foreground">
-              Dernière étape ! Créez votre premier agent IA. Vous pourrez le configurer en détail ensuite.
+              {language === 'fr' 
+                ? 'Dernière étape ! Créez votre premier agent IA. Vous pourrez le configurer en détail ensuite.'
+                : 'Last step! Create your first AI agent. You can configure it in detail later.'}
             </p>
             
             <div className="space-y-4">
               <div>
-                <Label htmlFor="agentPlatform">Plateforme</Label>
+                <Label htmlFor="agentPlatform">{language === 'fr' ? 'Plateforme' : 'Platform'}</Label>
                 <Select value={agentPlatform} onValueChange={setAgentPlatform}>
                   <SelectTrigger id="agentPlatform">
                     <SelectValue />
@@ -365,19 +372,19 @@ export function WelcomeModal() {
               </div>
 
               <div>
-                <Label htmlFor="agentName">Nom de l'agent *</Label>
+                <Label htmlFor="agentName">{language === 'fr' ? 'Nom de l\'agent' : 'Agent Name'} *</Label>
                 <Input
                   id="agentName"
                   value={agentName}
                   onChange={(e) => setAgentName(e.target.value)}
-                  placeholder="Ex: Assistant Vocal ABC"
+                  placeholder={language === 'fr' ? 'Ex: Assistant Vocal ABC' : 'E.g., ABC Voice Assistant'}
                 />
               </div>
 
               {createdClientId && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground bg-accent/10 p-3 rounded-lg">
                   <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  <span>Sera assigné au client: <strong>{clientName}</strong></span>
+                  <span>{language === 'fr' ? 'Sera assigné au client:' : 'Will be assigned to client:'} <strong>{clientName}</strong></span>
                 </div>
               )}
             </div>
@@ -385,14 +392,14 @@ export function WelcomeModal() {
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => setCurrentStep(3)} className="flex-1">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Retour
+                {language === 'fr' ? 'Retour' : 'Back'}
               </Button>
               <Button 
                 onClick={handleCreateAgent} 
                 disabled={isCreatingAgent || !agentName.trim()}
                 className="flex-1"
               >
-                {isCreatingAgent ? 'Création...' : 'Terminer'}
+                {isCreatingAgent ? (language === 'fr' ? 'Création...' : 'Creating...') : (language === 'fr' ? 'Terminer' : 'Finish')}
                 <CheckCircle2 className="w-4 h-4 ml-2" />
               </Button>
             </div>
@@ -427,13 +434,13 @@ export function WelcomeModal() {
             </Button>
           </div>
           <DialogDescription className="sr-only">
-            Étape {currentStep} sur {STEPS.length}
+            {language === 'fr' ? 'Étape' : 'Step'} {currentStep} {language === 'fr' ? 'sur' : 'of'} {STEPS.length}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Étape {currentStep}/{STEPS.length}</span>
+            <span>{language === 'fr' ? 'Étape' : 'Step'} {currentStep}/{STEPS.length}</span>
             <span>{Math.round(progress)}%</span>
           </div>
           <Progress value={progress} className="h-2" />

@@ -17,10 +17,12 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ArrowLeft, Save, Sparkles, Eye, Wand2, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 type BuilderMode = 'wizard' | 'advanced';
 
 export default function AgentBuilder() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { agentId } = useParams<{ agentId?: string }>();
   const { selectedOrgId } = useOrganization();
@@ -106,10 +108,10 @@ export default function AgentBuilder() {
 
   const handlePreview = () => {
     if (!config.systemPrompt) {
-      toast.error('Veuillez configurer le System Prompt pour prévisualiser');
+      toast.error(t('messages.configurePromptFirst'));
       return;
     }
-    toast.success('Utilisez le panneau de prévisualisation à droite pour tester');
+    toast.success(t('messages.usePreviewPanel'));
   };
 
   // Wizard mode (default for new agents)
@@ -126,10 +128,10 @@ export default function AgentBuilder() {
               <div>
                 <h1 className="text-xl font-bold flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-primary" />
-                  Créer un Agent
+                  {t('pages.agentBuilder.createAgent')}
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Configurez votre agent IA étape par étape
+                  {t('pages.agentBuilder.configureStepByStep')}
                 </p>
               </div>
             </div>
@@ -139,11 +141,11 @@ export default function AgentBuilder() {
                 <TabsList>
                   <TabsTrigger value="wizard" className="flex items-center gap-2">
                     <Wand2 className="h-4 w-4" />
-                    Assistant
+                    {t('pages.agentBuilder.assistant')}
                   </TabsTrigger>
                   <TabsTrigger value="advanced" className="flex items-center gap-2">
                     <Settings2 className="h-4 w-4" />
-                    Avancé
+                    {t('pages.agentBuilder.advanced')}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -189,10 +191,10 @@ export default function AgentBuilder() {
             <div>
               <h1 className="text-xl font-bold flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
-                {isEditMode ? 'Modifier l\'agent' : 'Agent Builder'}
+                {isEditMode ? t('pages.agentBuilder.editAgent') : 'Agent Builder'}
               </h1>
               <p className="text-sm text-muted-foreground">
-                {isEditMode ? 'Modifiez la configuration de votre agent' : 'Mode avancé - Glissez-déposez les blocs'}
+                {isEditMode ? t('pages.agentBuilder.editConfiguration') : t('pages.agentBuilder.advancedMode')}
               </p>
             </div>
           </div>
@@ -203,22 +205,22 @@ export default function AgentBuilder() {
                 <TabsList>
                   <TabsTrigger value="wizard" className="flex items-center gap-2">
                     <Wand2 className="h-4 w-4" />
-                    Assistant
+                    {t('pages.agentBuilder.assistant')}
                   </TabsTrigger>
                   <TabsTrigger value="advanced" className="flex items-center gap-2">
                     <Settings2 className="h-4 w-4" />
-                    Avancé
+                    {t('pages.agentBuilder.advanced')}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
             )}
             <Button variant="outline" onClick={handlePreview}>
               <Eye className="mr-2 h-4 w-4" />
-              Prévisualiser
+              {t('pages.agentBuilder.preview')}
             </Button>
             <Button onClick={handleSave} disabled={isSaving}>
               <Save className="mr-2 h-4 w-4" />
-              {isSaving ? 'Sauvegarde...' : isEditMode ? 'Mettre à jour' : 'Créer l\'agent'}
+              {isSaving ? t('pages.agentBuilder.saving') : isEditMode ? t('pages.agentBuilder.updateAgent') : t('pages.agentBuilder.createTheAgent')}
             </Button>
           </div>
         </div>
@@ -227,10 +229,10 @@ export default function AgentBuilder() {
         <div className="border-b bg-card p-4">
           <div className="flex items-end gap-4 max-w-3xl">
             <div className="flex-1">
-              <Label htmlFor="agentName">Nom de l'agent *</Label>
+              <Label htmlFor="agentName">{t('pages.agentBuilder.agentName')} *</Label>
               <Input
                 id="agentName"
-                placeholder="Mon Agent IA"
+                placeholder={t('pages.agentBuilder.agentName')}
                 value={agentName}
                 onChange={(e) => setAgentName(e.target.value)}
                 className="mt-1"
@@ -238,16 +240,16 @@ export default function AgentBuilder() {
             </div>
             {!isEditMode && (
               <div className="w-64">
-                <Label>Assigner à un client</Label>
+                <Label>{t('pages.agentBuilder.assignToClient')}</Label>
                 <Select
                   value={selectedClientId}
                   onValueChange={(v) => setSelectedClientId(v === 'none' ? undefined : v)}
                 >
                   <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Aucun client" />
+                    <SelectValue placeholder={t('pages.agentBuilder.noClient')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Aucun</SelectItem>
+                    <SelectItem value="none">{t('pages.agentBuilder.noClient')}</SelectItem>
                     {clients?.map((client) => (
                       <SelectItem key={client.id} value={client.id}>
                         {client.name}
