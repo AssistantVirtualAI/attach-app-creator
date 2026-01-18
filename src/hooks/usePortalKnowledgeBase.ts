@@ -115,14 +115,14 @@ async function fetchRetellKB(
 
   console.log('[RetellKB] Total available KBs:', kbs.length);
 
-  // If agent has linked KBs, filter to only show those
-  // If no linked KBs but agent was fetched, show all org KBs (agent hasn't been configured yet)
-  // This ensures the portal client matches the portal admin behavior
-  const filteredKbs = linkedKbIds.length > 0 
+  // IMPORTANT: Only show KBs that are explicitly linked to this agent
+  // If no linked KBs, show empty list (not all organization KBs)
+  // This ensures each agent's portal only shows its own knowledge base
+  const filteredKbs = agentFetched 
     ? kbs.filter((kb: any) => linkedKbIds.includes(kb.knowledge_base_id))
-    : kbs; // Show all available KBs if none specifically linked
+    : kbs; // Only show all if we couldn't fetch agent config
 
-  console.log('[RetellKB] Displaying KBs:', filteredKbs.length, linkedKbIds.length > 0 ? '(filtered by agent links)' : '(all available)');
+  console.log('[RetellKB] Displaying KBs:', filteredKbs.length, agentFetched ? '(filtered by agent links)' : '(agent not fetched, showing all)');
 
   const items: KnowledgeItem[] = filteredKbs.map((kb: any) => ({
     id: kb.knowledge_base_id,
