@@ -169,6 +169,7 @@ export default function WebhookLogs() {
         const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
           body: {
             action: 'list_workspace_webhooks',
+            agentId: selectedAgent.platform_agent_id,
             apiKey,
           },
         });
