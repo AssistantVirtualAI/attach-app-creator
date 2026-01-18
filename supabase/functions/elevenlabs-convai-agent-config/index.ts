@@ -205,6 +205,72 @@ serve(async (req) => {
       );
     }
 
+    if (action === 'update_workspace_webhook') {
+      const { webhookId, webhookName, isDisabled } = await req.json().catch(() => ({}));
+      console.log(`[elevenlabs-agent-config] Updating workspace webhook ${webhookId}`);
+
+      if (!webhookId) {
+        return new Response(
+          JSON.stringify({ error: 'webhookId is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const updateResponse = await fetch(`${ELEVENLABS_BASE_URL}/workspace/webhooks/${webhookId}`, {
+        method: 'PATCH',
+        headers: { 
+          'xi-api-key': apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: webhookName ?? '',
+          is_disabled: isDisabled ?? false,
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        throw new Error(`ElevenLabs API error: ${updateResponse.status} - ${errorText}`);
+      }
+
+      const updateData = await updateResponse.json();
+      console.log(`[elevenlabs-agent-config] Successfully updated webhook ${webhookId}`);
+
+      return new Response(
+        JSON.stringify({ success: true, data: updateData }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (action === 'delete_workspace_webhook') {
+      const { webhookId } = await req.json().catch(() => ({}));
+      console.log(`[elevenlabs-agent-config] Deleting workspace webhook ${webhookId}`);
+
+      if (!webhookId) {
+        return new Response(
+          JSON.stringify({ error: 'webhookId is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const deleteResponse = await fetch(`${ELEVENLABS_BASE_URL}/workspace/webhooks/${webhookId}`, {
+        method: 'DELETE',
+        headers: { 'xi-api-key': apiKey },
+      });
+
+      if (!deleteResponse.ok) {
+        const errorText = await deleteResponse.text();
+        throw new Error(`ElevenLabs API error: ${deleteResponse.status} - ${errorText}`);
+      }
+
+      console.log(`[elevenlabs-agent-config] Successfully deleted webhook ${webhookId}`);
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (!targetAgentId) {
       return new Response(
         JSON.stringify({ error: 'Agent ID required' }),

@@ -63,12 +63,17 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showEditPlatformModal, setShowEditPlatformModal] = useState(false);
   const [editingWebhook, setEditingWebhook] = useState<PlatformWebhook | null>(null);
+  const [editingPlatformWebhook, setEditingPlatformWebhook] = useState<Record<string, any> | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [fetchingPlatformWebhooks, setFetchingPlatformWebhooks] = useState(false);
   const [syncingWebhook, setSyncingWebhook] = useState(false);
+  const [deletingPlatformWebhook, setDeletingPlatformWebhook] = useState<string | null>(null);
+  const [updatingPlatformWebhook, setUpdatingPlatformWebhook] = useState(false);
   const [platformWebhooks, setPlatformWebhooks] = useState<PlatformWebhookConfig | null>(null);
   const [activeTab, setActiveTab] = useState<'local' | 'platform'>('local');
+  const [platformEditForm, setPlatformEditForm] = useState({ name: '', is_disabled: false });
   
   const [formData, setFormData] = useState<PlatformWebhookInput>({
     platform: 'elevenlabs',
@@ -334,6 +339,78 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
       setActiveTab('local');
     } catch (error) {
       console.error('Error importing webhook:', error);
+    }
+  };
+
+  const openEditPlatformModal = (wh: Record<string, any>) => {
+    setEditingPlatformWebhook(wh);
+    setPlatformEditForm({ name: wh.name || '', is_disabled: wh.is_disabled || false });
+    setShowEditPlatformModal(true);
+  };
+
+  const handleUpdatePlatformWebhook = async () => {
+    if (!editingPlatformWebhook || !selectedAgent) return;
+    setUpdatingPlatformWebhook(true);
+    try {
+      const agent = await getAgentApiKey(selectedAgentId);
+      if (!agent?.platform_api_key) {
+        toast.error(language === 'fr' ? 'Clé API non configurée' : 'API key not configured');
+        return;
+      }
+
+      const { error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
+        body: {
+          action: 'update_workspace_webhook',
+          apiKey: agent.platform_api_key,
+          webhookId: editingPlatformWebhook.webhook_id,
+          webhookName: platformEditForm.name,
+          isDisabled: platformEditForm.is_disabled,
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success(language === 'fr' ? 'Webhook mis à jour' : 'Webhook updated');
+      setShowEditPlatformModal(false);
+      setEditingPlatformWebhook(null);
+      // Refresh platform webhooks
+      fetchPlatformWebhooks();
+    } catch (error) {
+      console.error('Error updating platform webhook:', error);
+      toast.error(language === 'fr' ? 'Erreur lors de la mise à jour' : 'Failed to update webhook');
+    } finally {
+      setUpdatingPlatformWebhook(false);
+    }
+  };
+
+  const handleDeletePlatformWebhook = async (webhookId: string) => {
+    if (!selectedAgent) return;
+    setDeletingPlatformWebhook(webhookId);
+    try {
+      const agent = await getAgentApiKey(selectedAgentId);
+      if (!agent?.platform_api_key) {
+        toast.error(language === 'fr' ? 'Clé API non configurée' : 'API key not configured');
+        return;
+      }
+
+      const { error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
+        body: {
+          action: 'delete_workspace_webhook',
+          apiKey: agent.platform_api_key,
+          webhookId,
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success(language === 'fr' ? 'Webhook supprimé' : 'Webhook deleted');
+      // Refresh platform webhooks
+      fetchPlatformWebhooks();
+    } catch (error) {
+      console.error('Error deleting platform webhook:', error);
+      toast.error(language === 'fr' ? 'Erreur lors de la suppression' : 'Failed to delete webhook');
+    } finally {
+      setDeletingPlatformWebhook(null);
     }
   };
 
@@ -667,7 +744,7 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
                           {platformWebhooks.webhooks.map((wh: any) => (
                             <div key={wh.webhook_id || wh.webhook_url} className="p-3 rounded-lg border bg-card">
                               <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                   <div className="font-medium truncate">{wh.name || wh.webhook_id || 'Webhook'}</div>
                                   <code className="block text-xs bg-muted p-2 rounded-md font-mono mt-1 break-all">
                                     {wh.webhook_url}
@@ -689,6 +766,34 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
                                       {u.usage_type || 'usage'}
                                     </Badge>
                                   ))}
+                                </div>
+                              )}
+                              {/* Edit/Delete actions for ElevenLabs */}
+                              {selectedAgent?.platform === 'elevenlabs' && (
+                                <div className="flex gap-2 mt-3 pt-3 border-t">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openEditPlatformModal(wh)}
+                                    className="gap-2"
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                    {language === 'fr' ? 'Modifier' : 'Edit'}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeletePlatformWebhook(wh.webhook_id)}
+                                    disabled={deletingPlatformWebhook === wh.webhook_id}
+                                    className="text-destructive hover:text-destructive gap-2"
+                                  >
+                                    {deletingPlatformWebhook === wh.webhook_id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-3 w-3" />
+                                    )}
+                                    {language === 'fr' ? 'Supprimer' : 'Delete'}
+                                  </Button>
                                 </div>
                               )}
                             </div>
@@ -897,6 +1002,64 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
             >
               {updateWebhook.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Platform Webhook Modal (ElevenLabs) */}
+      <Dialog open={showEditPlatformModal} onOpenChange={setShowEditPlatformModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {language === 'fr' ? 'Modifier le webhook' : 'Edit Webhook'}
+            </DialogTitle>
+            <DialogDescription>
+              {language === 'fr' 
+                ? 'Modifiez le nom et le statut du webhook sur la plateforme.'
+                : 'Update the webhook name and status on the platform.'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>{language === 'fr' ? 'Nom' : 'Name'}</Label>
+              <Input
+                value={platformEditForm.name}
+                onChange={(e) => setPlatformEditForm({ ...platformEditForm, name: e.target.value })}
+                placeholder={language === 'fr' ? 'Nom du webhook' : 'Webhook name'}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>{language === 'fr' ? 'URL (lecture seule)' : 'URL (read-only)'}</Label>
+              <code className="block text-sm bg-muted p-2 rounded-md font-mono break-all">
+                {editingPlatformWebhook?.webhook_url || '-'}
+              </code>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="platform-webhook-disabled">
+                {language === 'fr' ? 'Désactiver le webhook' : 'Disable webhook'}
+              </Label>
+              <Switch
+                id="platform-webhook-disabled"
+                checked={platformEditForm.is_disabled}
+                onCheckedChange={(checked) => setPlatformEditForm({ ...platformEditForm, is_disabled: checked })}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditPlatformModal(false)}>
+              {language === 'fr' ? 'Annuler' : 'Cancel'}
+            </Button>
+            <Button 
+              onClick={handleUpdatePlatformWebhook} 
+              disabled={updatingPlatformWebhook}
+            >
+              {updatingPlatformWebhook && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {language === 'fr' ? 'Enregistrer' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </DialogContent>
