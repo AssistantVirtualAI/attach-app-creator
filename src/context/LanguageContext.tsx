@@ -19,11 +19,11 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
       if (stored === 'en' || stored === 'fr') {
         return stored;
       }
-      // Detect browser language
+      // Detect browser language - default to English unless explicitly French
       const browserLang = navigator.language.split('-')[0];
-      return browserLang === 'en' ? 'en' : 'fr';
+      return browserLang === 'fr' ? 'fr' : 'en';
     }
-    return 'fr';
+    return 'en';
   });
 
   useEffect(() => {
