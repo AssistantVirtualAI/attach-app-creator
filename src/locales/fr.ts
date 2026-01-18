@@ -2125,5 +2125,7 @@ export const fr = {
     logDetails: 'Détails du webhook',
     payload: 'Payload',
     noApiKey: 'Clé API non configurée pour cette plateforme',
+    unnamed: 'Sans nom',
+    webhookUrl: 'URL du webhook',
   },
 };
