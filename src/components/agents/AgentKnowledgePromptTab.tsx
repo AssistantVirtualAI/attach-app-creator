@@ -25,6 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AgentSettings } from '@/hooks/useAgentSettings';
 import { PromptTemplatesSection } from './PromptTemplatesSection';
+import { PromptAIAssistant } from './PromptAIAssistant';
 import { useAgentConfigByPlatform } from '@/hooks/usePortalAgentConfig';
 
 interface AgentKnowledgePromptTabProps {
@@ -336,6 +337,24 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
         </TabsList>
 
         <TabsContent value="prompt" className="space-y-4">
+          {/* AI Assistant for Prompt Improvement */}
+          <PromptAIAssistant
+            agentId={agent.id}
+            agentName={agent.name}
+            currentPrompt={prompt}
+            currentFirstMessage={firstMessage}
+            organizationId={agent.organization_id}
+            onApplyPrompt={(newPrompt) => {
+              setPrompt(newPrompt);
+              setHasChanges(true);
+            }}
+            onApplyFirstMessage={(newFirstMessage) => {
+              setFirstMessage(newFirstMessage);
+              setHasChanges(true);
+            }}
+            canEdit={true}
+          />
+
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

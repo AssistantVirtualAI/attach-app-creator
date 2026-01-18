@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { FileCode, MessageSquare, Eye, Save, Loader2, AlertCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { PromptAIAssistant } from '@/components/agents/PromptAIAssistant';
 
 const PortalPrompt = () => {
   const { session } = usePortal();
@@ -109,7 +110,28 @@ const PortalPrompt = () => {
       )}
 
       {agentConfig && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
+          {/* AI Assistant for Prompt Improvement */}
+          {canEdit && (
+            <PromptAIAssistant
+              agentId={session?.agentId || ''}
+              agentName={session?.agentName}
+              currentPrompt={systemPrompt}
+              currentFirstMessage={firstMessage}
+              organizationId={session?.organizationId}
+              onApplyPrompt={(newPrompt) => {
+                setSystemPrompt(newPrompt);
+                setHasChanges(true);
+              }}
+              onApplyFirstMessage={(newFirstMessage) => {
+                setFirstMessage(newFirstMessage);
+                setHasChanges(true);
+              }}
+              canEdit={canEdit}
+            />
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card className="bg-card/50 backdrop-blur-sm border-border/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -155,6 +177,7 @@ const PortalPrompt = () => {
               )}
             </CardContent>
           </Card>
+          </div>
         </div>
       )}
     </motion.div>
