@@ -187,7 +187,6 @@ serve(async (req) => {
       const filterAgentId = targetAgentId;
       console.log(`[elevenlabs-agent-config] Listing workspace webhooks${filterAgentId ? ` for agent ${filterAgentId}` : ''}`);
 
-      // First, fetch all workspace webhooks
       const webhooksResponse = await fetch(`${ELEVENLABS_BASE_URL}/workspace/webhooks?include_usages=true`, {
         headers: { 'xi-api-key': apiKey },
       });
@@ -199,35 +198,65 @@ serve(async (req) => {
 
       const webhooksData = await webhooksResponse.json();
       let webhooks = webhooksData.webhooks || [];
-      
-      console.log(`[elevenlabs-agent-config] Raw webhooks count: ${webhooks.length}`);
-      
-      // If we need to filter by agent, get the agent's config to find its associated webhook_id
-      if (filterAgentId && webhooks.length > 0) {
-        // Fetch agent config to get its webhook settings
-        const agentResponse = await fetch(`${ELEVENLABS_BASE_URL}/convai/agents/${filterAgentId}`, {
-          headers: { 'xi-api-key': apiKey },
-        });
 
+      console.log(`[elevenlabs-agent-config] Raw webhooks count: ${webhooks.length}`);
+
+      // If agent filter requested, try multiple strategies to map webhooks -> agent
+      if (filterAgentId && webhooks.length > 0) {
         let agentWebhookId: string | null = null;
-        
-        if (agentResponse.ok) {
-          const agentData = await agentResponse.json();
-          // The webhook_id is in platform_settings.webhook
-          agentWebhookId = agentData?.platform_settings?.webhook?.webhook_id || null;
-          console.log(`[elevenlabs-agent-config] Agent ${filterAgentId} has webhook_id: ${agentWebhookId}`);
-        } else {
-          console.log(`[elevenlabs-agent-config] Could not fetch agent config: ${agentResponse.status}`);
+
+        // Strategy A: read webhook_id from agent config (structure can differ between API versions)
+        try {
+          const agentResponse = await fetch(`${ELEVENLABS_BASE_URL}/convai/agents/${filterAgentId}`, {
+            headers: { 'xi-api-key': apiKey },
+          });
+
+          if (agentResponse.ok) {
+            const agentData = await agentResponse.json();
+            agentWebhookId =
+              agentData?.platform_settings?.webhook?.webhook_id ||
+              agentData?.platform_settings?.webhook_id ||
+              agentData?.conversation_config?.platform_settings?.webhook?.webhook_id ||
+              agentData?.conversation_config?.platform_settings?.webhook_id ||
+              null;
+
+            console.log(`[elevenlabs-agent-config] Agent ${filterAgentId} webhook_id (from config): ${agentWebhookId}`);
+          } else {
+            console.log(`[elevenlabs-agent-config] Could not fetch agent config: ${agentResponse.status}`);
+          }
+        } catch (e) {
+          console.log(`[elevenlabs-agent-config] Error fetching agent config for webhook filter: ${String(e)}`);
         }
-        
+
+        // Strategy B: if include_usages=true provides agent association, filter using usages
+        const matchesUsage = (webhook: any) => {
+          const usages = webhook?.usages;
+          if (!Array.isArray(usages)) return false;
+
+          return usages.some((u: any) => {
+            const ar = u?.associated_resources;
+            // Sometimes associated_resources is an object, sometimes an array
+            if (Array.isArray(ar)) {
+              return ar.some((r: any) => r?.agent_id === filterAgentId);
+            }
+            return ar?.agent_id === filterAgentId;
+          });
+        };
+
         if (agentWebhookId) {
-          // Filter webhooks to only show the one associated with this agent
-          webhooks = webhooks.filter((webhook: any) => webhook.webhook_id === agentWebhookId);
-          console.log(`[elevenlabs-agent-config] Filtered to ${webhooks.length} webhooks for agent ${filterAgentId}`);
+          webhooks = webhooks.filter((w: any) => w?.webhook_id === agentWebhookId);
+          console.log(`[elevenlabs-agent-config] Filtered by webhook_id => ${webhooks.length} webhooks`);
         } else {
-          // If agent has no webhook configured, return empty array
-          console.log(`[elevenlabs-agent-config] Agent has no webhook configured, returning empty`);
-          webhooks = [];
+          const usageFiltered = webhooks.filter(matchesUsage);
+          console.log(`[elevenlabs-agent-config] Filtered by usages => ${usageFiltered.length} webhooks`);
+          webhooks = usageFiltered;
+        }
+
+        // Helpful debug: log one sample webhook shape (without secrets)
+        if (webhooks.length === 0 && webhooksData?.webhooks?.length) {
+          const sample = webhooksData.webhooks[0];
+          console.log(`[elevenlabs-agent-config] Sample webhook keys: ${Object.keys(sample || {}).join(', ')}`);
+          console.log(`[elevenlabs-agent-config] Sample webhook.usages type: ${Array.isArray(sample?.usages) ? 'array' : typeof sample?.usages}`);
         }
       } else {
         console.log(`[elevenlabs-agent-config] Fetched ${webhooks.length} workspace webhooks (no filter)`);
