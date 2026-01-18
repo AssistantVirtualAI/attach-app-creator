@@ -9,7 +9,7 @@ export interface PortalSession {
   agentName: string;
   agentSlug: string;
   platformAgentId?: string;
-  // SECURITY: platformApiKey removed - use client-portal-proxy edge function instead
+  // SECURITY: platformApiKey removed - API keys are fetched server-side via dedicated edge functions
   platform?: string;
   role: 'viewer' | 'admin' | 'super_admin';
   canEditKnowledge: boolean;
@@ -121,7 +121,7 @@ export const usePortalAuth = () => {
         return null;
       }
 
-      // SECURITY: Do NOT fetch API keys client-side - use client-portal-proxy edge function
+      // SECURITY: Do NOT fetch API keys client-side - use dedicated edge functions with proper auth
       const portalSession: PortalSession = {
         clientId: 'super-admin',
         clientName: 'Super Admin',
@@ -173,7 +173,7 @@ export const usePortalAuth = () => {
         return null;
       }
 
-      // SECURITY: Do NOT fetch API keys client-side - use client-portal-proxy edge function
+      // SECURITY: Do NOT fetch API keys client-side - use dedicated edge functions with proper auth
       const portalSession: PortalSession = {
         clientId: 'admin',
         clientName: 'Admin',
