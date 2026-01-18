@@ -83,6 +83,7 @@ async function fetchRetellKB(
 ): Promise<KnowledgeBaseResponse> {
   // First get the agent config to find linked knowledge_base_ids
   let linkedKbIds: string[] = [];
+  let agentFetched = false;
   
   if (agentId) {
     try {
@@ -91,6 +92,7 @@ async function fetchRetellKB(
       });
       
       if (!agentError && agentData?.data) {
+        agentFetched = true;
         // Retell agent config has knowledge_base_ids array
         linkedKbIds = agentData.data.knowledge_base_ids || [];
         console.log('[RetellKB] Agent linked KB IDs:', linkedKbIds);
@@ -111,13 +113,16 @@ async function fetchRetellKB(
   const rawKbs = data?.data || data || [];
   const kbs = Array.isArray(rawKbs) ? rawKbs : [];
 
-  // Filter to only show KBs linked to this agent
-  // If agent has no linked KBs, show empty list (not all org KBs)
+  console.log('[RetellKB] Total available KBs:', kbs.length);
+
+  // If agent has linked KBs, filter to only show those
+  // If no linked KBs but agent was fetched, show all org KBs (agent hasn't been configured yet)
+  // This ensures the portal client matches the portal admin behavior
   const filteredKbs = linkedKbIds.length > 0 
     ? kbs.filter((kb: any) => linkedKbIds.includes(kb.knowledge_base_id))
-    : []; // No linked KBs = empty list (not a fallback to all)
+    : kbs; // Show all available KBs if none specifically linked
 
-  console.log('[RetellKB] Filtered KBs:', filteredKbs.length, 'out of', kbs.length);
+  console.log('[RetellKB] Displaying KBs:', filteredKbs.length, linkedKbIds.length > 0 ? '(filtered by agent links)' : '(all available)');
 
   const items: KnowledgeItem[] = filteredKbs.map((kb: any) => ({
     id: kb.knowledge_base_id,
@@ -126,7 +131,7 @@ async function fetchRetellKB(
     created_at: kb.created_at,
   }));
 
-  return { items, total: items.length };
+  return { items, total: kbs.length };
 }
 
 // Fetch VAPI knowledge base - filtered by assistant's linked files
