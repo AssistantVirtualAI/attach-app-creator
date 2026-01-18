@@ -81,31 +81,44 @@ async function fetchRetellKB(
   organizationId: string | undefined,
   agentId: string | undefined
 ): Promise<KnowledgeBaseResponse> {
+  console.log('[RetellKB] Fetching for org:', organizationId, 'agent:', agentId);
+  
   // First get the agent config to find linked knowledge_base_ids
   let linkedKbIds: string[] = [];
   let agentFetched = false;
   
   if (agentId) {
     try {
+      // Use retellAgentId parameter for Retell API
       const { data: agentData, error: agentError } = await supabase.functions.invoke('retell-proxy', {
-        body: { action: 'getAgent', organizationId, agentId },
+        body: { 
+          action: 'getAgent', 
+          organizationId, 
+          retellAgentId: agentId // Use retellAgentId for Retell API
+        },
       });
+      
+      console.log('[RetellKB] Agent fetch response:', JSON.stringify(agentData), 'error:', agentError);
       
       if (!agentError && agentData?.data) {
         agentFetched = true;
         // Retell agent config has knowledge_base_ids array
         linkedKbIds = agentData.data.knowledge_base_ids || [];
         console.log('[RetellKB] Agent linked KB IDs:', linkedKbIds);
+      } else if (agentData?.success === false) {
+        console.warn('[RetellKB] Agent fetch failed:', agentData?.error);
       }
     } catch (e) {
       console.warn('[RetellKB] Could not fetch agent config for KB filtering:', e);
     }
   }
 
-  // Fetch all knowledge bases
+  // Fetch all knowledge bases for the organization
   const { data, error } = await supabase.functions.invoke('retell-proxy', {
     body: { action: 'listKnowledgeBases', organizationId },
   });
+
+  console.log('[RetellKB] List KBs response:', JSON.stringify(data), 'error:', error);
 
   if (error) throw error;
 
@@ -113,16 +126,24 @@ async function fetchRetellKB(
   const rawKbs = data?.data || data || [];
   const kbs = Array.isArray(rawKbs) ? rawKbs : [];
 
-  console.log('[RetellKB] Total available KBs:', kbs.length);
+  console.log('[RetellKB] Total available KBs:', kbs.length, 'KB IDs:', kbs.map((kb: any) => kb.knowledge_base_id));
 
-  // IMPORTANT: Only show KBs that are explicitly linked to this agent
-  // If no linked KBs, show empty list (not all organization KBs)
-  // This ensures each agent's portal only shows its own knowledge base
-  const filteredKbs = agentFetched 
-    ? kbs.filter((kb: any) => linkedKbIds.includes(kb.knowledge_base_id))
-    : kbs; // Only show all if we couldn't fetch agent config
-
-  console.log('[RetellKB] Displaying KBs:', filteredKbs.length, agentFetched ? '(filtered by agent links)' : '(agent not fetched, showing all)');
+  // Filter KBs based on agent's linked knowledge_base_ids
+  let filteredKbs: any[];
+  
+  if (agentFetched && linkedKbIds.length > 0) {
+    // Agent has linked KBs - only show those
+    filteredKbs = kbs.filter((kb: any) => linkedKbIds.includes(kb.knowledge_base_id));
+    console.log('[RetellKB] Filtered by agent links:', filteredKbs.length, 'of', kbs.length);
+  } else if (agentFetched && linkedKbIds.length === 0) {
+    // Agent was fetched but has no linked KBs - show empty
+    filteredKbs = [];
+    console.log('[RetellKB] Agent has no linked KBs, showing empty list');
+  } else {
+    // Could not fetch agent config - show all KBs as fallback
+    filteredKbs = kbs;
+    console.log('[RetellKB] Could not fetch agent, showing all KBs as fallback');
+  }
 
   const items: KnowledgeItem[] = filteredKbs.map((kb: any) => ({
     id: kb.knowledge_base_id,
