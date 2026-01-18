@@ -183,6 +183,28 @@ serve(async (req) => {
       );
     }
 
+    if (action === 'list_workspace_webhooks') {
+      console.log('[elevenlabs-agent-config] Listing workspace webhooks');
+
+      const webhooksResponse = await fetch(`${ELEVENLABS_BASE_URL}/workspace/webhooks?include_usages=true`, {
+        headers: { 'xi-api-key': apiKey },
+      });
+
+      if (!webhooksResponse.ok) {
+        const errorText = await webhooksResponse.text();
+        throw new Error(`ElevenLabs API error: ${webhooksResponse.status} - ${errorText}`);
+      }
+
+      const webhooksData = await webhooksResponse.json();
+      const count = Array.isArray(webhooksData?.webhooks) ? webhooksData.webhooks.length : 0;
+      console.log(`[elevenlabs-agent-config] Fetched ${count} workspace webhooks`);
+
+      return new Response(
+        JSON.stringify({ webhooks: webhooksData.webhooks || [] }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (!targetAgentId) {
       return new Response(
         JSON.stringify({ error: 'Agent ID required' }),
