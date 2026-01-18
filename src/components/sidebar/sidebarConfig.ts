@@ -2,7 +2,8 @@ import {
   Home, TrendingUp, MessageSquare, BarChart3, BookOpen, 
   Bot, Sparkles, FileQuestion, Users, UserPlus, Calendar,
   Phone, MessageCircle, GitBranch, Sliders, Webhook,
-  CreditCard, Settings, Tag, Headphones, LayoutDashboard, Radio, Globe
+  CreditCard, Settings, Tag, Headphones, LayoutDashboard, Radio, Globe,
+  Shield, Building2
 } from 'lucide-react';
 
 export interface NavItem {
@@ -17,6 +18,7 @@ export interface NavGroup {
   icon: React.ComponentType<{ className?: string }>;
   items: NavItem[];
   adminOnly?: boolean;
+  superAdminOnly?: boolean;
 }
 
 export const sidebarGroups: NavGroup[] = [
@@ -96,6 +98,15 @@ export const sidebarGroups: NavGroup[] = [
     items: [
       { nameKey: 'sidebar.stripeBilling', href: '/stripe-billing', icon: CreditCard },
       { nameKey: 'sidebar.saasConfig', href: '/saas-config', icon: Settings },
+    ]
+  },
+  {
+    id: 'administration',
+    labelKey: 'sidebar.groups.administration',
+    icon: Shield,
+    superAdminOnly: true,
+    items: [
+      { nameKey: 'sidebar.superAdmin', href: '/super-admin', icon: Building2 },
     ]
   },
 ];

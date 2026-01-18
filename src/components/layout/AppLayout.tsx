@@ -40,6 +40,12 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Filter groups based on role - show adminOnly groups for admins and managers
   // During loading, show all groups to prevent flash of missing items
   const visibleGroups = sidebarGroups.filter(group => {
+    // Super admin only groups
+    if (group.superAdminOnly) {
+      if (isLoading) return false; // Don't show during loading
+      return isSuperAdmin;
+    }
+    
     if (group.adminOnly) {
       // During loading, show adminOnly groups (they'll be hidden if user doesn't have access after load)
       if (isLoading) return true;

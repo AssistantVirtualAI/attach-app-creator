@@ -477,6 +477,7 @@ export const en = {
       campaigns: 'Campaigns',
       config: 'Configuration',
       billing: 'Billing',
+      administration: 'Administration',
     },
     home: 'Home',
     dashboard: 'Dashboard',
@@ -503,6 +504,7 @@ export const en = {
     stripeBilling: 'Stripe Billing',
     saasConfig: 'SaaS Config',
     settings: 'Settings',
+    superAdmin: 'Super Admin',
   },
 
   // Roles
