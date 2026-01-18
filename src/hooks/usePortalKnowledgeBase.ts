@@ -76,44 +76,75 @@ async function fetchElevenLabsKB(
   };
 }
 
-// Fetch Retell knowledge bases - filtered by agent's linked KBs
+// Fetch Retell knowledge bases - filtered by the selected agent (via agent or LLM linkage)
 async function fetchRetellKB(
   organizationId: string | undefined,
   agentId: string | undefined
 ): Promise<KnowledgeBaseResponse> {
   console.log('[RetellKB] Fetching for org:', organizationId, 'agent:', agentId);
-  
-  // First get the agent config to find linked knowledge_base_ids
+
+  // Retell can link KBs either directly on the agent OR on the LLM used by the agent.
   let linkedKbIds: string[] = [];
-  let agentFetched = false;
-  
+  let linkageSource: 'agent' | 'llm' | 'none' = 'none';
+
+  // 1) Fetch agent config (to find LLM id and/or KB ids)
+  let agent: any | null = null;
   if (agentId) {
     try {
-      // Use retellAgentId parameter for Retell API
-      const { data: agentData, error: agentError } = await supabase.functions.invoke('retell-proxy', {
-        body: { 
-          action: 'getAgent', 
-          organizationId, 
-          retellAgentId: agentId // Use retellAgentId for Retell API
+      const { data: agentResp, error: agentError } = await supabase.functions.invoke('retell-proxy', {
+        body: {
+          action: 'getAgent',
+          organizationId,
+          retellAgentId: agentId,
         },
       });
-      
-      console.log('[RetellKB] Agent fetch response:', JSON.stringify(agentData), 'error:', agentError);
-      
-      if (!agentError && agentData?.data) {
-        agentFetched = true;
-        // Retell agent config has knowledge_base_ids array
-        linkedKbIds = agentData.data.knowledge_base_ids || [];
-        console.log('[RetellKB] Agent linked KB IDs:', linkedKbIds);
-      } else if (agentData?.success === false) {
-        console.warn('[RetellKB] Agent fetch failed:', agentData?.error);
+
+      console.log('[RetellKB] Agent fetch response:', JSON.stringify(agentResp), 'error:', agentError);
+
+      if (!agentError && agentResp?.data) {
+        agent = agentResp.data;
+
+        // Some Retell setups store KB linkage on the agent.
+        if (Array.isArray(agent.knowledge_base_ids) && agent.knowledge_base_ids.length > 0) {
+          linkedKbIds = agent.knowledge_base_ids;
+          linkageSource = 'agent';
+        }
+      } else if (agentResp?.success === false) {
+        console.warn('[RetellKB] Agent fetch failed:', agentResp?.error);
       }
     } catch (e) {
       console.warn('[RetellKB] Could not fetch agent config for KB filtering:', e);
     }
   }
 
-  // Fetch all knowledge bases for the organization
+  // 2) If not linked on agent, try linking via the agent's LLM (common for Retell)
+  if (linkedKbIds.length === 0) {
+    const llmId = agent?.response_engine?.llm_id || agent?.llm_id;
+    if (llmId) {
+      try {
+        const { data: llmResp, error: llmError } = await supabase.functions.invoke('retell-proxy', {
+          body: {
+            action: 'getLlm',
+            organizationId,
+            llmId,
+          },
+        });
+
+        console.log('[RetellKB] LLM fetch response:', JSON.stringify(llmResp), 'error:', llmError);
+
+        if (!llmError && llmResp?.data && Array.isArray(llmResp.data.knowledge_base_ids)) {
+          linkedKbIds = llmResp.data.knowledge_base_ids;
+          linkageSource = linkedKbIds.length > 0 ? 'llm' : 'none';
+        }
+      } catch (e) {
+        console.warn('[RetellKB] Could not fetch LLM config for KB filtering:', e);
+      }
+    }
+  }
+
+  console.log('[RetellKB] Linked KB IDs:', linkedKbIds, 'source:', linkageSource);
+
+  // 3) Fetch all knowledge bases for the organization
   const { data, error } = await supabase.functions.invoke('retell-proxy', {
     body: { action: 'listKnowledgeBases', organizationId },
   });
@@ -122,28 +153,18 @@ async function fetchRetellKB(
 
   if (error) throw error;
 
-  // Retell returns array directly or wrapped in data
   const rawKbs = data?.data || data || [];
   const kbs = Array.isArray(rawKbs) ? rawKbs : [];
 
-  console.log('[RetellKB] Total available KBs:', kbs.length, 'KB IDs:', kbs.map((kb: any) => kb.knowledge_base_id));
+  console.log('[RetellKB] Total available KBs:', kbs.length);
 
-  // Filter KBs based on agent's linked knowledge_base_ids
-  let filteredKbs: any[];
-  
-  if (agentFetched && linkedKbIds.length > 0) {
-    // Agent has linked KBs - only show those
-    filteredKbs = kbs.filter((kb: any) => linkedKbIds.includes(kb.knowledge_base_id));
-    console.log('[RetellKB] Filtered by agent links:', filteredKbs.length, 'of', kbs.length);
-  } else if (agentFetched && linkedKbIds.length === 0) {
-    // Agent was fetched but has no linked KBs - show empty
-    filteredKbs = [];
-    console.log('[RetellKB] Agent has no linked KBs, showing empty list');
-  } else {
-    // Could not fetch agent config - show all KBs as fallback
-    filteredKbs = kbs;
-    console.log('[RetellKB] Could not fetch agent, showing all KBs as fallback');
-  }
+  // IMPORTANT: in client portal, always scope KB to the selected agent.
+  // If we can't determine linkage, we show empty (not all KBs).
+  const filteredKbs = linkedKbIds.length > 0
+    ? kbs.filter((kb: any) => linkedKbIds.includes(kb.knowledge_base_id))
+    : [];
+
+  console.log('[RetellKB] Displaying KBs:', filteredKbs.length, '(filtered by', linkageSource, ')');
 
   const items: KnowledgeItem[] = filteredKbs.map((kb: any) => ({
     id: kb.knowledge_base_id,
@@ -152,7 +173,7 @@ async function fetchRetellKB(
     created_at: kb.created_at,
   }));
 
-  return { items, total: kbs.length };
+  return { items, total: filteredKbs.length };
 }
 
 // Fetch VAPI knowledge base - filtered by assistant's linked files
@@ -309,34 +330,54 @@ export const usePortalAddKnowledgeDocument = () => {
           });
           if (retellError) throw retellError;
 
-          // Then link the new KB to the agent
+          // Then link the new KB to the agent's configuration.
+          // NOTE: In Retell, KBs are often attached to the LLM (not the agent).
           const newKbId = retellData?.data?.knowledge_base_id;
           if (newKbId && platformAgentId) {
-            console.log('[RetellKB] Linking new KB', newKbId, 'to agent', platformAgentId);
-            
-            // Get current agent config to preserve existing KB IDs
-            const { data: agentData } = await supabase.functions.invoke('retell-proxy', {
-              body: { action: 'getAgent', organizationId, agentId: platformAgentId },
-            });
-            
-            const currentKbIds = agentData?.data?.knowledge_base_ids || [];
-            const updatedKbIds = [...currentKbIds, newKbId];
-            
-            // Update agent with new KB list
-            const { error: updateError } = await supabase.functions.invoke('retell-proxy', {
-              body: { 
-                action: 'updateAgent',
-                organizationId,
-                agentId: platformAgentId,
-                retellAgentId: platformAgentId,
-                config: { knowledge_base_ids: updatedKbIds },
-              },
-            });
-            
-            if (updateError) {
-              console.warn('[RetellKB] Failed to link KB to agent:', updateError);
-            } else {
-              console.log('[RetellKB] Successfully linked KB to agent');
+            console.log('[RetellKB] Linking new KB', newKbId, 'to retell agent/llm', platformAgentId);
+
+            try {
+              // Fetch agent to get the LLM id
+              const { data: agentResp, error: agentErr } = await supabase.functions.invoke('retell-proxy', {
+                body: { action: 'getAgent', organizationId, retellAgentId: platformAgentId },
+              });
+              if (agentErr) throw agentErr;
+
+              const llmId = agentResp?.data?.response_engine?.llm_id || agentResp?.data?.llm_id;
+              if (!llmId) {
+                console.warn('[RetellKB] Could not determine llm_id for agent; KB created but not linked');
+                return retellData;
+              }
+
+              // Get existing LLM KB ids
+              const { data: llmResp, error: llmErr } = await supabase.functions.invoke('retell-proxy', {
+                body: { action: 'getLlm', organizationId, llmId },
+              });
+              if (llmErr) throw llmErr;
+
+              const currentKbIds: string[] = Array.isArray(llmResp?.data?.knowledge_base_ids)
+                ? llmResp.data.knowledge_base_ids
+                : [];
+
+              const updatedKbIds = Array.from(new Set([...currentKbIds, newKbId]));
+
+              // Update LLM with the new KB list
+              const { error: updateError } = await supabase.functions.invoke('retell-proxy', {
+                body: {
+                  action: 'updateLlm',
+                  organizationId,
+                  llmId,
+                  config: { knowledge_base_ids: updatedKbIds },
+                },
+              });
+
+              if (updateError) {
+                console.warn('[RetellKB] Failed to link KB to LLM:', updateError);
+              } else {
+                console.log('[RetellKB] Successfully linked KB to LLM');
+              }
+            } catch (e) {
+              console.warn('[RetellKB] Failed to link KB after creation:', e);
             }
           }
           
