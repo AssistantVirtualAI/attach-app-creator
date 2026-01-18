@@ -65,6 +65,7 @@ import SmsTemplates from "./pages/SmsTemplates";
 import NotFound from "./pages/NotFound";
 import DemoCenter from "./pages/DemoCenter";
 import RealtimeMonitor from "./pages/RealtimeMonitor";
+import ApiExplorer from "./pages/ApiExplorer";
 
 // Portal pages
 import PortalLogin from "./pages/PortalLogin";
@@ -397,6 +398,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <RealtimeMonitor />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/api-explorer"
+                  element={
+                    <ProtectedRoute>
+                      <ApiExplorer />
                     </ProtectedRoute>
                   }
                 />

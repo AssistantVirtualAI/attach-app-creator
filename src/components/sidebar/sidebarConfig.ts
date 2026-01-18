@@ -2,7 +2,7 @@ import {
   Home, TrendingUp, MessageSquare, BarChart3, BookOpen, 
   Bot, Sparkles, FileQuestion, Users, UserPlus, Calendar,
   Phone, MessageCircle, GitBranch, Sliders, Webhook,
-  CreditCard, Settings, Tag, Headphones, LayoutDashboard, Radio
+  CreditCard, Settings, Tag, Headphones, LayoutDashboard, Radio, Globe
 } from 'lucide-react';
 
 export interface NavItem {
@@ -85,6 +85,7 @@ export const sidebarGroups: NavGroup[] = [
       { nameKey: 'sidebar.workflows', href: '/workflows', icon: GitBranch },
       { nameKey: 'sidebar.integrations', href: '/integrations', icon: Sliders },
       { nameKey: 'sidebar.webhookLogs', href: '/webhook-logs', icon: Webhook },
+      { nameKey: 'sidebar.apiExplorer', href: '/api-explorer', icon: Globe },
     ]
   },
   {

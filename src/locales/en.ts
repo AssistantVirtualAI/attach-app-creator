@@ -499,6 +499,7 @@ export const en = {
     workflows: 'Workflows',
     integrations: 'Integrations',
     webhookLogs: 'Webhook Logs',
+    apiExplorer: 'API Explorer',
     stripeBilling: 'Stripe Billing',
     saasConfig: 'SaaS Config',
     settings: 'Settings',

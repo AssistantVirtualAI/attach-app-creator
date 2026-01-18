@@ -499,6 +499,7 @@ export const fr = {
     workflows: 'Workflows',
     integrations: 'Intégrations',
     webhookLogs: 'Journaux Webhook',
+    apiExplorer: 'Explorateur API',
     stripeBilling: 'Facturation Stripe',
     saasConfig: 'Config SaaS',
     settings: 'Paramètres',
