@@ -8,6 +8,85 @@ const corsHeaders = {
 
 const ELEVENLABS_BASE_URL = 'https://api.elevenlabs.io/v1';
 
+type AnyObj = Record<string, any>;
+
+function findWebhookCandidates(obj: any, path: string[] = [], out: Array<{ path: string; value: any }> = []) {
+  if (!obj || typeof obj !== 'object') return out;
+
+  for (const [k, v] of Object.entries(obj as AnyObj)) {
+    const nextPath = [...path, k];
+    const key = k.toLowerCase();
+
+    if (key.includes('webhook')) {
+      out.push({ path: nextPath.join('.'), value: v });
+    }
+
+    if (v && typeof v === 'object') {
+      findWebhookCandidates(v, nextPath, out);
+    }
+  }
+
+  return out;
+}
+
+function normalizeAgentWebhookCandidates(agentData: any) {
+  const candidates = findWebhookCandidates(agentData);
+  const webhooks: any[] = [];
+
+  for (const c of candidates) {
+    const v = c.value;
+
+    // Common shapes we might see in agent config
+    // - { webhook_id, url, is_disabled }
+    // - { webhookId, webhookUrl, enabled }
+    // - string id
+    if (typeof v === 'string') {
+      // If a string looks like an id, keep it as a reference.
+      webhooks.push({
+        webhook_id: v,
+        name: `Agent webhook (${c.path})`,
+        is_disabled: false,
+        source_path: c.path,
+      });
+      continue;
+    }
+
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const webhookId = v.webhook_id || v.webhookId || v.id || null;
+      const webhookUrl = v.webhook_url || v.webhookUrl || v.url || null;
+      const isDisabled =
+        typeof v.is_disabled === 'boolean'
+          ? v.is_disabled
+          : typeof v.disabled === 'boolean'
+            ? v.disabled
+            : typeof v.enabled === 'boolean'
+              ? !v.enabled
+              : false;
+
+      // Only keep entries that actually look like a webhook config
+      if (webhookId || webhookUrl) {
+        webhooks.push({
+          webhook_id: webhookId || `agent_webhook:${c.path}`,
+          name: v.name || `Agent webhook (${c.path})`,
+          is_disabled: isDisabled,
+          webhook_url: webhookUrl,
+          source_path: c.path,
+          raw: v,
+        });
+      }
+    }
+  }
+
+  // De-dupe by webhook_id
+  const seen = new Set<string>();
+  return webhooks.filter((w) => {
+    const id = String(w.webhook_id);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
