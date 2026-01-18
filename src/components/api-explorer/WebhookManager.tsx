@@ -135,20 +135,43 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
     }));
   };
 
+  const getAgentApiKey = async (agentId: string) => {
+    // First try to get API key from agent
+    const { data: agent } = await supabase
+      .from('agents')
+      .select('platform_api_key, platform_agent_id, platform, organization_id')
+      .eq('id', agentId)
+      .single();
+
+    if (!agent) return null;
+
+    let apiKey = agent.platform_api_key;
+
+    // If no API key on agent, check organization integrations
+    if (!apiKey && agent.organization_id) {
+      const { data: integration } = await supabase
+        .from('organization_integrations')
+        .select('api_key')
+        .eq('organization_id', agent.organization_id)
+        .eq('platform', agent.platform)
+        .eq('is_active', true)
+        .single();
+
+      apiKey = integration?.api_key || null;
+    }
+
+    return { ...agent, platform_api_key: apiKey };
+  };
+
   const fetchPlatformWebhooks = async () => {
     if (!selectedAgent) return;
     
     setFetchingPlatformWebhooks(true);
     try {
-      // Get agent details with API key
-      const { data: agent } = await supabase
-        .from('agents')
-        .select('platform_api_key, platform_agent_id, platform')
-        .eq('id', selectedAgentId)
-        .single();
+      const agent = await getAgentApiKey(selectedAgentId);
 
       if (!agent?.platform_api_key) {
-        toast.error(language === 'fr' ? 'Clé API non configurée pour cet agent' : 'API key not configured for this agent');
+        toast.error(language === 'fr' ? 'Clé API non configurée. Configurez l\'intégration dans les paramètres.' : 'API key not configured. Configure the integration in settings.');
         return;
       }
 
@@ -223,14 +246,10 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
     
     setSyncingWebhook(true);
     try {
-      const { data: agent } = await supabase
-        .from('agents')
-        .select('platform_api_key, platform_agent_id, platform')
-        .eq('id', selectedAgentId)
-        .single();
+      const agent = await getAgentApiKey(selectedAgentId);
 
       if (!agent?.platform_api_key) {
-        toast.error(language === 'fr' ? 'Clé API non configurée' : 'API key not configured');
+        toast.error(language === 'fr' ? 'Clé API non configurée. Configurez l\'intégration dans les paramètres.' : 'API key not configured. Configure the integration in settings.');
         return;
       }
 
