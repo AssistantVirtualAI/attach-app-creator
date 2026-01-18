@@ -149,3 +149,6 @@ verify_jwt = false
 
 [functions.mcp-proxy]
 verify_jwt = true
+
+[functions.improve-prompt]
+verify_jwt = false
