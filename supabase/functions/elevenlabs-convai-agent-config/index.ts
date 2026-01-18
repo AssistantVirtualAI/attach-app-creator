@@ -205,6 +205,62 @@ serve(async (req) => {
       );
     }
 
+    // Get webhook delivery logs (conversations that triggered webhooks)
+    if (action === 'get_webhook_delivery_logs') {
+      const { webhookId, limit = 50 } = await req.json().catch(() => ({}));
+      console.log(`[elevenlabs-agent-config] Fetching webhook delivery logs for agent ${targetAgentId || 'all'}`);
+
+      // Build query params for conversations list
+      const queryParams = new URLSearchParams();
+      if (targetAgentId) {
+        queryParams.append('agent_id', targetAgentId);
+      }
+      queryParams.append('page_size', String(limit));
+
+      const conversationsResponse = await fetch(
+        `${ELEVENLABS_BASE_URL}/convai/conversations?${queryParams.toString()}`, 
+        {
+          headers: { 'xi-api-key': apiKey },
+        }
+      );
+
+      if (!conversationsResponse.ok) {
+        const errorText = await conversationsResponse.text();
+        throw new Error(`ElevenLabs API error: ${conversationsResponse.status} - ${errorText}`);
+      }
+
+      const conversationsData = await conversationsResponse.json();
+      const conversations = conversationsData.conversations || [];
+      
+      console.log(`[elevenlabs-agent-config] Fetched ${conversations.length} conversations as webhook delivery logs`);
+
+      // Transform conversations to look like webhook delivery logs
+      const deliveryLogs = conversations.map((conv: any) => ({
+        id: conv.conversation_id,
+        webhook_id: webhookId || null,
+        agent_id: conv.agent_id,
+        agent_name: conv.agent_name,
+        event_type: 'post_call_transcription',
+        timestamp: conv.start_time_unix_secs ? new Date(conv.start_time_unix_secs * 1000).toISOString() : null,
+        duration_secs: conv.call_duration_secs,
+        status: conv.call_successful === 'success' ? 'success' : conv.call_successful === 'failure' ? 'failure' : 'unknown',
+        message_count: conv.message_count,
+        direction: conv.direction,
+        rating: conv.rating,
+        summary: conv.transcript_summary,
+        title: conv.call_summary_title,
+      }));
+
+      return new Response(
+        JSON.stringify({ 
+          delivery_logs: deliveryLogs,
+          has_more: conversationsData.has_more,
+          next_cursor: conversationsData.next_cursor,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (action === 'update_workspace_webhook') {
       const { webhookId, webhookName, isDisabled } = await req.json().catch(() => ({}));
       console.log(`[elevenlabs-agent-config] Updating workspace webhook ${webhookId}`);
