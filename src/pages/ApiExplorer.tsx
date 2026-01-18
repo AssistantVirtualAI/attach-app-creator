@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Code, Wrench, Globe } from 'lucide-react';
+import { Code, Wrench, Globe, Webhook, Server } from 'lucide-react';
 import { EndpointExplorer } from '@/components/api-explorer/EndpointExplorer';
 import { MCPServerTester } from '@/components/api-explorer/MCPServerTester';
+import { WebhookManager } from '@/components/api-explorer/WebhookManager';
+import { MCPManager } from '@/components/api-explorer/MCPManager';
 import { useLanguage } from '@/context/LanguageContext';
 
 const ApiExplorer = () => {
@@ -12,10 +14,12 @@ const ApiExplorer = () => {
   const texts = {
     title: language === 'fr' ? 'Explorateur API' : 'API Explorer',
     description: language === 'fr' 
-      ? 'Testez les endpoints et intégrations MCP en temps réel'
-      : 'Test API endpoints and MCP integrations in real-time',
+      ? 'Testez les endpoints, gérez les webhooks et configurez les serveurs MCP'
+      : 'Test API endpoints, manage webhooks, and configure MCP servers',
     endpoints: language === 'fr' ? 'Endpoints API' : 'API Endpoints',
-    mcp: language === 'fr' ? 'Testeur MCP' : 'MCP Tester',
+    webhooks: language === 'fr' ? 'Webhooks' : 'Webhooks',
+    mcpConfig: language === 'fr' ? 'Config MCP' : 'MCP Config',
+    mcpTester: language === 'fr' ? 'Testeur MCP' : 'MCP Tester',
   };
 
   return (
@@ -34,9 +38,17 @@ const ApiExplorer = () => {
             <Code className="h-4 w-4" />
             {texts.endpoints}
           </TabsTrigger>
-          <TabsTrigger value="mcp" className="flex items-center gap-2">
+          <TabsTrigger value="webhooks" className="flex items-center gap-2">
+            <Webhook className="h-4 w-4" />
+            {texts.webhooks}
+          </TabsTrigger>
+          <TabsTrigger value="mcp-config" className="flex items-center gap-2">
+            <Server className="h-4 w-4" />
+            {texts.mcpConfig}
+          </TabsTrigger>
+          <TabsTrigger value="mcp-tester" className="flex items-center gap-2">
             <Wrench className="h-4 w-4" />
-            {texts.mcp}
+            {texts.mcpTester}
           </TabsTrigger>
         </TabsList>
 
@@ -44,7 +56,15 @@ const ApiExplorer = () => {
           <EndpointExplorer />
         </TabsContent>
 
-        <TabsContent value="mcp" className="mt-4">
+        <TabsContent value="webhooks" className="mt-4">
+          <WebhookManager />
+        </TabsContent>
+
+        <TabsContent value="mcp-config" className="mt-4">
+          <MCPManager />
+        </TabsContent>
+
+        <TabsContent value="mcp-tester" className="mt-4">
           <MCPServerTester />
         </TabsContent>
       </Tabs>
