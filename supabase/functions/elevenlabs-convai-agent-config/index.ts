@@ -341,6 +341,29 @@ serve(async (req) => {
         console.log(`[elevenlabs-agent-config] Fetched ${webhooks.length} workspace webhooks (no filter)`);
       }
 
+      // Fallback: ElevenLabs may not expose ConvAI post-call webhooks via workspace webhooks.
+      // If we couldn't find anything, try to extract webhook configuration directly from the agent config.
+      if (filterAgentId && webhooks.length === 0) {
+        try {
+          const agentResponse = await fetch(`${ELEVENLABS_BASE_URL}/convai/agents/${filterAgentId}`, {
+            headers: { 'xi-api-key': apiKey },
+          });
+
+          if (agentResponse.ok) {
+            const agentData = await agentResponse.json();
+            const derived = normalizeAgentWebhookCandidates(agentData);
+            console.log(`[elevenlabs-agent-config] Derived ${derived.length} webhook candidates from agent config`);
+            if (derived.length) {
+              webhooks = derived;
+            }
+          } else {
+            console.log(`[elevenlabs-agent-config] Fallback agent webhook scan failed: ${agentResponse.status}`);
+          }
+        } catch (e) {
+          console.log(`[elevenlabs-agent-config] Fallback agent webhook scan error: ${String(e)}`);
+        }
+      }
+
       return new Response(
         JSON.stringify({ webhooks }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
