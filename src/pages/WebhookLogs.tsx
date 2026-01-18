@@ -159,20 +159,22 @@ export default function WebhookLogs() {
 
         if (error) throw error;
         
-        // ElevenLabs returns webhook configs with their history
+        // ElevenLabs returns webhook configs with webhook_id field
         const webhooks = data?.webhooks || [];
         const events: PlatformWebhookEvent[] = [];
         
         for (const webhook of webhooks) {
-          // Each webhook can have multiple events
-          if (webhook.id) {
+          // ElevenLabs uses webhook_id, not id
+          if (webhook.webhook_id) {
             events.push({
-              id: webhook.id,
-              event_type: webhook.name || 'webhook',
-              timestamp: webhook.created_at || new Date().toISOString(),
+              id: webhook.webhook_id,
+              event_type: webhook.name || t('webhookLogs.unnamed'),
+              timestamp: webhook.created_at_unix 
+                ? new Date(webhook.created_at_unix * 1000).toISOString() 
+                : new Date().toISOString(),
               status: webhook.is_disabled ? 'disabled' : 'active',
-              payload: webhook,
-              webhook_id: webhook.id,
+              payload: webhook as Json,
+              webhook_id: webhook.webhook_id,
             });
           }
         }

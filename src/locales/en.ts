@@ -2125,5 +2125,7 @@ export const en = {
     logDetails: 'Webhook details',
     payload: 'Payload',
     noApiKey: 'API key not configured for this platform',
+    unnamed: 'Unnamed',
+    webhookUrl: 'Webhook URL',
   },
 };
