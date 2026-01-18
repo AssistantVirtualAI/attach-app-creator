@@ -66,6 +66,22 @@ interface PlatformWebhookEvent {
   payload?: Json;
   webhook_id?: string;
   response_status?: number;
+  webhook_url?: string;
+}
+
+interface DeliveryLog {
+  id: string;
+  agent_id: string;
+  agent_name?: string;
+  event_type: string;
+  timestamp: string;
+  duration_secs?: number;
+  status: string;
+  message_count?: number;
+  direction?: string;
+  rating?: number;
+  summary?: string;
+  title?: string;
 }
 
 export default function WebhookLogs() {
@@ -185,7 +201,39 @@ export default function WebhookLogs() {
       // TODO: Add support for other platforms (Retell, Vapi)
       return [];
     },
-    enabled: !!selectedAgent?.platform_agent_id && activeTab === 'platform',
+    enabled: !!selectedAgent?.platform_agent_id && (activeTab === 'platform' || activeTab === 'delivery'),
+  });
+
+  // Fetch delivery logs (conversations triggered by webhooks) for selected agent
+  const { data: deliveryLogs = [], isLoading: deliveryLogsLoading, refetch: refetchDeliveryLogs } = useQuery({
+    queryKey: ['webhook-delivery-logs', selectedAgentId, selectedAgent?.platform],
+    queryFn: async (): Promise<DeliveryLog[]> => {
+      if (!selectedAgent?.platform_agent_id) return [];
+      
+      const apiKey = await getAgentApiKey(selectedAgent);
+      if (!apiKey) {
+        return [];
+      }
+
+      // Fetch based on platform
+      if (selectedAgent.platform === 'elevenlabs') {
+        const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
+          body: {
+            action: 'get_webhook_delivery_logs',
+            agentId: selectedAgent.platform_agent_id,
+            apiKey,
+            limit: 50,
+          },
+        });
+
+        if (error) throw error;
+        
+        return (data?.delivery_logs || []) as DeliveryLog[];
+      }
+      
+      return [];
+    },
+    enabled: !!selectedAgent?.platform_agent_id && activeTab === 'delivery',
   });
 
   const filteredLogs = useMemo(() => {
@@ -199,6 +247,9 @@ export default function WebhookLogs() {
     refetchLogs();
     if (activeTab === 'platform') {
       refetchPlatformEvents();
+    }
+    if (activeTab === 'delivery') {
+      refetchDeliveryLogs();
     }
   };
 
@@ -274,12 +325,15 @@ export default function WebhookLogs() {
           </CardContent>
         </Card>
 
-        {/* Tabs: Local vs Platform */}
+        {/* Tabs: Local vs Platform vs Delivery */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="local">{t('webhookLogs.localLogs')}</TabsTrigger>
             <TabsTrigger value="platform" disabled={!selectedAgent}>
-              {t('webhookLogs.platformLogs')}
+              {t('webhookLogs.platformWebhooks')}
+            </TabsTrigger>
+            <TabsTrigger value="delivery" disabled={!selectedAgent}>
+              {t('webhookLogs.deliveryLogs')}
             </TabsTrigger>
           </TabsList>
 
@@ -446,6 +500,109 @@ export default function WebhookLogs() {
                                 processed: event.status === 'active',
                                 created_at: event.timestamp,
                                 payload: event.payload,
+                              })}
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              {t('webhookLogs.details')}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Delivery Logs Tab */}
+          <TabsContent value="delivery">
+            <div className="glass-card p-6">
+              {!selectedAgent ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Webhook className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>{t('webhookLogs.selectAgentFirst')}</p>
+                </div>
+              ) : deliveryLogsLoading ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                </div>
+              ) : deliveryLogs.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Webhook className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>{t('webhookLogs.noDeliveryLogs')}</p>
+                  <p className="text-sm mt-2">
+                    {t('webhookLogs.noDeliveryLogsDescription')}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <ExternalLink className="w-5 h-5" />
+                      {t('webhookLogs.deliveryLogsFor')} {selectedAgent.name}
+                    </h3>
+                    <Badge variant="outline">
+                      {deliveryLogs.length} {t('webhookLogs.eventsFound')}
+                    </Badge>
+                  </div>
+                  
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('webhookLogs.conversationId')}</TableHead>
+                        <TableHead>{t('webhookLogs.eventType')}</TableHead>
+                        <TableHead>{t('webhookLogs.timestamp')}</TableHead>
+                        <TableHead>{t('webhookLogs.duration')}</TableHead>
+                        <TableHead>{t('common.status')}</TableHead>
+                        <TableHead className="text-right">{t('common.actions')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {deliveryLogs.map((log) => (
+                        <TableRow key={log.id}>
+                          <TableCell className="font-mono text-xs">
+                            {log.id.slice(0, 20)}...
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{log.event_type}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {log.duration_secs ? `${log.duration_secs}s` : '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={log.status === 'success' ? 'default' : 'secondary'}
+                              className={log.status === 'success' ? 'bg-green-500' : log.status === 'failure' ? 'bg-red-500' : ''}
+                            >
+                              {log.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => setSelectedLog({
+                                id: log.id,
+                                event_type: log.event_type,
+                                connector: selectedAgent.platform,
+                                processed: log.status === 'success',
+                                created_at: log.timestamp,
+                                payload: {
+                                  agent_id: log.agent_id,
+                                  agent_name: log.agent_name,
+                                  duration_secs: log.duration_secs,
+                                  message_count: log.message_count,
+                                  direction: log.direction,
+                                  rating: log.rating,
+                                  summary: log.summary,
+                                  title: log.title,
+                                } as Json,
                               })}
                             >
                               <Eye className="w-4 h-4 mr-1" />
