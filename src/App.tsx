@@ -66,6 +66,7 @@ import NotFound from "./pages/NotFound";
 import DemoCenter from "./pages/DemoCenter";
 import RealtimeMonitor from "./pages/RealtimeMonitor";
 import ApiExplorer from "./pages/ApiExplorer";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 
 // Portal pages
 import PortalLogin from "./pages/PortalLogin";
@@ -406,6 +407,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <ApiExplorer />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/super-admin"
+                  element={
+                    <ProtectedRoute>
+                      <SuperAdminDashboard />
                     </ProtectedRoute>
                   }
                 />
