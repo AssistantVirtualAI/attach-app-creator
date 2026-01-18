@@ -158,21 +158,24 @@ export default function WebhookLogs() {
     queryFn: async () => {
       if (!selectedAgent?.platform_agent_id) return [];
       
-      const apiKey = await getAgentApiKey(selectedAgent);
-      if (!apiKey) {
+      // For ElevenLabs we can resolve credentials server-side; other platforms may require a configured API key.
+      const apiKey = selectedAgent.platform === 'elevenlabs'
+        ? null
+        : await getAgentApiKey(selectedAgent);
+
+      if (selectedAgent.platform !== 'elevenlabs' && !apiKey) {
         toast.error(t('webhookLogs.noApiKey'));
         return [];
       }
 
-      // Fetch based on platform
       if (selectedAgent.platform === 'elevenlabs') {
-        const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
-          body: {
-            action: 'list_workspace_webhooks',
-            agentId: selectedAgent.platform_agent_id,
-            apiKey,
-          },
-        });
+          const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
+            body: {
+              action: 'list_workspace_webhooks',
+              agentId: selectedAgent.platform_agent_id,
+              organizationId: selectedOrgId,
+            },
+          });
 
         if (error) throw error;
         
@@ -211,18 +214,20 @@ export default function WebhookLogs() {
     queryFn: async (): Promise<DeliveryLog[]> => {
       if (!selectedAgent?.platform_agent_id) return [];
       
-      const apiKey = await getAgentApiKey(selectedAgent);
-      if (!apiKey) {
+      const apiKey = selectedAgent.platform === 'elevenlabs'
+        ? null
+        : await getAgentApiKey(selectedAgent);
+
+      if (selectedAgent.platform !== 'elevenlabs' && !apiKey) {
         return [];
       }
 
-      // Fetch based on platform
       if (selectedAgent.platform === 'elevenlabs') {
         const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
           body: {
             action: 'get_webhook_delivery_logs',
             agentId: selectedAgent.platform_agent_id,
-            apiKey,
+            organizationId: selectedOrgId,
             limit: 50,
           },
         });
