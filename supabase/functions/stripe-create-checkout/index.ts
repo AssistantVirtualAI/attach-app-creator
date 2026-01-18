@@ -7,11 +7,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Price mapping - replace with your actual Stripe price IDs
-const PRICE_MAP: Record<string, { priceId: string; tier: string }> = {
-  price_starter: { priceId: "price_starter_monthly", tier: "starter" },
-  price_growth: { priceId: "price_growth_monthly", tier: "growth" },
-  price_ultimate: { priceId: "price_ultimate_monthly", tier: "ultimate" },
+// Price mapping - maps plan tier names to Stripe price IDs
+// Users need to create these products/prices in their Stripe dashboard
+// For now, we'll create them dynamically if they don't exist
+const PLAN_PRICES: Record<string, { monthly: number; annual: number; name: string }> = {
+  starter: { monthly: 4900, annual: 47000, name: "Starter Plan" },
+  growth: { monthly: 9900, annual: 95000, name: "Growth Plan" },
+  ultimate: { monthly: 29900, annual: 287000, name: "Ultimate Plan" },
 };
 
 serve(async (req) => {
@@ -38,10 +40,16 @@ serve(async (req) => {
       throw new Error("Unauthorized");
     }
 
-    const { organizationId, priceId, successUrl, cancelUrl } = await req.json();
+    const { organizationId, priceId, successUrl, cancelUrl, isAnnual } = await req.json();
 
     if (!organizationId || !priceId) {
       throw new Error("Missing required parameters");
+    }
+
+    // Validate plan exists
+    const planConfig = PLAN_PRICES[priceId];
+    if (!planConfig) {
+      throw new Error(`Invalid plan: ${priceId}. Valid plans: ${Object.keys(PLAN_PRICES).join(', ')}`);
     }
 
     // Verify user has access to this organization
@@ -95,6 +103,46 @@ serve(async (req) => {
       }
     }
 
+    // Get or create the price for this plan
+    const priceAmount = isAnnual ? planConfig.annual : planConfig.monthly;
+    const interval = isAnnual ? "year" : "month";
+    const priceLookupKey = `${priceId}_${interval}ly`;
+
+    // Try to find existing price by lookup key
+    let stripePriceId: string;
+    const existingPrices = await stripe.prices.list({
+      lookup_keys: [priceLookupKey],
+      limit: 1,
+    });
+
+    if (existingPrices.data.length > 0) {
+      stripePriceId = existingPrices.data[0].id;
+    } else {
+      // Create product and price if they don't exist
+      let product;
+      const existingProducts = await stripe.products.list({
+        limit: 100,
+      });
+      product = existingProducts.data.find((p: Stripe.Product) => p.metadata?.plan_tier === priceId);
+
+      if (!product) {
+        product = await stripe.products.create({
+          name: planConfig.name,
+          metadata: { plan_tier: priceId },
+        });
+      }
+
+      const newPrice = await stripe.prices.create({
+        product: product.id,
+        unit_amount: priceAmount,
+        currency: "usd",
+        recurring: { interval },
+        lookup_key: priceLookupKey,
+        metadata: { plan_tier: priceId },
+      });
+      stripePriceId = newPrice.id;
+    }
+
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
@@ -102,7 +150,7 @@ serve(async (req) => {
       payment_method_types: ["card"],
       line_items: [
         {
-          price: priceId,
+          price: stripePriceId,
           quantity: 1,
         },
       ],
@@ -110,15 +158,17 @@ serve(async (req) => {
       cancel_url: cancelUrl,
       metadata: {
         organization_id: organizationId,
+        plan_tier: priceId,
       },
       subscription_data: {
         metadata: {
           organization_id: organizationId,
+          plan_tier: priceId,
         },
       },
     });
 
-    console.log("Checkout session created:", session.id);
+    console.log("Checkout session created:", session.id, "for plan:", priceId);
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
