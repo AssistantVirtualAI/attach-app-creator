@@ -44,6 +44,7 @@ interface PlatformWebhookConfig {
   secret?: string;
   events?: string[];
   enabled?: boolean;
+  webhooks?: Array<Record<string, any>>; // platform list (e.g. ElevenLabs workspace webhooks)
   // ElevenLabs specific
   webhook_url?: string;
   webhook_events?: string[];
@@ -183,9 +184,8 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
         case 'elevenlabs':
           functionName = 'elevenlabs-convai-agent-config';
           body = {
-            action: 'get',
+            action: 'list_workspace_webhooks',
             apiKey: agent.platform_api_key,
-            agentId: agent.platform_agent_id,
           };
           break;
         case 'vapi':
@@ -212,12 +212,10 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
       
       // Extract webhook config from platform response based on platform type
       let webhookConfig: PlatformWebhookConfig | null = null;
-      
+
       if (agent.platform === 'elevenlabs') {
         webhookConfig = {
-          url: data?.agent?.platform_settings?.webhook?.url || data?.webhook_config?.url,
-          events: data?.agent?.platform_settings?.webhook?.events || [],
-          enabled: data?.agent?.platform_settings?.webhook?.enabled,
+          webhooks: data?.webhooks || [],
         };
       } else if (agent.platform === 'vapi') {
         webhookConfig = {
@@ -641,46 +639,96 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
                         {texts.platformConfig}
                       </CardTitle>
                       <CardDescription>
-                        {language === 'fr' 
-                          ? 'Configuration actuelle sur la plateforme' 
-                          : 'Current configuration on the platform'}
+                        {language === 'fr'
+                          ? 'Webhooks existants sur la plateforme'
+                          : 'Existing webhooks on the platform'}
                       </CardDescription>
                     </div>
-                    <Button onClick={importFromPlatform} className="gap-2">
-                      <Download className="h-4 w-4" />
-                      {texts.importFromPlatform}
-                    </Button>
+                    {!platformWebhooks.webhooks && (
+                      <Button onClick={importFromPlatform} className="gap-2">
+                        <Download className="h-4 w-4" />
+                        {texts.importFromPlatform}
+                      </Button>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {(platformWebhooks.url || platformWebhooks.webhook_url || platformWebhooks.serverUrl) && (
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Webhook URL</Label>
-                        <code className="block text-sm bg-muted p-2 rounded-md font-mono mt-1 break-all">
-                          {platformWebhooks.url || platformWebhooks.webhook_url || platformWebhooks.serverUrl}
-                        </code>
-                      </div>
-                    )}
-                    {(platformWebhooks.events || platformWebhooks.webhook_events) && (
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Events</Label>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {(platformWebhooks.events || platformWebhooks.webhook_events || []).map((event) => (
-                            <Badge key={event} variant="outline" className="text-xs">{event}</Badge>
+                  {/* ElevenLabs: workspace webhooks list */}
+                  {Array.isArray(platformWebhooks.webhooks) && (
+                    <div className="space-y-3">
+                      {platformWebhooks.webhooks.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          {language === 'fr'
+                            ? 'Aucun webhook trouvé dans le workspace.'
+                            : 'No webhooks found in the workspace.'}
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {platformWebhooks.webhooks.map((wh: any) => (
+                            <div key={wh.webhook_id || wh.webhook_url} className="p-3 rounded-lg border bg-card">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="font-medium truncate">{wh.name || wh.webhook_id || 'Webhook'}</div>
+                                  <code className="block text-xs bg-muted p-2 rounded-md font-mono mt-1 break-all">
+                                    {wh.webhook_url}
+                                  </code>
+                                </div>
+                                <div className="flex flex-col items-end gap-2 shrink-0">
+                                  <Badge variant={wh.is_disabled ? 'secondary' : 'default'}>
+                                    {wh.is_disabled
+                                      ? (language === 'fr' ? 'Désactivé' : 'Disabled')
+                                      : (language === 'fr' ? 'Actif' : 'Active')}
+                                  </Badge>
+                                  {wh.auth_type && <Badge variant="outline">{wh.auth_type}</Badge>}
+                                </div>
+                              </div>
+                              {Array.isArray(wh.usage) && wh.usage.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {wh.usage.map((u: any, idx: number) => (
+                                    <Badge key={`${wh.webhook_id}-u-${idx}`} variant="outline" className="text-xs">
+                                      {u.usage_type || 'usage'}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           ))}
                         </div>
-                      </div>
-                    )}
-                    {platformWebhooks.enabled !== undefined && (
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Status</Label>
-                        <Badge variant={platformWebhooks.enabled ? 'default' : 'secondary'} className="mt-1">
-                          {platformWebhooks.enabled ? 'Enabled' : 'Disabled'}
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Fallback: single webhook config */}
+                  {!platformWebhooks.webhooks && (
+                    <div className="space-y-3">
+                      {(platformWebhooks.url || platformWebhooks.webhook_url || platformWebhooks.serverUrl) && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Webhook URL</Label>
+                          <code className="block text-sm bg-muted p-2 rounded-md font-mono mt-1 break-all">
+                            {platformWebhooks.url || platformWebhooks.webhook_url || platformWebhooks.serverUrl}
+                          </code>
+                        </div>
+                      )}
+                      {(platformWebhooks.events || platformWebhooks.webhook_events) && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Events</Label>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {(platformWebhooks.events || platformWebhooks.webhook_events || []).map((event) => (
+                              <Badge key={event} variant="outline" className="text-xs">{event}</Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {platformWebhooks.enabled !== undefined && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Status</Label>
+                          <Badge variant={platformWebhooks.enabled ? 'default' : 'secondary'} className="mt-1">
+                            {platformWebhooks.enabled ? 'Enabled' : 'Disabled'}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
