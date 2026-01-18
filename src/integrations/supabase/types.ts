@@ -322,6 +322,146 @@ export type Database = {
           },
         ]
       }
+      agent_mcp_servers: {
+        Row: {
+          agent_id: string
+          auth_config: Json | null
+          auth_type: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          last_connected_at: string | null
+          name: string
+          organization_id: string
+          server_type: string
+          server_url: string
+          tools_enabled: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id: string
+          auth_config?: Json | null
+          auth_type?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_connected_at?: string | null
+          name: string
+          organization_id: string
+          server_type?: string
+          server_url: string
+          tools_enabled?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string
+          auth_config?: Json | null
+          auth_type?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_connected_at?: string | null
+          name?: string
+          organization_id?: string
+          server_type?: string
+          server_url?: string
+          tools_enabled?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_mcp_servers_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_mcp_servers_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_mcp_servers_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_platform_webhooks: {
+        Row: {
+          agent_id: string
+          created_at: string | null
+          error_count: number | null
+          events: string[]
+          id: string
+          is_active: boolean | null
+          last_triggered_at: string | null
+          organization_id: string
+          platform: string
+          updated_at: string | null
+          webhook_secret: string | null
+          webhook_url: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string | null
+          error_count?: number | null
+          events?: string[]
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          organization_id: string
+          platform: string
+          updated_at?: string | null
+          webhook_secret?: string | null
+          webhook_url: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string | null
+          error_count?: number | null
+          events?: string[]
+          id?: string
+          is_active?: boolean | null
+          last_triggered_at?: string | null
+          organization_id?: string
+          platform?: string
+          updated_at?: string | null
+          webhook_secret?: string | null
+          webhook_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_platform_webhooks_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_platform_webhooks_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_platform_webhooks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agents: {
         Row: {
           assigned_to: string | null

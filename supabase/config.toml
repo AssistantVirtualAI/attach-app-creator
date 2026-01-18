@@ -146,3 +146,6 @@ verify_jwt = false
 
 [functions.send-contact-sales]
 verify_jwt = false
+
+[functions.mcp-proxy]
+verify_jwt = true

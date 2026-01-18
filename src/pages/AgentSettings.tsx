@@ -3,7 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Bot, Key, Palette, BarChart3, Play, Code, Brain, Activity, Users, Settings2 } from 'lucide-react';
+import { ArrowLeft, Bot, Key, Palette, BarChart3, Play, Code, Brain, Activity, Users, Settings2, Wrench, Webhook } from 'lucide-react';
 import { useAgentSettings } from '@/hooks/useAgentSettings';
 import { AgentOverviewTab } from '@/components/agents/AgentOverviewTab';
 import { AgentCredentialsTab } from '@/components/agents/AgentCredentialsTab';
@@ -16,6 +16,8 @@ import { AgentKnowledgePromptTab } from '@/components/agents/AgentKnowledgePromp
 import { AgentClientsTab } from '@/components/agents/AgentClientsTab';
 import { AgentRealtimeAnalytics } from '@/components/agents/AgentRealtimeAnalytics';
 import { AgentFullConfigTab } from '@/components/agents/AgentFullConfigTab';
+import { AgentMCPConfigTab } from '@/components/agents/AgentMCPConfigTab';
+import { AgentPlatformWebhooksTab } from '@/components/agents/AgentPlatformWebhooksTab';
 
 const AgentSettingsPage = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -77,7 +79,7 @@ const AgentSettingsPage = () => {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-10">
+          <TabsList className="flex flex-wrap h-auto gap-1">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Bot className="h-4 w-4" />
               <span className="hidden sm:inline">Aperçu</span>
@@ -94,6 +96,14 @@ const AgentSettingsPage = () => {
               <Brain className="h-4 w-4" />
               <span className="hidden sm:inline">KB</span>
             </TabsTrigger>
+            <TabsTrigger value="mcp" className="flex items-center gap-2">
+              <Wrench className="h-4 w-4" />
+              <span className="hidden sm:inline">MCP</span>
+            </TabsTrigger>
+            <TabsTrigger value="webhooks" className="flex items-center gap-2">
+              <Webhook className="h-4 w-4" />
+              <span className="hidden sm:inline">Webhooks</span>
+            </TabsTrigger>
             <TabsTrigger value="widget" className="flex items-center gap-2">
               <Palette className="h-4 w-4" />
               <span className="hidden sm:inline">Widget</span>
@@ -105,10 +115,6 @@ const AgentSettingsPage = () => {
             <TabsTrigger value="clients" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Clients</span>
-            </TabsTrigger>
-            <TabsTrigger value="health" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              <span className="hidden sm:inline">Health</span>
             </TabsTrigger>
             <TabsTrigger value="prototype" className="flex items-center gap-2">
               <Play className="h-4 w-4" />
@@ -153,6 +159,14 @@ const AgentSettingsPage = () => {
             <AgentKnowledgePromptTab agent={agent} />
           </TabsContent>
 
+          <TabsContent value="mcp">
+            <AgentMCPConfigTab agentId={agentId!} />
+          </TabsContent>
+
+          <TabsContent value="webhooks">
+            <AgentPlatformWebhooksTab agentId={agentId!} platform={agent.platform} />
+          </TabsContent>
+
           <TabsContent value="widget">
             <AgentWidgetTab
               agent={agent}
@@ -182,7 +196,7 @@ const AgentSettingsPage = () => {
             />
           </TabsContent>
 
-          <TabsContent value="health">
+          <TabsContent value="prototype">
             <AgentAnalyticsWidget agentId={agentId!} agentName={agent.name} />
           </TabsContent>
 
