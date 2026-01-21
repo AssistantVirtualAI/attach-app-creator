@@ -2083,6 +2083,7 @@ export type Database = {
           phone_number: string
           provider: string
           provider_sid: string | null
+          recording_enabled: boolean | null
           status: string | null
           updated_at: string | null
         }
@@ -2098,6 +2099,7 @@ export type Database = {
           phone_number: string
           provider?: string
           provider_sid?: string | null
+          recording_enabled?: boolean | null
           status?: string | null
           updated_at?: string | null
         }
@@ -2113,6 +2115,7 @@ export type Database = {
           phone_number?: string
           provider?: string
           provider_sid?: string | null
+          recording_enabled?: boolean | null
           status?: string | null
           updated_at?: string | null
         }

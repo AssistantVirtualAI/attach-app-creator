@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Loader2, Bot, Phone } from 'lucide-react';
+import { Loader2, Bot, Phone, Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -38,6 +39,7 @@ export function PhoneNumberConfigModal({ open, onOpenChange, phoneNumber, twimlA
   const [smsFallbackMethod, setSmsFallbackMethod] = useState(phoneNumber.sms_fallback_method);
   const [voiceApplicationSid, setVoiceApplicationSid] = useState(phoneNumber.voice_application_sid || '');
   const [smsApplicationSid, setSmsApplicationSid] = useState(phoneNumber.sms_application_sid || '');
+  const [recordingEnabled, setRecordingEnabled] = useState(false);
   
   // Agent assignment
   const currentAgent = getAgentByTwilioNumber(phoneNumber.phone_number);
@@ -173,6 +175,31 @@ export function PhoneNumberConfigModal({ open, onOpenChange, phoneNumber, twimlA
                   {t('twilio.phoneNumbers.agentAssignmentNote')}
                 </p>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Recording Toggle */}
+          <Card className="border-muted">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Mic className="w-4 h-4" />
+                {t('twilio.recording.enabled')}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {t('twilio.recording.enabledDesc')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="recording-toggle" className="cursor-pointer">
+                  {t('twilio.recording.toggle')}
+                </Label>
+                <Switch
+                  id="recording-toggle"
+                  checked={recordingEnabled}
+                  onCheckedChange={setRecordingEnabled}
+                />
+              </div>
             </CardContent>
           </Card>
 
