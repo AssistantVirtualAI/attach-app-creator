@@ -480,6 +480,7 @@ export type Database = {
           platform_api_key: string | null
           slug: string | null
           theme_config: Json | null
+          twilio_number: string | null
           updated_at: string
           widget_layout: string | null
         }
@@ -500,6 +501,7 @@ export type Database = {
           platform_api_key?: string | null
           slug?: string | null
           theme_config?: Json | null
+          twilio_number?: string | null
           updated_at?: string
           widget_layout?: string | null
         }
@@ -520,6 +522,7 @@ export type Database = {
           platform_api_key?: string | null
           slug?: string | null
           theme_config?: Json | null
+          twilio_number?: string | null
           updated_at?: string
           widget_layout?: string | null
         }

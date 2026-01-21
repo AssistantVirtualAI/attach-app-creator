@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { Phone, Plus, Settings, Trash2, Search, Loader2, RefreshCw } from 'lucide-react';
+import { Phone, Plus, Settings, Trash2, Search, Loader2, RefreshCw, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useTwilioIntegration, TwilioPhoneNumber, AvailableNumber } from '@/hooks/useTwilioIntegration';
+import { useAgentsForTwilio } from '@/hooks/useAgentsForTwilio';
 import { PhoneNumberConfigModal } from './PhoneNumberConfigModal';
 import { useTranslation } from '@/hooks/useTranslation';
 import {
@@ -22,6 +23,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export function TwilioPhoneNumbersTab() {
   const { t } = useTranslation();
@@ -34,6 +41,8 @@ export function TwilioPhoneNumbersTab() {
     purchaseNumber,
     releaseNumber,
   } = useTwilioIntegration();
+  
+  const { agents, getAgentByTwilioNumber } = useAgentsForTwilio();
 
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
@@ -124,70 +133,81 @@ export function TwilioPhoneNumbersTab() {
                 <TableRow>
                   <TableHead>{t('twilio.phoneNumbers.number')}</TableHead>
                   <TableHead>{t('twilio.phoneNumbers.name')}</TableHead>
+                  <TableHead>{t('twilio.phoneNumbers.assignedAgent')}</TableHead>
                   <TableHead>{t('twilio.phoneNumbers.capabilities')}</TableHead>
                   <TableHead>{t('twilio.phoneNumbers.voiceConfig')}</TableHead>
-                  <TableHead>{t('twilio.phoneNumbers.smsConfig')}</TableHead>
                   <TableHead className="text-right">{t('common.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {phoneNumbers.map((number) => (
-                  <TableRow key={number.sid}>
-                    <TableCell className="font-mono">{number.phone_number}</TableCell>
-                    <TableCell>{number.friendly_name}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        {number.capabilities.voice && <Badge variant="secondary">Voice</Badge>}
-                        {number.capabilities.sms && <Badge variant="secondary">SMS</Badge>}
-                        {number.capabilities.mms && <Badge variant="secondary">MMS</Badge>}
-                      </div>
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate">
-                      {number.voice_application_sid ? (
-                        <Badge variant="outline">
-                          App: {twimlApps.find(a => a.sid === number.voice_application_sid)?.friendly_name || number.voice_application_sid.slice(0, 10)}
-                        </Badge>
-                      ) : number.voice_url ? (
-                        <span className="text-sm text-muted-foreground truncate">{number.voice_url}</span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">{t('twilio.phoneNumbers.notConfigured')}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate">
-                      {number.sms_application_sid ? (
-                        <Badge variant="outline">
-                          App: {twimlApps.find(a => a.sid === number.sms_application_sid)?.friendly_name || number.sms_application_sid.slice(0, 10)}
-                        </Badge>
-                      ) : number.sms_url ? (
-                        <span className="text-sm text-muted-foreground truncate">{number.sms_url}</span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">{t('twilio.phoneNumbers.notConfigured')}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <Settings className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openConfig(number)}>
-                            <Settings className="w-4 h-4 mr-2" />
-                            {t('twilio.phoneNumbers.configure')}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => setDeleteConfirm(number.sid)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            {t('twilio.phoneNumbers.release')}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {phoneNumbers.map((number) => {
+                  const assignedAgent = getAgentByTwilioNumber(number.phone_number);
+                  return (
+                    <TableRow key={number.sid}>
+                      <TableCell className="font-mono">{number.phone_number}</TableCell>
+                      <TableCell>{number.friendly_name}</TableCell>
+                      <TableCell>
+                        {assignedAgent ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="default" className="gap-1 cursor-pointer">
+                                  <Bot className="w-3 h-3" />
+                                  {assignedAgent.name}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{t('twilio.phoneNumbers.platform')}: {assignedAgent.platform}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">{t('twilio.phoneNumbers.notAssigned')}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {number.capabilities.voice && <Badge variant="secondary">Voice</Badge>}
+                          {number.capabilities.sms && <Badge variant="secondary">SMS</Badge>}
+                          {number.capabilities.mms && <Badge variant="secondary">MMS</Badge>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate">
+                        {number.voice_application_sid ? (
+                          <Badge variant="outline">
+                            App: {twimlApps.find(a => a.sid === number.voice_application_sid)?.friendly_name || number.voice_application_sid.slice(0, 10)}
+                          </Badge>
+                        ) : number.voice_url ? (
+                          <span className="text-sm text-muted-foreground truncate">{number.voice_url}</span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">{t('twilio.phoneNumbers.notConfigured')}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <Settings className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openConfig(number)}>
+                              <Settings className="w-4 h-4 mr-2" />
+                              {t('twilio.phoneNumbers.configure')}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => setDeleteConfirm(number.sid)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              {t('twilio.phoneNumbers.release')}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
