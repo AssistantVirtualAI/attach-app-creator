@@ -939,6 +939,9 @@ export const fr = {
       privacy: 'Confidentialité',
       audit: 'Audit',
       documentation: 'Documentation',
+      roles: 'Rôles & permissions',
+      securityAudit: 'Audit sécurité',
+      exports: 'Export des données',
     },
   },
 

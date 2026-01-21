@@ -167,13 +167,18 @@ export const useTeamMembers = () => {
     mutationFn: async ({ userId, newRole }: { userId: string; newRole: 'org_admin' | 'manager' | 'agent' | 'viewer' }) => {
       if (!selectedOrgId) throw new Error(t('messages.noOrganization'));
 
-      const { error } = await supabase
-        .from('user_roles')
-        .update({ role: newRole })
-        .eq('organization_id', selectedOrgId)
-        .eq('user_id', userId);
+      // Server-side authorization + audit logging
+      const { data, error } = await supabase.functions.invoke('manage-org-roles', {
+        body: {
+          action: 'update_role',
+          organization_id: selectedOrgId,
+          user_id: userId,
+          new_role: newRole,
+        },
+      });
 
-      if (error) throw error;
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['team-members'] });

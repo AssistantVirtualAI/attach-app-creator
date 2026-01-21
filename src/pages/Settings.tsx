@@ -1,6 +1,6 @@
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building, Palette, Users, Plug, Webhook, CreditCard, BarChart3, Languages, Shield, FileText, BookOpen } from 'lucide-react';
+import { Building, Palette, Users, Plug, Webhook, CreditCard, BarChart3, Languages, Shield, FileText, BookOpen, KeySquare, Download } from 'lucide-react';
 import { AgencyTab } from '@/components/settings/AgencyTab';
 import { WhiteLabelTab } from '@/components/settings/WhiteLabelTab';
 import { MembersTab } from '@/components/settings/MembersTab';
@@ -14,9 +14,17 @@ import { AuditLogsTab } from '@/components/settings/AuditLogsTab';
 import { SecurityStatus } from '@/components/settings/SecurityStatus';
 import { DocumentationTab } from '@/components/settings/DocumentationTab';
 import { useTranslation } from '@/hooks/useTranslation';
+import { RolesPermissionsTab } from '@/components/settings/RolesPermissionsTab';
+import { SecurityAuditTab } from '@/components/settings/SecurityAuditTab';
+import { DataExportTab } from '@/components/settings/DataExportTab';
+import { usePermissions } from '@/hooks/usePermissions';
 
 const Settings = () => {
   const { t } = useTranslation();
+  const { can, role, isSuperAdmin } = usePermissions();
+
+  const canSeeAdminTabs = isSuperAdmin || role === 'org_admin' || role === 'manager' || can('manage:organization') || can('manage:roles');
+  const canSeeExports = isSuperAdmin || role === 'org_admin';
 
   return (
     <AppLayout>
@@ -74,6 +82,25 @@ const Settings = () => {
               <BookOpen className="w-4 h-4" />
               <span className="hidden sm:inline">{t('settings.tabs.documentation')}</span>
             </TabsTrigger>
+
+            {canSeeAdminTabs && (
+              <TabsTrigger value="roles" className="gap-2">
+                <KeySquare className="w-4 h-4" />
+                <span className="hidden sm:inline">{t('settings.tabs.roles')}</span>
+              </TabsTrigger>
+            )}
+            {canSeeAdminTabs && (
+              <TabsTrigger value="securityAudit" className="gap-2">
+                <Shield className="w-4 h-4" />
+                <span className="hidden sm:inline">{t('settings.tabs.securityAudit')}</span>
+              </TabsTrigger>
+            )}
+            {canSeeExports && (
+              <TabsTrigger value="exports" className="gap-2">
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">{t('settings.tabs.exports')}</span>
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="agency"><AgencyTab /></TabsContent>
@@ -92,6 +119,10 @@ const Settings = () => {
           </TabsContent>
           <TabsContent value="audit"><AuditLogsTab /></TabsContent>
           <TabsContent value="documentation"><DocumentationTab /></TabsContent>
+
+          {canSeeAdminTabs && <TabsContent value="roles"><RolesPermissionsTab /></TabsContent>}
+          {canSeeAdminTabs && <TabsContent value="securityAudit"><SecurityAuditTab /></TabsContent>}
+          {canSeeExports && <TabsContent value="exports"><DataExportTab /></TabsContent>}
         </Tabs>
       </div>
     </AppLayout>
