@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Bot, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useTwilioIntegration, TwilioPhoneNumber, TwilioTwiMLApp } from '@/hooks/useTwilioIntegration';
+import { useAgentsForTwilio } from '@/hooks/useAgentsForTwilio';
 import { useTranslation } from '@/hooks/useTranslation';
+import { toast } from 'sonner';
 
 interface Props {
   open: boolean;
@@ -19,6 +23,7 @@ interface Props {
 export function PhoneNumberConfigModal({ open, onOpenChange, phoneNumber, twimlApps }: Props) {
   const { t } = useTranslation();
   const { updateNumber } = useTwilioIntegration();
+  const { agents, assignTwilioNumber, getAgentByTwilioNumber } = useAgentsForTwilio();
 
   const [friendlyName, setFriendlyName] = useState(phoneNumber.friendly_name);
   const [voiceUrl, setVoiceUrl] = useState(phoneNumber.voice_url || '');
@@ -33,6 +38,15 @@ export function PhoneNumberConfigModal({ open, onOpenChange, phoneNumber, twimlA
   const [smsFallbackMethod, setSmsFallbackMethod] = useState(phoneNumber.sms_fallback_method);
   const [voiceApplicationSid, setVoiceApplicationSid] = useState(phoneNumber.voice_application_sid || '');
   const [smsApplicationSid, setSmsApplicationSid] = useState(phoneNumber.sms_application_sid || '');
+  
+  // Agent assignment
+  const currentAgent = getAgentByTwilioNumber(phoneNumber.phone_number);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>(currentAgent?.id || '');
+
+  useEffect(() => {
+    const agent = getAgentByTwilioNumber(phoneNumber.phone_number);
+    setSelectedAgentId(agent?.id || '');
+  }, [phoneNumber.phone_number, agents]);
 
   useEffect(() => {
     setFriendlyName(phoneNumber.friendly_name);
@@ -88,6 +102,60 @@ export function PhoneNumberConfigModal({ open, onOpenChange, phoneNumber, twimlA
               placeholder="Mon numéro principal"
             />
           </div>
+
+          {/* Agent Assignment Section */}
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Bot className="w-4 h-4" />
+                {t('twilio.phoneNumbers.agentAssignment')}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {t('twilio.phoneNumbers.agentAssignmentDesc')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Select 
+                value={selectedAgentId} 
+                onValueChange={async (value) => {
+                  setSelectedAgentId(value);
+                  await assignTwilioNumber.mutateAsync({
+                    agentId: value || null,
+                    twilioNumber: phoneNumber.phone_number,
+                  });
+                  toast.success(value ? t('twilio.phoneNumbers.agentAssigned') : t('twilio.phoneNumbers.agentUnassigned'));
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t('twilio.phoneNumbers.selectAgent')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">{t('twilio.phoneNumbers.noAgent')}</SelectItem>
+                  {agents.map((agent) => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      <div className="flex items-center gap-2">
+                        <span>{agent.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {agent.platform}
+                        </Badge>
+                        {agent.twilio_number && agent.twilio_number !== phoneNumber.phone_number && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Phone className="w-3 h-3 mr-1" />
+                            {agent.twilio_number}
+                          </Badge>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedAgentId && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {t('twilio.phoneNumbers.agentAssignmentNote')}
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
           <Tabs defaultValue="voice">
             <TabsList className="grid w-full grid-cols-2">
