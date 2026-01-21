@@ -1,126 +1,19 @@
-import { useState, useEffect } from 'react';
-import { BarChart3, Phone, Clock, CheckCircle, XCircle, TrendingUp, Calendar } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
+import { BarChart3, Phone, Clock, CheckCircle, XCircle, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/integrations/supabase/client';
-import { useOrganization } from '@/context/OrganizationContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useTwilioCallsAnalytics } from '@/hooks/useTwilioCallsAnalytics';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
-import { format, subDays, startOfDay, endOfDay, eachDayOfInterval } from 'date-fns';
-import { fr } from 'date-fns/locale';
 
-interface CallAnalytics {
-  totalCalls: number;
-  completedCalls: number;
-  failedCalls: number;
-  successRate: number;
-  avgDuration: number;
-  totalDuration: number;
-  callsByDay: { date: string; calls: number; completed: number; failed: number }[];
-  callsByStatus: { status: string; count: number }[];
-  callsByAgent: { agent: string; calls: number }[];
-}
-
-const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--destructive))', 'hsl(var(--muted))'];
+const COLORS = ['hsl(var(--primary))', 'hsl(142, 76%, 36%)', 'hsl(var(--destructive))', 'hsl(var(--muted))', 'hsl(220, 70%, 50%)'];
 
 export function TwilioAnalyticsPanel() {
   const { t } = useTranslation();
-  const { selectedOrgId } = useOrganization();
-  const [period, setPeriod] = useState<'7' | '14' | '30'>('7');
-  const [analytics, setAnalytics] = useState<CallAnalytics | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!selectedOrgId) return;
-
-    const fetchAnalytics = async () => {
-      setLoading(true);
-      const days = parseInt(period);
-      const startDate = startOfDay(subDays(new Date(), days - 1));
-      const endDate = endOfDay(new Date());
-
-      // Fetch calls from twilio_active_calls
-      const { data: calls, error } = await supabase
-        .from('twilio_active_calls')
-        .select('*')
-        .eq('organization_id', selectedOrgId)
-        .gte('started_at', startDate.toISOString())
-        .lte('started_at', endDate.toISOString());
-
-      if (error) {
-        console.error('Error fetching call analytics:', error);
-        setLoading(false);
-        return;
-      }
-
-      // Fetch agents for names
-      const { data: agents } = await supabase
-        .from('agents')
-        .select('id, name')
-        .eq('organization_id', selectedOrgId);
-
-      const agentMap: Record<string, string> = {};
-      agents?.forEach(a => { agentMap[a.id] = a.name; });
-
-      // Calculate analytics
-      const totalCalls = calls?.length || 0;
-      const completedCalls = calls?.filter(c => c.status === 'completed').length || 0;
-      const failedCalls = calls?.filter(c => ['failed', 'busy', 'no-answer', 'canceled'].includes(c.status)).length || 0;
-      const successRate = totalCalls > 0 ? (completedCalls / totalCalls) * 100 : 0;
-      
-      const durations = calls?.filter(c => c.duration && c.duration > 0).map(c => c.duration) || [];
-      const totalDuration = durations.reduce((sum, d) => sum + d, 0);
-      const avgDuration = durations.length > 0 ? totalDuration / durations.length : 0;
-
-      // Calls by day
-      const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
-      const callsByDay = dateRange.map(date => {
-        const dayStr = format(date, 'yyyy-MM-dd');
-        const dayCalls = calls?.filter(c => format(new Date(c.started_at), 'yyyy-MM-dd') === dayStr) || [];
-        return {
-          date: format(date, 'dd/MM', { locale: fr }),
-          calls: dayCalls.length,
-          completed: dayCalls.filter(c => c.status === 'completed').length,
-          failed: dayCalls.filter(c => ['failed', 'busy', 'no-answer', 'canceled'].includes(c.status)).length,
-        };
-      });
-
-      // Calls by status
-      const statusCounts: Record<string, number> = {};
-      calls?.forEach(c => {
-        statusCounts[c.status] = (statusCounts[c.status] || 0) + 1;
-      });
-      const callsByStatus = Object.entries(statusCounts).map(([status, count]) => ({ status, count }));
-
-      // Calls by agent
-      const agentCounts: Record<string, number> = {};
-      calls?.forEach(c => {
-        const agentName = c.agent_id ? (agentMap[c.agent_id] || 'Unknown') : 'Unassigned';
-        agentCounts[agentName] = (agentCounts[agentName] || 0) + 1;
-      });
-      const callsByAgent = Object.entries(agentCounts)
-        .map(([agent, calls]) => ({ agent, calls }))
-        .sort((a, b) => b.calls - a.calls)
-        .slice(0, 5);
-
-      setAnalytics({
-        totalCalls,
-        completedCalls,
-        failedCalls,
-        successRate,
-        avgDuration,
-        totalDuration,
-        callsByDay,
-        callsByStatus,
-        callsByAgent,
-      });
-      setLoading(false);
-    };
-
-    fetchAnalytics();
-  }, [selectedOrgId, period]);
+  const [period, setPeriod] = useState<number>(7);
+  const { analytics, loading, error } = useTwilioCallsAnalytics(period);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -148,8 +41,30 @@ export function TwilioAnalyticsPanel() {
     );
   }
 
+  if (error) {
+    return (
+      <Card className="border-destructive">
+        <CardContent className="p-6">
+          <div className="text-center text-destructive">
+            <XCircle className="w-10 h-10 mx-auto mb-2" />
+            <p>{t('twilio.analytics.error')}: {error}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (!analytics) {
-    return null;
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-muted-foreground">
+            <Phone className="w-10 h-10 mx-auto mb-2 opacity-50" />
+            <p>{t('twilio.analytics.noData')}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -162,7 +77,7 @@ export function TwilioAnalyticsPanel() {
           </h3>
           <p className="text-sm text-muted-foreground">{t('twilio.analytics.description')}</p>
         </div>
-        <Select value={period} onValueChange={(v) => setPeriod(v as '7' | '14' | '30')}>
+        <Select value={period.toString()} onValueChange={(v) => setPeriod(parseInt(v))}>
           <SelectTrigger className="w-40">
             <SelectValue />
           </SelectTrigger>
@@ -276,38 +191,6 @@ export function TwilioAnalyticsPanel() {
           </CardContent>
         </Card>
 
-        {/* Calls by Agent */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">{t('twilio.analytics.callsByAgent')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              {analytics.callsByAgent.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={analytics.callsByAgent} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis type="number" className="text-xs" />
-                    <YAxis type="category" dataKey="agent" className="text-xs" width={100} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }} 
-                    />
-                    <Bar dataKey="calls" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  {t('twilio.analytics.noData')}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Call Status Distribution */}
         <Card>
           <CardHeader>
@@ -341,6 +224,38 @@ export function TwilioAnalyticsPanel() {
           </CardContent>
         </Card>
 
+        {/* Call Direction */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">{t('twilio.analytics.callDirection')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              {analytics.callsByDirection.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analytics.callsByDirection} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis type="number" className="text-xs" />
+                    <YAxis type="category" dataKey="direction" className="text-xs" width={100} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }} 
+                    />
+                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  {t('twilio.analytics.noData')}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Summary Stats */}
         <Card>
           <CardHeader>
@@ -357,7 +272,7 @@ export function TwilioAnalyticsPanel() {
             </div>
             <div className="flex justify-between items-center py-2 border-b">
               <span className="text-muted-foreground">{t('twilio.analytics.avgPerDay')}</span>
-              <span className="font-medium">{(analytics.totalCalls / parseInt(period)).toFixed(1)}</span>
+              <span className="font-medium">{(analytics.totalCalls / period).toFixed(1)}</span>
             </div>
             <div className="flex justify-between items-center py-2">
               <span className="text-muted-foreground">{t('twilio.analytics.peakDay')}</span>

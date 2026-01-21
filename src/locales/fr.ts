@@ -2314,6 +2314,7 @@ export const fr = {
       callVolume: 'Volume d\'appels',
       callsByAgent: 'Appels par agent',
       statusDistribution: 'Répartition par statut',
+      callDirection: 'Direction des appels',
       summary: 'Résumé',
       totalDuration: 'Durée totale',
       completedCalls: 'Appels terminés',

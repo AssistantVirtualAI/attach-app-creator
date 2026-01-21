@@ -1,4 +1,5 @@
 export const en = {
+  // Note: callDirection added to twilio.analytics section
   // Navigation
   nav: {
     features: 'Features',
@@ -2314,6 +2315,7 @@ export const en = {
       callVolume: 'Call Volume',
       callsByAgent: 'Calls by Agent',
       statusDistribution: 'Status Distribution',
+      callDirection: 'Call Direction',
       summary: 'Summary',
       totalDuration: 'Total Duration',
       completedCalls: 'Completed Calls',
