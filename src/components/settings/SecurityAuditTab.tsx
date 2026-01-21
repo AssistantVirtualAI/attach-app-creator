@@ -6,10 +6,14 @@ import { useOrganization } from '@/context/OrganizationContext';
 import { useRunSecurityAudit, useSecurityAuditRuns } from '@/hooks/useSecurityAudit';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CardFooter } from '@/components/ui/card';
+import { useMemo, useState } from 'react';
 
 type CheckStatus = 'pass' | 'fail' | 'warn';
 
-const statusVariant = (s: CheckStatus) => {
+const statusVariant = (s: CheckStatus | '—') => {
   if (s === 'pass') return 'default';
   if (s === 'fail') return 'destructive';
   return 'secondary';
@@ -21,6 +25,9 @@ export const SecurityAuditTab = () => {
   const { toast } = useToast();
   const runsQuery = useSecurityAuditRuns(selectedOrgId || undefined);
   const runAudit = useRunSecurityAudit();
+  const [dryRun, setDryRun] = useState(false);
+  const [compareA, setCompareA] = useState<string>('');
+  const [compareB, setCompareB] = useState<string>('');
 
   const canView = isSuperAdmin || can('read:security_audit');
   const canRun = isSuperAdmin || can('run:security_audit');
@@ -31,12 +38,50 @@ export const SecurityAuditTab = () => {
   const onRun = async () => {
     if (!selectedOrgId) return;
     try {
-      await runAudit.mutateAsync({ organizationId: selectedOrgId });
-      toast({ title: 'Audit lancé', description: 'Audit terminé et enregistré.' });
+      const res = await runAudit.mutateAsync({ organizationId: selectedOrgId, dryRun });
+      toast({
+        title: 'Audit lancé',
+        description: dryRun ? 'Audit terminé (dry-run: non enregistré).' : 'Audit terminé et enregistré.',
+      });
+      if (!dryRun && res?.run?.id) {
+        // Reset compare selection to latest after a new persisted run
+        setCompareA(res.run.id);
+      }
     } catch (e: any) {
       toast({ title: 'Erreur', description: e?.message || 'Impossible d’exécuter l’audit', variant: 'destructive' });
     }
   };
+
+  const runMap = useMemo(() => {
+    const m = new Map<string, any>();
+    (runsQuery.data || []).forEach((r) => m.set(r.id, r));
+    return m;
+  }, [runsQuery.data]);
+
+  const diff = useMemo(() => {
+    const a = compareA ? runMap.get(compareA) : null;
+    const b = compareB ? runMap.get(compareB) : null;
+    if (!a || !b) return [] as Array<{ id: string; title: string; a: string; b: string }>;
+
+    const toMap = (run: any) => {
+      const checks = ((run?.results?.checks as any[]) || []) as any[];
+      return new Map<string, any>(checks.map((c: any) => [String(c.id), c]));
+    };
+    const am = toMap(a);
+    const bm = toMap(b);
+    const ids = new Set<string>([...am.keys(), ...bm.keys()]);
+    const out: Array<{ id: string; title: string; a: string; b: string }> = [];
+    ids.forEach((id) => {
+      const ca = am.get(id);
+      const cb = bm.get(id);
+      const sa = (ca?.status as string | undefined) ?? '—';
+      const sb = (cb?.status as string | undefined) ?? '—';
+      if (sa !== sb) {
+        out.push({ id, title: String(cb?.title || ca?.title || id), a: sa, b: sb });
+      }
+    });
+    return out;
+  }, [compareA, compareB, runMap]);
 
   if (!canView) {
     return (
@@ -70,6 +115,13 @@ export const SecurityAuditTab = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/20 p-3">
+            <div>
+              <div className="text-sm font-medium">Dry-run</div>
+              <div className="text-xs text-muted-foreground">Exécute l’audit sans l’enregistrer (et sans alertes).</div>
+            </div>
+            <Switch checked={dryRun} onCheckedChange={setDryRun} />
+          </div>
           <div className="text-xs text-muted-foreground">
             En cas d’échec, une alerte est envoyée (email + notification in-app) aux Admin/Manager.
           </div>
@@ -90,7 +142,51 @@ export const SecurityAuditTab = () => {
             </div>
           )}
         </CardContent>
+        <CardFooter className="flex flex-col items-start gap-3">
+          <div className="text-sm font-medium">Comparer deux audits</div>
+          <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
+            <Select value={compareA} onValueChange={setCompareA}>
+              <SelectTrigger><SelectValue placeholder="Audit A" /></SelectTrigger>
+              <SelectContent>
+                {(runsQuery.data || []).map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {new Date(r.created_at).toLocaleString()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={compareB} onValueChange={setCompareB}>
+              <SelectTrigger><SelectValue placeholder="Audit B" /></SelectTrigger>
+              <SelectContent>
+                {(runsQuery.data || []).map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {new Date(r.created_at).toLocaleString()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {compareA && compareB && (
+            diff.length === 0 ? (
+              <div className="text-sm text-muted-foreground">Aucune différence.</div>
+            ) : (
+              <div className="w-full space-y-2">
+                {diff.map((d) => (
+                  <div key={d.id} className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/20 p-3">
+                    <div className="text-sm font-medium">{d.title}</div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <Badge variant={statusVariant(d.a as any)}>{d.a}</Badge>
+                      <span className="text-muted-foreground">→</span>
+                      <Badge variant={statusVariant(d.b as any)}>{d.b}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+        </CardFooter>
       </Card>
     </div>
   );
 };
+

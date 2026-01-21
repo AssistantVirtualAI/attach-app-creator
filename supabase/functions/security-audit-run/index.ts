@@ -12,6 +12,16 @@ const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 type AppRole = "super_admin" | "org_admin" | "manager" | "agent" | "viewer";
 
+async function getRetentionDays(supabase: any, orgId: string) {
+  const { data } = await supabase
+    .from("org_retention_settings")
+    .select("notifications_retention_days")
+    .eq("organization_id", orgId)
+    .maybeSingle();
+  const days = Number(data?.notifications_retention_days ?? 90);
+  return Number.isFinite(days) && days > 0 ? days : 90;
+}
+
 async function hasPermission(supabase: any, userId: string, orgId: string, permission: string) {
   const [{ data: isSuperAdmin }, { data: roleRow }] = await Promise.all([
     supabase.rpc("is_super_admin", { _user_id: userId }),
@@ -98,6 +108,7 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const organization_id = body?.organization_id as string | undefined;
+    const dry_run = Boolean(body?.dry_run);
     if (!organization_id) {
       return new Response(JSON.stringify({ error: "organization_id is required" }), {
         status: 400,
@@ -115,6 +126,12 @@ serve(async (req) => {
 
     const { data: results, error: rpcErr } = await supabase.rpc("run_security_audit", { _org_id: organization_id });
     if (rpcErr) throw rpcErr;
+
+    if (dry_run) {
+      return new Response(JSON.stringify({ dry_run: true, results: results ?? {} }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { data: runRow, error: insertErr } = await supabase
       .from("security_audit_runs")
@@ -150,6 +167,11 @@ serve(async (req) => {
         { organization_id, recipient_role: "org_admin", level: "error", title, body: bodyText, metadata: { failed } },
         { organization_id, recipient_role: "manager", level: "error", title, body: bodyText, metadata: { failed } },
       ]);
+
+      // Retention purge (event-triggered)
+      const keepDays = await getRetentionDays(supabase, organization_id);
+      const cutoff = new Date(Date.now() - keepDays * 24 * 60 * 60 * 1000).toISOString();
+      await supabase.from("org_notifications").delete().eq("organization_id", organization_id).lt("created_at", cutoff);
 
       // Email to org_admin/manager
       const { data: roles } = await supabase

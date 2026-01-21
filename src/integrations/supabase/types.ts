@@ -1767,6 +1767,30 @@ export type Database = {
         }
         Relationships: []
       }
+      org_retention_settings: {
+        Row: {
+          exports_retention_days: number
+          notifications_retention_days: number
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          exports_retention_days?: number
+          notifications_retention_days?: number
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          exports_retention_days?: number
+          notifications_retention_days?: number
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       org_role_permissions: {
         Row: {
           allowed: boolean

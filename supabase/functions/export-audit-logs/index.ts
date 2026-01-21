@@ -12,6 +12,16 @@ const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 type ExportFormat = "json" | "csv";
 
+async function getExportsRetentionDays(supabase: any, orgId: string) {
+  const { data } = await supabase
+    .from("org_retention_settings")
+    .select("exports_retention_days")
+    .eq("organization_id", orgId)
+    .maybeSingle();
+  const days = Number(data?.exports_retention_days ?? 90);
+  return Number.isFinite(days) && days > 0 ? days : 90;
+}
+
 function toCsv(rows: Record<string, unknown>[]) {
   if (rows.length === 0) return "";
   const headers = Object.keys(rows[0]);
@@ -199,6 +209,11 @@ serve(async (req) => {
       .select("id")
       .single();
     if (exportErr) throw exportErr;
+
+    // Retention purge (event-triggered)
+    const keepDays = await getExportsRetentionDays(supabase, organization_id);
+    const cutoff = new Date(Date.now() - keepDays * 24 * 60 * 60 * 1000).toISOString();
+    await supabase.from("org_exports").delete().eq("organization_id", organization_id).lt("created_at", cutoff);
 
     // Keep only last 20 exports
     const { data: old } = await supabase

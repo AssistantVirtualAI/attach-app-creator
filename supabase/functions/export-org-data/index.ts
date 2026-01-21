@@ -13,6 +13,16 @@ const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 type ExportType = "topics" | "prompt_templates" | "both";
 type ExportFormat = "json" | "csv";
 
+async function getExportsRetentionDays(supabase: any, orgId: string) {
+  const { data } = await supabase
+    .from("org_retention_settings")
+    .select("exports_retention_days")
+    .eq("organization_id", orgId)
+    .maybeSingle();
+  const days = Number(data?.exports_retention_days ?? 90);
+  return Number.isFinite(days) && days > 0 ? days : 90;
+}
+
 async function hasPermission(supabase: any, userId: string, orgId: string, permission: string) {
   const [{ data: isSuperAdmin }, { data: roleRow }] = await Promise.all([
     supabase.rpc("is_super_admin", { _user_id: userId }),
@@ -173,6 +183,10 @@ serve(async (req) => {
          content: csv,
        });
 
+       const keepDays = await getExportsRetentionDays(supabase, orgId);
+       const cutoff = new Date(Date.now() - keepDays * 24 * 60 * 60 * 1000).toISOString();
+       await supabase.from("org_exports").delete().eq("organization_id", orgId).lt("created_at", cutoff);
+
        const { data: old } = await supabase
          .from("org_exports")
          .select("id")
@@ -199,6 +213,10 @@ serve(async (req) => {
       mime: "application/json",
       content: json,
     });
+
+    const keepDays = await getExportsRetentionDays(supabase, orgId);
+    const cutoff = new Date(Date.now() - keepDays * 24 * 60 * 60 * 1000).toISOString();
+    await supabase.from("org_exports").delete().eq("organization_id", orgId).lt("created_at", cutoff);
 
     const { data: old } = await supabase
       .from("org_exports")

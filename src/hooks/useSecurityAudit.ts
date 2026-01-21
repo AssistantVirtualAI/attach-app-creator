@@ -32,16 +32,17 @@ export const useRunSecurityAudit = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ organizationId }: { organizationId: string }) => {
+    mutationFn: async ({ organizationId, dryRun }: { organizationId: string; dryRun?: boolean }) => {
       const { data, error } = await supabase.functions.invoke('security-audit-run', {
-        body: { organization_id: organizationId },
+        body: { organization_id: organizationId, dry_run: !!dryRun },
       });
 
       if (error) throw error;
-      return data?.run as SecurityAuditRun;
+      return data as { run?: SecurityAuditRun; results?: any; dry_run?: boolean };
     },
     onSuccess: (_run, vars) => {
       queryClient.invalidateQueries({ queryKey: ['security-audit-runs', vars.organizationId] });
     },
   });
 };
+
