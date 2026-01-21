@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Phone, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Phone, Loader2, AlertCircle, BarChart3 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -8,6 +8,7 @@ import { TwilioPhoneNumbersTab } from '@/components/twilio/TwilioPhoneNumbersTab
 import { TwilioAppsTab } from '@/components/twilio/TwilioAppsTab';
 import { TwilioUsageTab } from '@/components/twilio/TwilioUsageTab';
 import { TwilioCallsTab } from '@/components/twilio/TwilioCallsTab';
+import { TwilioAnalyticsPanel } from '@/components/twilio/TwilioAnalyticsPanel';
 import { useTwilioIntegration } from '@/hooks/useTwilioIntegration';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -81,6 +82,7 @@ export default function TwilioManagement() {
             <TabsTrigger value="numbers">{t('twilio.tabs.phoneNumbers')}</TabsTrigger>
             <TabsTrigger value="apps">{t('twilio.tabs.twimlApps')}</TabsTrigger>
             <TabsTrigger value="calls">{t('twilio.tabs.calls')}</TabsTrigger>
+            <TabsTrigger value="analytics">{t('twilio.tabs.analytics')}</TabsTrigger>
             <TabsTrigger value="usage">{t('twilio.tabs.usage')}</TabsTrigger>
           </TabsList>
 
@@ -94,6 +96,10 @@ export default function TwilioManagement() {
 
           <TabsContent value="calls">
             <TwilioCallsTab />
+          </TabsContent>
+
+          <TabsContent value="analytics">
+            <TwilioAnalyticsPanel />
           </TabsContent>
 
           <TabsContent value="usage">
