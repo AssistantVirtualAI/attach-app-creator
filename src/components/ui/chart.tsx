@@ -65,26 +65,37 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null;
   }
 
-  return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
-  })
-  .join("\n")}
-}
-`,
-          )
-          .join("\n"),
-      }}
-    />
-  );
+  const isSafeCssVarKey = (key: string) => /^[a-zA-Z0-9_-]+$/.test(key);
+
+  // Allows common safe color formats and theme-token usage, and rejects characters that could break out of a CSS declaration.
+  const isSafeCssColor = (value: string) => {
+    const v = value.trim();
+    if (!v || /[;{}<>]/.test(v)) return false;
+    if (/^hsl\(var\(--[a-zA-Z0-9_-]+\)\)$/.test(v)) return true;
+    if (/^#[0-9a-fA-F]{3,8}$/.test(v)) return true;
+    if (/^rgba?\([0-9\s.,%]+\)$/.test(v)) return true;
+    if (/^hsla?\([0-9\s.,%]+\)$/.test(v)) return true;
+    return false;
+  };
+
+  const cssText = Object.entries(THEMES)
+    .map(([theme, prefix]) => {
+      const declarations = colorConfig
+        .map(([key, itemConfig]) => {
+          if (!isSafeCssVarKey(key)) return null;
+          const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
+          if (!color || !isSafeCssColor(color)) return null;
+          return `  --color-${key}: ${color};`;
+        })
+        .filter(Boolean)
+        .join("\n");
+
+      return `\n${prefix} [data-chart=${id}] {\n${declarations}\n}`;
+    })
+    .join("\n");
+
+  // Render as textContent (no dangerouslySetInnerHTML)
+  return <style>{cssText}</style>;
 };
 
 const ChartTooltip = RechartsPrimitive.Tooltip;
