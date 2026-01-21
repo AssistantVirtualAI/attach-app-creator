@@ -2218,6 +2218,30 @@ export type Database = {
           },
         ]
       }
+      security_audit_runs: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string
+          results: Json
+          run_by: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id: string
+          results?: Json
+          run_by: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string
+          results?: Json
+          run_by?: string
+        }
+        Relationships: []
+      }
       sms_templates: {
         Row: {
           category: string | null
@@ -2996,6 +3020,7 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      run_security_audit: { Args: { _org_id: string }; Returns: Json }
       setup_new_user_organization: {
         Args: { _full_name?: string; _user_email: string; _user_id: string }
         Returns: string
