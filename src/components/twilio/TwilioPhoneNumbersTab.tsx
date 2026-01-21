@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Phone, Plus, Settings, Trash2, Search, Loader2, RefreshCw, Bot } from 'lucide-react';
+import { Phone, Plus, Settings, Trash2, Search, Loader2, RefreshCw, Bot, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useTwilioIntegration, TwilioPhoneNumber, AvailableNumber } from '@/hooks/useTwilioIntegration';
 import { useAgentsForTwilio } from '@/hooks/useAgentsForTwilio';
+import { usePlatformPhoneAssignments } from '@/hooks/usePlatformPhoneAssignments';
 import { PhoneNumberConfigModal } from './PhoneNumberConfigModal';
 import { useTranslation } from '@/hooks/useTranslation';
 import {
@@ -30,6 +31,20 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
+// Normalize phone number for comparison
+function normalizePhoneNumber(phone: string | null): string {
+  if (!phone) return '';
+  const cleaned = phone.replace(/[^\d+]/g, '');
+  return cleaned.startsWith('+') ? cleaned : `+${cleaned}`;
+}
+
+const PLATFORM_COLORS: Record<string, string> = {
+  elevenlabs: 'bg-purple-500/10 text-purple-600 border-purple-500/30',
+  vapi: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
+  retell: 'bg-green-500/10 text-green-600 border-green-500/30',
+  custom: 'bg-orange-500/10 text-orange-600 border-orange-500/30',
+};
+
 export function TwilioPhoneNumbersTab() {
   const { t } = useTranslation();
   const {
@@ -43,6 +58,7 @@ export function TwilioPhoneNumbersTab() {
   } = useTwilioIntegration();
   
   const { agents, getAgentByTwilioNumber, refetchAgents } = useAgentsForTwilio();
+  const { data: platformAssignments = [], refetch: refetchAssignments } = usePlatformPhoneAssignments(phoneNumbers);
 
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
@@ -85,6 +101,41 @@ export function TwilioPhoneNumbersTab() {
     setShowConfigModal(true);
   };
 
+  const handleRefresh = () => {
+    refetchNumbers();
+    refetchAgents();
+    refetchAssignments();
+  };
+
+  // Get assignment for a phone number
+  const getAssignment = (phoneNumber: string) => {
+    const normalized = normalizePhoneNumber(phoneNumber);
+    
+    // First check platform assignments (includes DB + platform API detection)
+    const platformAssignment = platformAssignments.find(
+      (a) => normalizePhoneNumber(a.phoneNumber) === normalized
+    );
+    
+    if (platformAssignment?.agentName) {
+      return platformAssignment;
+    }
+
+    // Fallback to direct DB lookup
+    const dbAgent = getAgentByTwilioNumber(phoneNumber);
+    if (dbAgent) {
+      return {
+        phoneNumber: normalized,
+        platform: dbAgent.platform as 'elevenlabs' | 'vapi' | 'retell',
+        agentId: dbAgent.id,
+        agentName: dbAgent.name,
+        detectedFrom: 'db_assignment' as const,
+      };
+    }
+
+    // Return platform detection even without agent name
+    return platformAssignment;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -93,7 +144,7 @@ export function TwilioPhoneNumbersTab() {
           <p className="text-sm text-muted-foreground">{t('twilio.phoneNumbers.description')}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetchNumbers()}>
+          <Button variant="outline" size="sm" onClick={handleRefresh}>
             <RefreshCw className="w-4 h-4 mr-2" />
             {t('common.refresh')}
           </Button>
@@ -141,23 +192,56 @@ export function TwilioPhoneNumbersTab() {
               </TableHeader>
               <TableBody>
                 {phoneNumbers.map((number) => {
-                  const assignedAgent = getAgentByTwilioNumber(number.phone_number);
+                  const assignment = getAssignment(number.phone_number);
                   return (
                     <TableRow key={number.sid}>
                       <TableCell className="font-mono">{number.phone_number}</TableCell>
                       <TableCell>{number.friendly_name}</TableCell>
                       <TableCell>
-                        {assignedAgent ? (
+                        {assignment?.agentName ? (
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Badge variant="default" className="gap-1 cursor-pointer">
+                                <Badge 
+                                  variant="outline" 
+                                  className={`gap-1 cursor-pointer ${PLATFORM_COLORS[assignment.platform] || ''}`}
+                                >
                                   <Bot className="w-3 h-3" />
-                                  {assignedAgent.name}
+                                  {assignment.agentName}
                                 </Badge>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>{t('twilio.phoneNumbers.platform')}: {assignedAgent.platform}</p>
+                                <p className="font-medium">{assignment.platform.toUpperCase()}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {assignment.detectedFrom === 'platform_api' && 'Detected from platform API'}
+                                  {assignment.detectedFrom === 'db_assignment' && 'Assigned in database'}
+                                  {assignment.detectedFrom === 'voice_url' && 'Detected from voice URL'}
+                                </p>
+                                {assignment.platformAgentId && (
+                                  <p className="text-xs font-mono mt-1">
+                                    ID: {assignment.platformAgentId.slice(0, 16)}...
+                                  </p>
+                                )}
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : assignment?.platform && assignment.platform !== 'unknown' ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge 
+                                  variant="outline" 
+                                  className={`gap-1 ${PLATFORM_COLORS[assignment.platform] || ''}`}
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  {assignment.platform}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Connected to {assignment.platform}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Agent not found in local database
+                                </p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -178,7 +262,18 @@ export function TwilioPhoneNumbersTab() {
                             App: {twimlApps.find(a => a.sid === number.voice_application_sid)?.friendly_name || number.voice_application_sid.slice(0, 10)}
                           </Badge>
                         ) : number.voice_url ? (
-                          <span className="text-sm text-muted-foreground truncate">{number.voice_url}</span>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="text-sm text-muted-foreground truncate block max-w-[180px]">
+                                  {number.voice_url}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-md">
+                                <p className="font-mono text-xs break-all">{number.voice_url}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         ) : (
                           <span className="text-sm text-muted-foreground">{t('twilio.phoneNumbers.notConfigured')}</span>
                         )}
@@ -331,8 +426,8 @@ export function TwilioPhoneNumbersTab() {
           onOpenChange={(open) => {
             setShowConfigModal(open);
             if (!open) {
-              // Refresh agents list when modal closes to update assigned agent display
-              refetchAgents();
+              // Refresh all data when modal closes
+              handleRefresh();
             }
           }}
           phoneNumber={selectedNumber}
