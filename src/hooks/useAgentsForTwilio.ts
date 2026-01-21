@@ -15,7 +15,7 @@ export function useAgentsForTwilio() {
   const { selectedOrgId } = useOrganization();
   const queryClient = useQueryClient();
 
-  const { data: agents = [], isLoading } = useQuery({
+  const { data: agents = [], isLoading, refetch: refetchAgents } = useQuery({
     queryKey: ['agents-for-twilio', selectedOrgId],
     queryFn: async () => {
       if (!selectedOrgId) return [];
@@ -64,7 +64,15 @@ export function useAgentsForTwilio() {
   });
 
   const getAgentByTwilioNumber = (twilioNumber: string): AgentForTwilio | undefined => {
-    return agents.find(agent => agent.twilio_number === twilioNumber);
+    // Normalize phone numbers for comparison (remove spaces, dashes)
+    const normalizePhone = (phone: string) => phone?.replace(/\s+/g, '').replace(/-/g, '') || '';
+    const normalizedInput = normalizePhone(twilioNumber);
+    
+    return agents.find(agent => {
+      if (!agent.twilio_number) return false;
+      const normalizedAgent = normalizePhone(agent.twilio_number);
+      return normalizedAgent === normalizedInput || agent.twilio_number === twilioNumber;
+    });
   };
 
   return {
@@ -72,5 +80,6 @@ export function useAgentsForTwilio() {
     isLoading,
     assignTwilioNumber,
     getAgentByTwilioNumber,
+    refetchAgents,
   };
 }

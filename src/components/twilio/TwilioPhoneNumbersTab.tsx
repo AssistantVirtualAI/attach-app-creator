@@ -42,7 +42,7 @@ export function TwilioPhoneNumbersTab() {
     releaseNumber,
   } = useTwilioIntegration();
   
-  const { agents, getAgentByTwilioNumber } = useAgentsForTwilio();
+  const { agents, getAgentByTwilioNumber, refetchAgents } = useAgentsForTwilio();
 
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
@@ -328,7 +328,13 @@ export function TwilioPhoneNumbersTab() {
       {selectedNumber && (
         <PhoneNumberConfigModal
           open={showConfigModal}
-          onOpenChange={setShowConfigModal}
+          onOpenChange={(open) => {
+            setShowConfigModal(open);
+            if (!open) {
+              // Refresh agents list when modal closes to update assigned agent display
+              refetchAgents();
+            }
+          }}
           phoneNumber={selectedNumber}
           twimlApps={twimlApps}
         />

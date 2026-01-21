@@ -3,7 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Bot, Key, Palette, BarChart3, Play, Code, Brain, Activity, Users, Settings2, Wrench, Webhook } from 'lucide-react';
+import { ArrowLeft, Bot, Key, Palette, BarChart3, Play, Code, Brain, Activity, Users, Settings2, Wrench, Webhook, Phone } from 'lucide-react';
 import { useAgentSettings } from '@/hooks/useAgentSettings';
 import { AgentOverviewTab } from '@/components/agents/AgentOverviewTab';
 import { AgentCredentialsTab } from '@/components/agents/AgentCredentialsTab';
@@ -18,6 +18,7 @@ import { AgentRealtimeAnalytics } from '@/components/agents/AgentRealtimeAnalyti
 import { AgentFullConfigTab } from '@/components/agents/AgentFullConfigTab';
 import { AgentMCPConfigTab } from '@/components/agents/AgentMCPConfigTab';
 import { AgentPlatformWebhooksTab } from '@/components/agents/AgentPlatformWebhooksTab';
+import { AgentTwilioSection } from '@/components/agents/AgentTwilioSection';
 
 const AgentSettingsPage = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -136,14 +137,24 @@ const AgentSettingsPage = () => {
           </TabsContent>
 
           <TabsContent value="config">
-            <AgentCredentialsTab
-              agent={agent}
-              integration={integration}
-              onUpdate={updateAgent}
-              onTestConnection={testConnection}
-              isUpdating={isUpdating}
-              isTesting={isTesting}
-            />
+            <div className="space-y-6">
+              <AgentCredentialsTab
+                agent={agent}
+                integration={integration}
+                onUpdate={updateAgent}
+                onTestConnection={testConnection}
+                isUpdating={isUpdating}
+                isTesting={isTesting}
+              />
+              {['elevenlabs', 'vapi', 'retell'].includes(agent.platform) && (
+                <AgentTwilioSection
+                  agentId={agentId!}
+                  agentName={agent.name}
+                  currentTwilioNumber={(agent as any).twilio_number || null}
+                  organizationId={agent.organization_id}
+                />
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="advanced">

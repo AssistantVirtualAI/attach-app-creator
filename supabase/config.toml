@@ -155,3 +155,6 @@ verify_jwt = false
 
 [functions.twilio-proxy]
 verify_jwt = true
+
+[functions.twilio-voice-webhook]
+verify_jwt = false
