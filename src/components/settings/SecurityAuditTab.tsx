@@ -17,12 +17,13 @@ const statusVariant = (s: CheckStatus) => {
 
 export const SecurityAuditTab = () => {
   const { selectedOrgId } = useOrganization();
-  const { can, isSuperAdmin, role } = usePermissions();
+  const { can, isSuperAdmin } = usePermissions();
   const { toast } = useToast();
   const runsQuery = useSecurityAuditRuns(selectedOrgId || undefined);
   const runAudit = useRunSecurityAudit();
 
-  const canView = isSuperAdmin || role === 'org_admin' || role === 'manager' || can('manage:organization');
+  const canView = isSuperAdmin || can('read:security_audit');
+  const canRun = isSuperAdmin || can('run:security_audit');
 
   const latest = runsQuery.data?.[0];
   const checks: Array<{ id: string; title: string; status: CheckStatus }> = latest?.results?.checks || [];
@@ -62,13 +63,16 @@ export const SecurityAuditTab = () => {
                 Dernier audit: {latest?.created_at ? new Date(latest.created_at).toLocaleString() : 'Aucun'}
               </CardDescription>
             </div>
-            <Button onClick={onRun} disabled={!selectedOrgId || runAudit.isPending} className="gap-2">
+             <Button onClick={onRun} disabled={!selectedOrgId || runAudit.isPending || !canRun} className="gap-2">
               <RefreshCw className={runAudit.isPending ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
               Relancer
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div className="text-xs text-muted-foreground">
+            En cas d’échec, une alerte est envoyée (email + notification in-app) aux Admin/Manager.
+          </div>
           {runsQuery.isLoading ? (
             <div className="text-sm text-muted-foreground">Chargement…</div>
           ) : !latest ? (

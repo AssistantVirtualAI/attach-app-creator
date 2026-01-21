@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -117,6 +118,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
               </Badge>
             )}
             <div className="flex items-center gap-1">
+              <NotificationsBell />
               {/* Language Toggle */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

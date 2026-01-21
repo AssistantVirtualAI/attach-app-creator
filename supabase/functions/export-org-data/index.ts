@@ -13,6 +13,33 @@ const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 type ExportType = "topics" | "prompt_templates" | "both";
 type ExportFormat = "json" | "csv";
 
+async function hasPermission(supabase: any, userId: string, orgId: string, permission: string) {
+  const [{ data: isSuperAdmin }, { data: roleRow }] = await Promise.all([
+    supabase.rpc("is_super_admin", { _user_id: userId }),
+    supabase.from("user_roles").select("role").eq("organization_id", orgId).eq("user_id", userId).maybeSingle(),
+  ]);
+  if (isSuperAdmin) return true;
+  const role = roleRow?.role as string | undefined;
+  if (!role) return false;
+  const base: Record<string, string[]> = {
+    org_admin: ["export:org_data"],
+    manager: [],
+    agent: [],
+    viewer: [],
+  };
+  const allowed = new Set(base[role] || []);
+  const { data: overrides } = await supabase
+    .from("org_role_permissions")
+    .select("permission, allowed")
+    .eq("organization_id", orgId)
+    .eq("role", role);
+  for (const o of overrides || []) {
+    if (o.allowed) allowed.add(o.permission);
+    else allowed.delete(o.permission);
+  }
+  return allowed.has(permission);
+}
+
 function toCsv(rows: Record<string, unknown>[]) {
   if (rows.length === 0) return "";
   const headers = Object.keys(rows[0]);
@@ -67,18 +94,8 @@ serve(async (req) => {
       });
     }
 
-    const [{ data: isSuperAdmin }, { data: roleRow }] = await Promise.all([
-      supabase.rpc("is_super_admin", { _user_id: userRes.user.id }),
-      supabase
-        .from("user_roles")
-        .select("role")
-        .eq("organization_id", orgId)
-        .eq("user_id", userRes.user.id)
-        .maybeSingle(),
-    ]);
-
-    const isOrgAdmin = roleRow?.role === "org_admin";
-    if (!isSuperAdmin && !isOrgAdmin) {
+    const canExport = await hasPermission(supabase, userRes.user.id, orgId, "export:org_data");
+    if (!canExport) {
       return new Response(JSON.stringify({ error: "Forbidden" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -142,15 +159,56 @@ serve(async (req) => {
         (payload.prompt_templates as Record<string, unknown>[]).forEach((r) => rows.push({ kind: "prompt_template", ...r }));
       }
 
-      const csv = toCsv(rows);
-      const filename = `org-export-${stamp}.csv`;
-      return new Response(JSON.stringify({ filename, mime: "text/csv", content: csv }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+       const csv = toCsv(rows);
+       const filename = `org-export-${stamp}.csv`;
+
+       await supabase.from("org_exports").insert({
+         organization_id: orgId,
+         created_by: userRes.user.id,
+         export_type: exportType,
+         format: exportFormat,
+         filters: { export_type: exportType },
+         filename,
+         mime: "text/csv",
+         content: csv,
+       });
+
+       const { data: old } = await supabase
+         .from("org_exports")
+         .select("id")
+         .eq("organization_id", orgId)
+         .order("created_at", { ascending: false })
+         .range(20, 200);
+       if (old?.length) await supabase.from("org_exports").delete().in("id", old.map((o: any) => o.id));
+
+       return new Response(JSON.stringify({ filename, mime: "text/csv", content: csv }), {
+         headers: { ...corsHeaders, "Content-Type": "application/json" },
+       });
     }
 
+    const json = JSON.stringify(payload, null, 2);
     const filename = `org-export-${stamp}.json`;
-    return new Response(JSON.stringify({ filename, mime: "application/json", content: JSON.stringify(payload, null, 2) }), {
+
+    await supabase.from("org_exports").insert({
+      organization_id: orgId,
+      created_by: userRes.user.id,
+      export_type: exportType,
+      format: exportFormat,
+      filters: { export_type: exportType },
+      filename,
+      mime: "application/json",
+      content: json,
+    });
+
+    const { data: old } = await supabase
+      .from("org_exports")
+      .select("id")
+      .eq("organization_id", orgId)
+      .order("created_at", { ascending: false })
+      .range(20, 200);
+    if (old?.length) await supabase.from("org_exports").delete().in("id", old.map((o: any) => o.id));
+
+    return new Response(JSON.stringify({ filename, mime: "application/json", content: json }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
