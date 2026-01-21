@@ -940,6 +940,9 @@ export const en = {
       privacy: 'Privacy',
       audit: 'Audit',
       documentation: 'Documentation',
+      roles: 'Roles & Permissions',
+      securityAudit: 'Security Audit',
+      exports: 'Data Export',
     },
   },
 
