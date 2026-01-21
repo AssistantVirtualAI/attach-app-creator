@@ -1689,6 +1689,114 @@ export type Database = {
           },
         ]
       }
+      org_exports: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string
+          export_type: string
+          filename: string
+          filters: Json
+          format: string
+          id: string
+          mime: string
+          organization_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by: string
+          export_type: string
+          filename: string
+          filters?: Json
+          format: string
+          id?: string
+          mime: string
+          organization_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string
+          export_type?: string
+          filename?: string
+          filters?: Json
+          format?: string
+          id?: string
+          mime?: string
+          organization_id?: string
+        }
+        Relationships: []
+      }
+      org_notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          level: string
+          metadata: Json
+          organization_id: string
+          read_at: string | null
+          recipient_role: Database["public"]["Enums"]["app_role"] | null
+          recipient_user_id: string | null
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          level?: string
+          metadata?: Json
+          organization_id: string
+          read_at?: string | null
+          recipient_role?: Database["public"]["Enums"]["app_role"] | null
+          recipient_user_id?: string | null
+          title: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          level?: string
+          metadata?: Json
+          organization_id?: string
+          read_at?: string | null
+          recipient_role?: Database["public"]["Enums"]["app_role"] | null
+          recipient_user_id?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      org_role_permissions: {
+        Row: {
+          allowed: boolean
+          id: string
+          organization_id: string
+          permission: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          allowed?: boolean
+          id?: string
+          organization_id: string
+          permission: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          allowed?: boolean
+          id?: string
+          organization_id?: string
+          permission?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       organization_api_keys: {
         Row: {
           created_at: string
