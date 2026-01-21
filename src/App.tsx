@@ -67,6 +67,7 @@ import DemoCenter from "./pages/DemoCenter";
 import RealtimeMonitor from "./pages/RealtimeMonitor";
 import ApiExplorer from "./pages/ApiExplorer";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+import TwilioManagement from "./pages/TwilioManagement";
 
 // Portal pages
 import PortalLogin from "./pages/PortalLogin";
@@ -204,6 +205,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <Integrations />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/twilio-management"
+                  element={
+                    <ProtectedRoute>
+                      <TwilioManagement />
                     </ProtectedRoute>
                   }
                 />

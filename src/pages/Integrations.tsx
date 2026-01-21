@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, CheckCircle, XCircle, Loader2, TestTube, Clock } from 'lucide-react';
+import { Plus, CheckCircle, XCircle, Loader2, TestTube, Clock, ExternalLink } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,6 +48,14 @@ const getPlatforms = (t: (key: string) => string) => [
     description: t('integrations.platforms.elevenlabs'),
     icon: '🔊',
   },
+  {
+    name: 'Twilio',
+    value: 'twilio',
+    description: t('integrations.platforms.twilio'),
+    icon: '📱',
+    fields: ['accountSid', 'authToken'],
+    managementUrl: '/twilio-management',
+  },
 ];
 
 export default function Integrations() {
@@ -59,6 +67,8 @@ export default function Integrations() {
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [agentId, setAgentId] = useState('');
+  const [accountSid, setAccountSid] = useState('');
+  const [authToken, setAuthToken] = useState('');
   const [saving, setSaving] = useState(false);
   const [testingPlatform, setTestingPlatform] = useState<string | null>(null);
 
@@ -125,7 +135,10 @@ export default function Integrations() {
   };
 
   const handleSave = async () => {
-    if (!selectedPlatform || !apiKey) {
+    const isTwilio = selectedPlatform === 'twilio';
+    const hasRequiredFields = isTwilio ? (accountSid && authToken) : apiKey;
+    
+    if (!selectedPlatform || !hasRequiredFields) {
       toast({
         title: t('common.error'),
         description: t('integrations.messages.fillRequired'),
@@ -151,14 +164,18 @@ export default function Integrations() {
         (int) => int.platform === selectedPlatform
       );
 
+      // For Twilio, we store accountSid in api_key and authToken in agent_id
+      const apiKeyToSave = selectedPlatform === 'twilio' ? accountSid : apiKey;
+      const agentIdToSave = selectedPlatform === 'twilio' ? authToken : (agentId || null);
+
       let integrationId: string;
 
       if (existingIntegration) {
         const { error } = await supabase
           .from('organization_integrations')
           .update({
-            api_key: apiKey,
-            agent_id: agentId || null,
+            api_key: apiKeyToSave,
+            agent_id: agentIdToSave,
             updated_at: new Date().toISOString(),
             test_status: 'pending',
           })
@@ -173,8 +190,8 @@ export default function Integrations() {
             organization_id: selectedOrgId || null,
             user_id: user.id,
             platform: selectedPlatform,
-            api_key: apiKey,
-            agent_id: agentId || null,
+            api_key: apiKeyToSave,
+            agent_id: agentIdToSave,
             is_active: true,
             test_status: 'pending',
           })
@@ -193,6 +210,8 @@ export default function Integrations() {
       setSelectedPlatform(null);
       setApiKey('');
       setAgentId('');
+      setAccountSid('');
+      setAuthToken('');
       await refetch();
 
       // Auto-test the integration
@@ -320,16 +339,31 @@ export default function Integrations() {
                           )}
                           {t('integrations.actions.test')}
                         </Button>
-                        <Button
+                          <Button
                           variant="outline"
                           size="sm"
                           onClick={() => {
                             setSelectedPlatform(platform.value);
-                            setAgentId(integration.agent_id || '');
+                            if (platform.value === 'twilio') {
+                              setAccountSid(integration.api_key || '');
+                              setAuthToken(integration.agent_id || '');
+                            } else {
+                              setAgentId(integration.agent_id || '');
+                            }
                           }}
                         >
                           {t('integrations.actions.reconfigure')}
                         </Button>
+                        {platform.value === 'twilio' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate('/twilio-management')}
+                          >
+                            <ExternalLink className="w-4 h-4 mr-1" />
+                            {t('integrations.actions.manage')}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -353,42 +387,69 @@ export default function Integrations() {
         >
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>
-                {t('integrations.modal.configure')} {platforms.find((p) => p.value === selectedPlatform)?.name}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 mt-4">
-              <div>
-                <Label htmlFor="apiKey">{t('integrations.modal.apiKey')} *</Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="sk-..."
-                />
-              </div>
-              <div>
-                <Label htmlFor="agentId">{t('integrations.modal.agentId')}</Label>
-                <Input
-                  id="agentId"
-                  value={agentId}
-                  onChange={(e) => setAgentId(e.target.value)}
-                  placeholder="agent_xxx"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleSave}
-                  disabled={saving || !apiKey}
-                  className="flex-1"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      {t('common.loading')}
-                    </>
-                  ) : (
+            <DialogTitle>
+              {t('integrations.modal.configure')} {platforms.find((p) => p.value === selectedPlatform)?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            {selectedPlatform === 'twilio' ? (
+              <>
+                <div>
+                  <Label htmlFor="accountSid">{t('integrations.modal.accountSid')} *</Label>
+                  <Input
+                    id="accountSid"
+                    type="password"
+                    value={accountSid}
+                    onChange={(e) => setAccountSid(e.target.value)}
+                    placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="authToken">{t('integrations.modal.authToken')} *</Label>
+                  <Input
+                    id="authToken"
+                    type="password"
+                    value={authToken}
+                    onChange={(e) => setAuthToken(e.target.value)}
+                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <Label htmlFor="apiKey">{t('integrations.modal.apiKey')} *</Label>
+                  <Input
+                    id="apiKey"
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="sk-..."
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="agentId">{t('integrations.modal.agentId')}</Label>
+                  <Input
+                    id="agentId"
+                    value={agentId}
+                    onChange={(e) => setAgentId(e.target.value)}
+                    placeholder="agent_xxx"
+                  />
+                </div>
+              </>
+            )}
+            <div className="flex gap-2">
+              <Button
+                onClick={handleSave}
+                disabled={saving || (selectedPlatform === 'twilio' ? (!accountSid || !authToken) : !apiKey)}
+                className="flex-1"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {t('common.loading')}
+                  </>
+                ) : (
                     t('integrations.actions.saveAndTest')
                   )}
                 </Button>
