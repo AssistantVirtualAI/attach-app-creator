@@ -123,6 +123,25 @@ export function PhoneNumberConfigModal({ open, onOpenChange, phoneNumber, twimlA
                     agentId: value || null,
                     twilioNumber: phoneNumber.phone_number,
                   });
+                  
+                  // Auto-configure voice webhook and status callback when agent is assigned
+                  if (value) {
+                    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                    const voiceWebhookUrl = `${supabaseUrl}/functions/v1/twilio-voice-webhook`;
+                    const statusCallbackUrl = `${supabaseUrl}/functions/v1/twilio-status-callback`;
+                    
+                    await updateNumber.mutateAsync({
+                      phoneSid: phoneNumber.sid,
+                      voice_url: voiceWebhookUrl,
+                      voice_method: 'POST',
+                      status_callback: statusCallbackUrl,
+                      status_callback_method: 'POST',
+                    });
+                    
+                    setVoiceUrl(voiceWebhookUrl);
+                    setStatusCallback(statusCallbackUrl);
+                  }
+                  
                   toast.success(value ? t('twilio.phoneNumbers.agentAssigned') : t('twilio.phoneNumbers.agentUnassigned'));
                 }}
               >

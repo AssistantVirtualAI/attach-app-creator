@@ -2327,6 +2327,79 @@ export type Database = {
           },
         ]
       }
+      twilio_active_calls: {
+        Row: {
+          agent_id: string | null
+          call_sid: string
+          direction: string
+          duration: number | null
+          ended_at: string | null
+          from_number: string
+          id: string
+          organization_id: string | null
+          recording_sid: string | null
+          recording_url: string | null
+          started_at: string | null
+          status: string
+          to_number: string
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          call_sid: string
+          direction?: string
+          duration?: number | null
+          ended_at?: string | null
+          from_number: string
+          id?: string
+          organization_id?: string | null
+          recording_sid?: string | null
+          recording_url?: string | null
+          started_at?: string | null
+          status?: string
+          to_number: string
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          call_sid?: string
+          direction?: string
+          duration?: number | null
+          ended_at?: string | null
+          from_number?: string
+          id?: string
+          organization_id?: string | null
+          recording_sid?: string | null
+          recording_url?: string | null
+          started_at?: string | null
+          status?: string
+          to_number?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "twilio_active_calls_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "twilio_active_calls_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "twilio_active_calls_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_consents: {
         Row: {
           consent_type: string
