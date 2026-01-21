@@ -8,6 +8,8 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useDownloadExport, useExportsHistory } from '@/hooks/useExportsHistory';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useRetentionSettings, useUpsertRetentionSettings } from '@/hooks/useRetentionSettings';
 
 export const DataExportTab = () => {
   const { selectedOrgId } = useOrganization();
@@ -16,9 +18,15 @@ export const DataExportTab = () => {
   const exporter = useOrgDataExport();
   const history = useExportsHistory(selectedOrgId || undefined);
   const downloadExport = useDownloadExport();
+  const retention = useRetentionSettings(selectedOrgId || undefined);
+  const saveRetention = useUpsertRetentionSettings();
 
   const canExport = isSuperAdmin || can('export:org_data');
   const canSeeHistory = isSuperAdmin || can('read:exports');
+  const canManageRetention = isSuperAdmin || can('manage:organization');
+
+  const exportsDays = retention.data?.exports_retention_days ?? 90;
+  const notificationsDays = retention.data?.notifications_retention_days ?? 90;
 
   const runExport = async (exportType: 'topics' | 'prompt_templates' | 'both', format: 'json' | 'csv') => {
     if (!selectedOrgId) return;
@@ -43,6 +51,59 @@ export const DataExportTab = () => {
 
   return (
     <div className="space-y-6">
+      {canManageRetention && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Rétention</CardTitle>
+            <CardDescription>Conserver exports & notifications pendant 7/30/90 jours (purge automatique côté serveur).</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Exports</div>
+              <Select
+                value={String(exportsDays)}
+                onValueChange={(v) =>
+                  selectedOrgId &&
+                  saveRetention.mutate({
+                    organizationId: selectedOrgId,
+                    exportsRetentionDays: Number(v),
+                    notificationsRetentionDays: notificationsDays,
+                  })
+                }
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">7 jours</SelectItem>
+                  <SelectItem value="30">30 jours</SelectItem>
+                  <SelectItem value="90">90 jours</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Notifications</div>
+              <Select
+                value={String(notificationsDays)}
+                onValueChange={(v) =>
+                  selectedOrgId &&
+                  saveRetention.mutate({
+                    organizationId: selectedOrgId,
+                    exportsRetentionDays: exportsDays,
+                    notificationsRetentionDays: Number(v),
+                  })
+                }
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">7 jours</SelectItem>
+                  <SelectItem value="30">30 jours</SelectItem>
+                  <SelectItem value="90">90 jours</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
