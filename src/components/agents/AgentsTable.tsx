@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Settings, Trash2, MessageSquare, MoreHorizontal, ExternalLink, Bot } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Settings, Trash2, MessageSquare, MoreHorizontal, ExternalLink, Bot, Phone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PlatformBadge } from './PlatformBadge';
 import { QuickPromptModal } from './QuickPromptModal';
@@ -24,6 +25,7 @@ interface Agent {
   organization_id: string;
   client_id?: string | null;
   slug?: string | null;
+  twilio_number?: string | null;
   client?: { id: string; name: string } | null;
 }
 
@@ -92,6 +94,7 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
             <TableRow className="border-border/50 hover:bg-transparent">
               <TableHead className="text-muted-foreground font-medium">Agent</TableHead>
               <TableHead className="text-muted-foreground font-medium">Plateforme</TableHead>
+              <TableHead className="text-muted-foreground font-medium">Téléphone</TableHead>
               <TableHead className="text-muted-foreground font-medium">Prompt</TableHead>
               <TableHead className="text-muted-foreground font-medium">Client assigné</TableHead>
               <TableHead className="text-muted-foreground font-medium">Agent ID</TableHead>
@@ -121,6 +124,25 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                 </TableCell>
                 <TableCell>
                   <PlatformBadge platform={agent.platform} />
+                </TableCell>
+                <TableCell>
+                  {agent.twilio_number ? (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge variant="secondary" className="gap-1 font-mono text-xs cursor-pointer">
+                            <Phone className="h-3 w-3" />
+                            {agent.twilio_number.replace(/(\+\d{1,2})(\d{3})(\d{3})(\d{4})/, '$1 $2-***-$4')}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{agent.twilio_number}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">—</span>
+                  )}
                 </TableCell>
                 <TableCell className="max-w-[200px]">
                   <TooltipProvider>

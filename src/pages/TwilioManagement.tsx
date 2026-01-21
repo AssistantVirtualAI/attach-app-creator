@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { TwilioPhoneNumbersTab } from '@/components/twilio/TwilioPhoneNumbersTab';
 import { TwilioAppsTab } from '@/components/twilio/TwilioAppsTab';
 import { TwilioUsageTab } from '@/components/twilio/TwilioUsageTab';
+import { TwilioCallsTab } from '@/components/twilio/TwilioCallsTab';
 import { useTwilioIntegration } from '@/hooks/useTwilioIntegration';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -77,8 +78,9 @@ export default function TwilioManagement() {
 
         <Tabs defaultValue="numbers" className="space-y-6">
           <TabsList>
-            <TabsTrigger value="numbers">{t('twilio.tabs.numbers')}</TabsTrigger>
-            <TabsTrigger value="apps">{t('twilio.tabs.apps')}</TabsTrigger>
+            <TabsTrigger value="numbers">{t('twilio.tabs.phoneNumbers')}</TabsTrigger>
+            <TabsTrigger value="apps">{t('twilio.tabs.twimlApps')}</TabsTrigger>
+            <TabsTrigger value="calls">{t('twilio.tabs.calls')}</TabsTrigger>
             <TabsTrigger value="usage">{t('twilio.tabs.usage')}</TabsTrigger>
           </TabsList>
 
@@ -88,6 +90,10 @@ export default function TwilioManagement() {
 
           <TabsContent value="apps">
             <TwilioAppsTab />
+          </TabsContent>
+
+          <TabsContent value="calls">
+            <TwilioCallsTab />
           </TabsContent>
 
           <TabsContent value="usage">

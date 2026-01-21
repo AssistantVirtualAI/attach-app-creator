@@ -71,6 +71,19 @@ export interface AvailableNumber {
   };
 }
 
+export interface TwilioCall {
+  sid: string;
+  from: string;
+  to: string;
+  direction: 'inbound' | 'outbound-api' | 'outbound-dial';
+  status: string;
+  duration: number;
+  date_created: string;
+  date_updated: string;
+  answered_by: string | null;
+  caller_name: string | null;
+}
+
 function mapPhoneNumber(raw: any): TwilioPhoneNumber {
   return {
     sid: raw.sid,
@@ -292,6 +305,25 @@ export function useTwilioIntegration() {
     },
   });
 
+  // Get calls
+  const getCalls = useMutation({
+    mutationFn: async (params: { startDate?: string; endDate?: string; status?: string; limit?: number }) => {
+      const result = await invokeProxy('list_calls', params);
+      return (result.calls || []).map((c: any) => ({
+        sid: c.sid,
+        from: c.from,
+        to: c.to,
+        direction: c.direction,
+        status: c.status,
+        duration: parseInt(c.duration) || 0,
+        date_created: c.date_created,
+        date_updated: c.date_updated,
+        answered_by: c.answered_by,
+        caller_name: c.caller_name,
+      })) as TwilioCall[];
+    },
+  });
+
   return {
     isConfigured,
     checkingConfig,
@@ -310,5 +342,6 @@ export function useTwilioIntegration() {
     deleteTwiMLApp,
     getUsage,
     getAccount,
+    getCalls,
   };
 }
