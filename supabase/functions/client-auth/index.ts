@@ -53,6 +53,83 @@ const RATE_LIMITED_ACTIONS = [
   'reset-password', 'verify-reset-token'
 ];
 
+// --------------------
+// Credential helpers
+// --------------------
+async function getClientByLoginIdWithCredentials(
+  supabase: any,
+  login_id: string,
+): Promise<
+  | {
+      client: any;
+      creds: { password_hash: string | null; password_reset_token: string | null; password_reset_expires_at: string | null };
+    }
+  | null
+> {
+  const { data: client, error: clientError } = await supabase
+    .from("clients")
+    .select("id, name, organization_id, theme, language, login_id, status")
+    .eq("login_id", login_id)
+    .maybeSingle();
+
+  if (clientError) throw clientError;
+  if (!client) return null;
+
+  const { data: creds, error: credsError } = await supabase
+    .from("client_credentials")
+    .select("password_hash, password_reset_token, password_reset_expires_at")
+    .eq("client_id", client.id)
+    .maybeSingle();
+
+  if (credsError) throw credsError;
+
+  return {
+    client,
+    creds: {
+      password_hash: creds?.password_hash ?? null,
+      password_reset_token: creds?.password_reset_token ?? null,
+      password_reset_expires_at: creds?.password_reset_expires_at ?? null,
+    },
+  };
+}
+
+async function getMemberByLoginIdWithCredentials(
+  supabase: any,
+  login_id: string,
+): Promise<
+  | {
+      member: any;
+      creds: { password_hash: string | null; password_reset_token: string | null; password_reset_expires_at: string | null };
+    }
+  | null
+> {
+  const { data: member, error: memberError } = await supabase
+    .from("client_members")
+    .select("id, client_id, name, email, role, login_id, status")
+    .eq("login_id", login_id)
+    .maybeSingle();
+
+  if (memberError) throw memberError;
+  if (!member) return null;
+
+  const { data: creds, error: credsError } = await supabase
+    .from("client_member_credentials")
+    .select("password_hash, password_reset_token, password_reset_expires_at")
+    .eq("member_id", member.id)
+    .maybeSingle();
+
+  if (credsError) throw credsError;
+
+  return {
+    member,
+    creds: {
+      password_hash: creds?.password_hash ?? null,
+      password_reset_token: creds?.password_reset_token ?? null,
+      password_reset_expires_at: creds?.password_reset_expires_at ?? null,
+    },
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -87,27 +164,16 @@ serve(async (req) => {
           );
         }
 
-        // Find client by login_id
-        const { data: client, error: clientError } = await supabase
-          .from("clients")
-          .select("id, name, organization_id, theme, language, login_id, password_hash, status")
-          .eq("login_id", login_id)
-          .maybeSingle();
-
-        if (clientError) {
-          console.error("Error finding client:", clientError);
-          return new Response(
-            JSON.stringify({ error: "Erreur lors de la recherche du client" }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        if (!client) {
+        const lookup = await getClientByLoginIdWithCredentials(supabase, login_id);
+        if (!lookup) {
           return new Response(
             JSON.stringify({ error: "Identifiants invalides" }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+
+        const { client } = lookup;
+        const password_hash = lookup.creds.password_hash;
 
         if (client.status !== "active") {
           return new Response(
@@ -116,7 +182,7 @@ serve(async (req) => {
           );
         }
 
-        if (!client.password_hash) {
+        if (!password_hash) {
           return new Response(
             JSON.stringify({ error: "Aucun mot de passe défini. Contactez votre administrateur." }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -124,7 +190,7 @@ serve(async (req) => {
         }
 
         // Verify password with bcrypt
-        const passwordMatch = bcrypt.compareSync(password, client.password_hash);
+        const passwordMatch = bcrypt.compareSync(password, password_hash);
         
         if (!passwordMatch) {
           return new Response(
@@ -271,27 +337,16 @@ serve(async (req) => {
           );
         }
 
-        // Find client by login_id
-        const { data: client, error: clientError } = await supabase
-          .from("clients")
-          .select("id, name, organization_id, theme, language, login_id, password_hash, status")
-          .eq("login_id", login_id)
-          .maybeSingle();
-
-        if (clientError) {
-          console.error("Error finding client:", clientError);
-          return new Response(
-            JSON.stringify({ error: "Erreur lors de la recherche du client" }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        if (!client) {
+        const lookup = await getClientByLoginIdWithCredentials(supabase, login_id);
+        if (!lookup) {
           return new Response(
             JSON.stringify({ error: "Identifiants invalides" }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+
+        const { client } = lookup;
+        const password_hash = lookup.creds.password_hash;
 
         if (client.status !== "active") {
           return new Response(
@@ -300,7 +355,7 @@ serve(async (req) => {
           );
         }
 
-        if (!client.password_hash) {
+        if (!password_hash) {
           return new Response(
             JSON.stringify({ error: "Aucun mot de passe défini. Contactez votre administrateur." }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -308,7 +363,7 @@ serve(async (req) => {
         }
 
         // Verify password with bcrypt
-        const passwordMatch = bcrypt.compareSync(password, client.password_hash);
+        const passwordMatch = bcrypt.compareSync(password, password_hash);
         
         if (!passwordMatch) {
           return new Response(
@@ -387,15 +442,15 @@ serve(async (req) => {
         const salt = bcrypt.genSaltSync(10);
         const passwordHash = bcrypt.hashSync(password, salt);
 
-        // Update client password
+        // Upsert client credentials
         const { error: updateError } = await supabase
-          .from("clients")
-          .update({ 
+          .from("client_credentials")
+          .upsert({
+            client_id,
             password_hash: passwordHash,
             password_reset_token: null,
-            password_reset_expires_at: null
-          })
-          .eq("id", client_id);
+            password_reset_expires_at: null,
+          });
 
         if (updateError) {
           console.error("Error updating password:", updateError);
@@ -453,14 +508,14 @@ serve(async (req) => {
         const resetToken = crypto.randomUUID();
         const expiresAt = new Date(Date.now() + 3600000); // 1 hour
 
-        // Update client with reset token
+        // Upsert client credentials with reset token
         const { error: updateError } = await supabase
-          .from("clients")
-          .update({ 
+          .from("client_credentials")
+          .upsert({
+            client_id: client.id,
             password_reset_token: resetToken,
-            password_reset_expires_at: expiresAt.toISOString()
-          })
-          .eq("id", client.id);
+            password_reset_expires_at: expiresAt.toISOString(),
+          });
 
         if (updateError) {
           console.error("Error setting reset token:", updateError);
@@ -531,13 +586,13 @@ serve(async (req) => {
         }
 
         // Find client by reset token
-        const { data: client, error: clientError } = await supabase
-          .from("clients")
-          .select("id, password_reset_expires_at")
+        const { data: creds, error: credsError } = await supabase
+          .from("client_credentials")
+          .select("client_id, password_reset_expires_at")
           .eq("password_reset_token", token)
           .maybeSingle();
 
-        if (clientError || !client) {
+        if (credsError || !creds) {
           return new Response(
             JSON.stringify({ error: "Token invalide ou expiré" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -545,7 +600,7 @@ serve(async (req) => {
         }
 
         // Check if token is expired
-        if (client.password_reset_expires_at && new Date(client.password_reset_expires_at) < new Date()) {
+        if (creds.password_reset_expires_at && new Date(creds.password_reset_expires_at) < new Date()) {
           return new Response(
             JSON.stringify({ error: "Token expiré. Demandez une nouvelle réinitialisation." }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -558,13 +613,13 @@ serve(async (req) => {
 
         // Update client password and clear reset token
         const { error: updateError } = await supabase
-          .from("clients")
-          .update({ 
+          .from("client_credentials")
+          .update({
             password_hash: passwordHash,
             password_reset_token: null,
-            password_reset_expires_at: null
+            password_reset_expires_at: null,
           })
-          .eq("id", client.id);
+          .eq("client_id", creds.client_id);
 
         if (updateError) {
           console.error("Error updating password:", updateError);
@@ -606,27 +661,26 @@ serve(async (req) => {
           );
         }
 
-        // Find member by login_id
-        const { data: member, error: memberError } = await supabase
-          .from("client_members")
-          .select("id, client_id, name, email, role, login_id, password_hash, status")
-          .eq("login_id", login_id)
-          .maybeSingle();
-
-        if (memberError) {
-          console.error("Error finding member:", memberError);
+        let lookup: any;
+        try {
+          lookup = await getMemberByLoginIdWithCredentials(supabase, login_id);
+        } catch (e) {
+          console.error("Error finding member:", e);
           return new Response(
             JSON.stringify({ error: "Erreur lors de la recherche" }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
-        if (!member) {
+        if (!lookup) {
           return new Response(
             JSON.stringify({ error: "Identifiants invalides" }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+
+        const member = lookup.member;
+        const memberPasswordHash = lookup.creds.password_hash;
 
         if (member.status !== "active") {
           return new Response(
@@ -635,7 +689,7 @@ serve(async (req) => {
           );
         }
 
-        if (!member.password_hash) {
+        if (!memberPasswordHash) {
           return new Response(
             JSON.stringify({ error: "Aucun mot de passe défini. Contactez votre administrateur." }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -643,7 +697,7 @@ serve(async (req) => {
         }
 
         // Verify password
-        const memberPasswordMatch = bcrypt.compareSync(password, member.password_hash);
+        const memberPasswordMatch = bcrypt.compareSync(password, memberPasswordHash);
         if (!memberPasswordMatch) {
           return new Response(
             JSON.stringify({ error: "Identifiants invalides" }),
@@ -740,20 +794,20 @@ serve(async (req) => {
         // Determine if changing client or member password
         if (member_id) {
           // Member password change
-          const { data: member, error: memberError } = await supabase
-            .from("client_members")
-            .select("id, password_hash")
-            .eq("id", member_id)
+          const { data: memberCreds, error: memberCredsError } = await supabase
+            .from("client_member_credentials")
+            .select("member_id, password_hash")
+            .eq("member_id", member_id)
             .maybeSingle();
 
-          if (memberError || !member) {
+          if (memberCredsError) {
             return new Response(
-              JSON.stringify({ error: "Membre non trouvé" }),
-              { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              JSON.stringify({ error: "Erreur lors de la vérification" }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
 
-          if (!member.password_hash || !bcrypt.compareSync(current_password, member.password_hash)) {
+          if (!memberCreds?.password_hash || !bcrypt.compareSync(current_password, memberCreds.password_hash)) {
             return new Response(
               JSON.stringify({ error: "Mot de passe actuel incorrect" }),
               { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -764,9 +818,8 @@ serve(async (req) => {
           const newHash = bcrypt.hashSync(new_password, salt);
 
           const { error: updateError } = await supabase
-            .from("client_members")
-            .update({ password_hash: newHash })
-            .eq("id", member_id);
+            .from("client_member_credentials")
+            .upsert({ member_id, password_hash: newHash });
 
           if (updateError) {
             return new Response(
@@ -776,20 +829,20 @@ serve(async (req) => {
           }
         } else if (client_id) {
           // Client password change
-          const { data: client, error: clientError } = await supabase
-            .from("clients")
-            .select("id, password_hash")
-            .eq("id", client_id)
+          const { data: clientCreds, error: clientCredsError } = await supabase
+            .from("client_credentials")
+            .select("client_id, password_hash")
+            .eq("client_id", client_id)
             .maybeSingle();
 
-          if (clientError || !client) {
+          if (clientCredsError) {
             return new Response(
-              JSON.stringify({ error: "Client non trouvé" }),
-              { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              JSON.stringify({ error: "Erreur lors de la vérification" }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
 
-          if (!client.password_hash || !bcrypt.compareSync(current_password, client.password_hash)) {
+          if (!clientCreds?.password_hash || !bcrypt.compareSync(current_password, clientCreds.password_hash)) {
             return new Response(
               JSON.stringify({ error: "Mot de passe actuel incorrect" }),
               { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -800,9 +853,8 @@ serve(async (req) => {
           const newHash = bcrypt.hashSync(new_password, salt);
 
           const { error: updateError } = await supabase
-            .from("clients")
-            .update({ password_hash: newHash })
-            .eq("id", client_id);
+            .from("client_credentials")
+            .upsert({ client_id, password_hash: newHash });
 
           if (updateError) {
             return new Response(
@@ -982,7 +1034,6 @@ serve(async (req) => {
             name,
             email,
             login_id,
-            password_hash: passwordHash,
             role: role || "member",
             status: "active",
           })
@@ -991,6 +1042,19 @@ serve(async (req) => {
 
         if (error) {
           console.error("Error adding member:", error);
+          return new Response(
+            JSON.stringify({ error: "Erreur lors de l'ajout du membre" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Store credentials separately
+        const { error: credsError } = await supabase
+          .from("client_member_credentials")
+          .upsert({ member_id: newMember.id, password_hash: passwordHash });
+
+        if (credsError) {
+          console.error("Error storing member credentials:", credsError);
           return new Response(
             JSON.stringify({ error: "Erreur lors de l'ajout du membre" }),
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -1086,13 +1150,13 @@ serve(async (req) => {
         const passwordHash = bcrypt.hashSync(new_password, salt);
 
         const { error } = await supabase
-          .from("client_members")
-          .update({ 
+          .from("client_member_credentials")
+          .upsert({
+            member_id,
             password_hash: passwordHash,
             password_reset_token: null,
-            password_reset_expires_at: null
-          })
-          .eq("id", member_id);
+            password_reset_expires_at: null,
+          });
 
         if (error) {
           return new Response(
@@ -1123,7 +1187,7 @@ serve(async (req) => {
         // First try to find a client with this login_id (simple query without join)
         const { data: client, error: clientError } = await supabase
           .from("clients")
-          .select("id, name, organization_id, theme, language, login_id, password_hash, status, assigned_agent_id")
+          .select("id, name, organization_id, theme, language, login_id, status, assigned_agent_id")
           .eq("login_id", login_id)
           .maybeSingle();
 
@@ -1137,7 +1201,15 @@ serve(async (req) => {
 
         // If client found, validate password and return session
         if (client) {
-          console.log(`Found client: ${client.name}, status: ${client.status}, has_password: ${!!client.password_hash}`);
+          const { data: clientCreds } = await supabase
+            .from("client_credentials")
+            .select("password_hash")
+            .eq("client_id", client.id)
+            .maybeSingle();
+
+          const clientPasswordHash = clientCreds?.password_hash ?? null;
+
+          console.log(`Found client: ${client.name}, status: ${client.status}, has_password: ${!!clientPasswordHash}`);
           
           if (client.status !== "active") {
             return new Response(
@@ -1146,14 +1218,14 @@ serve(async (req) => {
             );
           }
 
-          if (!client.password_hash) {
+          if (!clientPasswordHash) {
             return new Response(
               JSON.stringify({ error: "Aucun mot de passe défini. Contactez votre administrateur." }),
               { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
 
-          const passwordMatch = bcrypt.compareSync(password, client.password_hash);
+          const passwordMatch = bcrypt.compareSync(password, clientPasswordHash);
           if (!passwordMatch) {
             console.log(`Password mismatch for client: ${client.name}`);
             return new Response(
@@ -1222,7 +1294,7 @@ serve(async (req) => {
         // If no client found, try to find a member
         const { data: member, error: memberError } = await supabase
           .from("client_members")
-          .select("id, client_id, name, email, role, login_id, password_hash, status")
+          .select("id, client_id, name, email, role, login_id, status")
           .eq("login_id", login_id)
           .maybeSingle();
 
@@ -1248,14 +1320,22 @@ serve(async (req) => {
           );
         }
 
-        if (!member.password_hash) {
+        const { data: memberCreds } = await supabase
+          .from("client_member_credentials")
+          .select("password_hash")
+          .eq("member_id", member.id)
+          .maybeSingle();
+
+        const memberPasswordHash = memberCreds?.password_hash ?? null;
+
+        if (!memberPasswordHash) {
           return new Response(
             JSON.stringify({ error: "Aucun mot de passe défini. Contactez votre administrateur." }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
-        const memberPasswordMatch = bcrypt.compareSync(password, member.password_hash);
+        const memberPasswordMatch = bcrypt.compareSync(password, memberPasswordHash);
         if (!memberPasswordMatch) {
           return new Response(
             JSON.stringify({ error: "Identifiants invalides" }),
@@ -1365,9 +1445,8 @@ serve(async (req) => {
         const newHash = bcrypt.hashSync(new_password, salt);
 
         const { error: updateError } = await supabase
-          .from("clients")
-          .update({ password_hash: newHash })
-          .eq("id", client_id);
+          .from("client_credentials")
+          .upsert({ client_id, password_hash: newHash });
 
         if (updateError) {
           console.error("Error updating password:", updateError);
