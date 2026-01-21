@@ -2177,6 +2177,10 @@ export const en = {
       refresh: 'Refresh',
       loadCalls: 'Load Calls',
       seconds: 's',
+      recording: 'Recording',
+      playRecording: 'Play',
+      noRecording: 'No recording',
+      downloadRecording: 'Download',
     },
     agentSection: {
       title: 'Twilio Phone Number',
@@ -2282,6 +2286,19 @@ export const en = {
       friendlyName: 'Account Name',
       status: 'Status',
       balance: 'Balance',
+    },
+    activeCalls: {
+      title: 'Active Calls',
+      noCalls: 'No active calls',
+      ringing: 'Ringing',
+      inProgress: 'In Progress',
+      connecting: 'Connecting',
+      incoming: 'Incoming call',
+      outgoing: 'Outgoing call',
+    },
+    notifications: {
+      callEnded: 'Call ended',
+      callFailed: 'Call failed',
     },
   },
 };

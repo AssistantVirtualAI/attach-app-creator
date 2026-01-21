@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Phone, PhoneIncoming, PhoneOutgoing, Loader2, RefreshCw, Bot, Play } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Phone, PhoneIncoming, PhoneOutgoing, Loader2, RefreshCw, Bot, Play, Pause, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,26 +7,33 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useTwilioIntegration, TwilioCall } from '@/hooks/useTwilioIntegration';
 import { useAgentsForTwilio } from '@/hooks/useAgentsForTwilio';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useOrganization } from '@/context/OrganizationContext';
+import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { ActiveCallsPanel } from './ActiveCallsPanel';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 
 function normalizePhoneNumber(phone: string): string {
-  return phone?.replace(/\s+/g, '').replace(/-/g, '') || '';
+  return phone?.replace(/[\s\-\(\)]/g, '') || '';
 }
 
 export function TwilioCallsTab() {
   const { t } = useTranslation();
   const { getCalls } = useTwilioIntegration();
-  const { agents, getAgentByTwilioNumber } = useAgentsForTwilio();
+  const { agents } = useAgentsForTwilio();
+  const { selectedOrgId } = useOrganization();
   const [calls, setCalls] = useState<TwilioCall[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [playingCallSid, setPlayingCallSid] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const loadCalls = async () => {
     setLoading(true);
@@ -43,7 +50,6 @@ export function TwilioCallsTab() {
     const phoneNumber = call.direction === 'inbound' ? call.to : call.from;
     const normalizedNumber = normalizePhoneNumber(phoneNumber);
     
-    // Try exact match first, then try normalized comparison
     const agent = agents.find(a => {
       if (!a.twilio_number) return false;
       const normalizedAgentNumber = normalizePhoneNumber(a.twilio_number);
@@ -74,8 +80,77 @@ export function TwilioCallsTab() {
     return <Badge variant={variants[status] || 'outline'}>{status}</Badge>;
   };
 
+  const playRecording = async (callSid: string) => {
+    if (playingCallSid === callSid) {
+      // Stop playing
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setPlayingCallSid(null);
+      return;
+    }
+
+    try {
+      // Get current session for auth
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Please log in to listen to recordings');
+        return;
+      }
+
+      // Create audio URL via edge function proxy
+      const response = await supabase.functions.invoke('twilio-recording-proxy', {
+        body: { callSid, organizationId: selectedOrgId },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      // Create blob URL from response
+      const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      // Stop any currently playing audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+
+      // Play new audio
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      setPlayingCallSid(callSid);
+
+      audio.onended = () => {
+        setPlayingCallSid(null);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      audio.onerror = () => {
+        toast.error('Failed to play recording');
+        setPlayingCallSid(null);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      await audio.play();
+    } catch (error) {
+      console.error('Error playing recording:', error);
+      toast.error('Failed to load recording');
+      setPlayingCallSid(null);
+    }
+  };
+
+  // Check if a call has a recording (for now we'll check by status - completed calls may have recordings)
+  const hasRecording = (call: TwilioCall) => {
+    return call.status === 'completed' && call.duration > 0;
+  };
+
   return (
     <div className="space-y-6">
+      {/* Active Calls Panel - Real-time */}
+      <ActiveCallsPanel />
+
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">{t('twilio.calls.title')}</h3>
@@ -133,12 +208,14 @@ export function TwilioCallsTab() {
                   <TableHead>{t('twilio.calls.agent')}</TableHead>
                   <TableHead>{t('twilio.calls.status')}</TableHead>
                   <TableHead>{t('twilio.calls.duration')}</TableHead>
+                  <TableHead>{t('twilio.calls.recording')}</TableHead>
                   <TableHead>{t('twilio.calls.date')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {calls.map((call) => {
                   const assignedAgent = getAssignedAgent(call);
+                  const isPlaying = playingCallSid === call.sid;
                   return (
                     <TableRow key={call.sid}>
                       <TableCell>
@@ -177,6 +254,25 @@ export function TwilioCallsTab() {
                       </TableCell>
                       <TableCell>{getStatusBadge(call.status)}</TableCell>
                       <TableCell>{formatDuration(call.duration)}</TableCell>
+                      <TableCell>
+                        {hasRecording(call) ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => playRecording(call.sid)}
+                            className="gap-1"
+                          >
+                            {isPlaying ? (
+                              <Pause className="w-4 h-4" />
+                            ) : (
+                              <Play className="w-4 h-4" />
+                            )}
+                            {isPlaying ? t('twilio.calls.listen') : t('twilio.calls.playRecording')}
+                          </Button>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">{t('twilio.calls.noRecording')}</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {format(new Date(call.date_created), 'dd MMM yyyy HH:mm', { locale: fr })}
                       </TableCell>
