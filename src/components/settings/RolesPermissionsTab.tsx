@@ -6,6 +6,10 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { MembersList } from '@/components/team/MembersList';
 import { useTeamMembers } from '@/hooks/useTeamMembers';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrganization } from '@/context/OrganizationContext';
+import { Switch } from '@/components/ui/switch';
+import { ALL_PERMISSIONS, DEFAULT_PERMISSIONS_MATRIX, type Permission, type Role } from '@/lib/permissions';
+import { useOrgRolePermissions, useUpsertOrgRolePermission } from '@/hooks/useRolePermissionsManagement';
 
 const ROLE_DESCRIPTIONS: Record<string, string> = {
   org_admin: 'Accès complet (gestion rôles, intégrations, facturation).',
@@ -25,8 +29,24 @@ const PERMISSIONS: Array<{ permission: string; roles: string[] }> = [
 
 export const RolesPermissionsTab = () => {
   const { role, isSuperAdmin, can } = usePermissions();
+  const { selectedOrgId } = useOrganization();
   const { members, isLoading, updateMemberRole, removeMember } = useTeamMembers();
   const { user } = useAuth();
+
+  const canManagePermissions = isSuperAdmin || can('manage:permissions');
+  const matrix = useOrgRolePermissions(selectedOrgId || undefined);
+  const upsert = useUpsertOrgRolePermission();
+
+  const rolesForMatrix: Role[] = ['org_admin', 'manager', 'agent', 'viewer'];
+  const overridesByKey = new Map<string, boolean>(
+    (matrix.data || []).map((o) => [`${o.role}:${o.permission}`, o.allowed] as const),
+  );
+
+  const effectiveAllowed = (r: Role, p: Permission) => {
+    const k = `${r}:${p}`;
+    if (overridesByKey.has(k)) return Boolean(overridesByKey.get(k));
+    return (DEFAULT_PERMISSIONS_MATRIX[r] || []).includes(p);
+  };
 
   const canManageRoles = can('manage:roles');
   const canSee = isSuperAdmin || role === 'org_admin' || role === 'manager' || canManageRoles;
@@ -71,6 +91,64 @@ export const RolesPermissionsTab = () => {
               ))}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Permissions (matrice)</CardTitle>
+          <CardDescription>
+            Personnalisez les permissions par rôle (enforced côté serveur). Seuls les admins peuvent modifier.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {matrix.isLoading ? (
+            <div className="text-sm text-muted-foreground">Chargement…</div>
+          ) : !selectedOrgId ? (
+            <div className="text-sm text-muted-foreground">Aucune organisation sélectionnée.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Permission</TableHead>
+                    {rolesForMatrix.map((r) => (
+                      <TableHead key={r} className="text-center">
+                        <Badge variant="outline">{r}</Badge>
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(ALL_PERMISSIONS as Permission[]).map((perm) => (
+                    <TableRow key={perm}>
+                      <TableCell className="font-mono text-xs">{perm}</TableCell>
+                      {rolesForMatrix.map((r) => {
+                        const checked = effectiveAllowed(r, perm);
+                        return (
+                          <TableCell key={`${r}:${perm}`} className="text-center">
+                            <Switch
+                              checked={checked}
+                              disabled={!canManagePermissions || upsert.isPending}
+                              onCheckedChange={(next) => {
+                                if (!selectedOrgId) return;
+                                upsert.mutate({
+                                  organizationId: selectedOrgId,
+                                  role: r,
+                                  permission: perm,
+                                  allowed: Boolean(next),
+                                });
+                              }}
+                            />
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -128,3 +206,4 @@ export const RolesPermissionsTab = () => {
     </div>
   );
 };
+

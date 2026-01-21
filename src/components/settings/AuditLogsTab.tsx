@@ -12,6 +12,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useAuditLogsExport } from '@/hooks/useAuditLogsExport';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface AuditLog {
   id: string;
@@ -47,12 +50,17 @@ const RESOURCE_LABELS: Record<string, string> = {
 
 export const AuditLogsTab = () => {
   const { selectedOrg } = useOrganization();
+  const { can, isSuperAdmin } = usePermissions();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState<string>('all');
   const [resourceFilter, setResourceFilter] = useState<string>('all');
   const [hipaaEnabled, setHipaaEnabled] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'json'>('csv');
+  const exporter = useAuditLogsExport();
+
+  const canServerExport = isSuperAdmin || can('export:audit_logs');
 
   useEffect(() => {
     if (selectedOrg) {
@@ -97,7 +105,7 @@ export const AuditLogsTab = () => {
     setIsLoading(false);
   };
 
-  const handleExportLogs = () => {
+  const handleClientExportLogs = () => {
     const csv = [
       ['Date', 'Action', 'Ressource', 'ID Ressource', 'IP', 'User Agent'].join(','),
       ...logs.map(log => [
@@ -119,6 +127,19 @@ export const AuditLogsTab = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleServerExport = async () => {
+    if (!selectedOrg) return;
+    await exporter.mutateAsync({
+      organizationId: selectedOrg.id,
+      format: exportFormat,
+      filters: {
+        action: actionFilter !== 'all' ? actionFilter : undefined,
+        resource_type: resourceFilter !== 'all' ? resourceFilter : undefined,
+        search: search || undefined,
+      },
+    });
   };
 
   const filteredLogs = logs.filter(log => {
@@ -166,10 +187,31 @@ export const AuditLogsTab = () => {
               Historique de toutes les actions effectuées dans votre organisation
             </CardDescription>
           </div>
-          <Button variant="outline" onClick={handleExportLogs} className="gap-2">
-            <Download className="w-4 h-4" />
-            Exporter CSV
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleClientExportLogs} className="gap-2">
+              <Download className="w-4 h-4" />
+              Exporter (local)
+            </Button>
+            {canServerExport && (
+              <Tabs value={exportFormat} onValueChange={(v) => setExportFormat(v as any)}>
+                <TabsList>
+                  <TabsTrigger value="csv">CSV</TabsTrigger>
+                  <TabsTrigger value="json">JSON</TabsTrigger>
+                </TabsList>
+                <TabsContent value={exportFormat} className="hidden" />
+              </Tabs>
+            )}
+            {canServerExport && (
+              <Button
+                onClick={handleServerExport}
+                disabled={!selectedOrg || exporter.isPending}
+                className="gap-2"
+              >
+                <Download className={exporter.isPending ? 'w-4 h-4 animate-spin' : 'w-4 h-4'} />
+                Exporter (serveur)
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

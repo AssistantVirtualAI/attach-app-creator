@@ -1,113 +1,47 @@
 import { useMemo } from 'react';
 import { useOrganization } from '@/context/OrganizationContext';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { ALL_PERMISSIONS, DEFAULT_PERMISSIONS_MATRIX, type Permission, type Role } from '@/lib/permissions';
 
-export type Permission = 
-  | 'read:conversations'
-  | 'create:conversations'
-  | 'edit:conversations'
-  | 'delete:conversations'
-  | 'read:analytics'
-  | 'read:knowledge_base'
-  | 'create:knowledge_base'
-  | 'edit:knowledge_base'
-  | 'delete:knowledge_base'
-  | 'read:agent_config'
-  | 'edit:agent_config'
-  | 'read:integrations'
-  | 'edit:integrations'
-  | 'manage:members'
-  | 'manage:roles'
-  | 'manage:organization'
-  | 'manage:api_keys';
-
-export type Role = 'super_admin' | 'org_admin' | 'manager' | 'agent' | 'viewer';
-
-// Permission matrix: what each role can do
-const PERMISSIONS_MATRIX: Record<Role, Permission[]> = {
-  super_admin: [
-    'read:conversations',
-    'create:conversations',
-    'edit:conversations',
-    'delete:conversations',
-    'read:analytics',
-    'read:knowledge_base',
-    'create:knowledge_base',
-    'edit:knowledge_base',
-    'delete:knowledge_base',
-    'read:agent_config',
-    'edit:agent_config',
-    'read:integrations',
-    'edit:integrations',
-    'manage:members',
-    'manage:roles',
-    'manage:organization',
-    'manage:api_keys',
-  ],
-  org_admin: [
-    'read:conversations',
-    'create:conversations',
-    'edit:conversations',
-    'delete:conversations',
-    'read:analytics',
-    'read:knowledge_base',
-    'create:knowledge_base',
-    'edit:knowledge_base',
-    'delete:knowledge_base',
-    'read:agent_config',
-    'edit:agent_config',
-    'read:integrations',
-    'edit:integrations',
-    'manage:members',
-    'manage:roles',
-    'manage:organization',
-    'manage:api_keys',
-  ],
-  manager: [
-    'read:conversations',
-    'create:conversations',
-    'edit:conversations',
-    'delete:conversations',
-    'read:analytics',
-    'read:knowledge_base',
-    'create:knowledge_base',
-    'edit:knowledge_base',
-    'delete:knowledge_base',
-    'read:agent_config',
-    'edit:agent_config',
-    'manage:members',
-  ],
-  agent: [
-    'read:conversations',
-    'create:conversations',
-    'edit:conversations',
-    'read:analytics',
-    'read:knowledge_base',
-    'create:knowledge_base',
-    'edit:knowledge_base',
-    'read:agent_config',
-  ],
-  viewer: [
-    'read:conversations',
-    'read:analytics',
-    'read:knowledge_base',
-    'read:agent_config',
-  ],
-};
 
 export const usePermissions = () => {
-  const { userRole, isSuperAdmin } = useOrganization();
+  const { userRole, isSuperAdmin, selectedOrgId } = useOrganization();
+
+  const overridesQuery = useQuery({
+    queryKey: ['org-role-permissions', selectedOrgId, userRole?.role],
+    queryFn: async () => {
+      if (!selectedOrgId || !userRole?.role) return [] as Array<{ permission: string; allowed: boolean }>;
+      const { data, error } = await supabase
+        .from('org_role_permissions')
+        .select('permission, allowed')
+        .eq('organization_id', selectedOrgId)
+        .eq('role', userRole.role);
+      if (error) throw error;
+      return (data || []) as Array<{ permission: string; allowed: boolean }>;
+    },
+    enabled: !!selectedOrgId && !!userRole?.role && !isSuperAdmin,
+    staleTime: 30_000,
+  });
 
   const permissions = useMemo(() => {
     if (isSuperAdmin) {
-      return new Set(PERMISSIONS_MATRIX.super_admin);
+      return new Set(DEFAULT_PERMISSIONS_MATRIX.super_admin);
     }
     
     if (!userRole) {
       return new Set<Permission>();
     }
 
-    return new Set(PERMISSIONS_MATRIX[userRole.role] || []);
-  }, [userRole, isSuperAdmin]);
+    const base = new Set(DEFAULT_PERMISSIONS_MATRIX[userRole.role] || []);
+    for (const o of overridesQuery.data || []) {
+      // Only apply overrides for known permissions
+      if (!ALL_PERMISSIONS.includes(o.permission as Permission)) continue;
+      if (o.allowed) base.add(o.permission as Permission);
+      else base.delete(o.permission as Permission);
+    }
+    return base;
+  }, [userRole, isSuperAdmin, overridesQuery.data]);
 
   const can = (permission: Permission): boolean => {
     return permissions.has(permission);
@@ -137,3 +71,4 @@ export const usePermissions = () => {
     permissions: Array.from(permissions),
   };
 };
+
