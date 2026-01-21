@@ -1051,6 +1051,90 @@ export type Database = {
           },
         ]
       }
+      client_credentials: {
+        Row: {
+          client_id: string
+          created_at: string
+          password_hash: string | null
+          password_reset_expires_at: string | null
+          password_reset_token: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          password_hash?: string | null
+          password_reset_expires_at?: string | null
+          password_reset_token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          password_hash?: string | null
+          password_reset_expires_at?: string | null
+          password_reset_token?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_credentials_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_credentials_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_member_credentials: {
+        Row: {
+          created_at: string
+          member_id: string
+          password_hash: string | null
+          password_reset_expires_at: string | null
+          password_reset_token: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          member_id: string
+          password_hash?: string | null
+          password_reset_expires_at?: string | null
+          password_reset_token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          member_id?: string
+          password_hash?: string | null
+          password_reset_expires_at?: string | null
+          password_reset_token?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_member_credentials_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: true
+            referencedRelation: "client_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_member_credentials_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: true
+            referencedRelation: "client_members_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_members: {
         Row: {
           client_id: string
@@ -1060,9 +1144,6 @@ export type Database = {
           last_login_at: string | null
           login_id: string | null
           name: string | null
-          password_hash: string | null
-          password_reset_expires_at: string | null
-          password_reset_token: string | null
           role: string | null
           status: string | null
         }
@@ -1074,9 +1155,6 @@ export type Database = {
           last_login_at?: string | null
           login_id?: string | null
           name?: string | null
-          password_hash?: string | null
-          password_reset_expires_at?: string | null
-          password_reset_token?: string | null
           role?: string | null
           status?: string | null
         }
@@ -1088,9 +1166,6 @@ export type Database = {
           last_login_at?: string | null
           login_id?: string | null
           name?: string | null
-          password_hash?: string | null
-          password_reset_expires_at?: string | null
-          password_reset_token?: string | null
           role?: string | null
           status?: string | null
         }
@@ -1125,9 +1200,6 @@ export type Database = {
           login_id: string | null
           name: string
           organization_id: string
-          password_hash: string | null
-          password_reset_expires_at: string | null
-          password_reset_token: string | null
           status: string | null
           theme: string | null
           updated_at: string
@@ -1147,9 +1219,6 @@ export type Database = {
           login_id?: string | null
           name: string
           organization_id: string
-          password_hash?: string | null
-          password_reset_expires_at?: string | null
-          password_reset_token?: string | null
           status?: string | null
           theme?: string | null
           updated_at?: string
@@ -1169,9 +1238,6 @@ export type Database = {
           login_id?: string | null
           name?: string
           organization_id?: string
-          password_hash?: string | null
-          password_reset_expires_at?: string | null
-          password_reset_token?: string | null
           status?: string | null
           theme?: string | null
           updated_at?: string
@@ -2951,30 +3017,6 @@ export type Database = {
           role: string | null
           status: string | null
         }
-        Insert: {
-          client_id?: string | null
-          created_at?: string | null
-          email?: string | null
-          has_password?: never
-          id?: string | null
-          last_login_at?: string | null
-          login_id?: string | null
-          name?: string | null
-          role?: string | null
-          status?: string | null
-        }
-        Update: {
-          client_id?: string | null
-          created_at?: string | null
-          email?: string | null
-          has_password?: never
-          id?: string | null
-          last_login_at?: string | null
-          login_id?: string | null
-          name?: string | null
-          role?: string | null
-          status?: string | null
-        }
         Relationships: [
           {
             foreignKeyName: "client_members_client_id_fkey"
@@ -3012,46 +3054,6 @@ export type Database = {
           updated_at: string | null
           user_id: string | null
           username: string | null
-        }
-        Insert: {
-          access_controls?: Json | null
-          assigned_agent_id?: string | null
-          assigned_agents?: number | null
-          created_at?: string | null
-          created_by?: string | null
-          custom_css?: string | null
-          email?: string | null
-          has_password?: never
-          id?: string | null
-          language?: string | null
-          login_id?: string | null
-          name?: string | null
-          organization_id?: string | null
-          status?: string | null
-          theme?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-          username?: string | null
-        }
-        Update: {
-          access_controls?: Json | null
-          assigned_agent_id?: string | null
-          assigned_agents?: number | null
-          created_at?: string | null
-          created_by?: string | null
-          custom_css?: string | null
-          email?: string | null
-          has_password?: never
-          id?: string | null
-          language?: string | null
-          login_id?: string | null
-          name?: string | null
-          organization_id?: string | null
-          status?: string | null
-          theme?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-          username?: string | null
         }
         Relationships: [
           {
