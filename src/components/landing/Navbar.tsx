@@ -14,7 +14,12 @@ export const Navbar = () => {
   const { t } = useTranslation();
 
   const navLinks = [
+    { label: t('nav.howItWorks'), href: '#how-it-works' },
+    { label: t('nav.agentCreation'), href: '#agent-creation' },
     { label: t('nav.features'), href: '#features' },
+    { label: t('nav.portals'), href: '#portals' },
+    { label: t('nav.integrations'), href: '#integrations' },
+    { label: t('nav.analytics'), href: '#analytics' },
     { label: t('nav.testimonials'), href: '#testimonials' },
     { label: t('nav.pricing'), href: '#pricing' },
   ];

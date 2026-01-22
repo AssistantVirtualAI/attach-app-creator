@@ -112,7 +112,7 @@ export const HeroSection = () => {
               <Button
                 size="lg"
                 className="h-14 px-8 text-lg bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-xl shadow-primary/25"
-                onClick={() => navigate('/auth')}
+                onClick={() => navigate('/demo')}
               >
                 {t('hero.cta1')}
                 <ArrowRight className="ml-2 w-5 h-5" />
@@ -123,7 +123,7 @@ export const HeroSection = () => {
                 size="lg"
                 variant="outline"
                 className="h-14 px-8 text-lg border-2"
-                onClick={() => navigate('/demo')}
+                onClick={() => navigate('/auth')}
               >
                 <Play className="mr-2 w-5 h-5" />
                 {t('hero.cta2')}
