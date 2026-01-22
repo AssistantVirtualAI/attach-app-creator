@@ -68,6 +68,7 @@ import RealtimeMonitor from "./pages/RealtimeMonitor";
 import ApiExplorer from "./pages/ApiExplorer";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import TwilioManagement from "./pages/TwilioManagement";
+import FeaturesPage from "./pages/Features";
 
 // Portal pages
 import PortalLogin from "./pages/PortalLogin";
@@ -120,6 +121,9 @@ const App = () => (
               <Routes>
                 {/* Landing page on root */}
                 <Route path="/" element={<Landing />} />
+
+                {/* Public full feature list */}
+                <Route path="/features" element={<FeaturesPage />} />
                 
                 {/* Universal login - redirects based on user type */}
                 <Route path="/login" element={<UniversalLogin />} />

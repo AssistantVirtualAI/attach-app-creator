@@ -17,6 +17,7 @@ export const Navbar = () => {
     { label: t('nav.howItWorks'), href: '#how-it-works' },
     { label: t('nav.agentCreation'), href: '#agent-creation' },
     { label: t('nav.features'), href: '#features' },
+    { label: 'Full list', href: '/features' },
     { label: t('nav.portals'), href: '#portals' },
     { label: t('nav.integrations'), href: '#integrations' },
     { label: t('nav.analytics'), href: '#analytics' },
@@ -29,7 +30,9 @@ export const Navbar = () => {
     if (href.startsWith('#')) {
       const element = document.querySelector(href);
       element?.scrollIntoView({ behavior: 'smooth' });
+      return;
     }
+    navigate(href);
   };
 
   return (
