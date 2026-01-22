@@ -4,9 +4,9 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Search, ChevronDown, Settings, Sparkles, Bot, Zap, TrendingUp } from 'lucide-react';
+import { Plus, Search, Bot, Zap, TrendingUp } from 'lucide-react';
 import { AgentsTable } from '@/components/agents/AgentsTable';
-import { AddAgentModal } from '@/components/agents/AddAgentModal';
+import { CreateAgentWizard } from '@/components/agents/CreateAgentWizard';
 import { EmptyState } from '@/components/agents/EmptyState';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useQuery } from '@tanstack/react-query';
@@ -15,12 +15,6 @@ import { TableSkeleton } from '@/components/LoadingSkeleton';
 import { motion } from 'framer-motion';
 import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { useTranslation } from '@/hooks/useTranslation';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 
 export default function Agents() {
   const { t } = useTranslation();
@@ -111,25 +105,13 @@ export default function Agents() {
             description={t('agents.description')}
             icon={Bot}
           />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 border-0 shadow-lg">
-                <Plus className="mr-2 h-4 w-4" />
-                {t('agents.newAgent')}
-                <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-popover border-border">
-              <DropdownMenuItem onClick={() => setIsModalOpen(true)}>
-                <Settings className="mr-2 h-4 w-4" />
-                {t('agents.viaIntegration')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/agent-builder')}>
-                <Sparkles className="mr-2 h-4 w-4" />
-                {t('agents.createWithBuilder')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 border-0 shadow-lg"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            {t('agents.newAgent')}
+          </Button>
         </div>
 
         {/* Stats Cards */}
@@ -203,10 +185,9 @@ export default function Agents() {
           />
         )}
 
-        <AddAgentModal
+        <CreateAgentWizard
           open={isModalOpen}
           onOpenChange={setIsModalOpen}
-          onSuccess={refetch}
         />
       </div>
     </AppLayout>
