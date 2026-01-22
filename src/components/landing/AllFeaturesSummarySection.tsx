@@ -8,6 +8,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "@/context/LanguageContext";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -159,6 +160,10 @@ const copy: Copy = {
 
 export function AllFeaturesSummarySection() {
   const navigate = useNavigate();
+  const { language } = useLanguage();
+
+  const pick = <T extends { fr: string; en: string }>(v: T) =>
+    language === "fr" ? v.fr : v.en;
 
   return (
     <section className="py-28 relative overflow-hidden">
@@ -172,20 +177,20 @@ export function AllFeaturesSummarySection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">{copy.title.fr}</h2>
-          <p className="text-sm text-muted-foreground mb-4">{copy.title.en}</p>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">{copy.subtitle.fr}</p>
-          <p className="text-sm text-muted-foreground max-w-3xl mx-auto">{copy.subtitle.en}</p>
+          <h2 className="text-4xl md:text-5xl font-bold mb-4">{pick(copy.title)}</h2>
+          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">{pick(copy.subtitle)}</p>
 
           <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Button
               className="bg-gradient-to-r from-primary to-secondary hover:opacity-90"
               onClick={() => navigate("/features")}
             >
-              Full feature list / Liste complète
+              {language === "fr" ? "Liste complète" : "Full feature list"}
               <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
-            <Button variant="outline" onClick={() => navigate("/demo-request")}>Book a demo / Demander une démo</Button>
+            <Button variant="outline" onClick={() => navigate("/demo-request")}>
+              {language === "fr" ? "Demander une démo" : "Book a demo"}
+            </Button>
           </div>
         </motion.div>
 
@@ -209,8 +214,7 @@ export function AllFeaturesSummarySection() {
                     <g.icon className="w-6 h-6 text-primary-foreground" />
                   </div>
                   <div className="flex-1">
-                    <div className="font-semibold text-lg">{g.title.fr}</div>
-                    <div className="text-sm text-muted-foreground">{g.title.en}</div>
+                    <div className="font-semibold text-lg">{pick(g.title)}</div>
                   </div>
                 </div>
 
@@ -219,10 +223,7 @@ export function AllFeaturesSummarySection() {
                     <li key={b.en} className="text-sm text-muted-foreground">
                       <div className="flex gap-2">
                         <span className="mt-2 w-1.5 h-1.5 rounded-full bg-primary/60" />
-                        <div className="space-y-0.5">
-                          <div>{b.fr}</div>
-                          <div className="text-xs text-muted-foreground">{b.en}</div>
-                        </div>
+                        <div>{pick(b)}</div>
                       </div>
                     </li>
                   ))}

@@ -3,12 +3,12 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, Mic, Globe, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
-import { useBilingualTranslation } from "@/hooks/useBilingualTranslation";
+import { useLanguage } from "@/context/LanguageContext";
 
 export const HeroSection = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { bt } = useBilingualTranslation();
+  const { language } = useLanguage();
 
   const features = [
     { icon: Mic, label: t('hero.feature1') },
@@ -102,9 +102,6 @@ export const HeroSection = () => {
           >
             {t('hero.subtitle')}
           </motion.p>
-          <p className="text-sm text-muted-foreground max-w-3xl mx-auto -mt-8 mb-10">
-            {bt('hero.subtitle').secondary}
-          </p>
 
           {/* CTA Buttons */}
           <motion.div
@@ -141,7 +138,7 @@ export const HeroSection = () => {
                 className="h-14 px-6 text-lg"
                 onClick={() => navigate('/features')}
               >
-                Full list / Liste complète
+                {language === 'fr' ? 'Liste complète' : 'Full list'}
               </Button>
             </motion.div>
           </motion.div>
