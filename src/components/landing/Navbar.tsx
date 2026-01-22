@@ -2,10 +2,16 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { AvaLogo } from '@/components/shared/AvaLogo';
 import { useNavigate } from 'react-router-dom';
-import { Menu, X, Globe } from 'lucide-react';
+import { Menu, X, Globe, MoreHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useTranslation } from '@/hooks/useTranslation';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export const Navbar = () => {
   const navigate = useNavigate();
@@ -25,6 +31,12 @@ export const Navbar = () => {
     { label: t('nav.pricing'), href: '#pricing' },
   ];
 
+  // Keep the header clean: show core links + a “More” menu for the rest.
+  const primaryLinks = navLinks.filter((l) =>
+    ['#how-it-works', '#agent-creation', '#features', '#portals', '#pricing'].includes(l.href)
+  );
+  const moreLinks = navLinks.filter((l) => !primaryLinks.some((p) => p.href === l.href));
+
   const scrollToSection = (href: string) => {
     setIsMobileMenuOpen(false);
     if (href.startsWith('#')) {
@@ -40,7 +52,7 @@ export const Navbar = () => {
       initial={{ y: -100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50"
+      className="fixed top-0 left-0 right-0 z-50 bg-background/70 backdrop-blur-xl border-b border-border/50"
     >
       <div className="container mx-auto px-6">
         <div className="flex items-center justify-between h-16">
@@ -48,26 +60,50 @@ export const Navbar = () => {
           <AvaLogo size="sm" animated={false} />
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-2">
-            {navLinks.map((link) => (
+          <nav className="hidden md:flex items-center gap-1">
+            {primaryLinks.map((link) => (
               <button
-                key={link.label}
+                key={link.href}
                 onClick={() => scrollToSection(link.href)}
-                className="px-3 py-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors font-medium"
+                className="px-3 py-1.5 rounded-full text-sm text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors font-medium whitespace-nowrap"
               >
                 {link.label}
               </button>
             ))}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full px-3 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                  <span className="ml-2 font-medium whitespace-nowrap">Plus</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-56">
+                {moreLinks.map((link) => (
+                  <DropdownMenuItem
+                    key={link.href}
+                    onClick={() => scrollToSection(link.href)}
+                    className="cursor-pointer"
+                  >
+                    {link.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
 
           {/* Desktop CTA + Language */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-2">
             {/* Language Toggle */}
             <Button
               variant="ghost"
               size="sm"
               onClick={toggleLanguage}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 rounded-full"
             >
               <Globe className="w-4 h-4" />
               <span className="font-medium">{language.toUpperCase()}</span>
@@ -82,11 +118,12 @@ export const Navbar = () => {
             <Button
               variant="outline"
               onClick={() => navigate('/demo-request')}
+              className="rounded-full"
             >
               Book a demo
             </Button>
             <Button
-              className="bg-gradient-to-r from-primary to-secondary hover:opacity-90"
+              className="rounded-full bg-gradient-to-r from-primary to-secondary hover:opacity-90"
               onClick={() => navigate('/login')}
             >
               {t('nav.getStarted')}
