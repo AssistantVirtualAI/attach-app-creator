@@ -814,9 +814,9 @@ export function CreateAgentWizard({ open, onOpenChange }: CreateAgentWizardProps
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+      <DialogContent className="max-w-4xl h-[90vh] overflow-hidden flex flex-col p-0">
         {/* Progress Header */}
-        <div className="p-6 border-b">
+        <div className="shrink-0 p-6 border-b">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Create New Agent</h2>
             <Badge variant="secondary">
@@ -853,20 +853,24 @@ export function CreateAgentWizard({ open, onOpenChange }: CreateAgentWizardProps
           </div>
         </div>
 
-        {/* Content */}
-        <ScrollArea className="flex-1 p-6">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-            >
-              {renderStepContent()}
-            </motion.div>
-          </AnimatePresence>
-        </ScrollArea>
+        {/* Content - Scrollable area */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="h-full">
+            <div className="p-6">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentStep}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  {renderStepContent()}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </ScrollArea>
+        </div>
 
         {/* Footer */}
         <div className="p-6 border-t flex items-center justify-between">
