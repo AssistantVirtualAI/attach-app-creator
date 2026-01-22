@@ -440,7 +440,12 @@ export function CreateAgentWizard({ open, onOpenChange }: CreateAgentWizardProps
               onSystemPromptChange={setSystemPrompt}
               onFirstMessageChange={setFirstMessage}
               language={language}
+              platform={selectedPlatform || 'elevenlabs'}
               organizationId={selectedOrgId || undefined}
+              voiceSettings={voiceSettings}
+              turnSettings={turnSettings}
+              onVoiceSettingsChange={(settings) => setVoiceSettings({ ...voiceSettings, ...settings })}
+              onTurnSettingsChange={(settings) => setTurnSettings({ ...turnSettings, ...settings })}
             />
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
