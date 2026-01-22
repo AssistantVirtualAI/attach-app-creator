@@ -95,8 +95,8 @@ export function useAgentReports(selectedAgentId?: string, dateRange?: DateRange)
 
       // Fetch agents with their platform info
       const { data: agents } = await supabase
-        .from('agents')
-        .select('id, name, platform, platform_agent_id, platform_api_key')
+        .from('agents_safe')
+        .select('id, name, platform, platform_agent_id')
         .eq('organization_id', selectedOrg.id);
 
       if (!agents || agents.length === 0) {
