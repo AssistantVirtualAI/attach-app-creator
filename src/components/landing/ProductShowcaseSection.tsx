@@ -10,6 +10,28 @@ import { Badge } from "@/components/ui/badge";
 import { Sparkles, Phone, BarChart3, Bot } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 
+const Waveform = ({ bars = 18 }: { bars?: number }) => {
+  return (
+    <div className="flex items-end gap-1 h-8">
+      {Array.from({ length: bars }).map((_, i) => (
+        <motion.div
+          key={i}
+          className="w-1 rounded-full bg-primary/60"
+          initial={{ height: 6 }}
+          animate={{ height: [6, 22, 10, 26, 8] }}
+          transition={{
+            duration: 1.4,
+            repeat: Infinity,
+            delay: i * 0.04,
+            ease: "easeInOut",
+          }}
+          style={{ opacity: 0.4 + (i % 6) * 0.1 }}
+        />
+      ))}
+    </div>
+  );
+};
+
 const SlideShell = ({
   title,
   subtitle,
@@ -49,33 +71,122 @@ export const ProductShowcaseSection = () => {
       subtitle: t("landing.showcase.agent.subtitle"),
       icon: Bot,
       body: (
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="rounded-2xl border border-border/60 bg-background/40 p-5">
-            <div className="text-sm text-muted-foreground mb-3">{t("landing.showcase.agent.panel1Title")}</div>
-            <div className="space-y-3">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-3 rounded-full bg-muted/70" style={{ width: `${88 - i * 10}%` }} />
-              ))}
-              <div className="h-10 rounded-xl bg-gradient-to-r from-primary/10 to-secondary/10 border border-border/60" />
-            </div>
-          </div>
-          <div className="rounded-2xl border border-border/60 bg-background/40 p-5">
-            <div className="text-sm text-muted-foreground mb-3">{t("landing.showcase.agent.panel2Title")}</div>
-            <div className="space-y-4">
-              <div className="rounded-xl border border-border/60 bg-card/60 p-4">
+          <div className="grid lg:grid-cols-12 gap-6">
+            {/* Faux sidebar */}
+            <div className="lg:col-span-4 rounded-2xl border border-border/60 bg-background/40 overflow-hidden">
+              <div className="px-4 py-3 border-b border-border/60 bg-gradient-to-r from-primary/10 via-transparent to-secondary/10">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{t("landing.showcase.agent.voiceLabel")}</span>
-                  <Badge variant="secondary">{t("landing.showcase.agent.preview")}</Badge>
+                  <div className="text-sm font-medium">{t("landing.showcase.agent.panel1Title")}</div>
+                  <Badge variant="secondary" className="font-medium">Wizard</Badge>
                 </div>
-                <div className="mt-3 h-2 rounded-full bg-muted/70" />
               </div>
-              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-                <div className="text-sm text-muted-foreground">{t("landing.showcase.agent.sync")}</div>
-                <div className="mt-2 h-2 rounded-full bg-primary/30" />
+
+              <div className="p-4 space-y-3">
+                {[0, 1, 2, 3].map((i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 8 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.05 }}
+                    className="rounded-xl border border-border/60 bg-card/40 p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 border border-border/60" />
+                      <div className="flex-1">
+                        <div className="h-2.5 rounded-full bg-muted/70 w-3/5" />
+                        <div className="mt-2 h-2 rounded-full bg-muted/60 w-4/5" />
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+                  <div className="text-xs text-muted-foreground">{t("landing.showcase.agent.panel2Title")}</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {['ElevenLabs', 'Vapi', 'Retell'].map((p) => (
+                      <Badge key={p} variant="outline" className="bg-background/30">{p}</Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Main demo panel */}
+            <div className="lg:col-span-8 rounded-2xl border border-border/60 bg-background/40 overflow-hidden">
+              <div className="px-4 py-3 border-b border-border/60 bg-gradient-to-r from-primary/10 via-transparent to-secondary/10">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-medium">{t("landing.showcase.agent.panel2Title")}</div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">{t("landing.showcase.agent.preview")}</Badge>
+                    <Badge variant="outline" className="bg-background/30">Sync</Badge>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-5 grid md:grid-cols-2 gap-5">
+                <div className="rounded-xl border border-border/60 bg-card/50 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{t("landing.showcase.agent.voiceLabel")}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">AVA — Voice 03</span>
+                      <motion.span
+                        className="w-2 h-2 rounded-full bg-primary"
+                        animate={{ opacity: [0.35, 1, 0.35] }}
+                        transition={{ duration: 1.2, repeat: Infinity }}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 rounded-xl border border-border/60 bg-background/30 p-3">
+                    <Waveform />
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {['stability', 'style', 'similarity'].map((k) => (
+                      <Badge key={k} variant="outline" className="bg-background/30 text-xs">
+                        {k}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium">{t("landing.showcase.agent.sync")}</div>
+                      <div className="text-xs text-muted-foreground">ElevenLabs → Config pushed</div>
+                    </div>
+                    <Badge variant="secondary">Live</Badge>
+                  </div>
+                  <div className="mt-4 rounded-xl border border-border/60 bg-background/30 p-3">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>prompt</span>
+                      <span>100%</span>
+                    </div>
+                    <div className="mt-2 h-2 rounded-full bg-primary/25 overflow-hidden">
+                      <motion.div
+                        className="h-full bg-primary/70"
+                        initial={{ width: '0%' }}
+                        whileInView={{ width: '100%' }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.8, ease: 'easeOut' }}
+                      />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                      <span>voice</span>
+                      <span>synced</span>
+                    </div>
+                    <div className="mt-2 h-2 rounded-full bg-muted/60" />
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {['Push config', 'Test call', 'Open agent'].map((label) => (
+                      <Badge key={label} variant="outline" className="bg-background/30">
+                        {label}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
       ),
     },
     {

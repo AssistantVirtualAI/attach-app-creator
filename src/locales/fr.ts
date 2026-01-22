@@ -92,10 +92,10 @@ export const fr = {
       badge: 'Voir plutôt que lire',
       title: 'Une expérience Admin unifiée',
       subtitle:
-        'Création d’agents, téléphonie et analytics — pensé pour être géré en un seul endroit.',
+        'Créez des agents, gérez la téléphonie et suivez la performance — depuis un seul portail.',
       agent: {
         title: 'Création agent + sync',
-        subtitle: 'Créez des agents, pré-écoutez les voix, synchronisez la configuration.',
+        subtitle: 'Créez l’agent, pré-écoutez la voix, puis poussez la configuration vers votre provider en quelques secondes.',
         panel1Title: 'Wizard : prompt & knowledge',
         panel2Title: 'Wizard : voix & sync',
         voiceLabel: 'Sélection de voix',
