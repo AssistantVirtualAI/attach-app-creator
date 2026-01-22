@@ -107,13 +107,14 @@ export function PlatformVoiceSelector({
         voice_id: v.voice_id || v.id || v.voiceId,
         name: v.name || v.voice_name || 'Unknown Voice',
         labels: v.labels || {},
-        preview_url: v.preview_url || v.sample_audio_url,
+        // Retell uses preview_audio_url, ElevenLabs uses preview_url
+        preview_url: v.preview_url || v.preview_audio_url || v.sample_audio_url,
         description: v.description,
         category: v.category || v.labels?.category,
         gender: v.labels?.gender || v.gender,
         language: v.labels?.language || v.language,
         accent: v.labels?.accent || v.accent,
-        provider: platform,
+        provider: v.provider || platform,
       })) as Voice[];
     },
     enabled: !!organizationId,
