@@ -93,10 +93,10 @@ export const en = {
       badge: 'Show, don’t tell',
       title: 'A unified Admin Portal experience',
       subtitle:
-        'Agent creation, telephony and analytics — designed to be managed in one place.',
+        'Create agents, manage telephony, and track performance — all from one portal.',
       agent: {
         title: 'Agent creation + sync',
-        subtitle: 'Create agents, preview voices, and push configs to your provider.',
+        subtitle: 'Build the agent, preview the voice, then push the config to your provider in seconds.',
         panel1Title: 'Wizard: prompt & knowledge',
         panel2Title: 'Wizard: voice & sync',
         voiceLabel: 'Voice selection',
