@@ -185,7 +185,7 @@ export function AllFeaturesSummarySection() {
               Full feature list / Liste complète
               <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
-            <Button variant="outline" onClick={() => navigate("/demo")}>Book a demo / Demander une démo</Button>
+            <Button variant="outline" onClick={() => navigate("/demo-request")}>Book a demo / Demander une démo</Button>
           </div>
         </motion.div>
 

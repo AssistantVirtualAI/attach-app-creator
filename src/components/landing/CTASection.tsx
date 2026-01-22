@@ -63,7 +63,7 @@ export const CTASection = () => {
               <Button
                 size="lg"
                 className="h-14 px-8 text-lg bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-xl shadow-primary/25"
-                onClick={() => navigate('/demo')}
+                onClick={() => navigate('/demo-request')}
               >
                 {t('cta.cta2')}
                 <ArrowRight className="ml-2 w-5 h-5" />

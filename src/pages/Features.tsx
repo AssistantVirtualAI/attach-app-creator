@@ -125,7 +125,7 @@ export default function FeaturesPage() {
               <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Button
                   className="bg-gradient-to-r from-primary to-secondary hover:opacity-90"
-                  onClick={() => navigate("/demo")}
+                  onClick={() => navigate("/demo-request")}
                 >
                   Book a demo / Demander une démo
                   <ArrowRight className="ml-2 w-4 h-4" />
