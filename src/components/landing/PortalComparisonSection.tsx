@@ -11,7 +11,9 @@ import {
   Plug,
   MessageSquare,
   UserCircle,
-  Shield
+  Shield,
+  Phone,
+  RefreshCw
 } from 'lucide-react';
 
 const portalFeatures = [
@@ -68,6 +70,18 @@ const portalFeatures = [
     agency: true,
     client: false,
     icon: Plug,
+  },
+  {
+    feature: 'Synchronisation agents (plateformes vocales)',
+    agency: true,
+    client: false,
+    icon: RefreshCw,
+  },
+  {
+    feature: 'Téléphonie (Twilio) : numéros, appels, enregistrements',
+    agency: true,
+    client: false,
+    icon: Phone,
   },
   {
     feature: 'Profil utilisateur',
@@ -165,6 +179,10 @@ export const PortalComparisonSection = () => {
               <li className="flex items-center gap-3">
                 <Check className="w-5 h-5 text-primary" />
                 <span>Intégrations multiples (ElevenLabs, Vapi, Retell)</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <Check className="w-5 h-5 text-primary" />
+                <span>Téléphonie Twilio intégrée (numéros, routage, enregistrements)</span>
               </li>
               <li className="flex items-center gap-3">
                 <Check className="w-5 h-5 text-primary" />

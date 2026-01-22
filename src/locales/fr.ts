@@ -2,6 +2,10 @@ export const fr = {
   // Navigation
   nav: {
     features: 'Fonctionnalités',
+    analytics: 'Analytics',
+    portals: 'Portails',
+    integrations: 'Intégrations',
+    agentCreation: 'Créer des agents',
     howItWorks: 'Comment ça marche',
     testimonials: 'Témoignages',
     pricing: 'Tarifs',
@@ -16,12 +20,105 @@ export const fr = {
     title1: 'Agents IA Vocaux',
     title2: 'Pour Votre Entreprise',
     subtitle: 'Créez, déployez et analysez vos agents conversationnels IA. Une plateforme complète pour gérer vos interactions clients avec intelligence.',
-    cta1: 'Commencer gratuitement',
-    cta2: 'Voir la démo',
+    cta1: 'Demander une démo',
+    cta2: 'Démarrer l’essai',
     feature1: 'Voix naturelles',
     feature2: 'Multi-langues',
     feature3: 'Analyses temps réel',
     scrollDown: 'Découvrir',
+  },
+
+  landing: {
+    agentCreation: {
+      badge: 'Création + synchronisation',
+      title: 'Créez vos agents directement dans le Portail Admin',
+      subtitle:
+        'Construisez, configurez, écoutez les voix et synchronisez vers votre fournisseur — sans naviguer entre plusieurs dashboards.',
+      ctaDemo: 'Demander une démo',
+      ctaStart: 'Démarrer l’essai',
+      step: 'Étape {{n}}',
+      s1: { title: 'Choisir une plateforme', description: 'ElevenLabs, Vapi ou Retell — par agent.' },
+      s2: { title: 'Templates & IA', description: 'Démarrez vite et améliorez vos prompts.' },
+      s3: { title: 'Sélectionner une voix', description: 'Pré-écoute avant sélection (tous fournisseurs).' },
+      s4: { title: 'Régler les paramètres', description: 'Comportement, langue, style de réponse.' },
+      s5: { title: 'Créer & synchroniser', description: 'Poussez la config et lancez l’exploitation.' },
+      callout: {
+        title: 'Tout se gère dans votre portail',
+        description:
+          'Agents, intégrations, analytics et clients — un seul endroit pour tout piloter.',
+      },
+    },
+    integrations: {
+      badge: 'Pilotage tout-en-un',
+      title: 'Intégrations et téléphonie dans le portail',
+      subtitle:
+        'Connectez vos plateformes vocales et gérez la suite Twilio de bout en bout depuis le Portail Admin.',
+      cards: {
+        voicePlatforms: {
+          title: 'Plateformes vocales',
+          description: 'Connectez ElevenLabs, Vapi et Retell pour créer et synchroniser vos agents.',
+          b1: 'Configuration centralisée par organisation',
+          b2: 'Wizard agent (templates + settings)',
+          b3: 'Pré-écoute des voix avant sélection',
+        },
+        twilio: {
+          title: 'Suite téléphonie Twilio',
+          description:
+            'Numéros, routage, enregistrements et analytics — gérés directement dans votre portail.',
+          b1: 'Recherche & achat de numéros',
+          b2: 'Routage / webhooks',
+          b3: 'Lecture sécurisée des enregistrements',
+          b4: 'Monitoring temps réel des appels',
+          b5: 'Analytics & usage',
+          cta: 'Connecter Twilio (Admin)',
+        },
+        automation: {
+          title: 'Automations & webhooks',
+          description: 'Connectez vos outils et déclenchez des actions automatiquement.',
+          b1: 'Workflow builder',
+          b2: 'Endpoints webhooks',
+          b3: 'Routage d’événements',
+        },
+        analytics: {
+          title: 'Analytics & insights',
+          description: 'Une vision unifiée sur agents, appels et résultats.',
+          b1: 'Dashboards temps réel',
+          b2: 'Sentiment et sujets',
+          b3: 'Rapports automatiques + recommandations',
+        },
+      },
+    },
+    showcase: {
+      badge: 'Voir plutôt que lire',
+      title: 'Une expérience Admin unifiée',
+      subtitle:
+        'Création d’agents, téléphonie et analytics — pensé pour être géré en un seul endroit.',
+      agent: {
+        title: 'Création agent + sync',
+        subtitle: 'Créez des agents, pré-écoutez les voix, synchronisez la configuration.',
+        panel1Title: 'Wizard : prompt & knowledge',
+        panel2Title: 'Wizard : voix & sync',
+        voiceLabel: 'Sélection de voix',
+        preview: 'Pré-écoute',
+        sync: 'Statut sync',
+      },
+      twilio: {
+        title: 'Gestion Twilio',
+        subtitle: 'Numéros, appels et enregistrements sans quitter le portail.',
+        numbers: { title: 'Numéros', description: 'Acheter, configurer et assigner aux agents.' },
+        calls: { title: 'Appels', description: 'Suivre l’activité et les statuts en temps réel.' },
+        recordings: { title: 'Enregistrements', description: 'Lecture sécurisée pour QA et conformité.' },
+      },
+      analytics: {
+        title: 'Analytics & insights',
+        subtitle: 'Mesurez la performance sur agents, portails et téléphonie.',
+        panel1Title: 'KPIs',
+        panel2Title: 'Tendances',
+        sentiment: 'Sentiment',
+        topics: 'Sujets',
+        score: 'Health score',
+      },
+    },
   },
 
   // Trusted By Section
@@ -271,6 +368,8 @@ export const fr = {
     cta1: 'Commencer gratuitement',
     cta2: 'Demander une démo',
   },
+
+  // (removed duplicate integrations block; Twilio helper strings live under the main integrations section)
 
   // Footer
   footer: {
@@ -1155,6 +1254,10 @@ export const fr = {
       mustBeLoggedIn: 'Vous devez être connecté pour ajouter une intégration',
     },
     configuredOn: 'Configuré le',
+    twilio: {
+      helpLine: 'Besoin d’aide pour trouver votre Account SID ?',
+      openConsole: 'Ouvrir la console Twilio',
+    },
   },
 
   // Endpoints

@@ -10,6 +10,9 @@ import { FAQSection } from "@/components/landing/FAQSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { CTASection } from "@/components/landing/CTASection";
 import { FooterSection } from "@/components/landing/FooterSection";
+import { AgentCreationSection } from "@/components/landing/AgentCreationSection";
+import { IntegrationsSection } from "@/components/landing/IntegrationsSection";
+import { ProductShowcaseSection } from "@/components/landing/ProductShowcaseSection";
 
 const Landing = () => {
   return (
@@ -25,10 +28,21 @@ const Landing = () => {
         <div id="how-it-works">
           <HowItWorksSection />
         </div>
+        <div id="agent-creation">
+          <AgentCreationSection />
+        </div>
         <div id="features">
           <FeaturesSection />
         </div>
-        <PortalComparisonSection />
+        <div id="portals">
+          <PortalComparisonSection />
+        </div>
+        <div id="integrations">
+          <IntegrationsSection />
+        </div>
+        <div id="analytics">
+          <ProductShowcaseSection />
+        </div>
         <div id="testimonials">
           <TestimonialsSection />
         </div>

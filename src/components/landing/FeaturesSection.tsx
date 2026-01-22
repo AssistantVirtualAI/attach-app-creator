@@ -4,12 +4,12 @@ import { useTranslation } from "@/hooks/useTranslation";
 
 const featureIcons = [Bot, Users, BarChart3, BookOpen, Globe2, Zap];
 const featureColors = [
-  { bg: 'from-blue-500/20 to-cyan-500/20', icon: 'from-blue-500 to-cyan-500' },
-  { bg: 'from-purple-500/20 to-pink-500/20', icon: 'from-purple-500 to-pink-500' },
-  { bg: 'from-orange-500/20 to-amber-500/20', icon: 'from-orange-500 to-amber-500' },
-  { bg: 'from-green-500/20 to-emerald-500/20', icon: 'from-green-500 to-emerald-500' },
-  { bg: 'from-indigo-500/20 to-violet-500/20', icon: 'from-indigo-500 to-violet-500' },
-  { bg: 'from-red-500/20 to-rose-500/20', icon: 'from-red-500 to-rose-500' },
+  { bg: 'from-primary/15 to-secondary/10', icon: 'from-primary to-secondary' },
+  { bg: 'from-secondary/15 to-accent/10', icon: 'from-secondary to-accent' },
+  { bg: 'from-accent/15 to-primary/10', icon: 'from-accent to-primary' },
+  { bg: 'from-primary/10 to-accent/10', icon: 'from-primary to-accent' },
+  { bg: 'from-secondary/10 to-primary/10', icon: 'from-secondary to-primary' },
+  { bg: 'from-accent/10 to-secondary/10', icon: 'from-accent to-secondary' },
 ];
 
 const containerVariants = {
@@ -92,7 +92,7 @@ export const FeaturesSection = () => {
 
                 {/* Icon */}
                 <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${colors.icon} flex items-center justify-center mb-6 shadow-lg`}>
-                  <Icon className="w-8 h-8 text-white" />
+                  <Icon className="w-8 h-8 text-primary-foreground" />
                 </div>
 
                 {/* Content */}

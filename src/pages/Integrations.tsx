@@ -23,6 +23,9 @@ import { format } from 'date-fns';
 import { fr, enUS } from 'date-fns/locale';
 import { useTranslation } from '@/hooks/useTranslation';
 
+const twilioHelpHref =
+  "https://www.twilio.com/console";
+
 const getPlatforms = (t: (key: string) => string) => [
   {
     name: 'OpenAI',
@@ -403,6 +406,18 @@ export default function Integrations() {
                     onChange={(e) => setAccountSid(e.target.value)}
                     placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                   />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {t('integrations.twilio.helpLine')}{" "}
+                    <a
+                      href={twilioHelpHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline underline-offset-4"
+                    >
+                      {t('integrations.twilio.openConsole')}
+                    </a>
+                    .
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="authToken">{t('integrations.modal.authToken')} *</Label>

@@ -63,9 +63,9 @@ export const CTASection = () => {
               <Button
                 size="lg"
                 className="h-14 px-8 text-lg bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-xl shadow-primary/25"
-                onClick={() => navigate('/auth')}
+                onClick={() => navigate('/demo')}
               >
-                {t('cta.cta1')}
+                {t('cta.cta2')}
                 <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
             </motion.div>
@@ -77,7 +77,7 @@ export const CTASection = () => {
                 className="h-14 px-8 text-lg border-2"
                 onClick={() => navigate('/auth')}
               >
-                {t('cta.cta2')}
+                {t('cta.cta1')}
               </Button>
             </motion.div>
           </div>
