@@ -18,6 +18,20 @@ interface ContactFormRequest {
   requirements?: string;
 }
 
+function escapeHtml(input: string) {
+  return input
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function normalizeOptional(value?: string) {
+  const v = (value ?? "").trim();
+  return v.length ? v : undefined;
+}
+
 async function sendEmail(to: string[], subject: string, html: string, replyTo?: string) {
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -62,7 +76,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Received contact form submission:", { name, email, company });
 
-    // Validate required fields
+    // Validate required fields + basic bounds (server-side)
     if (!name || !email) {
       return new Response(
         JSON.stringify({ error: "Name and email are required" }),
@@ -72,6 +86,20 @@ const handler = async (req: Request): Promise<Response> => {
         }
       );
     }
+
+    const safeName = escapeHtml(String(name).trim().slice(0, 100));
+    const safeEmail = escapeHtml(String(email).trim().slice(0, 255));
+    const safeCompany = normalizeOptional(company) ? escapeHtml(normalizeOptional(company)!.slice(0, 120)) : undefined;
+    const safePhone = normalizeOptional(phone) ? escapeHtml(normalizeOptional(phone)!.slice(0, 40)) : undefined;
+    const safeExpectedClients = normalizeOptional(expectedClients)
+      ? escapeHtml(normalizeOptional(expectedClients)!.slice(0, 40))
+      : undefined;
+    const safeCurrentPlatform = normalizeOptional(currentPlatform)
+      ? escapeHtml(normalizeOptional(currentPlatform)!.slice(0, 80))
+      : undefined;
+    const safeRequirements = normalizeOptional(requirements)
+      ? escapeHtml(normalizeOptional(requirements)!.slice(0, 2000))
+      : undefined;
 
     // Send email to sales team
     const salesEmailHtml = `
@@ -99,46 +127,46 @@ const handler = async (req: Request): Promise<Response> => {
           <div class="content">
             <div class="field">
               <div class="label">👤 Contact Name</div>
-              <div class="value">${name}</div>
+              <div class="value">${safeName}</div>
             </div>
             
             <div class="field">
               <div class="label">📧 Email Address</div>
-              <div class="value"><a href="mailto:${email}">${email}</a></div>
+               <div class="value"><a href="mailto:${safeEmail}">${safeEmail}</a></div>
             </div>
             
-            ${company ? `
+             ${safeCompany ? `
             <div class="field">
               <div class="label">🏢 Company</div>
-              <div class="value">${company}</div>
+               <div class="value">${safeCompany}</div>
             </div>
             ` : ''}
             
-            ${phone ? `
+             ${safePhone ? `
             <div class="field">
               <div class="label">📱 Phone Number</div>
-              <div class="value"><a href="tel:${phone}">${phone}</a></div>
+               <div class="value"><a href="tel:${safePhone}">${safePhone}</a></div>
             </div>
             ` : ''}
             
-            ${expectedClients ? `
+             ${safeExpectedClients ? `
             <div class="field">
               <div class="label">👥 Expected Number of Clients</div>
-              <div class="value">${expectedClients}</div>
+               <div class="value">${safeExpectedClients}</div>
             </div>
             ` : ''}
             
-            ${currentPlatform ? `
+             ${safeCurrentPlatform ? `
             <div class="field">
               <div class="label">🔧 Current Platform</div>
-              <div class="value">${currentPlatform}</div>
+               <div class="value">${safeCurrentPlatform}</div>
             </div>
             ` : ''}
             
-            ${requirements ? `
+             ${safeRequirements ? `
             <div class="field">
               <div class="label">📝 Requirements & Notes</div>
-              <div class="requirements">${requirements}</div>
+               <div class="requirements">${safeRequirements}</div>
             </div>
             ` : ''}
             
@@ -154,9 +182,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     const emailResponse = await sendEmail(
       ["mhassoun@assistantvirtualai.com"],
-      `🚀 New Enterprise Inquiry from ${name}${company ? ` (${company})` : ''}`,
+      `🚀 New Enterprise Inquiry from ${safeName}${safeCompany ? ` (${safeCompany})` : ''}`,
       salesEmailHtml,
-      email
+      safeEmail
     );
 
     console.log("Email sent successfully:", emailResponse);
@@ -177,7 +205,7 @@ const handler = async (req: Request): Promise<Response> => {
       <body>
         <div class="container">
           <div class="header">
-            <h1 style="margin: 0;">Thank You, ${name}!</h1>
+            <h1 style="margin: 0;">Thank You, ${safeName}!</h1>
           </div>
           <div class="content">
             <p>We've received your inquiry about the AVA Enterprise plan.</p>

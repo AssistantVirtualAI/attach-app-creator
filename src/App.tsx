@@ -69,6 +69,7 @@ import ApiExplorer from "./pages/ApiExplorer";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import TwilioManagement from "./pages/TwilioManagement";
 import FeaturesPage from "./pages/Features";
+import DemoRequestPage from "./pages/DemoRequest";
 
 // Portal pages
 import PortalLogin from "./pages/PortalLogin";
@@ -124,6 +125,9 @@ const App = () => (
 
                 {/* Public full feature list */}
                 <Route path="/features" element={<FeaturesPage />} />
+
+                {/* Public demo request */}
+                <Route path="/demo-request" element={<DemoRequestPage />} />
                 
                 {/* Universal login - redirects based on user type */}
                 <Route path="/login" element={<UniversalLogin />} />

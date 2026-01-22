@@ -48,12 +48,12 @@ export const Navbar = () => {
           <AvaLogo size="sm" animated={false} />
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-8">
+          <nav className="hidden md:flex items-center gap-2">
             {navLinks.map((link) => (
               <button
                 key={link.label}
                 onClick={() => scrollToSection(link.href)}
-                className="text-muted-foreground hover:text-foreground transition-colors font-medium"
+                className="px-3 py-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors font-medium"
               >
                 {link.label}
               </button>
@@ -78,6 +78,12 @@ export const Navbar = () => {
               onClick={() => navigate('/login')}
             >
               {t('nav.login')}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/demo-request')}
+            >
+              Book a demo
             </Button>
             <Button
               className="bg-gradient-to-r from-primary to-secondary hover:opacity-90"
@@ -136,6 +142,13 @@ export const Navbar = () => {
                 onClick={() => navigate('/login')}
               >
                 {t('nav.login')}
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => navigate('/demo-request')}
+              >
+                Book a demo
               </Button>
               <Button
                 className="w-full bg-gradient-to-r from-primary to-secondary"

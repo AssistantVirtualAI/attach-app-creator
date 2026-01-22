@@ -66,7 +66,7 @@ export const AgentCreationSection = () => {
             <div className="flex flex-col sm:flex-row gap-3">
               <Button
                 size="lg"
-                onClick={() => navigate("/demo")}
+                onClick={() => navigate("/demo-request")}
                 className="h-12 bg-gradient-to-r from-primary to-secondary hover:opacity-90"
               >
                 {t("landing.agentCreation.ctaDemo")}
