@@ -94,7 +94,15 @@ export function PlatformVoiceSelector({
       if (error) throw error;
       
       // Normalize voice data across platforms
-      const rawVoices = data?.voices || data || [];
+      // retell-proxy returns { success: true, data: [...] }
+      // elevenlabs returns { voices: [...] }
+      let rawVoices: any[] = [];
+      if (platform === 'retell') {
+        rawVoices = data?.data || data || [];
+      } else {
+        rawVoices = data?.voices || data || [];
+      }
+      
       return rawVoices.map((v: any) => ({
         voice_id: v.voice_id || v.id || v.voiceId,
         name: v.name || v.voice_name || 'Unknown Voice',
