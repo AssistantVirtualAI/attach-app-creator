@@ -6,15 +6,16 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Platform-specific optimization guidelines
+// Platform-specific optimization guidelines with recommended settings
 const PLATFORM_GUIDELINES = {
   elevenlabs: {
     name: 'ElevenLabs Conversational AI',
     strengths: [
       'Excellent voice quality and natural intonation',
-      'Low-latency responses',
-      'Multilingual support',
+      'Low-latency responses (~300ms)',
+      'Multilingual support with 29+ languages',
       'Real-time voice activity detection',
+      'Advanced turn-taking control',
     ],
     promptBestPractices: [
       'Keep responses concise (50-150 words) for natural conversation flow',
@@ -23,52 +24,122 @@ const PLATFORM_GUIDELINES = {
       'Include explicit pause instructions using "..." for natural breaks',
       'Specify emotional tone explicitly (calm, enthusiastic, professional)',
       'Use phonetic spelling for uncommon words or brand names',
+      'Structure prompts for interruption handling',
     ],
     turnTakingTips: [
       'Design for interruptions - agent should handle being cut off gracefully',
       'Include backchanneling cues like "I understand" or "Got it"',
       'Keep turns short to allow natural conversation rhythm',
+      'Use turn_eagerness setting to control response timing',
     ],
     avoidPatterns: [
       'Long lists (break into conversational segments)',
       'Technical jargon without explanation',
       'Complex nested conditionals',
       'Emoji or special characters in speech',
+      'URLs or code snippets (spell them out)',
     ],
+    recommendedSettings: {
+      conversational: {
+        stability: 0.5,
+        similarity_boost: 0.75,
+        style: 0.3,
+        speed: 1.0,
+        turn_eagerness: 'normal',
+        turn_timeout: 10,
+      },
+      professional: {
+        stability: 0.8,
+        similarity_boost: 0.85,
+        style: 0.2,
+        speed: 0.95,
+        turn_eagerness: 'relaxed',
+        turn_timeout: 12,
+      },
+      energetic: {
+        stability: 0.4,
+        similarity_boost: 0.7,
+        style: 0.5,
+        speed: 1.1,
+        turn_eagerness: 'eager',
+        turn_timeout: 8,
+      },
+      calm: {
+        stability: 0.9,
+        similarity_boost: 0.8,
+        style: 0.1,
+        speed: 0.9,
+        turn_eagerness: 'relaxed',
+        turn_timeout: 15,
+      },
+    },
+    voiceRecommendations: {
+      support: ['JBFqnCBsd6RMkjVDRZzb', 'EXAVITQu4vr4xnSDxMaL'],
+      sales: ['TX3LPaxmHKxFdv7VOQHJ', 'onwK4e9ZLuTAKqWW03F9'],
+      receptionist: ['XrExE9yKIg1WjnnlVkGX', 'pFZP5JQG7iQjIQuC4Bku'],
+    },
   },
   vapi: {
     name: 'Vapi Voice AI',
     strengths: [
       'Advanced function calling capabilities',
-      'Sophisticated call routing',
-      'Multiple voice provider support',
-      'Real-time transcription',
+      'Sophisticated call routing and transfers',
+      'Multiple voice provider support (ElevenLabs, Deepgram, PlayHT)',
+      'Real-time transcription and analytics',
+      'Squad-based multi-agent workflows',
     ],
     promptBestPractices: [
       'Structure prompts for clear function calling triggers',
       'Define explicit handoff conditions to human agents',
-      'Use structured data collection patterns',
+      'Use structured data collection patterns with confirmations',
       'Include confirmation steps for critical actions',
       'Design for multi-turn tool use scenarios',
+      'Specify fallback behaviors for function failures',
     ],
     turnTakingTips: [
-      'Configure appropriate silence thresholds',
-      'Use explicit confirmation for actions',
+      'Configure appropriate silence thresholds (15-45s)',
+      'Use explicit confirmation for destructive actions',
       'Design fallback responses for unclear inputs',
+      'Include timeout handling instructions',
     ],
     avoidPatterns: [
-      'Vague action triggers',
+      'Vague action triggers that cause false positives',
       'Missing error handling instructions',
       'Undefined edge cases for function calls',
+      'Complex conditional logic without explicit states',
+    ],
+    recommendedSettings: {
+      standard: {
+        silenceTimeout: 30,
+        maxDuration: 600,
+        temperature: 0.7,
+      },
+      quickCalls: {
+        silenceTimeout: 15,
+        maxDuration: 300,
+        temperature: 0.5,
+      },
+      detailed: {
+        silenceTimeout: 45,
+        maxDuration: 1200,
+        temperature: 0.8,
+      },
+    },
+    functionCallingPatterns: [
+      'Define clear trigger phrases for each function',
+      'Include confirmation before executing actions',
+      'Handle function errors gracefully in the prompt',
+      'Specify retry behavior for failed operations',
     ],
   },
   retell: {
     name: 'Retell AI',
     strengths: [
-      'Enterprise-grade reliability',
-      'Custom LLM integration',
-      'Advanced analytics',
-      'Webhook integrations',
+      'Enterprise-grade reliability and uptime',
+      'Custom LLM integration with Retell LLM',
+      'Advanced analytics and conversation tagging',
+      'Webhook integrations for real-time events',
+      'Pronunciation dictionary support',
     ],
     promptBestPractices: [
       'Optimize for low-latency LLM responses',
@@ -76,19 +147,60 @@ const PLATFORM_GUIDELINES = {
       'Design for analytics tracking (tag conversations)',
       'Structure for A/B testing different approaches',
       'Use consistent terminology for better analysis',
+      'Include escalation keywords for handoff',
     ],
     turnTakingTips: [
       'Configure response timing for natural flow',
       'Include explicit conversation ending signals',
       'Design for call transfer scenarios',
+      'Use ambient sounds for professional feel',
     ],
     avoidPatterns: [
-      'Inconsistent response lengths',
+      'Inconsistent response lengths affecting flow',
       'Missing conversation closure patterns',
       'Undefined escalation paths',
+      'Overly complex nested instructions',
+    ],
+    recommendedSettings: {
+      standard: {
+        voice_speed: 1.0,
+        voice_temperature: 1.0,
+        silenceTimeout: 30,
+      },
+      fast: {
+        voice_speed: 1.15,
+        voice_temperature: 0.8,
+        silenceTimeout: 20,
+      },
+      professional: {
+        voice_speed: 0.95,
+        voice_temperature: 1.0,
+        silenceTimeout: 35,
+        ambientSound: 'office',
+      },
+    },
+    llmOptimizations: [
+      'Use begin_message for consistent opening',
+      'Structure prompts for analytics tagging',
+      'Include escalation keywords for handoff',
     ],
   },
 };
+
+// Detect tone from prompt content
+function detectPromptTone(prompt: string): 'conversational' | 'professional' | 'energetic' | 'calm' {
+  const lowerPrompt = prompt.toLowerCase();
+  
+  const energeticKeywords = ['enthousiaste', 'dynamique', 'excited', 'enthusiastic', 'energetic', 'fun', 'engaging'];
+  const professionalKeywords = ['professionnel', 'formel', 'professional', 'formal', 'business', 'corporate', 'enterprise'];
+  const calmKeywords = ['calme', 'serein', 'apaisant', 'calm', 'soothing', 'relaxed', 'gentle', 'meditation'];
+  
+  if (energeticKeywords.some(k => lowerPrompt.includes(k))) return 'energetic';
+  if (professionalKeywords.some(k => lowerPrompt.includes(k))) return 'professional';
+  if (calmKeywords.some(k => lowerPrompt.includes(k))) return 'calm';
+  
+  return 'conversational';
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -124,6 +236,12 @@ serve(async (req) => {
 
     // Get platform-specific guidelines
     const platformConfig = PLATFORM_GUIDELINES[platform as keyof typeof PLATFORM_GUIDELINES] || PLATFORM_GUIDELINES.elevenlabs;
+
+    // Detect tone for settings recommendations
+    const detectedTone = detectPromptTone(currentPrompt || '');
+    const recommendedSettingsForTone = platformConfig.recommendedSettings?.[detectedTone as keyof typeof platformConfig.recommendedSettings] 
+      || platformConfig.recommendedSettings?.['standard' as keyof typeof platformConfig.recommendedSettings]
+      || {};
 
     // Get the latest AI advice for this agent to understand context
     let adviceContext = '';
@@ -199,6 +317,10 @@ ${platformConfig.turnTakingTips.map((t: string) => `- ${t}`).join('\n')}
 ### Patterns to Avoid:
 ${platformConfig.avoidPatterns.map((a: string) => `- ${a}`).join('\n')}
 
+### Detected Tone: ${detectedTone}
+### Recommended Settings for Detected Tone:
+${JSON.stringify(recommendedSettingsForTone, null, 2)}
+
 ### Current Voice Settings:
 - Stability: ${voiceSettings.stability ?? 'default'}
 - Similarity: ${voiceSettings.similarity_boost ?? 'default'}
@@ -224,6 +346,7 @@ Focus on:
 4. Turn-taking and conversation flow
 5. Handling edge cases appropriately for voice AI
 6. Matching the voice settings (stability, style) with prompt tone
+7. Recommending optimal settings based on detected prompt tone
 
 Be specific, actionable, and provide concrete examples. Consider the platform's strengths and limitations.
 
@@ -237,6 +360,7 @@ Concentre-toi sur:
 4. Le flux de conversation et les tours de parole
 5. La gestion des cas limites appropriée pour l'IA vocale
 6. L'adaptation du prompt aux paramètres de voix (stabilité, style)
+7. La recommandation des paramètres optimaux basés sur le ton détecté
 
 Sois spécifique, actionnable et fournis des exemples concrets. Prends en compte les forces et limitations de la plateforme.
 
@@ -256,7 +380,7 @@ Based on the platform capabilities and conversation analysis above, provide:
 1. A list of 3-5 specific improvements for the system prompt, optimized for ${platformConfig.name}
 2. A suggested improved version of the system prompt that follows ${platformConfig.name} best practices
 3. A suggested improved version of the first message optimized for voice
-4. Platform-specific recommendations for voice/turn settings if needed
+4. Platform-specific recommendations for voice/turn settings based on the detected tone
 
 Format your response as JSON with this structure:
 {
@@ -271,10 +395,11 @@ Format your response as JSON with this structure:
   "improvedPrompt": "the full improved system prompt",
   "improvedFirstMessage": "the improved first message (short, natural for voice)",
   "platformRecommendations": {
-    "voiceSettings": { "stability": 0.7, "similarity_boost": 0.8 },
-    "turnSettings": { "turn_eagerness": "normal" },
-    "notes": "explanation of recommended settings"
+    "voiceSettings": { "stability": 0.7, "similarity_boost": 0.8, "style": 0.3, "speed": 1.0 },
+    "turnSettings": { "turn_eagerness": "normal", "turn_timeout": 10 },
+    "notes": "explanation of recommended settings based on detected tone: ${detectedTone}"
   },
+  "detectedTone": "${detectedTone}",
   "summary": "brief summary of key changes made"
 }`;
 
@@ -337,7 +462,9 @@ Format your response as JSON with this structure:
           platformConfig: {
             name: platformConfig.name,
             strengths: platformConfig.strengths,
+            recommendedSettings: platformConfig.recommendedSettings,
           },
+          detectedTone,
           hasAdviceContext: !!adviceContext
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -406,7 +533,8 @@ Garde la même intention et personnalité mais optimise pour la conversation voc
           success: true, 
           improvedPrompt: result.improvedPrompt,
           improvedFirstMessage: result.improvedFirstMessage,
-          platform 
+          platform,
+          detectedTone
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -418,7 +546,8 @@ Garde la même intention et personnalité mais optimise pour la conversation voc
         JSON.stringify({ 
           success: true, 
           platform,
-          guidelines: platformConfig
+          guidelines: platformConfig,
+          detectedTone: detectPromptTone(currentPrompt || ''),
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

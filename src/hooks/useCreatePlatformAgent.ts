@@ -11,6 +11,7 @@ export interface VoiceSettings {
   similarity_boost?: number;
   style?: number;
   speed?: number;
+  provider?: string;
 }
 
 export interface TurnSettings {
@@ -27,6 +28,7 @@ export interface LLMSettings {
   model?: string;
   temperature?: number;
   max_tokens?: number;
+  provider?: string;
 }
 
 export interface ASRSettings {
@@ -97,29 +99,31 @@ async function createVapiAgent(
       action: 'createAssistant',
       organizationId,
       name: params.name,
-      model: {
-        provider: 'openai',
-        model: params.llmSettings?.model || 'gpt-4o-mini',
-        temperature: params.llmSettings?.temperature ?? 0.7,
-        maxTokens: params.llmSettings?.max_tokens || 1000,
-        systemPrompt: params.systemPrompt,
-      },
-      voice: {
-        provider: 'elevenlabs',
-        voiceId: params.voiceSettings.voice_id,
-        stability: params.voiceSettings.stability ?? 0.5,
-        similarityBoost: params.voiceSettings.similarity_boost ?? 0.75,
-      },
+      systemPrompt: params.systemPrompt,
       firstMessage: params.firstMessage,
-      silenceTimeoutSeconds: params.turnSettings?.silence_end_call_timeout || 30,
-      maxDurationSeconds: params.conversationSettings?.max_duration_seconds || 600,
+      // Voice settings
+      voiceId: params.voiceSettings.voice_id,
+      voiceProvider: params.voiceSettings.provider || 'elevenlabs',
+      stability: params.voiceSettings.stability ?? 0.5,
+      similarityBoost: params.voiceSettings.similarity_boost ?? 0.75,
+      style: params.voiceSettings.style,
+      // LLM settings
+      llmProvider: params.llmSettings?.provider || 'openai',
+      llmModel: params.llmSettings?.model || 'gpt-4o-mini',
+      temperature: params.llmSettings?.temperature ?? 0.7,
+      maxTokens: params.llmSettings?.max_tokens || 1000,
+      // Timing settings
+      silenceTimeout: params.turnSettings?.silence_end_call_timeout || 30,
+      maxDuration: params.conversationSettings?.max_duration_seconds || 600,
     },
   });
 
   if (error) throw new Error(error.message);
-  if (!data?.id) throw new Error('Failed to create assistant on Vapi');
+  
+  const agentData = data?.data || data;
+  if (!agentData?.id) throw new Error('Failed to create assistant on Vapi');
 
-  return { agent_id: data.id, agent: data };
+  return { agent_id: agentData.id, agent: agentData };
 }
 
 async function createRetellAgent(
@@ -130,21 +134,28 @@ async function createRetellAgent(
     body: {
       action: 'createAgent',
       organizationId,
-      agent_name: params.name,
-      voice_id: params.voiceSettings.voice_id,
-      response_engine: {
-        type: 'retell-llm',
-        llm_id: null, // Will be created automatically
-      },
-      // We need to create LLM first or use inline config
-      llm_websocket_url: null,
+      name: params.name,
+      systemPrompt: params.systemPrompt,
+      firstMessage: params.firstMessage,
+      // Voice settings
+      voiceId: params.voiceSettings.voice_id,
+      speed: params.voiceSettings.speed || 1.0,
+      // Language
+      language: params.language || 'en-US',
+      // LLM settings
+      llmModel: params.llmSettings?.model || 'gpt-4o-mini',
+      temperature: params.llmSettings?.temperature ?? 0.7,
+      // Timing settings
+      silenceTimeout: params.turnSettings?.silence_end_call_timeout || 30,
     },
   });
 
   if (error) throw new Error(error.message);
-  if (!data?.agent_id) throw new Error('Failed to create agent on Retell AI');
+  
+  const agentData = data?.data || data;
+  if (!agentData?.agent_id) throw new Error('Failed to create agent on Retell AI');
 
-  return { agent_id: data.agent_id, agent: data };
+  return { agent_id: agentData.agent_id, agent: agentData };
 }
 
 export function useCreatePlatformAgent() {
@@ -213,7 +224,7 @@ export function useCreatePlatformAgent() {
         success: true,
       };
     },
-    onSuccess: (result) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       toast.success('Agent created successfully on platform!');
     },
