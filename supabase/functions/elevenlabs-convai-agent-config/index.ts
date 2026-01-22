@@ -1057,6 +1057,118 @@ serve(async (req) => {
         );
       }
 
+      case 'create_agent': {
+        console.log('[elevenlabs-agent-config] Creating new agent on ElevenLabs');
+        
+        const { 
+          name: agentName, 
+          systemPrompt, 
+          firstMessage: agentFirstMessage,
+          voiceId,
+          language,
+          ttsSettings: createTtsSettings,
+          asrSettings: createAsrSettings,
+          turnSettings: createTurnSettings,
+          conversationSettings: createConversationSettings,
+          llmSettings: createLlmSettings,
+          platformSettings: createPlatformSettings
+        } = await req.json().catch(() => ({}));
+        
+        // Build the agent creation payload
+        const createPayload: any = {
+          conversation_config: {
+            agent: {
+              prompt: {
+                prompt: systemPrompt || 'You are a helpful assistant.',
+              },
+              first_message: agentFirstMessage || 'Hello! How can I help you today?',
+              language: language || 'en',
+            },
+            tts: {
+              voice_id: voiceId || 'EXAVITQu4vr4xnSDxMaL', // Default to Sarah
+              model_id: createTtsSettings?.model_id || 'eleven_turbo_v2_5',
+              stability: createTtsSettings?.stability ?? 0.5,
+              similarity_boost: createTtsSettings?.similarity_boost ?? 0.75,
+              ...(createTtsSettings?.style !== undefined && { style: createTtsSettings.style }),
+              ...(createTtsSettings?.speed !== undefined && { speed: createTtsSettings.speed }),
+            },
+          },
+        };
+        
+        // Add optional name
+        if (agentName) {
+          createPayload.name = agentName;
+        }
+        
+        // Add ASR settings if provided
+        if (createAsrSettings) {
+          createPayload.conversation_config.stt = {
+            ...(createAsrSettings.provider && { provider: createAsrSettings.provider }),
+            ...(createAsrSettings.quality && { quality: createAsrSettings.quality }),
+            ...(createAsrSettings.keywords && { keywords: createAsrSettings.keywords }),
+          };
+        }
+        
+        // Add turn settings if provided
+        if (createTurnSettings) {
+          createPayload.conversation_config.turn = {
+            ...(createTurnSettings.turn_timeout !== undefined && { turn_timeout: createTurnSettings.turn_timeout }),
+            ...(createTurnSettings.silence_end_call_timeout !== undefined && { silence_end_call_timeout: createTurnSettings.silence_end_call_timeout }),
+            ...(createTurnSettings.turn_eagerness && { mode: createTurnSettings.turn_eagerness }),
+          };
+        }
+        
+        // Add conversation settings if provided
+        if (createConversationSettings) {
+          createPayload.conversation_config.conversation = {
+            ...(createConversationSettings.max_duration_seconds !== undefined && { max_duration_seconds: createConversationSettings.max_duration_seconds }),
+          };
+        }
+        
+        // Add LLM settings if provided
+        if (createLlmSettings) {
+          createPayload.conversation_config.agent.prompt.llm = {
+            ...(createLlmSettings.model && { model: createLlmSettings.model }),
+            ...(createLlmSettings.temperature !== undefined && { temperature: createLlmSettings.temperature }),
+            ...(createLlmSettings.max_tokens !== undefined && { max_tokens: createLlmSettings.max_tokens }),
+          };
+        }
+        
+        // Add platform settings if provided
+        if (createPlatformSettings) {
+          createPayload.platform_settings = createPlatformSettings;
+        }
+        
+        console.log('[elevenlabs-agent-config] Create payload:', JSON.stringify(createPayload, null, 2));
+        
+        const createResponse = await fetch(`${ELEVENLABS_BASE_URL}/convai/agents/create`, {
+          method: 'POST',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(createPayload),
+        });
+
+        if (!createResponse.ok) {
+          const errorText = await createResponse.text();
+          console.error('[elevenlabs-agent-config] ElevenLabs API error:', createResponse.status, errorText);
+          throw new Error(`ElevenLabs API error: ${createResponse.status} - ${errorText}`);
+        }
+
+        const createdAgent = await createResponse.json();
+        console.log('[elevenlabs-agent-config] Successfully created agent:', createdAgent.agent_id);
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            agent_id: createdAgent.agent_id,
+            agent: createdAgent 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       default:
         throw new Error(`Action non supportée: ${action}`);
     }
