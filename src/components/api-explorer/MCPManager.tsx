@@ -159,32 +159,15 @@ export const MCPManager = ({ defaultAgentId }: MCPManagerProps) => {
     setLoadingTools(false);
   };
 
-  const getAgentApiKey = async (agentId: string) => {
-    // First try to get API key from agent
+  const getAgentPlatformInfo = async (agentId: string) => {
+    // IMPORTANT: never fetch platform API keys client-side.
     const { data: agent } = await supabase
-      .from('agents')
-      .select('platform_api_key, platform_agent_id, platform, organization_id')
+      .from('agents_safe')
+      .select('platform_agent_id, platform, organization_id')
       .eq('id', agentId)
       .single();
 
-    if (!agent) return null;
-
-    let apiKey = agent.platform_api_key;
-
-    // If no API key on agent, check organization integrations
-    if (!apiKey && agent.organization_id) {
-      const { data: integration } = await supabase
-        .from('organization_integrations')
-        .select('api_key')
-        .eq('organization_id', agent.organization_id)
-        .eq('platform', agent.platform)
-        .eq('is_active', true)
-        .single();
-
-      apiKey = integration?.api_key || null;
-    }
-
-    return { ...agent, platform_api_key: apiKey };
+    return agent || null;
   };
 
   const fetchPlatformMCPConfig = async () => {
@@ -192,10 +175,10 @@ export const MCPManager = ({ defaultAgentId }: MCPManagerProps) => {
     
     setFetchingPlatform(true);
     try {
-      const agent = await getAgentApiKey(selectedAgentId);
+      const agent = await getAgentPlatformInfo(selectedAgentId);
 
-      if (!agent?.platform_api_key) {
-        toast.error(language === 'fr' ? 'Clé API non configurée. Configurez l\'intégration dans les paramètres.' : 'API key not configured. Configure the integration in settings.');
+      if (!agent?.platform_agent_id || !agent?.organization_id) {
+        toast.error(language === 'fr' ? 'Agent non configuré' : 'Agent not configured');
         return;
       }
 
@@ -207,24 +190,24 @@ export const MCPManager = ({ defaultAgentId }: MCPManagerProps) => {
           functionName = 'elevenlabs-convai-agent-config';
           body = {
             action: 'get',
-            apiKey: agent.platform_api_key,
             agentId: agent.platform_agent_id,
+            organizationId: agent.organization_id,
           };
           break;
         case 'vapi':
           functionName = 'vapi-proxy';
           body = {
             action: 'get_assistant',
-            apiKey: agent.platform_api_key,
             assistantId: agent.platform_agent_id,
+            organizationId: agent.organization_id,
           };
           break;
         case 'retell':
           functionName = 'retell-proxy';
           body = {
             action: 'get_agent',
-            apiKey: agent.platform_api_key,
             agentId: agent.platform_agent_id,
+            organizationId: agent.organization_id,
           };
           break;
       }

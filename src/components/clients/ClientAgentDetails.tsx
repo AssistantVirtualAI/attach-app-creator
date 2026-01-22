@@ -29,8 +29,8 @@ export const ClientAgentDetails = ({ agentId, onClose }: ClientAgentDetailsProps
     queryKey: ['agent-details', agentId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('agents')
-        .select('*')
+        .from('agents_safe')
+        .select('id, name, platform, platform_agent_id, config, organization_id')
         .eq('id', agentId)
         .single();
 
@@ -47,14 +47,13 @@ export const ClientAgentDetails = ({ agentId, onClose }: ClientAgentDetailsProps
 
       const platform = agent.platform;
       const platformAgentId = agent.platform_agent_id;
-      const apiKey = agent.platform_api_key;
 
       console.log(`[ClientAgentDetails] Fetching config for ${platform} agent: ${platformAgentId}`);
 
       switch (platform) {
         case 'elevenlabs': {
           const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
-            body: { action: 'get', agentId: platformAgentId, api_key: apiKey }
+            body: { action: 'get', agentId: platformAgentId, organizationId: agent.organization_id }
           });
           if (error) throw error;
           
@@ -80,7 +79,6 @@ export const ClientAgentDetails = ({ agentId, onClose }: ClientAgentDetailsProps
             body: { 
               action: 'getAgent', 
               retellAgentId: platformAgentId, 
-              apiKey,
               organizationId: agent.organization_id
             }
           });
@@ -99,7 +97,6 @@ export const ClientAgentDetails = ({ agentId, onClose }: ClientAgentDetailsProps
                 body: { 
                   action: 'getLlm', 
                   llmId, 
-                  apiKey,
                   organizationId: agent.organization_id
                 }
               });
@@ -127,7 +124,6 @@ export const ClientAgentDetails = ({ agentId, onClose }: ClientAgentDetailsProps
             body: { 
               action: 'getAssistant', 
               assistantId: platformAgentId, 
-              apiKey,
               organizationId: agent.organization_id
             }
           });

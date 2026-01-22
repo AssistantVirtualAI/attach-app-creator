@@ -133,41 +133,12 @@ export default function WebhookLogs() {
     return agentsData.agents.find(a => a.id === selectedAgentId);
   }, [selectedAgentId, agentsData?.agents]);
 
-  // Get API key for selected agent's platform
-  const getAgentApiKey = async (agent: typeof selectedAgent) => {
-    if (!agent || !selectedOrgId) return null;
-    
-    // Try to get from organization integrations
-    const { data: integration } = await supabase
-      .from('organization_integrations')
-      .select('api_key')
-      .eq('organization_id', selectedOrgId)
-      .eq('platform', agent.platform)
-      .eq('is_active', true)
-      .maybeSingle();
-    
-    if (integration?.api_key) return integration.api_key;
-    
-    // Check fallback
-    return agentsData?.fallbackApiKeys?.[agent.platform] || null;
-  };
-
   // Fetch platform webhook events for selected agent
   const { data: platformEvents = [], isLoading: platformEventsLoading, refetch: refetchPlatformEvents } = useQuery({
     queryKey: ['platform-webhook-events', selectedAgentId, selectedAgent?.platform],
     queryFn: async () => {
       if (!selectedAgent?.platform_agent_id) return [];
       
-      // For ElevenLabs we can resolve credentials server-side; other platforms may require a configured API key.
-      const apiKey = selectedAgent.platform === 'elevenlabs'
-        ? null
-        : await getAgentApiKey(selectedAgent);
-
-      if (selectedAgent.platform !== 'elevenlabs' && !apiKey) {
-        toast.error(t('webhookLogs.noApiKey'));
-        return [];
-      }
-
       if (selectedAgent.platform === 'elevenlabs') {
           const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
             body: {
@@ -214,14 +185,6 @@ export default function WebhookLogs() {
     queryFn: async (): Promise<DeliveryLog[]> => {
       if (!selectedAgent?.platform_agent_id) return [];
       
-      const apiKey = selectedAgent.platform === 'elevenlabs'
-        ? null
-        : await getAgentApiKey(selectedAgent);
-
-      if (selectedAgent.platform !== 'elevenlabs' && !apiKey) {
-        return [];
-      }
-
       if (selectedAgent.platform === 'elevenlabs') {
         const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
           body: {

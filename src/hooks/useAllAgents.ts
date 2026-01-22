@@ -38,26 +38,8 @@ export const useAllAgents = () => {
 
       if (error) throw error;
 
-      // Get organization integrations for fallback API keys (all platforms)
-      const { data: integrations } = await supabase
-        .from('organization_integrations')
-        .select('api_key, agent_id, platform')
-        .eq('is_active', true)
-        .or(`organization_id.eq.${orgMember.organization_id},user_id.eq.${user.id}`);
-
-      // Build a map of platform -> fallback API key
-      const fallbackApiKeys: Record<string, string> = {};
-      if (integrations) {
-        for (const integration of integrations) {
-          if (integration.api_key && integration.platform) {
-            fallbackApiKeys[integration.platform] = integration.api_key;
-          }
-        }
-      }
-
       return {
         agents: (agents || []) as AgentWithPlatform[],
-        fallbackApiKeys,
       };
     },
   });

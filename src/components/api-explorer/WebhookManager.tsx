@@ -141,32 +141,15 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
     }));
   };
 
-  const getAgentApiKey = async (agentId: string) => {
-    // First try to get API key from agent
+  const getAgentPlatformInfo = async (agentId: string) => {
+    // IMPORTANT: never fetch platform API keys client-side.
     const { data: agent } = await supabase
-      .from('agents')
-      .select('platform_api_key, platform_agent_id, platform, organization_id')
+      .from('agents_safe')
+      .select('platform, platform_agent_id, organization_id')
       .eq('id', agentId)
       .single();
 
-    if (!agent) return null;
-
-    let apiKey = agent.platform_api_key;
-
-    // If no API key on agent, check organization integrations
-    if (!apiKey && agent.organization_id) {
-      const { data: integration } = await supabase
-        .from('organization_integrations')
-        .select('api_key')
-        .eq('organization_id', agent.organization_id)
-        .eq('platform', agent.platform)
-        .eq('is_active', true)
-        .single();
-
-      apiKey = integration?.api_key || null;
-    }
-
-    return { ...agent, platform_api_key: apiKey };
+    return agent || null;
   };
 
   const fetchPlatformWebhooks = async () => {
@@ -174,10 +157,9 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
     
     setFetchingPlatformWebhooks(true);
     try {
-      const agent = await getAgentApiKey(selectedAgentId);
-
-      if (!agent?.platform_api_key) {
-        toast.error(language === 'fr' ? 'Clé API non configurée. Configurez l\'intégration dans les paramètres.' : 'API key not configured. Configure the integration in settings.');
+      const agent = await getAgentPlatformInfo(selectedAgentId);
+      if (!agent?.platform_agent_id || !agent?.organization_id) {
+        toast.error(language === 'fr' ? 'Agent non configuré' : 'Agent not configured');
         return;
       }
 
@@ -190,23 +172,24 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
           functionName = 'elevenlabs-convai-agent-config';
           body = {
             action: 'list_workspace_webhooks',
-            apiKey: agent.platform_api_key,
+            agentId: agent.platform_agent_id,
+            organizationId: agent.organization_id,
           };
           break;
         case 'vapi':
           functionName = 'vapi-proxy';
           body = {
             action: 'get_assistant',
-            apiKey: agent.platform_api_key,
             assistantId: agent.platform_agent_id,
+            organizationId: agent.organization_id,
           };
           break;
         case 'retell':
           functionName = 'retell-proxy';
           body = {
             action: 'get_agent',
-            apiKey: agent.platform_api_key,
             agentId: agent.platform_agent_id,
+            organizationId: agent.organization_id,
           };
           break;
       }
@@ -249,10 +232,9 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
     
     setSyncingWebhook(true);
     try {
-      const agent = await getAgentApiKey(selectedAgentId);
-
-      if (!agent?.platform_api_key) {
-        toast.error(language === 'fr' ? 'Clé API non configurée. Configurez l\'intégration dans les paramètres.' : 'API key not configured. Configure the integration in settings.');
+      const agent = await getAgentPlatformInfo(selectedAgentId);
+      if (!agent?.platform_agent_id || !agent?.organization_id) {
+        toast.error(language === 'fr' ? 'Agent non configuré' : 'Agent not configured');
         return;
       }
 
@@ -264,8 +246,8 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
           functionName = 'elevenlabs-convai-agent-config';
           body = {
             action: 'update',
-            apiKey: agent.platform_api_key,
             agentId: agent.platform_agent_id,
+            organizationId: agent.organization_id,
             config: {
               platform_settings: {
                 webhook: {
@@ -281,8 +263,8 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
           functionName = 'vapi-proxy';
           body = {
             action: 'update_assistant',
-            apiKey: agent.platform_api_key,
             assistantId: agent.platform_agent_id,
+            organizationId: agent.organization_id,
             data: {
               serverUrl: webhook.webhook_url,
               serverUrlSecret: webhook.webhook_secret,
@@ -293,8 +275,8 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
           functionName = 'retell-proxy';
           body = {
             action: 'update_agent',
-            apiKey: agent.platform_api_key,
             agentId: agent.platform_agent_id,
+            organizationId: agent.organization_id,
             data: {
               webhook_url: webhook.webhook_url,
             },
@@ -352,16 +334,16 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
     if (!editingPlatformWebhook || !selectedAgent) return;
     setUpdatingPlatformWebhook(true);
     try {
-      const agent = await getAgentApiKey(selectedAgentId);
-      if (!agent?.platform_api_key) {
-        toast.error(language === 'fr' ? 'Clé API non configurée' : 'API key not configured');
+      const agent = await getAgentPlatformInfo(selectedAgentId);
+      if (!agent?.organization_id) {
+        toast.error(language === 'fr' ? 'Agent non configuré' : 'Agent not configured');
         return;
       }
 
       const { error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
         body: {
           action: 'update_workspace_webhook',
-          apiKey: agent.platform_api_key,
+          organizationId: agent.organization_id,
           webhookId: editingPlatformWebhook.webhook_id,
           webhookName: platformEditForm.name,
           isDisabled: platformEditForm.is_disabled,
@@ -387,16 +369,16 @@ export const WebhookManager = ({ defaultAgentId }: WebhookManagerProps) => {
     if (!selectedAgent) return;
     setDeletingPlatformWebhook(webhookId);
     try {
-      const agent = await getAgentApiKey(selectedAgentId);
-      if (!agent?.platform_api_key) {
-        toast.error(language === 'fr' ? 'Clé API non configurée' : 'API key not configured');
+      const agent = await getAgentPlatformInfo(selectedAgentId);
+      if (!agent?.organization_id) {
+        toast.error(language === 'fr' ? 'Agent non configuré' : 'Agent not configured');
         return;
       }
 
       const { error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
         body: {
           action: 'delete_workspace_webhook',
-          apiKey: agent.platform_api_key,
+          organizationId: agent.organization_id,
           webhookId,
         },
       });
