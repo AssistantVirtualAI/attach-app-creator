@@ -3,10 +3,12 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, Mic, Globe, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useBilingualTranslation } from "@/hooks/useBilingualTranslation";
 
 export const HeroSection = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { bt } = useBilingualTranslation();
 
   const features = [
     { icon: Mic, label: t('hero.feature1') },
@@ -100,6 +102,9 @@ export const HeroSection = () => {
           >
             {t('hero.subtitle')}
           </motion.p>
+          <p className="text-sm text-muted-foreground max-w-3xl mx-auto -mt-8 mb-10">
+            {bt('hero.subtitle').secondary}
+          </p>
 
           {/* CTA Buttons */}
           <motion.div
@@ -127,6 +132,16 @@ export const HeroSection = () => {
               >
                 <Play className="mr-2 w-5 h-5" />
                 {t('hero.cta2')}
+              </Button>
+            </motion.div>
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                size="lg"
+                variant="ghost"
+                className="h-14 px-6 text-lg"
+                onClick={() => navigate('/features')}
+              >
+                Full list / Liste complète
               </Button>
             </motion.div>
           </motion.div>

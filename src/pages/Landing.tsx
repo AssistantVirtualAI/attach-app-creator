@@ -13,6 +13,7 @@ import { FooterSection } from "@/components/landing/FooterSection";
 import { AgentCreationSection } from "@/components/landing/AgentCreationSection";
 import { IntegrationsSection } from "@/components/landing/IntegrationsSection";
 import { ProductShowcaseSection } from "@/components/landing/ProductShowcaseSection";
+import { AllFeaturesSummarySection } from "@/components/landing/AllFeaturesSummarySection";
 
 const Landing = () => {
   return (
@@ -33,6 +34,9 @@ const Landing = () => {
         </div>
         <div id="features">
           <FeaturesSection />
+        </div>
+        <div id="feature-list">
+          <AllFeaturesSummarySection />
         </div>
         <div id="portals">
           <PortalComparisonSection />
