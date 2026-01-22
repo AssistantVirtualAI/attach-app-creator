@@ -33,7 +33,7 @@ export const Navbar = () => {
 
   // Keep the header clean: show core links + a “More” menu for the rest.
   const primaryLinks = navLinks.filter((l) =>
-    ['#how-it-works', '#agent-creation', '#features', '#portals', '#pricing'].includes(l.href)
+    ['#how-it-works', '#features', '#pricing'].includes(l.href)
   );
   const moreLinks = navLinks.filter((l) => !primaryLinks.some((p) => p.href === l.href));
 
