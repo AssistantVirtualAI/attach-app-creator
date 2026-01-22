@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Outlet, useParams, Link, useLocation } from 'react-router-dom';
 import { ClientProvider, useClient } from '@/context/ClientContext';
 import { useClientAgentAccess } from '@/hooks/useClientAgentAccess';
@@ -43,43 +43,69 @@ const ClientAgentPortalContent = () => {
   const location = useLocation();
   const { t } = useTranslation();
   const { language, setLanguage } = useLanguage();
+  const [adminLoginAttempted, setAdminLoginAttempted] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
   
   const { hasAccess, role, agentName, platform, isLoading: accessLoading } = useClientAgentAccess(clientId, agentId);
 
   useEffect(() => {
     const tryAdminAutoLogin = async () => {
-      if (authLoading || isAuthenticated) return;
+      // Already authenticated as client, no need to try admin login
+      if (isAuthenticated) {
+        setCheckingAdmin(false);
+        return;
+      }
+
+      // Still loading client auth, wait
+      if (authLoading) return;
+
+      // No clientId in URL, redirect to login
       if (!clientId) {
+        setCheckingAdmin(false);
         navigate('/client/login');
         return;
       }
 
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) {
-        navigate('/client/login');
+      // Already attempted admin login, don't retry
+      if (adminLoginAttempted) {
+        setCheckingAdmin(false);
         return;
       }
+
+      setAdminLoginAttempted(true);
 
       try {
-        const adminSession = await loginAsAdmin(clientId);
-        if (adminSession) return;
-      } catch {
-        // ignore
+        // Check if there's an active Supabase admin session
+        const { data } = await supabase.auth.getSession();
+        
+        if (data.session?.user) {
+          // Try admin login
+          const adminSession = await loginAsAdmin(clientId);
+          if (adminSession) {
+            setCheckingAdmin(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.log('Admin auto-login failed:', err);
       }
 
+      // No admin session or admin login failed, redirect to client login
+      setCheckingAdmin(false);
       navigate('/client/login');
     };
 
     tryAdminAutoLogin();
-  }, [authLoading, isAuthenticated, clientId, loginAsAdmin, navigate]);
+  }, [authLoading, isAuthenticated, clientId, loginAsAdmin, navigate, adminLoginAttempted]);
 
   useEffect(() => {
-    if (!accessLoading && !hasAccess && clientId && agentId) {
+    if (!accessLoading && !hasAccess && clientId && agentId && !checkingAdmin && isAuthenticated) {
       navigate(`/client/${clientId}/conversations`);
     }
-  }, [hasAccess, accessLoading, clientId, agentId, navigate]);
+  }, [hasAccess, accessLoading, clientId, agentId, navigate, checkingAdmin, isAuthenticated]);
 
-  if (authLoading || accessLoading) {
+  // Show loading while checking admin or client auth
+  if (authLoading || accessLoading || checkingAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <motion.div
