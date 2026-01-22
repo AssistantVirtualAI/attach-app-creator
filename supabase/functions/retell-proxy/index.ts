@@ -69,9 +69,92 @@ serve(async (req) => {
         if (!params.retellAgentId && !agentId) throw new Error('retellAgentId is required');
         result = await retellRequest(retellApiKey, 'GET', `/get-agent/${params.retellAgentId || agentId}`);
         break;
-      case 'createAgent':
-        result = await retellRequest(retellApiKey, 'POST', '/create-agent', undefined, params.config);
+      
+      // Enhanced createAgent with LLM creation
+      case 'createAgent': {
+        let llmId = params.llmId;
+        
+        // Create LLM first if we have a system prompt
+        if (!llmId && params.systemPrompt) {
+          console.log('[Retell] Creating LLM for agent...');
+          const llmConfig: any = {
+            model: params.llmModel || 'gpt-4o-mini',
+            general_prompt: params.systemPrompt,
+          };
+          
+          if (params.firstMessage) {
+            llmConfig.begin_message = params.firstMessage;
+          }
+          
+          if (params.temperature !== undefined) {
+            llmConfig.model_temperature = params.temperature;
+          }
+          
+          // Add general tools placeholder
+          llmConfig.general_tools = [];
+          
+          const llmResult = await retellRequest(retellApiKey, 'POST', '/create-retell-llm', undefined, llmConfig);
+          llmId = llmResult.llm_id;
+          console.log(`[Retell] Created LLM with ID: ${llmId}`);
+        }
+        
+        // Now create the agent
+        const agentConfig: any = {
+          agent_name: params.name,
+          voice_id: params.voiceId,
+        };
+        
+        // Set response engine
+        if (llmId) {
+          agentConfig.response_engine = {
+            type: 'retell-llm',
+            llm_id: llmId,
+          };
+        }
+        
+        // Voice settings
+        if (params.speed !== undefined) {
+          agentConfig.voice_speed = params.speed;
+        }
+        if (params.voiceTemperature !== undefined) {
+          agentConfig.voice_temperature = params.voiceTemperature;
+        }
+        
+        // Language
+        if (params.language) {
+          agentConfig.language = params.language;
+        }
+        
+        // Timing settings
+        if (params.silenceTimeout !== undefined) {
+          agentConfig.end_call_after_silence_ms = params.silenceTimeout * 1000;
+        }
+        
+        // Ambient sound
+        if (params.ambientSound) {
+          agentConfig.ambient_sound = params.ambientSound;
+        }
+        
+        // Pronunciation dictionary
+        if (params.pronunciationDictionary) {
+          agentConfig.pronunciation_dictionary = params.pronunciationDictionary;
+        }
+        
+        // Merge with config if provided
+        if (params.config) {
+          Object.assign(agentConfig, params.config);
+        }
+        
+        console.log('[Retell] Creating agent with config:', JSON.stringify(agentConfig, null, 2));
+        result = await retellRequest(retellApiKey, 'POST', '/create-agent', undefined, agentConfig);
+        
+        // Add LLM ID to result for reference
+        if (llmId) {
+          result.llm_id = llmId;
+        }
         break;
+      }
+      
       case 'updateAgent':
         if (!params.retellAgentId && !agentId) throw new Error('retellAgentId is required');
         result = await retellRequest(retellApiKey, 'PATCH', `/update-agent/${params.retellAgentId || agentId}`, undefined, params.config);
@@ -91,7 +174,6 @@ serve(async (req) => {
 
         console.log(`[Retell] listCalls - Filters:`, callFilters);
 
-        // NOTE: Retell's calls endpoints are versioned under /v2
         const raw = await retellRequest(
           retellApiKey,
           'POST',
@@ -100,7 +182,6 @@ serve(async (req) => {
           Object.keys(callFilters).length > 0 ? { filter_criteria: callFilters } : {}
         );
 
-        // Retell responses can vary: sometimes array, sometimes an object containing the array.
         const callsArray = Array.isArray(raw)
           ? raw
           : Array.isArray(raw?.calls)
@@ -115,7 +196,6 @@ serve(async (req) => {
       }
       case 'getCall':
         if (!params.callId) throw new Error('callId is required');
-        // NOTE: Retell's call detail endpoint is versioned under /v2
         result = await retellRequest(retellApiKey, 'GET', `/v2/get-call/${params.callId}`);
         break;
       case 'createCall':
@@ -244,7 +324,6 @@ serve(async (req) => {
               ? (callsResult as any).call_details
               : [];
 
-        // Filter by date client-side
         const filteredCalls = callsArray.filter((call: any) => {
           const callDate = new Date(call.start_timestamp || call.created_at);
           return callDate >= startDate;
@@ -313,7 +392,6 @@ async function retellRequest(
     throw new Error(`Retell API error (${response.status}): ${errorText}`);
   }
 
-  // Handle empty responses
   const text = await response.text();
   if (!text) return { success: true };
   
@@ -340,10 +418,8 @@ function getStartDate(timeframe: string): Date {
       now.setDate(now.getDate() - 90);
       break;
     case 'all':
-      // Return a very old date to include all calls
       return new Date(0);
     default:
-      // Default to all time if unrecognized
       return new Date(0);
   }
   return now;
@@ -357,22 +433,18 @@ function computeAnalytics(calls: any[]) {
   const callsByDay: Record<string, number> = {};
 
   for (const call of calls) {
-    // Count by status
     const status = call.call_status || call.status || 'unknown';
     callsByStatus[status] = (callsByStatus[status] || 0) + 1;
 
-    // Sum duration (in milliseconds, convert to seconds)
     if (call.end_timestamp && call.start_timestamp) {
       const duration = (call.end_timestamp - call.start_timestamp) / 1000;
       totalDuration += duration;
     }
 
-    // Count completed
     if (status === 'ended' || status === 'completed') {
       completedCalls++;
     }
 
-    // Group by day
     const timestamp = call.start_timestamp || call.created_at;
     if (timestamp) {
       const day = new Date(timestamp).toISOString().split('T')[0];
