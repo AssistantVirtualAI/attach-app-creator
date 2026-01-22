@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useClient } from '@/context/ClientContext';
 import { useClientAssignedAgents } from '@/hooks/useClientAgentAccess';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,6 +39,8 @@ export const ClientLayout = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { language, setLanguage } = useLanguage();
+  const [adminLoginAttempted, setAdminLoginAttempted] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
 
   const { clientId } = useParams();
 
@@ -46,26 +48,56 @@ export const ClientLayout = () => {
 
   useEffect(() => {
     const tryAdminAutoLogin = async () => {
-      if (authLoading || isAuthenticated) return;
-      if (!clientId) return;
-
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) return;
-
-      try {
-        const adminSession = await loginAsAdmin(clientId);
-        if (adminSession) return;
-      } catch {
-        // fallthrough to regular login
+      // Already authenticated as client, no need to try admin login
+      if (isAuthenticated) {
+        setCheckingAdmin(false);
+        return;
       }
 
+      // Still loading client auth, wait
+      if (authLoading) return;
+
+      // No clientId in URL, redirect to login
+      if (!clientId) {
+        setCheckingAdmin(false);
+        navigate('/client/login');
+        return;
+      }
+
+      // Already attempted admin login, don't retry
+      if (adminLoginAttempted) {
+        setCheckingAdmin(false);
+        return;
+      }
+
+      setAdminLoginAttempted(true);
+
+      try {
+        // Check if there's an active Supabase admin session
+        const { data } = await supabase.auth.getSession();
+        
+        if (data.session?.user) {
+          // Try admin login
+          const adminSession = await loginAsAdmin(clientId);
+          if (adminSession) {
+            setCheckingAdmin(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.log('Admin auto-login failed:', err);
+      }
+
+      // No admin session or admin login failed, redirect to client login
+      setCheckingAdmin(false);
       navigate('/client/login');
     };
 
     tryAdminAutoLogin();
-  }, [authLoading, isAuthenticated, clientId, loginAsAdmin, navigate]);
+  }, [authLoading, isAuthenticated, clientId, loginAsAdmin, navigate, adminLoginAttempted]);
 
-  if (authLoading) {
+  // Show loading while checking admin or client auth
+  if (authLoading || checkingAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <motion.div
