@@ -48,7 +48,6 @@ const KnowledgeBase = () => {
   // Get ALL agents (all platforms)
   const { data: agentsData, isLoading: isLoadingAgents } = useAllAgents();
   const agents = agentsData?.agents || [];
-  const fallbackApiKeys = agentsData?.fallbackApiKeys || {};
 
   // Get the selected agent
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
@@ -56,11 +55,9 @@ const KnowledgeBase = () => {
   const isElevenLabs = selectedPlatform === 'elevenlabs';
   const isRetell = selectedPlatform === 'retell';
 
-  // Get API key for the selected agent (ElevenLabs needs it in the frontend calls)
-  const apiKey = selectedAgent?.platform_api_key ||
-    (selectedAgent?.config as any)?.api_key ||
-    fallbackApiKeys[selectedPlatform] ||
-    null;
+  // IMPORTANT: API keys must never be handled client-side.
+  // Platform credentials are resolved server-side inside backend functions.
+  const apiKey = null;
   const platformAgentId = selectedAgent?.platform_agent_id || undefined;
   const organizationId = selectedAgent?.organization_id || undefined;
 
@@ -72,7 +69,7 @@ const KnowledgeBase = () => {
     refetch: refetchElevenKb,
   } = useElevenLabsKnowledgeBase(
     isElevenLabs ? selectedAgentId : null,
-    isElevenLabs ? apiKey : null
+    null
   );
 
   const {
@@ -166,7 +163,7 @@ const KnowledgeBase = () => {
 
     await deleteMutation.mutateAsync({
       agentId: selectedAgentId,
-      apiKey: apiKey || undefined,
+      apiKey: undefined,
       documentId: item.id,
     });
   };
@@ -368,7 +365,7 @@ const KnowledgeBase = () => {
         </Card>
 
         {/* Actions Bar */}
-        {selectedAgentId && ((isElevenLabs && !!apiKey) || isRetell) && (
+        {selectedAgentId && (isElevenLabs || isRetell) && (
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -428,17 +425,7 @@ const KnowledgeBase = () => {
           </Card>
         )}
 
-        {/* No API Key State - only for ElevenLabs */}
-        {selectedAgentId && isElevenLabs && !apiKey && (
-          <Card className="p-12 text-center border-border">
-            <AlertCircle className="w-16 h-16 mx-auto mb-4 text-warning" />
-            <h3 className="text-lg font-semibold mb-2">API Key manquante</h3>
-            <p className="text-muted-foreground mb-4">
-              Cet agent n'a pas d'API Key {getPlatformDisplayName(selectedPlatform)} configurée.
-              Veuillez ajouter une API Key dans les paramètres de l'agent ou les intégrations.
-            </p>
-          </Card>
-        )}
+        {/* API keys are resolved server-side; missing credentials will surface as backend errors. */}
 
         {/* Loading State */}
         {isLoadingKB && selectedAgentId && (isElevenLabs ? !!apiKey : isRetell) && (
@@ -734,7 +721,7 @@ const KnowledgeBase = () => {
             open={isAddDialogOpen}
             onOpenChange={setIsAddDialogOpen}
             agentId={selectedAgentId}
-            apiKey={apiKey || undefined}
+              apiKey={undefined}
           />
         ) : (
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
