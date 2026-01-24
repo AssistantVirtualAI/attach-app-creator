@@ -1073,6 +1073,25 @@ serve(async (req) => {
           llmSettings: createLlmSettings,
           platformSettings: createPlatformSettings
         } = await req.json().catch(() => ({}));
+
+        // ElevenLabs ConvAI validation: English agents must use turbo/flash v2.
+        // We defensively normalize model_id to avoid 400s when a caller passes
+        // a newer/unsupported model id (e.g. eleven_turbo_v2_5).
+        const normalizedLanguage = (language || 'en').toLowerCase();
+        const requestedTtsModelId = createTtsSettings?.model_id;
+        const normalizeTtsModelId = (lang: string, modelId?: string) => {
+          if (!modelId) return undefined;
+          const isEnglish = lang === 'en' || lang.startsWith('en-');
+          if (!isEnglish) return modelId;
+
+          const allowed = new Set(['eleven_turbo_v2', 'eleven_flash_v2']);
+          return allowed.has(modelId) ? modelId : 'eleven_turbo_v2';
+        };
+        const safeTtsModelId =
+          normalizeTtsModelId(normalizedLanguage, requestedTtsModelId) ||
+          (normalizedLanguage === 'en' || normalizedLanguage.startsWith('en-')
+            ? 'eleven_turbo_v2'
+            : 'eleven_turbo_v2_5');
         
         // Build the agent creation payload
         const createPayload: any = {
@@ -1086,7 +1105,7 @@ serve(async (req) => {
             },
             tts: {
               voice_id: voiceId || 'EXAVITQu4vr4xnSDxMaL', // Default to Sarah
-              model_id: createTtsSettings?.model_id || 'eleven_turbo_v2_5',
+              model_id: safeTtsModelId,
               stability: createTtsSettings?.stability ?? 0.5,
               similarity_boost: createTtsSettings?.similarity_boost ?? 0.75,
               ...(createTtsSettings?.style !== undefined && { style: createTtsSettings.style }),
