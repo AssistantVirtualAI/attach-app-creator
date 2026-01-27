@@ -67,6 +67,38 @@ const ClientAgentConversations = () => {
   const [durationRange, setDurationRange] = useState<[number, number]>([0, 600]);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [datePreset, setDatePreset] = useState<string | null>(null);
+
+  // Date preset helper
+  const applyDatePreset = (preset: string) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    let fromDate: Date;
+
+    switch (preset) {
+      case '7d':
+        fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '60d':
+        fromDate = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        return;
+    }
+
+    setDateFrom(fromDate);
+    setDateTo(today);
+    setDatePreset(preset);
+  };
+
+  const clearDatePreset = () => {
+    setDatePreset(null);
+    setDateFrom(undefined);
+    setDateTo(undefined);
+  };
 
   const { data: conversationsData, isLoading } = useClientElevenLabsConversations({
     apiKey,
@@ -176,13 +208,13 @@ const ClientAgentConversations = () => {
     setDurationRange([0, 600]);
     setDateFrom(undefined);
     setDateTo(undefined);
+    setDatePreset(null);
   };
 
   const activeFiltersCount = [
     searchQuery,
     durationRange[0] > 0 || durationRange[1] < 600,
-    dateFrom,
-    dateTo
+    dateFrom || dateTo || datePreset
   ].filter(Boolean).length;
 
   const formatDuration = (seconds: number) => {
@@ -234,6 +266,31 @@ const ClientAgentConversations = () => {
               />
             </div>
 
+            {/* Date Presets */}
+            <div className="flex items-center gap-1">
+              <Button 
+                variant={datePreset === '7d' ? 'default' : 'outline'} 
+                size="sm"
+                onClick={() => datePreset === '7d' ? clearDatePreset() : applyDatePreset('7d')}
+              >
+                7 jours
+              </Button>
+              <Button 
+                variant={datePreset === '30d' ? 'default' : 'outline'} 
+                size="sm"
+                onClick={() => datePreset === '30d' ? clearDatePreset() : applyDatePreset('30d')}
+              >
+                30 jours
+              </Button>
+              <Button 
+                variant={datePreset === '60d' ? 'default' : 'outline'} 
+                size="sm"
+                onClick={() => datePreset === '60d' ? clearDatePreset() : applyDatePreset('60d')}
+              >
+                60 jours
+              </Button>
+            </div>
+
             {/* Duration Filter */}
             <Popover>
               <PopoverTrigger asChild>
@@ -247,7 +304,7 @@ const ClientAgentConversations = () => {
                   )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80">
+              <PopoverContent className="w-80 bg-background border">
                 <div className="space-y-4">
                   <h4 className="font-medium">Filtrer par durée</h4>
                   <div className="space-y-2">
@@ -267,49 +324,50 @@ const ClientAgentConversations = () => {
               </PopoverContent>
             </Popover>
 
-            {/* Date From */}
+            {/* Custom Date Range */}
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="gap-2">
-                  Du
-                  {dateFrom && (
+                  Dates personnalisées
+                  {(dateFrom || dateTo) && !datePreset && (
                     <Badge variant="secondary" className="text-xs">
-                      {format(dateFrom, 'dd/MM/yy', { locale: fr })}
+                      {dateFrom ? format(dateFrom, 'dd/MM', { locale: fr }) : '...'} - {dateTo ? format(dateTo, 'dd/MM', { locale: fr }) : '...'}
                     </Badge>
                   )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={dateFrom}
-                  onSelect={setDateFrom}
-                  locale={fr}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-
-            {/* Date To */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  Au
-                  {dateTo && (
-                    <Badge variant="secondary" className="text-xs">
-                      {format(dateTo, 'dd/MM/yy', { locale: fr })}
-                    </Badge>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={dateTo}
-                  onSelect={setDateTo}
-                  locale={fr}
-                  initialFocus
-                />
+              <PopoverContent className="w-auto p-4 bg-background border" align="start">
+                <div className="space-y-4">
+                  <h4 className="font-medium text-sm">Plage de dates</h4>
+                  <div className="flex gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Du</label>
+                      <Calendar
+                        mode="single"
+                        selected={dateFrom}
+                        onSelect={(date) => {
+                          setDateFrom(date);
+                          setDatePreset(null);
+                        }}
+                        locale={fr}
+                        className="pointer-events-auto"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs text-muted-foreground">Au</label>
+                      <Calendar
+                        mode="single"
+                        selected={dateTo}
+                        onSelect={(date) => {
+                          setDateTo(date);
+                          setDatePreset(null);
+                        }}
+                        locale={fr}
+                        className="pointer-events-auto"
+                      />
+                    </div>
+                  </div>
+                </div>
               </PopoverContent>
             </Popover>
 
