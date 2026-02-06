@@ -48,6 +48,7 @@ export const usePortalAuth = () => {
   // undefined = still checking, null = not logged in, user = logged in
   const [supabaseUser, setSupabaseUser] = useState<any | undefined>(undefined);
   const [isSuperAdminUser, setIsSuperAdminUser] = useState(false);
+  const [isSuperAdminChecked, setIsSuperAdminChecked] = useState(false);
 
   // Check Supabase auth on mount
   useEffect(() => {
@@ -62,6 +63,7 @@ export const usePortalAuth = () => {
       } else {
         setIsSuperAdminUser(false);
       }
+      setIsSuperAdminChecked(true);
     };
     checkAuth();
 
@@ -72,13 +74,16 @@ export const usePortalAuth = () => {
 
       if (!user?.id) {
         setIsSuperAdminUser(false);
+        setIsSuperAdminChecked(true);
         return;
       }
 
       // Defer any Supabase calls
+      setIsSuperAdminChecked(false);
       setTimeout(async () => {
         const superAdmin = await checkIsSuperAdmin(user.id);
         setIsSuperAdminUser(superAdmin);
+        setIsSuperAdminChecked(true);
       }, 0);
     });
 
@@ -297,6 +302,7 @@ export const usePortalAuth = () => {
     loginAsOrgAdmin,
     logout,
     isSuperAdmin,
+    isSuperAdminChecked,
     supabaseUser,
     hasEditAccess: () => session?.role === 'admin' || session?.role === 'super_admin',
     canEditKnowledge: () => session?.canEditKnowledge === true,
@@ -314,6 +320,7 @@ interface PortalContextType {
   loginAsOrgAdmin: (agentSlug: string) => Promise<PortalSession | null>;
   logout: () => void;
   isSuperAdmin: () => boolean;
+  isSuperAdminChecked: boolean;
   supabaseUser: any;
   hasEditAccess: () => boolean;
   canEditKnowledge: () => boolean;
