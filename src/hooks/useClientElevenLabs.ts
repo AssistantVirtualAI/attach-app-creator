@@ -5,19 +5,21 @@ import { toast } from 'sonner';
 interface UseClientElevenLabsParams {
   apiKey: string | null;
   agentId: string | null;
+  organizationId?: string | null;
   enabled?: boolean;
 }
 
 // Hook for fetching conversations via ElevenLabs API
-export const useClientElevenLabsConversations = ({ apiKey, agentId, enabled = true }: UseClientElevenLabsParams, page = 1, limit = 50) => {
+export const useClientElevenLabsConversations = ({ apiKey, agentId, organizationId, enabled = true }: UseClientElevenLabsParams, page = 1, limit = 50) => {
   return useQuery({
     queryKey: ['client-elevenlabs-conversations', agentId, page, limit],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-conversations', {
         body: { 
           action: 'list',
-          apiKey,
+          apiKey: apiKey || undefined,
           agentId,
+          organizationId: organizationId || undefined,
           page,
           limit
         }
@@ -26,20 +28,21 @@ export const useClientElevenLabsConversations = ({ apiKey, agentId, enabled = tr
       if (error) throw error;
       return data;
     },
-    enabled: enabled && !!apiKey && !!agentId,
+    enabled: enabled && (!!apiKey || !!organizationId) && !!agentId,
   });
 };
 
 // Hook for fetching conversation details
-export const useClientElevenLabsConversationDetails = ({ apiKey, agentId, enabled = true }: UseClientElevenLabsParams, conversationId: string | undefined) => {
+export const useClientElevenLabsConversationDetails = ({ apiKey, agentId, organizationId, enabled = true }: UseClientElevenLabsParams, conversationId: string | undefined) => {
   return useQuery({
     queryKey: ['client-elevenlabs-conversation-details', conversationId],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-conversations', {
         body: { 
           action: 'details',
-          apiKey,
+          apiKey: apiKey || undefined,
           agentId,
+          organizationId: organizationId || undefined,
           conversationId
         }
       });
@@ -47,19 +50,20 @@ export const useClientElevenLabsConversationDetails = ({ apiKey, agentId, enable
       if (error) throw error;
       return data;
     },
-    enabled: enabled && !!apiKey && !!agentId && !!conversationId,
+    enabled: enabled && (!!apiKey || !!organizationId) && !!agentId && !!conversationId,
   });
 };
 
 // Hook for fetching analytics
-export const useClientElevenLabsAnalytics = ({ apiKey, agentId, enabled = true }: UseClientElevenLabsParams, timeframe = '7d') => {
+export const useClientElevenLabsAnalytics = ({ apiKey, agentId, organizationId, enabled = true }: UseClientElevenLabsParams, timeframe = '7d') => {
   return useQuery({
     queryKey: ['client-elevenlabs-analytics', agentId, timeframe],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-analytics', {
         body: { 
-          apiKey,
+          apiKey: apiKey || undefined,
           agentId,
+          organizationId: organizationId || undefined,
           timeframe,
           includeRealtime: true,
           includeCharts: true
@@ -69,12 +73,12 @@ export const useClientElevenLabsAnalytics = ({ apiKey, agentId, enabled = true }
       if (error) throw error;
       return data;
     },
-    enabled: enabled && !!apiKey && !!agentId,
+    enabled: enabled && (!!apiKey || !!organizationId) && !!agentId,
   });
 };
 
 // Hook for fetching knowledge base
-export const useClientElevenLabsKnowledgeBase = ({ apiKey, agentId, enabled = true }: UseClientElevenLabsParams) => {
+export const useClientElevenLabsKnowledgeBase = ({ apiKey, agentId, organizationId, enabled = true }: UseClientElevenLabsParams) => {
   return useQuery({
     queryKey: ['client-elevenlabs-knowledge-base', agentId],
     queryFn: async () => {
@@ -82,8 +86,9 @@ export const useClientElevenLabsKnowledgeBase = ({ apiKey, agentId, enabled = tr
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
         body: { 
           action: 'list',
-          apiKey,
+          apiKey: apiKey || undefined,
           agentId,
+          organizationId: organizationId || undefined,
           pageSize: 100
         }
       });
@@ -95,13 +100,13 @@ export const useClientElevenLabsKnowledgeBase = ({ apiKey, agentId, enabled = tr
       console.log('[Client KB] Response:', data);
       return data;
     },
-    enabled: enabled && !!apiKey && !!agentId,
+    enabled: enabled && (!!apiKey || !!organizationId) && !!agentId,
   });
 };
 
 // Hook for fetching a single document's full content
 export const useClientElevenLabsKnowledgeBaseDocument = (
-  { apiKey, agentId, enabled = true }: UseClientElevenLabsParams, 
+  { apiKey, agentId, organizationId, enabled = true }: UseClientElevenLabsParams, 
   documentId: string | null
 ) => {
   return useQuery({
@@ -111,8 +116,9 @@ export const useClientElevenLabsKnowledgeBaseDocument = (
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
         body: { 
           action: 'get_document',
-          apiKey,
+          apiKey: apiKey || undefined,
           agentId,
+          organizationId: organizationId || undefined,
           documentId
         }
       });
@@ -123,7 +129,7 @@ export const useClientElevenLabsKnowledgeBaseDocument = (
       }
       return data;
     },
-    enabled: enabled && !!apiKey && !!agentId && !!documentId,
+    enabled: enabled && (!!apiKey || !!organizationId) && !!agentId && !!documentId,
   });
 };
 
@@ -243,22 +249,23 @@ export const useClientUpdateKnowledgeBase = () => {
 };
 
 // Hook for fetching agent config (prompt, voice settings)
-export const useClientElevenLabsAgentConfig = ({ apiKey, agentId, enabled = true }: UseClientElevenLabsParams) => {
+export const useClientElevenLabsAgentConfig = ({ apiKey, agentId, organizationId, enabled = true }: UseClientElevenLabsParams) => {
   return useQuery({
     queryKey: ['client-elevenlabs-agent-config', agentId],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
         body: { 
           action: 'get',
-          apiKey,
-          agentId
+          apiKey: apiKey || undefined,
+          agentId,
+          organizationId: organizationId || undefined,
         }
       });
 
       if (error) throw error;
       return data;
     },
-    enabled: enabled && !!apiKey && !!agentId,
+    enabled: enabled && (!!apiKey || !!organizationId) && !!agentId,
   });
 };
 
@@ -339,17 +346,19 @@ export const useClientUpdateAgentVoice = () => {
 // Hook for generating conversation audio
 export const useClientElevenLabsAudio = () => {
   return useMutation({
-    mutationFn: async ({ apiKey, agentId, conversationId, format = 'mp3' }: { 
-      apiKey: string; 
+    mutationFn: async ({ apiKey, agentId, organizationId, conversationId, format = 'mp3' }: { 
+      apiKey?: string | null; 
       agentId: string; 
+      organizationId?: string | null;
       conversationId: string; 
       format?: string;
     }) => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-conversations', {
         body: { 
           action: 'audio',
-          apiKey,
+          apiKey: apiKey || undefined,
           agentId,
+          organizationId: organizationId || undefined,
           conversationId,
           format
         }
@@ -362,23 +371,22 @@ export const useClientElevenLabsAudio = () => {
 };
 
 // Hook for fetching available ElevenLabs voices
-export const useClientElevenLabsVoices = (apiKey: string | null) => {
+export const useClientElevenLabsVoices = (apiKey: string | null, organizationId?: string | null) => {
   return useQuery({
-    queryKey: ['client-elevenlabs-voices', apiKey],
+    queryKey: ['client-elevenlabs-voices', apiKey, organizationId],
     queryFn: async () => {
-      if (!apiKey) return [];
-      
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
         body: { 
           action: 'get_voices',
-          apiKey 
+          apiKey: apiKey || undefined,
+          organizationId: organizationId || undefined,
         }
       });
 
       if (error) throw error;
       return data?.voices || [];
     },
-    enabled: !!apiKey,
+    enabled: !!apiKey || !!organizationId,
     staleTime: 300000, // Cache 5 minutes
   });
 };

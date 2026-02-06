@@ -35,7 +35,7 @@ import { toast } from 'sonner';
 
 const ClientAgentSettings = () => {
   const { clientId, agentId } = useParams();
-  const { apiKey, platformAgentId, agentName, canEdit, platform, isLoading: accessLoading } = useClientAgentAccess(clientId, agentId);
+  const { apiKey, platformAgentId, agentName, canEdit, platform, organizationId, isLoading: accessLoading } = useClientAgentAccess(clientId, agentId);
   
   // Prompt state
   const [prompt, setPrompt] = useState('');
@@ -54,11 +54,13 @@ const ClientAgentSettings = () => {
     apiKey,
     agentId: platformAgentId,
     platform,
+    organizationId,
   });
 
   // Only fetch ElevenLabs voices when platform is elevenlabs
   const { data: voices = [], isLoading: voicesLoading } = useClientElevenLabsVoices(
-    platform === 'elevenlabs' ? apiKey : null
+    platform === 'elevenlabs' ? apiKey : null,
+    platform === 'elevenlabs' ? organizationId : null
   );
 
   const updatePromptMutation = useClientUpdateAgentPrompt();
