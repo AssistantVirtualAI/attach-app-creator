@@ -155,7 +155,7 @@ const ClientAgentSettings = () => {
   };
 
   const handleSavePrompt = async () => {
-    if (!apiKey || !platformAgentId) return;
+    if ((!apiKey && !organizationId) || !platformAgentId) return;
     
     // Only ElevenLabs supports prompt updates via API for now
     if (platform !== 'elevenlabs') {
@@ -165,8 +165,9 @@ const ClientAgentSettings = () => {
     
     try {
       await updatePromptMutation.mutateAsync({
-        apiKey,
+        apiKey: apiKey || undefined,
         agentId: platformAgentId,
+        organizationId: organizationId || undefined,
         prompt,
         firstMessage: firstMessage || undefined,
       });
@@ -177,12 +178,13 @@ const ClientAgentSettings = () => {
   };
 
   const handleSaveVoice = async () => {
-    if (!apiKey || !platformAgentId || platform !== 'elevenlabs') return;
+    if ((!apiKey && !organizationId) || !platformAgentId || platform !== 'elevenlabs') return;
     
     try {
       await updateVoiceMutation.mutateAsync({
-        apiKey,
+        apiKey: apiKey || undefined,
         agentId: platformAgentId,
+        organizationId: organizationId || undefined,
         voiceSettings: {
           voice_id: voiceId || undefined,
           stability,
@@ -208,7 +210,7 @@ const ClientAgentSettings = () => {
   }
 
   // Error state - missing config
-  if (!platform || !apiKey || !platformAgentId) {
+  if (!platform || (!apiKey && !organizationId) || !platformAgentId) {
     return (
       <div className="space-y-6">
         <div>
