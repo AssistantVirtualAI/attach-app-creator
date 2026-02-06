@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ElevenLabsAPISections } from '@/components/elevenlabs/ElevenLabsAPISections';
+import { VapiAPISections } from '@/components/vapi/VapiAPISections';
 import { useParams } from 'react-router-dom';
 import { useClientAgentAccess } from '@/hooks/useClientAgentAccess';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -252,11 +253,18 @@ const ClientAgentSettings = () => {
           apiKey={apiKey}
           canEdit={canEdit}
         />
+      ) : platform === 'vapi' ? (
+        <VapiAPISections
+          organizationId={organizationId}
+          apiKey={apiKey}
+          assistantId={platformAgentId}
+          canEdit={canEdit}
+        />
       ) : !isElevenLabs ? (
         <Card className="p-8 text-center">
           <Settings2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
           <p className="text-muted-foreground">
-            La configuration avancée n'est pas encore disponible pour {platform?.toUpperCase()}.
+            La configuration avancée n'est pas encore disponible pour {(platform as string)?.toUpperCase()}.
           </p>
         </Card>
       ) : (
