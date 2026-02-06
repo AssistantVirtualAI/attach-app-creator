@@ -173,3 +173,6 @@ verify_jwt = false
 
 [functions.security-audit-run]
 verify_jwt = false
+
+[functions.elevenlabs-api-proxy]
+verify_jwt = false

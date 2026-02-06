@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ElevenLabsAPISections } from '@/components/elevenlabs/ElevenLabsAPISections';
 import { useParams } from 'react-router-dom';
 import { useClientAgentAccess } from '@/hooks/useClientAgentAccess';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -259,6 +260,7 @@ const ClientAgentSettings = () => {
           </p>
         </Card>
       ) : (
+        <div className="space-y-6">
         <Accordion type="multiple" defaultValue={['prompt', 'voice']} className="space-y-4">
           {/* Section 1: Prompt & First Message */}
           <AccordionItem value="prompt" className="border rounded-lg bg-card">
@@ -822,6 +824,17 @@ const ClientAgentSettings = () => {
             </AccordionContent>
           </AccordionItem>
         </Accordion>
+
+        <div className="mt-6">
+          <h2 className="text-lg font-semibold mb-4">API ElevenLabs Étendue</h2>
+          <ElevenLabsAPISections
+            apiKey={apiKey}
+            organizationId={organizationId}
+            canEdit={canEdit}
+            voiceId={ttsSettings.voice_id}
+          />
+        </div>
+        </div>
       )}
     </div>
   );
