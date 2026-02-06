@@ -1834,6 +1834,7 @@ export const en = {
     charts: {
       conversationTrends: 'Conversation Trends',
       configureAgents: 'Configure your agents to see real data',
+      noDataYet: 'No data yet',
       platformDistribution: 'Platform Distribution',
       peakHours: 'Peak Hours',
       sentimentAnalysis: 'Sentiment Analysis',
