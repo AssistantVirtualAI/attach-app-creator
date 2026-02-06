@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { ElevenLabsAPISections } from '@/components/elevenlabs/ElevenLabsAPISections';
 import { 
   Volume2, Mic, Clock, MessageSquare, Settings2, Webhook, 
   Wrench, Globe, Save, Loader2, RefreshCw, ChevronDown 
@@ -747,6 +748,15 @@ function ElevenLabsFullConfigTab({ agentId, platformAgentId, apiKey }: { agentId
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+
+      {/* Extended ElevenLabs API sections */}
+      <div className="mt-6">
+        <h2 className="text-lg font-semibold mb-4">API ElevenLabs Étendue</h2>
+        <ElevenLabsAPISections
+          apiKey={apiKey}
+          voiceId={ttsSettings.voice_id}
+        />
+      </div>
     </motion.div>
   );
 }

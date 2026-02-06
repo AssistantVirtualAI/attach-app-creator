@@ -286,4 +286,87 @@ export const TTS_MODELS = [
   { id: 'eleven_turbo_v2', name: 'Turbo v2', description: 'Faible latence' },
   { id: 'eleven_multilingual_v2', name: 'Multilingual v2', description: 'Multi-langues, haute qualité' },
   { id: 'eleven_monolingual_v1', name: 'Monolingual v1', description: 'Anglais uniquement, legacy' },
+  { id: 'eleven_flash_v2', name: 'Flash v2', description: 'Ultra-faible latence' },
+  { id: 'eleven_flash_v2_5', name: 'Flash v2.5', description: 'Ultra-faible latence, amélioré' },
 ] as const;
+
+// ============= Output Formats =============
+export const OUTPUT_FORMATS = [
+  { id: 'mp3_22050_32', name: 'MP3 22kHz 32kbps', description: 'Taille réduite' },
+  { id: 'mp3_44100_32', name: 'MP3 44kHz 32kbps', description: 'Qualité standard' },
+  { id: 'mp3_44100_64', name: 'MP3 44kHz 64kbps', description: 'Bonne qualité' },
+  { id: 'mp3_44100_96', name: 'MP3 44kHz 96kbps', description: 'Haute qualité' },
+  { id: 'mp3_44100_128', name: 'MP3 44kHz 128kbps', description: 'Très haute qualité (défaut)' },
+  { id: 'mp3_44100_192', name: 'MP3 44kHz 192kbps', description: 'Qualité maximale (Creator+)' },
+  { id: 'pcm_16000', name: 'PCM 16kHz', description: 'Audio brut 16kHz' },
+  { id: 'pcm_22050', name: 'PCM 22kHz', description: 'Audio brut 22kHz' },
+  { id: 'pcm_24000', name: 'PCM 24kHz', description: 'Audio brut 24kHz' },
+  { id: 'pcm_44100', name: 'PCM 44kHz', description: 'Audio brut 44kHz (Pro+)' },
+  { id: 'ulaw_8000', name: 'μ-law 8kHz', description: 'Téléphonie (Twilio)' },
+] as const;
+
+// ============= Pronunciation Dictionary =============
+export interface PronunciationDictionary {
+  id: string;
+  name: string;
+  description?: string;
+  created_at?: string;
+  rules_count?: number;
+}
+
+// ============= History Item =============
+export interface HistoryItem {
+  history_item_id: string;
+  request_id?: string;
+  voice_id?: string;
+  voice_name?: string;
+  text?: string;
+  date_unix?: number;
+  character_count_change_from?: number;
+  character_count_change_to?: number;
+  content_type?: string;
+  state?: string;
+  settings?: Record<string, any>;
+  feedback?: { thumbs_up: boolean; feedback: string; emotions: boolean };
+}
+
+// ============= User Info =============
+export interface ElevenLabsUserInfo {
+  subscription?: {
+    tier?: string;
+    character_count?: number;
+    character_limit?: number;
+    can_extend_character_limit?: boolean;
+    allowed_to_extend_character_limit?: boolean;
+    next_character_count_reset_unix?: number;
+    voice_limit?: number;
+    max_voice_add_edits?: number;
+    voice_add_edit_counter?: number;
+    professional_voice_limit?: number;
+    can_extend_voice_limit?: boolean;
+    can_use_instant_voice_cloning?: boolean;
+    can_use_professional_voice_cloning?: boolean;
+    currency?: string;
+    status?: string;
+  };
+  xi_api_key?: string;
+  is_new_user?: boolean;
+  first_name?: string;
+}
+
+// ============= Usage Stats =============
+export interface UsageStats {
+  characters?: Array<{
+    date: string;
+    characters_count: number;
+  }>;
+}
+
+// ============= Voice Design Params =============
+export interface VoiceDesignParams {
+  gender: 'male' | 'female';
+  age: 'young' | 'middle_aged' | 'old';
+  accent: string;
+  accent_strength: number;
+  text?: string;
+}
