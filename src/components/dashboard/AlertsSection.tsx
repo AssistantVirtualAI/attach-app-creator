@@ -15,7 +15,8 @@ import {
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS } from 'date-fns/locale';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface Alert {
   id: string;
@@ -28,13 +29,14 @@ interface Alert {
 
 export const AlertsSection = () => {
   const { selectedOrgId } = useOrganization();
+  const { t, language } = useTranslation();
+  const dateLocale = language === 'fr' ? fr : enUS;
 
   const { data: alerts, isLoading } = useQuery({
     queryKey: ['dashboard-alerts', selectedOrgId],
     queryFn: async (): Promise<Alert[]> => {
       if (!selectedOrgId) return [];
 
-      // Fetch recent low satisfaction conversations
       const { data: lowSatConversations } = await supabase
         .from('agent_insights')
         .select('id, conversation_id, satisfaction_score, created_at, overall_sentiment')
@@ -45,15 +47,14 @@ export const AlertsSection = () => {
 
       const generatedAlerts: Alert[] = [];
 
-      // Generate alerts from low satisfaction
       if (lowSatConversations && lowSatConversations.length > 0) {
         lowSatConversations.forEach((conv) => {
           generatedAlerts.push({
             id: conv.id,
             type: 'satisfaction',
             severity: conv.satisfaction_score && conv.satisfaction_score < 2 ? 'critical' : 'warning',
-            title: 'Satisfaction faible détectée',
-            description: `Score de ${conv.satisfaction_score?.toFixed(1)}/5 - Sentiment ${conv.overall_sentiment || 'inconnu'}`,
+            title: t('dashboard.alerts.lowSatisfaction'),
+            description: `${t('dashboard.alerts.score')} ${conv.satisfaction_score?.toFixed(1)}/5 - ${t('conversations.sentiment.' + (conv.overall_sentiment || 'neutral'))}`,
             timestamp: conv.created_at || new Date().toISOString(),
           });
         });
@@ -90,7 +91,7 @@ export const AlertsSection = () => {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Bell className="h-5 w-5 text-amber-500" />
-            Alertes
+            {t('dashboard.alerts.title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -112,7 +113,7 @@ export const AlertsSection = () => {
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
             <Bell className="h-5 w-5 text-amber-500" />
-            Alertes
+            {t('dashboard.alerts.title')}
             {hasAlerts && (
               <Badge variant="outline" className="text-amber-500 border-amber-500/30">
                 {alerts.length}
@@ -125,8 +126,8 @@ export const AlertsSection = () => {
         {!hasAlerts ? (
           <div className="text-center py-6">
             <CheckCircle className="h-10 w-10 mx-auto mb-2 text-emerald-500/50" />
-            <p className="text-sm text-muted-foreground">Aucune alerte active</p>
-            <p className="text-xs text-muted-foreground mt-1">Tout fonctionne correctement</p>
+            <p className="text-sm text-muted-foreground">{t('dashboard.alerts.noAlerts')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('dashboard.alerts.allGood')}</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -147,7 +148,7 @@ export const AlertsSection = () => {
                     <p className="text-xs opacity-60 mt-1">
                       {formatDistanceToNow(new Date(alert.timestamp), { 
                         addSuffix: true, 
-                        locale: fr 
+                        locale: dateLocale 
                       })}
                     </p>
                   </div>
@@ -157,7 +158,7 @@ export const AlertsSection = () => {
 
             <Link to="/conversations" className="block pt-2">
               <Button variant="ghost" size="sm" className="w-full justify-between group">
-                <span>Voir les conversations</span>
+                <span>{t('dashboard.alerts.viewConversations')}</span>
                 <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
               </Button>
             </Link>

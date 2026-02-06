@@ -19,11 +19,15 @@ import {
 } from 'lucide-react';
 import { useRealtimeConversations, useRealtimeConversationsHttp, useSyncConversations } from '@/hooks/useRealtimeConversations';
 import { format, formatDistanceToNow } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export const RealtimeDashboard = () => {
+  const { t, language } = useTranslation();
+  const dateLocale = language === 'fr' ? fr : enUS;
+
   const [useWebSocket, setUseWebSocket] = useState(true);
   const { 
     isConnected, 
@@ -38,7 +42,6 @@ export const RealtimeDashboard = () => {
   const { data: httpData, isLoading: isLoadingHttp, refetch } = useRealtimeConversationsHttp();
   const syncMutation = useSyncConversations();
 
-  // Auto-connect WebSocket
   useEffect(() => {
     if (useWebSocket) {
       connect();
@@ -82,14 +85,13 @@ export const RealtimeDashboard = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Dashboard Temps Réel</h2>
+          <h2 className="text-2xl font-bold">{t('dashboard.realtime.title')}</h2>
           <p className="text-muted-foreground">
-            Surveillez les conversations en cours sur tous vos agents
+            {t('dashboard.realtime.subtitle')}
           </p>
         </div>
         
         <div className="flex items-center gap-3">
-          {/* Connection Status */}
           <Badge 
             variant={isConnected || !useWebSocket ? 'default' : 'secondary'}
             className={`gap-2 ${isConnected ? 'bg-green-500/20 text-green-400 border-green-500/30' : ''}`}
@@ -97,17 +99,16 @@ export const RealtimeDashboard = () => {
             {isConnected || !useWebSocket ? (
               <>
                 <Wifi className="w-3 h-3" />
-                Connecté
+                {t('dashboard.realtime.connected')}
               </>
             ) : (
               <>
                 <WifiOff className="w-3 h-3" />
-                Déconnecté
+                {t('dashboard.realtime.disconnected')}
               </>
             )}
           </Badge>
 
-          {/* Sync Button */}
           <Button 
             variant="outline" 
             size="sm"
@@ -115,10 +116,9 @@ export const RealtimeDashboard = () => {
             disabled={syncMutation.isPending}
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-            Synchroniser
+            {t('dashboard.dataSource.synchronize')}
           </Button>
 
-          {/* Manual Refresh for HTTP mode */}
           {!useWebSocket && (
             <Button 
               variant="outline" 
@@ -134,12 +134,11 @@ export const RealtimeDashboard = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Active Calls */}
         <Card className={`glass-card ${activeCount > 0 ? 'border-green-500/50' : ''}`}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Appels en cours</p>
+                <p className="text-sm text-muted-foreground">{t('dashboard.realtime.activeCalls')}</p>
                 <p className="text-3xl font-bold">{activeCount}</p>
               </div>
               <div className={`p-3 rounded-full ${activeCount > 0 ? 'bg-green-500/20' : 'bg-muted'}`}>
@@ -149,12 +148,11 @@ export const RealtimeDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Recent Conversations */}
         <Card className="glass-card">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">30 dernières min</p>
+                <p className="text-sm text-muted-foreground">{t('dashboard.realtime.last30min')}</p>
                 <p className="text-3xl font-bold">{recentCount}</p>
               </div>
               <div className="p-3 rounded-full bg-primary/20">
@@ -164,12 +162,11 @@ export const RealtimeDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Active Agents */}
         <Card className="glass-card">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Agents actifs</p>
+                <p className="text-sm text-muted-foreground">{t('dashboard.realtime.activeAgents')}</p>
                 <p className="text-3xl font-bold">{agentsTotal}</p>
               </div>
               <div className="p-3 rounded-full bg-primary/20">
@@ -179,17 +176,16 @@ export const RealtimeDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Last Update */}
         <Card className="glass-card">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Dernière MAJ</p>
+                <p className="text-sm text-muted-foreground">{t('dashboard.realtime.lastUpdate')}</p>
                 <p className="text-lg font-semibold">
-          {displayData?.timestamp 
-            ? formatDistanceToNow(new Date(displayData.timestamp), { addSuffix: true, locale: fr })
-            : 'En attente...'
-          }
+                  {displayData?.timestamp 
+                    ? formatDistanceToNow(new Date(displayData.timestamp), { addSuffix: true, locale: dateLocale })
+                    : t('dashboard.realtime.waiting')
+                  }
                 </p>
               </div>
               <div className="p-3 rounded-full bg-muted">
@@ -205,10 +201,10 @@ export const RealtimeDashboard = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <PhoneCall className="w-5 h-5 text-green-500" />
-            Conversations en cours
+            {t('dashboard.realtime.ongoingConversations')}
             {activeCount > 0 && (
               <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                {activeCount} actif{activeCount > 1 ? 's' : ''}
+                {activeCount} {t('dashboard.realtime.active')}
               </Badge>
             )}
           </CardTitle>
@@ -217,8 +213,8 @@ export const RealtimeDashboard = () => {
           {activeCount === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <PhoneOff className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Aucune conversation en cours</p>
-              <p className="text-sm">Les appels actifs apparaîtront ici en temps réel</p>
+              <p>{t('dashboard.realtime.noOngoing')}</p>
+              <p className="text-sm">{t('dashboard.realtime.callsWillAppear')}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -247,10 +243,10 @@ export const RealtimeDashboard = () => {
                         {formatDuration(conv.duration_secs)}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Démarré {formatDistanceToNow(new Date(conv.start_time), { addSuffix: true, locale: fr })}
+                        {formatDistanceToNow(new Date(conv.start_time), { addSuffix: true, locale: dateLocale })}
                       </p>
                     </div>
-                    <Badge className="bg-green-500 text-white">En cours</Badge>
+                    <Badge className="bg-green-500 text-white">{t('dashboard.realtime.ongoing')}</Badge>
                   </div>
                 </div>
               ))}
@@ -264,13 +260,13 @@ export const RealtimeDashboard = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="w-5 h-5 text-primary" />
-            Conversations récentes (30 min)
+            {t('dashboard.realtime.recentConversations')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {recentCount === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <p>Aucune conversation récente</p>
+              <p>{t('dashboard.realtime.noRecent')}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -302,7 +298,7 @@ export const RealtimeDashboard = () => {
                         </span>
                       )}
                       <span className="text-muted-foreground">
-                        {conv.start_time && formatDistanceToNow(new Date(conv.start_time), { addSuffix: true, locale: fr })}
+                        {conv.start_time && formatDistanceToNow(new Date(conv.start_time), { addSuffix: true, locale: dateLocale })}
                       </span>
                     </div>
                   </div>
@@ -320,7 +316,7 @@ export const RealtimeDashboard = () => {
             <div className="flex items-center gap-3">
               <RefreshCw className="w-5 h-5 text-primary animate-spin" />
               <div className="flex-1">
-                <p className="font-medium">Synchronisation en cours...</p>
+                <p className="font-medium">{t('dashboard.realtime.syncing')}</p>
                 <Progress value={50} className="h-2 mt-2" />
               </div>
             </div>

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface PriorityAction {
   action: string;
@@ -21,6 +22,8 @@ interface PriorityAction {
 }
 
 export const AIPriorityActions = () => {
+  const { t } = useTranslation();
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['dashboard-priority-actions'],
     queryFn: async () => {
@@ -75,13 +78,13 @@ export const AIPriorityActions = () => {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Zap className="h-5 w-5 text-primary" />
-            Actions Prioritaires
+            {t('dashboard.priorityActions.title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-6 text-muted-foreground">
             <Lightbulb className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Aucune action prioritaire pour le moment</p>
+            <p className="text-sm">{t('dashboard.priorityActions.noActions')}</p>
           </div>
         </CardContent>
       </Card>
@@ -95,14 +98,14 @@ export const AIPriorityActions = () => {
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <Zap className="h-5 w-5 text-primary" />
-          Actions Prioritaires
+          {t('dashboard.priorityActions.title')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {actions.length === 0 ? (
           <div className="text-center py-6 text-muted-foreground">
             <Lightbulb className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Excellente performance ! Aucune action requise.</p>
+            <p className="text-sm">{t('dashboard.priorityActions.excellentPerformance')}</p>
           </div>
         ) : (
           actions.map((action, index) => (
@@ -132,7 +135,7 @@ export const AIPriorityActions = () => {
 
         <Link to="/agent-reports" className="block pt-2">
           <Button variant="ghost" size="sm" className="w-full justify-between group">
-            <span>Voir toutes les recommandations</span>
+            <span>{t('dashboard.priorityActions.viewAll')}</span>
             <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
           </Button>
         </Link>

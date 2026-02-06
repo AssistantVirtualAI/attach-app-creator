@@ -7,6 +7,7 @@ import {
 import { DashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { TrendingUp, PieChartIcon, Star, Activity, Zap, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface ConversationsChartProps {
   metrics: DashboardMetrics;
@@ -43,17 +44,23 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
+  const { t } = useTranslation();
+
+  // Day name mapping for placeholder data
+  const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+  const getDayName = (key: string) => t(`dashboard.charts.days.${key}`);
+
   // Use real data from metrics or generate placeholder
   const weeklyData = metrics.weeklyData && metrics.weeklyData.length > 0
     ? metrics.weeklyData
     : [
-        { name: 'Lun', conversations: 12, satisfaction: 4.2 },
-        { name: 'Mar', conversations: 18, satisfaction: 4.5 },
-        { name: 'Mer', conversations: 15, satisfaction: 4.1 },
-        { name: 'Jeu', conversations: 22, satisfaction: 4.7 },
-        { name: 'Ven', conversations: 28, satisfaction: 4.3 },
-        { name: 'Sam', conversations: 10, satisfaction: 4.6 },
-        { name: 'Dim', conversations: 8, satisfaction: 4.4 },
+        { name: getDayName('mon'), conversations: 12, satisfaction: 4.2 },
+        { name: getDayName('tue'), conversations: 18, satisfaction: 4.5 },
+        { name: getDayName('wed'), conversations: 15, satisfaction: 4.1 },
+        { name: getDayName('thu'), conversations: 22, satisfaction: 4.7 },
+        { name: getDayName('fri'), conversations: 28, satisfaction: 4.3 },
+        { name: getDayName('sat'), conversations: 10, satisfaction: 4.6 },
+        { name: getDayName('sun'), conversations: 8, satisfaction: 4.4 },
       ];
 
   const platformData = metrics.platformDistribution.length > 0 
@@ -69,9 +76,9 @@ export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
 
   // Sentiment data for radial chart
   const sentimentData = [
-    { name: 'Positif', value: metrics.sentimentBreakdown.positive || 60, fill: '#10b981' },
-    { name: 'Neutre', value: metrics.sentimentBreakdown.neutral || 25, fill: '#f59e0b' },
-    { name: 'Négatif', value: metrics.sentimentBreakdown.negative || 15, fill: '#ef4444' },
+    { name: t('dashboard.charts.positive'), value: metrics.sentimentBreakdown.positive || 60, fill: '#10b981' },
+    { name: t('dashboard.charts.neutral'), value: metrics.sentimentBreakdown.neutral || 25, fill: '#f59e0b' },
+    { name: t('dashboard.charts.negative'), value: metrics.sentimentBreakdown.negative || 15, fill: '#ef4444' },
   ];
 
   // Peak hours data
@@ -118,7 +125,7 @@ export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
                   <TrendingUp className="h-4 w-4 text-white" />
                 </div>
                 <span className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
-                  Tendances des Conversations
+                  {t('dashboard.charts.conversationTrends')}
                 </span>
               </CardTitle>
             </CardHeader>
@@ -176,7 +183,7 @@ export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
                     strokeWidth={3}
                     fillOpacity={1} 
                     fill="url(#conversationsGradient)" 
-                    name="Conversations"
+                    name={t('dashboard.stats.conversations')}
                     filter="url(#glow)"
                   />
                   <Line
@@ -187,13 +194,13 @@ export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
                     strokeWidth={3}
                     dot={{ fill: '#f59e0b', strokeWidth: 2, r: 5 }}
                     activeDot={{ r: 8, stroke: '#f59e0b', strokeWidth: 2, fill: '#fff' }}
-                    name="Satisfaction"
+                    name={t('dashboard.stats.satisfaction')}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
               {!hasData && (
                 <p className="text-center text-muted-foreground text-sm mt-2">
-                  Configurez vos agents pour voir les données réelles
+                  {t('dashboard.charts.configureAgents')}
                 </p>
               )}
             </CardContent>
@@ -214,7 +221,7 @@ export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
                 <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600">
                   <PieChartIcon className="h-4 w-4 text-white" />
                 </div>
-                Distribution Plateformes
+                {t('dashboard.charts.platformDistribution')}
               </CardTitle>
             </CardHeader>
             <CardContent className="relative">
@@ -286,7 +293,7 @@ export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
                 <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500 to-green-600">
                   <Clock className="h-4 w-4 text-white" />
                 </div>
-                Heures de Pointe
+                {t('dashboard.charts.peakHours')}
               </CardTitle>
             </CardHeader>
             <CardContent className="relative">
@@ -317,7 +324,7 @@ export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
                     dataKey="count" 
                     fill="url(#barGradient)" 
                     radius={[6, 6, 0, 0]}
-                    name="Appels"
+                    name={t('dashboard.charts.calls')}
                     className="drop-shadow-md"
                   />
                 </BarChart>
@@ -340,7 +347,7 @@ export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
                 <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600">
                   <Activity className="h-4 w-4 text-white" />
                 </div>
-                Analyse des Sentiments
+                {t('dashboard.charts.sentimentAnalysis')}
               </CardTitle>
             </CardHeader>
             <CardContent className="relative">
@@ -406,7 +413,7 @@ export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
                 <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600">
                   <Star className="h-4 w-4 text-white" />
                 </div>
-                Évolution de la Satisfaction Client
+                {t('dashboard.charts.satisfactionEvolution')}
               </CardTitle>
             </CardHeader>
             <CardContent className="relative">
@@ -437,7 +444,7 @@ export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
                   />
                   <Tooltip 
                     content={<CustomTooltip />}
-                    formatter={(value: number) => [`${value.toFixed(1)}/5`, 'Satisfaction']}
+                    formatter={(value: number) => [`${value.toFixed(1)}/5`, t('dashboard.stats.satisfaction')]}
                   />
                   <Area 
                     type="monotone" 
@@ -447,7 +454,7 @@ export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
                     fill="url(#satisfactionAreaGradient)"
                     dot={{ fill: '#f59e0b', strokeWidth: 2, r: 5, stroke: '#fff' }}
                     activeDot={{ r: 8, stroke: '#f59e0b', strokeWidth: 3, fill: '#fff' }}
-                    name="Satisfaction"
+                    name={t('dashboard.stats.satisfaction')}
                   />
                 </AreaChart>
               </ResponsiveContainer>
