@@ -274,17 +274,19 @@ export const useClientUpdateAgentPrompt = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ apiKey, agentId, prompt, firstMessage }: { 
-      apiKey: string; 
+    mutationFn: async ({ apiKey, agentId, organizationId, prompt, firstMessage }: { 
+      apiKey?: string | null; 
       agentId: string; 
+      organizationId?: string | null;
       prompt: string;
       firstMessage?: string;
     }) => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
         body: { 
           action: 'update_prompt',
-          apiKey,
+          apiKey: apiKey || undefined,
           agentId,
+          organizationId: organizationId || undefined,
           prompt,
           firstMessage
         }
@@ -309,9 +311,10 @@ export const useClientUpdateAgentVoice = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ apiKey, agentId, voiceSettings }: { 
-      apiKey: string; 
+    mutationFn: async ({ apiKey, agentId, organizationId, voiceSettings }: { 
+      apiKey?: string | null; 
       agentId: string; 
+      organizationId?: string | null;
       voiceSettings: {
         voice_id?: string;
         stability?: number;
@@ -323,8 +326,9 @@ export const useClientUpdateAgentVoice = () => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-agent-config', {
         body: { 
           action: 'update_voice',
-          apiKey,
+          apiKey: apiKey || undefined,
           agentId,
+          organizationId: organizationId || undefined,
           voiceSettings
         }
       });
