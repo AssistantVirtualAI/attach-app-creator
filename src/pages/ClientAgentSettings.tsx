@@ -109,8 +109,10 @@ const ClientAgentSettings = () => {
     );
   };
 
-  const handleVoiceChange = () => {
-    const tts = agentConfig?.agent?.tts || {};
+  // Detect voice changes via useEffect instead of manual calls (avoids stale state)
+  useEffect(() => {
+    if (!agentConfig?.agent?.tts || platform !== 'elevenlabs') return;
+    const tts = agentConfig.agent.tts;
     setHasVoiceChanges(
       voiceId !== (tts.voice_id || '') ||
       stability !== (tts.stability ?? 0.5) ||
@@ -118,7 +120,7 @@ const ClientAgentSettings = () => {
       style !== (tts.style ?? 0) ||
       speed !== (tts.speed ?? 1)
     );
-  };
+  }, [voiceId, stability, similarityBoost, style, speed, agentConfig, platform]);
 
   // Filter voices based on search
   const filteredVoices = voices.filter((voice: any) => 
@@ -151,7 +153,6 @@ const ClientAgentSettings = () => {
   // Handle voice selection
   const handleSelectVoice = (selectedVoiceId: string) => {
     setVoiceId(selectedVoiceId);
-    handleVoiceChange();
   };
 
   const handleSavePrompt = async () => {
@@ -490,7 +491,6 @@ const ClientAgentSettings = () => {
                         value={[stability * 100]}
                         onValueChange={(vals) => {
                           setStability(vals[0] / 100);
-                          handleVoiceChange();
                         }}
                         max={100}
                         step={1}
@@ -513,7 +513,6 @@ const ClientAgentSettings = () => {
                         value={[similarityBoost * 100]}
                         onValueChange={(vals) => {
                           setSimilarityBoost(vals[0] / 100);
-                          handleVoiceChange();
                         }}
                         max={100}
                         step={1}
@@ -536,7 +535,6 @@ const ClientAgentSettings = () => {
                         value={[style * 100]}
                         onValueChange={(vals) => {
                           setStyle(vals[0] / 100);
-                          handleVoiceChange();
                         }}
                         max={100}
                         step={1}
@@ -559,7 +557,6 @@ const ClientAgentSettings = () => {
                         value={[speed * 50]}
                         onValueChange={(vals) => {
                           setSpeed(vals[0] / 50);
-                          handleVoiceChange();
                         }}
                         min={25}
                         max={100}
