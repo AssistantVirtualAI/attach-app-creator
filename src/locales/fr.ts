@@ -2233,6 +2233,32 @@ export const fr = {
     },
   },
 
+  // Webhook Settings (used in AgentPlatformWebhooksTab)
+  webhooks: {
+    platformWebhooks: 'Webhooks Plateforme',
+    platformWebhooksDescription: 'Configurez les webhooks pour recevoir les événements en temps réel de vos plateformes vocales IA.',
+    yourWebhookUrl: 'Votre URL Webhook',
+    webhookUrlDescription: 'Utilisez cette URL dans le tableau de bord de votre plateforme pour recevoir les événements.',
+    copyUrlInstructions: 'Copiez cette URL et collez-la dans la configuration webhook de votre plateforme.',
+    configuration: 'Configuration',
+    notConfigured: 'Aucun webhook configuré',
+    configure: 'Configurer',
+    needHelp: 'Besoin d\'aide pour configurer les webhooks ?',
+    viewDocs: 'Consultez la documentation de la plateforme pour des instructions détaillées.',
+    viewDocumentation: 'Voir la Documentation',
+    urlCopied: 'URL du webhook copiée !',
+    lastTriggered: 'Dernier déclenchement',
+    errors: 'erreurs',
+    subscribedEvents: 'Événements Souscrits',
+    forwardingTo: 'Redirection vers',
+    configureWebhook: 'Configurer le Webhook',
+    forwardingUrl: 'URL de Redirection',
+    forwardingUrlDescription: 'Les événements reçus seront redirigés vers cette URL.',
+    signingSecret: 'Secret de Signature',
+    signingSecretPlaceholder: 'Secret HMAC optionnel pour la vérification de signature',
+    selectEvents: 'Sélectionner les Événements',
+  },
+
   // Webhook Logs
   webhookLogs: {
     title: 'Journaux Webhook',

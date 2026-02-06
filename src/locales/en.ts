@@ -2234,6 +2234,32 @@ export const en = {
     },
   },
 
+  // Webhook Settings (used in AgentPlatformWebhooksTab)
+  webhooks: {
+    platformWebhooks: 'Platform Webhooks',
+    platformWebhooksDescription: 'Configure webhooks to receive real-time events from your voice AI platforms.',
+    yourWebhookUrl: 'Your Webhook URL',
+    webhookUrlDescription: 'Use this URL in your platform dashboard to receive events.',
+    copyUrlInstructions: 'Copy this URL and paste it into your platform\'s webhook configuration.',
+    configuration: 'Configuration',
+    notConfigured: 'No webhook configured',
+    configure: 'Configure',
+    needHelp: 'Need help setting up webhooks?',
+    viewDocs: 'Check the platform documentation for step-by-step instructions.',
+    viewDocumentation: 'View Documentation',
+    urlCopied: 'Webhook URL copied!',
+    lastTriggered: 'Last triggered',
+    errors: 'errors',
+    subscribedEvents: 'Subscribed Events',
+    forwardingTo: 'Forwarding to',
+    configureWebhook: 'Configure Webhook',
+    forwardingUrl: 'Forwarding URL',
+    forwardingUrlDescription: 'Events received will be forwarded to this URL.',
+    signingSecret: 'Signing Secret',
+    signingSecretPlaceholder: 'Optional HMAC secret for signature verification',
+    selectEvents: 'Select Events',
+  },
+
   // Webhook Logs
   webhookLogs: {
     title: 'Webhook Logs',
