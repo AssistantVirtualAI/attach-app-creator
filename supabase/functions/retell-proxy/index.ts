@@ -3,14 +3,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 const RETELL_BASE_URL = 'https://api.retellai.com';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -20,17 +20,16 @@ serve(async (req) => {
 
     const { action, apiKey, organizationId, agentId, ...params } = await req.json();
 
-    console.log(`[Retell] Request received - Action: ${action}, OrganizationId: ${organizationId || 'NOT PROVIDED'}, AgentId: ${agentId || 'N/A'}`);
+    console.log(`[Retell] Action: ${action}, Org: ${organizationId || 'N/A'}, Agent: ${agentId || 'N/A'}`);
 
     if (!action) {
       throw new Error('Missing required parameter: action');
     }
 
-    // Get API key from integration if not provided directly
+    // Resolve API key
     let retellApiKey = apiKey;
     if (!retellApiKey && organizationId) {
-      console.log(`[Retell] Fetching API key for organization: ${organizationId}`);
-      const { data: integration, error: integrationError } = await supabase
+      const { data: integration } = await supabase
         .from('organization_integrations')
         .select('api_key')
         .eq('organization_id', organizationId)
@@ -38,304 +37,16 @@ serve(async (req) => {
         .eq('is_active', true)
         .single();
 
-      if (integrationError) {
-        console.error(`[Retell] Integration query error:`, integrationError);
-      }
-
       if (integration) {
-        console.log(`[Retell] Found API key for organization`);
         retellApiKey = integration.api_key;
-      } else {
-        console.log(`[Retell] No integration found for organization ${organizationId}`);
       }
-    } else if (!organizationId) {
-      console.log(`[Retell] No organizationId provided in request`);
     }
 
     if (!retellApiKey) {
       throw new Error('API key not found. Please configure Retell integration.');
     }
 
-    console.log(`[Retell] Processing action: ${action}`);
-
-    let result;
-    
-    switch (action) {
-      // Agents
-      case 'listAgents':
-        result = await retellRequest(retellApiKey, 'GET', '/list-agents');
-        break;
-      case 'getAgent':
-        if (!params.retellAgentId && !agentId) throw new Error('retellAgentId is required');
-        result = await retellRequest(retellApiKey, 'GET', `/get-agent/${params.retellAgentId || agentId}`);
-        break;
-      
-      // Enhanced createAgent with LLM creation
-      case 'createAgent': {
-        let llmId = params.llmId;
-        
-        // Create LLM first if we have a system prompt
-        if (!llmId && params.systemPrompt) {
-          console.log('[Retell] Creating LLM for agent...');
-          const llmConfig: any = {
-            model: params.llmModel || 'gpt-4o-mini',
-            general_prompt: params.systemPrompt,
-          };
-          
-          if (params.firstMessage) {
-            llmConfig.begin_message = params.firstMessage;
-          }
-          
-          if (params.temperature !== undefined) {
-            llmConfig.model_temperature = params.temperature;
-          }
-          
-          // Add general tools placeholder
-          llmConfig.general_tools = [];
-          
-          const llmResult = await retellRequest(retellApiKey, 'POST', '/create-retell-llm', undefined, llmConfig);
-          llmId = llmResult.llm_id;
-          console.log(`[Retell] Created LLM with ID: ${llmId}`);
-        }
-        
-        // Now create the agent
-        const agentConfig: any = {
-          agent_name: params.name,
-          voice_id: params.voiceId,
-        };
-        
-        // Set response engine
-        if (llmId) {
-          agentConfig.response_engine = {
-            type: 'retell-llm',
-            llm_id: llmId,
-          };
-        }
-        
-        // Voice settings
-        if (params.speed !== undefined) {
-          agentConfig.voice_speed = params.speed;
-        }
-        if (params.voiceTemperature !== undefined) {
-          agentConfig.voice_temperature = params.voiceTemperature;
-        }
-        
-        // Language
-        if (params.language) {
-          agentConfig.language = params.language;
-        }
-        
-        // Timing settings
-        if (params.silenceTimeout !== undefined) {
-          agentConfig.end_call_after_silence_ms = params.silenceTimeout * 1000;
-        }
-        
-        // Ambient sound
-        if (params.ambientSound) {
-          agentConfig.ambient_sound = params.ambientSound;
-        }
-        
-        // Pronunciation dictionary
-        if (params.pronunciationDictionary) {
-          agentConfig.pronunciation_dictionary = params.pronunciationDictionary;
-        }
-        
-        // Merge with config if provided
-        if (params.config) {
-          Object.assign(agentConfig, params.config);
-        }
-        
-        console.log('[Retell] Creating agent with config:', JSON.stringify(agentConfig, null, 2));
-        result = await retellRequest(retellApiKey, 'POST', '/create-agent', undefined, agentConfig);
-        
-        // Add LLM ID to result for reference
-        if (llmId) {
-          result.llm_id = llmId;
-        }
-        break;
-      }
-      
-      case 'updateAgent':
-        if (!params.retellAgentId && !agentId) throw new Error('retellAgentId is required');
-        result = await retellRequest(retellApiKey, 'PATCH', `/update-agent/${params.retellAgentId || agentId}`, undefined, params.config);
-        break;
-      case 'deleteAgent':
-        if (!params.retellAgentId) throw new Error('retellAgentId is required');
-        result = await retellRequest(retellApiKey, 'DELETE', `/delete-agent/${params.retellAgentId}`);
-        break;
-
-      // Calls
-      case 'listCalls': {
-        const callFilters: any = {};
-        const retellAgentIdForCalls = params.retellAgentId || agentId;
-        if (retellAgentIdForCalls) callFilters.agent_id = [retellAgentIdForCalls];
-        if (params.limit) callFilters.limit = params.limit;
-        if (params.sortOrder) callFilters.sort_order = params.sortOrder;
-
-        console.log(`[Retell] listCalls - Filters:`, callFilters);
-
-        const raw = await retellRequest(
-          retellApiKey,
-          'POST',
-          '/v2/list-calls',
-          undefined,
-          Object.keys(callFilters).length > 0 ? { filter_criteria: callFilters } : {}
-        );
-
-        const callsArray = Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.calls)
-            ? raw.calls
-            : Array.isArray(raw?.call_details)
-              ? raw.call_details
-              : [];
-
-        console.log(`[Retell] listCalls - Got ${callsArray.length} calls`);
-        result = callsArray;
-        break;
-      }
-      case 'getCall':
-        if (!params.callId) throw new Error('callId is required');
-        result = await retellRequest(retellApiKey, 'GET', `/v2/get-call/${params.callId}`);
-        break;
-      case 'createCall':
-        result = await retellRequest(retellApiKey, 'POST', '/v2/create-phone-call', undefined, {
-          from_number: params.from,
-          to_number: params.to,
-          agent_id: agentId || params.retellAgentId,
-          ...(params.metadata && { metadata: params.metadata }),
-        });
-        break;
-
-      // Phone Numbers
-      case 'listPhoneNumbers':
-        result = await retellRequest(retellApiKey, 'GET', '/list-phone-numbers');
-        break;
-      case 'getPhoneNumber':
-        if (!params.phoneNumber) throw new Error('phoneNumber is required');
-        result = await retellRequest(retellApiKey, 'GET', `/get-phone-number/${encodeURIComponent(params.phoneNumber)}`);
-        break;
-      case 'importPhoneNumber':
-        result = await retellRequest(retellApiKey, 'POST', '/import-phone-number', undefined, {
-          phone_number: params.phoneNumber,
-          ...(params.agentId && { agent_id: params.agentId }),
-          ...(params.terminationUri && { termination_uri: params.terminationUri }),
-        });
-        break;
-      case 'updatePhoneNumber':
-        if (!params.phoneNumber) throw new Error('phoneNumber is required');
-        result = await retellRequest(retellApiKey, 'PATCH', `/update-phone-number/${encodeURIComponent(params.phoneNumber)}`, undefined, params.config);
-        break;
-
-      // Knowledge Base
-      case 'listKnowledgeBases':
-        result = await retellRequest(retellApiKey, 'GET', '/list-knowledge-bases');
-        break;
-      case 'getKnowledgeBase':
-        if (!params.knowledgeBaseId) throw new Error('knowledgeBaseId is required');
-        result = await retellRequest(retellApiKey, 'GET', `/get-knowledge-base/${params.knowledgeBaseId}`);
-        break;
-      case 'createKnowledgeBase':
-        const kbPayload: any = {
-          knowledge_base_name: params.name || 'New Knowledge Base',
-        };
-        if (params.texts && params.texts.length > 0) {
-          kbPayload.knowledge_base_texts = params.texts.map((t: any) => ({
-            text: t.content || t.text,
-            title: t.title || t.name || 'Document',
-          }));
-        }
-        if (params.urls && params.urls.length > 0) {
-          kbPayload.knowledge_base_urls = params.urls;
-        }
-        result = await retellRequest(retellApiKey, 'POST', '/create-knowledge-base', undefined, kbPayload);
-        break;
-      case 'addKnowledgeBaseDocument':
-        if (!params.knowledgeBaseId) throw new Error('knowledgeBaseId is required');
-        const addDocPayload: any = {};
-        if (params.text) {
-          addDocPayload.knowledge_base_texts = [{
-            text: params.text,
-            title: params.title || 'Document',
-          }];
-        }
-        if (params.url) {
-          addDocPayload.knowledge_base_urls = [params.url];
-        }
-        result = await retellRequest(retellApiKey, 'PATCH', `/update-knowledge-base/${params.knowledgeBaseId}`, undefined, addDocPayload);
-        break;
-      case 'deleteKnowledgeBase':
-        if (!params.knowledgeBaseId) throw new Error('knowledgeBaseId is required');
-        result = await retellRequest(retellApiKey, 'DELETE', `/delete-knowledge-base/${params.knowledgeBaseId}`);
-        break;
-
-      case 'updateKnowledgeBase': {
-        if (!params.knowledgeBaseId) throw new Error('knowledgeBaseId is required');
-        const updateKbPayload: any = {};
-        if (params.knowledge_base_name) updateKbPayload.knowledge_base_name = params.knowledge_base_name;
-        if (params.knowledge_base_texts) updateKbPayload.knowledge_base_texts = params.knowledge_base_texts;
-        if (params.knowledge_base_urls) updateKbPayload.knowledge_base_urls = params.knowledge_base_urls;
-        result = await retellRequest(retellApiKey, 'PATCH', `/update-knowledge-base/${params.knowledgeBaseId}`, undefined, updateKbPayload);
-        break;
-      }
-
-      // LLMs
-      case 'listLlms':
-        result = await retellRequest(retellApiKey, 'GET', '/list-retell-llms');
-        break;
-      case 'getLlm':
-        if (!params.llmId) throw new Error('llmId is required');
-        result = await retellRequest(retellApiKey, 'GET', `/get-retell-llm/${params.llmId}`);
-        break;
-      case 'createLlm':
-        result = await retellRequest(retellApiKey, 'POST', '/create-retell-llm', undefined, params.config);
-        break;
-      case 'updateLlm':
-        if (!params.llmId) throw new Error('llmId is required');
-        result = await retellRequest(retellApiKey, 'PATCH', `/update-retell-llm/${params.llmId}`, undefined, params.config);
-        break;
-
-      // Voices
-      case 'listVoices':
-        result = await retellRequest(retellApiKey, 'GET', '/list-voices');
-        break;
-      case 'getVoice':
-        if (!params.voiceId) throw new Error('voiceId is required');
-        result = await retellRequest(retellApiKey, 'GET', `/get-voice/${params.voiceId}`);
-        break;
-
-      // Analytics (computed from calls)
-      case 'getAnalytics': {
-        const timeframe = params.timeframe || '7d';
-        const startDate = getStartDate(timeframe);
-
-        const callsResult = await retellRequest(retellApiKey, 'POST', '/v2/list-calls', undefined, {
-          filter_criteria: {
-            ...(agentId && { agent_id: [agentId] }),
-          },
-          limit: 1000,
-        });
-
-        const callsArray = Array.isArray(callsResult)
-          ? callsResult
-          : Array.isArray((callsResult as any)?.calls)
-            ? (callsResult as any).calls
-            : Array.isArray((callsResult as any)?.call_details)
-              ? (callsResult as any).call_details
-              : [];
-
-        const filteredCalls = callsArray.filter((call: any) => {
-          const callDate = new Date(call.start_timestamp || call.created_at);
-          return callDate >= startDate;
-        });
-
-        result = computeAnalytics(filteredCalls);
-        break;
-      }
-
-      default:
-        throw new Error(`Unsupported action: ${action}`);
-    }
+    const result = await handleAction(retellApiKey, action, agentId, params);
 
     return new Response(
       JSON.stringify({ success: true, data: result }),
@@ -350,6 +61,325 @@ serve(async (req) => {
     );
   }
 });
+
+async function handleAction(apiKey: string, action: string, agentId: string | undefined, params: any): Promise<any> {
+  switch (action) {
+    // ─── VOICE AGENTS ───
+    case 'listAgents':
+      return retellRequest(apiKey, 'GET', '/v2/list-agents');
+    case 'getAgent':
+      return retellRequest(apiKey, 'GET', `/v2/get-agent/${requireId(params.retellAgentId || agentId, 'agentId')}`);
+    case 'createAgent': {
+      return handleCreateAgent(apiKey, agentId, params);
+    }
+    case 'updateAgent':
+      return retellRequest(apiKey, 'PATCH', `/v2/update-agent/${requireId(params.retellAgentId || agentId, 'agentId')}`, undefined, params.config);
+    case 'deleteAgent':
+      return retellRequest(apiKey, 'DELETE', `/v2/delete-agent/${requireId(params.retellAgentId, 'agentId')}`);
+    case 'publishAgent':
+      return retellRequest(apiKey, 'POST', `/v2/publish-agent/${requireId(params.retellAgentId || agentId, 'agentId')}`, undefined, params.config || {});
+    case 'getAgentVersions':
+      return retellRequest(apiKey, 'GET', `/v2/get-agent-versions/${requireId(params.retellAgentId || agentId, 'agentId')}`);
+
+    // ─── CALLS (V2) ───
+    case 'createCall':
+      return retellRequest(apiKey, 'POST', '/v2/create-phone-call', undefined, {
+        from_number: params.from,
+        to_number: params.to,
+        agent_id: agentId || params.retellAgentId,
+        ...(params.metadata && { metadata: params.metadata }),
+        ...(params.retell_llm_dynamic_variables && { retell_llm_dynamic_variables: params.retell_llm_dynamic_variables }),
+      });
+    case 'createWebCall':
+      return retellRequest(apiKey, 'POST', '/v2/create-web-call', undefined, {
+        agent_id: agentId || params.retellAgentId,
+        ...(params.metadata && { metadata: params.metadata }),
+        ...(params.retell_llm_dynamic_variables && { retell_llm_dynamic_variables: params.retell_llm_dynamic_variables }),
+      });
+    case 'getCall':
+      return retellRequest(apiKey, 'GET', `/v2/get-call/${requireId(params.callId, 'callId')}`);
+    case 'listCalls': {
+      const callFilters: any = {};
+      const callAgentId = params.retellAgentId || agentId;
+      if (callAgentId) callFilters.agent_id = [callAgentId];
+      if (params.limit) callFilters.limit = params.limit;
+      if (params.sortOrder) callFilters.sort_order = params.sortOrder;
+
+      const raw = await retellRequest(apiKey, 'POST', '/v2/list-calls', undefined, 
+        Object.keys(callFilters).length > 0 ? { filter_criteria: callFilters } : {}
+      );
+      return normalizeCallsArray(raw);
+    }
+    case 'updateCall':
+      return retellRequest(apiKey, 'PATCH', `/v2/update-call/${requireId(params.callId, 'callId')}`, undefined, params.config);
+    case 'deleteCall':
+      return retellRequest(apiKey, 'DELETE', `/v2/delete-call/${requireId(params.callId, 'callId')}`);
+
+    // ─── CHAT ───
+    case 'createChat':
+      return retellRequest(apiKey, 'POST', '/v2/create-chat', undefined, {
+        agent_id: params.chatAgentId || agentId,
+        ...(params.metadata && { metadata: params.metadata }),
+        ...(params.retell_llm_dynamic_variables && { retell_llm_dynamic_variables: params.retell_llm_dynamic_variables }),
+      });
+    case 'getChat':
+      return retellRequest(apiKey, 'GET', `/v2/get-chat/${requireId(params.chatId, 'chatId')}`);
+    case 'listChats':
+      return retellRequest(apiKey, 'GET', '/v2/list-chat');
+    case 'updateChat':
+      return retellRequest(apiKey, 'PATCH', `/v2/update-chat/${requireId(params.chatId, 'chatId')}`, undefined, params.config);
+    case 'endChat':
+      return retellRequest(apiKey, 'PATCH', `/v2/end-chat/${requireId(params.chatId, 'chatId')}`);
+    case 'createChatCompletion':
+      return retellRequest(apiKey, 'POST', '/v2/create-chat-completion', undefined, params.config);
+    case 'createOutboundSms':
+      return retellRequest(apiKey, 'POST', '/v2/create-outbound-sms', undefined, params.config);
+
+    // ─── CHAT AGENTS ───
+    case 'createChatAgent':
+      return retellRequest(apiKey, 'POST', '/v2/create-chat-agent', undefined, params.config);
+    case 'getChatAgent':
+      return retellRequest(apiKey, 'GET', `/v2/get-chat-agent/${requireId(params.chatAgentId, 'chatAgentId')}`);
+    case 'listChatAgents':
+      return retellRequest(apiKey, 'GET', '/v2/list-chat-agents');
+    case 'updateChatAgent':
+      return retellRequest(apiKey, 'PATCH', `/v2/update-chat-agent/${requireId(params.chatAgentId, 'chatAgentId')}`, undefined, params.config);
+    case 'deleteChatAgent':
+      return retellRequest(apiKey, 'DELETE', `/v2/delete-chat-agent/${requireId(params.chatAgentId, 'chatAgentId')}`);
+    case 'publishChatAgent':
+      return retellRequest(apiKey, 'POST', `/v2/publish-chat-agent/${requireId(params.chatAgentId, 'chatAgentId')}`, undefined, params.config || {});
+    case 'getChatAgentVersions':
+      return retellRequest(apiKey, 'GET', `/v2/get-chat-agent-versions/${requireId(params.chatAgentId, 'chatAgentId')}`);
+
+    // ─── RETELL LLM ───
+    case 'listLlms':
+      return retellRequest(apiKey, 'GET', '/v2/list-retell-llms');
+    case 'getLlm':
+      return retellRequest(apiKey, 'GET', `/v2/get-retell-llm/${requireId(params.llmId, 'llmId')}`);
+    case 'createLlm':
+      return retellRequest(apiKey, 'POST', '/v2/create-retell-llm', undefined, params.config);
+    case 'updateLlm':
+      return retellRequest(apiKey, 'PATCH', `/v2/update-retell-llm/${requireId(params.llmId, 'llmId')}`, undefined, params.config);
+    case 'deleteLlm':
+      return retellRequest(apiKey, 'DELETE', `/v2/delete-retell-llm/${requireId(params.llmId, 'llmId')}`);
+
+    // ─── CONVERSATION FLOW ───
+    case 'createConversationFlow':
+      return retellRequest(apiKey, 'POST', '/v2/create-conversation-flow', undefined, params.config);
+    case 'getConversationFlow':
+      return retellRequest(apiKey, 'GET', `/v2/get-conversation-flow/${requireId(params.flowId, 'flowId')}`);
+    case 'listConversationFlows':
+      return retellRequest(apiKey, 'GET', '/v2/list-conversation-flows');
+    case 'updateConversationFlow':
+      return retellRequest(apiKey, 'PATCH', `/v2/update-conversation-flow/${requireId(params.flowId, 'flowId')}`, undefined, params.config);
+    case 'deleteConversationFlow':
+      return retellRequest(apiKey, 'DELETE', `/v2/delete-conversation-flow/${requireId(params.flowId, 'flowId')}`);
+
+    // ─── CONVERSATION FLOW COMPONENT ───
+    case 'createConversationFlowComponent':
+      return retellRequest(apiKey, 'POST', '/v2/create-conversation-flow-component', undefined, params.config);
+    case 'getConversationFlowComponent':
+      return retellRequest(apiKey, 'GET', `/v2/get-conversation-flow-component/${requireId(params.componentId, 'componentId')}`);
+    case 'listConversationFlowComponents':
+      return retellRequest(apiKey, 'GET', '/v2/list-conversation-flow-components');
+    case 'updateConversationFlowComponent':
+      return retellRequest(apiKey, 'PATCH', `/v2/update-conversation-flow-component/${requireId(params.componentId, 'componentId')}`, undefined, params.config);
+    case 'deleteConversationFlowComponent':
+      return retellRequest(apiKey, 'DELETE', `/v2/delete-conversation-flow-component/${requireId(params.componentId, 'componentId')}`);
+
+    // ─── MCP TOOLS ───
+    case 'getMcpTools':
+      return retellRequest(apiKey, 'GET', '/v2/get-mcp-tools');
+
+    // ─── KNOWLEDGE BASE ───
+    case 'listKnowledgeBases':
+      return retellRequest(apiKey, 'GET', '/v2/list-knowledge-bases');
+    case 'getKnowledgeBase':
+      return retellRequest(apiKey, 'GET', `/v2/get-knowledge-base/${requireId(params.knowledgeBaseId, 'knowledgeBaseId')}`);
+    case 'createKnowledgeBase': {
+      const kbPayload: any = {
+        knowledge_base_name: params.name || 'New Knowledge Base',
+      };
+      if (params.texts?.length > 0) {
+        kbPayload.knowledge_base_texts = params.texts.map((t: any) => ({
+          text: t.content || t.text,
+          title: t.title || 'Document',
+        }));
+      }
+      if (params.urls?.length > 0) {
+        kbPayload.knowledge_base_urls = params.urls;
+      }
+      return retellRequest(apiKey, 'POST', '/v2/create-knowledge-base', undefined, kbPayload);
+    }
+    case 'updateKnowledgeBase': {
+      const updateKbPayload: any = {};
+      if (params.knowledge_base_name) updateKbPayload.knowledge_base_name = params.knowledge_base_name;
+      if (params.knowledge_base_texts) updateKbPayload.knowledge_base_texts = params.knowledge_base_texts;
+      if (params.knowledge_base_urls) updateKbPayload.knowledge_base_urls = params.knowledge_base_urls;
+      return retellRequest(apiKey, 'PATCH', `/v2/update-knowledge-base/${requireId(params.knowledgeBaseId, 'knowledgeBaseId')}`, undefined, updateKbPayload);
+    }
+    case 'deleteKnowledgeBase':
+      return retellRequest(apiKey, 'DELETE', `/v2/delete-knowledge-base/${requireId(params.knowledgeBaseId, 'knowledgeBaseId')}`);
+    case 'addKnowledgeBaseSources': {
+      const sourcesPayload: any = {};
+      if (params.texts) {
+        sourcesPayload.knowledge_base_texts = params.texts.map((t: any) => ({
+          text: t.content || t.text,
+          title: t.title || 'Document',
+        }));
+      }
+      if (params.urls) {
+        sourcesPayload.knowledge_base_urls = params.urls;
+      }
+      return retellRequest(apiKey, 'POST', `/v2/add-knowledge-base-sources/${requireId(params.knowledgeBaseId, 'knowledgeBaseId')}`, undefined, sourcesPayload);
+    }
+    case 'deleteKnowledgeBaseSource':
+      return retellRequest(apiKey, 'DELETE', `/v2/delete-knowledge-base-source/${requireId(params.knowledgeBaseId, 'knowledgeBaseId')}/${requireId(params.sourceId, 'sourceId')}`);
+
+    // ─── VOICES ───
+    case 'listVoices':
+      return retellRequest(apiKey, 'GET', '/v2/list-voices');
+    case 'getVoice':
+      return retellRequest(apiKey, 'GET', `/v2/get-voice/${requireId(params.voiceId, 'voiceId')}`);
+    case 'addVoice':
+      return retellRequest(apiKey, 'POST', '/v2/add-voice', undefined, params.config);
+    case 'cloneVoice':
+      return retellRequest(apiKey, 'POST', '/v2/clone-voice', undefined, params.config);
+    case 'searchVoice':
+      return retellRequest(apiKey, 'POST', '/v2/search-voice', undefined, params.config || {});
+
+    // ─── PHONE NUMBERS ───
+    case 'listPhoneNumbers':
+      return retellRequest(apiKey, 'GET', '/v2/list-phone-numbers');
+    case 'getPhoneNumber':
+      return retellRequest(apiKey, 'GET', `/v2/get-phone-number/${encodeURIComponent(requireId(params.phoneNumber, 'phoneNumber'))}`);
+    case 'createPhoneNumber':
+      return retellRequest(apiKey, 'POST', '/v2/create-phone-number', undefined, params.config);
+    case 'updatePhoneNumber':
+      return retellRequest(apiKey, 'PATCH', `/v2/update-phone-number/${encodeURIComponent(requireId(params.phoneNumber, 'phoneNumber'))}`, undefined, params.config);
+    case 'deletePhoneNumber':
+      return retellRequest(apiKey, 'DELETE', `/v2/delete-phone-number/${encodeURIComponent(requireId(params.phoneNumber, 'phoneNumber'))}`);
+    case 'importPhoneNumber':
+      return retellRequest(apiKey, 'POST', '/v2/import-phone-number', undefined, {
+        phone_number: params.phoneNumber,
+        ...(params.agentId && { agent_id: params.agentId }),
+        ...(params.terminationUri && { termination_uri: params.terminationUri }),
+      });
+    case 'registerPhoneCall':
+      return retellRequest(apiKey, 'POST', '/v2/register-phone-call', undefined, params.config);
+
+    // ─── BATCH CALL ───
+    case 'createBatchCall':
+      return retellRequest(apiKey, 'POST', '/v2/create-batch-call', undefined, params.config);
+
+    // ─── TEST CASE ───
+    case 'createTestCaseDefinition':
+      return retellRequest(apiKey, 'POST', '/v2/create-test-case-definition', undefined, params.config);
+    case 'getTestCaseDefinition':
+      return retellRequest(apiKey, 'GET', `/v2/get-test-case-definition/${requireId(params.testId, 'testId')}`);
+    case 'listTestCaseDefinitions':
+      return retellRequest(apiKey, 'GET', '/v2/list-test-case-definitions');
+    case 'updateTestCaseDefinition':
+      return retellRequest(apiKey, 'PUT', `/v2/update-test-case-definition/${requireId(params.testId, 'testId')}`, undefined, params.config);
+    case 'deleteTestCaseDefinition':
+      return retellRequest(apiKey, 'DELETE', `/v2/delete-test-case-definition/${requireId(params.testId, 'testId')}`);
+
+    // ─── BATCH TEST ───
+    case 'createBatchTest':
+      return retellRequest(apiKey, 'POST', '/v2/create-batch-test', undefined, params.config);
+    case 'getBatchTest':
+      return retellRequest(apiKey, 'GET', `/v2/get-batch-test/${requireId(params.batchId, 'batchId')}`);
+    case 'listBatchTests':
+      return retellRequest(apiKey, 'GET', '/v2/list-batch-tests');
+
+    // ─── TEST RUN ───
+    case 'getTestRun':
+      return retellRequest(apiKey, 'GET', `/v2/get-test-run/${requireId(params.runId, 'runId')}`);
+    case 'listTestRuns':
+      return retellRequest(apiKey, 'GET', '/v2/list-test-runs');
+
+    // ─── CONCURRENCY ───
+    case 'getConcurrency':
+      return retellRequest(apiKey, 'GET', '/v2/get-concurrency');
+
+    // ─── ANALYTICS (computed from calls) ───
+    case 'getAnalytics': {
+      const timeframe = params.timeframe || '7d';
+      const startDate = getStartDate(timeframe);
+
+      const callsResult = await retellRequest(apiKey, 'POST', '/v2/list-calls', undefined, {
+        filter_criteria: {
+          ...(agentId && { agent_id: [agentId] }),
+        },
+        limit: 1000,
+      });
+
+      const callsArray = normalizeCallsArray(callsResult);
+      const filteredCalls = callsArray.filter((call: any) => {
+        const callDate = new Date(call.start_timestamp || call.created_at);
+        return callDate >= startDate;
+      });
+
+      return computeAnalytics(filteredCalls);
+    }
+
+    default:
+      throw new Error(`Unsupported action: ${action}`);
+  }
+}
+
+// ─── Create Agent (with optional LLM creation) ───
+async function handleCreateAgent(apiKey: string, agentId: string | undefined, params: any) {
+  let llmId = params.llmId;
+  
+  if (!llmId && params.systemPrompt) {
+    console.log('[Retell] Creating LLM for agent...');
+    const llmConfig: any = {
+      model: params.llmModel || 'gpt-4o-mini',
+      general_prompt: params.systemPrompt,
+      general_tools: [],
+    };
+    if (params.firstMessage) llmConfig.begin_message = params.firstMessage;
+    if (params.temperature !== undefined) llmConfig.model_temperature = params.temperature;
+
+    const llmResult = await retellRequest(apiKey, 'POST', '/v2/create-retell-llm', undefined, llmConfig);
+    llmId = llmResult.llm_id;
+    console.log(`[Retell] Created LLM: ${llmId}`);
+  }
+
+  const agentConfig: any = {
+    agent_name: params.name,
+    voice_id: params.voiceId,
+  };
+
+  if (llmId) {
+    agentConfig.response_engine = { type: 'retell-llm', llm_id: llmId };
+  }
+  if (params.speed !== undefined) agentConfig.voice_speed = params.speed;
+  if (params.voiceTemperature !== undefined) agentConfig.voice_temperature = params.voiceTemperature;
+  if (params.language) agentConfig.language = params.language;
+  if (params.silenceTimeout !== undefined) agentConfig.end_call_after_silence_ms = params.silenceTimeout * 1000;
+  if (params.ambientSound) agentConfig.ambient_sound = params.ambientSound;
+  if (params.pronunciationDictionary) agentConfig.pronunciation_dictionary = params.pronunciationDictionary;
+  if (params.config) Object.assign(agentConfig, params.config);
+
+  const result = await retellRequest(apiKey, 'POST', '/v2/create-agent', undefined, agentConfig);
+  if (llmId) result.llm_id = llmId;
+  return result;
+}
+
+// ─── Helpers ───
+function requireId(id: string | undefined | null, name: string): string {
+  if (!id) throw new Error(`${name} is required`);
+  return id;
+}
+
+function normalizeCallsArray(raw: any): any[] {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.calls)) return raw.calls;
+  if (Array.isArray(raw?.call_details)) return raw.call_details;
+  return [];
+}
 
 async function retellRequest(
   apiKey: string, 
@@ -405,22 +435,12 @@ async function retellRequest(
 function getStartDate(timeframe: string): Date {
   const now = new Date();
   switch (timeframe) {
-    case '24h':
-      now.setHours(now.getHours() - 24);
-      break;
-    case '7d':
-      now.setDate(now.getDate() - 7);
-      break;
-    case '30d':
-      now.setDate(now.getDate() - 30);
-      break;
-    case '90d':
-      now.setDate(now.getDate() - 90);
-      break;
-    case 'all':
-      return new Date(0);
-    default:
-      return new Date(0);
+    case '24h': now.setHours(now.getHours() - 24); break;
+    case '7d': now.setDate(now.getDate() - 7); break;
+    case '30d': now.setDate(now.getDate() - 30); break;
+    case '90d': now.setDate(now.getDate() - 90); break;
+    case 'all': return new Date(0);
+    default: return new Date(0);
   }
   return now;
 }
@@ -437,13 +457,10 @@ function computeAnalytics(calls: any[]) {
     callsByStatus[status] = (callsByStatus[status] || 0) + 1;
 
     if (call.end_timestamp && call.start_timestamp) {
-      const duration = (call.end_timestamp - call.start_timestamp) / 1000;
-      totalDuration += duration;
+      totalDuration += (call.end_timestamp - call.start_timestamp) / 1000;
     }
 
-    if (status === 'ended' || status === 'completed') {
-      completedCalls++;
-    }
+    if (status === 'ended' || status === 'completed') completedCalls++;
 
     const timestamp = call.start_timestamp || call.created_at;
     if (timestamp) {
