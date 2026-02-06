@@ -1234,36 +1234,49 @@ serve(async (req) => {
             );
           }
 
-          // Check if client has assigned agent
-          if (!client.assigned_agent_id) {
+          // Find agent via client_agent_assignments table (primary source of truth)
+          const { data: assignments, error: assignmentsError } = await supabase
+            .from("client_agent_assignments")
+            .select("role, can_edit_knowledge, can_edit_prompt, agent_id")
+            .eq("client_id", client.id)
+            .limit(1);
+
+          if (assignmentsError) {
+            console.error("Error finding agent assignments:", assignmentsError);
             return new Response(
-              JSON.stringify({ error: "Aucun agent assigné à ce compte. Contactez votre administrateur." }),
+              JSON.stringify({ error: "Erreur lors de la recherche des agents" }),
+              { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          // Fallback to assigned_agent_id if no assignments found
+          const agentIdToUse = assignments?.length > 0 
+            ? assignments[0].agent_id 
+            : client.assigned_agent_id;
+
+          if (!agentIdToUse) {
+            return new Response(
+              JSON.stringify({ error: "No agent assigned to this account. Contact your administrator." }),
               { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
 
-          // Fetch the assigned agent separately
+          // Fetch the agent details
           const { data: assignedAgent, error: agentError } = await supabase
             .from("agents")
             .select("id, name, slug, organization_id, platform, platform_agent_id")
-            .eq("id", client.assigned_agent_id)
+            .eq("id", agentIdToUse)
             .maybeSingle();
 
           if (agentError || !assignedAgent) {
             console.error("Error finding assigned agent:", agentError);
             return new Response(
-              JSON.stringify({ error: "Agent assigné non trouvé. Contactez votre administrateur." }),
+              JSON.stringify({ error: "Assigned agent not found. Contact your administrator." }),
               { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
 
-          // Check if client has access via assignment table
-          const { data: assignment } = await supabase
-            .from("client_agent_assignments")
-            .select("role, can_edit_knowledge, can_edit_prompt")
-            .eq("client_id", client.id)
-            .eq("agent_id", assignedAgent.id)
-            .maybeSingle();
+          const assignment = assignments?.length > 0 ? assignments[0] : null;
 
           // SECURITY: Do NOT return API keys to clients - use server-side proxy instead
           const session = {
@@ -1357,34 +1370,44 @@ serve(async (req) => {
           );
         }
 
-        if (!parentClient.assigned_agent_id) {
+        // Find agent via client_agent_assignments table (primary source of truth)
+        const { data: parentAssignments, error: parentAssignmentsError } = await supabase
+          .from("client_agent_assignments")
+          .select("role, can_edit_knowledge, can_edit_prompt, agent_id")
+          .eq("client_id", parentClient.id)
+          .limit(1);
+
+        if (parentAssignmentsError) {
+          console.error("Error finding parent agent assignments:", parentAssignmentsError);
+        }
+
+        const parentAgentIdToUse = parentAssignments?.length > 0 
+          ? parentAssignments[0].agent_id 
+          : parentClient.assigned_agent_id;
+
+        if (!parentAgentIdToUse) {
           return new Response(
-            JSON.stringify({ error: "Aucun agent assigné au client. Contactez votre administrateur." }),
+            JSON.stringify({ error: "No agent assigned to this account. Contact your administrator." }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
-        // Fetch the assigned agent separately
+        // Fetch the assigned agent
         const { data: parentAssignedAgent, error: parentAgentError } = await supabase
           .from("agents")
           .select("id, name, slug, organization_id, platform, platform_agent_id")
-          .eq("id", parentClient.assigned_agent_id)
+          .eq("id", parentAgentIdToUse)
           .maybeSingle();
 
         if (parentAgentError || !parentAssignedAgent) {
           return new Response(
-            JSON.stringify({ error: "Agent assigné non trouvé. Contactez votre administrateur." }),
+            JSON.stringify({ error: "Assigned agent not found. Contact your administrator." }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
         // Get assignment
-        const { data: memberAssignment } = await supabase
-          .from("client_agent_assignments")
-          .select("role, can_edit_knowledge, can_edit_prompt")
-          .eq("client_id", parentClient.id)
-          .eq("agent_id", parentAssignedAgent.id)
-          .maybeSingle();
+        const memberAssignment = parentAssignments?.length > 0 ? parentAssignments[0] : null;
 
         // SECURITY: Do NOT return API keys to clients - use server-side proxy instead
         // Update last login
