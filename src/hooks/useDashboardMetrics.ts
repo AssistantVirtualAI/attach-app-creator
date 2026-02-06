@@ -169,23 +169,26 @@ export const useDashboardMetrics = (dateRange?: DateRange) => {
       if (elevenLabsData && !elevenLabsData.requiresSetup) {
         dataSource = 'elevenlabs';
         
-        totalConversations = elevenLabsData.metrics?.totalConversations || 0;
-        avgSatisfaction = elevenLabsData.metrics?.avgSatisfaction || 0;
-        avgDuration = elevenLabsData.metrics?.avgDuration || 0;
+        // API returns snake_case: total_conversations, avg_conversation_duration, satisfaction_score
+        totalConversations = elevenLabsData.metrics?.total_conversations || elevenLabsData.metrics?.totalConversations || 0;
+        avgSatisfaction = elevenLabsData.metrics?.satisfaction_score || elevenLabsData.metrics?.avgSatisfaction || 0;
+        avgDuration = elevenLabsData.metrics?.avg_conversation_duration || elevenLabsData.metrics?.avgDuration || 0;
 
-        // Process agent performance
-        if (elevenLabsData.agents && Array.isArray(elevenLabsData.agents)) {
-          agentPerformance = elevenLabsData.agents.map((agent: any) => ({
+        // Process agent performance - API returns "perAgent" array
+        const agentsArray = elevenLabsData.perAgent || elevenLabsData.agents;
+        if (agentsArray && Array.isArray(agentsArray)) {
+          agentPerformance = agentsArray.map((agent: any) => ({
             name: agent.name || 'Agent',
-            conversations: agent.totalConversations || 0,
-            satisfaction: agent.avgSatisfaction || 0,
-            duration: agent.avgDuration || 0,
+            conversations: agent.metrics?.total_conversations || agent.totalConversations || 0,
+            satisfaction: agent.metrics?.satisfaction_score || agent.avgSatisfaction || 0,
+            duration: agent.metrics?.avg_duration || agent.avgDuration || 0,
           }));
         }
 
-        // Process chart data for weekly view
-        if (elevenLabsData.chartData?.daily && Array.isArray(elevenLabsData.chartData.daily)) {
-          const last7Days = elevenLabsData.chartData.daily.slice(-7);
+        // Process chart data for weekly view - API returns "charts.conversations_over_time"
+        const chartDaily = elevenLabsData.charts?.conversations_over_time || elevenLabsData.chartData?.daily;
+        if (chartDaily && Array.isArray(chartDaily)) {
+          const last7Days = chartDaily.slice(-7);
           const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
           const dayNames = dayKeys.map(k => t(`dashboard.charts.days.${k}`));
           weeklyData = last7Days.map((day: any) => {
@@ -337,7 +340,7 @@ export const useDashboardMetrics = (dateRange?: DateRange) => {
           conversationsThisWeek,
           conversationsThisMonth: totalConversations,
           previousPeriodConversations: 0,
-          conversationsTrend: elevenLabsData?.trends?.conversationsTrend || 0,
+          conversationsTrend: elevenLabsData?.trends?.conversations_change || elevenLabsData?.trends?.conversationsTrend || 0,
           incomingMessages: totalConversations,
           previousPeriodMessages: 0,
           messagesTrend: 0,
@@ -361,7 +364,7 @@ export const useDashboardMetrics = (dateRange?: DateRange) => {
           sentimentBreakdown: finalSentimentBreakdown,
           peakHours,
           qualityScore,
-          weeklyGrowth: elevenLabsData?.trends?.conversationsTrend || 0,
+          weeklyGrowth: elevenLabsData?.trends?.conversations_change || elevenLabsData?.trends?.conversationsTrend || 0,
           totalDurationMinutes: Math.round(totalDuration / 60),
           // Additional AI insights data
           aiInsightsAvailable: !!aiInsights,
