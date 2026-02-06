@@ -73,29 +73,70 @@ const ClientAgentPortalContent = () => {
 
     setAdminLoginAttempted(true);
 
-    // Wait for Supabase auth to fully initialize before checking session
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    let cancelled = false;
+
+    const attemptAdminLogin = async () => {
       try {
-        if (session?.user) {
-          // Try admin login
+        // First try getting the session directly
+        const { data: { session: authSession } } = await supabase.auth.getSession();
+        if (!cancelled && authSession?.user) {
           const adminSession = await loginAsAdmin(clientId);
-          if (adminSession) {
+          if (!cancelled && adminSession) {
             setCheckingAdmin(false);
-            subscription.unsubscribe();
             return;
           }
         }
       } catch (err) {
-        console.log('Admin auto-login failed:', err);
+        console.log('Admin auto-login failed (getSession):', err);
       }
 
-      // No admin session or admin login failed, redirect to client login
-      setCheckingAdmin(false);
-      navigate('/client/login');
-      subscription.unsubscribe();
-    });
+      // If getSession didn't work, listen for auth state changes (token refresh, etc.)
+      if (cancelled) return;
 
-    return () => subscription.unsubscribe();
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (cancelled) {
+          subscription.unsubscribe();
+          return;
+        }
+
+        if (session?.user) {
+          try {
+            const adminSession = await loginAsAdmin(clientId);
+            if (!cancelled && adminSession) {
+              setCheckingAdmin(false);
+              subscription.unsubscribe();
+              return;
+            }
+          } catch (err) {
+            console.log('Admin auto-login failed (onAuthStateChange):', err);
+          }
+        }
+
+        // Only redirect on definitive events (not intermediate states)
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_OUT') {
+          if (!cancelled) {
+            setCheckingAdmin(false);
+            navigate('/client/login');
+          }
+          subscription.unsubscribe();
+        }
+      });
+
+      // Safety timeout - if nothing happens within 5 seconds, redirect
+      setTimeout(() => {
+        if (!cancelled) {
+          setCheckingAdmin(false);
+          navigate('/client/login');
+          subscription.unsubscribe();
+        }
+      }, 5000);
+    };
+
+    attemptAdminLogin();
+
+    return () => {
+      cancelled = true;
+    };
   }, [authLoading, isAuthenticated, clientId, loginAsAdmin, navigate, adminLoginAttempted]);
 
   useEffect(() => {
