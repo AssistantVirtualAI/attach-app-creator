@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { DashboardMetrics, DateRange } from './useDashboardMetrics';
 import { format } from 'date-fns';
+import { t } from '@/lib/i18n';
 
 export interface AgentWithStats {
   id: string;
@@ -147,21 +148,25 @@ export const useAgentDashboardMetrics = (agentId: string | null, dateRange?: Dat
       const insights = insightsRes.data || [];
       const conversations = conversationsData?.conversations || [];
 
+      // Helper to parse conversation timestamps (handles both start_time and start_time_unix_secs)
+      const parseConvDate = (c: any): Date => {
+        if (c.start_time_unix_secs) return new Date(c.start_time_unix_secs * 1000);
+        if (c.start_time) {
+          const d = new Date(c.start_time);
+          if (!isNaN(d.getTime())) return d;
+        }
+        if (c.created_at) return new Date(c.created_at);
+        return new Date(0);
+      };
+
       // Calculate metrics from agent-specific data
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
 
-      const conversationsToday = conversations.filter((c: any) => {
-        const convDate = new Date(c.start_time || c.created_at);
-        return convDate >= today;
-      }).length;
-
-      const conversationsThisWeek = conversations.filter((c: any) => {
-        const convDate = new Date(c.start_time || c.created_at);
-        return convDate >= weekAgo;
-      }).length;
+      const conversationsToday = conversations.filter((c: any) => parseConvDate(c) >= today).length;
+      const conversationsThisWeek = conversations.filter((c: any) => parseConvDate(c) >= weekAgo).length;
 
       // Sentiment breakdown
       const sentimentBreakdown = { positive: 0, neutral: 0, negative: 0 };
@@ -177,7 +182,7 @@ export const useAgentDashboardMetrics = (agentId: string | null, dateRange?: Dat
         else if (sentiment === 'negative') sentimentBreakdown.negative++;
         else sentimentBreakdown.neutral++;
 
-        if (c.status === 'done' || c.analysis?.call_successful) resolvedCount++;
+        if (c.status === 'done' || c.analysis?.call_successful === 'success' || c.call_successful === 'success') resolvedCount++;
         if (c.call_duration_secs) totalDuration += c.call_duration_secs;
         
         if (c.analysis?.satisfaction_score) {
@@ -185,8 +190,10 @@ export const useAgentDashboardMetrics = (agentId: string | null, dateRange?: Dat
           satisfactionCount++;
         }
 
-        const hour = new Date(c.start_time || c.created_at).getHours();
-        hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+        const hour = parseConvDate(c).getHours();
+        if (!isNaN(hour)) {
+          hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+        }
       });
 
       // Also include insights sentiment
@@ -204,47 +211,72 @@ export const useAgentDashboardMetrics = (agentId: string | null, dateRange?: Dat
 
       const avgSatisfaction = satisfactionCount > 0 
         ? totalSatisfaction / satisfactionCount 
-        : (analytics?.avgSatisfaction || 0);
+        : (analytics?.metrics?.avg_satisfaction || analytics?.metrics?.satisfaction_score || analytics?.avgSatisfaction || 0);
 
-      const totalConversations = conversationsData?.total || conversations.length;
+      const totalConversations = analytics?.metrics?.total_conversations || conversationsData?.total || conversations.length;
       const resolutionRate = totalConversations > 0 
         ? Math.round((resolvedCount / totalConversations) * 100) 
         : 0;
 
-      const peakHours = Object.entries(hourCounts)
-        .map(([hour, count]) => ({ hour: parseInt(hour), count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
-
-      // Generate weekly data
-      const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-      const dayCounts: Record<string, { conversations: number; satisfaction: number[] }> = {};
-      
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dayName = dayNames[date.getDay()];
-        dayCounts[dayName] = { conversations: 0, satisfaction: [] };
+      // Use analytics API peak_hours if available, otherwise compute from conversations
+      let peakHours: { hour: number; count: number }[] = [];
+      if (analytics?.charts?.peak_hours && Array.isArray(analytics.charts.peak_hours)) {
+        peakHours = analytics.charts.peak_hours
+          .map((h: any) => ({ hour: h.hour, count: h.count }))
+          .sort((a: any, b: any) => a.hour - b.hour);
+      } else {
+        peakHours = Object.entries(hourCounts)
+          .map(([hour, count]) => ({ hour: parseInt(hour), count }))
+          .sort((a, b) => a.hour - b.hour);
       }
 
-      conversations.forEach((c: any) => {
-        const convDate = new Date(c.start_time || c.created_at);
-        const dayName = dayNames[convDate.getDay()];
-        if (dayCounts[dayName]) {
-          dayCounts[dayName].conversations++;
-          if (c.analysis?.satisfaction_score) {
-            dayCounts[dayName].satisfaction.push(c.analysis.satisfaction_score);
-          }
-        }
-      });
+      // Generate weekly data from analytics chart data or conversations
+      const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      const dayNames = dayKeys.map(k => t(`dashboard.charts.days.${k}`));
+      let weeklyData: { name: string; conversations: number; satisfaction: number }[] = [];
 
-      const weeklyData = Object.entries(dayCounts).map(([name, data]) => ({
-        name,
-        conversations: data.conversations,
-        satisfaction: data.satisfaction.length > 0 
-          ? data.satisfaction.reduce((a, b) => a + b, 0) / data.satisfaction.length 
-          : 0,
-      }));
+      // Try using analytics chart data first
+      const chartDaily = analytics?.charts?.conversations_over_time;
+      if (chartDaily && Array.isArray(chartDaily) && chartDaily.length > 0) {
+        const last7Days = chartDaily.slice(-7);
+        weeklyData = last7Days.map((day: any) => {
+          const date = new Date(day.date);
+          return {
+            name: dayNames[date.getDay()],
+            conversations: day.count || day.conversations || 0,
+            satisfaction: day.avgSatisfaction || 0,
+          };
+        });
+      } else {
+        // Fallback: compute from conversations
+        const dayCounts: Record<string, { conversations: number; satisfaction: number[] }> = {};
+        
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          const dayName = dayNames[date.getDay()];
+          dayCounts[dayName] = { conversations: 0, satisfaction: [] };
+        }
+
+        conversations.forEach((c: any) => {
+          const convDate = parseConvDate(c);
+          const dayName = dayNames[convDate.getDay()];
+          if (dayCounts[dayName]) {
+            dayCounts[dayName].conversations++;
+            if (c.analysis?.satisfaction_score) {
+              dayCounts[dayName].satisfaction.push(c.analysis.satisfaction_score);
+            }
+          }
+        });
+
+        weeklyData = Object.entries(dayCounts).map(([name, data]) => ({
+          name,
+          conversations: data.conversations,
+          satisfaction: data.satisfaction.length > 0 
+            ? data.satisfaction.reduce((a, b) => a + b, 0) / data.satisfaction.length 
+            : 0,
+        }));
+      }
 
       // Top smart tags from insights
       const tagCounts: Record<string, number> = {};
@@ -280,17 +312,15 @@ export const useAgentDashboardMetrics = (agentId: string | null, dateRange?: Dat
       // Recent activity
       const recentActivity = conversations
         .filter((c: any) => {
-          const timestamp = c.start_time || c.created_at;
-          if (!timestamp) return false;
-          const date = new Date(timestamp);
-          return !isNaN(date.getTime());
+          const date = parseConvDate(c);
+          return date.getTime() > 0;
         })
         .slice(0, 10)
         .map((c: any) => ({
           id: c.conversation_id || c.id,
           type: 'conversation' as const,
-          title: `Conversation ${(c.conversation_id || c.id)?.substring(0, 8) || 'N/A'}`,
-          timestamp: c.start_time || c.created_at,
+          title: c.call_summary_title || `Conversation ${(c.conversation_id || c.id)?.substring(0, 8) || 'N/A'}`,
+          timestamp: parseConvDate(c).toISOString(),
         }));
 
       return {
@@ -299,7 +329,7 @@ export const useAgentDashboardMetrics = (agentId: string | null, dateRange?: Dat
         conversationsThisWeek,
         conversationsThisMonth: totalConversations,
         previousPeriodConversations: 0,
-        conversationsTrend: analytics?.trends?.conversationsTrend || 0,
+        conversationsTrend: analytics?.trends?.conversations?.direction === 'up' ? 5 : analytics?.trends?.conversations?.direction === 'down' ? -5 : 0,
         incomingMessages: totalConversations,
         previousPeriodMessages: 0,
         messagesTrend: 0,
@@ -308,7 +338,7 @@ export const useAgentDashboardMetrics = (agentId: string | null, dateRange?: Dat
         usersTrend: 0,
         avgInteractions: 0,
         avgSatisfaction: Math.round(avgSatisfaction * 10) / 10,
-        avgDuration: Math.round(analytics?.avgDuration || (totalDuration / Math.max(1, conversations.length))),
+        avgDuration: Math.round(analytics?.metrics?.avg_duration || analytics?.avgDuration || (totalDuration / Math.max(1, conversations.length))),
         activeClients: 0,
         totalAgents: 1,
         platformDistribution: [{ platform: 'ElevenLabs', count: totalConversations }],
@@ -320,14 +350,14 @@ export const useAgentDashboardMetrics = (agentId: string | null, dateRange?: Dat
           name: agent.name,
           conversations: totalConversations,
           satisfaction: avgSatisfaction,
-          duration: analytics?.avgDuration || 0
+          duration: analytics?.metrics?.avg_duration || analytics?.avgDuration || 0
         }],
         resolutionRate,
         resolvedConversations: resolvedCount,
         sentimentBreakdown,
         peakHours,
         qualityScore: avgSatisfaction > 0 ? Math.round((avgSatisfaction / 10) * 100) : 0,
-        weeklyGrowth: analytics?.trends?.conversationsTrend || 0,
+        weeklyGrowth: analytics?.trends?.conversations?.direction === 'up' ? 5 : 0,
         totalDurationMinutes: Math.round(totalDuration / 60),
         aiInsightsAvailable: insights.length > 0,
         analysisCoverageRate: totalConversations > 0 

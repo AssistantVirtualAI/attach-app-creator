@@ -206,26 +206,31 @@ export const useDashboardMetrics = (dateRange?: DateRange) => {
       if (conversationsData?.conversations && Array.isArray(conversationsData.conversations)) {
         const conversations = conversationsData.conversations;
         
+        // Helper to parse conversation timestamps (handles both start_time and start_time_unix_secs)
+        const parseConvDate = (c: any): Date => {
+          if (c.start_time_unix_secs) return new Date(c.start_time_unix_secs * 1000);
+          if (c.start_time) {
+            const d = new Date(c.start_time);
+            if (!isNaN(d.getTime())) return d;
+          }
+          if (c.created_at) return new Date(c.created_at);
+          return new Date(0);
+        };
+
         // Calculate today's conversations
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const conversationsToday = conversations.filter((c: any) => {
-          const convDate = new Date(c.start_time || c.created_at);
-          return convDate >= today;
-        }).length;
+        const conversationsToday = conversations.filter((c: any) => parseConvDate(c) >= today).length;
 
         // Calculate this week's conversations
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 7);
-        const conversationsThisWeek = conversations.filter((c: any) => {
-          const convDate = new Date(c.start_time || c.created_at);
-          return convDate >= weekAgo;
-        }).length;
+        const conversationsThisWeek = conversations.filter((c: any) => parseConvDate(c) >= weekAgo).length;
 
         // Platform distribution
         const platformCounts: Record<string, number> = {};
         conversations.forEach((c: any) => {
-          const platform = 'ElevenLabs';
+          const platform = c.agent_name || 'ElevenLabs';
           platformCounts[platform] = (platformCounts[platform] || 0) + 1;
         });
         platformDistribution = Object.entries(platformCounts).map(([platform, count]) => ({
@@ -235,18 +240,13 @@ export const useDashboardMetrics = (dateRange?: DateRange) => {
 
         // Recent activity - filter out invalid dates
         recentActivity = conversations
-          .filter((c: any) => {
-            const timestamp = c.start_time || c.created_at;
-            if (!timestamp) return false;
-            const date = new Date(timestamp);
-            return !isNaN(date.getTime());
-          })
+          .filter((c: any) => parseConvDate(c).getTime() > 0)
           .slice(0, 10)
           .map((c: any) => ({
             id: c.conversation_id || c.id,
             type: 'conversation' as const,
-            title: `Conversation ${(c.conversation_id || c.id)?.substring(0, 8) || 'N/A'}`,
-            timestamp: c.start_time || c.created_at,
+            title: c.call_summary_title || `Conversation ${(c.conversation_id || c.id)?.substring(0, 8) || 'N/A'}`,
+            timestamp: parseConvDate(c).toISOString(),
           }));
 
         // Generate weekly data if not from analytics
@@ -262,7 +262,7 @@ export const useDashboardMetrics = (dateRange?: DateRange) => {
           }
 
           conversations.forEach((c: any) => {
-            const convDate = new Date(c.start_time || c.created_at);
+            const convDate = parseConvDate(c);
             const dayName = dayNames[convDate.getDay()];
             if (dayCounts[dayName]) {
               dayCounts[dayName].conversations++;
@@ -300,19 +300,29 @@ export const useDashboardMetrics = (dateRange?: DateRange) => {
           else sentimentBreakdown.neutral++;
           
           // Resolution
-          if (c.status === 'done' || c.analysis?.call_successful) resolvedCount++;
+          if (c.status === 'done' || c.analysis?.call_successful === 'success' || c.call_successful === 'success') resolvedCount++;
           
           // Duration
           if (c.call_duration_secs) totalDuration += c.call_duration_secs;
           
-          // Peak hours
-          const hour = new Date(c.start_time || c.created_at).getHours();
-          hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+          // Peak hours (from conversations as fallback)
+          const hour = parseConvDate(c).getHours();
+          if (!isNaN(hour)) {
+            hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+          }
         });
 
-        const peakHours = Object.entries(hourCounts)
-          .map(([hour, count]) => ({ hour: parseInt(hour), count }))
-          .sort((a, b) => a.hour - b.hour);
+        // Use analytics API peak_hours if available, otherwise use computed from conversations
+        let peakHours: { hour: number; count: number }[] = [];
+        if (elevenLabsData?.charts?.peak_hours && Array.isArray(elevenLabsData.charts.peak_hours)) {
+          peakHours = elevenLabsData.charts.peak_hours
+            .map((h: any) => ({ hour: h.hour, count: h.count }))
+            .sort((a: any, b: any) => a.hour - b.hour);
+        } else {
+          peakHours = Object.entries(hourCounts)
+            .map(([hour, count]) => ({ hour: parseInt(hour), count }))
+            .sort((a, b) => a.hour - b.hour);
+        }
 
         const resolutionRate = conversations.length > 0 
           ? Math.round((resolvedCount / conversations.length) * 100) 
