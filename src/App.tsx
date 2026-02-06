@@ -46,6 +46,9 @@ import ClientAgentAnalytics from "./pages/ClientAgentAnalytics";
 import ClientAgentKnowledge from "./pages/ClientAgentKnowledge";
 import ClientAgentSettings from "./pages/ClientAgentSettings";
 import ClientAgentEndpoints from "./pages/ClientAgentEndpoints";
+import ClientAgentMCP from "./pages/ClientAgentMCP";
+import ClientAgentWebhooks from "./pages/ClientAgentWebhooks";
+import ClientAgentWidget from "./pages/ClientAgentWidget";
 import WidgetPrototype from "./pages/WidgetPrototype";
 import WidgetIframe from "./pages/WidgetIframe";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -474,6 +477,9 @@ const App = () => (
                   <Route path="knowledge" element={<ClientAgentKnowledge />} />
                   <Route path="settings" element={<ClientAgentSettings />} />
                   <Route path="endpoints" element={<ClientAgentEndpoints />} />
+                  <Route path="mcp" element={<ClientAgentMCP />} />
+                  <Route path="webhooks" element={<ClientAgentWebhooks />} />
+                  <Route path="widget" element={<ClientAgentWidget />} />
                 </Route>
 
                 {/* New Portal Routes - Agent slug based directly at root */}
