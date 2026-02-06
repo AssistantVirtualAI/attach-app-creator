@@ -19,7 +19,7 @@ const PortalLoginContent = () => {
   const [agentInfo, setAgentInfo] = useState<{ name: string; avatar_url?: string } | null>(null);
   const [loadingAgent, setLoadingAgent] = useState(true);
   const [checkingSuperAdmin, setCheckingSuperAdmin] = useState(true);
-  const { login, isLoading, isAuthenticated, session, isSuperAdmin, loginAsSuperAdmin, loginAsOrgAdmin, supabaseUser } = usePortal();
+  const { login, isLoading, isAuthenticated, session, isSuperAdmin, isSuperAdminChecked, loginAsSuperAdmin, loginAsOrgAdmin, supabaseUser } = usePortal();
   const navigate = useNavigate();
 
   // Guard against placeholder routes like /portal/:agentSlug
@@ -30,12 +30,14 @@ const PortalLoginContent = () => {
   }, [agentSlug, navigate]);
 
   // Check for super admin / org admin auto-login first
+  // Wait for isSuperAdminChecked to avoid race condition
   useEffect(() => {
     const checkSuperAdminAccess = async () => {
       console.log('[PortalLogin] Checking admin access...', {
         agentSlug,
         supabaseUserId: supabaseUser?.id,
         supabaseUserEmail: supabaseUser?.email,
+        isSuperAdminChecked,
       });
 
       if (!agentSlug || agentSlug === ':agentSlug') {
@@ -54,6 +56,12 @@ const PortalLoginContent = () => {
       if (supabaseUser === null) {
         console.log('[PortalLogin] No authenticated user, showing login form');
         setCheckingSuperAdmin(false);
+        return;
+      }
+
+      // Wait for super admin check to complete before making decisions
+      if (!isSuperAdminChecked) {
+        console.log('[PortalLogin] Waiting for super admin check to complete...');
         return;
       }
 
@@ -100,7 +108,7 @@ const PortalLoginContent = () => {
     };
 
     checkSuperAdminAccess();
-  }, [agentSlug, isSuperAdmin, loginAsSuperAdmin, loginAsOrgAdmin, supabaseUser, navigate]);
+  }, [agentSlug, isSuperAdmin, isSuperAdminChecked, loginAsSuperAdmin, loginAsOrgAdmin, supabaseUser, navigate]);
 
   useEffect(() => {
     const loadAgent = async () => {
