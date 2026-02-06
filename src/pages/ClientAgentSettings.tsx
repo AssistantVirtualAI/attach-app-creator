@@ -1,12 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useClientAgentAccess } from '@/hooks/useClientAgentAccess';
-import { useClientPlatformAgentConfig } from '@/hooks/useClientPlatformData';
-import { 
-  useClientUpdateAgentPrompt,
-  useClientUpdateAgentVoice,
-  useClientElevenLabsVoices
-} from '@/hooks/useClientElevenLabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,9 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Checkbox } from '@/components/ui/checkbox';
+import { VoiceSelector } from '@/components/agents/VoiceSelector';
 import { 
   Settings, 
   MessageSquare, 
@@ -25,179 +22,162 @@ import {
   Lock,
   Info,
   RefreshCw,
-  Play,
-  Pause,
-  Search,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Mic,
+  Clock,
+  Globe,
+  Settings2,
+  Brain,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  useElevenLabsFullAgentConfig,
+  useUpdateTTSSettings,
+  useUpdateASRSettings,
+  useUpdateTurnSettings,
+  useUpdateConversationSettings,
+  useUpdateAgentAdvancedSettings,
+  useUpdatePrompt,
+  useUpdateLLMSettings,
+} from '@/hooks/useElevenLabsFullConfig';
+import {
+  ELEVENLABS_LANGUAGES,
+  ELEVENLABS_CLIENT_EVENTS,
+  TURN_EAGERNESS_OPTIONS,
+  ASR_PROVIDERS,
+  TTS_MODELS,
+} from '@/types/elevenlabs-full';
+import type { TTSSettings, ASRSettings, TurnSettings, ConversationSettings, LLMSettings } from '@/types/elevenlabs-full';
 
 const ClientAgentSettings = () => {
   const { clientId, agentId } = useParams();
   const { apiKey, platformAgentId, agentName, canEdit, platform, organizationId, isLoading: accessLoading } = useClientAgentAccess(clientId, agentId);
-  
-  // Prompt state
-  const [prompt, setPrompt] = useState('');
-  const [firstMessage, setFirstMessage] = useState('');
-  const [hasPromptChanges, setHasPromptChanges] = useState(false);
-  
-  // Voice state (ElevenLabs only)
-  const [voiceId, setVoiceId] = useState('');
-  const [stability, setStability] = useState(0.5);
-  const [similarityBoost, setSimilarityBoost] = useState(0.75);
-  const [style, setStyle] = useState(0);
-  const [speed, setSpeed] = useState(1);
-  const [hasVoiceChanges, setHasVoiceChanges] = useState(false);
 
-  const { data: agentConfig, isLoading, refetch } = useClientPlatformAgentConfig({
-    apiKey,
+  // Full config from ElevenLabs API
+  const { data: config, isLoading, refetch } = useElevenLabsFullAgentConfig({
     agentId: platformAgentId,
-    platform,
+    apiKey,
     organizationId,
+    enabled: !!platformAgentId && platform === 'elevenlabs',
   });
 
-  // Only fetch ElevenLabs voices when platform is elevenlabs
-  const { data: voices = [], isLoading: voicesLoading } = useClientElevenLabsVoices(
-    platform === 'elevenlabs' ? apiKey : null,
-    platform === 'elevenlabs' ? organizationId : null
-  );
+  // Mutation hooks
+  const updateTTS = useUpdateTTSSettings();
+  const updateASR = useUpdateASRSettings();
+  const updateTurn = useUpdateTurnSettings();
+  const updateConversation = useUpdateConversationSettings();
+  const updateAdvanced = useUpdateAgentAdvancedSettings();
+  const updatePromptMutation = useUpdatePrompt();
+  const updateLLM = useUpdateLLMSettings();
 
-  const updatePromptMutation = useClientUpdateAgentPrompt();
-  const updateVoiceMutation = useClientUpdateAgentVoice();
-  
-  // Voice preview state
-  const [voiceSearch, setVoiceSearch] = useState('');
-  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  // Local state for all settings
+  const [prompt, setPrompt] = useState('');
+  const [firstMessage, setFirstMessage] = useState('');
 
-  // Initialize prompt state from config
+  const [ttsSettings, setTtsSettings] = useState<TTSSettings>({
+    voice_id: '',
+    model_id: 'eleven_turbo_v2_5',
+    stability: 0.5,
+    similarity_boost: 0.75,
+    style: 0,
+    speed: 1,
+    optimize_streaming_latency: 3,
+  });
+
+  const [asrSettings, setAsrSettings] = useState<ASRSettings>({
+    provider: 'elevenlabs',
+    quality: 'high',
+    keywords: [],
+  });
+
+  const [turnSettings, setTurnSettings] = useState<TurnSettings>({
+    turn_timeout: 10,
+    silence_end_call_timeout: 30,
+    turn_eagerness: 'normal',
+  });
+
+  const [conversationSettings, setConversationSettings] = useState<ConversationSettings>({
+    max_duration_seconds: 600,
+    client_events: ['transcript', 'audio'],
+  });
+
+  const [language, setLanguage] = useState('fr');
+  const [disableFirstMessageInterruption, setDisableFirstMessageInterruption] = useState(false);
+  const [llmSettings, setLlmSettings] = useState<LLMSettings>({
+    temperature: 0.7,
+    max_tokens: 1000,
+  });
+  const [keywords, setKeywords] = useState('');
+
+  // Sync config to local state
   useEffect(() => {
-    if (agentConfig?.agent) {
-      const configPrompt = agentConfig.agent.prompt?.prompt || '';
-      const configFirstMessage = agentConfig.agent.first_message || '';
-      setPrompt(configPrompt);
-      setFirstMessage(configFirstMessage);
-    }
-  }, [agentConfig]);
+    if (config) {
+      const tts = config.conversation_config?.tts;
+      const stt = config.conversation_config?.stt;
+      const turn = config.conversation_config?.turn;
+      const conv = config.conversation_config?.conversation;
+      const agent = config.conversation_config?.agent;
 
-  // Initialize voice state from config (ElevenLabs)
-  useEffect(() => {
-    if (agentConfig?.agent?.tts && platform === 'elevenlabs') {
-      const tts = agentConfig.agent.tts;
-      setVoiceId(tts.voice_id || '');
-      setStability(tts.stability ?? 0.5);
-      setSimilarityBoost(tts.similarity_boost ?? 0.75);
-      setStyle(tts.style ?? 0);
-      setSpeed(tts.speed ?? 1);
+      if (tts) setTtsSettings(prev => ({ ...prev, ...tts }));
+      if (stt) {
+        setAsrSettings(prev => ({ ...prev, ...stt }));
+        if (stt.keywords) setKeywords(stt.keywords.join(', '));
+      }
+      if (turn) setTurnSettings(prev => ({ ...prev, ...turn }));
+      if (conv) setConversationSettings(prev => ({ ...prev, ...conv }));
+      if (agent) {
+        setLanguage(agent.language || 'fr');
+        setPrompt(agent.prompt?.prompt || '');
+        setFirstMessage(agent.first_message || '');
+        if (agent.prompt?.llm) setLlmSettings(prev => ({ ...prev, ...agent.prompt?.llm }));
+      }
     }
-  }, [agentConfig, platform]);
+  }, [config]);
 
-  const handlePromptChange = (value: string) => {
-    setPrompt(value);
-    setHasPromptChanges(
-      value !== (agentConfig?.agent?.prompt?.prompt || '') ||
-      firstMessage !== (agentConfig?.agent?.first_message || '')
-    );
+  const mutationParams = {
+    agentId: platformAgentId!,
+    apiKey: apiKey || undefined,
+    organizationId: organizationId || undefined,
   };
 
-  const handleFirstMessageChange = (value: string) => {
-    setFirstMessage(value);
-    setHasPromptChanges(
-      prompt !== (agentConfig?.agent?.prompt?.prompt || '') ||
-      value !== (agentConfig?.agent?.first_message || '')
-    );
+  const handleSavePrompt = () => {
+    if (!platformAgentId) return;
+    updatePromptMutation.mutate({ ...mutationParams, prompt, firstMessage });
   };
 
-  // Detect voice changes via useEffect instead of manual calls (avoids stale state)
-  useEffect(() => {
-    if (!agentConfig?.agent?.tts || platform !== 'elevenlabs') return;
-    const tts = agentConfig.agent.tts;
-    setHasVoiceChanges(
-      voiceId !== (tts.voice_id || '') ||
-      stability !== (tts.stability ?? 0.5) ||
-      similarityBoost !== (tts.similarity_boost ?? 0.75) ||
-      style !== (tts.style ?? 0) ||
-      speed !== (tts.speed ?? 1)
-    );
-  }, [voiceId, stability, similarityBoost, style, speed, agentConfig, platform]);
-
-  // Filter voices based on search
-  const filteredVoices = voices.filter((voice: any) => 
-    voice.name?.toLowerCase().includes(voiceSearch.toLowerCase()) ||
-    voice.labels?.accent?.toLowerCase().includes(voiceSearch.toLowerCase()) ||
-    voice.labels?.gender?.toLowerCase().includes(voiceSearch.toLowerCase())
-  );
-
-  // Handle voice preview
-  const handlePlayPreview = (voice: any) => {
-    if (playingVoiceId === voice.voice_id) {
-      audioElement?.pause();
-      setPlayingVoiceId(null);
-      return;
-    }
-
-    if (audioElement) {
-      audioElement.pause();
-    }
-
-    if (voice.preview_url) {
-      const audio = new Audio(voice.preview_url);
-      audio.onended = () => setPlayingVoiceId(null);
-      audio.play();
-      setAudioElement(audio);
-      setPlayingVoiceId(voice.voice_id);
-    }
+  const handleSaveTTS = () => {
+    if (!platformAgentId) return;
+    updateTTS.mutate({ ...mutationParams, ttsSettings });
   };
 
-  // Handle voice selection
-  const handleSelectVoice = (selectedVoiceId: string) => {
-    setVoiceId(selectedVoiceId);
+  const handleSaveASR = () => {
+    if (!platformAgentId) return;
+    const keywordsArray = keywords.split(',').map(k => k.trim()).filter(Boolean);
+    updateASR.mutate({ ...mutationParams, asrSettings: { ...asrSettings, keywords: keywordsArray } });
   };
 
-  const handleSavePrompt = async () => {
-    if ((!apiKey && !organizationId) || !platformAgentId) return;
-    
-    // Only ElevenLabs supports prompt updates via API for now
-    if (platform !== 'elevenlabs') {
-      toast.info('La modification du prompt n\'est pas encore supportée pour cette plateforme');
-      return;
-    }
-    
-    try {
-      await updatePromptMutation.mutateAsync({
-        apiKey: apiKey || undefined,
-        agentId: platformAgentId,
-        organizationId: organizationId || undefined,
-        prompt,
-        firstMessage: firstMessage || undefined,
-      });
-      setHasPromptChanges(false);
-    } catch (error) {
-      // Error handled by mutation
-    }
+  const handleSaveTurn = () => {
+    if (!platformAgentId) return;
+    updateTurn.mutate({ ...mutationParams, turnSettings });
   };
 
-  const handleSaveVoice = async () => {
-    if ((!apiKey && !organizationId) || !platformAgentId || platform !== 'elevenlabs') return;
-    
-    try {
-      await updateVoiceMutation.mutateAsync({
-        apiKey: apiKey || undefined,
-        agentId: platformAgentId,
-        organizationId: organizationId || undefined,
-        voiceSettings: {
-          voice_id: voiceId || undefined,
-          stability,
-          similarity_boost: similarityBoost,
-          style,
-          speed,
-        },
-      });
-      setHasVoiceChanges(false);
-    } catch (error) {
-      // Error handled by mutation
-    }
+  const handleSaveConversation = () => {
+    if (!platformAgentId) return;
+    updateConversation.mutate({ ...mutationParams, conversationSettings });
+  };
+
+  const handleSaveAdvanced = () => {
+    if (!platformAgentId) return;
+    updateAdvanced.mutate({ 
+      ...mutationParams, 
+      agentAdvancedSettings: { language, disable_first_message_interruptions: disableFirstMessageInterruption } 
+    });
+  };
+
+  const handleSaveLLM = () => {
+    if (!platformAgentId) return;
+    updateLLM.mutate({ ...mutationParams, llmSettings });
   };
 
   // Loading state
@@ -210,7 +190,7 @@ const ClientAgentSettings = () => {
     );
   }
 
-  // Error state - missing config
+  // Error state
   if (!platform || (!apiKey && !organizationId) || !platformAgentId) {
     return (
       <div className="space-y-6">
@@ -235,9 +215,7 @@ const ClientAgentSettings = () => {
     );
   }
 
-  // Check if voice settings are available for this platform
-  const supportsVoiceSettings = platform === 'elevenlabs';
-  const supportsPromptEdit = platform === 'elevenlabs';
+  const isElevenLabs = platform === 'elevenlabs';
 
   return (
     <div className="space-y-6">
@@ -247,9 +225,7 @@ const ClientAgentSettings = () => {
           <p className="text-muted-foreground">Paramètres de {agentName}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="capitalize">
-            {platform}
-          </Badge>
+          <Badge variant="outline" className="capitalize">{platform}</Badge>
           <Button variant="outline" size="icon" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -262,347 +238,556 @@ const ClientAgentSettings = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="prompt" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="prompt" className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" />
-            Prompt
-          </TabsTrigger>
-          {supportsVoiceSettings && (
-            <TabsTrigger value="voice" className="flex items-center gap-2">
-              <Volume2 className="h-4 w-4" />
-              Voix
-            </TabsTrigger>
-          )}
-          <TabsTrigger value="info" className="flex items-center gap-2">
-            <Info className="h-4 w-4" />
-            Informations
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Prompt Tab */}
-        <TabsContent value="prompt" className="space-y-6">
-          {/* System Prompt */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                Prompt Système
-              </CardTitle>
-              <CardDescription>
-                Instructions données à l'agent pour définir son comportement
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-48 w-full" />
-              ) : (
-                <div className="space-y-4">
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : !isElevenLabs ? (
+        <Card className="p-8 text-center">
+          <Settings2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+          <p className="text-muted-foreground">
+            La configuration avancée n'est pas encore disponible pour {platform?.toUpperCase()}.
+          </p>
+        </Card>
+      ) : (
+        <Accordion type="multiple" defaultValue={['prompt', 'voice']} className="space-y-4">
+          {/* Section 1: Prompt & First Message */}
+          <AccordionItem value="prompt" className="border rounded-lg bg-card">
+            <AccordionTrigger className="px-6 hover:no-underline">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-500/10">
+                  <MessageSquare className="h-5 w-5 text-blue-500" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold">Prompt & Premier Message</h3>
+                  <p className="text-sm text-muted-foreground">Instructions et message de bienvenue</p>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-6">
+              <div className="space-y-6">
+                <div>
+                  <Label className="text-base font-medium">Prompt Système</Label>
                   <Textarea
                     value={prompt}
-                    onChange={(e) => handlePromptChange(e.target.value)}
+                    onChange={(e) => setPrompt(e.target.value)}
                     placeholder="Instructions pour l'agent..."
-                    rows={12}
-                    disabled={!canEdit || !supportsPromptEdit}
-                    className="font-mono text-sm"
+                    rows={10}
+                    disabled={!canEdit}
+                    className="mt-2 font-mono text-sm"
                   />
-                  {!supportsPromptEdit && (
-                    <p className="text-xs text-muted-foreground">
-                      La modification du prompt n'est pas disponible pour {platform.toUpperCase()} via cette interface.
-                    </p>
-                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* First Message */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Info className="h-5 w-5" />
-                Premier Message
-              </CardTitle>
-              <CardDescription>
-                Message de bienvenue prononcé par l'agent au début de chaque conversation
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-24 w-full" />
-              ) : (
-                <Textarea
-                  value={firstMessage}
-                  onChange={(e) => handleFirstMessageChange(e.target.value)}
-                  placeholder="Message de bienvenue de l'agent..."
-                  rows={4}
-                  disabled={!canEdit || !supportsPromptEdit}
-                />
-              )}
-            </CardContent>
-          </Card>
+                <div>
+                  <Label className="text-base font-medium">Premier Message</Label>
+                  <Textarea
+                    value={firstMessage}
+                    onChange={(e) => setFirstMessage(e.target.value)}
+                    placeholder="Message de bienvenue de l'agent..."
+                    rows={3}
+                    disabled={!canEdit}
+                    className="mt-2"
+                  />
+                </div>
 
-          {/* Save Prompt Button */}
-          {canEdit && supportsPromptEdit && (
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {hasPromptChanges ? 'Modifications non sauvegardées' : 'Aucune modification'}
-              </p>
-              <Button 
-                onClick={handleSavePrompt} 
-                disabled={!hasPromptChanges || updatePromptMutation.isPending}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {updatePromptMutation.isPending ? 'Sauvegarde...' : 'Sauvegarder'}
-              </Button>
-            </div>
-          )}
-        </TabsContent>
+                {canEdit && (
+                  <Button onClick={handleSavePrompt} disabled={updatePromptMutation.isPending}>
+                    {updatePromptMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    <Save className="h-4 w-4 mr-2" />
+                    Sauvegarder Prompt
+                  </Button>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
 
-        {/* Voice Tab (ElevenLabs only) */}
-        {supportsVoiceSettings && (
-          <TabsContent value="voice" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Volume2 className="h-5 w-5" />
-                  Paramètres Vocaux
-                </CardTitle>
-                <CardDescription>
-                  Configuration de la voix de l'agent
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="space-y-4">
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
+          {/* Section 2: Voice & TTS */}
+          <AccordionItem value="voice" className="border rounded-lg bg-card">
+            <AccordionTrigger className="px-6 hover:no-underline">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Volume2 className="h-5 w-5 text-primary" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold">Voix & TTS</h3>
+                  <p className="text-sm text-muted-foreground">Paramètres de synthèse vocale</p>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-6">
+              <div className="space-y-6">
+                <div>
+                  <Label className="text-base font-medium mb-4 block">Sélectionner une voix</Label>
+                  <VoiceSelector
+                    selectedVoiceId={ttsSettings.voice_id}
+                    onSelect={(voice) => setTtsSettings(prev => ({ ...prev, voice_id: voice.voice_id }))}
+                    apiKey={apiKey}
+                    organizationId={organizationId}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label>Modèle TTS</Label>
+                    <Select
+                      value={ttsSettings.model_id || 'eleven_turbo_v2_5'}
+                      onValueChange={(v) => setTtsSettings(prev => ({ ...prev, model_id: v }))}
+                      disabled={!canEdit}
+                    >
+                      <SelectTrigger className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TTS_MODELS.map(model => (
+                          <SelectItem key={model.id} value={model.id}>
+                            <div>
+                              <div className="font-medium">{model.name}</div>
+                              <div className="text-xs text-muted-foreground">{model.description}</div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                ) : (
-                  <div className="space-y-6">
-                    {/* Voice Selector */}
-                    <div className="space-y-3">
-                      <Label>Sélectionner une voix</Label>
-                      
-                      {/* Current voice */}
-                      {voiceId && (
-                        <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-                          <p className="text-sm font-medium">Voix actuelle</p>
-                          <p className="text-xs text-muted-foreground font-mono">{voiceId}</p>
-                        </div>
-                      )}
-                      
-                      {/* Voice search */}
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          value={voiceSearch}
-                          onChange={(e) => setVoiceSearch(e.target.value)}
-                          placeholder="Rechercher une voix..."
-                          className="pl-10"
+
+                  <div>
+                    <Label>Vitesse ({ttsSettings.speed?.toFixed(1)}x)</Label>
+                    <Slider
+                      value={[ttsSettings.speed || 1]}
+                      onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, speed: v }))}
+                      min={0.5}
+                      max={2}
+                      step={0.1}
+                      className="mt-4"
+                      disabled={!canEdit}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <Label>Stabilité ({Math.round((ttsSettings.stability || 0.5) * 100)}%)</Label>
+                    <Slider
+                      value={[ttsSettings.stability || 0.5]}
+                      onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, stability: v }))}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      className="mt-4"
+                      disabled={!canEdit}
+                    />
+                  </div>
+                  <div>
+                    <Label>Similarité ({Math.round((ttsSettings.similarity_boost || 0.75) * 100)}%)</Label>
+                    <Slider
+                      value={[ttsSettings.similarity_boost || 0.75]}
+                      onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, similarity_boost: v }))}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      className="mt-4"
+                      disabled={!canEdit}
+                    />
+                  </div>
+                  <div>
+                    <Label>Style ({Math.round((ttsSettings.style || 0) * 100)}%)</Label>
+                    <Slider
+                      value={[ttsSettings.style || 0]}
+                      onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, style: v }))}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      className="mt-4"
+                      disabled={!canEdit}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Optimisation latence streaming (0-4)</Label>
+                  <Slider
+                    value={[ttsSettings.optimize_streaming_latency || 3]}
+                    onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, optimize_streaming_latency: v }))}
+                    min={0}
+                    max={4}
+                    step={1}
+                    className="mt-4"
+                    disabled={!canEdit}
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    0 = Haute qualité, 4 = Faible latence
+                  </p>
+                </div>
+
+                {canEdit && (
+                  <Button onClick={handleSaveTTS} disabled={updateTTS.isPending}>
+                    {updateTTS.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    <Save className="h-4 w-4 mr-2" />
+                    Sauvegarder TTS
+                  </Button>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Section 3: ASR/STT */}
+          <AccordionItem value="asr" className="border rounded-lg bg-card">
+            <AccordionTrigger className="px-6 hover:no-underline">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-500/10">
+                  <Mic className="h-5 w-5 text-purple-500" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold">Reconnaissance Vocale (ASR)</h3>
+                  <p className="text-sm text-muted-foreground">Paramètres de transcription</p>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-6">
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label>Fournisseur ASR</Label>
+                    <Select
+                      value={asrSettings.provider || 'elevenlabs'}
+                      onValueChange={(v: any) => setAsrSettings(prev => ({ ...prev, provider: v }))}
+                      disabled={!canEdit}
+                    >
+                      <SelectTrigger className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ASR_PROVIDERS.map(provider => (
+                          <SelectItem key={provider.value} value={provider.value}>
+                            <div>
+                              <div className="font-medium">{provider.label}</div>
+                              <div className="text-xs text-muted-foreground">{provider.description}</div>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Qualité</Label>
+                    <Select
+                      value={asrSettings.quality || 'high'}
+                      onValueChange={(v: any) => setAsrSettings(prev => ({ ...prev, quality: v }))}
+                      disabled={!canEdit}
+                    >
+                      <SelectTrigger className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="high">Haute (recommandé)</SelectItem>
+                        <SelectItem value="standard">Standard</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Mots-clés personnalisés</Label>
+                  <Input
+                    value={keywords}
+                    onChange={(e) => setKeywords(e.target.value)}
+                    placeholder="mot1, mot2, mot3..."
+                    className="mt-2"
+                    disabled={!canEdit}
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Séparez les mots-clés par des virgules. Améliore la reconnaissance de termes spécifiques.
+                  </p>
+                </div>
+
+                {canEdit && (
+                  <Button onClick={handleSaveASR} disabled={updateASR.isPending}>
+                    {updateASR.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    <Save className="h-4 w-4 mr-2" />
+                    Sauvegarder ASR
+                  </Button>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Section 4: Turn Settings */}
+          <AccordionItem value="turn" className="border rounded-lg bg-card">
+            <AccordionTrigger className="px-6 hover:no-underline">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-orange-500/10">
+                  <Clock className="h-5 w-5 text-orange-500" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold">Gestion des Tours</h3>
+                  <p className="text-sm text-muted-foreground">Timing et interruptions</p>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-6">
+              <div className="space-y-6">
+                <div>
+                  <Label>Réactivité de l'agent</Label>
+                  <div className="grid grid-cols-3 gap-3 mt-3">
+                    {TURN_EAGERNESS_OPTIONS.map(option => (
+                      <div
+                        key={option.value}
+                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                          turnSettings.turn_eagerness === option.value 
+                            ? 'border-primary bg-primary/5' 
+                            : 'border-border hover:border-muted-foreground/50'
+                        } ${!canEdit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        onClick={() => canEdit && setTurnSettings(prev => ({ ...prev, turn_eagerness: option.value as any }))}
+                      >
+                        <p className="font-medium text-sm">{option.label}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label>Timeout de tour ({turnSettings.turn_timeout}s)</Label>
+                    <Slider
+                      value={[turnSettings.turn_timeout || 10]}
+                      onValueChange={([v]) => setTurnSettings(prev => ({ ...prev, turn_timeout: v }))}
+                      min={1}
+                      max={30}
+                      step={1}
+                      className="mt-4"
+                      disabled={!canEdit}
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">Temps avant que l'agent relance</p>
+                  </div>
+
+                  <div>
+                    <Label>Silence fin d'appel ({turnSettings.silence_end_call_timeout}s)</Label>
+                    <Slider
+                      value={[turnSettings.silence_end_call_timeout || 30]}
+                      onValueChange={([v]) => setTurnSettings(prev => ({ ...prev, silence_end_call_timeout: v }))}
+                      min={5}
+                      max={120}
+                      step={5}
+                      className="mt-4"
+                      disabled={!canEdit}
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">Silence avant fin automatique</p>
+                  </div>
+                </div>
+
+                {canEdit && (
+                  <Button onClick={handleSaveTurn} disabled={updateTurn.isPending}>
+                    {updateTurn.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    <Save className="h-4 w-4 mr-2" />
+                    Sauvegarder Tours
+                  </Button>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Section 5: Conversation Settings */}
+          <AccordionItem value="conversation" className="border rounded-lg bg-card">
+            <AccordionTrigger className="px-6 hover:no-underline">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-500/10">
+                  <Settings className="h-5 w-5 text-green-500" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold">Paramètres de Conversation</h3>
+                  <p className="text-sm text-muted-foreground">Durée et événements</p>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-6">
+              <div className="space-y-6">
+                <div>
+                  <Label>Durée maximale ({Math.round((conversationSettings.max_duration_seconds || 600) / 60)} min)</Label>
+                  <Slider
+                    value={[conversationSettings.max_duration_seconds || 600]}
+                    onValueChange={([v]) => setConversationSettings(prev => ({ ...prev, max_duration_seconds: v }))}
+                    min={60}
+                    max={3600}
+                    step={60}
+                    className="mt-4"
+                    disabled={!canEdit}
+                  />
+                </div>
+
+                <div>
+                  <Label className="mb-3 block">Événements Client</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {ELEVENLABS_CLIENT_EVENTS.map(event => (
+                      <div key={event.id} className="flex items-start gap-3 p-3 rounded-lg border">
+                        <Checkbox
+                          checked={conversationSettings.client_events?.includes(event.id)}
+                          onCheckedChange={(checked) => {
+                            if (!canEdit) return;
+                            setConversationSettings(prev => ({
+                              ...prev,
+                              client_events: checked
+                                ? [...(prev.client_events || []), event.id]
+                                : (prev.client_events || []).filter(e => e !== event.id),
+                            }));
+                          }}
                           disabled={!canEdit}
                         />
-                      </div>
-
-                      {/* Voices list */}
-                      {voicesLoading ? (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        <div>
+                          <p className="text-sm font-medium">{event.name}</p>
+                          <p className="text-xs text-muted-foreground">{event.description}</p>
                         </div>
-                      ) : (
-                        <ScrollArea className="h-[250px] rounded-lg border border-border/50">
-                          <div className="p-2 space-y-2">
-                            {filteredVoices.length === 0 ? (
-                              <p className="text-sm text-muted-foreground text-center py-4">
-                                Aucune voix trouvée
-                              </p>
-                            ) : (
-                              filteredVoices.map((voice: any) => (
-                                <div
-                                  key={voice.voice_id}
-                                  className={`p-3 rounded-lg cursor-pointer transition-all border ${
-                                    voiceId === voice.voice_id
-                                      ? 'bg-primary/10 border-primary/30'
-                                      : 'bg-muted/20 border-border/30 hover:bg-muted/40'
-                                  }`}
-                                  onClick={() => canEdit && handleSelectVoice(voice.voice_id)}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex-1 min-w-0">
-                                      <p className="font-medium text-sm truncate">{voice.name}</p>
-                                      <div className="flex flex-wrap gap-1 mt-1">
-                                        {voice.labels?.accent && (
-                                          <Badge variant="secondary" className="text-xs">
-                                            {voice.labels.accent}
-                                          </Badge>
-                                        )}
-                                        {voice.labels?.gender && (
-                                          <Badge variant="outline" className="text-xs">
-                                            {voice.labels.gender}
-                                          </Badge>
-                                        )}
-                                        {voice.labels?.age && (
-                                          <Badge variant="outline" className="text-xs">
-                                            {voice.labels.age}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    </div>
-                                    {voice.preview_url && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 ml-2"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handlePlayPreview(voice);
-                                        }}
-                                      >
-                                        {playingVoiceId === voice.voice_id ? (
-                                          <Pause className="h-4 w-4" />
-                                        ) : (
-                                          <Play className="h-4 w-4" />
-                                        )}
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </ScrollArea>
-                      )}
-                      
-                      <p className="text-xs text-muted-foreground">
-                        Sélectionnez une voix ou écoutez un aperçu avant de choisir
-                      </p>
-                    </div>
-
-                    {/* Stability */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label>Stabilité</Label>
-                        <span className="text-sm text-muted-foreground">
-                          {Math.round(stability * 100)}%
-                        </span>
                       </div>
-                      <Slider
-                        value={[stability * 100]}
-                        onValueChange={(vals) => {
-                          setStability(vals[0] / 100);
-                        }}
-                        max={100}
-                        step={1}
-                        disabled={!canEdit}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Plus stable = voix plus cohérente. Moins stable = plus expressif.
-                      </p>
-                    </div>
-
-                    {/* Similarity Boost */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label>Similarité</Label>
-                        <span className="text-sm text-muted-foreground">
-                          {Math.round(similarityBoost * 100)}%
-                        </span>
-                      </div>
-                      <Slider
-                        value={[similarityBoost * 100]}
-                        onValueChange={(vals) => {
-                          setSimilarityBoost(vals[0] / 100);
-                        }}
-                        max={100}
-                        step={1}
-                        disabled={!canEdit}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Contrôle la fidélité à la voix originale
-                      </p>
-                    </div>
-
-                    {/* Style */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label>Style</Label>
-                        <span className="text-sm text-muted-foreground">
-                          {Math.round(style * 100)}%
-                        </span>
-                      </div>
-                      <Slider
-                        value={[style * 100]}
-                        onValueChange={(vals) => {
-                          setStyle(vals[0] / 100);
-                        }}
-                        max={100}
-                        step={1}
-                        disabled={!canEdit}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Amplifie le style unique de la voix
-                      </p>
-                    </div>
-
-                    {/* Speed */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label>Vitesse</Label>
-                        <span className="text-sm text-muted-foreground">
-                          {speed.toFixed(2)}x
-                        </span>
-                      </div>
-                      <Slider
-                        value={[speed * 50]}
-                        onValueChange={(vals) => {
-                          setSpeed(vals[0] / 50);
-                        }}
-                        min={25}
-                        max={100}
-                        step={1}
-                        disabled={!canEdit}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Vitesse de parole (0.5x à 2x)
-                      </p>
-                    </div>
+                    ))}
                   </div>
+                </div>
+
+                {canEdit && (
+                  <Button onClick={handleSaveConversation} disabled={updateConversation.isPending}>
+                    {updateConversation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    <Save className="h-4 w-4 mr-2" />
+                    Sauvegarder Conversation
+                  </Button>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* Save Voice Button */}
-            {canEdit && (
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  {hasVoiceChanges ? 'Modifications non sauvegardées' : 'Aucune modification'}
-                </p>
-                <Button 
-                  onClick={handleSaveVoice} 
-                  disabled={!hasVoiceChanges || updateVoiceMutation.isPending}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {updateVoiceMutation.isPending ? 'Sauvegarde...' : 'Sauvegarder'}
-                </Button>
               </div>
-            )}
-          </TabsContent>
-        )}
+            </AccordionContent>
+          </AccordionItem>
 
-        {/* Info Tab */}
-        <TabsContent value="info" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Info className="h-5 w-5" />
-                Informations de l'Agent
-              </CardTitle>
-              <CardDescription>
-                Détails techniques de configuration
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          {/* Section 6: LLM Settings */}
+          <AccordionItem value="llm" className="border rounded-lg bg-card">
+            <AccordionTrigger className="px-6 hover:no-underline">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-cyan-500/10">
+                  <Brain className="h-5 w-5 text-cyan-500" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold">Paramètres LLM</h3>
+                  <p className="text-sm text-muted-foreground">Température et limites du modèle</p>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-6">
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label>Température ({llmSettings.temperature?.toFixed(1)})</Label>
+                    <Slider
+                      value={[llmSettings.temperature || 0.7]}
+                      onValueChange={([v]) => setLlmSettings(prev => ({ ...prev, temperature: v }))}
+                      min={0}
+                      max={2}
+                      step={0.1}
+                      className="mt-4"
+                      disabled={!canEdit}
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Plus bas = plus prévisible, plus haut = plus créatif
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label>Max Tokens</Label>
+                    <Input
+                      type="number"
+                      value={llmSettings.max_tokens || 1000}
+                      onChange={(e) => setLlmSettings(prev => ({ ...prev, max_tokens: parseInt(e.target.value) || 1000 }))}
+                      className="mt-2"
+                      disabled={!canEdit}
+                      min={100}
+                      max={32000}
+                    />
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Nombre maximum de tokens par réponse
+                    </p>
+                  </div>
+                </div>
+
+                {canEdit && (
+                  <Button onClick={handleSaveLLM} disabled={updateLLM.isPending}>
+                    {updateLLM.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    <Save className="h-4 w-4 mr-2" />
+                    Sauvegarder LLM
+                  </Button>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Section 7: Language & Advanced */}
+          <AccordionItem value="advanced" className="border rounded-lg bg-card">
+            <AccordionTrigger className="px-6 hover:no-underline">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/10">
+                  <Globe className="h-5 w-5 text-amber-500" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold">Langue & Avancé</h3>
+                  <p className="text-sm text-muted-foreground">Langue et paramètres avancés</p>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-6">
+              <div className="space-y-6">
+                <div>
+                  <Label>Langue de l'agent</Label>
+                  <Select
+                    value={language}
+                    onValueChange={setLanguage}
+                    disabled={!canEdit}
+                  >
+                    <SelectTrigger className="mt-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ELEVENLABS_LANGUAGES.map(lang => (
+                        <SelectItem key={lang.code} value={lang.code}>
+                          {lang.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-lg border">
+                  <div>
+                    <p className="font-medium text-sm">Désactiver l'interruption du premier message</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      L'utilisateur ne pourra pas interrompre le message de bienvenue
+                    </p>
+                  </div>
+                  <Switch
+                    checked={disableFirstMessageInterruption}
+                    onCheckedChange={setDisableFirstMessageInterruption}
+                    disabled={!canEdit}
+                  />
+                </div>
+
+                {canEdit && (
+                  <Button onClick={handleSaveAdvanced} disabled={updateAdvanced.isPending}>
+                    {updateAdvanced.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    <Save className="h-4 w-4 mr-2" />
+                    Sauvegarder Avancé
+                  </Button>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Section 8: Agent Info */}
+          <AccordionItem value="info" className="border rounded-lg bg-card">
+            <AccordionTrigger className="px-6 hover:no-underline">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gray-500/10">
+                  <Info className="h-5 w-5 text-gray-500" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold">Informations</h3>
+                  <p className="text-sm text-muted-foreground">Détails techniques de l'agent</p>
+                </div>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-sm text-muted-foreground">Plateforme</p>
@@ -612,23 +797,23 @@ const ClientAgentSettings = () => {
                   <p className="text-sm text-muted-foreground">Agent ID</p>
                   <p className="font-mono text-sm truncate">{platformAgentId}</p>
                 </div>
-                {agentConfig?.agent?.name && (
+                {config?.name && (
                   <div className="p-3 rounded-lg bg-muted/50 col-span-2">
                     <p className="text-sm text-muted-foreground">Nom de l'Agent</p>
-                    <p className="font-medium">{agentConfig.agent.name}</p>
+                    <p className="font-medium">{config.name}</p>
                   </div>
                 )}
-                {agentConfig?.agent?.tts?.voice_id && (
+                {ttsSettings.voice_id && (
                   <div className="p-3 rounded-lg bg-muted/50 col-span-2">
                     <p className="text-sm text-muted-foreground">Voice ID</p>
-                    <p className="font-mono text-sm">{agentConfig.agent.tts.voice_id}</p>
+                    <p className="font-mono text-sm">{ttsSettings.voice_id}</p>
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
     </div>
   );
 };
