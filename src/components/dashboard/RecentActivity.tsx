@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS } from 'date-fns/locale';
 import { DashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface RecentActivityProps {
   metrics: DashboardMetrics;
@@ -12,28 +13,26 @@ const isValidDate = (date: Date): boolean => {
   return date instanceof Date && !isNaN(date.getTime());
 };
 
-const formatTimestamp = (timestamp: string | undefined): string => {
-  if (!timestamp) return 'Date inconnue';
-  
-  const date = new Date(timestamp);
-  if (!isValidDate(date)) return 'Date invalide';
-  
-  return formatDistanceToNow(date, {
-    addSuffix: true,
-    locale: fr,
-  });
-};
-
 export const RecentActivity = ({ metrics }: RecentActivityProps) => {
+  const { t, language } = useTranslation();
+  const dateLocale = language === 'fr' ? fr : enUS;
+
+  const formatTimestamp = (timestamp: string | undefined): string => {
+    if (!timestamp) return t('dashboard.charts.unknownDate');
+    const date = new Date(timestamp);
+    if (!isValidDate(date)) return t('dashboard.charts.invalidDate');
+    return formatDistanceToNow(date, { addSuffix: true, locale: dateLocale });
+  };
+
   if (metrics.recentActivity.length === 0) {
     return (
       <Card className="bg-card/50 backdrop-blur-sm border-border/50">
         <CardHeader>
-          <CardTitle className="text-lg">Activité récente</CardTitle>
+          <CardTitle className="text-lg">{t('dashboard.recentActivity.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center py-8">
-            Aucune activité récente
+            {t('dashboard.recentActivity.noActivity')}
           </p>
         </CardContent>
       </Card>
@@ -43,7 +42,7 @@ export const RecentActivity = ({ metrics }: RecentActivityProps) => {
   return (
     <Card className="bg-card/50 backdrop-blur-sm border-border/50">
       <CardHeader>
-        <CardTitle className="text-lg">Activité récente</CardTitle>
+        <CardTitle className="text-lg">{t('dashboard.recentActivity.title')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {metrics.recentActivity.map((activity) => (

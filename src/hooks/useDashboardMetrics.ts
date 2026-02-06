@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { format } from 'date-fns';
+import { t } from '@/lib/i18n';
 
 export interface DateRange {
   start: Date;
@@ -185,7 +186,8 @@ export const useDashboardMetrics = (dateRange?: DateRange) => {
         // Process chart data for weekly view
         if (elevenLabsData.chartData?.daily && Array.isArray(elevenLabsData.chartData.daily)) {
           const last7Days = elevenLabsData.chartData.daily.slice(-7);
-          const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+          const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+          const dayNames = dayKeys.map(k => t(`dashboard.charts.days.${k}`));
           weeklyData = last7Days.map((day: any) => {
             const date = new Date(day.date);
             return {
@@ -246,7 +248,7 @@ export const useDashboardMetrics = (dateRange?: DateRange) => {
 
         // Generate weekly data if not from analytics
         if (weeklyData.length === 0) {
-          const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+          const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].map(k => t(`dashboard.charts.days.${k}`));
           const dayCounts: Record<string, { conversations: number; satisfaction: number[] }> = {};
           
           for (let i = 6; i >= 0; i--) {

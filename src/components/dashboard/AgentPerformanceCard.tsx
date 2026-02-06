@@ -4,6 +4,7 @@ import { Bot, Clock, Star, TrendingUp, Trophy, AlertTriangle } from 'lucide-reac
 import { Progress } from '@/components/ui/progress';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface AgentPerformance {
   name: string;
@@ -18,13 +19,15 @@ interface AgentPerformanceCardProps {
 }
 
 export const AgentPerformanceCard = ({ agents, isLoading }: AgentPerformanceCardProps) => {
+  const { t } = useTranslation();
+
   if (isLoading) {
     return (
       <Card className="glass-card">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Bot className="h-5 w-5 text-primary" />
-            Performance des Agents
+            {t('dashboard.performance.title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -44,15 +47,15 @@ export const AgentPerformanceCard = ({ agents, isLoading }: AgentPerformanceCard
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Bot className="h-5 w-5 text-primary" />
-            Performance des Agents
+            {t('dashboard.performance.title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
             <Bot className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
-            <p className="text-muted-foreground text-sm">Aucun agent avec des conversations</p>
+            <p className="text-muted-foreground text-sm">{t('dashboard.performance.noAgents')}</p>
             <Link to="/agents" className="text-primary text-sm hover:underline mt-2 inline-block">
-              Configurer un agent
+              {t('dashboard.performance.configureAgentsLink')}
             </Link>
           </div>
         </CardContent>
@@ -87,7 +90,7 @@ export const AgentPerformanceCard = ({ agents, isLoading }: AgentPerformanceCard
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <Bot className="h-5 w-5 text-primary" />
-          Performance des Agents
+          {t('dashboard.performance.title')}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -110,7 +113,6 @@ export const AgentPerformanceCard = ({ agents, isLoading }: AgentPerformanceCard
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    {/* Avatar with gradient */}
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                       isBest ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' :
                       needsAttention ? 'bg-gradient-to-br from-red-500 to-red-600' :
@@ -133,10 +135,9 @@ export const AgentPerformanceCard = ({ agents, isLoading }: AgentPerformanceCard
                   </Badge>
                 </div>
                 
-                {/* Progress bar */}
                 <div className="space-y-1.5 mb-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Volume relatif</span>
+                    <span className="text-muted-foreground">{t('dashboard.performance.relativeVolume')}</span>
                     <span className="text-foreground">
                       {Math.round((agent.conversations / maxConversations) * 100)}%
                     </span>
@@ -151,7 +152,6 @@ export const AgentPerformanceCard = ({ agents, isLoading }: AgentPerformanceCard
                   </div>
                 </div>
 
-                {/* Stats row */}
                 <div className="flex items-center gap-4 text-xs">
                   <div className="flex items-center gap-1">
                     <Star className={`h-3.5 w-3.5 ${getSatisfactionColor(agent.satisfaction)}`} />
