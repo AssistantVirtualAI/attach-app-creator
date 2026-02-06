@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Checkbox } from '@/components/ui/checkbox';
 import { VoiceSelector } from '@/components/agents/VoiceSelector';
+import { RetellFullConfigTab } from '@/components/agents/RetellFullConfigTab';
 import { 
   Settings, 
   MessageSquare, 
@@ -242,6 +243,14 @@ const ClientAgentSettings = () => {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
+      ) : platform === 'retell' ? (
+        <RetellFullConfigTab
+          agentId={agentId!}
+          platformAgentId={platformAgentId}
+          organizationId={organizationId || ''}
+          apiKey={apiKey}
+          canEdit={canEdit}
+        />
       ) : !isElevenLabs ? (
         <Card className="p-8 text-center">
           <Settings2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
