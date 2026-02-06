@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ElevenLabsAPISections } from '@/components/elevenlabs/ElevenLabsAPISections';
+import { VapiAPISections } from '@/components/vapi/VapiAPISections';
 import { 
   Volume2, Mic, Clock, MessageSquare, Settings2, Webhook, 
   Wrench, Globe, Save, Loader2, RefreshCw, ChevronDown 
@@ -57,17 +58,14 @@ export function AgentFullConfigTab({ agentId, platformAgentId, apiKey, platform,
     );
   }
 
-  if (platform === 'vapi') {
+  if (platform === 'vapi' && organizationId) {
     return (
-      <Card className="p-8 text-center">
-        <Settings2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-        <p className="text-muted-foreground">
-          La configuration avancée n'est pas encore disponible pour Vapi.
-        </p>
-        <p className="text-sm text-muted-foreground mt-2">
-          Utilisez le dashboard Vapi pour configurer votre agent.
-        </p>
-      </Card>
+      <VapiAPISections
+        organizationId={organizationId}
+        apiKey={apiKey}
+        assistantId={platformAgentId}
+        canEdit={true}
+      />
     );
   }
 
