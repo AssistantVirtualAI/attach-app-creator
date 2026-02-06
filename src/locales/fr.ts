@@ -1833,6 +1833,7 @@ export const fr = {
     charts: {
       conversationTrends: 'Tendances des Conversations',
       configureAgents: 'Configurez vos agents pour voir les données réelles',
+      noDataYet: 'Aucune donnée disponible',
       platformDistribution: 'Distribution Plateformes',
       peakHours: 'Heures de Pointe',
       sentimentAnalysis: 'Analyse des Sentiments',

@@ -46,57 +46,45 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
   const { t } = useTranslation();
 
-  // Day name mapping for placeholder data
-  const dayKeys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
-  const getDayName = (key: string) => t(`dashboard.charts.days.${key}`);
-
-  // Use real data from metrics or generate placeholder
+  // Use real data only — no fake placeholders
   const weeklyData = metrics.weeklyData && metrics.weeklyData.length > 0
     ? metrics.weeklyData
-    : [
-        { name: getDayName('mon'), conversations: 12, satisfaction: 4.2 },
-        { name: getDayName('tue'), conversations: 18, satisfaction: 4.5 },
-        { name: getDayName('wed'), conversations: 15, satisfaction: 4.1 },
-        { name: getDayName('thu'), conversations: 22, satisfaction: 4.7 },
-        { name: getDayName('fri'), conversations: 28, satisfaction: 4.3 },
-        { name: getDayName('sat'), conversations: 10, satisfaction: 4.6 },
-        { name: getDayName('sun'), conversations: 8, satisfaction: 4.4 },
-      ];
+    : [];
+
+  const hasWeeklyData = weeklyData.length > 0 && weeklyData.some(d => d.conversations > 0);
 
   const platformData = metrics.platformDistribution.length > 0 
     ? metrics.platformDistribution.map(p => ({
         name: p.platform.charAt(0).toUpperCase() + p.platform.slice(1),
         value: p.count,
       }))
-    : [
-        { name: 'ElevenLabs', value: 45 },
-        { name: 'Vapi', value: 30 },
-        { name: 'Retell', value: 25 },
-      ];
+    : [];
+
+  const hasPlatformData = platformData.length > 0;
 
   // Sentiment data for radial chart
-  const sentimentData = [
-    { name: t('dashboard.charts.positive'), value: metrics.sentimentBreakdown.positive || 60, fill: '#10b981' },
-    { name: t('dashboard.charts.neutral'), value: metrics.sentimentBreakdown.neutral || 25, fill: '#f59e0b' },
-    { name: t('dashboard.charts.negative'), value: metrics.sentimentBreakdown.negative || 15, fill: '#ef4444' },
+  const totalSentiment = (metrics.sentimentBreakdown.positive || 0) + (metrics.sentimentBreakdown.neutral || 0) + (metrics.sentimentBreakdown.negative || 0);
+  const sentimentData = totalSentiment > 0 ? [
+    { name: t('dashboard.charts.positive'), value: Math.round((metrics.sentimentBreakdown.positive / totalSentiment) * 100), fill: '#10b981' },
+    { name: t('dashboard.charts.neutral'), value: Math.round((metrics.sentimentBreakdown.neutral / totalSentiment) * 100), fill: '#f59e0b' },
+    { name: t('dashboard.charts.negative'), value: Math.round((metrics.sentimentBreakdown.negative / totalSentiment) * 100), fill: '#ef4444' },
+  ] : [
+    { name: t('dashboard.charts.positive'), value: 0, fill: '#10b981' },
+    { name: t('dashboard.charts.neutral'), value: 0, fill: '#f59e0b' },
+    { name: t('dashboard.charts.negative'), value: 0, fill: '#ef4444' },
   ];
 
-  // Peak hours data
-  const peakHoursData = metrics.peakHours && metrics.peakHours.length > 0
-    ? metrics.peakHours.map(h => ({
-        hour: `${h.hour}h`,
-        count: h.count,
-      }))
-    : [
-        { hour: '9h', count: 12 },
-        { hour: '10h', count: 28 },
-        { hour: '11h', count: 35 },
-        { hour: '12h', count: 18 },
-        { hour: '14h', count: 42 },
-        { hour: '15h', count: 38 },
-        { hour: '16h', count: 25 },
-        { hour: '17h', count: 15 },
-      ];
+  // Peak hours: fill all 24 hours for proper time distribution
+  const peakHoursMap = new Map<number, number>();
+  if (metrics.peakHours && metrics.peakHours.length > 0) {
+    metrics.peakHours.forEach(h => peakHoursMap.set(h.hour, h.count));
+  }
+  // Show business hours (6h-23h) for readability
+  const peakHoursData: { hour: string; count: number }[] = [];
+  for (let h = 6; h <= 23; h++) {
+    peakHoursData.push({ hour: `${h}h`, count: peakHoursMap.get(h) || 0 });
+  }
+  const hasPeakData = peakHoursData.some(d => d.count > 0);
 
   const hasData = metrics.dataSource === 'elevenlabs' || metrics.totalConversations > 0;
 
@@ -130,78 +118,77 @@ export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
               </CardTitle>
             </CardHeader>
             <CardContent className="relative">
-              <ResponsiveContainer width="100%" height={300}>
-                <ComposedChart data={weeklyData}>
-                  <defs>
-                    <linearGradient id="conversationsGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.8}/>
-                      <stop offset="50%" stopColor="#8B5CF6" stopOpacity={0.4}/>
-                      <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0.05}/>
-                    </linearGradient>
-                    <linearGradient id="satisfactionGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.8}/>
-                      <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.1}/>
-                    </linearGradient>
-                    <filter id="glow">
-                      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                      <feMerge>
-                        <feMergeNode in="coloredBlur"/>
-                        <feMergeNode in="SourceGraphic"/>
-                      </feMerge>
-                    </filter>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
-                  <XAxis 
-                    dataKey="name" 
-                    stroke="hsl(var(--muted-foreground))" 
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis 
-                    yAxisId="left"
-                    stroke="hsl(var(--muted-foreground))" 
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis 
-                    yAxisId="right"
-                    orientation="right"
-                    stroke="#f59e0b" 
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    domain={[0, 5]}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Area 
-                    yAxisId="left"
-                    type="monotone" 
-                    dataKey="conversations" 
-                    stroke="#8B5CF6" 
-                    strokeWidth={3}
-                    fillOpacity={1} 
-                    fill="url(#conversationsGradient)" 
-                    name={t('dashboard.stats.conversations')}
-                    filter="url(#glow)"
-                  />
-                  <Line
-                    yAxisId="right"
-                    type="monotone"
-                    dataKey="satisfaction"
-                    stroke="#f59e0b"
-                    strokeWidth={3}
-                    dot={{ fill: '#f59e0b', strokeWidth: 2, r: 5 }}
-                    activeDot={{ r: 8, stroke: '#f59e0b', strokeWidth: 2, fill: '#fff' }}
-                    name={t('dashboard.stats.satisfaction')}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-              {!hasData && (
-                <p className="text-center text-muted-foreground text-sm mt-2">
-                  {t('dashboard.charts.configureAgents')}
-                </p>
+              {hasWeeklyData ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <ComposedChart data={weeklyData}>
+                    <defs>
+                      <linearGradient id="conversationsGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.8}/>
+                        <stop offset="50%" stopColor="#8B5CF6" stopOpacity={0.4}/>
+                        <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0.05}/>
+                      </linearGradient>
+                      <filter id="glow">
+                        <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                        <feMerge>
+                          <feMergeNode in="coloredBlur"/>
+                          <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                      </filter>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                    <XAxis 
+                      dataKey="name" 
+                      stroke="hsl(var(--muted-foreground))" 
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      yAxisId="left"
+                      stroke="hsl(var(--muted-foreground))" 
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      yAxisId="right"
+                      orientation="right"
+                      stroke="#f59e0b" 
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      domain={[0, 5]}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area 
+                      yAxisId="left"
+                      type="monotone" 
+                      dataKey="conversations" 
+                      stroke="#8B5CF6" 
+                      strokeWidth={3}
+                      fillOpacity={1} 
+                      fill="url(#conversationsGradient)" 
+                      name={t('dashboard.stats.conversations')}
+                      filter="url(#glow)"
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="satisfaction"
+                      stroke="#f59e0b"
+                      strokeWidth={3}
+                      dot={{ fill: '#f59e0b', strokeWidth: 2, r: 5 }}
+                      activeDot={{ r: 8, stroke: '#f59e0b', strokeWidth: 2, fill: '#fff' }}
+                      name={t('dashboard.stats.satisfaction')}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
+                  <TrendingUp className="h-12 w-12 mb-3 opacity-20" />
+                  <p className="text-sm font-medium">{t('dashboard.charts.noDataYet')}</p>
+                  <p className="text-xs mt-1">{t('dashboard.charts.configureAgents')}</p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -225,53 +212,62 @@ export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
               </CardTitle>
             </CardHeader>
             <CardContent className="relative">
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <defs>
-                    {COLORS.map((color, index) => (
-                      <linearGradient key={index} id={`pieGradient${index}`} x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stopColor={color} stopOpacity={1}/>
-                        <stop offset="100%" stopColor={color} stopOpacity={0.7}/>
-                      </linearGradient>
+              {hasPlatformData ? (
+                <>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <defs>
+                        {COLORS.map((color, index) => (
+                          <linearGradient key={index} id={`pieGradient${index}`} x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor={color} stopOpacity={1}/>
+                            <stop offset="100%" stopColor={color} stopOpacity={0.7}/>
+                          </linearGradient>
+                        ))}
+                      </defs>
+                      <Pie
+                        data={platformData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={85}
+                        paddingAngle={4}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {platformData.map((_, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={`url(#pieGradient${index})`}
+                            className="hover:opacity-80 transition-opacity cursor-pointer drop-shadow-lg"
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="flex flex-wrap justify-center gap-3 mt-2">
+                    {platformData.map((entry, index) => (
+                      <motion.div 
+                        key={entry.name} 
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                        whileHover={{ scale: 1.05 }}
+                      >
+                        <div
+                          className="w-2.5 h-2.5 rounded-full shadow-sm"
+                          style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                        />
+                        <span className="text-xs text-muted-foreground">{entry.name}</span>
+                        <span className="text-xs font-bold">{entry.value}</span>
+                      </motion.div>
                     ))}
-                  </defs>
-                  <Pie
-                    data={platformData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={85}
-                    paddingAngle={4}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {platformData.map((_, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={`url(#pieGradient${index})`}
-                        className="hover:opacity-80 transition-opacity cursor-pointer drop-shadow-lg"
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="flex flex-wrap justify-center gap-3 mt-2">
-                {platformData.map((entry, index) => (
-                  <motion.div 
-                    key={entry.name} 
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
-                    whileHover={{ scale: 1.05 }}
-                  >
-                    <div
-                      className="w-2.5 h-2.5 rounded-full shadow-sm"
-                      style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                    />
-                    <span className="text-xs text-muted-foreground">{entry.name}</span>
-                    <span className="text-xs font-bold">{entry.value}</span>
-                  </motion.div>
-                ))}
-              </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-[280px] text-muted-foreground">
+                  <PieChartIcon className="h-12 w-12 mb-3 opacity-20" />
+                  <p className="text-sm font-medium">{t('dashboard.charts.noDataYet')}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -297,38 +293,48 @@ export const ConversationsChart = ({ metrics }: ConversationsChartProps) => {
               </CardTitle>
             </CardHeader>
             <CardContent className="relative">
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={peakHoursData} barGap={4}>
-                  <defs>
-                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#10b981" stopOpacity={1}/>
-                      <stop offset="100%" stopColor="#059669" stopOpacity={0.8}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-                  <XAxis 
-                    dataKey="hour" 
-                    stroke="hsl(var(--muted-foreground))" 
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis 
-                    stroke="hsl(var(--muted-foreground))" 
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Bar 
-                    dataKey="count" 
-                    fill="url(#barGradient)" 
-                    radius={[6, 6, 0, 0]}
-                    name={t('dashboard.charts.calls')}
-                    className="drop-shadow-md"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              {hasPeakData ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={peakHoursData} barGap={2}>
+                    <defs>
+                      <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10b981" stopOpacity={1}/>
+                        <stop offset="100%" stopColor="#059669" stopOpacity={0.8}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+                    <XAxis 
+                      dataKey="hour" 
+                      stroke="hsl(var(--muted-foreground))" 
+                      fontSize={10}
+                      tickLine={false}
+                      axisLine={false}
+                      interval={1}
+                    />
+                    <YAxis 
+                      stroke="hsl(var(--muted-foreground))" 
+                      fontSize={11}
+                      tickLine={false}
+                      axisLine={false}
+                      allowDecimals={false}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar 
+                      dataKey="count" 
+                      fill="url(#barGradient)" 
+                      radius={[4, 4, 0, 0]}
+                      name={t('dashboard.charts.calls')}
+                      className="drop-shadow-md"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-[220px] text-muted-foreground">
+                  <Clock className="h-12 w-12 mb-3 opacity-20" />
+                  <p className="text-sm font-medium">{t('dashboard.charts.noDataYet')}</p>
+                  <p className="text-xs mt-1">{t('dashboard.charts.configureAgents')}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

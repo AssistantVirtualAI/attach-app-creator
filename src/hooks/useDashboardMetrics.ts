@@ -309,8 +309,7 @@ export const useDashboardMetrics = (dateRange?: DateRange) => {
 
         const peakHours = Object.entries(hourCounts)
           .map(([hour, count]) => ({ hour: parseInt(hour), count }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 5);
+          .sort((a, b) => a.hour - b.hour);
 
         const resolutionRate = conversations.length > 0 
           ? Math.round((resolvedCount / conversations.length) * 100) 
