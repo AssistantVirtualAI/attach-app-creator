@@ -49,40 +49,39 @@ const ClientAgentPortalContent = () => {
   const { hasAccess, role, agentName, platform, isLoading: accessLoading } = useClientAgentAccess(clientId, agentId);
 
   useEffect(() => {
-    const tryAdminAutoLogin = async () => {
-      // Already authenticated as client, no need to try admin login
-      if (isAuthenticated) {
-        setCheckingAdmin(false);
-        return;
-      }
+    // Already authenticated as client, no need to try admin login
+    if (isAuthenticated) {
+      setCheckingAdmin(false);
+      return;
+    }
 
-      // Still loading client auth, wait
-      if (authLoading) return;
+    // Still loading client auth, wait
+    if (authLoading) return;
 
-      // No clientId in URL, redirect to login
-      if (!clientId) {
-        setCheckingAdmin(false);
-        navigate('/client/login');
-        return;
-      }
+    // No clientId in URL, redirect to login
+    if (!clientId) {
+      setCheckingAdmin(false);
+      navigate('/client/login');
+      return;
+    }
 
-      // Already attempted admin login, don't retry
-      if (adminLoginAttempted) {
-        setCheckingAdmin(false);
-        return;
-      }
+    // Already attempted admin login, don't retry
+    if (adminLoginAttempted) {
+      setCheckingAdmin(false);
+      return;
+    }
 
-      setAdminLoginAttempted(true);
+    setAdminLoginAttempted(true);
 
+    // Wait for Supabase auth to fully initialize before checking session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       try {
-        // Check if there's an active Supabase admin session
-        const { data } = await supabase.auth.getSession();
-        
-        if (data.session?.user) {
+        if (session?.user) {
           // Try admin login
           const adminSession = await loginAsAdmin(clientId);
           if (adminSession) {
             setCheckingAdmin(false);
+            subscription.unsubscribe();
             return;
           }
         }
@@ -93,9 +92,10 @@ const ClientAgentPortalContent = () => {
       // No admin session or admin login failed, redirect to client login
       setCheckingAdmin(false);
       navigate('/client/login');
-    };
+      subscription.unsubscribe();
+    });
 
-    tryAdminAutoLogin();
+    return () => subscription.unsubscribe();
   }, [authLoading, isAuthenticated, clientId, loginAsAdmin, navigate, adminLoginAttempted]);
 
   useEffect(() => {
