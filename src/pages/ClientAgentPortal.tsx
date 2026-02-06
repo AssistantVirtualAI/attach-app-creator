@@ -28,7 +28,10 @@ import {
   Loader2,
   User,
   ChevronUp,
-  Globe
+  Globe,
+  Wrench,
+  Webhook,
+  Palette
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AvaLogo } from '@/components/shared/AvaLogo';
@@ -163,14 +166,34 @@ const ClientAgentPortalContent = () => {
     return null;
   }
 
-  const navItems = [
-    { icon: LayoutDashboard, label: t('clientPortal.sidebar.dashboard') || 'Dashboard', href: `/client/${clientId}/agent/${agentId}/dashboard`, color: 'text-blue-400' },
-    { icon: MessageSquare, label: t('clientPortal.sidebar.conversations') || 'Conversations', href: `/client/${clientId}/agent/${agentId}/conversations`, color: 'text-cyan-400' },
-    { icon: BarChart3, label: t('clientPortal.sidebar.analytics') || 'Analytics', href: `/client/${clientId}/agent/${agentId}/analytics`, color: 'text-purple-400' },
-    { icon: BookOpen, label: t('clientPortal.sidebar.knowledge') || 'Base de connaissances', href: `/client/${clientId}/agent/${agentId}/knowledge`, color: 'text-green-400' },
-    { icon: Settings, label: t('clientPortal.sidebar.settings') || 'Configuration', href: `/client/${clientId}/agent/${agentId}/settings`, color: 'text-pink-400' },
-    { icon: Code, label: 'Endpoints', href: `/client/${clientId}/agent/${agentId}/endpoints`, color: 'text-orange-400' },
+  const navSections = [
+    {
+      title: null,
+      items: [
+        { icon: LayoutDashboard, label: t('clientPortal.sidebar.dashboard') || 'Dashboard', href: `/client/${clientId}/agent/${agentId}/dashboard`, color: 'text-blue-400' },
+        { icon: MessageSquare, label: t('clientPortal.sidebar.conversations') || 'Conversations', href: `/client/${clientId}/agent/${agentId}/conversations`, color: 'text-cyan-400' },
+        { icon: BarChart3, label: t('clientPortal.sidebar.analytics') || 'Analytics', href: `/client/${clientId}/agent/${agentId}/analytics`, color: 'text-purple-400' },
+      ],
+    },
+    {
+      title: 'Configuration',
+      items: [
+        { icon: Settings, label: t('clientPortal.sidebar.settings') || 'Configuration', href: `/client/${clientId}/agent/${agentId}/settings`, color: 'text-pink-400' },
+        { icon: BookOpen, label: t('clientPortal.sidebar.knowledge') || 'Base de connaissances', href: `/client/${clientId}/agent/${agentId}/knowledge`, color: 'text-green-400' },
+        { icon: Wrench, label: 'MCP', href: `/client/${clientId}/agent/${agentId}/mcp`, color: 'text-amber-400' },
+        { icon: Webhook, label: 'Webhooks', href: `/client/${clientId}/agent/${agentId}/webhooks`, color: 'text-red-400' },
+      ],
+    },
+    {
+      title: 'Intégration',
+      items: [
+        { icon: Code, label: 'Endpoints', href: `/client/${clientId}/agent/${agentId}/endpoints`, color: 'text-orange-400' },
+        { icon: Palette, label: 'Widget', href: `/client/${clientId}/agent/${agentId}/widget`, color: 'text-teal-400' },
+      ],
+    },
   ];
+
+  const navItems = navSections.flatMap(s => s.items);
 
   const handleLogout = () => {
     logout();
@@ -256,32 +279,43 @@ const ClientAgentPortalContent = () => {
 
         {/* Navigation */}
         <ScrollArea className="flex-1 p-4">
-          <nav className="space-y-1.5 mb-6">
-            {navItems.map((item, index) => {
-              const isActive = location.pathname === item.href;
-              return (
-                <motion.div
-                  key={item.href}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <Link to={item.href}>
-                    <Button
-                      variant="ghost"
-                      className={`w-full justify-start gap-3 h-11 transition-all duration-200 ${
-                        isActive 
-                          ? 'bg-primary/10 text-primary border-l-2 border-primary shadow-[0_0_15px_rgba(var(--primary),0.2)]' 
-                          : 'hover:bg-muted/50 hover:translate-x-1'
-                      }`}
-                    >
-                      <item.icon className={`h-4 w-4 ${isActive ? 'text-primary' : item.color}`} />
-                      <span className={isActive ? 'font-medium' : ''}>{item.label}</span>
-                    </Button>
-                  </Link>
-                </motion.div>
-              );
-            })}
+          <nav className="space-y-4 mb-6">
+            {navSections.map((section, sIdx) => (
+              <div key={sIdx}>
+                {section.title && (
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1.5 px-3">
+                    {section.title}
+                  </p>
+                )}
+                <div className="space-y-0.5">
+                  {section.items.map((item, index) => {
+                    const isActive = location.pathname === item.href;
+                    return (
+                      <motion.div
+                        key={item.href}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: (sIdx * 3 + index) * 0.03 }}
+                      >
+                        <Link to={item.href}>
+                          <Button
+                            variant="ghost"
+                            className={`w-full justify-start gap-3 h-10 transition-all duration-150 ${
+                              isActive 
+                                ? 'bg-primary/10 text-primary border-l-2 border-primary shadow-[0_0_15px_rgba(var(--primary),0.2)]' 
+                                : 'hover:bg-muted/50 hover:translate-x-1'
+                            }`}
+                          >
+                            <item.icon className={`h-4 w-4 ${isActive ? 'text-primary' : item.color}`} />
+                            <span className={`text-sm ${isActive ? 'font-medium' : ''}`}>{item.label}</span>
+                          </Button>
+                        </Link>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </nav>
 
           {/* Agent Selector */}

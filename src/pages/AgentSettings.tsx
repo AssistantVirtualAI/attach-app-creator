@@ -1,9 +1,14 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Bot, Key, Palette, BarChart3, Play, Code, Brain, Activity, Users, Settings2, Wrench, Webhook, Phone } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  ArrowLeft, Bot, Key, Palette, BarChart3, Play, Code, Brain, 
+  Activity, Users, Settings2, Wrench, Webhook, Phone 
+} from 'lucide-react';
 import { useAgentSettings } from '@/hooks/useAgentSettings';
 import { AgentOverviewTab } from '@/components/agents/AgentOverviewTab';
 import { AgentCredentialsTab } from '@/components/agents/AgentCredentialsTab';
@@ -19,10 +24,22 @@ import { AgentFullConfigTab } from '@/components/agents/AgentFullConfigTab';
 import { AgentMCPConfigTab } from '@/components/agents/AgentMCPConfigTab';
 import { AgentPlatformWebhooksTab } from '@/components/agents/AgentPlatformWebhooksTab';
 import { AgentTwilioSection } from '@/components/agents/AgentTwilioSection';
+import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
+
+interface NavSection {
+  title: string;
+  items: {
+    id: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }[];
+}
 
 const AgentSettingsPage = () => {
   const { agentId } = useParams<{ agentId: string }>();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('overview');
   
   const {
     agent,
@@ -64,161 +81,210 @@ const AgentSettingsPage = () => {
 
   const platformAgentId = (agent.config as Record<string, any>)?.agent_id || agent.platform_agent_id;
 
-  return (
-    <AppLayout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/agents')}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{agent.name}</h1>
-            <p className="text-muted-foreground">
-              {agent.platform} • {platformAgentId || 'Non configuré'}
-            </p>
-          </div>
-        </div>
+  const navSections: NavSection[] = [
+    {
+      title: 'Général',
+      items: [
+        { id: 'overview', label: 'Aperçu', icon: Bot },
+        { id: 'config', label: 'Connexion', icon: Key },
+        { id: 'clients', label: 'Clients', icon: Users },
+      ],
+    },
+    {
+      title: 'Configuration',
+      items: [
+        { id: 'advanced', label: 'Paramètres', icon: Settings2 },
+        { id: 'knowledge', label: 'Base de connaissances', icon: Brain },
+        { id: 'mcp', label: 'Serveurs MCP', icon: Wrench },
+        { id: 'webhooks', label: 'Webhooks', icon: Webhook },
+      ],
+    },
+    {
+      title: 'Apparence',
+      items: [
+        { id: 'widget', label: 'Widget', icon: Palette },
+        { id: 'embed', label: 'Intégration', icon: Code },
+      ],
+    },
+    {
+      title: 'Performance',
+      items: [
+        { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+        { id: 'prototype', label: 'Test', icon: Play },
+      ],
+    },
+  ];
 
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="flex flex-wrap h-auto gap-1">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <Bot className="h-4 w-4" />
-              <span className="hidden sm:inline">Aperçu</span>
-            </TabsTrigger>
-            <TabsTrigger value="config" className="flex items-center gap-2">
-              <Key className="h-4 w-4" />
-              <span className="hidden sm:inline">Config</span>
-            </TabsTrigger>
-            <TabsTrigger value="advanced" className="flex items-center gap-2">
-              <Settings2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Avancé</span>
-            </TabsTrigger>
-            <TabsTrigger value="knowledge" className="flex items-center gap-2">
-              <Brain className="h-4 w-4" />
-              <span className="hidden sm:inline">KB</span>
-            </TabsTrigger>
-            <TabsTrigger value="mcp" className="flex items-center gap-2">
-              <Wrench className="h-4 w-4" />
-              <span className="hidden sm:inline">MCP</span>
-            </TabsTrigger>
-            <TabsTrigger value="webhooks" className="flex items-center gap-2">
-              <Webhook className="h-4 w-4" />
-              <span className="hidden sm:inline">Webhooks</span>
-            </TabsTrigger>
-            <TabsTrigger value="widget" className="flex items-center gap-2">
-              <Palette className="h-4 w-4" />
-              <span className="hidden sm:inline">Widget</span>
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Analytics</span>
-            </TabsTrigger>
-            <TabsTrigger value="clients" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Clients</span>
-            </TabsTrigger>
-            <TabsTrigger value="prototype" className="flex items-center gap-2">
-              <Play className="h-4 w-4" />
-              <span className="hidden sm:inline">Test</span>
-            </TabsTrigger>
-            <TabsTrigger value="embed" className="flex items-center gap-2">
-              <Code className="h-4 w-4" />
-              <span className="hidden sm:inline">Embed</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview">
-            <AgentOverviewTab
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return (
+          <AgentOverviewTab
+            agent={agent}
+            client={client}
+            analytics={analytics}
+            isLoadingAnalytics={isLoadingAnalytics}
+          />
+        );
+      case 'config':
+        return (
+          <div className="space-y-6">
+            <AgentCredentialsTab
               agent={agent}
-              client={client}
+              integration={integration}
+              onUpdate={updateAgent}
+              onTestConnection={testConnection}
+              isUpdating={isUpdating}
+              isTesting={isTesting}
+            />
+            {['elevenlabs', 'vapi', 'retell'].includes(agent.platform) && (
+              <AgentTwilioSection
+                agentId={agentId!}
+                agentName={agent.name}
+                currentTwilioNumber={(agent as any).twilio_number || null}
+                organizationId={agent.organization_id}
+              />
+            )}
+          </div>
+        );
+      case 'advanced':
+        return (
+          <AgentFullConfigTab
+            agentId={agentId!}
+            platformAgentId={platformAgentId}
+            platform={agent.platform}
+            organizationId={agent.organization_id}
+          />
+        );
+      case 'knowledge':
+        return <AgentKnowledgePromptTab agent={agent} />;
+      case 'mcp':
+        return <AgentMCPConfigTab agentId={agentId!} />;
+      case 'webhooks':
+        return <AgentPlatformWebhooksTab agentId={agentId!} platform={agent.platform} />;
+      case 'widget':
+        return (
+          <AgentWidgetTab
+            agent={agent}
+            onUpdate={updateAgent}
+            isUpdating={isUpdating}
+          />
+        );
+      case 'analytics':
+        return (
+          <div className="space-y-6">
+            <AgentRealtimeAnalytics 
+              agentId={agentId!}
+              platformAgentId={platformAgentId}
+            />
+            <AgentAnalyticsTab
+              conversations={conversations || []}
               analytics={analytics}
               isLoadingAnalytics={isLoadingAnalytics}
             />
-          </TabsContent>
-
-          <TabsContent value="config">
-            <div className="space-y-6">
-              <AgentCredentialsTab
-                agent={agent}
-                integration={integration}
-                onUpdate={updateAgent}
-                onTestConnection={testConnection}
-                isUpdating={isUpdating}
-                isTesting={isTesting}
-              />
-              {['elevenlabs', 'vapi', 'retell'].includes(agent.platform) && (
-                <AgentTwilioSection
-                  agentId={agentId!}
-                  agentName={agent.name}
-                  currentTwilioNumber={(agent as any).twilio_number || null}
-                  organizationId={agent.organization_id}
-                />
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="advanced">
-            <AgentFullConfigTab
-              agentId={agentId!}
-              platformAgentId={platformAgentId}
-              platform={agent.platform}
-              organizationId={agent.organization_id}
-            />
-          </TabsContent>
-
-          <TabsContent value="knowledge">
-            <AgentKnowledgePromptTab agent={agent} />
-          </TabsContent>
-
-          <TabsContent value="mcp">
-            <AgentMCPConfigTab agentId={agentId!} />
-          </TabsContent>
-
-          <TabsContent value="webhooks">
-            <AgentPlatformWebhooksTab agentId={agentId!} platform={agent.platform} />
-          </TabsContent>
-
-          <TabsContent value="widget">
-            <AgentWidgetTab
-              agent={agent}
-              onUpdate={updateAgent}
-              isUpdating={isUpdating}
-            />
-          </TabsContent>
-
-          <TabsContent value="analytics">
-            <div className="space-y-6">
-              <AgentRealtimeAnalytics 
-                agentId={agentId!}
-                platformAgentId={platformAgentId}
-              />
-              <AgentAnalyticsTab
-                conversations={conversations || []}
-                analytics={analytics}
-                isLoadingAnalytics={isLoadingAnalytics}
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="clients">
-            <AgentClientsTab 
-              agentId={agentId!} 
-              organizationId={agent.organization_id}
-            />
-          </TabsContent>
-
-          <TabsContent value="prototype">
+          </div>
+        );
+      case 'clients':
+        return (
+          <AgentClientsTab 
+            agentId={agentId!} 
+            organizationId={agent.organization_id}
+          />
+        );
+      case 'prototype':
+        return (
+          <div className="space-y-6">
             <AgentAnalyticsWidget agentId={agentId!} agentName={agent.name} />
-          </TabsContent>
-
-          <TabsContent value="prototype">
             <AgentPrototypeTab agent={agent} />
-          </TabsContent>
+          </div>
+        );
+      case 'embed':
+        return <AgentEmbedTab agent={agent} />;
+      default:
+        return null;
+    }
+  };
 
-          <TabsContent value="embed">
-            <AgentEmbedTab agent={agent} />
-          </TabsContent>
-        </Tabs>
+  return (
+    <AppLayout>
+      <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-8rem)]">
+        {/* Sidebar Navigation */}
+        <motion.aside 
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="lg:w-64 flex-shrink-0"
+        >
+          <div className="lg:sticky lg:top-6 space-y-5">
+            {/* Agent Header Card */}
+            <div className="p-4 rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm">
+              <button 
+                onClick={() => navigate('/agents')}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Retour aux agents
+              </button>
+              <h1 className="text-lg font-bold truncate">{agent.name}</h1>
+              <div className="flex items-center gap-2 mt-2">
+                <Badge variant="outline" className="text-xs capitalize">
+                  {agent.platform}
+                </Badge>
+                {platformAgentId && (
+                  <span className="text-xs text-muted-foreground font-mono truncate max-w-[120px]">
+                    {platformAgentId}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <ScrollArea className="lg:max-h-[calc(100vh-16rem)]">
+              <nav className="space-y-5">
+                {navSections.map((section) => (
+                  <div key={section.title}>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-1.5 px-3">
+                      {section.title}
+                    </p>
+                    <div className="space-y-0.5">
+                      {section.items.map((item) => {
+                        const isActive = activeTab === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => setActiveTab(item.id)}
+                            className={cn(
+                              'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150',
+                              isActive
+                                ? 'bg-primary/10 text-primary font-medium shadow-sm'
+                                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                            )}
+                          >
+                            <item.icon className={cn(
+                              'h-4 w-4 flex-shrink-0',
+                              isActive ? 'text-primary' : 'text-muted-foreground/70'
+                            )} />
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </nav>
+            </ScrollArea>
+          </div>
+        </motion.aside>
+
+        {/* Main Content */}
+        <motion.main 
+          key={activeTab}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.15 }}
+          className="flex-1 min-w-0"
+        >
+          {renderContent()}
+        </motion.main>
       </div>
     </AppLayout>
   );
