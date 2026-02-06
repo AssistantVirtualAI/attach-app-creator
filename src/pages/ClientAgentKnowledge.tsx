@@ -107,7 +107,7 @@ const useClientUpdateKnowledgeDocument = () => {
 
 const ClientAgentKnowledge = () => {
   const { clientId, agentId } = useParams();
-  const { apiKey, platformAgentId, agentName, canEdit } = useClientAgentAccess(clientId, agentId);
+  const { apiKey, platformAgentId, agentName, canEdit, organizationId } = useClientAgentAccess(clientId, agentId);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -124,10 +124,11 @@ const ClientAgentKnowledge = () => {
   const { data: knowledgeBase, isLoading, error, refetch } = useClientElevenLabsKnowledgeBase({
     apiKey,
     agentId: platformAgentId,
+    organizationId,
   });
 
   const { data: documentData, isLoading: isLoadingDocument } = useClientElevenLabsKnowledgeBaseDocument(
-    { apiKey, agentId: platformAgentId },
+    { apiKey, agentId: platformAgentId, organizationId },
     viewDocumentId
   );
 

@@ -96,6 +96,20 @@ export const ClientLayout = () => {
     tryAdminAutoLogin();
   }, [authLoading, isAuthenticated, clientId, loginAsAdmin, navigate, adminLoginAttempted]);
 
+  // Auto-redirect to agent portal if client has exactly one agent
+  useEffect(() => {
+    if (!session || !isAuthenticated || agentsLoading || !assignedAgents) return;
+    
+    if (assignedAgents.length === 1 && assignedAgents[0].agent?.id) {
+      const agentId = assignedAgents[0].agent.id;
+      const currentPath = location.pathname;
+      // Only redirect if we're on the main portal pages (not already in agent portal)
+      if (!currentPath.includes('/agent/')) {
+        navigate(`/client/${session.clientId}/agent/${agentId}/dashboard`, { replace: true });
+      }
+    }
+  }, [session, isAuthenticated, agentsLoading, assignedAgents, navigate, location.pathname]);
+
   // Show loading while checking admin or client auth
   if (authLoading || checkingAdmin) {
     return (

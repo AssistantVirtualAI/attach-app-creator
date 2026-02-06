@@ -103,11 +103,13 @@ const ClientAgentConversations = () => {
   const { data: conversationsData, isLoading } = useClientElevenLabsConversations({
     apiKey,
     agentId: platformAgentId,
+    organizationId,
   }, page, 20);
 
   const { data: conversationDetails, isLoading: detailsLoading, error: detailsError, refetch: refetchDetails } = useClientElevenLabsConversationDetails({
     apiKey,
     agentId: platformAgentId,
+    organizationId,
   }, selectedConversation || undefined);
 
   const audioMutation = useClientElevenLabsAudio();
@@ -151,14 +153,15 @@ const ClientAgentConversations = () => {
   const [audioUnavailable, setAudioUnavailable] = useState(false);
 
   const handlePlayAudio = async (conversationId: string) => {
-    if (!apiKey || !platformAgentId) return;
+    if (!platformAgentId) return;
     
     setAudioUnavailable(false);
     
     try {
       const result = await audioMutation.mutateAsync({
-        apiKey,
+        apiKey: apiKey || undefined,
         agentId: platformAgentId,
+        organizationId: organizationId || undefined,
         conversationId,
         format: 'mp3'
       });
