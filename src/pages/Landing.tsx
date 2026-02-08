@@ -13,9 +13,13 @@ import { FooterSection } from "@/components/landing/FooterSection";
 import { AgentCreationSection } from "@/components/landing/AgentCreationSection";
 import { IntegrationsSection } from "@/components/landing/IntegrationsSection";
 import { ProductShowcaseSection } from "@/components/landing/ProductShowcaseSection";
-import { AllFeaturesSummarySection } from "@/components/landing/AllFeaturesSummarySection";
+import { PortalPreviewSection } from "@/components/landing/PortalPreviewSection";
+import { InlineCTA } from "@/components/landing/InlineCTA";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const Landing = () => {
+  const { t } = useTranslation();
+
   return (
     <div className="min-h-screen bg-background overflow-hidden">
       <Navbar />
@@ -26,24 +30,36 @@ const Landing = () => {
       >
         <HeroSection />
         <TrustedBySection />
+        <div id="portal-preview">
+          <PortalPreviewSection />
+        </div>
         <div id="how-it-works">
           <HowItWorksSection />
         </div>
+        <InlineCTA
+          title={t("inlineCTA.afterHowItWorks")}
+          buttonLabel={t("inlineCTA.button")}
+        />
         <div id="agent-creation">
           <AgentCreationSection />
         </div>
         <div id="features">
           <FeaturesSection />
         </div>
-        <div id="feature-list">
-          <AllFeaturesSummarySection />
-        </div>
+        <InlineCTA
+          title={t("inlineCTA.afterFeatures")}
+          buttonLabel={t("inlineCTA.button")}
+        />
         <div id="portals">
           <PortalComparisonSection />
         </div>
         <div id="integrations">
           <IntegrationsSection />
         </div>
+        <InlineCTA
+          title={t("inlineCTA.afterIntegrations")}
+          buttonLabel={t("inlineCTA.button")}
+        />
         <div id="analytics">
           <ProductShowcaseSection />
         </div>

@@ -18,11 +18,15 @@ export const en = {
   // Hero Section
   hero: {
     badge: 'Powered by next-gen AI',
-    title1: 'Voice AI Agents',
-    title2: 'For Your Business',
-    subtitle: 'Create, deploy and analyze your conversational AI agents. A complete platform to manage your customer interactions with intelligence.',
+    title1: 'One Portal.',
+    title2: 'Every Tool.',
+    subtitle: 'Create, deploy and manage AI voice agents without switching dashboards. One platform for your entire team.',
     cta1: 'Book a demo',
     cta2: 'Start free trial',
+    noMoreTabs: 'No more jumping between platforms',
+    mockStat1: 'Conversations',
+    mockStat2: 'Satisfaction',
+    mockStat3: 'Active agents',
     feature1: 'Natural voices',
     feature2: 'Multi-language',
     feature3: 'Real-time analytics',
@@ -191,9 +195,36 @@ export const en = {
       value: '99.9%',
       label: 'Uptime',
     },
+    seeAll: 'See all features',
   },
 
-  // Portal Comparison Section
+  // Portal Preview Section
+  portalPreview: {
+    badge: 'All-in-one portal',
+    title: 'Everything lives in one place',
+    subtitle: 'Explore every module of the Admin Portal — agents, analytics, telephony, clients and more.',
+    statement: 'Everything your team needs. Nothing they don\'t.',
+    cta: 'Book a demo',
+    modules: {
+      agents: 'Agents',
+      conversations: 'Conversations',
+      analytics: 'Analytics',
+      telephony: 'Telephony',
+      knowledge: 'Knowledge',
+      clients: 'Clients',
+      settings: 'Settings',
+    },
+  },
+
+  // Inline CTA
+  inlineCTA: {
+    afterHowItWorks: 'Ready to see it in action?',
+    afterFeatures: 'Ready to centralize your operations?',
+    afterIntegrations: 'Connect all your tools today',
+    afterComparison: 'Two portals. One platform. Zero complexity.',
+    button: 'Book a demo',
+  },
+
   portalComparison: {
     badge: 'Two portals, one ecosystem',
     title: 'Agency vs Client Portal',
@@ -238,6 +269,7 @@ export const en = {
       knowledgeBase: 'Knowledge base',
       customTheme: 'Custom theme',
     },
+    bottomStatement: 'Two portals. One platform. Zero complexity.',
   },
 
   // Testimonials Section
@@ -368,6 +400,7 @@ export const en = {
     subtitle: 'Join hundreds of companies using AVA to automate their customer interactions.',
     cta1: 'Start for free',
     cta2: 'Request a demo',
+    socialProof: 'Join 50+ agencies already using the platform',
   },
 
   // (removed duplicate integrations block; Twilio helper strings live under the main integrations section)

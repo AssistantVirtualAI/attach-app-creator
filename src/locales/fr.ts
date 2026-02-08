@@ -17,11 +17,15 @@ export const fr = {
   // Hero Section
   hero: {
     badge: 'Propulsé par IA nouvelle génération',
-    title1: 'Agents IA Vocaux',
-    title2: 'Pour Votre Entreprise',
-    subtitle: 'Créez, déployez et analysez vos agents conversationnels IA. Une plateforme complète pour gérer vos interactions clients avec intelligence.',
+    title1: 'Un Portail.',
+    title2: 'Tous les outils.',
+    subtitle: 'Créez, déployez et gérez vos agents IA vocaux sans changer de tableau de bord. Une plateforme pour toute votre équipe.',
     cta1: 'Demander une démo',
-    cta2: 'Démarrer l’essai',
+    cta2: "Démarrer l'essai",
+    noMoreTabs: 'Fini de jongler entre les plateformes',
+    mockStat1: 'Conversations',
+    mockStat2: 'Satisfaction',
+    mockStat3: 'Agents actifs',
     feature1: 'Voix naturelles',
     feature2: 'Multi-langues',
     feature3: 'Analyses temps réel',
@@ -190,9 +194,36 @@ export const fr = {
       value: '99.9%',
       label: 'Disponibilité',
     },
+    seeAll: 'Voir toutes les fonctionnalités',
   },
 
-  // Portal Comparison Section
+  // Portal Preview Section
+  portalPreview: {
+    badge: 'Portail tout-en-un',
+    title: 'Tout vit au même endroit',
+    subtitle: 'Explorez chaque module du Portail Admin — agents, analytics, téléphonie, clients et plus.',
+    statement: 'Tout ce dont votre équipe a besoin. Rien de superflu.',
+    cta: 'Demander une démo',
+    modules: {
+      agents: 'Agents',
+      conversations: 'Conversations',
+      analytics: 'Analytics',
+      telephony: 'Téléphonie',
+      knowledge: 'Connaissances',
+      clients: 'Clients',
+      settings: 'Paramètres',
+    },
+  },
+
+  // Inline CTA
+  inlineCTA: {
+    afterHowItWorks: 'Prêt à voir ça en action ?',
+    afterFeatures: 'Prêt à centraliser vos opérations ?',
+    afterIntegrations: 'Connectez tous vos outils aujourd\'hui',
+    afterComparison: 'Deux portails. Une plateforme. Zéro complexité.',
+    button: 'Demander une démo',
+  },
+
   portalComparison: {
     badge: 'Deux portails, un écosystème',
     title: 'Portail Agence vs Client',
@@ -237,6 +268,7 @@ export const fr = {
       knowledgeBase: 'Base de connaissances',
       customTheme: 'Thème personnalisé',
     },
+    bottomStatement: 'Deux portails. Une plateforme. Zéro complexité.',
   },
 
   // Testimonials Section
@@ -367,6 +399,7 @@ export const fr = {
     subtitle: 'Rejoignez des centaines d\'entreprises qui utilisent AVA pour automatiser leurs interactions clients.',
     cta1: 'Commencer gratuitement',
     cta2: 'Demander une démo',
+    socialProof: 'Rejoignez 50+ agences qui utilisent déjà la plateforme',
   },
 
   // (removed duplicate integrations block; Twilio helper strings live under the main integrations section)
