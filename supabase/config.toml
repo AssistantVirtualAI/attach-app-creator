@@ -176,3 +176,6 @@ verify_jwt = false
 
 [functions.elevenlabs-api-proxy]
 verify_jwt = false
+
+[functions.notify-admin-signup]
+verify_jwt = false

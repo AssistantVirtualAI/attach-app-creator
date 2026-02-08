@@ -66,12 +66,25 @@ export const useAuth = () => {
         // Use setTimeout to defer to avoid auth deadlock
         setTimeout(async () => {
           await createOrganizationForNewUser(data.user!.id, email, fullName);
+          
+          // Notify admin about new signup
+          try {
+            await supabase.functions.invoke('notify-admin-signup', {
+              body: {
+                email,
+                fullName: fullName || null,
+                organizationName: fullName ? `${fullName}'s Agency` : null,
+              },
+            });
+          } catch (notifyError) {
+            console.error('Failed to send signup notification:', notifyError);
+          }
         }, 0);
       }
 
       toast({
         title: "Inscription réussie",
-        description: "Bienvenue ! Votre essai gratuit de 7 jours est activé.",
+        description: "Bienvenue ! Votre essai gratuit de 14 jours est activé.",
       });
       return { error: null };
     } catch (error: any) {
