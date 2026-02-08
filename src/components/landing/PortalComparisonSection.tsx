@@ -10,6 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useLanguage } from "@/context/LanguageContext";
+import { translations } from "@/locales";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -29,7 +31,11 @@ const FeatureValue = ({ value }: { value: boolean | string }) => {
 
 export const PortalComparisonSection = () => {
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const navigate = useNavigate();
+
+  const agencyFeatures = translations[language].portalComparison.agency.features as unknown as string[];
+  const clientFeatures = translations[language].portalComparison.client.features as unknown as string[];
 
   const tableKeys = [
     "multiClient",
@@ -110,7 +116,7 @@ export const PortalComparisonSection = () => {
               </div>
               <p className="text-muted-foreground mb-5">{t("portalComparison.agency.description")}</p>
               <ul className="space-y-2.5">
-                {(t("portalComparison.agency.features") as unknown as string[]).map((f: string, i: number) => (
+                {agencyFeatures.map((f: string, i: number) => (
                   <li key={i} className="flex items-center gap-3">
                     <Check className="w-5 h-5 text-primary shrink-0" />
                     <span className="text-sm">{f}</span>
@@ -140,7 +146,7 @@ export const PortalComparisonSection = () => {
               </div>
               <p className="text-muted-foreground mb-5">{t("portalComparison.client.description")}</p>
               <ul className="space-y-2.5">
-                {(t("portalComparison.client.features") as unknown as string[]).map((f: string, i: number) => (
+                {clientFeatures.map((f: string, i: number) => (
                   <li key={i} className="flex items-center gap-3">
                     <Check className="w-5 h-5 text-secondary shrink-0" />
                     <span className="text-sm">{f}</span>
