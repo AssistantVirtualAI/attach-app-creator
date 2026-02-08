@@ -10,19 +10,20 @@ import {
 } from "@/components/ui/accordion";
 import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "@/hooks/useTranslation";
 
 type Bi = { fr: string; en: string };
 
 const sections: Array<{ id: string; title: Bi; items: Bi[] }> = [
   {
     id: "agent-creation",
-    title: { fr: "Création & sync d’agents", en: "Agent creation & sync" },
+    title: { fr: "Création & sync d'agents", en: "Agent creation & sync" },
     items: [
       { fr: "Wizard guidé pour créer des agents dans le portail Admin", en: "Guided wizard to create agents inside the Admin Portal" },
       { fr: "Templates de prompts + assistant IA (review & apply)", en: "Prompt templates + AI assistant (review & apply)" },
       { fr: "Sélection & pré-écoute des voix", en: "Voice selection & preview" },
       { fr: "Paramètres avancés (comportement, langue, style, sécurité)", en: "Advanced settings (behavior, language, style, safety)" },
-      { fr: "Synchronisation vers plateformes vocales (sans changer d’interface)", en: "Sync to voice platforms (without switching interfaces)" },
+      { fr: "Synchronisation vers plateformes vocales (sans changer d'interface)", en: "Sync to voice platforms (without switching interfaces)" },
     ],
   },
   {
@@ -33,7 +34,7 @@ const sections: Array<{ id: string; title: Bi; items: Bi[] }> = [
       { fr: "Routage dynamique / webhooks", en: "Dynamic routing / webhooks" },
       { fr: "Enregistrements : activation + lecture sécurisée", en: "Recordings: enablement + secure playback" },
       { fr: "Monitoring temps réel des appels actifs", en: "Real-time monitoring of active calls" },
-      { fr: "Analytics d’usage et performance", en: "Usage and performance analytics" },
+      { fr: "Analytics d'usage et performance", en: "Usage and performance analytics" },
     ],
   },
   {
@@ -44,7 +45,7 @@ const sections: Array<{ id: string; title: Bi; items: Bi[] }> = [
       { fr: "Analyse conversation : sentiment, timeline, tags intelligents", en: "Conversation analysis: sentiment, timeline, smart tags" },
       { fr: "Topic analysis : sujets + requêtes mal comprises", en: "Topic analysis: topics + misunderstood queries" },
       { fr: "Rapports IA (périodiques) + recommandations", en: "AI reports (periodic) + recommendations" },
-      { fr: "Suggestions d’amélioration de prompt & first message", en: "Suggestions to improve prompt & first message" },
+      { fr: "Suggestions d'amélioration de prompt & first message", en: "Suggestions to improve prompt & first message" },
     ],
   },
   {
@@ -81,7 +82,7 @@ const sections: Array<{ id: string; title: Bi; items: Bi[] }> = [
     title: { fr: "Automatisation & intégrations", en: "Automation & integrations" },
     items: [
       { fr: "Workflow builder", en: "Workflow builder" },
-      { fr: "Webhooks + router d’événements", en: "Webhooks + event router" },
+      { fr: "Webhooks + router d'événements", en: "Webhooks + event router" },
       { fr: "API Explorer : Webhook manager + MCP manager", en: "API Explorer: Webhook manager + MCP manager" },
     ],
   },
@@ -99,6 +100,7 @@ const sections: Array<{ id: string; title: Bi; items: Bi[] }> = [
 
 export default function FeaturesPage() {
   const navigate = useNavigate();
+  const { t, language } = useTranslation();
 
   return (
     <div className="min-h-screen bg-background overflow-hidden">
@@ -113,13 +115,9 @@ export default function FeaturesPage() {
               transition={{ duration: 0.5 }}
               className="max-w-4xl mx-auto text-center"
             >
-              <h1 className="text-4xl md:text-5xl font-bold mb-4">Full feature list</h1>
-              <p className="text-sm text-muted-foreground mb-6">Liste complète des fonctionnalités</p>
+              <h1 className="text-4xl md:text-5xl font-bold mb-4">{t('features.page.title')}</h1>
               <p className="text-xl text-muted-foreground mb-8">
-                Everything included in the Admin and Client portals.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Tout ce qui est inclus côté Admin et côté Client.
+                {t('features.page.subtitle')}
               </p>
 
               <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -127,10 +125,10 @@ export default function FeaturesPage() {
                   className="bg-gradient-to-r from-primary to-secondary hover:opacity-90"
                   onClick={() => navigate("/demo-request")}
                 >
-                  Book a demo / Demander une démo
+                  {t('features.page.bookDemo')}
                   <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
-                <Button variant="outline" onClick={() => navigate("/")}>Back to landing / Retour</Button>
+                <Button variant="outline" onClick={() => navigate("/")}>{t('features.page.backToLanding')}</Button>
               </div>
             </motion.div>
           </div>
@@ -144,20 +142,16 @@ export default function FeaturesPage() {
                   <AccordionItem key={s.id} value={s.id} className="border-border/60">
                     <AccordionTrigger>
                       <div className="text-left">
-                        <div className="font-semibold">{s.title.en}</div>
-                        <div className="text-sm text-muted-foreground">{s.title.fr}</div>
+                        <div className="font-semibold">{s.title[language]}</div>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
                       <ul className="space-y-2 py-2">
-                        {s.items.map((it) => (
-                          <li key={it.en} className="text-sm text-muted-foreground">
+                        {s.items.map((it, idx) => (
+                          <li key={idx} className="text-sm text-muted-foreground">
                             <div className="flex gap-2">
                               <span className="mt-2 w-1.5 h-1.5 rounded-full bg-primary/60" />
-                              <div className="space-y-0.5">
-                                <div className="text-foreground/90">{it.en}</div>
-                                <div className="text-xs text-muted-foreground">{it.fr}</div>
-                              </div>
+                              <div className="text-foreground/90">{it[language]}</div>
                             </div>
                           </li>
                         ))}

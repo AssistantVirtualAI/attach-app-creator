@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useTranslation } from "@/hooks/useTranslation";
 
 const demoRequestSchema = z.object({
   name: z.string().trim().min(2).max(100),
@@ -29,6 +30,7 @@ type DemoRequestValues = z.infer<typeof demoRequestSchema>;
 export default function DemoRequestPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [submitting, setSubmitting] = useState(false);
 
   const defaultValues = useMemo<DemoRequestValues>(
@@ -69,13 +71,13 @@ export default function DemoRequestPage() {
       if (error) throw error;
 
       toast({
-        title: "Request sent / Demande envoyée",
-        description: "We’ll reply within 24–48h. / Réponse sous 24–48h.",
+        title: t('demoRequest.successTitle'),
+        description: t('demoRequest.successDescription'),
       });
       form.reset(defaultValues);
     } catch (e: any) {
       toast({
-        title: "Error / Erreur",
+        title: t('demoRequest.errorTitle'),
         description: e?.message ?? "Something went wrong",
         variant: "destructive",
       });
@@ -93,35 +95,31 @@ export default function DemoRequestPage() {
           <div className="container mx-auto px-6 relative z-10">
             <div className="max-w-3xl mx-auto">
               <div className="text-center mb-8">
-                <h1 className="text-4xl md:text-5xl font-bold">Book a demo</h1>
-                <p className="text-sm text-muted-foreground mt-2">Demander une démo</p>
+                <h1 className="text-4xl md:text-5xl font-bold">{t('demoRequest.title')}</h1>
                 <p className="text-muted-foreground mt-4">
-                  Tell us about your needs and we’ll contact you.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Décrivez votre besoin et on vous recontacte.
+                  {t('demoRequest.subtitle')}
                 </p>
               </div>
 
               <Card className="bg-card/50 backdrop-blur-xl border-border/60">
                 <CardHeader>
-                  <CardTitle>Contact details / Coordonnées</CardTitle>
+                  <CardTitle>{t('demoRequest.cardTitle')}</CardTitle>
                   <CardDescription>
-                    Required: name + email. / Requis : nom + email.
+                    {t('demoRequest.cardDescription')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="name">Name / Nom</Label>
+                        <Label htmlFor="name">{t('demoRequest.nameLabel')}</Label>
                         <Input id="name" autoComplete="name" {...form.register("name")} />
                         {form.formState.errors.name ? (
                           <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
                         ) : null}
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
+                        <Label htmlFor="email">{t('demoRequest.emailLabel')}</Label>
                         <Input id="email" type="email" autoComplete="email" {...form.register("email")} />
                         {form.formState.errors.email ? (
                           <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
@@ -131,32 +129,32 @@ export default function DemoRequestPage() {
 
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="company">Company / Société</Label>
+                        <Label htmlFor="company">{t('demoRequest.companyLabel')}</Label>
                         <Input id="company" {...form.register("company")} />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="phone">Phone / Téléphone</Label>
+                        <Label htmlFor="phone">{t('demoRequest.phoneLabel')}</Label>
                         <Input id="phone" {...form.register("phone")} />
                       </div>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="expectedClients"># Clients (expected) / # clients</Label>
+                        <Label htmlFor="expectedClients">{t('demoRequest.expectedClientsLabel')}</Label>
                         <Input id="expectedClients" {...form.register("expectedClients")} />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="currentPlatform">Current platform / Plateforme actuelle</Label>
+                        <Label htmlFor="currentPlatform">{t('demoRequest.currentPlatformLabel')}</Label>
                         <Input id="currentPlatform" {...form.register("currentPlatform")} />
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="requirements">Requirements / Besoins</Label>
+                      <Label htmlFor="requirements">{t('demoRequest.requirementsLabel')}</Label>
                       <Textarea
                         id="requirements"
                         rows={6}
-                        placeholder="Tell us what you want to build… / Décrivez votre projet…"
+                        placeholder={t('demoRequest.requirementsPlaceholder')}
                         {...form.register("requirements")}
                       />
                       {form.formState.errors.requirements ? (
@@ -165,13 +163,13 @@ export default function DemoRequestPage() {
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3 justify-end">
-                      <Button type="button" variant="outline" onClick={() => navigate("/")}>Back / Retour</Button>
+                      <Button type="button" variant="outline" onClick={() => navigate("/")}>{t('demoRequest.back')}</Button>
                       <Button
                         type="submit"
                         className="bg-gradient-to-r from-primary to-secondary hover:opacity-90"
                         disabled={submitting}
                       >
-                        {submitting ? "Sending… / Envoi…" : "Submit / Envoyer"}
+                        {submitting ? t('demoRequest.sending') : t('demoRequest.submit')}
                       </Button>
                     </div>
                   </form>

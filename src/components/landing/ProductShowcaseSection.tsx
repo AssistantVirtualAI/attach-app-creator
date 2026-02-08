@@ -77,7 +77,7 @@ export const ProductShowcaseSection = () => {
               <div className="px-4 py-3 border-b border-border/60 bg-gradient-to-r from-primary/10 via-transparent to-secondary/10">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-medium">{t("landing.showcase.agent.panel1Title")}</div>
-                  <Badge variant="secondary" className="font-medium">Wizard</Badge>
+                  <Badge variant="secondary" className="font-medium">{t("landing.showcase.agent.wizard")}</Badge>
                 </div>
               </div>
 
@@ -118,7 +118,7 @@ export const ProductShowcaseSection = () => {
                   <div className="text-sm font-medium">{t("landing.showcase.agent.panel2Title")}</div>
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">{t("landing.showcase.agent.preview")}</Badge>
-                    <Badge variant="outline" className="bg-background/30">Sync</Badge>
+                    <Badge variant="outline" className="bg-background/30">{t("landing.showcase.agent.syncBadge")}</Badge>
                   </div>
                 </div>
               </div>
@@ -140,9 +140,9 @@ export const ProductShowcaseSection = () => {
                     <Waveform />
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {['stability', 'style', 'similarity'].map((k) => (
+                    {(['stability', 'style', 'similarity'] as const).map((k) => (
                       <Badge key={k} variant="outline" className="bg-background/30 text-xs">
-                        {k}
+                        {t(`landing.showcase.agent.${k}`)}
                       </Badge>
                     ))}
                   </div>
@@ -154,7 +154,7 @@ export const ProductShowcaseSection = () => {
                       <div className="text-sm font-medium">{t("landing.showcase.agent.sync")}</div>
                       <div className="text-xs text-muted-foreground">ElevenLabs → Config pushed</div>
                     </div>
-                    <Badge variant="secondary">Live</Badge>
+                    <Badge variant="secondary">{t("landing.showcase.agent.live")}</Badge>
                   </div>
                   <div className="mt-4 rounded-xl border border-border/60 bg-background/30 p-3">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -177,9 +177,9 @@ export const ProductShowcaseSection = () => {
                     <div className="mt-2 h-2 rounded-full bg-muted/60" />
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {['Push config', 'Test call', 'Open agent'].map((label) => (
+                    {(['pushConfig', 'testCall', 'openAgent'] as const).map((label) => (
                       <Badge key={label} variant="outline" className="bg-background/30">
-                        {label}
+                        {t(`landing.showcase.agent.${label}`)}
                       </Badge>
                     ))}
                   </div>

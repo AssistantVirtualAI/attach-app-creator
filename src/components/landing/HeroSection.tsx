@@ -122,7 +122,7 @@ export const HeroSection = () => {
                 size="lg"
                 variant="outline"
                 className="h-16 px-10 text-lg font-semibold border-2"
-                onClick={() => navigate("/auth")}
+                onClick={() => navigate("/login")}
               >
                 <Play className="mr-2 w-5 h-5" />
                 {t("hero.cta2")}

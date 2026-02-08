@@ -30,7 +30,7 @@ type ModuleKey = (typeof modules)[number]["key"];
 
 /* ── Mini previews per module ────────────────────────────── */
 
-const AgentsPreview = () => (
+const AgentsPreview = ({ t }: { t: (key: string) => string }) => (
   <div className="space-y-3">
     {[1, 2, 3].map((i) => (
       <div key={i} className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/40 p-3">
@@ -55,39 +55,42 @@ const AgentsPreview = () => (
   </div>
 );
 
-const ConversationsPreview = () => (
-  <div className="space-y-2">
-    {["positive", "neutral", "negative", "positive"].map((s, i) => (
-      <div key={i} className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/40 p-3">
-        <div className="w-8 h-8 rounded-full bg-muted/50" />
-        <div className="flex-1">
-          <div className="h-2.5 rounded-full bg-muted/70 w-3/4 mb-1.5" />
-          <div className="h-2 rounded-full bg-muted/40 w-1/2" />
+const ConversationsPreview = ({ t }: { t: (key: string) => string }) => {
+  const sentiments = ["positive", "neutral", "negative", "positive"] as const;
+  return (
+    <div className="space-y-2">
+      {sentiments.map((s, i) => (
+        <div key={i} className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/40 p-3">
+          <div className="w-8 h-8 rounded-full bg-muted/50" />
+          <div className="flex-1">
+            <div className="h-2.5 rounded-full bg-muted/70 w-3/4 mb-1.5" />
+            <div className="h-2 rounded-full bg-muted/40 w-1/2" />
+          </div>
+          <Badge
+            variant="outline"
+            className={`text-xs ${
+              s === "positive" ? "border-success/50 text-success" : s === "negative" ? "border-destructive/50 text-destructive" : "border-muted-foreground/30"
+            }`}
+          >
+            {t(`portalPreview.skeleton.${s}`)}
+          </Badge>
         </div>
-        <Badge
-          variant="outline"
-          className={`text-xs ${
-            s === "positive" ? "border-success/50 text-success" : s === "negative" ? "border-destructive/50 text-destructive" : "border-muted-foreground/30"
-          }`}
-        >
-          {s}
-        </Badge>
-      </div>
-    ))}
-  </div>
-);
+      ))}
+    </div>
+  );
+};
 
-const AnalyticsPreview = () => (
+const AnalyticsPreview = ({ t }: { t: (key: string) => string }) => (
   <div className="space-y-3">
     <div className="grid grid-cols-3 gap-2">
       {[
-        { label: "Satisfaction", value: "94%" },
-        { label: "Resolution", value: "87%" },
-        { label: "Volume", value: "1.2K" },
+        { key: "satisfaction", value: "94%" },
+        { key: "resolution", value: "87%" },
+        { key: "volume", value: "1.2K" },
       ].map((m) => (
-        <div key={m.label} className="rounded-xl bg-gradient-to-br from-primary/10 to-secondary/5 border border-border/40 p-3 text-center">
+        <div key={m.key} className="rounded-xl bg-gradient-to-br from-primary/10 to-secondary/5 border border-border/40 p-3 text-center">
           <div className="text-lg font-bold">{m.value}</div>
-          <div className="text-xs text-muted-foreground">{m.label}</div>
+          <div className="text-xs text-muted-foreground">{t(`portalPreview.skeleton.${m.key}`)}</div>
         </div>
       ))}
     </div>
@@ -103,30 +106,30 @@ const AnalyticsPreview = () => (
   </div>
 );
 
-const TelephonyPreview = () => (
+const TelephonyPreview = ({ t }: { t: (key: string) => string }) => (
   <div className="space-y-2">
     {["+1 (555) 234-5678", "+33 1 42 68 53 00", "+44 20 7946 0958"].map((n, i) => (
       <div key={i} className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/40 p-3">
         <Phone className="w-4 h-4 text-primary" />
         <span className="font-mono text-sm flex-1">{n}</span>
         <Badge variant={i === 0 ? "default" : "secondary"} className="text-xs">
-          {i === 0 ? "Active" : "Ready"}
+          {i === 0 ? t('portalPreview.skeleton.active') : t('portalPreview.skeleton.ready')}
         </Badge>
       </div>
     ))}
     <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 flex items-center gap-2">
       <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-      <span className="text-xs text-muted-foreground">Live monitoring — 3 active calls</span>
+      <span className="text-xs text-muted-foreground">{t('portalPreview.skeleton.liveMonitoring')}</span>
     </div>
   </div>
 );
 
-const KnowledgePreview = () => (
+const KnowledgePreview = ({ t }: { t: (key: string) => string }) => (
   <div className="grid grid-cols-2 gap-2">
-    {["FAQ", "Products", "Policies", "Scripts"].map((cat) => (
-      <div key={cat} className="rounded-xl border border-border/50 bg-background/40 p-3">
+    {(["faq", "products", "policies", "scripts"] as const).map((catKey) => (
+      <div key={catKey} className="rounded-xl border border-border/50 bg-background/40 p-3">
         <BookOpen className="w-4 h-4 text-muted-foreground mb-2" />
-        <div className="text-sm font-medium mb-1">{cat}</div>
+        <div className="text-sm font-medium mb-1">{t(`portalPreview.skeleton.${catKey}`)}</div>
         <div className="h-2 rounded-full bg-muted/50 w-3/4 mb-1" />
         <div className="h-2 rounded-full bg-muted/30 w-1/2" />
       </div>
@@ -134,7 +137,7 @@ const KnowledgePreview = () => (
   </div>
 );
 
-const ClientsPreview = () => (
+const ClientsPreview = ({ t }: { t: (key: string) => string }) => (
   <div className="space-y-2">
     {["TechStart", "InnoGroup", "VoiceAgency"].map((name, i) => (
       <div key={name} className="flex items-center gap-3 rounded-xl border border-border/50 bg-background/40 p-3">
@@ -148,26 +151,26 @@ const ClientsPreview = () => (
         </div>
         <div className="flex-1">
           <div className="text-sm font-medium">{name}</div>
-          <div className="text-xs text-muted-foreground">{2 + i} agents</div>
+          <div className="text-xs text-muted-foreground">{2 + i} {t('portalPreview.skeleton.agents')}</div>
         </div>
-        <Badge variant="outline" className="text-xs">White-label</Badge>
+        <Badge variant="outline" className="text-xs">{t('portalPreview.skeleton.whiteLabel')}</Badge>
       </div>
     ))}
   </div>
 );
 
-const SettingsPreview = () => (
+const SettingsPreview = ({ t }: { t: (key: string) => string }) => (
   <div className="space-y-3">
-    {["Organization", "Branding", "API Keys", "Permissions"].map((s) => (
-      <div key={s} className="flex items-center justify-between rounded-xl border border-border/50 bg-background/40 p-3">
-        <span className="text-sm">{s}</span>
+    {(["organization", "branding", "apiKeys", "permissions"] as const).map((sKey) => (
+      <div key={sKey} className="flex items-center justify-between rounded-xl border border-border/50 bg-background/40 p-3">
+        <span className="text-sm">{t(`portalPreview.skeleton.${sKey}`)}</span>
         <div className="w-20 h-2.5 rounded-full bg-muted/60" />
       </div>
     ))}
   </div>
 );
 
-const previewComponents: Record<ModuleKey, () => JSX.Element> = {
+const previewComponents: Record<ModuleKey, (props: { t: (key: string) => string }) => JSX.Element> = {
   agents: AgentsPreview,
   conversations: ConversationsPreview,
   analytics: AnalyticsPreview,
@@ -268,7 +271,7 @@ export const PortalPreviewSection = () => {
                     exit={{ opacity: 0, x: -20 }}
                     transition={{ duration: 0.25 }}
                   >
-                    <Preview />
+                    <Preview t={t} />
                   </motion.div>
                 </AnimatePresence>
               </div>

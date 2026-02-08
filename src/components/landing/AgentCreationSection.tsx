@@ -63,7 +63,7 @@ export const AgentCreationSection = () => {
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => navigate("/auth")}
+                onClick={() => navigate("/login")}
                 className="h-12"
               >
                 {t("landing.agentCreation.ctaStart")}

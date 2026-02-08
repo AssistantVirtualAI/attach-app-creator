@@ -51,7 +51,7 @@ export const IntegrationsSection = () => {
         t("landing.integrations.cards.twilio.b5"),
       ],
       ctaLabel: t("landing.integrations.cards.twilio.cta"),
-      ctaAction: () => navigate("/auth?next=/integrations"),
+      ctaAction: () => navigate("/login"),
     },
     {
       icon: Plug,

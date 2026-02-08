@@ -153,7 +153,7 @@ export const PricingSection = () => {
                       : ""
                   }`}
                   variant={isPopular ? "default" : "outline"}
-                  onClick={() => isEnterprise ? setShowContactModal(true) : navigate("/auth")}
+                  onClick={() => isEnterprise ? setShowContactModal(true) : navigate("/login")}
                 >
                   {isEnterprise ? (
                     <>
