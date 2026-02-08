@@ -1,78 +1,149 @@
 
-# Plan: Complete Portal Endpoints + Fix Admin Auto-Login
+# Landing Page Overhaul: "All-in-One Portal" Emphasis
 
-## Problem 1: Portal Settings Missing Vapi & Full ElevenLabs Endpoints
-
-The Agent Portal (accessed via `/:agentSlug/settings`) currently has incomplete platform coverage:
-
-- **ElevenLabs**: Only has Voice, Turn, ASR, Prompt, and Members tabs. Missing: LLM settings, Conversation settings (max duration, client events), Language/Advanced settings, and the extended `ElevenLabsAPISections` (user info, usage stats, pronunciation dictionaries, history, TTS generation).
-- **Vapi**: Not handled at all -- if the agent platform is Vapi, the page falls through to the ElevenLabs-specific UI.
-- **Retell**: Already handled correctly via `RetellFullConfigTab`.
-
-By contrast, the Client Portal (`ClientAgentSettings.tsx`) already supports all 3 platforms with full configuration parity.
-
-### Solution
-
-Update `src/pages/PortalSettings.tsx` to add platform routing similar to `ClientAgentSettings.tsx`:
-
-1. **Add Vapi branch**: When `session.platform === 'vapi'`, render the `VapiAPISections` component with `organizationId` and `platformAgentId` from the portal session.
-
-2. **Add missing ElevenLabs sections**:
-   - Add LLM settings tab (temperature, max tokens)
-   - Add Conversation settings tab (max duration, client events)
-   - Add Language & Advanced tab (language selector, first message interruption toggle)
-   - Add the `ElevenLabsAPISections` component below the tabs for extended API features (user info, usage, pronunciation, history, TTS generation)
-   - Import the missing hooks: `useUpdateConversationSettings`, `useUpdateAgentAdvancedSettings`, `useUpdateLLMSettings`
-   - Import missing types: `ConversationSettings`, `LLMSettings`, `ELEVENLABS_LANGUAGES`, `ELEVENLABS_CLIENT_EVENTS`
-
-### Files to modify
-- `src/pages/PortalSettings.tsx` -- Add Vapi platform handling, add missing ElevenLabs configuration sections
+## Vision
+Transform the landing page into a bold, visually striking showcase that hammers home one core message: **everything lives in a single portal**. The current page has good content but doesn't make that message feel big enough. We'll make it louder, more visual, and more conversion-oriented.
 
 ---
 
-## Problem 2: Admin-to-Portal Auto-Login Broken
+## Changes Overview
 
-When clicking "Ouvrir le portail" from the Agents page, a new tab opens at `/portal/:slug`. The `PortalLogin` page should detect the admin's Supabase session and auto-redirect to the dashboard. Instead, it shows the login form.
+### 1. Hero Section -- Complete Redesign
+**Current state:** Generic title "Voice AI Agents / For Your Business" with small feature pills.
 
-### Root Cause
+**New design:**
+- Title rewritten to emphasize the all-in-one angle:
+  - EN: **"One Portal. Every Tool."** / "Create, deploy, and manage AI voice agents without switching dashboards."
+  - FR: **"Un Portail. Tous les outils."** / "Creez, deployez et gerez vos agents IA vocaux sans changer de tableau de bord."
+- Larger, bolder typography (text-6xl to text-8xl on desktop)
+- Below the title: a **visual mockup strip** showing a faux portal UI with sidebar icons (agents, analytics, conversations, telephony, clients) that animate in with staggered reveals -- giving visitors an immediate visual sense of the product
+- Stronger CTAs: primary "Book a demo" button stays, secondary "Start free trial" stays, remove the "Full list" ghost button (it's redundant and dilutes the CTA area)
+- Add a short animated tagline underneath: "No more jumping between platforms" with a crossed-out icon of multiple browser tabs
 
-There is a race condition in `usePortalAuth.tsx`:
+### 2. New "All-in-One Portal" Showcase Section (replaces current position of AllFeaturesSummarySection)
+**Current state:** `AllFeaturesSummarySection` is a 2x2 grid of bullet-point cards -- functional but not visually impactful.
 
-1. On mount, `supabaseUser` starts as `undefined`, `isSuperAdminUser` starts as `false`
-2. `onAuthStateChange` fires first and sets `supabaseUser` to the logged-in user
-3. The `checkIsSuperAdmin` RPC runs in a `setTimeout(0)`, so `isSuperAdminUser` is still `false`
-4. `PortalLogin`'s effect triggers because `supabaseUser` changed from `undefined` to a user object
-5. At this point, `isSuperAdmin()` returns `false`, so the super admin path is skipped
-6. `loginAsOrgAdmin()` is tried next -- if the admin is not in `organization_members`, it returns `null`
-7. `setCheckingSuperAdmin(false)` is called, showing the login form
-8. Later, `isSuperAdminUser` becomes `true`, the effect re-runs and should work...
+**New design -- Interactive Portal Preview:**
+- A large, centered **faux portal UI** that takes up most of the viewport width
+- Left sidebar with glowing icons representing each module (Agents, Conversations, Analytics, Telephony, Knowledge Base, Clients, Settings)
+- When each icon is hovered/clicked, the right panel morphs to show a relevant mini-preview (skeleton UI):
+  - **Agents**: wizard steps + voice preview waveform
+  - **Conversations**: transcript list with sentiment badges
+  - **Analytics**: mini chart cards (satisfaction, resolution, volume)
+  - **Telephony**: phone number list + recording player
+  - **Knowledge Base**: document cards with categories
+  - **Clients**: client cards with white-label branding preview
+- Below the portal preview: a bold statement like "Everything your team needs. Nothing they don't." with a CTA
+- This replaces the static bullet lists with something visitors can interact with
 
-However, `loginAsSuperAdmin` has an internal guard: `if (!supabaseUser?.id || !isSuperAdminUser) return null`. There is a timing issue where the callback closure may capture stale values, and the re-run may not trigger reliably due to React batching.
+### 3. Features Section -- Visual Upgrade
+**Current state:** 6 cards in a 3-column grid with icon + title + description. Decent but generic.
 
-### Solution
+**Enhancements:**
+- Each card gets a **mini illustration/animation** instead of just a static icon:
+  - Bot card: animated pulsing waveform
+  - Users card: animated count-up number
+  - BarChart3 card: mini animated bar chart
+  - BookOpen card: animated page flip
+  - Globe2 card: rotating globe animation
+  - Zap card: lightning bolt pulse
+- Cards become taller with more visual weight
+- Add a "See all features" button at the bottom linking to `/features`
+- Add a prominent CTA row between features grid and stats: "Ready to centralize your operations?" + Book a demo button
 
-Add a `isSuperAdminChecked` boolean state to `usePortalAuth.tsx` that tracks whether the super admin check has completed. The `PortalLogin` page should wait for this flag before making any login decisions.
+### 4. Portal Comparison Section -- Visual Enhancement
+**Current state:** Two side-by-side cards + a comparison table. The content is good but visually flat.
 
-Changes to `src/hooks/usePortalAuth.tsx`:
-- Add `isSuperAdminChecked` state (starts `false`, set to `true` after `checkIsSuperAdmin` resolves)
-- Expose it in the hook return and context type
-- Both the initial `checkAuth` and the `onAuthStateChange` handler should set this flag after the RPC call
+**Enhancements:**
+- Redesign as a **split-screen visual**: left side shows a dark-themed Admin Portal mockup, right side shows a branded Client Portal mockup
+- Animated transition between them (slide/morph)
+- The comparison table gets color-coded rows and icon improvements
+- Add bilingual support (currently hardcoded French only)
+- Add CTA: "Two portals. One platform. Zero complexity."
 
-Changes to `src/pages/PortalLogin.tsx`:
-- Add `isSuperAdminChecked` to dependencies from `usePortal()`
-- Wait for `supabaseUser !== undefined` AND `isSuperAdminChecked === true` before running the admin login logic
-- This eliminates the race condition where the effect runs before the admin status is known
+### 5. Agent Creation Section -- More Visual
+**Current state:** Left text + right 2x2 grid of step cards. Good structure.
 
-### Files to modify
-- `src/hooks/usePortalAuth.tsx` -- Add `isSuperAdminChecked` state and expose it
-- `src/pages/PortalLogin.tsx` -- Wait for `isSuperAdminChecked` before deciding login flow
+**Enhancements:**
+- Make the step cards into a **visual timeline/flow** instead of a grid
+- Add connecting arrows or a dotted path between steps
+- The callout box ("Everything stays inside your portal") becomes much larger and more prominent -- full-width with a gradient background, bigger text, and an icon
+- Add animated platform logos (ElevenLabs, Vapi, Retell) floating around the flow
+
+### 6. Product Showcase Section -- Fullscreen Carousel Upgrade
+**Current state:** Carousel with 3 slides (Agent, Twilio, Analytics). Each slide has faux UI mockups.
+
+**Enhancements:**
+- Make each slide fill more width with a 16:9-style aspect ratio
+- Add subtle parallax effect on slide transition
+- Add a **live demo CTA** on each slide: "See it live" button
+- Add dots or thumbnails for carousel navigation (currently just arrows)
+
+### 7. CTA Section -- Make it Unmissable
+**Current state:** Standard centered CTA with sparkle icon + two buttons. Fine but not impactful enough.
+
+**New design:**
+- Full-bleed gradient background that's more vivid
+- Much larger text (text-6xl+)
+- Add animated stats/social proof: "Join 50+ agencies already using the platform"
+- Floating portal UI elements in the background (glassmorphism mockup elements)
+- Stack CTAs vertically on mobile for better tap targets
+
+### 8. Scattered CTAs Throughout the Page
+Currently only a few sections have CTAs. Add a prominent "Book a demo" CTA after:
+- How It Works section
+- Features section
+- Integrations section
+- Portal Comparison section
+
+Each CTA should be a full-width banner with gradient background.
+
+### 9. Translation Updates
+All new copy must be added to both `src/locales/en.ts` and `src/locales/fr.ts`.
 
 ---
 
-## Technical Summary
+## Technical Details
 
-| File | Change |
-|------|--------|
-| `src/pages/PortalSettings.tsx` | Add Vapi platform branch with `VapiAPISections`, add missing ElevenLabs tabs (LLM, Conversation, Language/Advanced), add `ElevenLabsAPISections` extended component |
-| `src/hooks/usePortalAuth.tsx` | Add `isSuperAdminChecked` state to eliminate race condition |
-| `src/pages/PortalLogin.tsx` | Use `isSuperAdminChecked` to wait for admin status before auto-login logic |
+### Files to Create
+| File | Purpose |
+|------|---------|
+| `src/components/landing/PortalPreviewSection.tsx` | New interactive portal preview component (replaces AllFeaturesSummarySection in the page flow) |
+| `src/components/landing/InlineCTA.tsx` | Reusable inline CTA banner component for use between sections |
+
+### Files to Modify
+| File | Changes |
+|------|---------|
+| `src/pages/Landing.tsx` | Reorder sections, add new PortalPreviewSection and InlineCTA components between sections, remove or reposition AllFeaturesSummarySection |
+| `src/components/landing/HeroSection.tsx` | Complete rewrite: new copy, larger typography, faux portal UI strip, remove "Full list" button, add animated tagline |
+| `src/components/landing/FeaturesSection.tsx` | Add mini-animations to each card icon, add CTA row at bottom |
+| `src/components/landing/PortalComparisonSection.tsx` | Add bilingual support via `useTranslation`, enhance visual with portal mockups |
+| `src/components/landing/AgentCreationSection.tsx` | Transform step grid into visual timeline, enlarge callout box |
+| `src/components/landing/CTASection.tsx` | Enlarge text, add social proof stats, add floating UI elements |
+| `src/components/landing/AllFeaturesSummarySection.tsx` | Keep as backup/secondary reference but move after PortalPreviewSection or remove from main flow |
+| `src/components/landing/ProductShowcaseSection.tsx` | Add slide indicators, "See it live" CTAs on each slide |
+| `src/locales/en.ts` | Add new translation keys for hero rewrite, portal preview section, inline CTAs, updated copy |
+| `src/locales/fr.ts` | Add corresponding French translation keys |
+
+### Section Order (New)
+1. Navbar
+2. **HeroSection** (redesigned -- bold "One Portal" message + faux UI strip)
+3. TrustedBySection
+4. **PortalPreviewSection** (NEW -- interactive portal mockup with hoverable modules)
+5. HowItWorksSection + InlineCTA
+6. AgentCreationSection (enhanced timeline)
+7. FeaturesSection (animated icons) + InlineCTA
+8. PortalComparisonSection (bilingual + visual)
+9. IntegrationsSection + InlineCTA
+10. ProductShowcaseSection (enhanced carousel)
+11. TestimonialsSection
+12. PricingSection
+13. FAQSection
+14. CTASection (supersized)
+15. FooterSection
+
+### Animation & Performance Notes
+- All new animations use `framer-motion` (already installed)
+- Interactive portal preview uses React state for active module (no extra dependencies)
+- Mini-animations on feature cards are CSS-based or lightweight framer-motion variants
+- No heavy assets or images required -- everything is built with Tailwind + framer-motion skeleton UI
