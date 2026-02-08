@@ -1,149 +1,137 @@
 
-# Landing Page Overhaul: "All-in-One Portal" Emphasis
+# Fix Landing Page Links and Language Consistency
 
-## Vision
-Transform the landing page into a bold, visually striking showcase that hammers home one core message: **everything lives in a single portal**. The current page has good content but doesn't make that message feel big enough. We'll make it louder, more visual, and more conversion-oriented.
+## Issues Found
 
----
+### 1. Hardcoded strings not translated (language not respected)
 
-## Changes Overview
+**Navbar (Navbar.tsx):**
+- Line 26: `'Full list'` -- hardcoded English, should use `t('nav.fullList')`
+- Line 82: `'Plus'` -- hardcoded French for the "More" dropdown, should use `t('nav.more')`
+- Lines 122, 188: `'Book a demo'` -- hardcoded English, should use `t('nav.bookDemo')`
 
-### 1. Hero Section -- Complete Redesign
-**Current state:** Generic title "Voice AI Agents / For Your Business" with small feature pills.
+**Footer (FooterSection.tsx):**
+- Line 142: `'All systems operational'` -- hardcoded English, should use `t('footer.systemStatus')`
 
-**New design:**
-- Title rewritten to emphasize the all-in-one angle:
-  - EN: **"One Portal. Every Tool."** / "Create, deploy, and manage AI voice agents without switching dashboards."
-  - FR: **"Un Portail. Tous les outils."** / "Creez, deployez et gerez vos agents IA vocaux sans changer de tableau de bord."
-- Larger, bolder typography (text-6xl to text-8xl on desktop)
-- Below the title: a **visual mockup strip** showing a faux portal UI with sidebar icons (agents, analytics, conversations, telephony, clients) that animate in with staggered reveals -- giving visitors an immediate visual sense of the product
-- Stronger CTAs: primary "Book a demo" button stays, secondary "Start free trial" stays, remove the "Full list" ghost button (it's redundant and dilutes the CTA area)
-- Add a short animated tagline underneath: "No more jumping between platforms" with a crossed-out icon of multiple browser tabs
+**PortalPreviewSection.tsx (mini-previews inside the interactive portal):**
+- Multiple hardcoded English labels in skeleton UI: "Active", "Ready", "Live monitoring -- 3 active calls", "FAQ", "Products", "Policies", "Scripts", "Organization", "Branding", "API Keys", "Permissions", "ElevenLabs" badge labels, "White-label", "agents" text, sentiment labels ("positive", "neutral", "negative"), analytics labels ("Satisfaction", "Resolution", "Volume")
 
-### 2. New "All-in-One Portal" Showcase Section (replaces current position of AllFeaturesSummarySection)
-**Current state:** `AllFeaturesSummarySection` is a 2x2 grid of bullet-point cards -- functional but not visually impactful.
+**ProductShowcaseSection.tsx:**
+- Several hardcoded badge texts: "Wizard", "Sync", "Live", "stability", "style", "similarity", "Push config", "Test call", "Open agent"
 
-**New design -- Interactive Portal Preview:**
-- A large, centered **faux portal UI** that takes up most of the viewport width
-- Left sidebar with glowing icons representing each module (Agents, Conversations, Analytics, Telephony, Knowledge Base, Clients, Settings)
-- When each icon is hovered/clicked, the right panel morphs to show a relevant mini-preview (skeleton UI):
-  - **Agents**: wizard steps + voice preview waveform
-  - **Conversations**: transcript list with sentiment badges
-  - **Analytics**: mini chart cards (satisfaction, resolution, volume)
-  - **Telephony**: phone number list + recording player
-  - **Knowledge Base**: document cards with categories
-  - **Clients**: client cards with white-label branding preview
-- Below the portal preview: a bold statement like "Everything your team needs. Nothing they don't." with a CTA
-- This replaces the static bullet lists with something visitors can interact with
+### 2. Footer links pointing to non-existent sections/pages
 
-### 3. Features Section -- Visual Upgrade
-**Current state:** 6 cards in a 3-column grid with icon + title + description. Decent but generic.
+The footer uses `<Link to="#changelog">`, `<Link to="#about">`, `<Link to="#blog">`, `<Link to="#careers">`, `<Link to="#contact">`, `<Link to="#cookies">`. None of these sections exist on the landing page, so they lead nowhere.
 
-**Enhancements:**
-- Each card gets a **mini illustration/animation** instead of just a static icon:
-  - Bot card: animated pulsing waveform
-  - Users card: animated count-up number
-  - BarChart3 card: mini animated bar chart
-  - BookOpen card: animated page flip
-  - Globe2 card: rotating globe animation
-  - Zap card: lightning bolt pulse
-- Cards become taller with more visual weight
-- Add a "See all features" button at the bottom linking to `/features`
-- Add a prominent CTA row between features grid and stats: "Ready to centralize your operations?" + Book a demo button
+Additionally, all footer hash links use `<Link to="#features">` (React Router), which navigates to `/#features` but doesn't smoothly scroll. They should either use anchor-click scrolling or be replaced with real page routes.
 
-### 4. Portal Comparison Section -- Visual Enhancement
-**Current state:** Two side-by-side cards + a comparison table. The content is good but visually flat.
+**Fix approach:**
+- Remove links to pages/sections that don't exist yet (changelog, about, blog, careers, contact, cookies) or replace them with placeholder page routes
+- Convert footer hash links (`#features`, `#pricing`, `#integrations`) to use `onClick` scroll handlers like the Navbar does, instead of `<Link to=>`
 
-**Enhancements:**
-- Redesign as a **split-screen visual**: left side shows a dark-themed Admin Portal mockup, right side shows a branded Client Portal mockup
-- Animated transition between them (slide/morph)
-- The comparison table gets color-coded rows and icon improvements
-- Add bilingual support (currently hardcoded French only)
-- Add CTA: "Two portals. One platform. Zero complexity."
+### 3. Footer social links are placeholders
+- Twitter, GitHub, LinkedIn all point to `#` (broken)
+- Email points to `mailto:contact@example.com` (placeholder)
 
-### 5. Agent Creation Section -- More Visual
-**Current state:** Left text + right 2x2 grid of step cards. Good structure.
+**Fix:** Remove placeholder `#` hrefs or replace with real links. For now, we'll make them non-clickable or remove them.
 
-**Enhancements:**
-- Make the step cards into a **visual timeline/flow** instead of a grid
-- Add connecting arrows or a dotted path between steps
-- The callout box ("Everything stays inside your portal") becomes much larger and more prominent -- full-width with a gradient background, bigger text, and an icon
-- Add animated platform logos (ElevenLabs, Vapi, Retell) floating around the flow
+### 4. Pages not translated (show both languages simultaneously)
 
-### 6. Product Showcase Section -- Fullscreen Carousel Upgrade
-**Current state:** Carousel with 3 slides (Agent, Twilio, Analytics). Each slide has faux UI mockups.
+These pages show bilingual text ("EN / FR") side-by-side instead of switching based on language:
 
-**Enhancements:**
-- Make each slide fill more width with a 16:9-style aspect ratio
-- Add subtle parallax effect on slide transition
-- Add a **live demo CTA** on each slide: "See it live" button
-- Add dots or thumbnails for carousel navigation (currently just arrows)
+**Features.tsx (/features page):**
+- Title: `"Full feature list"` with subtitle `"Liste complete des fonctionnalites"`
+- Buttons: `"Book a demo / Demander une demo"`, `"Back to landing / Retour"`
+- Accordion shows both `s.title.en` AND `s.title.fr` simultaneously, and items show both `it.en` and `it.fr`
+- Should use `useTranslation()` and `language` to show only the active language
 
-### 7. CTA Section -- Make it Unmissable
-**Current state:** Standard centered CTA with sparkle icon + two buttons. Fine but not impactful enough.
+**DemoRequest.tsx (/demo-request page):**
+- Title: `"Book a demo"` with `"Demander une demo"` below
+- Labels: `"Name / Nom"`, `"Email"`, `"Company / Societe"`, etc.
+- Buttons: `"Submit / Envoyer"`, `"Back / Retour"`
+- Toast messages: bilingual
+- Should use `useTranslation()` to show only the active language
 
-**New design:**
-- Full-bleed gradient background that's more vivid
-- Much larger text (text-6xl+)
-- Add animated stats/social proof: "Join 50+ agencies already using the platform"
-- Floating portal UI elements in the background (glassmorphism mockup elements)
-- Stack CTAs vertically on mobile for better tap targets
+**PrivacyPolicy.tsx (/privacy):**
+- Entirely in French with no language toggle or English version
 
-### 8. Scattered CTAs Throughout the Page
-Currently only a few sections have CTAs. Add a prominent "Book a demo" CTA after:
-- How It Works section
-- Features section
-- Integrations section
-- Portal Comparison section
+**Legal.tsx (/legal):**
+- Entirely in French with no language toggle or English version
+- Uses `<AppLayout>` wrapper (admin layout) instead of public landing layout (Navbar + Footer)
 
-Each CTA should be a full-width banner with gradient background.
-
-### 9. Translation Updates
-All new copy must be added to both `src/locales/en.ts` and `src/locales/fr.ts`.
+### 5. Navigation consistency issues
+- Pricing section CTA buttons navigate to `/auth` (line 156 in PricingSection.tsx) which redirects to `/login` -- fine but could navigate directly to `/login`
+- Hero CTA2 "Start free trial" navigates to `/auth` -- same redirect concern
 
 ---
 
-## Technical Details
+## Implementation Plan
 
-### Files to Create
-| File | Purpose |
-|------|---------|
-| `src/components/landing/PortalPreviewSection.tsx` | New interactive portal preview component (replaces AllFeaturesSummarySection in the page flow) |
-| `src/components/landing/InlineCTA.tsx` | Reusable inline CTA banner component for use between sections |
+### Step 1: Add missing translation keys to en.ts and fr.ts
 
-### Files to Modify
+Add keys for:
+- `nav.fullList`, `nav.more`, `nav.bookDemo`
+- `footer.systemStatus`
+- `features.page.*` keys (title, subtitle, buttons, back)
+- `demoRequest.*` keys (title, subtitle, labels, buttons, toasts)
+- `privacy.*` keys (all privacy policy content in English)
+- `legal.*` keys (all legal content in English)
+
+### Step 2: Fix Navbar.tsx
+- Replace `'Full list'` with `t('nav.fullList')`
+- Replace `'Plus'` with `t('nav.more')`
+- Replace `'Book a demo'` with `t('nav.bookDemo')`
+
+### Step 3: Fix FooterSection.tsx
+- Replace all `<Link to="#section">` with `<button onClick={scroll}>` handlers for existing landing page sections (features, pricing, integrations)
+- Remove or replace links to non-existent pages (changelog, about, blog, careers, contact, cookies) -- either remove them or point to a generic anchor
+- Translate `'All systems operational'`
+- Update social links: remove broken `#` hrefs
+
+### Step 4: Fix Features.tsx (/features page)
+- Import `useTranslation` and `useLanguage`
+- Replace all bilingual strings with `language === 'fr' ? ... : ...` or `t()` calls
+- Show accordion content in a single language based on context
+
+### Step 5: Fix DemoRequest.tsx (/demo-request page)
+- Import `useTranslation` and `useLanguage`
+- Replace all bilingual label/button strings with proper translations
+- Update toast messages to use current language
+
+### Step 6: Fix PrivacyPolicy.tsx and Legal.tsx
+- Add English translations for both pages
+- Use `useTranslation`/`useLanguage` to render in the active language
+- Fix Legal.tsx to use public layout (Navbar + FooterSection) instead of `<AppLayout>`
+
+### Step 7: Fix PortalPreviewSection.tsx hardcoded labels
+- Add translation keys for the skeleton UI labels (sentiment badges, categories, etc.)
+- Replace hardcoded strings with `t()` calls
+
+### Step 8: Fix ProductShowcaseSection.tsx hardcoded labels
+- Add translation keys for badge texts
+- Replace hardcoded strings with `t()` calls
+
+### Step 9: Navigation cleanup
+- Change `/auth` navigations to `/login` directly (Hero, CTA, Pricing, AgentCreation, Integrations)
+
+---
+
+## Files to Modify
+
 | File | Changes |
 |------|---------|
-| `src/pages/Landing.tsx` | Reorder sections, add new PortalPreviewSection and InlineCTA components between sections, remove or reposition AllFeaturesSummarySection |
-| `src/components/landing/HeroSection.tsx` | Complete rewrite: new copy, larger typography, faux portal UI strip, remove "Full list" button, add animated tagline |
-| `src/components/landing/FeaturesSection.tsx` | Add mini-animations to each card icon, add CTA row at bottom |
-| `src/components/landing/PortalComparisonSection.tsx` | Add bilingual support via `useTranslation`, enhance visual with portal mockups |
-| `src/components/landing/AgentCreationSection.tsx` | Transform step grid into visual timeline, enlarge callout box |
-| `src/components/landing/CTASection.tsx` | Enlarge text, add social proof stats, add floating UI elements |
-| `src/components/landing/AllFeaturesSummarySection.tsx` | Keep as backup/secondary reference but move after PortalPreviewSection or remove from main flow |
-| `src/components/landing/ProductShowcaseSection.tsx` | Add slide indicators, "See it live" CTAs on each slide |
-| `src/locales/en.ts` | Add new translation keys for hero rewrite, portal preview section, inline CTAs, updated copy |
-| `src/locales/fr.ts` | Add corresponding French translation keys |
-
-### Section Order (New)
-1. Navbar
-2. **HeroSection** (redesigned -- bold "One Portal" message + faux UI strip)
-3. TrustedBySection
-4. **PortalPreviewSection** (NEW -- interactive portal mockup with hoverable modules)
-5. HowItWorksSection + InlineCTA
-6. AgentCreationSection (enhanced timeline)
-7. FeaturesSection (animated icons) + InlineCTA
-8. PortalComparisonSection (bilingual + visual)
-9. IntegrationsSection + InlineCTA
-10. ProductShowcaseSection (enhanced carousel)
-11. TestimonialsSection
-12. PricingSection
-13. FAQSection
-14. CTASection (supersized)
-15. FooterSection
-
-### Animation & Performance Notes
-- All new animations use `framer-motion` (already installed)
-- Interactive portal preview uses React state for active module (no extra dependencies)
-- Mini-animations on feature cards are CSS-based or lightweight framer-motion variants
-- No heavy assets or images required -- everything is built with Tailwind + framer-motion skeleton UI
+| `src/locales/en.ts` | Add nav.fullList, nav.more, nav.bookDemo, footer.systemStatus, features page keys, demo request keys, privacy keys, legal keys, portal preview labels, showcase labels |
+| `src/locales/fr.ts` | Add matching French keys |
+| `src/components/landing/Navbar.tsx` | Replace 3 hardcoded strings with t() calls |
+| `src/components/landing/FooterSection.tsx` | Fix broken links, add scroll handlers, translate hardcoded text, clean up social links |
+| `src/pages/Features.tsx` | Use useTranslation/useLanguage, show single language |
+| `src/pages/DemoRequest.tsx` | Use useTranslation/useLanguage, show single language |
+| `src/pages/PrivacyPolicy.tsx` | Add English content, use language context, add Navbar+Footer |
+| `src/pages/Legal.tsx` | Add English content, switch from AppLayout to public layout, use language context |
+| `src/components/landing/PortalPreviewSection.tsx` | Translate hardcoded skeleton labels |
+| `src/components/landing/ProductShowcaseSection.tsx` | Translate hardcoded badge texts |
+| `src/components/landing/HeroSection.tsx` | Change `/auth` to `/login` |
+| `src/components/landing/CTASection.tsx` | Change `/auth` to `/login` |
+| `src/components/landing/PricingSection.tsx` | Change `/auth` to `/login` |
+| `src/components/landing/AgentCreationSection.tsx` | Change `/auth` to `/login` |
+| `src/components/landing/IntegrationsSection.tsx` | Change `/auth?next=/integrations` to `/login` |
