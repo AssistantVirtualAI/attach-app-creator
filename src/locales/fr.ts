@@ -373,7 +373,7 @@ export const fr = {
     subtitle: 'Réponses aux questions les plus courantes sur notre plateforme.',
     q1: {
       question: 'Comment fonctionne la facturation ?',
-      answer: 'Nous proposons des abonnements mensuels avec différents niveaux selon vos besoins. Vous pouvez upgrader ou downgrader à tout moment. Essai gratuit de 7 jours inclus.',
+      answer: 'Nous proposons des abonnements mensuels avec différents niveaux selon vos besoins. Vous pouvez upgrader ou downgrader à tout moment. Essai gratuit de 14 jours inclus.',
     },
     q2: {
       question: 'Quelles plateformes vocales supportez-vous ?',
@@ -407,7 +407,7 @@ export const fr = {
     custom: 'Sur mesure',
     cta: 'Commencer',
     ctaContact: 'Nous contacter',
-    trial: 'Tous les plans incluent un essai gratuit de 7 jours. Aucune carte de crédit requise.',
+    trial: 'Tous les plans incluent un essai gratuit de 14 jours. Aucune carte de crédit requise.',
     starter: {
       name: 'Starter',
       description: 'Parfait pour démarrer avec les agents IA',

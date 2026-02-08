@@ -374,7 +374,7 @@ export const en = {
     subtitle: 'Answers to the most common questions about our platform.',
     q1: {
       question: 'How does billing work?',
-      answer: 'We offer monthly subscriptions with different levels based on your needs. You can upgrade or downgrade at any time. 7-day free trial included.',
+      answer: 'We offer monthly subscriptions with different levels based on your needs. You can upgrade or downgrade at any time. 14-day free trial included.',
     },
     q2: {
       question: 'What voice platforms do you support?',
@@ -408,7 +408,7 @@ export const en = {
     custom: 'Custom',
     cta: 'Get started',
     ctaContact: 'Contact us',
-    trial: 'All plans include a 7-day free trial. No credit card required.',
+    trial: 'All plans include a 14-day free trial. No credit card required.',
     starter: {
       name: 'Starter',
       description: 'Perfect to get started with AI agents',
