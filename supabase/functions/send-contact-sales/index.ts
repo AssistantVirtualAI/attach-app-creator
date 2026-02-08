@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const ADMIN_EMAIL = Deno.env.get("ADMIN_NOTIFICATION_EMAIL");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -180,8 +181,9 @@ const handler = async (req: Request): Promise<Response> => {
       </html>
     `;
 
+    const adminTo = ADMIN_EMAIL || "mhassoun@assistantvirtualai.com";
     const emailResponse = await sendEmail(
-      ["mhassoun@assistantvirtualai.com"],
+      [adminTo],
       `🚀 New Enterprise Inquiry from ${safeName}${safeCompany ? ` (${safeCompany})` : ''}`,
       salesEmailHtml,
       safeEmail

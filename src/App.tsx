@@ -73,6 +73,7 @@ import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import TwilioManagement from "./pages/TwilioManagement";
 import FeaturesPage from "./pages/Features";
 import DemoRequestPage from "./pages/DemoRequest";
+import ContactUs from "./pages/ContactUs";
 
 // Portal pages
 import PortalLogin from "./pages/PortalLogin";
@@ -87,6 +88,8 @@ import PortalProfile from "./pages/PortalProfile";
 import UniversalLogin from "./pages/UniversalLogin";
 
 const queryClient = new QueryClient();
+
+import { TrialExpiredGate } from "./components/billing/TrialExpiredGate";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -103,7 +106,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/auth" replace />;
   }
 
-  return <>{children}</>;
+  return <TrialExpiredGate>{children}</TrialExpiredGate>;
 };
 
 const App = () => (
@@ -131,6 +134,9 @@ const App = () => (
 
                 {/* Public demo request */}
                 <Route path="/demo-request" element={<DemoRequestPage />} />
+                
+                {/* Contact Us */}
+                <Route path="/contact" element={<ContactUs />} />
                 
                 {/* Universal login - redirects based on user type */}
                 <Route path="/login" element={<UniversalLogin />} />

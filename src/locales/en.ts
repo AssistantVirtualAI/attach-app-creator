@@ -16,6 +16,7 @@ export const en = {
     fullList: 'Full list',
     more: 'More',
     bookDemo: 'Book a demo',
+    contact: 'Contact',
   },
 
   // Hero Section
@@ -481,6 +482,7 @@ export const en = {
     terms: 'Terms',
     copyright: '© 2024 AVA. All rights reserved.',
     systemStatus: 'All systems operational',
+    bookDemo: 'Book a demo',
   },
 
   // Common
@@ -2607,5 +2609,40 @@ export const en = {
     toolsEnabled: 'tools enabled',
     availableTools: 'Available Tools',
     noToolsFound: 'No tools found on this server',
+  },
+
+  // Contact page
+  contact: {
+    title: 'Contact Us',
+    subtitle: 'Have a question? We\'d love to hear from you.',
+    formTitle: 'Send us a message',
+    formDescription: 'Fill out the form below and we\'ll get back to you within 24-48 hours.',
+    nameLabel: 'Name',
+    namePlaceholder: 'Your name',
+    emailLabel: 'Email',
+    emailPlaceholder: 'your@email.com',
+    subjectLabel: 'Subject',
+    subjectPlaceholder: 'What is this about?',
+    messageLabel: 'Message',
+    messagePlaceholder: 'Tell us how we can help...',
+    submit: 'Send Message',
+    sending: 'Sending...',
+    successTitle: 'Message sent!',
+    successDescription: 'We\'ll get back to you within 24-48 hours.',
+    errorTitle: 'Failed to send message. Please try again.',
+    back: 'Back',
+    backToHome: 'Back to home',
+  },
+
+  // Chatbot
+  chatbot: {
+    title: 'AVA Assistant',
+    subtitle: 'Online — Ask me anything',
+    placeholder: 'Type your message...',
+  },
+
+  // Footer additions
+  footerExtra: {
+    bookDemo: 'Book a demo',
   },
 };

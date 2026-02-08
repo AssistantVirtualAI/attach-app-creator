@@ -179,3 +179,12 @@ verify_jwt = false
 
 [functions.notify-admin-signup]
 verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.send-contact-form]
+verify_jwt = false
+
+[functions.landing-chatbot]
+verify_jwt = false

@@ -71,8 +71,13 @@ export const FooterSection = () => {
             <h4 className="font-semibold mb-4">{t('footer.company')}</h4>
             <ul className="space-y-3">
               <li>
-                <Link to="/demo-request" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link to="/contact" className="text-muted-foreground hover:text-foreground transition-colors">
                   {t('footer.contact')}
+                </Link>
+              </li>
+              <li>
+                <Link to="/demo-request" className="text-muted-foreground hover:text-foreground transition-colors">
+                  {t('footer.bookDemo')}
                 </Link>
               </li>
             </ul>
