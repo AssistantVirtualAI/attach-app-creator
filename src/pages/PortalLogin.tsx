@@ -103,7 +103,7 @@ const PortalLoginContent = () => {
       if (!agentSlug || agentSlug === ':agentSlug') return;
       
        const { data, error } = await supabase
-         .from('agents')
+         .from('agents_safe')
          .select('name, avatar_url')
          .eq('slug', agentSlug)
          .maybeSingle();

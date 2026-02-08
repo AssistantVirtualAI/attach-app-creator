@@ -30,7 +30,7 @@ export function useAgentsForTwilio() {
       if (!selectedOrgId) return [];
       
       const { data, error } = await supabase
-        .from('agents')
+        .from('agents_safe')
         .select('id, name, platform, platform_agent_id, twilio_number')
         .eq('organization_id', selectedOrgId)
         .in('platform', ['elevenlabs', 'vapi', 'retell'])

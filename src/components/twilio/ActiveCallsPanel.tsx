@@ -46,7 +46,7 @@ export function ActiveCallsPanel() {
     if (!selectedOrgId) return;
     
     const { data } = await supabase
-      .from('agents')
+      .from('agents_safe')
       .select('id, name')
       .eq('organization_id', selectedOrgId);
     

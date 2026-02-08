@@ -97,7 +97,7 @@ export const useClientDetail = (clientId: string | undefined) => {
       
       // Get agents in the organization that are NOT assigned to this client
       const { data: allAgents, error: agentsError } = await supabase
-        .from('agents')
+        .from('agents_safe')
         .select('*')
         .eq('organization_id', client.organization_id);
 

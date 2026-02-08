@@ -151,7 +151,7 @@ export const useAllAgentsHealthScores = (organizationId: string | null) => {
       if (!organizationId) return [];
 
       const { data: agents, error: agentsError } = await supabase
-        .from('agents')
+        .from('agents_safe')
         .select('id, name, platform')
         .eq('organization_id', organizationId);
 

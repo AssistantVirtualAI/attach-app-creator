@@ -75,7 +75,7 @@ const AgentReports = () => {
     queryFn: async () => {
       if (!selectedOrg?.id) return [];
       const { data } = await supabase
-        .from('agents')
+        .from('agents_safe')
         .select('id, name')
         .eq('organization_id', selectedOrg.id);
       return data || [];

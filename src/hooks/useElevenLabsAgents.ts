@@ -27,8 +27,8 @@ export const useElevenLabsAgents = () => {
 
       // Also check organization integrations for fallback API key
       const { data: integration } = await supabase
-        .from('organization_integrations')
-        .select('api_key, agent_id')
+        .from('organization_integrations_safe')
+        .select('agent_id')
         .eq('user_id', user.id)
         .eq('platform', 'elevenlabs')
         .eq('is_active', true)
@@ -36,7 +36,6 @@ export const useElevenLabsAgents = () => {
 
       return {
         agents: (agents || []) as ElevenLabsAgent[],
-        fallbackApiKey: integration?.api_key || null,
         fallbackAgentId: integration?.agent_id || null,
       };
     },

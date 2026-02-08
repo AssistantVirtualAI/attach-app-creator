@@ -150,7 +150,7 @@ const WidgetPrototype = () => {
       }
 
       const { data, error: fetchError } = await supabase
-        .from('agents')
+        .from('agents_safe')
         .select('id, name, description, avatar_url, branding_url, platform_agent_id, platform, organization_id, theme_config')
         .eq('id', agentId)
         .single();

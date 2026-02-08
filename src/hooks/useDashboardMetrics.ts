@@ -146,7 +146,7 @@ export const useDashboardMetrics = (dateRange?: DateRange) => {
           .eq('organization_id', selectedOrgId)
           .eq('status', 'active'),
         supabase
-          .from('agents')
+          .from('agents_safe')
           .select('id, name, platform, platform_agent_id')
           .eq('organization_id', selectedOrgId),
       ]);

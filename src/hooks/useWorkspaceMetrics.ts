@@ -51,7 +51,7 @@ export const useWorkspaceMetrics = (dateRange?: { start: Date; end: Date }) => {
           .eq('organization_id', selectedOrgId)
           .eq('status', 'active'),
         supabase
-          .from('agents')
+          .from('agents_safe')
           .select('*', { count: 'exact', head: true })
           .eq('organization_id', selectedOrgId),
         conversationsQuery,
