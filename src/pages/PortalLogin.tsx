@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ const PortalLoginContent = () => {
   const [checkingSuperAdmin, setCheckingSuperAdmin] = useState(true);
   const { login, isLoading, isAuthenticated, session, isSuperAdmin, isSuperAdminChecked, loginAsSuperAdmin, loginAsOrgAdmin, supabaseUser } = usePortal();
   const navigate = useNavigate();
+  const autoLoginAttempted = useRef(false);
 
   // Guard against placeholder routes like /portal/:agentSlug
   useEffect(() => {
@@ -33,51 +34,43 @@ const PortalLoginContent = () => {
   // Wait for isSuperAdminChecked to avoid race condition
   useEffect(() => {
     const checkSuperAdminAccess = async () => {
-      console.log('[PortalLogin] Checking admin access...', {
-        agentSlug,
-        supabaseUserId: supabaseUser?.id,
-        supabaseUserEmail: supabaseUser?.email,
-        isSuperAdminChecked,
-      });
-
       if (!agentSlug || agentSlug === ':agentSlug') {
-        console.log('[PortalLogin] No valid agentSlug, skipping admin check');
         setCheckingSuperAdmin(false);
         return;
       }
 
       // Wait for auth to be checked (undefined means still loading)
       if (supabaseUser === undefined) {
-        console.log('[PortalLogin] Waiting for auth...');
         return;
       }
 
       // If no authenticated main user, they need to login manually
       if (supabaseUser === null) {
-        console.log('[PortalLogin] No authenticated user, showing login form');
         setCheckingSuperAdmin(false);
         return;
       }
 
       // Wait for super admin check to complete before making decisions
       if (!isSuperAdminChecked) {
-        console.log('[PortalLogin] Waiting for super admin check to complete...');
         return;
       }
 
-      // 1) Super admin shortcut
-      const isSuperAdminResult = isSuperAdmin();
-      console.log('[PortalLogin] isSuperAdmin() result:', isSuperAdminResult);
+      // Prevent concurrent/duplicate auto-login attempts
+      if (autoLoginAttempted.current) {
+        return;
+      }
+      autoLoginAttempted.current = true;
 
-      if (isSuperAdminResult) {
+      console.log('[PortalLogin] Admin access check ready', {
+        isSuperAdmin: isSuperAdmin(),
+        isSuperAdminChecked,
+        userId: supabaseUser?.id,
+      });
+
+      // 1) Super admin shortcut
+      if (isSuperAdmin()) {
         console.log('[PortalLogin] Super admin detected, auto-logging in...');
         const superAdminSession = await loginAsSuperAdmin(agentSlug);
-        console.log('[PortalLogin] loginAsSuperAdmin result:', superAdminSession ? {
-          agentId: superAdminSession.agentId,
-          agentName: superAdminSession.agentName,
-          platform: superAdminSession.platform,
-          platformAgentId: superAdminSession.platformAgentId,
-        } : 'null');
 
         if (superAdminSession) {
           const isLegacyRoute = window.location.pathname.startsWith('/portal/');
@@ -85,17 +78,11 @@ const PortalLoginContent = () => {
           navigate(isLegacyRoute ? `/portal/${canonical}/dashboard` : `/${canonical}/dashboard`);
           return;
         }
+        console.warn('[PortalLogin] loginAsSuperAdmin returned null, trying org admin...');
       }
 
       // 2) Org admin shortcut (logged-in admin in main portal)
-      console.log('[PortalLogin] Trying org admin auto-login...');
       const adminSession = await loginAsOrgAdmin(agentSlug);
-      console.log('[PortalLogin] loginAsOrgAdmin result:', adminSession ? {
-        agentId: adminSession.agentId,
-        agentName: adminSession.agentName,
-        platform: adminSession.platform,
-        platformAgentId: adminSession.platformAgentId,
-      } : 'null');
 
       if (adminSession) {
         const isLegacyRoute = window.location.pathname.startsWith('/portal/');
@@ -104,6 +91,7 @@ const PortalLoginContent = () => {
         return;
       }
 
+      console.log('[PortalLogin] No admin auto-login possible, showing login form');
       setCheckingSuperAdmin(false);
     };
 
@@ -117,7 +105,7 @@ const PortalLoginContent = () => {
        const { data, error } = await supabase
          .from('agents')
          .select('name, avatar_url')
-         .or(`slug.eq.${agentSlug},id.eq.${agentSlug}`)
+         .eq('slug', agentSlug)
          .maybeSingle();
 
       if (error) {
