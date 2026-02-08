@@ -52,6 +52,8 @@ export const usePortalAuth = () => {
 
   // Check Supabase auth on mount
   useEffect(() => {
+    let initialCheckDone = false;
+
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setSupabaseUser(user);
@@ -64,13 +66,24 @@ export const usePortalAuth = () => {
         setIsSuperAdminUser(false);
       }
       setIsSuperAdminChecked(true);
+      initialCheckDone = true;
     };
     checkAuth();
 
     // IMPORTANT: keep this callback synchronous to avoid auth deadlocks
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const user = session?.user || null;
       setSupabaseUser(user);
+
+      // For INITIAL_SESSION, let checkAuth handle the super admin check
+      // to avoid a race condition where the duplicate check overwrites the result
+      if (event === 'INITIAL_SESSION') {
+        if (!user?.id) {
+          setIsSuperAdminUser(false);
+          setIsSuperAdminChecked(true);
+        }
+        return;
+      }
 
       if (!user?.id) {
         setIsSuperAdminUser(false);
@@ -78,8 +91,10 @@ export const usePortalAuth = () => {
         return;
       }
 
-      // Defer any Supabase calls
-      setIsSuperAdminChecked(false);
+      // For subsequent auth changes (SIGNED_IN, TOKEN_REFRESHED, etc.), re-check
+      if (initialCheckDone) {
+        setIsSuperAdminChecked(false);
+      }
       setTimeout(async () => {
         const superAdmin = await checkIsSuperAdmin(user.id);
         setIsSuperAdminUser(superAdmin);
@@ -110,7 +125,17 @@ export const usePortalAuth = () => {
 
   // Auto-login for super admins
   const loginAsSuperAdmin = useCallback(async (agentSlug: string): Promise<PortalSession | null> => {
+    console.log('[PortalAuth] loginAsSuperAdmin called', { 
+      userId: supabaseUser?.id, 
+      isSuperAdminUser, 
+      agentSlug 
+    });
+
     if (!supabaseUser?.id || !isSuperAdminUser) {
+      console.log('[PortalAuth] loginAsSuperAdmin guard failed', { 
+        hasUserId: !!supabaseUser?.id, 
+        isSuperAdminUser 
+      });
       return null;
     }
 
@@ -119,8 +144,14 @@ export const usePortalAuth = () => {
       const { data: agent, error: agentError } = await supabase
         .from('agents')
         .select('id, name, organization_id, platform_agent_id, platform, slug')
-        .or(`slug.eq.${agentSlug},id.eq.${agentSlug}`)
+        .eq('slug', agentSlug)
         .maybeSingle();
+
+      console.log('[PortalAuth] Agent query result', { 
+        agentFound: !!agent, 
+        error: agentError?.message,
+        agentName: agent?.name 
+      });
 
       if (agentError || !agent) {
         return null;
@@ -147,7 +178,8 @@ export const usePortalAuth = () => {
       localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify(portalSession));
       setSession(portalSession);
       return portalSession;
-    } catch {
+    } catch (err) {
+      console.error('[PortalAuth] loginAsSuperAdmin exception:', err);
       return null;
     }
   }, [supabaseUser, isSuperAdminUser]);
@@ -160,7 +192,7 @@ export const usePortalAuth = () => {
       const { data: agent, error: agentError } = await supabase
         .from('agents')
         .select('id, name, organization_id, platform_agent_id, platform, slug')
-        .or(`slug.eq.${agentSlug},id.eq.${agentSlug}`)
+        .eq('slug', agentSlug)
         .maybeSingle();
 
       if (agentError || !agent) return null;
