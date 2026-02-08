@@ -21,19 +21,6 @@ const steps = [
   { icon: Rocket, key: "s5" },
 ] as const;
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.08 },
-  },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 22 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.45 } },
-};
-
 export const AgentCreationSection = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -46,6 +33,7 @@ export const AgentCreationSection = () => {
 
       <div className="container mx-auto px-6 relative z-10">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
+          {/* Left — text */}
           <motion.div
             initial={{ opacity: 0, y: 22 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -56,7 +44,7 @@ export const AgentCreationSection = () => {
               <Sparkles className="w-3.5 h-3.5" />
               {t("landing.agentCreation.badge")}
             </Badge>
-            <h2 className="text-4xl md:text-5xl font-bold leading-tight mb-4">
+            <h2 className="text-4xl md:text-5xl font-extrabold leading-tight mb-4">
               {t("landing.agentCreation.title")}
             </h2>
             <p className="text-xl text-muted-foreground mb-8">
@@ -83,52 +71,89 @@ export const AgentCreationSection = () => {
             </div>
           </motion.div>
 
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            className="relative"
-          >
+          {/* Right — visual timeline */}
+          <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-secondary/10 rounded-3xl blur-2xl" />
+
             <div className="relative rounded-3xl border border-border/60 bg-card/50 backdrop-blur-xl p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Timeline steps */}
+              <div className="space-y-0">
                 {steps.map((s, idx) => (
                   <motion.div
                     key={s.key}
-                    variants={itemVariants}
-                    className="rounded-2xl border border-border/50 bg-background/40 p-4"
+                    initial={{ opacity: 0, x: 20 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: idx * 0.1 }}
+                    className="flex gap-4 relative"
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                    {/* Timeline line */}
+                    <div className="flex flex-col items-center">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/20 z-10">
                         <s.icon className="w-5 h-5 text-primary-foreground" />
                       </div>
-                      <span className="text-xs text-muted-foreground">
-                        {t("landing.agentCreation.step")} {idx + 1}
-                      </span>
+                      {idx < steps.length - 1 && (
+                        <div className="w-0.5 flex-1 bg-gradient-to-b from-primary/30 to-secondary/10 my-1" />
+                      )}
                     </div>
-                    <h3 className="font-semibold mb-1">{t(`landing.agentCreation.${s.key}.title`)}</h3>
-                    <p className="text-sm text-muted-foreground">{t(`landing.agentCreation.${s.key}.description`)}</p>
+
+                    {/* Content */}
+                    <div className={`pb-5 flex-1 ${idx === steps.length - 1 ? "pb-0" : ""}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold">{t(`landing.agentCreation.${s.key}.title`)}</h3>
+                        <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
+                          {idx + 1}/{steps.length}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {t(`landing.agentCreation.${s.key}.description`)}
+                      </p>
+                    </div>
                   </motion.div>
                 ))}
-
-                <motion.div
-                  variants={itemVariants}
-                  className="sm:col-span-2 rounded-2xl border border-primary/20 bg-primary/5 p-5"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                      <Sparkles className="w-5 h-5 text-primary-foreground" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold">{t("landing.agentCreation.callout.title")}</h4>
-                      <p className="text-sm text-muted-foreground">{t("landing.agentCreation.callout.description")}</p>
-                    </div>
-                  </div>
-                </motion.div>
               </div>
+
+              {/* Floating platform badges */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.6 }}
+                className="flex gap-2 mt-4 justify-center"
+              >
+                {["ElevenLabs", "Vapi", "Retell"].map((p, i) => (
+                  <motion.div
+                    key={p}
+                    animate={{ y: [0, -4, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: i * 0.5 }}
+                  >
+                    <Badge variant="outline" className="bg-background/60 backdrop-blur-sm">
+                      {p}
+                    </Badge>
+                  </motion.div>
+                ))}
+              </motion.div>
+
+              {/* Prominent callout */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.7 }}
+                className="mt-5 rounded-2xl bg-gradient-to-r from-primary/10 via-secondary/10 to-accent/10 border border-primary/20 p-5"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+                    <Sparkles className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg">{t("landing.agentCreation.callout.title")}</h4>
+                    <p className="text-muted-foreground">{t("landing.agentCreation.callout.description")}</p>
+                  </div>
+                </div>
+              </motion.div>
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
     </section>
