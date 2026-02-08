@@ -1,15 +1,21 @@
 import { motion } from "framer-motion";
 import { Mail } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { AvaLogo } from "@/components/shared/AvaLogo";
 import { useTranslation } from "@/hooks/useTranslation";
 
 export const FooterSection = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const scrollToSection = (id: string) => {
-    const element = document.getElementById(id);
-    element?.scrollIntoView({ behavior: 'smooth' });
+    if (location.pathname === '/') {
+      const element = document.getElementById(id);
+      element?.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      navigate('/#' + id);
+    }
   };
 
   return (

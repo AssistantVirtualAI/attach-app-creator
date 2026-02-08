@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { AvaLogo } from '@/components/shared/AvaLogo';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, Globe, MoreHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -15,6 +15,7 @@ import {
 
 export const Navbar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { language, toggleLanguage } = useLanguage();
   const { t } = useTranslation();
@@ -40,8 +41,12 @@ export const Navbar = () => {
   const scrollToSection = (href: string) => {
     setIsMobileMenuOpen(false);
     if (href.startsWith('#')) {
-      const element = document.querySelector(href);
-      element?.scrollIntoView({ behavior: 'smooth' });
+      if (location.pathname === '/') {
+        const element = document.querySelector(href);
+        element?.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        navigate('/' + href);
+      }
       return;
     }
     navigate(href);
