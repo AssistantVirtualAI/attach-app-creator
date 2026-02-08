@@ -115,7 +115,7 @@ export const CTASection = () => {
                 size="lg"
                 variant="outline"
                 className="h-16 px-10 text-lg font-semibold border-2"
-                onClick={() => navigate("/auth")}
+                onClick={() => navigate("/login")}
               >
                 {t("cta.cta1")}
               </Button>

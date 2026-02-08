@@ -23,7 +23,7 @@ export const Navbar = () => {
     { label: t('nav.howItWorks'), href: '#how-it-works' },
     { label: t('nav.agentCreation'), href: '#agent-creation' },
     { label: t('nav.features'), href: '#features' },
-    { label: 'Full list', href: '/features' },
+    { label: t('nav.fullList'), href: '/features' },
     { label: t('nav.portals'), href: '#portals' },
     { label: t('nav.integrations'), href: '#integrations' },
     { label: t('nav.analytics'), href: '#analytics' },
@@ -79,7 +79,7 @@ export const Navbar = () => {
                   className="rounded-full px-3 text-sm text-muted-foreground hover:text-foreground"
                 >
                   <MoreHorizontal className="w-4 h-4" />
-                  <span className="ml-2 font-medium whitespace-nowrap">Plus</span>
+                  <span className="ml-2 font-medium whitespace-nowrap">{t('nav.more')}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-56">
@@ -115,13 +115,13 @@ export const Navbar = () => {
             >
               {t('nav.login')}
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate('/demo-request')}
-              className="rounded-full"
-            >
-              Book a demo
-            </Button>
+             <Button
+               variant="outline"
+               onClick={() => navigate('/demo-request')}
+               className="rounded-full"
+             >
+               {t('nav.bookDemo')}
+             </Button>
             <Button
               className="rounded-full bg-gradient-to-r from-primary to-secondary hover:opacity-90"
               onClick={() => navigate('/login')}
@@ -180,13 +180,13 @@ export const Navbar = () => {
               >
                 {t('nav.login')}
               </Button>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => navigate('/demo-request')}
-              >
-                Book a demo
-              </Button>
+               <Button
+                 variant="outline"
+                 className="w-full"
+                 onClick={() => navigate('/demo-request')}
+               >
+                 {t('nav.bookDemo')}
+               </Button>
               <Button
                 className="w-full bg-gradient-to-r from-primary to-secondary"
                 onClick={() => navigate('/login')}
