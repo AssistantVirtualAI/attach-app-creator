@@ -142,7 +142,7 @@ export const usePortalAuth = () => {
     try {
       // Fetch agent details (no API key - use proxy instead)
       const { data: agent, error: agentError } = await supabase
-        .from('agents')
+        .from('agents_safe')
         .select('id, name, organization_id, platform_agent_id, platform, slug')
         .eq('slug', agentSlug)
         .maybeSingle();
@@ -190,7 +190,7 @@ export const usePortalAuth = () => {
 
     try {
       const { data: agent, error: agentError } = await supabase
-        .from('agents')
+        .from('agents_safe')
         .select('id, name, organization_id, platform_agent_id, platform, slug')
         .eq('slug', agentSlug)
         .maybeSingle();

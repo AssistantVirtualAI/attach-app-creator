@@ -76,7 +76,7 @@ export function usePlatformPhoneAssignments(twilioPhoneNumbers: TwilioPhoneNumbe
 
       // 1. Fetch all agents for this org
       const { data: agents } = await supabase
-        .from('agents')
+        .from('agents_safe')
         .select('id, name, platform, platform_agent_id, twilio_number')
         .eq('organization_id', selectedOrgId)
         .in('platform', ['elevenlabs', 'vapi', 'retell']);

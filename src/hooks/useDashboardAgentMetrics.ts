@@ -60,7 +60,7 @@ export const useDashboardAgents = () => {
 
       // Get agents
       const { data: agents, error } = await supabase
-        .from('agents')
+        .from('agents_safe')
         .select('id, name, platform_agent_id, platform')
         .eq('organization_id', selectedOrgId);
 
@@ -116,7 +116,7 @@ export const useAgentDashboardMetrics = (agentId: string | null, dateRange?: Dat
 
       // Get the agent's platform_agent_id
       const { data: agent } = await supabase
-        .from('agents')
+        .from('agents_safe')
         .select('platform_agent_id, name')
         .eq('id', agentId)
         .single();

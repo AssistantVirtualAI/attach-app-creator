@@ -2882,7 +2882,9 @@ export type Database = {
           organization_id: string | null
           platform: string | null
           platform_agent_id: string | null
+          slug: string | null
           theme_config: Json | null
+          twilio_number: string | null
           updated_at: string | null
           widget_layout: string | null
         }
@@ -2900,7 +2902,9 @@ export type Database = {
           organization_id?: string | null
           platform?: string | null
           platform_agent_id?: string | null
+          slug?: string | null
           theme_config?: Json | null
+          twilio_number?: string | null
           updated_at?: string | null
           widget_layout?: string | null
         }
@@ -2918,7 +2922,9 @@ export type Database = {
           organization_id?: string | null
           platform?: string | null
           platform_agent_id?: string | null
+          slug?: string | null
           theme_config?: Json | null
+          twilio_number?: string | null
           updated_at?: string | null
           widget_layout?: string | null
         }

@@ -70,7 +70,7 @@ const WidgetIframe = () => {
       }
 
       const { data, error: fetchError } = await supabase
-        .from('agents')
+        .from('agents_safe')
         .select('id, name, description, avatar_url, platform_agent_id, platform, theme_config')
         .eq('id', agentId)
         .single();

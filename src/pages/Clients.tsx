@@ -109,7 +109,7 @@ export default function Clients() {
       if (!selectedOrgId) return [];
       
       const { data, error } = await supabase
-        .from('agents')
+        .from('agents_safe')
         .select('*')
         .eq('organization_id', selectedOrgId)
         .order('name');

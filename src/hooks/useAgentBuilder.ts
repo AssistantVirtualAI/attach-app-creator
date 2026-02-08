@@ -103,7 +103,7 @@ export function useAgentBuilder() {
   const loadAgent = useCallback(async (agentId: string) => {
     try {
       const { data, error } = await supabase
-        .from('agents')
+        .from('agents_safe')
         .select('*')
         .eq('id', agentId)
         .single();
