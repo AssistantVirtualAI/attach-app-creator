@@ -17,6 +17,7 @@ import { IntegrationsSection } from "@/components/landing/IntegrationsSection";
 import { ProductShowcaseSection } from "@/components/landing/ProductShowcaseSection";
 import { PortalPreviewSection } from "@/components/landing/PortalPreviewSection";
 import { InlineCTA } from "@/components/landing/InlineCTA";
+import { ChatWidget } from "@/components/landing/ChatWidget";
 import { useTranslation } from "@/hooks/useTranslation";
 
 const Landing = () => {
@@ -89,6 +90,7 @@ const Landing = () => {
         <CTASection />
         <FooterSection />
       </motion.div>
+      <ChatWidget />
     </div>
   );
 };

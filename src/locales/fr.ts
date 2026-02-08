@@ -15,6 +15,7 @@ export const fr = {
     fullList: 'Liste complète',
     more: 'Plus',
     bookDemo: 'Demander une démo',
+    contact: 'Contact',
   },
 
   // Hero Section
@@ -480,6 +481,7 @@ export const fr = {
     terms: 'Conditions',
     copyright: '© 2024 AVA. Tous droits réservés.',
     systemStatus: 'Tous les systèmes opérationnels',
+    bookDemo: 'Demander une démo',
   },
 
   // Common
@@ -2606,5 +2608,40 @@ export const fr = {
     toolsEnabled: 'outils activés',
     availableTools: 'Outils disponibles',
     noToolsFound: 'Aucun outil trouvé sur ce serveur',
+  },
+
+  // Page Contact
+  contact: {
+    title: 'Nous contacter',
+    subtitle: 'Vous avez une question ? Nous serions ravis de vous entendre.',
+    formTitle: 'Envoyez-nous un message',
+    formDescription: 'Remplissez le formulaire ci-dessous et nous vous répondrons sous 24-48 heures.',
+    nameLabel: 'Nom',
+    namePlaceholder: 'Votre nom',
+    emailLabel: 'Email',
+    emailPlaceholder: 'votre@email.com',
+    subjectLabel: 'Sujet',
+    subjectPlaceholder: 'De quoi s\'agit-il ?',
+    messageLabel: 'Message',
+    messagePlaceholder: 'Dites-nous comment nous pouvons vous aider...',
+    submit: 'Envoyer le message',
+    sending: 'Envoi...',
+    successTitle: 'Message envoyé !',
+    successDescription: 'Nous vous répondrons sous 24-48 heures.',
+    errorTitle: 'Échec de l\'envoi. Veuillez réessayer.',
+    back: 'Retour',
+    backToHome: 'Retour à l\'accueil',
+  },
+
+  // Chatbot
+  chatbot: {
+    title: 'Assistant AVA',
+    subtitle: 'En ligne — Posez-moi vos questions',
+    placeholder: 'Tapez votre message...',
+  },
+
+  // Footer additions
+  footerExtra: {
+    bookDemo: 'Demander une démo',
   },
 };

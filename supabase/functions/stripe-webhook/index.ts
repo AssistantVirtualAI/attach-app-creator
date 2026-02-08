@@ -14,6 +14,107 @@ const PRICE_TO_TIER: Record<string, string> = {
   price_ultimate_monthly: "ultimate",
 };
 
+const TIER_NAMES: Record<string, string> = {
+  starter: "Starter",
+  growth: "Growth",
+  ultimate: "Ultimate",
+};
+
+async function sendAdminNotification(subject: string, html: string) {
+  const resendKey = Deno.env.get("RESEND_API_KEY");
+  const adminEmail = Deno.env.get("ADMIN_NOTIFICATION_EMAIL");
+
+  if (!resendKey || !adminEmail) {
+    console.log("Skipping admin notification: RESEND_API_KEY or ADMIN_NOTIFICATION_EMAIL not set");
+    return;
+  }
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "AVA Platform <noreply@assistantvirtualai.com>",
+        to: [adminEmail],
+        subject,
+        html,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Failed to send admin notification:", error);
+    } else {
+      console.log("Admin notification sent:", subject);
+    }
+  } catch (err) {
+    console.error("Error sending admin notification:", err);
+  }
+}
+
+function buildPaymentEmailHtml(details: {
+  event: string;
+  customerEmail?: string;
+  amount?: number;
+  currency?: string;
+  planName?: string;
+  orgName?: string;
+  date: string;
+}) {
+  const amountStr = details.amount
+    ? `$${(details.amount / 100).toFixed(2)} ${(details.currency || "usd").toUpperCase()}`
+    : "N/A";
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 25px; border-radius: 10px 10px 0 0; }
+        .content { background: #f9fafb; padding: 25px; border-radius: 0 0 10px 10px; }
+        .field { margin-bottom: 15px; }
+        .label { font-weight: bold; color: #059669; margin-bottom: 4px; }
+        .value { background: white; padding: 10px; border-radius: 5px; border-left: 3px solid #10b981; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1 style="margin: 0;">💰 ${details.event}</h1>
+          <p style="margin: 8px 0 0 0; opacity: 0.9;">${details.date}</p>
+        </div>
+        <div class="content">
+          ${details.customerEmail ? `
+          <div class="field">
+            <div class="label">📧 Customer</div>
+            <div class="value">${details.customerEmail}</div>
+          </div>` : ""}
+          ${details.planName ? `
+          <div class="field">
+            <div class="label">📋 Plan</div>
+            <div class="value">${details.planName}</div>
+          </div>` : ""}
+          ${details.orgName ? `
+          <div class="field">
+            <div class="label">🏢 Organization</div>
+            <div class="value">${details.orgName}</div>
+          </div>` : ""}
+          <div class="field">
+            <div class="label">💵 Amount</div>
+            <div class="value">${amountStr}</div>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -38,7 +139,6 @@ serve(async (req) => {
 
     let event: Stripe.Event;
 
-    // Require webhook secret in production - signature verification is mandatory
     if (!webhookSecret) {
       console.error("STRIPE_WEBHOOK_SECRET not configured");
       return new Response(
@@ -92,6 +192,26 @@ serve(async (req) => {
             })
             .eq("organization_id", organizationId);
 
+          // Get org name for notification
+          const { data: org } = await supabase
+            .from("organizations")
+            .select("name")
+            .eq("id", organizationId)
+            .single();
+
+          await sendAdminNotification(
+            `🎉 New Subscription: ${TIER_NAMES[tier] || tier} plan`,
+            buildPaymentEmailHtml({
+              event: "New Subscription Started",
+              customerEmail: session.customer_email || undefined,
+              amount: session.amount_total || undefined,
+              currency: session.currency || undefined,
+              planName: TIER_NAMES[tier] || tier,
+              orgName: org?.name,
+              date: new Date().toLocaleString(),
+            })
+          );
+
           console.log(`Updated billing for org ${organizationId} to ${tier}`);
         }
         break;
@@ -144,7 +264,6 @@ serve(async (req) => {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
 
-        // Update subscription end date
         if (invoice.subscription) {
           const subscription = await stripe.subscriptions.retrieve(
             invoice.subscription as string
@@ -160,6 +279,29 @@ serve(async (req) => {
                 ).toISOString(),
               })
               .eq("organization_id", organizationId);
+
+            // Get org name for notification
+            const { data: org } = await supabase
+              .from("organizations")
+              .select("name")
+              .eq("id", organizationId)
+              .single();
+
+            const priceId = subscription.items.data[0]?.price.id;
+            const tier = PRICE_TO_TIER[priceId] || "unknown";
+
+            await sendAdminNotification(
+              `💰 Payment Received: $${((invoice.amount_paid || 0) / 100).toFixed(2)}`,
+              buildPaymentEmailHtml({
+                event: "Invoice Paid",
+                customerEmail: invoice.customer_email || undefined,
+                amount: invoice.amount_paid || undefined,
+                currency: invoice.currency || undefined,
+                planName: TIER_NAMES[tier] || tier,
+                orgName: org?.name,
+                date: new Date().toLocaleString(),
+              })
+            );
           }
         }
 
@@ -171,7 +313,6 @@ serve(async (req) => {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId = invoice.customer as string;
 
-        // Get organization from billing_config
         const { data: config } = await supabase
           .from("billing_config")
           .select("organization_id")
@@ -184,6 +325,17 @@ serve(async (req) => {
             .update({ subscription_status: "past_due" })
             .eq("organization_id", config.organization_id);
         }
+
+        await sendAdminNotification(
+          `⚠️ Payment Failed for customer ${customerId}`,
+          buildPaymentEmailHtml({
+            event: "Payment Failed",
+            customerEmail: invoice.customer_email || undefined,
+            amount: invoice.amount_due || undefined,
+            currency: invoice.currency || undefined,
+            date: new Date().toLocaleString(),
+          })
+        );
 
         console.log(`Invoice payment failed for customer ${customerId}`);
         break;

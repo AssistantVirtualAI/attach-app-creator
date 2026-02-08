@@ -30,6 +30,7 @@ export const Navbar = () => {
     { label: t('nav.analytics'), href: '#analytics' },
     { label: t('nav.testimonials'), href: '#testimonials' },
     { label: t('nav.pricing'), href: '#pricing' },
+    { label: t('nav.contact'), href: '/contact' },
   ];
 
   // Keep the header clean: show core links + a “More” menu for the rest.
