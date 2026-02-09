@@ -383,24 +383,32 @@ serve(async (req) => {
         
         console.log(`[KB] Total documents fetched: ${allDocuments.length}`);
         
-        let filteredDocs = allDocuments;
-        if (platformAgentId) {
-          // Strict filtering: only show documents explicitly linked to this agent
-          filteredDocs = allDocuments.filter((doc: any) => {
-            const dependentAgents = doc.dependent_agents || [];
-            
-            // Check if linked to this specific agent
-            const isLinked = dependentAgents.some((a: any) => {
-              const agentIdMatches = a.id === platformAgentId || 
-                                     a.agent_id === platformAgentId ||
-                                     a.platform_agent_id === platformAgentId;
-              return agentIdMatches;
-            });
-            
-            return isLinked;
-          });
-          console.log(`[KB] After strict filtering for agent ${platformAgentId}: ${filteredDocs.length} documents`);
+      let filteredDocs = allDocuments;
+      if (platformAgentId) {
+        // Fetch the agent's current KB list (updated immediately via PATCH)
+        let agentKbIds: string[] = [];
+        try {
+          const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
+          agentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb).filter(Boolean);
+          console.log(`[KB] Agent KB IDs from config: ${agentKbIds.length} items`);
+        } catch (e) {
+          console.error(`[KB] Could not fetch agent config for filtering:`, e);
         }
+
+        filteredDocs = allDocuments.filter((doc: any) => {
+          // Check 1: document is in the agent's knowledge_base array (immediate, always reliable)
+          if (agentKbIds.includes(doc.id)) return true;
+
+          // Check 2: dependent_agents metadata (may lag after creation)
+          const dependentAgents = doc.dependent_agents || [];
+          return dependentAgents.some((a: any) =>
+            a.id === platformAgentId ||
+            a.agent_id === platformAgentId ||
+            a.platform_agent_id === platformAgentId
+          );
+        });
+        console.log(`[KB] After filtering for agent ${platformAgentId}: ${filteredDocs.length} documents`);
+      }
         
         const items = filteredDocs.map((doc: any) => ({
           id: doc.id,
