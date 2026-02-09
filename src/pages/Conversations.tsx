@@ -248,7 +248,7 @@ const Conversations = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="text-lg font-semibold text-foreground">
-                              {t('conversations.conversation')} {conversation.conversation_id.substring(0, 8)}
+                              {conversation.caller_number || conversation.metadata?.caller_id || conversation.metadata?.caller_number || `${t('conversations.conversation')} ${conversation.conversation_id.substring(0, 8)}`}
                             </h3>
                             <Badge className="bg-primary/20 text-primary border-primary/30">
                               {conversation.agent_name}
@@ -256,6 +256,12 @@ const Conversations = () => {
                           </div>
 
                           <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                            {(conversation.caller_number || conversation.metadata?.caller_id) && (
+                              <div className="flex items-center gap-2">
+                                <Phone className="w-4 h-4" />
+                                {conversation.caller_number || conversation.metadata?.caller_id}
+                              </div>
+                            )}
                             <div className="flex items-center gap-2">
                               <Clock className="w-4 h-4" />
                               {formatDuration(duration)}
