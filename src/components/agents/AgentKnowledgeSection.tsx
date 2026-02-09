@@ -239,15 +239,28 @@ export function AgentKnowledgeSection({
           throw new Error(`Platform ${platform} not supported`);
       }
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       toast.success('Document ajouté avec succès');
+      // Optimistically add the new document to the local list
+      const newItem: KBItem = {
+        id: data?.documentId || `temp-${Date.now()}`,
+        name: title,
+        type: addType === 'url' ? 'url' : 'text',
+        content: addType === 'text' ? content : undefined,
+        url: addType === 'url' ? url : undefined,
+        created_at: new Date().toISOString(),
+      };
+      queryClient.setQueryData(
+        ['agent-knowledge-base', agentId, platform, platformAgentId],
+        (old: KBItem[] | undefined) => [...(old || []), newItem]
+      );
       setTitle('');
       setContent('');
       setUrl('');
-      // Delay refetch to give ElevenLabs time to update dependent_agents linkage
+      // Also refetch after delay to get the real data from ElevenLabs
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['agent-knowledge-base', agentId] });
-      }, 2000);
+      }, 3000);
     },
     onError: (error: any) => {
       toast.error(error.message || 'Erreur lors de l\'ajout du document');
