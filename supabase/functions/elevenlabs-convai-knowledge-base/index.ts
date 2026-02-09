@@ -389,8 +389,9 @@ serve(async (req) => {
         let agentKbIds: string[] = [];
         try {
           const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
-          agentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb).filter(Boolean);
-          console.log(`[KB] Agent KB IDs from config: ${agentKbIds.length} items`);
+          const kbArray = agentConfig?.conversation_config?.agent?.prompt?.knowledge_base || [];
+          agentKbIds = kbArray.map((kb: any) => kb.id || kb).filter(Boolean);
+          console.log(`[KB] Agent KB IDs from config (conversation_config path): ${agentKbIds.length} items`);
         } catch (e) {
           console.error(`[KB] Could not fetch agent config for filtering:`, e);
         }
@@ -551,19 +552,26 @@ serve(async (req) => {
             console.log(`[KB] Linking document ${data.id} to agent ${platformAgentId}`);
             
             const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
-            const currentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb);
+            const currentKb = agentConfig?.conversation_config?.agent?.prompt?.knowledge_base || [];
+            const alreadyLinked = currentKb.some((kb: any) => kb.id === data.id);
             
-            if (!currentKbIds.includes(data.id)) {
-              currentKbIds.push(data.id);
+            if (!alreadyLinked) {
+              currentKb.push({ type: "file", name: docName, id: data.id });
               
               await callElevenLabs(`/convai/agents/${platformAgentId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  knowledge_base: currentKbIds,
+                  conversation_config: {
+                    agent: {
+                      prompt: {
+                        knowledge_base: currentKb
+                      }
+                    }
+                  }
                 }),
               });
-              console.log(`[KB] Document linked to agent`);
+              console.log(`[KB] Document linked to agent via conversation_config path`);
             }
           } catch (linkError) {
             console.error(`[KB] Failed to link document to agent:`, linkError);
@@ -604,18 +612,26 @@ serve(async (req) => {
         if (platformAgentId && data.id) {
           try {
             const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
-            const currentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb);
+            const currentKb = agentConfig?.conversation_config?.agent?.prompt?.knowledge_base || [];
+            const alreadyLinked = currentKb.some((kb: any) => kb.id === data.id);
             
-            if (!currentKbIds.includes(data.id)) {
-              currentKbIds.push(data.id);
+            if (!alreadyLinked) {
+              currentKb.push({ type: "file", name: sanitizedTitle || url, id: data.id });
               
               await callElevenLabs(`/convai/agents/${platformAgentId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  knowledge_base: currentKbIds,
+                  conversation_config: {
+                    agent: {
+                      prompt: {
+                        knowledge_base: currentKb
+                      }
+                    }
+                  }
                 }),
               });
+              console.log(`[KB] URL document linked to agent via conversation_config path`);
             }
           } catch (linkError) {
             console.error(`[KB] Failed to link URL document to agent:`, linkError);
@@ -676,19 +692,26 @@ serve(async (req) => {
           try {
             console.log(`[KB] Linking file document ${data.id} to agent ${platformAgentId}`);
             const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
-            const currentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb);
+            const currentKb = agentConfig?.conversation_config?.agent?.prompt?.knowledge_base || [];
+            const alreadyLinked = currentKb.some((kb: any) => kb.id === data.id);
             
-            if (!currentKbIds.includes(data.id)) {
-              currentKbIds.push(data.id);
+            if (!alreadyLinked) {
+              currentKb.push({ type: "file", name: fileName, id: data.id });
               
               await callElevenLabs(`/convai/agents/${platformAgentId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  knowledge_base: currentKbIds,
+                  conversation_config: {
+                    agent: {
+                      prompt: {
+                        knowledge_base: currentKb
+                      }
+                    }
+                  }
                 }),
               });
-              console.log(`[KB] File document linked to agent`);
+              console.log(`[KB] File document linked to agent via conversation_config path`);
             }
           } catch (linkError) {
             console.error(`[KB] Failed to link file document to agent:`, linkError);
@@ -764,16 +787,23 @@ serve(async (req) => {
         }
 
         const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
-        const currentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb);
+        const currentKb = agentConfig?.conversation_config?.agent?.prompt?.knowledge_base || [];
+        const alreadyLinked = currentKb.some((kb: any) => kb.id === docId);
         
-        if (!currentKbIds.includes(docId)) {
-          currentKbIds.push(docId);
+        if (!alreadyLinked) {
+          currentKb.push({ type: "file", name: docId, id: docId });
           
           await callElevenLabs(`/convai/agents/${platformAgentId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              knowledge_base: currentKbIds,
+              conversation_config: {
+                agent: {
+                  prompt: {
+                    knowledge_base: currentKb
+                  }
+                }
+              }
             }),
           });
         }
@@ -794,14 +824,20 @@ serve(async (req) => {
         }
 
         const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
-        const currentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb)
-          .filter((id: string) => id !== docId);
+        const currentKb = (agentConfig?.conversation_config?.agent?.prompt?.knowledge_base || [])
+          .filter((kb: any) => kb.id !== docId);
 
         await callElevenLabs(`/convai/agents/${platformAgentId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            knowledge_base: currentKbIds,
+            conversation_config: {
+              agent: {
+                prompt: {
+                  knowledge_base: currentKb
+                }
+              }
+            }
           }),
         });
 
