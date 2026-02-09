@@ -414,7 +414,7 @@ const KnowledgeBase = () => {
         {/* API keys are resolved server-side; missing credentials will surface as backend errors. */}
 
         {/* Loading State */}
-        {isLoadingKB && selectedAgentId && (isElevenLabs ? !!apiKey : isRetell) && (
+        {isLoadingKB && selectedAgentId && (isElevenLabs || isRetell) && (
           <div className="text-center py-12">
             <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
             <p className="mt-4 text-muted-foreground">Chargement de la base de connaissances...</p>
@@ -422,7 +422,7 @@ const KnowledgeBase = () => {
         )}
 
         {/* Error State */}
-        {kbError && selectedAgentId && (isElevenLabs ? !!apiKey : isRetell) && (
+        {kbError && selectedAgentId && (isElevenLabs || isRetell) && (
           <Card className="p-12 text-center border-destructive">
             <AlertCircle className="w-16 h-16 mx-auto mb-4 text-destructive" />
             <h3 className="text-lg font-semibold mb-2">Erreur de chargement</h3>
@@ -437,7 +437,7 @@ const KnowledgeBase = () => {
         )}
 
         {/* Knowledge Base Items */}
-        {!isLoadingKB && !kbError && selectedAgentId && ((isElevenLabs && !!apiKey) || isRetell) && (
+        {!isLoadingKB && !kbError && selectedAgentId && (isElevenLabs || isRetell) && (
           <>
             {isElevenLabs ? (
               filteredItems.length > 0 ? (
@@ -602,7 +602,7 @@ const KnowledgeBase = () => {
         )}
 
         {/* Stats Footer */}
-        {selectedAgentId && ((isElevenLabs && !!apiKey && items.length > 0) || (isRetell && kbListForRetell.length > 0)) && (
+        {selectedAgentId && ((isElevenLabs && items.length > 0) || (isRetell && kbListForRetell.length > 0)) && (
           <div className="mt-6 text-center text-sm text-muted-foreground">
             {isElevenLabs
               ? `${items.length} document${items.length > 1 ? 's' : ''} dans la base de connaissances`
