@@ -59,8 +59,11 @@ const PortalConversations = () => {
 
   // Apply filters
   const filteredConversations = conversations.filter(c => {
-    if (searchTerm && !c.conversation_id.toLowerCase().includes(searchTerm.toLowerCase())) {
-      return false;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      const matchesId = c.conversation_id.toLowerCase().includes(term);
+      const matchesCaller = (c.caller_number || '').toLowerCase().includes(term);
+      if (!matchesId && !matchesCaller) return false;
     }
     
     const duration = c.call_duration_secs || 0;
@@ -376,8 +379,8 @@ const PortalConversations = () => {
                             <User className="h-4 w-4 text-primary" />
                           </div>
                           <div>
-                            <p className="font-medium text-sm truncate max-w-[120px]">
-                              {conversation.conversation_id.slice(0, 8)}...
+                            <p className="font-medium text-sm truncate max-w-[160px]">
+                              {conversation.caller_number || `${conversation.conversation_id.slice(0, 8)}...`}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {formatTimestamp(conversation.start_time_unix_secs, 'PPp')}
@@ -567,7 +570,7 @@ const PortalConversations = () => {
                             audioUrl={audioUrl}
                             conversation={{
                               conversation_id: selectedConversation.conversation_id,
-                              caller_number: '',
+                              caller_number: selectedConversation.caller_number || '',
                               duration_seconds: selectedConversation.call_duration_secs,
                               satisfaction_score: analysis?.satisfaction_score,
                             }}

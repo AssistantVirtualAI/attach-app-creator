@@ -9,6 +9,7 @@ export interface PortalConversation {
   start_time_unix_secs: number;
   call_duration_secs: number;
   message_count: number;
+  caller_number?: string;
   transcript?: {
     role: string;
     message: string;

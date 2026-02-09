@@ -154,11 +154,50 @@ serve(async (req) => {
         }
 
         const conversationsData = await conversationsResponse.json();
+        const rawConversations = conversationsData.conversations || [];
+
+        // Batch-fetch details for the first 30 conversations to get caller_number
+        const convsToEnrich = rawConversations.slice(0, 30);
+        const detailResults = await Promise.allSettled(
+          convsToEnrich.map(async (conv: any) => {
+            try {
+              const detailRes = await fetch(
+                `https://api.elevenlabs.io/v1/convai/conversations/${conv.conversation_id}`,
+                { headers: { 'xi-api-key': apiKey, 'accept': 'application/json' } }
+              );
+              if (detailRes.ok) {
+                const detail = await detailRes.json();
+                return { id: conv.conversation_id, caller_id: detail.caller_id, metadata: detail.metadata };
+              }
+            } catch (e) {
+              // ignore individual failures
+            }
+            return null;
+          })
+        );
+
+        // Build caller map
+        const callerMap = new Map<string, string>();
+        for (const result of detailResults) {
+          if (result.status === 'fulfilled' && result.value) {
+            const { id, caller_id, metadata } = result.value;
+            const callerNumber = caller_id || metadata?.caller_id || metadata?.caller_number || metadata?.phone_number;
+            if (callerNumber) {
+              callerMap.set(id, callerNumber);
+            }
+          }
+        }
+
+        // Enrich conversations with caller_number
+        const enrichedConversations = rawConversations.map((conv: any) => ({
+          ...conv,
+          caller_number: conv.caller_id || conv.metadata?.caller_id || conv.metadata?.caller_number || callerMap.get(conv.conversation_id) || undefined,
+        }));
 
         return new Response(
           JSON.stringify({
-            conversations: conversationsData.conversations || [],
-            total: (conversationsData.conversations || []).length,
+            conversations: enrichedConversations,
+            total: enrichedConversations.length,
             has_more: !!conversationsData.has_more,
             next_cursor: conversationsData.next_cursor ?? null,
           }),
