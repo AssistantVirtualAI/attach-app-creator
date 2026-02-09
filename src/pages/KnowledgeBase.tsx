@@ -335,24 +335,10 @@ const KnowledgeBase = () => {
               {/* Connection Status */}
               {selectedAgentId && (isElevenLabs || isRetell) && (
                 <div className="flex items-center gap-2">
-                  {isElevenLabs ? (
-                    apiKey ? (
-                      <Badge className="bg-success/20 text-success border-success/30">
-                        <CheckCircle2 className="w-3 h-3 mr-1" />
-                        Connecté
-                      </Badge>
-                    ) : (
-                      <Badge variant="destructive">
-                        <AlertCircle className="w-3 h-3 mr-1" />
-                        API Key manquante
-                      </Badge>
-                    )
-                  ) : (
-                    <Badge className="bg-success/20 text-success border-success/30">
-                      <CheckCircle2 className="w-3 h-3 mr-1" />
-                      Connecté
-                    </Badge>
-                  )}
+                  <Badge className="bg-success/20 text-success border-success/30">
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    Connecté
+                  </Badge>
                   {isElevenLabs && totalDocs > items.length && (
                     <span className="text-sm text-muted-foreground">
                       {items.length} liés / {totalDocs} total
