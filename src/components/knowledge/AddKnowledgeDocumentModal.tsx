@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,14 +6,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Link2, Plus, Loader2 } from 'lucide-react';
-import { useAddKnowledgeBaseItem, useAddKnowledgeBaseUrl } from '@/hooks/useElevenLabsKnowledgeBase';
+import { FileText, Link2, Plus, Loader2, Upload, X } from 'lucide-react';
+import { useAddKnowledgeBaseItem, useAddKnowledgeBaseUrl, useAddKnowledgeBaseFile } from '@/hooks/useElevenLabsKnowledgeBase';
 
 interface AddKnowledgeDocumentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agentId: string;
   apiKey?: string;
+  organizationId?: string;
 }
 
 const CATEGORIES = [
@@ -28,13 +29,17 @@ const CATEGORIES = [
   'À propos',
 ];
 
+const ACCEPTED_FILE_TYPES = '.pdf,.xlsx,.xls,.csv,.doc,.docx,.pptx,.html,.txt,.md';
+const MAX_FILE_SIZE_MB = 50;
+
 export function AddKnowledgeDocumentModal({ 
   open, 
   onOpenChange, 
   agentId, 
-  apiKey 
+  apiKey,
+  organizationId
 }: AddKnowledgeDocumentModalProps) {
-  const [activeTab, setActiveTab] = useState<'text' | 'url'>('text');
+  const [activeTab, setActiveTab] = useState<'text' | 'url' | 'file'>('text');
   
   // Text form state
   const [title, setTitle] = useState('');
@@ -45,10 +50,16 @@ export function AddKnowledgeDocumentModal({
   const [url, setUrl] = useState('');
   const [urlTitle, setUrlTitle] = useState('');
 
+  // File form state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileTitle, setFileTitle] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const addTextMutation = useAddKnowledgeBaseItem();
   const addUrlMutation = useAddKnowledgeBaseUrl();
+  const addFileMutation = useAddKnowledgeBaseFile();
 
-  const isLoading = addTextMutation.isPending || addUrlMutation.isPending;
+  const isLoading = addTextMutation.isPending || addUrlMutation.isPending || addFileMutation.isPending;
 
   const resetForm = () => {
     setTitle('');
@@ -56,6 +67,8 @@ export function AddKnowledgeDocumentModal({
     setCategory('Général');
     setUrl('');
     setUrlTitle('');
+    setSelectedFile(null);
+    setFileTitle('');
     setActiveTab('text');
   };
 
@@ -64,44 +77,86 @@ export function AddKnowledgeDocumentModal({
     onOpenChange(false);
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      alert(`Le fichier dépasse la limite de ${MAX_FILE_SIZE_MB} Mo`);
+      return;
+    }
+
+    setSelectedFile(file);
+    if (!fileTitle) {
+      setFileTitle(file.name.replace(/\.[^/.]+$/, ''));
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setFileTitle('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleAddText = async () => {
     if (!title || !content) return;
-
     await addTextMutation.mutateAsync({
       agentId,
       apiKey,
       title,
       content,
-      category
+      category,
+      organizationId,
     });
-
     handleClose();
   };
 
   const handleAddUrl = async () => {
     if (!url) return;
-
     await addUrlMutation.mutateAsync({
       agentId,
       apiKey,
       url,
-      title: urlTitle || undefined
+      title: urlTitle || undefined,
+      organizationId,
     });
+    handleClose();
+  };
 
+  const handleAddFile = async () => {
+    if (!selectedFile) return;
+    await addFileMutation.mutateAsync({
+      agentId,
+      apiKey,
+      file: selectedFile,
+      title: fileTitle || undefined,
+      organizationId,
+    });
     handleClose();
   };
 
   const handleSubmit = () => {
     if (activeTab === 'text') {
       handleAddText();
-    } else {
+    } else if (activeTab === 'url') {
       handleAddUrl();
+    } else {
+      handleAddFile();
     }
   };
 
-  const canSubmit = activeTab === 'text' 
-    ? title.trim() && content.trim()
-    : url.trim();
+  const canSubmit = 
+    activeTab === 'text' ? (title.trim() && content.trim()) :
+    activeTab === 'url' ? url.trim() :
+    !!selectedFile;
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} o`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -113,8 +168,8 @@ export function AddKnowledgeDocumentModal({
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'text' | 'url')} className="mt-4">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'text' | 'url' | 'file')} className="mt-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="text" className="flex items-center gap-2">
               <FileText className="w-4 h-4" />
               Texte
@@ -123,8 +178,13 @@ export function AddKnowledgeDocumentModal({
               <Link2 className="w-4 h-4" />
               URL
             </TabsTrigger>
+            <TabsTrigger value="file" className="flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              Fichier
+            </TabsTrigger>
           </TabsList>
 
+          {/* Text Tab */}
           <TabsContent value="text" className="mt-6 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -159,12 +219,8 @@ export function AddKnowledgeDocumentModal({
                 id="content"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="Entrez le contenu du document...
-
-Vous pouvez ajouter des informations sur vos produits, services, FAQ, politiques, etc.
-
-L'agent IA utilisera ce contenu pour répondre aux questions des utilisateurs."
-                className="min-h-[250px] bg-background font-mono text-sm"
+                placeholder="Entrez le contenu du document..."
+                className="min-h-[200px] bg-background font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">
                 {content.length} caractères
@@ -172,6 +228,7 @@ L'agent IA utilisera ce contenu pour répondre aux questions des utilisateurs."
             </div>
           </TabsContent>
 
+          {/* URL Tab */}
           <TabsContent value="url" className="mt-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="url">URL *</Label>
@@ -198,14 +255,61 @@ L'agent IA utilisera ce contenu pour répondre aux questions des utilisateurs."
                 className="bg-background"
               />
             </div>
+          </TabsContent>
 
-            <div className="p-4 bg-muted/30 rounded-lg text-sm text-muted-foreground">
-              <p className="font-medium mb-2">Conseils pour les URLs :</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Utilisez des pages avec du contenu textuel (pas des images)</li>
-                <li>Les pages nécessitant une authentification ne fonctionneront pas</li>
-                <li>Les PDFs et documents peuvent être importés</li>
-              </ul>
+          {/* File Tab */}
+          <TabsContent value="file" className="mt-6 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="fileTitle">Titre (optionnel)</Label>
+              <Input
+                id="fileTitle"
+                value={fileTitle}
+                onChange={(e) => setFileTitle(e.target.value)}
+                placeholder="Titre personnalisé pour ce fichier"
+                className="bg-background"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Fichier *</Label>
+              {selectedFile ? (
+                <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border border-border">
+                  <Upload className="w-5 h-5 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{selectedFile.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatFileSize(selectedFile.size)}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRemoveFile}
+                    className="shrink-0 text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+                  <p className="text-sm font-medium mb-1">Cliquez pour sélectionner un fichier</p>
+                  <p className="text-xs text-muted-foreground">
+                    PDF, Word, Excel, PowerPoint, HTML, TXT, Markdown, CSV
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Maximum {MAX_FILE_SIZE_MB} Mo
+                  </p>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_FILE_TYPES}
+                onChange={handleFileSelect}
+                className="hidden"
+              />
             </div>
           </TabsContent>
         </Tabs>
@@ -222,7 +326,7 @@ L'agent IA utilisera ce contenu pour répondre aux questions des utilisateurs."
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Ajout...
+                {activeTab === 'file' ? 'Upload...' : 'Ajout...'}
               </>
             ) : (
               <>

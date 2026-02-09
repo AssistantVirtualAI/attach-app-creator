@@ -707,7 +707,8 @@ const KnowledgeBase = () => {
             open={isAddDialogOpen}
             onOpenChange={setIsAddDialogOpen}
             agentId={selectedAgentId}
-              apiKey={undefined}
+            apiKey={undefined}
+            organizationId={organizationId}
           />
         ) : (
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
