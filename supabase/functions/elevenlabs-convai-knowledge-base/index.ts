@@ -116,92 +116,117 @@ serve(async (req) => {
     // ============ RBAC CHECK FOR WRITE ACTIONS ============
     if (isWriteAction(action)) {
       const authHeader = req.headers.get('Authorization');
+      const bodyOrganizationId = body.organizationId;
       
-      if (!authHeader) {
-        console.log('[KB] Write action attempted without auth header');
+      let authorized = false;
+
+      if (authHeader) {
+        // Path 1: Supabase JWT authentication (admin portal)
+        const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: authHeader } }
+        });
+
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
+        
+        if (user && !userError) {
+          console.log(`[KB] User ${user.id} attempting write action: ${action}`);
+
+          // Check if super admin
+          const { data: isSuperAdmin } = await supabaseService.rpc('is_super_admin', { _user_id: user.id });
+          
+          if (isSuperAdmin) {
+            console.log('[KB] User is super admin, access granted');
+            authorized = true;
+          } else {
+            // Need to check org_admin role for the agent's organization
+            let orgId: string | null = null;
+
+            if (agentId && isValidUUID(agentId)) {
+              const { data: agent } = await supabaseService
+                .from('agents')
+                .select('organization_id')
+                .eq('id', agentId)
+                .single();
+              if (agent) orgId = agent.organization_id;
+            }
+
+            if (!orgId && agentId) {
+              const { data: agent } = await supabaseService
+                .from('agents')
+                .select('organization_id')
+                .eq('platform_agent_id', agentId)
+                .single();
+              if (agent) orgId = agent.organization_id;
+            }
+
+            if (orgId) {
+              const { data: hasRole } = await supabaseService.rpc('has_role', { 
+                _user_id: user.id, 
+                _org_id: orgId,
+                _role: 'org_admin'
+              });
+              if (hasRole) {
+                console.log('[KB] User has org_admin role, access granted');
+                authorized = true;
+              }
+            }
+          }
+        }
+      }
+      
+      // Path 2: Client portal authentication via organizationId + agentId
+      if (!authorized && bodyOrganizationId && agentId) {
+        console.log(`[KB] Attempting client portal auth: orgId=${bodyOrganizationId}, agentId=${agentId}`);
+        
+        // Verify the organization exists
+        const { data: org } = await supabaseService
+          .from('organizations')
+          .select('id')
+          .eq('id', bodyOrganizationId)
+          .maybeSingle();
+        
+        if (org) {
+          // Verify the agent belongs to this organization
+          let agentBelongsToOrg = false;
+          
+          if (isValidUUID(agentId)) {
+            const { data: agent } = await supabaseService
+              .from('agents')
+              .select('id')
+              .eq('id', agentId)
+              .eq('organization_id', bodyOrganizationId)
+              .maybeSingle();
+            agentBelongsToOrg = !!agent;
+          }
+          
+          if (!agentBelongsToOrg) {
+            const { data: agent } = await supabaseService
+              .from('agents')
+              .select('id')
+              .eq('platform_agent_id', agentId)
+              .eq('organization_id', bodyOrganizationId)
+              .maybeSingle();
+            agentBelongsToOrg = !!agent;
+          }
+          
+          if (agentBelongsToOrg) {
+            console.log('[KB] Client portal auth: agent belongs to organization, access granted');
+            authorized = true;
+          } else {
+            console.log('[KB] Client portal auth: agent does not belong to organization');
+          }
+        } else {
+          console.log('[KB] Client portal auth: organization not found');
+        }
+      }
+
+      if (!authorized) {
+        console.log('[KB] Write action denied: no valid auth path');
         return new Response(
           JSON.stringify({ error: 'Accès refusé. Authentification requise pour cette action.', success: false }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
-      }
-
-      // Create client with user's auth
-      const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: authHeader } }
-      });
-
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
-      
-      if (userError || !user) {
-        console.log('[KB] Auth validation failed:', userError);
-        return new Response(
-          JSON.stringify({ error: 'Accès refusé. Session invalide.', success: false }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      console.log(`[KB] User ${user.id} attempting write action: ${action}`);
-
-      // Check if super admin
-      const { data: isSuperAdmin } = await supabaseService.rpc('is_super_admin', { _user_id: user.id });
-      
-      if (isSuperAdmin) {
-        console.log('[KB] User is super admin, access granted');
-      } else {
-        // Need to check org_admin role for the agent's organization
-        let organizationId: string | null = null;
-
-        // Get organization from agent
-        if (agentId && isValidUUID(agentId)) {
-          const { data: agent } = await supabaseService
-            .from('agents')
-            .select('organization_id')
-            .eq('id', agentId)
-            .single();
-          
-          if (agent) {
-            organizationId = agent.organization_id;
-          }
-        }
-
-        // If no org found from agent, try from platform_agent_id
-        if (!organizationId && agentId) {
-          const { data: agent } = await supabaseService
-            .from('agents')
-            .select('organization_id')
-            .eq('platform_agent_id', agentId)
-            .single();
-          
-          if (agent) {
-            organizationId = agent.organization_id;
-          }
-        }
-
-        if (!organizationId) {
-          console.log('[KB] Could not determine organization for access check');
-          return new Response(
-            JSON.stringify({ error: 'Accès refusé. Organisation non trouvée.', success: false }),
-            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // Check if user has org_admin role
-        const { data: hasRole } = await supabaseService.rpc('has_role', { 
-          _user_id: user.id, 
-          _org_id: organizationId,
-          _role: 'org_admin'
-        });
-
-        if (!hasRole) {
-          console.log(`[KB] User ${user.id} does not have org_admin role for org ${organizationId}`);
-          return new Response(
-            JSON.stringify({ error: 'Accès refusé. Seuls les administrateurs peuvent effectuer cette action.', success: false }),
-            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        console.log('[KB] User has org_admin role, access granted');
       }
     }
 

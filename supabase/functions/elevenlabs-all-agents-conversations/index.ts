@@ -635,9 +635,46 @@ serve(async (req) => {
             }
           } while (cursor);
           
-          conversations = allElevenLabsConvs.map((conv: any) => 
-            normalizeElevenLabsConversation(conv, config)
+          // Batch-fetch details for the first 30 conversations to get caller_number
+          const convsToEnrich = allElevenLabsConvs.slice(0, 30);
+          const detailResults = await Promise.allSettled(
+            convsToEnrich.map(async (conv: any) => {
+              try {
+                const detailRes = await fetch(
+                  `https://api.elevenlabs.io/v1/convai/conversations/${conv.conversation_id}`,
+                  { headers: { 'xi-api-key': config.apiKey, 'accept': 'application/json' } }
+                );
+                if (detailRes.ok) {
+                  const detail = await detailRes.json();
+                  return { id: conv.conversation_id, caller_id: detail.caller_id, metadata: detail.metadata };
+                }
+              } catch (e) {
+                // ignore individual failures
+              }
+              return null;
+            })
           );
+          
+          // Build a map of conversation_id -> caller info
+          const callerMap = new Map<string, string>();
+          for (const result of detailResults) {
+            if (result.status === 'fulfilled' && result.value) {
+              const { id, caller_id, metadata } = result.value;
+              const callerNumber = caller_id || metadata?.caller_id || metadata?.caller_number || metadata?.phone_number;
+              if (callerNumber) {
+                callerMap.set(id, callerNumber);
+              }
+            }
+          }
+          
+          conversations = allElevenLabsConvs.map((conv: any) => {
+            const normalized = normalizeElevenLabsConversation(conv, config);
+            // Enrich with caller_number from details if available
+            if (!normalized.caller_number && callerMap.has(conv.conversation_id)) {
+              normalized.caller_number = callerMap.get(conv.conversation_id);
+            }
+            return normalized;
+          });
         } else if (config.platform === 'retell') {
           // Fetch ALL calls from Retell (no time limit, max 1000)
           const response = await fetch('https://api.retellai.com/v2/list-calls', {
