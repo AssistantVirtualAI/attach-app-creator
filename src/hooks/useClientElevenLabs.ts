@@ -138,18 +138,20 @@ export const useClientAddKnowledgeBaseText = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ apiKey, agentId, title, content, category }: { 
-      apiKey: string; 
+    mutationFn: async ({ apiKey, agentId, title, content, category, organizationId }: { 
+      apiKey?: string | null; 
       agentId: string; 
       title: string; 
       content: string; 
-      category?: string; 
+      category?: string;
+      organizationId?: string | null;
     }) => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
         body: { 
           action: 'create_text',
-          apiKey,
+          apiKey: apiKey || undefined,
           agentId,
+          organizationId: organizationId || undefined,
           title,
           content,
           category
@@ -179,16 +181,18 @@ export const useClientDeleteKnowledgeBaseItem = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ apiKey, agentId, documentId }: { 
-      apiKey: string; 
+    mutationFn: async ({ apiKey, agentId, documentId, organizationId }: { 
+      apiKey?: string | null; 
       agentId: string; 
       documentId: string;
+      organizationId?: string | null;
     }) => {
       const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
         body: { 
           action: 'delete',
-          apiKey,
+          apiKey: apiKey || undefined,
           agentId,
+          organizationId: organizationId || undefined,
           documentId
         }
       });
