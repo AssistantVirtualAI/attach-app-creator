@@ -244,7 +244,10 @@ export function AgentKnowledgeSection({
       setTitle('');
       setContent('');
       setUrl('');
-      queryClient.invalidateQueries({ queryKey: ['agent-knowledge-base', agentId] });
+      // Delay refetch to give ElevenLabs time to update dependent_agents linkage
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['agent-knowledge-base', agentId] });
+      }, 2000);
     },
     onError: (error: any) => {
       toast.error(error.message || 'Erreur lors de l\'ajout du document');
