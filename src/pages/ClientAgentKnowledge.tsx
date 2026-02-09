@@ -49,21 +49,24 @@ const useClientUpdateKnowledgeDocument = () => {
       documentId, 
       name, 
       content, 
-      deleteOld = true 
+      deleteOld = true,
+      organizationId
     }: { 
-      apiKey: string;
+      apiKey?: string | null;
       agentId: string;
       documentId: string;
       name: string; 
       content: string;
       deleteOld?: boolean;
+      organizationId?: string | null;
     }) => {
       // Create new document
       const { data: createData, error: createError } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
         body: {
           action: 'create_text',
           agentId,
-          apiKey,
+          apiKey: apiKey || undefined,
+          organizationId: organizationId || undefined,
           title: name,
           content,
         },
@@ -79,7 +82,8 @@ const useClientUpdateKnowledgeDocument = () => {
             body: {
               action: 'delete',
               agentId,
-              apiKey,
+              apiKey: apiKey || undefined,
+              organizationId: organizationId || undefined,
               documentId,
             },
           });
@@ -150,7 +154,7 @@ const ClientAgentKnowledge = () => {
   });
 
   const handleAddItem = async () => {
-    if (!apiKey || !platformAgentId) return;
+    if ((!apiKey && !organizationId) || !platformAgentId) return;
     if (!newItem.title || !newItem.content) {
       toast.error('Veuillez remplir tous les champs');
       return;
@@ -163,6 +167,7 @@ const ClientAgentKnowledge = () => {
         title: newItem.title,
         content: newItem.content,
         category: newItem.category || 'Général',
+        organizationId,
       });
 
       setIsAddModalOpen(false);
@@ -173,13 +178,14 @@ const ClientAgentKnowledge = () => {
   };
 
   const handleDeleteItem = async () => {
-    if (!apiKey || !platformAgentId || !deleteDocumentId) return;
+    if ((!apiKey && !organizationId) || !platformAgentId || !deleteDocumentId) return;
 
     try {
       await deleteMutation.mutateAsync({
         apiKey,
         agentId: platformAgentId,
         documentId: deleteDocumentId,
+        organizationId,
       });
       setDeleteDocumentId(null);
     } catch (error) {
@@ -203,7 +209,7 @@ const ClientAgentKnowledge = () => {
   };
 
   const handleSaveEdit = async () => {
-    if (!apiKey || !platformAgentId || !viewDocumentId || !editName.trim() || !editContent.trim()) {
+    if ((!apiKey && !organizationId) || !platformAgentId || !viewDocumentId || !editName.trim() || !editContent.trim()) {
       toast.error('Veuillez remplir tous les champs');
       return;
     }
@@ -216,6 +222,7 @@ const ClientAgentKnowledge = () => {
         name: editName,
         content: editContent,
         deleteOld: true,
+        organizationId,
       });
       setViewDocumentId(null);
       setIsEditMode(false);
