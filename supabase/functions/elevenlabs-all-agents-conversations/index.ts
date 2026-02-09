@@ -28,6 +28,7 @@ interface NormalizedConversation {
   end_time?: string;
   duration: number;
   status: string;
+  caller_number?: string;
   transcript?: string;
   metadata?: any;
   analysis?: {
@@ -50,6 +51,7 @@ function normalizeElevenLabsConversation(conv: any, config: any): NormalizedConv
     end_time: conv.end_time,
     duration: conv.call_duration_secs || conv.duration || 0,
     status: conv.status || 'completed',
+    caller_number: conv.caller_id || conv.metadata?.caller_id || conv.metadata?.caller_number || undefined,
     transcript: conv.transcript,
     metadata: conv.metadata,
     analysis: conv.analysis,
@@ -74,6 +76,7 @@ function normalizeRetellCall(call: any, config: any): NormalizedConversation {
     end_time: endTime,
     duration: duration,
     status: call.call_status || call.status || 'completed',
+    caller_number: call.from_number || call.caller_id || undefined,
     transcript: call.transcript,
     metadata: call.metadata,
     analysis: call.call_analysis ? {
@@ -103,6 +106,7 @@ function normalizeVapiCall(call: any, config: any): NormalizedConversation {
     end_time: endTime,
     duration: duration,
     status: call.status || 'completed',
+    caller_number: call.customer?.number || call.phoneNumber || undefined,
     transcript: call.transcript,
     metadata: call.metadata,
     analysis: call.analysis ? {
@@ -417,7 +421,9 @@ serve(async (req) => {
                   to_number: retellData.to_number,
                   call_type: retellData.call_type,
                   disconnection_reason: retellData.disconnection_reason,
+                  caller_number: retellData.from_number || retellData.caller_id,
                 },
+                caller_number: retellData.from_number || retellData.caller_id || undefined,
                 analysis: retellData.call_analysis ? {
                   summary: retellData.call_analysis.call_summary,
                   satisfaction_score: retellData.call_analysis.user_sentiment === 'Positive' ? 8 :
@@ -453,10 +459,11 @@ serve(async (req) => {
                 call_duration_secs: duration,
                 duration: duration,
                 status: vapiData.status || 'completed',
+                caller_number: vapiData.customer?.number || vapiData.phoneNumber || undefined,
                 transcript: vapiData.transcript,
                 recording_url: vapiData.recordingUrl,
                 audio_url: vapiData.recordingUrl,
-                metadata: vapiData.metadata,
+                metadata: { ...vapiData.metadata, caller_number: vapiData.customer?.number || vapiData.phoneNumber },
                 analysis: vapiData.analysis ? {
                   summary: vapiData.analysis.summary,
                   satisfaction_score: vapiData.analysis.successEvaluation === 'true' ? 8 : 5,
@@ -729,7 +736,8 @@ serve(async (req) => {
       filteredConversations = filteredConversations.filter(c => {
         const transcript = (c.transcript || '').toLowerCase();
         const summary = (c.analysis?.summary || '').toLowerCase();
-        return transcript.includes(searchLower) || summary.includes(searchLower);
+        const callerNumber = (c.caller_number || '').toLowerCase();
+        return transcript.includes(searchLower) || summary.includes(searchLower) || callerNumber.includes(searchLower);
       });
     }
 

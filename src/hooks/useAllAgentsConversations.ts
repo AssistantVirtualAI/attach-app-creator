@@ -11,6 +11,7 @@ export interface ElevenLabsConversation {
   call_duration_secs?: number;
   duration?: number;
   status?: string;
+  caller_number?: string;
   metadata?: any;
   analysis?: {
     summary?: string;
