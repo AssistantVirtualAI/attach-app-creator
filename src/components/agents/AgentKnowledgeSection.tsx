@@ -14,7 +14,8 @@ import {
   Plus,
   Trash2,
   Link as LinkIcon,
-  AlertCircle
+  AlertCircle,
+  Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,10 +51,11 @@ export function AgentKnowledgeSection({
   organizationId 
 }: AgentKnowledgeSectionProps) {
   const queryClient = useQueryClient();
-  const [addType, setAddType] = useState<'text' | 'url'>('text');
+  const [addType, setAddType] = useState<'text' | 'url' | 'file'>('text');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [url, setUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // Fetch knowledge base based on platform
   const { data: kbData, isLoading, refetch } = useQuery({
@@ -173,6 +175,22 @@ export function AgentKnowledgeSection({
     mutationFn: async () => {
       switch (platform) {
         case 'elevenlabs': {
+          if (addType === 'file' && selectedFile) {
+            // File upload uses FormData
+            const formData = new FormData();
+            formData.append('action', 'create_file');
+            formData.append('agentId', platformAgentId);
+            formData.append('organizationId', organizationId);
+            if (title) formData.append('title', title);
+            formData.append('file', selectedFile);
+            
+            const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
+              body: formData,
+            });
+            if (error) throw error;
+            return data;
+          }
+          
           const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
             body: { 
               action: addType === 'url' ? 'create_url' : 'add',
@@ -241,11 +259,10 @@ export function AgentKnowledgeSection({
     },
     onSuccess: (data: any) => {
       toast.success('Document ajouté avec succès');
-      // Optimistically add the new document to the local list
       const newItem: KBItem = {
         id: data?.documentId || `temp-${Date.now()}`,
-        name: title,
-        type: addType === 'url' ? 'url' : 'text',
+        name: title || selectedFile?.name || 'Document',
+        type: addType === 'url' ? 'url' : addType === 'file' ? 'file' : 'text',
         content: addType === 'text' ? content : undefined,
         url: addType === 'url' ? url : undefined,
         created_at: new Date().toISOString(),
@@ -257,6 +274,7 @@ export function AgentKnowledgeSection({
       setTitle('');
       setContent('');
       setUrl('');
+      setSelectedFile(null);
       // Also refetch after delay to get the real data from ElevenLabs
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['agent-knowledge-base', agentId] });
@@ -326,6 +344,7 @@ export function AgentKnowledgeSection({
 
   const getDocIcon = (type: string) => {
     if (type === 'url' || type === 'link') return <LinkIcon className="w-4 h-4 text-muted-foreground" />;
+    if (type === 'file') return <Upload className="w-4 h-4 text-muted-foreground" />;
     return <FileText className="w-4 h-4 text-muted-foreground" />;
   };
 
@@ -431,13 +450,14 @@ export function AgentKnowledgeSection({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="kb-type">Type de contenu</Label>
-                  <Select value={addType} onValueChange={(v) => setAddType(v as 'text' | 'url')}>
+                  <Select value={addType} onValueChange={(v) => setAddType(v as 'text' | 'url' | 'file')}>
                     <SelectTrigger id="kb-type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="text">Texte</SelectItem>
                       <SelectItem value="url">URL</SelectItem>
+                      <SelectItem value="file">Fichier (PDF, Excel, ...)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -454,7 +474,7 @@ export function AgentKnowledgeSection({
                     className="min-h-[150px]"
                   />
                 </div>
-              ) : (
+              ) : addType === 'url' ? (
                 <div className="space-y-2">
                   <Label htmlFor="kb-url">URL</Label>
                   <Input
@@ -465,12 +485,38 @@ export function AgentKnowledgeSection({
                     placeholder="https://example.com/document.pdf"
                   />
                 </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="kb-file">Fichier</Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="kb-file"
+                      type="file"
+                      accept=".pdf,.xlsx,.xls,.csv,.txt,.doc,.docx,.pptx,.html,.md"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setSelectedFile(file);
+                        if (file && !title) setTitle(file.name);
+                      }}
+                      className="flex-1"
+                    />
+                    {selectedFile && (
+                      <Badge variant="outline" className="shrink-0">
+                        <Upload className="w-3 h-3 mr-1" />
+                        {(selectedFile.size / 1024).toFixed(0)} Ko
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Formats acceptés : PDF, Excel, CSV, Word, PowerPoint, HTML, TXT, Markdown
+                  </p>
+                </div>
               )}
 
               <div className="flex justify-end">
                 <Button
                   onClick={() => addDocument.mutate()}
-                  disabled={addDocument.isPending || !title || (addType === 'text' ? !content : !url)}
+                  disabled={addDocument.isPending || (addType === 'file' ? !selectedFile : (!title || (addType === 'text' ? !content : !url)))}
                 >
                   {addDocument.isPending ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />

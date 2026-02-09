@@ -12,7 +12,7 @@ const ELEVENLABS_API_BASE = "https://api.elevenlabs.io/v1";
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ELEVENLABS_AGENT_ID_REGEX = /^[a-zA-Z0-9]{10,30}$/;
 const READ_ACTIONS = ['list', 'get', 'get_document'] as const;
-const WRITE_ACTIONS = ['add', 'create_text', 'create_url', 'delete', 'link_to_agent', 'unlink_from_agent', 'rename'] as const;
+const WRITE_ACTIONS = ['add', 'create_text', 'create_url', 'create_file', 'upload_file', 'delete', 'link_to_agent', 'unlink_from_agent', 'rename'] as const;
 const VALID_ACTIONS = [...READ_ACTIONS, ...WRITE_ACTIONS] as const;
 type ValidAction = typeof VALID_ACTIONS[number];
 
@@ -61,7 +61,29 @@ serve(async (req) => {
     // Create service client for DB operations
     const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body = await req.json();
+    // Handle both JSON and multipart/form-data requests
+    const contentType = req.headers.get('content-type') || '';
+    let body: any = {};
+    let uploadedFile: File | null = null;
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      body = {
+        action: formData.get('action') as string,
+        agentId: formData.get('agentId') as string,
+        apiKey: formData.get('apiKey') as string,
+        organizationId: formData.get('organizationId') as string,
+        title: formData.get('title') as string,
+        documentId: formData.get('documentId') as string,
+      };
+      const fileEntry = formData.get('file');
+      if (fileEntry && fileEntry instanceof File) {
+        uploadedFile = fileEntry;
+      }
+    } else {
+      body = await req.json();
+    }
+
     const { action, agentId, apiKey, documentId, title, content, url, category, itemId, search, pageSize, newName } = body;
 
     // Validate action
@@ -597,6 +619,79 @@ serve(async (req) => {
             success: true, 
             documentId: data.id,
             message: "Document créé depuis l'URL avec succès"
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "create_file":
+      case "upload_file": {
+        if (!uploadedFile) {
+          return new Response(
+            JSON.stringify({ error: "Un fichier est requis pour cette action", success: false }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const fileName = sanitizedTitle || uploadedFile.name || `File ${new Date().toISOString()}`;
+        console.log(`[KB] Uploading file: ${fileName} (${uploadedFile.size} bytes, type: ${uploadedFile.type})`);
+        
+        // Build multipart form data for ElevenLabs
+        const formData = new FormData();
+        formData.append('file', uploadedFile, uploadedFile.name);
+        if (sanitizedTitle) {
+          formData.append('name', sanitizedTitle);
+        }
+
+        const fullUrl = `${ELEVENLABS_API_BASE}/convai/knowledge-base/file`;
+        console.log(`[KB] Calling: POST ${fullUrl}`);
+        
+        const response = await fetch(fullUrl, {
+          method: "POST",
+          headers: {
+            "xi-api-key": elevenLabsApiKey,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[KB] ElevenLabs file upload error ${response.status}: ${errorText}`);
+          throw new Error(`ElevenLabs API error ${response.status}: ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log(`[KB] File uploaded: ${JSON.stringify(data)}`);
+
+        // Link to agent
+        if (platformAgentId && data.id) {
+          try {
+            console.log(`[KB] Linking file document ${data.id} to agent ${platformAgentId}`);
+            const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
+            const currentKbIds = (agentConfig.knowledge_base || []).map((kb: any) => kb.id || kb);
+            
+            if (!currentKbIds.includes(data.id)) {
+              currentKbIds.push(data.id);
+              
+              await callElevenLabs(`/convai/agents/${platformAgentId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  knowledge_base: currentKbIds,
+                }),
+              });
+              console.log(`[KB] File document linked to agent`);
+            }
+          } catch (linkError) {
+            console.error(`[KB] Failed to link file document to agent:`, linkError);
+          }
+        }
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            documentId: data.id,
+            message: "Fichier uploadé avec succès"
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
