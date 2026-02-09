@@ -167,7 +167,7 @@ serve(async (req) => {
               );
               if (detailRes.ok) {
                 const detail = await detailRes.json();
-                return { id: conv.conversation_id, caller_id: detail.caller_id, metadata: detail.metadata };
+                return { id: conv.conversation_id, caller_id: detail.caller_id, metadata: detail.metadata, user_id: detail.user_id };
               }
             } catch (e) {
               // ignore individual failures
@@ -181,7 +181,8 @@ serve(async (req) => {
         for (const result of detailResults) {
           if (result.status === 'fulfilled' && result.value) {
             const { id, caller_id, metadata } = result.value;
-            const callerNumber = caller_id || metadata?.caller_id || metadata?.caller_number || metadata?.phone_number;
+            const { user_id } = result.value;
+            const callerNumber = caller_id || metadata?.caller_id || metadata?.caller_number || metadata?.phone_number || user_id;
             if (callerNumber) {
               callerMap.set(id, callerNumber);
             }
@@ -191,7 +192,7 @@ serve(async (req) => {
         // Enrich conversations with caller_number
         const enrichedConversations = rawConversations.map((conv: any) => ({
           ...conv,
-          caller_number: conv.caller_id || conv.metadata?.caller_id || conv.metadata?.caller_number || callerMap.get(conv.conversation_id) || undefined,
+          caller_number: conv.caller_id || conv.metadata?.caller_id || conv.metadata?.caller_number || conv.metadata?.phone_number || conv.user_id || callerMap.get(conv.conversation_id) || undefined,
         }));
 
         return new Response(
