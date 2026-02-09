@@ -147,11 +147,26 @@ serve(async (req) => {
       
       // Strategy 2: Try agentId to find agent's organization
       if (!apiKey && agentId) {
-        const { data: agent } = await supabaseService
-          .from('agents')
-          .select('platform_agent_id, platform_api_key, organization_id, config')
-          .or(`id.eq.${agentId},platform_agent_id.eq.${agentId}`)
-          .maybeSingle();
+        // Check if agentId looks like a UUID to avoid query errors
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(agentId);
+        
+        let agent = null;
+        if (isUuid) {
+          const { data } = await supabaseService
+            .from('agents')
+            .select('platform_agent_id, platform_api_key, organization_id, config')
+            .or(`id.eq.${agentId},platform_agent_id.eq.${agentId}`)
+            .maybeSingle();
+          agent = data;
+        } else {
+          // Non-UUID agentId — only search by platform_agent_id
+          const { data } = await supabaseService
+            .from('agents')
+            .select('platform_agent_id, platform_api_key, organization_id, config')
+            .eq('platform_agent_id', agentId)
+            .maybeSingle();
+          agent = data;
+        }
         
         if (agent) {
           targetAgentId = agent.platform_agent_id || agentId;
