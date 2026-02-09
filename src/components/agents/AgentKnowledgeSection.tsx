@@ -175,10 +175,10 @@ export function AgentKnowledgeSection({
         case 'elevenlabs': {
           const { data, error } = await supabase.functions.invoke('elevenlabs-convai-knowledge-base', {
             body: { 
-              action: 'add',
+              action: addType === 'url' ? 'create_url' : 'add',
               agentId: platformAgentId,
               organizationId,
-              name: title,
+              title: title,
               content: addType === 'text' ? content : undefined,
               url: addType === 'url' ? url : undefined,
             },
