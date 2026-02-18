@@ -40,17 +40,23 @@ export const en = {
   landing: {
     agentCreation: {
       badge: 'Create & sync agents',
-      title: 'Create agents directly in the Admin Portal',
+      title: 'From idea to live agent — in minutes',
       subtitle:
-        'Build, configure, preview voices and sync to your provider — without jumping between dashboards.',
+        'Build, configure, preview voices and sync to your provider in one seamless wizard. No context switching, no dev time.',
       ctaDemo: 'Book a demo',
       ctaStart: 'Start free trial',
       step: 'Step {{n}}',
-      s1: { title: 'Choose a platform', description: 'ElevenLabs, Vapi or Retell — per agent.' },
-      s2: { title: 'Use templates & AI', description: 'Start from templates and refine prompts faster.' },
-      s3: { title: 'Pick a voice', description: 'Preview voices before selecting (all providers).' },
-      s4: { title: 'Tune settings', description: 'Behavior, safety, language and response style.' },
-      s5: { title: 'Create & sync', description: 'Push the configuration and start running calls.' },
+      prev: 'Back',
+      next: 'Next',
+      progress: 'Setup progress',
+      benefit1: 'Live in minutes',
+      benefit2: 'Multi-language support',
+      benefit3: 'One-click sync',
+      s1: { title: 'Choose a platform', description: 'Select ElevenLabs, Vapi or Retell per agent — all credentials managed centrally, never exposing keys to clients.' },
+      s2: { title: 'Use templates & AI', description: 'Start from industry templates, then let AI improve your prompt with one click. Faster, smarter, better results.' },
+      s3: { title: 'Pick a voice', description: 'Preview any voice before selecting — 120+ options across all providers. What you hear is exactly what your callers get.' },
+      s4: { title: 'Tune settings', description: 'Fine-tune behavior, safety guardrails, response style and language. Enterprise-grade controls in a simple interface.' },
+      s5: { title: 'Create & sync', description: 'Push the configuration to your provider in one click. Your agent is live and handling calls within seconds.' },
       callout: {
         title: 'Everything stays inside your portal',
         description:

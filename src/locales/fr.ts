@@ -39,21 +39,25 @@ export const fr = {
   landing: {
     agentCreation: {
       badge: 'Création + synchronisation',
-      title: 'Créez vos agents directement dans le Portail Admin',
-      subtitle:
-        'Construisez, configurez, écoutez les voix et synchronisez vers votre fournisseur — sans naviguer entre plusieurs dashboards.',
+      title: "De l'idée à l'agent live — en quelques minutes",
+      subtitle: "Construisez, configurez, écoutez les voix et synchronisez en un seul wizard. Zéro changement de contexte.",
       ctaDemo: 'Demander une démo',
-      ctaStart: 'Démarrer l’essai',
+      ctaStart: "Démarrer l'essai",
       step: 'Étape {{n}}',
-      s1: { title: 'Choisir une plateforme', description: 'ElevenLabs, Vapi ou Retell — par agent.' },
-      s2: { title: 'Templates & IA', description: 'Démarrez vite et améliorez vos prompts.' },
-      s3: { title: 'Sélectionner une voix', description: 'Pré-écoute avant sélection (tous fournisseurs).' },
-      s4: { title: 'Régler les paramètres', description: 'Comportement, langue, style de réponse.' },
-      s5: { title: 'Créer & synchroniser', description: 'Poussez la config et lancez l’exploitation.' },
+      prev: 'Retour',
+      next: 'Suivant',
+      progress: 'Progression',
+      benefit1: 'Live en quelques minutes',
+      benefit2: 'Support multi-langues',
+      benefit3: 'Sync en un clic',
+      s1: { title: 'Choisir une plateforme', description: "Sélectionnez ElevenLabs, Vapi ou Retell par agent." },
+      s2: { title: 'Templates & IA', description: "Démarrez depuis des templates, améliorez votre prompt avec l'IA." },
+      s3: { title: 'Sélectionner une voix', description: "120+ voix à préécouter avant de choisir." },
+      s4: { title: 'Régler les paramètres', description: "Comportement, sécurité, style de réponse et langue." },
+      s5: { title: 'Créer & synchroniser', description: "Poussez la configuration en un clic. Agent live en secondes." },
       callout: {
         title: 'Tout se gère dans votre portail',
-        description:
-          'Agents, intégrations, analytics et clients — un seul endroit pour tout piloter.',
+        description: 'Agents, intégrations, analytics et clients — un seul endroit pour tout piloter.',
       },
     },
     integrations: {
