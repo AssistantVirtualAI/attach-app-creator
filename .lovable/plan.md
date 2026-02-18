@@ -1,102 +1,126 @@
 
-# Fix: Knowledge Base Documents Not Persisting in ElevenLabs
+# Landing Page Enhancement: Transition Photos, Live Demo Section & AI-Focused Features
 
-## Root Cause
+## What We're Building
 
-The PATCH request to link documents to the agent uses the **wrong format**. The current code sends:
+Three major additions to the landing page:
+
+1. **Section Transition Visuals** — Animated, full-width "bridge" elements between key sections that use AI-themed illustrations (brain networks, voice waves, data flows) built entirely with CSS + SVG + Framer Motion (no external images needed, stays consistent with the existing code style).
+
+2. **Live Demo Section** — A new interactive `LiveDemoSection` component inserted between the Features section and the Portal Comparison section. It shows a simulated AI agent conversation in real time, letting visitors experience the platform without signing up. Reuses the existing `ChatDemo` widget style already built in `/components/demo/`.
+
+3. **AI Impact on Companies Section** — A new `AIForCompaniesSection` component, inserted near the bottom before Testimonials, highlighting how the platform's AI features help companies with industry-specific use cases (real estate, insurance, e-commerce, legal). Each card shows a rich mock dashboard with AI metrics.
+
+## Technical Details
+
+### Files to Create
+
+**`src/components/landing/SectionDivider.tsx`**
+A reusable animated divider component that renders between sections. It accepts a `variant` prop (`"wave"`, `"network"`, `"pulse"`) and renders an SVG-based animated visual with subtle brand gradients. Used 3–4 times across the landing page.
+
+**`src/components/landing/LiveDemoSection.tsx`**
+An interactive chat simulation:
+- Left side: Animated "AI agent" chat UI with a typewriter effect showing a scripted conversation (no real API call — fully scripted to keep it fast and reliable).
+- Right side: Metrics panel showing live-updating mock stats (calls handled, response time, satisfaction score) animated with Framer Motion counters.
+- A "Try a real demo" CTA linking to `/demo-request`.
+- Auto-plays the chat on scroll into view (uses `whileInView`).
+
+**`src/components/landing/AIForCompaniesSection.tsx`**
+A 4-card grid showing industry use cases:
+- Real Estate: AI qualifies leads 24/7
+- Insurance: Handles claim inquiries and routing
+- E-commerce: Answers product questions and tracks orders
+- Legal / Professional Services: Appointment booking and FAQ
+Each card shows a mini animated "before/after" mock (skeleton UI showing agent handling the task) with impact stats (e.g., "72% fewer missed calls").
+
+### Files to Modify
+
+**`src/pages/Landing.tsx`**
+- Import and insert `SectionDivider` between each major section.
+- Import and insert `LiveDemoSection` between `FeaturesSection` and the first `InlineCTA` after features.
+- Import and insert `AIForCompaniesSection` between `ProductShowcaseSection` and `TestimonialsSection`.
+
+**`src/locales/en.ts` and `src/locales/fr.ts`**
+Add translation keys for:
+- `liveDemo.*` (section header, chat messages, metric labels, CTA)
+- `aiCompanies.*` (section header, 4 industry cards with title, description, stat)
+
+### Landing Page Order After Changes
 
 ```text
-PATCH /convai/agents/{agent_id}
-Body: { "knowledge_base": ["doc_id_1", "doc_id_2"] }
+HeroSection
+TrustedBySection
+  ── SectionDivider variant="wave" ──
+PortalPreviewSection
+  ── SectionDivider variant="network" ──
+HowItWorksSection
+InlineCTA (after how-it-works)
+AgentCreationSection
+FeaturesSection
+  ── SectionDivider variant="pulse" ──
+[NEW] LiveDemoSection         ← New interactive chat demo
+InlineCTA (after features)
+PortalComparisonSection
+IntegrationsSection
+InlineCTA (after integrations)
+ProductShowcaseSection (analytics)
+[NEW] AIForCompaniesSection   ← AI impact on companies
+TestimonialsSection
+FAQSection
+PricingSection
+CTASection
+FooterSection
 ```
 
-But ElevenLabs expects the knowledge base to be nested inside `conversation_config.agent.prompt.knowledge_base` as an array of objects:
+### LiveDemoSection — Chat Script (auto-plays on scroll)
+
+The section will replay this simulated conversation with typewriter delays:
 
 ```text
-PATCH /convai/agents/{agent_id}
-Body: {
-  "conversation_config": {
-    "agent": {
-      "prompt": {
-        "knowledge_base": [
-          { "type": "file", "name": "doc name", "id": "doc_id" },
-          ...existing docs...
-        ]
-      }
-    }
-  }
-}
+User:  "Hi, I'd like to reschedule my appointment"
+Agent: "Of course! I can help you with that. What date works best for you?"
+User:  "Next Tuesday at 3pm?"
+Agent: "Perfect — I've updated your appointment to Tuesday at 3:00 PM. You'll receive a confirmation email shortly. Is there anything else I can help you with?"
+User:  "No, that's all. Thanks!"
+Agent: "Happy to help! Have a great day."
 ```
 
-This explains why:
-- The document IS created in ElevenLabs (the POST to `/convai/knowledge-base/text` works)
-- The PATCH reports no error (ElevenLabs silently ignores the unknown top-level `knowledge_base` field)
-- The list shows `Agent KB IDs from config: 0 items` (because `agentConfig.knowledge_base` is empty -- the real data is at `agentConfig.conversation_config.agent.prompt.knowledge_base`)
-- The document disappears from the UI (filtering finds 0 matching KB IDs)
+Alongside the chat, a live metrics panel auto-counts up:
+- Response time: 0.8s avg
+- Conversations handled: 3,247 this month
+- Customer satisfaction: 94.2%
 
-## Changes
+### AIForCompaniesSection — Cards
 
-### 1. Fix the Edge Function linking logic
+| Industry | Headline | Key Stat |
+|---|---|---|
+| Real Estate | Qualify leads 24/7, never miss a call | -72% missed opportunities |
+| Insurance | Instant claim intake and smart routing | 3x faster claim intake |
+| E-commerce | Product Q&A and order tracking at scale | 89% resolved without human |
+| Legal / Pro Services | Appointment booking on autopilot | +40% booked consultations |
 
-**File**: `supabase/functions/elevenlabs-convai-knowledge-base/index.ts`
+Each card has:
+- Industry icon (House, Shield, ShoppingBag, Briefcase from lucide-react)
+- A mini animated mock showing the AI agent interacting (skeleton conversation)
+- The impact stat in a large gradient number
+- A short description
 
-In all three creation cases (`create_text`, `create_url`, `create_file`), fix the PATCH call:
+### SectionDivider Variants
 
-**Before (wrong):**
-```
-const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
-const currentKbIds = (agentConfig.knowledge_base || []).map(kb => kb.id || kb);
-currentKbIds.push(data.id);
-await callElevenLabs(`/convai/agents/${platformAgentId}`, {
-  method: "PATCH",
-  body: JSON.stringify({ knowledge_base: currentKbIds })
-});
-```
+- **`wave`** — Animated flowing wave SVG in primary/secondary gradient colors
+- **`network`** — A network of animated dots connected by thin lines, suggesting AI neural network
+- **`pulse`** — A horizontal pulsing waveform (like the voice feature cards)
 
-**After (correct):**
-```
-const agentConfig = await callElevenLabs(`/convai/agents/${platformAgentId}`);
-const currentKb = agentConfig?.conversation_config?.agent?.prompt?.knowledge_base || [];
-const alreadyLinked = currentKb.some(kb => kb.id === data.id);
-if (!alreadyLinked) {
-  currentKb.push({ type: "file", name: docName, id: data.id });
-  await callElevenLabs(`/convai/agents/${platformAgentId}`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      conversation_config: {
-        agent: {
-          prompt: {
-            knowledge_base: currentKb
-          }
-        }
-      }
-    })
-  });
-}
-```
+All dividers are ~80px tall, full-width, and use `opacity-30` to be subtle, not distracting.
 
-### 2. Fix the list filtering to read from the correct path
+## No External Dependencies Needed
 
-In the `list` action, the agent KB IDs extraction also needs to use the correct path:
+Everything uses already-installed packages:
+- `framer-motion` — all animations
+- `lucide-react` — icons
+- `@/components/ui/badge` and `button` — existing UI components
+- Existing `useTranslation` and `useNavigate` patterns
 
-**Before:**
-```
-agentKbIds = (agentConfig.knowledge_base || []).map(kb => kb.id || kb);
-```
+## Bilingual Support
 
-**After:**
-```
-const kbArray = agentConfig?.conversation_config?.agent?.prompt?.knowledge_base || [];
-agentKbIds = kbArray.map(kb => kb.id || kb).filter(Boolean);
-```
-
-### 3. Redeploy the edge function
-
-After making the changes, redeploy `elevenlabs-convai-knowledge-base` so all create + list operations use the correct API format.
-
-## Summary of Impact
-
-- Documents will now actually be linked to the agent in ElevenLabs (visible in ElevenLabs dashboard too)
-- The list query will correctly find linked documents via the agent config
-- Documents will persist in both the Admin Portal and Client Portal knowledge base pages
-- No frontend changes needed -- the issue is entirely in the Edge Function
+All new text added to both `en.ts` and `fr.ts` translation files to maintain the existing FR/EN toggle functionality.
