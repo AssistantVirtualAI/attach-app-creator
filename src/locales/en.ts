@@ -2645,4 +2645,50 @@ export const en = {
   footerExtra: {
     bookDemo: 'Book a demo',
   },
+
+  // Live Demo Section
+  liveDemo: {
+    badge: 'See it in action',
+    title: 'Watch your AI agent work in real time',
+    subtitle: 'No sign-up needed. See how AVA handles a real customer conversation — from rescheduling to answering questions, instantly.',
+    online: 'Online — responding instantly',
+    replay: 'Replay',
+    cta: 'Try a real demo',
+    conversationEnded: '✓ Conversation resolved in seconds',
+    metricsTitle: 'Live performance metrics',
+    metric1Label: 'Avg. response time',
+    metric1Unit: 's avg',
+    metric2Label: 'Conversations this month',
+    metric3Label: 'Customer satisfaction',
+    liveLabel: 'Processing 24/7',
+    liveDesc: 'Your AI agent never sleeps — every call, every time.',
+  },
+
+  // AI for Companies Section
+  aiCompanies: {
+    badge: 'Industry impact',
+    title: 'Built for the industries that can\'t afford to miss a call',
+    subtitle: 'From real estate to legal services, AVA adapts to your industry\'s specific needs and delivers measurable results.',
+    footnote: 'Results based on average customer data. Individual results may vary.',
+    card1: {
+      title: 'Real Estate',
+      desc: 'Qualify leads 24/7, capture every inquiry and book viewings without missing a call.',
+      statLabel: 'fewer missed opportunities',
+    },
+    card2: {
+      title: 'Insurance',
+      desc: 'Handle claim inquiries, collect information and route to the right agent — instantly.',
+      statLabel: 'faster claim intake',
+    },
+    card3: {
+      title: 'E-commerce',
+      desc: 'Answer product questions, track orders and resolve issues before customers churn.',
+      statLabel: 'resolved without human',
+    },
+    card4: {
+      title: 'Legal & Pro Services',
+      desc: 'Book consultations on autopilot, answer FAQs and qualify prospects around the clock.',
+      statLabel: 'more booked consultations',
+    },
+  },
 };

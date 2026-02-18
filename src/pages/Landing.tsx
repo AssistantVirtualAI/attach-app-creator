@@ -18,6 +18,9 @@ import { ProductShowcaseSection } from "@/components/landing/ProductShowcaseSect
 import { PortalPreviewSection } from "@/components/landing/PortalPreviewSection";
 import { InlineCTA } from "@/components/landing/InlineCTA";
 import { ChatWidget } from "@/components/landing/ChatWidget";
+import { SectionDivider } from "@/components/landing/SectionDivider";
+import { LiveDemoSection } from "@/components/landing/LiveDemoSection";
+import { AIForCompaniesSection } from "@/components/landing/AIForCompaniesSection";
 import { useTranslation } from "@/hooks/useTranslation";
 
 const Landing = () => {
@@ -45,9 +48,11 @@ const Landing = () => {
       >
         <HeroSection />
         <TrustedBySection />
+        <SectionDivider variant="wave" />
         <div id="portal-preview">
           <PortalPreviewSection />
         </div>
+        <SectionDivider variant="network" />
         <div id="how-it-works">
           <HowItWorksSection />
         </div>
@@ -60,6 +65,10 @@ const Landing = () => {
         </div>
         <div id="features">
           <FeaturesSection />
+        </div>
+        <SectionDivider variant="pulse" />
+        <div id="live-demo">
+          <LiveDemoSection />
         </div>
         <InlineCTA
           title={t("inlineCTA.afterFeatures")}
@@ -77,6 +86,9 @@ const Landing = () => {
         />
         <div id="analytics">
           <ProductShowcaseSection />
+        </div>
+        <div id="ai-for-companies">
+          <AIForCompaniesSection />
         </div>
         <div id="testimonials">
           <TestimonialsSection />
