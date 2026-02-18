@@ -2646,6 +2646,57 @@ export const en = {
     bookDemo: 'Book a demo',
   },
 
+  // Competitor Comparison Section
+  competitorComparison: {
+    badge: 'How we compare',
+    title: 'Why teams choose AVA over the alternatives',
+    subtitle: 'A transparent look at what AVA offers versus generic chatbot tools, point solutions and custom builds.',
+    recommended: 'Best choice',
+    genericLabel: 'Generic chatbot tools',
+    customLabel: 'Custom build',
+    avaVoice: 'ElevenLabs · Vapi · Retell',
+    oneProvider: 'Limited',
+    avaSetup: 'Minutes',
+    hours: 'Hours',
+    weeks: 'Weeks',
+    months: '3–6 months',
+    avaPricing: 'Flat · scalable',
+    chatdashPricing: 'Per seat',
+    genericPricing: 'Per usage',
+    customPricing: '$$$ upfront',
+    rows: {
+      multiPortal: 'Multi-client portals',
+      voiceProviders: 'Voice AI providers',
+      clientPortal: 'White-label client portal',
+      twilioBuiltIn: 'Built-in telephony (Twilio)',
+      aiAnalytics: 'AI analytics & sentiment',
+      whiteLabel: 'Full white-labeling',
+      knowledgeBase: 'Agent knowledge base',
+      setup: 'Time to set up',
+      pricing: 'Pricing model',
+    },
+    legendIncluded: 'Included',
+    legendPartial: 'Partial',
+    legendMissing: 'Not available',
+    why1: {
+      title: 'All-in-one, not all-over-the-place',
+      desc: 'AVA replaces 4–5 separate tools: your voice provider dashboard, telephony platform, analytics tool and client management system — in one portal.',
+    },
+    why2: {
+      title: 'Built for agencies & resellers',
+      desc: 'Unlike generic chatbot tools, AVA is designed from the ground up to let you manage multiple clients, each with their own branded portal and agents.',
+    },
+    why3: {
+      title: 'Production-ready from day one',
+      desc: 'No months of custom development. Your first agent can be live in minutes, with enterprise-grade security, analytics and telephony included.',
+    },
+    ctaHeadline: 'Ready to see the difference?',
+    ctaSubline: 'Join agencies already running AI voice agents for their clients through one clean portal.',
+    ctaButton: 'Book a free demo',
+    ctaSecondary: 'Start free trial',
+    ctaFootnote: 'No credit card required · Setup in minutes',
+  },
+
   // Live Demo Section
   liveDemo: {
     badge: 'See it in action',
