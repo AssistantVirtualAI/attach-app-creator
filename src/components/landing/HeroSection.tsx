@@ -150,7 +150,7 @@ export const HeroSection = () => {
                 </div>
                 <div className="flex-1 flex justify-center">
                   <div className="px-6 py-1 rounded-full bg-muted/50 text-xs text-muted-foreground font-mono">
-                    app.ava-platform.com
+                    attach-app-creator.lovable.app
                   </div>
                 </div>
               </div>
