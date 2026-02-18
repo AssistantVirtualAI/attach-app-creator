@@ -523,7 +523,7 @@ export const ProductShowcaseSection = () => {
               {/* URL + live indicator */}
               <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/50 border border-border/40">
                 <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-xs text-muted-foreground font-mono hidden sm:block">attach-app-creator.lovable.app</span>
+                <span className="text-xs text-muted-foreground font-mono hidden sm:block">app.avastatistic.com</span>
               </div>
             </div>
 
