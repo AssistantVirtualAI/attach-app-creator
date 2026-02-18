@@ -2644,4 +2644,50 @@ export const fr = {
   footerExtra: {
     bookDemo: 'Demander une démo',
   },
+
+  // Live Demo Section
+  liveDemo: {
+    badge: 'Voyez-le en action',
+    title: 'Regardez votre agent IA travailler en temps réel',
+    subtitle: 'Sans inscription. Voyez comment AVA gère une vraie conversation client — de la reprogrammation aux questions, instantanément.',
+    online: 'En ligne — réponse instantanée',
+    replay: 'Rejouer',
+    cta: 'Essayer une vraie démo',
+    conversationEnded: '✓ Conversation résolue en quelques secondes',
+    metricsTitle: 'Métriques en direct',
+    metric1Label: 'Temps de réponse moyen',
+    metric1Unit: 's moy.',
+    metric2Label: 'Conversations ce mois',
+    metric3Label: 'Satisfaction client',
+    liveLabel: 'Actif 24h/24, 7j/7',
+    liveDesc: 'Votre agent IA ne dort jamais — chaque appel, à chaque instant.',
+  },
+
+  // AI for Companies Section
+  aiCompanies: {
+    badge: 'Impact par secteur',
+    title: 'Conçu pour les secteurs qui ne peuvent pas rater un appel',
+    subtitle: "De l'immobilier aux services juridiques, AVA s'adapte aux besoins de votre secteur et livre des résultats mesurables.",
+    footnote: 'Résultats basés sur les données moyennes clients. Les résultats individuels peuvent varier.',
+    card1: {
+      title: 'Immobilier',
+      desc: 'Qualifiez vos leads 24h/24, captez chaque demande et planifiez des visites sans manquer un appel.',
+      statLabel: "d'opportunités manquées en moins",
+    },
+    card2: {
+      title: 'Assurance',
+      desc: 'Traitez les demandes de sinistres, collectez les informations et routez vers le bon agent — instantanément.',
+      statLabel: 'plus rapide pour la prise en charge',
+    },
+    card3: {
+      title: 'E-commerce',
+      desc: 'Répondez aux questions produits, suivez les commandes et résolvez les problèmes avant que les clients partent.',
+      statLabel: 'résolus sans intervention humaine',
+    },
+    card4: {
+      title: 'Juridique & Services Pro',
+      desc: 'Réservez des consultations en automatique, répondez aux FAQs et qualifiez vos prospects à toute heure.',
+      statLabel: 'de consultations réservées en plus',
+    },
+  },
 };
