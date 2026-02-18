@@ -380,7 +380,7 @@ export default function SaaSConfigurator() {
                     placeholder="app.votre-domaine.com"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Pointez un enregistrement CNAME vers: app.avastatistic.lovable.app
+                    Pointez un enregistrement CNAME vers: app.avastatistic.com
                   </p>
                 </div>
 

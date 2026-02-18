@@ -13,7 +13,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 
-const SITE_URL = "attach-app-creator.lovable.app";
+const SITE_URL = "app.avastatistic.com";
 
 /* ─── Scroll helper ──────────────────────────────────── */
 const scrollTo = (id: string) => {

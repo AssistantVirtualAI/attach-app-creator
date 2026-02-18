@@ -1079,7 +1079,7 @@ const Docs = () => {
                 <div className="bg-muted rounded-lg p-4">
                   <h4 className="font-medium mb-2">Enregistrements DNS Requis</h4>
                   <div className="font-mono text-sm">
-                    <code>CNAME app → votre-projet.lovable.app</code>
+                    <code>CNAME app → app.avastatistic.com</code>
                   </div>
                 </div>
               </CardContent>
