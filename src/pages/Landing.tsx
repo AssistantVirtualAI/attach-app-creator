@@ -21,6 +21,7 @@ import { ChatWidget } from "@/components/landing/ChatWidget";
 import { SectionDivider } from "@/components/landing/SectionDivider";
 import { LiveDemoSection } from "@/components/landing/LiveDemoSection";
 import { AIForCompaniesSection } from "@/components/landing/AIForCompaniesSection";
+import { CompetitorComparisonSection } from "@/components/landing/CompetitorComparisonSection";
 import { useTranslation } from "@/hooks/useTranslation";
 
 const Landing = () => {
@@ -76,6 +77,9 @@ const Landing = () => {
         />
         <div id="portals">
           <PortalComparisonSection />
+        </div>
+        <div id="vs-competition">
+          <CompetitorComparisonSection />
         </div>
         <div id="integrations">
           <IntegrationsSection />
