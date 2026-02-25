@@ -821,6 +821,20 @@ export const fr = {
     configRequired: 'Configuration Requise',
     configMessage: 'Veuillez configurer au moins un agent ElevenLabs.',
     loadingError: 'Erreur lors du chargement des analytics',
+    funnel: {
+      title: 'Funnel de conversation',
+      total: 'Total',
+      engaged: 'Engagées',
+      resolved: 'Résolues',
+      satisfied: 'Satisfaites',
+    },
+    tagDistribution: {
+      title: 'Distribution des tags',
+      empty: 'Aucun tag utilisé pour la période.',
+    },
+    peakHours: {
+      title: 'Heures de pointe',
+    },
   },
 
   // Agents
@@ -2744,5 +2758,42 @@ export const fr = {
     ctaButton: 'Réserver une démo gratuite',
     ctaSecondary: 'Démarrer l\'essai gratuit',
     ctaFootnote: 'Sans carte de crédit · Mise en place en minutes',
+  },
+
+  whatsNew: {
+    badge: 'Nouveautés',
+    title: 'Les dernières fonctionnalités',
+    subtitle: 'Découvrez les nouvelles capacités qui rendent votre plateforme encore plus puissante.',
+    rbac: {
+      title: 'Contrôle d\'accès par rôle (RBAC)',
+      description: 'Sécurité renforcée avec gestion fine des permissions par rôle.',
+      detail: 'Gérez visuellement qui peut accéder à quoi grâce à une matrice interactive rôles × permissions. Chaque modification est journalisée et appliquée instantanément côté serveur.',
+    },
+    customTags: {
+      title: 'Tags personnalisés',
+      description: 'Organisez vos conversations avec des tags sur mesure.',
+      detail: 'Créez des tags colorés propres à votre organisation, appliquez-les en un clic sur n\'importe quelle conversation, et filtrez instantanément par tag pour retrouver ce qui compte.',
+    },
+    dataView: {
+      title: 'Vue données',
+      description: 'Navigation simplifiée avec filtres prédéfinis.',
+      detail: 'Passez d\'une vue à l\'autre en un clic : non résolues, sentiment négatif, cette semaine, durée élevée, ou conversations taguées. Chaque preset applique les bons filtres automatiquement.',
+    },
+    embedded: {
+      title: 'Iframe intégré & Analytics étendus',
+      description: 'Insights approfondis et intégration transparente.',
+      detail: 'Intégrez le widget vocal sur n\'importe quel site via iframe, et explorez de nouveaux graphiques : funnel de conversion, distribution des tags, et heatmap des heures de pointe.',
+    },
+  },
+
+  dataView: {
+    presets: {
+      all: 'Tout',
+      unresolved: 'Non résolues',
+      negative: 'Négatif',
+      thisWeek: 'Cette semaine',
+      highDuration: 'Longues',
+      tagged: 'Taguées',
+    },
   },
 };

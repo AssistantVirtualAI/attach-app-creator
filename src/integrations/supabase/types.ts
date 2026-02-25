@@ -1268,6 +1268,42 @@ export type Database = {
           },
         ]
       }
+      conversation_tags: {
+        Row: {
+          conversation_id: string
+          tag_id: string
+          tagged_at: string
+          tagged_by: string | null
+        }
+        Insert: {
+          conversation_id: string
+          tag_id: string
+          tagged_at?: string
+          tagged_by?: string | null
+        }
+        Update: {
+          conversation_id?: string
+          tag_id?: string
+          tagged_at?: string
+          tagged_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_tags_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "custom_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_topics: {
         Row: {
           analyzed_at: string
@@ -1429,6 +1465,44 @@ export type Database = {
           },
           {
             foreignKeyName: "conversations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_tags: {
+        Row: {
+          color: string
+          created_at: string
+          created_by: string | null
+          icon: string | null
+          id: string
+          name: string
+          organization_id: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          organization_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_tags_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
