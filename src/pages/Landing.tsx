@@ -22,6 +22,7 @@ import { SectionDivider } from "@/components/landing/SectionDivider";
 import { LiveDemoSection } from "@/components/landing/LiveDemoSection";
 import { AIForCompaniesSection } from "@/components/landing/AIForCompaniesSection";
 import { CompetitorComparisonSection } from "@/components/landing/CompetitorComparisonSection";
+import { WhatsNewSection } from "@/components/landing/WhatsNewSection";
 import { useTranslation } from "@/hooks/useTranslation";
 
 const Landing = () => {
@@ -66,6 +67,9 @@ const Landing = () => {
         </div>
         <div id="features">
           <FeaturesSection />
+        </div>
+        <div id="whats-new">
+          <WhatsNewSection />
         </div>
         <SectionDivider variant="pulse" />
         <div id="live-demo">

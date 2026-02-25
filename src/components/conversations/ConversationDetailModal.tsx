@@ -10,6 +10,7 @@ import { SentimentTimeline } from './SentimentTimeline';
 import { ImprovementsList } from './ImprovementCard';
 import { SatisfactionScore, SatisfactionBadge } from './SatisfactionScore';
 import { SmartTagsList } from './SmartTags';
+import { CustomTagPicker } from './CustomTagPicker';
 import { useConversationDetails } from '@/hooks/useConversationDetails';
 import { useEnhancedConversationAnalysis } from '@/hooks/useEnhancedConversationAnalysis';
 import { ConversationCardSkeleton } from '@/components/LoadingSkeleton';
@@ -427,6 +428,19 @@ export function ConversationDetailModal({
                       </CardContent>
                     </Card>
                   )}
+
+                  {/* Custom Tags */}
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Tag className="w-5 h-5 text-primary" />
+                        Tags
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <CustomTagPicker conversationId={conversationId} />
+                    </CardContent>
+                  </Card>
 
                   {/* Smart Tags */}
                   {(analysis as any).smart_tags && (analysis as any).smart_tags.length > 0 && (

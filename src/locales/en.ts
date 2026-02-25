@@ -824,6 +824,20 @@ export const en = {
     configRequired: 'Configuration Required',
     configMessage: 'Please configure at least one ElevenLabs agent.',
     loadingError: 'Error loading analytics',
+    funnel: {
+      title: 'Conversation Funnel',
+      total: 'Total',
+      engaged: 'Engaged',
+      resolved: 'Resolved',
+      satisfied: 'Satisfied',
+    },
+    tagDistribution: {
+      title: 'Tag Distribution',
+      empty: 'No tags used for this period.',
+    },
+    peakHours: {
+      title: 'Peak Hours',
+    },
   },
 
   // Agents
@@ -2746,6 +2760,43 @@ export const en = {
       title: 'Legal & Pro Services',
       desc: 'Book consultations on autopilot, answer FAQs and qualify prospects around the clock.',
       statLabel: 'more booked consultations',
+    },
+  },
+
+  whatsNew: {
+    badge: "What's New",
+    title: 'Latest Features',
+    subtitle: 'Discover the new capabilities that make your platform even more powerful.',
+    rbac: {
+      title: 'Role-Based Access Control (RBAC)',
+      description: 'Enhanced security with fine-grained permission management.',
+      detail: 'Visually manage who can access what with an interactive roles × permissions matrix. Every change is audit-logged and enforced server-side instantly.',
+    },
+    customTags: {
+      title: 'Custom Tags',
+      description: 'Organize your conversations with custom tags.',
+      detail: 'Create color-coded tags unique to your organization, apply them to any conversation in one click, and filter instantly by tag to find what matters.',
+    },
+    dataView: {
+      title: 'Data View',
+      description: 'Streamlined navigation with preset filters.',
+      detail: 'Switch between views in one click: unresolved, negative sentiment, this week, high duration, or tagged conversations. Each preset applies the right filters automatically.',
+    },
+    embedded: {
+      title: 'Embedded Iframe & Expanded Analytics',
+      description: 'Deeper insights and more seamless integration.',
+      detail: 'Embed the voice widget on any website via iframe, and explore new charts: conversation funnel, tag distribution, and peak hours heatmap.',
+    },
+  },
+
+  dataView: {
+    presets: {
+      all: 'All',
+      unresolved: 'Unresolved',
+      negative: 'Negative',
+      thisWeek: 'This Week',
+      highDuration: 'Long',
+      tagged: 'Tagged',
     },
   },
 };
