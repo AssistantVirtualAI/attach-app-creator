@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortal, PortalProvider } from '@/hooks/usePortalAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, AlertTriangle, Globe } from 'lucide-react';
+import { Loader2, AlertTriangle, Globe, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AvaLogo } from '@/components/shared/AvaLogo';
 import { AnimatedFeatures } from '@/components/auth/AnimatedFeatures';
@@ -72,6 +72,18 @@ const UniversalLoginContent = () => {
 
       {/* Left side - Login form */}
       <div className="flex-1 flex items-center justify-center p-8 relative z-10">
+        {/* Back to home */}
+        <Link to="/">
+          <motion.button
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute top-6 left-6 flex items-center gap-2 px-3 py-2 rounded-full bg-card/60 backdrop-blur-sm border border-border/30 hover:border-primary/50 transition-all text-sm font-medium"
+          >
+            <Home className="h-4 w-4 text-primary" />
+            <span>{t('auth.buttons.backToHome')}</span>
+          </motion.button>
+        </Link>
+
         {/* Language toggle */}
         <motion.button
           initial={{ opacity: 0, y: -10 }}
