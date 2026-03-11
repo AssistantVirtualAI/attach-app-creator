@@ -72,7 +72,7 @@ export function AvaLogo({ size = 'md', animated = true, showText = true, classNa
             transition={{ delay: 0.2 }}
             className={cn(
               sizes.text,
-              'font-black tracking-tight bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent'
+              'font-black tracking-tight text-[#8B5CF6]'
             )}
           >
             AVA
@@ -83,7 +83,7 @@ export function AvaLogo({ size = 'md', animated = true, showText = true, classNa
             transition={{ delay: 0.3 }}
             className={cn(
               sizes.subtitle,
-              'font-medium tracking-widest uppercase -mt-1 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent'
+              'font-medium tracking-widest uppercase -mt-1 text-[#8B5CF6]'
             )}
           >
             Statistics
