@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortal, PortalProvider } from '@/hooks/usePortalAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, AlertTriangle, Globe } from 'lucide-react';
+import { Loader2, AlertTriangle, Globe, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AvaLogo } from '@/components/shared/AvaLogo';
 import { AnimatedFeatures } from '@/components/auth/AnimatedFeatures';
