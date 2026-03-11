@@ -55,8 +55,8 @@ export const InteractiveSlideshow = ({
   };
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    let progressInterval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
+    let progressInterval: ReturnType<typeof setInterval>;
 
     if (isPlaying) {
       progressInterval = setInterval(() => {

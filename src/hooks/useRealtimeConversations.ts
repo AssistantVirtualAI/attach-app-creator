@@ -45,7 +45,7 @@ export const useRealtimeConversations = () => {
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
   const [agentCount, setAgentCount] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast } = useToast();
 
   const connect = useCallback(async () => {
