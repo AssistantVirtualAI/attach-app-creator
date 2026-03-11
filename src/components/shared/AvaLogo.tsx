@@ -60,7 +60,7 @@ export function AvaLogo({ size = 'md', animated = true, showText = true, classNa
         <img
           src={logoImage}
           alt="AVA Statistics"
-          className={cn(sizes.icon, 'object-contain')}
+          className={cn(sizes.icon, 'object-cover')}
         />
       </motion.div>
 
