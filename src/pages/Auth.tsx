@@ -139,6 +139,18 @@ const AuthPage = () => {
           <span>{language === 'fr' ? 'EN' : 'FR'}</span>
         </motion.button>
 
+        {/* Back to landing */}
+        <Link to="/">
+          <motion.button
+            className="absolute top-6 left-6 flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-sm font-medium text-muted-foreground hover:text-foreground"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Home className="w-4 h-4" />
+            <span>{t('auth.buttons.backToHome') || 'Accueil'}</span>
+          </motion.button>
+        </Link>
+
         <div className="w-full max-w-md space-y-8">
           {/* Logo */}
           <motion.div 
