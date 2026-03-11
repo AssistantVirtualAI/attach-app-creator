@@ -1847,6 +1847,7 @@ export const en = {
       noAccount: "Don't have an account? Sign up",
       hasAccount: 'Already have an account? Sign in',
       backToLogin: 'Back to login',
+      backToHome: 'Home',
       sendLink: 'Send link',
       cancel: 'Cancel',
       loading: 'Loading...',

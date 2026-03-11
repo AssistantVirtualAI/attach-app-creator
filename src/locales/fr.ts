@@ -1844,6 +1844,7 @@ export const fr = {
       noAccount: "Pas encore de compte ? S'inscrire",
       hasAccount: 'Déjà un compte ? Se connecter',
       backToLogin: 'Retour à la connexion',
+      backToHome: 'Accueil',
       sendLink: 'Envoyer le lien',
       cancel: 'Annuler',
       loading: 'Chargement...',

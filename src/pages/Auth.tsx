@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Activity, Mail, Lock, User, ArrowLeft, Chrome, Globe } from 'lucide-react';
+import { Activity, Mail, Lock, User, ArrowLeft, Chrome, Globe, Home } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -138,6 +138,18 @@ const AuthPage = () => {
           <Globe className="w-4 h-4" />
           <span>{language === 'fr' ? 'EN' : 'FR'}</span>
         </motion.button>
+
+        {/* Back to landing */}
+        <Link to="/">
+          <motion.button
+            className="absolute top-6 left-6 flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-sm font-medium text-muted-foreground hover:text-foreground"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Home className="w-4 h-4" />
+            <span>{t('auth.buttons.backToHome') || 'Accueil'}</span>
+          </motion.button>
+        </Link>
 
         <div className="w-full max-w-md space-y-8">
           {/* Logo */}
