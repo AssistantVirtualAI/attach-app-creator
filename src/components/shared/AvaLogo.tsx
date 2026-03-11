@@ -12,21 +12,21 @@ interface AvaLogoProps {
 const sizeClasses = {
   sm: {
     container: 'h-8 gap-2',
-    icon: 'h-8 w-8',
+    icon: 'h-10 w-10',
     iconContainer: 'w-10 h-10',
     text: 'text-lg',
     subtitle: 'text-[8px]',
   },
   md: {
     container: 'h-10 gap-2.5',
-    icon: 'h-10 w-10',
+    icon: 'h-12 w-12',
     iconContainer: 'w-12 h-12',
     text: 'text-xl',
     subtitle: 'text-[10px]',
   },
   lg: {
     container: 'h-16 gap-3',
-    icon: 'h-14 w-14',
+    icon: 'h-16 w-16',
     iconContainer: 'w-16 h-16',
     text: 'text-3xl',
     subtitle: 'text-xs',
@@ -60,7 +60,7 @@ export function AvaLogo({ size = 'md', animated = true, showText = true, classNa
         <img
           src={logoImage}
           alt="AVA Statistics"
-          className={cn(sizes.icon, 'object-contain')}
+          className={cn(sizes.icon, 'object-cover')}
         />
       </motion.div>
 
