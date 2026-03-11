@@ -81,7 +81,10 @@ export function AvaLogo({ size = 'md', animated = true, showText = true, classNa
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.3 }}
-            className={cn(sizes.subtitle, 'font-medium text-muted-foreground tracking-widest uppercase -mt-1')}
+            className={cn(
+              sizes.subtitle,
+              'font-medium tracking-widest uppercase -mt-1 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent'
+            )}
           >
             Statistics
           </motion.span>
