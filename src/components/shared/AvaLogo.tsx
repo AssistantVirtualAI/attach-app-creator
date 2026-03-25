@@ -55,7 +55,7 @@ export function AvaLogo({ size = 'md', animated = true, showText = true, classNa
         variants={iconVariants}
         initial="initial"
         animate={animated ? 'animate' : 'initial'}
-        className={cn(sizes.iconContainer, 'overflow-hidden shadow-lg')}
+        className={cn(sizes.iconContainer, 'overflow-hidden')}
       >
         <img
           src={logoImage}
