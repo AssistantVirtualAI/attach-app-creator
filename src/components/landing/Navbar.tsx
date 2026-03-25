@@ -63,7 +63,7 @@ export const Navbar = () => {
       <div className="container mx-auto px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <AvaLogo size="sm" animated={false} showText={false} className="[&_div:first-child]:w-10 [&_div:first-child]:h-10 [&_img]:w-10 [&_img]:h-10" />
+          <AvaLogo size="sm" animated={false} showText={false} className="[&_div:first-child]:w-14 [&_div:first-child]:h-14 [&_img]:w-14 [&_img]:h-14" />
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-1">

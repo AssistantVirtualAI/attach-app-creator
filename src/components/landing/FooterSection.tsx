@@ -30,7 +30,7 @@ export const FooterSection = () => {
               viewport={{ once: true }}
               className="mb-6"
             >
-              <AvaLogo size="sm" animated={false} showText={false} className="[&_div:first-child]:w-14 [&_div:first-child]:h-14 [&_img]:w-14 [&_img]:h-14" />
+              <AvaLogo size="sm" animated={false} showText={false} className="[&_div:first-child]:w-20 [&_div:first-child]:h-20 [&_img]:w-20 [&_img]:h-20" />
             </motion.div>
             <p className="text-muted-foreground mb-6">
               {t('footer.description')}
