@@ -109,7 +109,7 @@ const UniversalLoginContent = () => {
                 transition={{ delay: 0.2 }}
                 className="mx-auto mb-4"
               >
-                <AvaLogo size="lg" animated />
+                <AvaLogo size="lg" animated showText={false} className="[&_div:first-child]:w-24 [&_div:first-child]:h-24 [&_img]:w-24 [&_img]:h-24" />
               </motion.div>
               <CardTitle className="text-2xl font-bold">
                 {t('auth.portalLogin')}
