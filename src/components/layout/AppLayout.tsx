@@ -80,7 +80,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           <Menu className="w-6 h-6 text-foreground" />
         </button>
         <Link to="/" className="ml-3">
-          <AvaLogo size="sm" animated={false} />
+          <AvaLogo size="sm" animated={false} showText={false} className="[&_div:first-child]:w-10 [&_div:first-child]:h-10 [&_img]:w-10 [&_img]:h-10" />
         </Link>
       </header>
 
@@ -100,7 +100,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           {/* Logo - AVA Statistics */}
           <div className="p-6 border-b border-sidebar-border flex items-center justify-between">
             <Link to="/" onClick={() => setIsSidebarOpen(false)}>
-              <AvaLogo size="md" animated={true} />
+              <AvaLogo size="lg" animated={true} showText={false} className="[&_div:first-child]:w-16 [&_div:first-child]:h-16 [&_img]:w-16 [&_img]:h-16" />
             </Link>
             <button
               onClick={() => setIsSidebarOpen(false)}
