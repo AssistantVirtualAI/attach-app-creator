@@ -80,7 +80,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           <Menu className="w-6 h-6 text-foreground" />
         </button>
         <Link to="/" className="ml-3">
-          <AvaLogo size="sm" animated={false} />
+          <AvaLogo size="sm" animated={false} showText={false} className="[&_div:first-child]:w-10 [&_div:first-child]:h-10 [&_img]:w-10 [&_img]:h-10" />
         </Link>
       </header>
 
