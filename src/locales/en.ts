@@ -2765,28 +2765,48 @@ export const en = {
   },
 
   whatsNew: {
-    badge: "What's New",
-    title: 'Latest Features',
-    subtitle: 'Discover the new capabilities that make your platform even more powerful.',
-    rbac: {
-      title: 'Role-Based Access Control (RBAC)',
-      description: 'Enhanced security with fine-grained permission management.',
-      detail: 'Visually manage who can access what with an interactive roles × permissions matrix. Every change is audit-logged and enforced server-side instantly.',
+    badge: "What's New — April 2026",
+    title: 'Unified Analytics, Conversations & More',
+    subtitle: 'Discover the latest features that make your platform even more powerful.',
+    unifiedAnalytics: {
+      title: 'Consolidated Analytics & Conversations',
+      description: 'View all agents in one place — no more switching.',
+      detail: 'View analytics and conversations across all your agents in one unified dashboard. Disabled by default, enable it per client in access controls.',
     },
-    customTags: {
-      title: 'Custom Tags',
-      description: 'Organize your conversations with custom tags.',
-      detail: 'Create color-coded tags unique to your organization, apply them to any conversation in one click, and filter instantly by tag to find what matters.',
+    rememberMe: {
+      title: 'Remember Me (30-Day Login)',
+      description: 'Stay signed in for 30 days with one checkbox.',
+      detail: 'Check "Remember Me" at login to stay signed in for 30 days without needing to log back in. Available for both agencies and clients.',
     },
-    dataView: {
-      title: 'Data View',
-      description: 'Streamlined navigation with preset filters.',
-      detail: 'Switch between views in one click: unresolved, negative sentiment, this week, high duration, or tagged conversations. Each preset applies the right filters automatically.',
+    afterHours: {
+      title: 'After-Hours Call Tracking',
+      description: 'Automatically tag calls outside business hours.',
+      detail: 'Set your client\'s business hours (start/end time, days of the week, and timezone). Every incoming call is automatically tagged as after-hours or not — build analytics charts to see exactly how many calls came in outside of business hours.',
     },
-    embedded: {
-      title: 'Embedded Iframe & Expanded Analytics',
-      description: 'Deeper insights and more seamless integration.',
-      detail: 'Embed the voice widget on any website via iframe, and explore new charts: conversation funnel, tag distribution, and peak hours heatmap.',
+    revenueMultiplier: {
+      title: 'Revenue Multiplier for Custom Metrics',
+      description: 'Turn call counts into pipeline revenue values.',
+      detail: 'Enable "Show as Revenue Metric" on number charts and set a value per unit (USD or EUR). The chart automatically multiplies the count by that value — e.g., 47 booked calls × $100 = $4,700 in pipeline value.',
+    },
+    dragDrop: {
+      title: 'Custom Menu Drag & Drop',
+      description: 'Rearrange sidebar items by dragging them.',
+      detail: 'Rearrange your custom sidebar menu items by dragging and dropping them into any order you want. Changes are saved instantly.',
+    },
+    bulkDelete: {
+      title: 'Bulk Delete Conversations',
+      description: 'Select multiple conversations and delete them at once.',
+      detail: 'Select multiple conversations in the table and delete them all at once — saving time when cleaning up old or test data.',
+    },
+    freeTrial: {
+      title: 'Free Trial for Client Billing',
+      description: 'Offer trial periods when creating subscriptions.',
+      detail: 'You can now offer a free trial period when creating a subscription for a client. Great for onboarding new customers risk-free.',
+    },
+    callEnded: {
+      title: 'Call Ended Reason & Transfer Rate',
+      description: 'New analytics for ElevenLabs agents.',
+      detail: 'Call ended reason and call transfer rate are now tracked and visible in analytics for ElevenLabs agents. These charts are disabled by default and can be enabled in client access.',
     },
   },
 

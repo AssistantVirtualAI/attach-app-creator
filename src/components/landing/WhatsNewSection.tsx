@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Tag, LayoutList, BarChart3 } from 'lucide-react';
+import { BarChart3, Clock, DollarSign, GripVertical, Trash2, Gift, PhoneOff, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
 
 const FEATURES = [
-  { key: 'rbac', icon: Shield, gradient: 'from-indigo-500 to-purple-600' },
-  { key: 'customTags', icon: Tag, gradient: 'from-pink-500 to-rose-600' },
-  { key: 'dataView', icon: LayoutList, gradient: 'from-emerald-500 to-teal-600' },
-  { key: 'embedded', icon: BarChart3, gradient: 'from-amber-500 to-orange-600' },
+  { key: 'unifiedAnalytics', icon: BarChart3, gradient: 'from-indigo-500 to-purple-600' },
+  { key: 'rememberMe', icon: Users, gradient: 'from-pink-500 to-rose-600' },
+  { key: 'afterHours', icon: Clock, gradient: 'from-emerald-500 to-teal-600' },
+  { key: 'revenueMultiplier', icon: DollarSign, gradient: 'from-amber-500 to-orange-600' },
+  { key: 'dragDrop', icon: GripVertical, gradient: 'from-cyan-500 to-blue-600' },
+  { key: 'bulkDelete', icon: Trash2, gradient: 'from-red-500 to-rose-600' },
+  { key: 'freeTrial', icon: Gift, gradient: 'from-violet-500 to-purple-600' },
+  { key: 'callEnded', icon: PhoneOff, gradient: 'from-orange-500 to-red-600' },
 ] as const;
 
 export function WhatsNewSection() {
@@ -25,7 +29,6 @@ export function WhatsNewSection() {
 
   return (
     <section className="py-20 px-4 relative overflow-hidden">
-      {/* Background glow */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent pointer-events-none" />
 
       <div className="container mx-auto max-w-6xl relative z-10">
@@ -41,8 +44,8 @@ export function WhatsNewSection() {
           </p>
         </div>
 
-        {/* Feature cards */}
-        <div className="grid md:grid-cols-4 gap-4">
+        {/* Feature cards - 2 rows of 4 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {FEATURES.map((feat, idx) => {
             const Icon = feat.icon;
             const isActive = idx === active;
@@ -52,7 +55,7 @@ export function WhatsNewSection() {
                 key={feat.key}
                 onClick={() => setActive(idx)}
                 className={cn(
-                  'relative text-left p-6 rounded-2xl border transition-all duration-300',
+                  'relative text-left p-5 rounded-2xl border transition-all duration-300',
                   'bg-card/50 backdrop-blur-sm hover:bg-card/80',
                   isActive
                     ? 'border-primary/40 shadow-lg shadow-primary/10 scale-[1.02]'
@@ -60,7 +63,6 @@ export function WhatsNewSection() {
                 )}
                 whileHover={{ y: -2 }}
               >
-                {/* Progress bar for auto-cycle */}
                 {isActive && (
                   <motion.div
                     className="absolute top-0 left-0 h-0.5 bg-primary rounded-t-2xl"
@@ -71,16 +73,16 @@ export function WhatsNewSection() {
                 )}
 
                 <div className={cn(
-                  'w-10 h-10 rounded-xl flex items-center justify-center mb-4 bg-gradient-to-br',
+                  'w-9 h-9 rounded-xl flex items-center justify-center mb-3 bg-gradient-to-br',
                   feat.gradient,
                 )}>
-                  <Icon className="h-5 w-5 text-white" />
+                  <Icon className="h-4 w-4 text-white" />
                 </div>
 
-                <h3 className="font-semibold text-sm mb-2">
+                <h3 className="font-semibold text-sm mb-1.5">
                   {t(`whatsNew.${feat.key}.title`)}
                 </h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">
+                <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
                   {t(`whatsNew.${feat.key}.description`)}
                 </p>
               </motion.button>
