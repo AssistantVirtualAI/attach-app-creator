@@ -97,12 +97,21 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Debug: log sidebar visibility info
   console.log('[Sidebar Debug] Role:', role, 'isSuperAdmin:', isSuperAdmin, 'isLoading:', isLoading, 'userRole:', userRole);
 
+  // Filter groups based on role
+  const visibleGroups = useMemo(() => sidebarGroups.filter(group => {
+    if (group.superAdminOnly) return !isLoading && isSuperAdmin;
+    if (group.adminOnly) {
+      if (isLoading) return true;
+      return role === 'org_admin' || role === 'manager' || isSuperAdmin;
+    }
+    return true;
+  }), [role, isSuperAdmin, isLoading]);
+
   // Sidebar group ordering with drag & drop
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
-
   const orderedGroups = useMemo(() => {
     const saved = getSavedOrder();
     if (!saved) return visibleGroups;
