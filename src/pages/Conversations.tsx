@@ -3,10 +3,11 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Clock, TrendingUp, TrendingDown, Minus,
   ChevronLeft, ChevronRight, Play, Sparkles, Search,
-  MessageCircle, Phone, User
+  MessageCircle, Phone, User, Trash2
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -28,13 +29,19 @@ import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { GlowBadge } from '@/components/portal/GlowBadge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLanguage } from '@/context/LanguageContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 const Conversations = () => {
   const { t } = useTranslation();
   const { language } = useLanguage();
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [filters, setFilters] = useState<Filters>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<{
     id: string;
     agentName: string;
