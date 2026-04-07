@@ -185,6 +185,7 @@ const Conversations = () => {
             conversations={data?.conversations || []} 
             filename="conversations"
           />
+          </div>
         </div>
 
         {/* Stats Cards */}
