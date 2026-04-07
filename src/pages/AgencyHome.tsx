@@ -38,6 +38,7 @@ import {
   AlertTitle,
 } from "@/components/ui/alert";
 import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
+import { WhatsNewModal } from "@/components/dashboard/WhatsNewModal";
 import { motion } from "framer-motion";
 import { SimpleAnimatedCounter } from "@/components/ui/animated-counter";
 import { useClientsMetrics } from "@/hooks/useClientsMetrics";
@@ -193,6 +194,7 @@ const AgencyHome = () => {
   return (
     <AppLayout>
       <WelcomeModal />
+      <WhatsNewModal />
       <motion.div 
         className="container mx-auto px-6 py-8 space-y-8"
         variants={containerVariants}

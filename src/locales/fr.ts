@@ -2762,28 +2762,48 @@ export const fr = {
   },
 
   whatsNew: {
-    badge: 'Nouveautés',
-    title: 'Les dernières fonctionnalités',
-    subtitle: 'Découvrez les nouvelles capacités qui rendent votre plateforme encore plus puissante.',
-    rbac: {
-      title: 'Contrôle d\'accès par rôle (RBAC)',
-      description: 'Sécurité renforcée avec gestion fine des permissions par rôle.',
-      detail: 'Gérez visuellement qui peut accéder à quoi grâce à une matrice interactive rôles × permissions. Chaque modification est journalisée et appliquée instantanément côté serveur.',
+    badge: 'Nouveautés — Avril 2026',
+    title: 'Analytics unifiés, Conversations et plus',
+    subtitle: 'Découvrez les dernières fonctionnalités qui rendent votre plateforme encore plus puissante.',
+    unifiedAnalytics: {
+      title: 'Analytics & Conversations consolidés',
+      description: 'Visualisez tous vos agents en un seul endroit.',
+      detail: 'Consultez les analytics et conversations de tous vos agents dans un tableau de bord unifié. Désactivé par défaut, activable par client dans les contrôles d\'accès.',
     },
-    customTags: {
-      title: 'Tags personnalisés',
-      description: 'Organisez vos conversations avec des tags sur mesure.',
-      detail: 'Créez des tags colorés propres à votre organisation, appliquez-les en un clic sur n\'importe quelle conversation, et filtrez instantanément par tag pour retrouver ce qui compte.',
+    rememberMe: {
+      title: 'Se souvenir de moi (30 jours)',
+      description: 'Restez connecté 30 jours en un clic.',
+      detail: 'Cochez « Se souvenir de moi » à la connexion pour rester connecté 30 jours sans avoir à vous reconnecter. Disponible pour les agences et les clients.',
     },
-    dataView: {
-      title: 'Vue données',
-      description: 'Navigation simplifiée avec filtres prédéfinis.',
-      detail: 'Passez d\'une vue à l\'autre en un clic : non résolues, sentiment négatif, cette semaine, durée élevée, ou conversations taguées. Chaque preset applique les bons filtres automatiquement.',
+    afterHours: {
+      title: 'Suivi des appels hors horaires',
+      description: 'Taguez automatiquement les appels hors horaires.',
+      detail: 'Configurez les horaires d\'ouverture de votre client (heure de début/fin, jours de la semaine, fuseau horaire). Chaque appel entrant est automatiquement tagué comme hors horaires ou non — créez des graphiques analytics pour voir exactement combien d\'appels sont arrivés en dehors des heures d\'ouverture.',
     },
-    embedded: {
-      title: 'Iframe intégré & Analytics étendus',
-      description: 'Insights approfondis et intégration transparente.',
-      detail: 'Intégrez le widget vocal sur n\'importe quel site via iframe, et explorez de nouveaux graphiques : funnel de conversion, distribution des tags, et heatmap des heures de pointe.',
+    revenueMultiplier: {
+      title: 'Multiplicateur de revenus',
+      description: 'Transformez les compteurs en valeurs de revenus.',
+      detail: 'Activez « Afficher comme métrique de revenu » sur les graphiques numériques et définissez une valeur par unité (USD ou EUR). Le graphique multiplie automatiquement le compteur par cette valeur — ex. : 47 appels réservés × 100 $ = 4 700 $ en pipeline.',
+    },
+    dragDrop: {
+      title: 'Menu personnalisé Drag & Drop',
+      description: 'Réorganisez les éléments du menu par glisser-déposer.',
+      detail: 'Réorganisez les éléments de votre menu latéral personnalisé en les glissant-déposant dans l\'ordre souhaité. Les modifications sont enregistrées instantanément.',
+    },
+    bulkDelete: {
+      title: 'Suppression groupée de conversations',
+      description: 'Sélectionnez et supprimez plusieurs conversations d\'un coup.',
+      detail: 'Sélectionnez plusieurs conversations dans le tableau et supprimez-les toutes en une fois — un gain de temps pour le nettoyage des données de test.',
+    },
+    freeTrial: {
+      title: 'Essai gratuit pour la facturation client',
+      description: 'Offrez des périodes d\'essai lors de la création d\'abonnements.',
+      detail: 'Vous pouvez désormais offrir une période d\'essai gratuite lors de la création d\'un abonnement pour un client. Idéal pour l\'intégration de nouveaux clients sans risque.',
+    },
+    callEnded: {
+      title: 'Raison de fin d\'appel & Taux de transfert',
+      description: 'Nouvelles analytics pour les agents ElevenLabs.',
+      detail: 'La raison de fin d\'appel et le taux de transfert sont désormais suivis et visibles dans les analytics pour les agents ElevenLabs. Ces graphiques sont désactivés par défaut et peuvent être activés dans les contrôles d\'accès client.',
     },
   },
 
