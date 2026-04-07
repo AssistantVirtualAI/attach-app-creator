@@ -307,6 +307,13 @@ const Conversations = () => {
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-4">
+                        {/* Selection Checkbox */}
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(conversation.conversation_id)}
+                            onCheckedChange={() => toggleSelect(conversation.conversation_id)}
+                          />
+                        </div>
                         {/* Avatar */}
                         <div className="relative">
                           <div className="absolute inset-0 bg-gradient-to-r from-primary to-secondary rounded-full blur opacity-40 group-hover:opacity-60 transition-opacity" />
