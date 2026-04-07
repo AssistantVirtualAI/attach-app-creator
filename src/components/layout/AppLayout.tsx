@@ -73,13 +73,6 @@ function SortableNavGroup({ group, onNavigate }: { group: NavGroup; onNavigate: 
     </div>
   );
 }
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 
 interface AppLayoutProps {
   children: ReactNode;
