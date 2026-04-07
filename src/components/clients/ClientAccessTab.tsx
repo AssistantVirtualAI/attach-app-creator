@@ -106,10 +106,14 @@ export const ClientAccessTab = ({ client, onUpdate, isUpdating, hasPassword = fa
 
   useEffect(() => {
     if (client.access_controls) {
+      const ac = client.access_controls as any;
       setControls((prev) => ({
         ...prev,
-        ...client.access_controls,
+        ...ac,
       }));
+      if (ac.business_hours) {
+        setBusinessHours((prev) => ({ ...prev, ...ac.business_hours }));
+      }
     }
   }, [client.access_controls]);
 
@@ -121,7 +125,12 @@ export const ClientAccessTab = ({ client, onUpdate, isUpdating, hasPassword = fa
   };
 
   const handleSave = () => {
-    onUpdate({ access_controls: controls });
+    onUpdate({ 
+      access_controls: {
+        ...controls,
+        business_hours: controls.after_hours_tracking ? businessHours : undefined,
+      } as any,
+    });
   };
 
   const enabledCount = Object.values(controls).filter(Boolean).length;
