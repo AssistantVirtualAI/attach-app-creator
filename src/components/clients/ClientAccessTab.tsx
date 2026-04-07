@@ -91,6 +91,17 @@ export const ClientAccessTab = ({ client, onUpdate, isUpdating, hasPassword = fa
     can_view_knowledge_base: true,
     can_export_data: false,
     can_manage_agents: false,
+    unified_analytics: false,
+    after_hours_tracking: false,
+    elevenlabs_call_ended_reason: false,
+    elevenlabs_transfer_rate: false,
+  });
+
+  const [businessHours, setBusinessHours] = useState({
+    start_time: '09:00',
+    end_time: '18:00',
+    days: ['mon', 'tue', 'wed', 'thu', 'fri'] as string[],
+    timezone: 'Europe/Paris',
   });
 
   useEffect(() => {
