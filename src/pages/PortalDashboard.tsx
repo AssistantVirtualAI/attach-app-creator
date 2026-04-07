@@ -78,6 +78,8 @@ const PortalDashboard = () => {
   ];
 
   return (
+    <>
+    <WhatsNewModal />
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-8">
       {/* Hero Section */}
       <motion.div variants={itemVariants} className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/20 via-purple-500/15 to-pink-500/20 p-8 md:p-10 border border-primary/20">
