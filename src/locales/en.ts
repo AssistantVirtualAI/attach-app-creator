@@ -942,6 +942,12 @@ export const en = {
   conversations: {
     title: 'Conversations',
     description: '{total} conversations total • {agents} agents',
+    bulkDelete: {
+      button: 'Delete ({count})',
+      success: '{count} conversations deleted',
+      selected: 'selected',
+      selectAll: 'Select all',
+    },
     allConversations: 'All conversations from your voice agents',
     stats: {
       total: 'Total',
