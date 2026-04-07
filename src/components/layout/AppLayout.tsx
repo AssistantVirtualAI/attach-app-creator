@@ -244,13 +244,17 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-            {visibleGroups.map((group) => (
-              <SidebarNavGroup
-                key={group.id}
-                group={group}
-                onNavigate={() => setIsSidebarOpen(false)}
-              />
-            ))}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={groupOrder} strategy={verticalListSortingStrategy}>
+                {sortedGroups.map((group) => (
+                  <SortableNavGroup
+                    key={group.id}
+                    group={group}
+                    onNavigate={() => setIsSidebarOpen(false)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
             
             {/* Settings link - always visible */}
             <Link
