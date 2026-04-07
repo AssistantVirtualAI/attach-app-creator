@@ -9,6 +9,7 @@ import { AvaLogo } from '@/components/shared/AvaLogo';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
+import { WhatsNewModal } from '@/components/dashboard/WhatsNewModal';
 
 const PortalDashboard = () => {
   const { t, language } = useTranslation();
