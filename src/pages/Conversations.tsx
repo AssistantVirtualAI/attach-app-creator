@@ -103,6 +103,42 @@ const Conversations = () => {
     setPage(1);
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!data?.conversations) return;
+    if (selectedIds.size === data.conversations.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(data.conversations.map((c: any) => c.conversation_id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .delete()
+        .in('external_id', Array.from(selectedIds));
+      if (error) throw error;
+      toast.success(t('conversations.bulkDelete.success')?.replace('{count}', String(selectedIds.size)) || `${selectedIds.size} conversations supprimées`);
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['all-agents-conversations'] });
+    } catch (err: any) {
+      toast.error(err.message || 'Erreur lors de la suppression');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Show setup message if no agents configured
   if (data?.requiresSetup) {
     return (
@@ -132,7 +168,20 @@ const Conversations = () => {
             description={t('conversations.description').replace('{total}', String(data?.total || 0)).replace('{agents}', String(data?.agents?.length || 0))}
             icon={MessageCircle}
           />
-          <ConversationExport 
+          <div className="flex items-center gap-2">
+            {selectedIds.size > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBulkDelete}
+                disabled={isDeleting}
+                className="gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                {t('conversations.bulkDelete.button')?.replace('{count}', String(selectedIds.size)) || `Supprimer (${selectedIds.size})`}
+              </Button>
+            )}
+            <ConversationExport
             conversations={data?.conversations || []} 
             filename="conversations"
           />
