@@ -97,25 +97,46 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Debug: log sidebar visibility info
   console.log('[Sidebar Debug] Role:', role, 'isSuperAdmin:', isSuperAdmin, 'isLoading:', isLoading, 'userRole:', userRole);
 
-  // Filter groups based on role - show adminOnly groups for admins and managers
-  // During loading, show all groups to prevent flash of missing items
-  const visibleGroups = sidebarGroups.filter(group => {
-    // Super admin only groups
-    if (group.superAdminOnly) {
-      if (isLoading) return false; // Don't show during loading
-      return isSuperAdmin;
+  // Sidebar group ordering with drag & drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const orderedGroups = useMemo(() => {
+    const saved = getSavedOrder();
+    if (!saved) return visibleGroups;
+    const ordered: typeof visibleGroups = [];
+    saved.forEach(id => {
+      const g = visibleGroups.find(g => g.id === id);
+      if (g) ordered.push(g);
+    });
+    visibleGroups.forEach(g => {
+      if (!ordered.find(o => o.id === g.id)) ordered.push(g);
+    });
+    return ordered;
+  }, [visibleGroups]);
+
+  const [groupOrder, setGroupOrder] = useState(orderedGroups.map(g => g.id));
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setGroupOrder(prev => {
+        const oldIndex = prev.indexOf(active.id as string);
+        const newIndex = prev.indexOf(over.id as string);
+        const newOrder = arrayMove(prev, oldIndex, newIndex);
+        saveOrder(newOrder);
+        return newOrder;
+      });
     }
-    
-    if (group.adminOnly) {
-      // During loading, show adminOnly groups (they'll be hidden if user doesn't have access after load)
-      if (isLoading) return true;
-      // Show adminOnly groups only for org_admin, manager, super_admin
-      const isVisible = role === 'org_admin' || role === 'manager' || isSuperAdmin;
-      console.log(`[Sidebar Debug] Group "${group.labelKey}" adminOnly=${group.adminOnly}, visible=${isVisible}`);
-      return isVisible;
-    }
-    return true;
-  });
+  }, []);
+
+  const sortedGroups = useMemo(() => {
+    return groupOrder
+      .map(id => orderedGroups.find(g => g.id === id))
+      .filter(Boolean) as typeof orderedGroups;
+  }, [groupOrder, orderedGroups]);
 
   const isSettingsActive = location.pathname === settingsLink.href;
   const SettingsIcon = settingsLink.icon;
