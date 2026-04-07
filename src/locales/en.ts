@@ -1816,6 +1816,7 @@ export const en = {
   
   // Auth
   auth: {
+    rememberMe: 'Remember me (30 days)',
     login: 'Login',
     signup: 'Create an account',
     resetPassword: 'New password',

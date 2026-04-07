@@ -1813,6 +1813,7 @@ export const fr = {
   
   // Auth
   auth: {
+    rememberMe: 'Se souvenir de moi (30 jours)',
     login: 'Connexion',
     signup: 'Créer un compte',
     resetPassword: 'Nouveau mot de passe',
