@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Shield, Save, Eye, BarChart3, BookOpen, Download, Bot } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Shield, Save, Eye, BarChart3, BookOpen, Download, Bot, Layers, Clock, PhoneOff, TrendingUp } from 'lucide-react';
 import { ClientDetail } from '@/hooks/useClientDetail';
 import { ClientPasswordReset } from './ClientPasswordReset';
 
@@ -12,6 +13,7 @@ interface AccessControl {
   label: string;
   description: string;
   icon: React.ReactNode;
+  section?: string;
 }
 
 const ACCESS_CONTROLS: AccessControl[] = [
@@ -44,6 +46,34 @@ const ACCESS_CONTROLS: AccessControl[] = [
     label: 'Gérer les agents',
     description: 'Configurer les agents assignés',
     icon: <Bot className="h-4 w-4" />,
+  },
+  {
+    key: 'unified_analytics',
+    label: 'Analytics & Conversations unifiés',
+    description: 'Voir les analytics et conversations de tous les agents en un seul tableau de bord',
+    icon: <Layers className="h-4 w-4" />,
+    section: 'new',
+  },
+  {
+    key: 'after_hours_tracking',
+    label: 'Suivi des appels hors horaires',
+    description: 'Taguer automatiquement les appels reçus en dehors des heures de bureau',
+    icon: <Clock className="h-4 w-4" />,
+    section: 'new',
+  },
+  {
+    key: 'elevenlabs_call_ended_reason',
+    label: 'Raison de fin d\'appel ElevenLabs',
+    description: 'Afficher la raison de fin d\'appel et le taux de transfert dans les analytics',
+    icon: <PhoneOff className="h-4 w-4" />,
+    section: 'new',
+  },
+  {
+    key: 'elevenlabs_transfer_rate',
+    label: 'Taux de transfert ElevenLabs',
+    description: 'Afficher le taux de transfert des appels dans les analytics',
+    icon: <TrendingUp className="h-4 w-4" />,
+    section: 'new',
   },
 ];
 
