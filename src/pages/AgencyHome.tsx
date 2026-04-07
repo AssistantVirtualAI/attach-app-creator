@@ -38,6 +38,7 @@ import {
   AlertTitle,
 } from "@/components/ui/alert";
 import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
+import { WhatsNewModal } from "@/components/dashboard/WhatsNewModal";
 import { motion } from "framer-motion";
 import { SimpleAnimatedCounter } from "@/components/ui/animated-counter";
 import { useClientsMetrics } from "@/hooks/useClientsMetrics";
