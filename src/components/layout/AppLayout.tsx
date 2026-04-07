@@ -1,6 +1,6 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useCallback, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Moon, Sun, Globe } from 'lucide-react';
+import { Menu, X, Moon, Sun, Globe, GripVertical } from 'lucide-react';
 import { AvaLogo } from '@/components/shared/AvaLogo';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,68 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { SidebarFooter } from '@/components/sidebar/SidebarFooter';
 import { SidebarNavGroup } from '@/components/sidebar/SidebarNavGroup';
-import { sidebarGroups, settingsLink } from '@/components/sidebar/sidebarConfig';
+import { sidebarGroups, settingsLink, NavGroup } from '@/components/sidebar/sidebarConfig';
 import { CookieConsentBanner } from '@/components/gdpr/CookieConsentBanner';
 import { motion } from 'framer-motion';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { NotificationsBell } from '@/components/notifications/NotificationsBell';
+
+const SIDEBAR_ORDER_KEY = 'sidebar-group-order';
+
+const getSavedOrder = (): string[] | null => {
+  try {
+    const stored = localStorage.getItem(SIDEBAR_ORDER_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch { return null; }
+};
+
+const saveOrder = (order: string[]) => {
+  localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(order));
+};
+
+function SortableNavGroup({ group, onNavigate }: { group: NavGroup; onNavigate: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative group/drag">
+      <div
+        className="absolute left-0 top-3 p-1 opacity-0 group-hover/drag:opacity-60 cursor-grab active:cursor-grabbing z-10 transition-opacity"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="w-3.5 h-3.5 text-muted-foreground" />
+      </div>
+      <SidebarNavGroup group={group} onNavigate={onNavigate} />
+    </div>
+  );
+}
 import {
   DropdownMenu,
   DropdownMenuContent,
