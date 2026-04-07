@@ -1,6 +1,6 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useCallback, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Moon, Sun, Globe } from 'lucide-react';
+import { Menu, X, Moon, Sun, Globe, GripVertical } from 'lucide-react';
 import { AvaLogo } from '@/components/shared/AvaLogo';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,68 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { SidebarFooter } from '@/components/sidebar/SidebarFooter';
 import { SidebarNavGroup } from '@/components/sidebar/SidebarNavGroup';
-import { sidebarGroups, settingsLink } from '@/components/sidebar/sidebarConfig';
+import { sidebarGroups, settingsLink, NavGroup } from '@/components/sidebar/sidebarConfig';
 import { CookieConsentBanner } from '@/components/gdpr/CookieConsentBanner';
 import { motion } from 'framer-motion';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { NotificationsBell } from '@/components/notifications/NotificationsBell';
+
+const SIDEBAR_ORDER_KEY = 'sidebar-group-order';
+
+const getSavedOrder = (): string[] | null => {
+  try {
+    const stored = localStorage.getItem(SIDEBAR_ORDER_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch { return null; }
+};
+
+const saveOrder = (order: string[]) => {
+  localStorage.setItem(SIDEBAR_ORDER_KEY, JSON.stringify(order));
+};
+
+function SortableNavGroup({ group, onNavigate }: { group: NavGroup; onNavigate: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="relative group/drag">
+      <div
+        className="absolute left-0 top-3 p-1 opacity-0 group-hover/drag:opacity-60 cursor-grab active:cursor-grabbing z-10 transition-opacity"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="w-3.5 h-3.5 text-muted-foreground" />
+      </div>
+      <SidebarNavGroup group={group} onNavigate={onNavigate} />
+    </div>
+  );
+}
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,25 +97,55 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Debug: log sidebar visibility info
   console.log('[Sidebar Debug] Role:', role, 'isSuperAdmin:', isSuperAdmin, 'isLoading:', isLoading, 'userRole:', userRole);
 
-  // Filter groups based on role - show adminOnly groups for admins and managers
-  // During loading, show all groups to prevent flash of missing items
-  const visibleGroups = sidebarGroups.filter(group => {
-    // Super admin only groups
-    if (group.superAdminOnly) {
-      if (isLoading) return false; // Don't show during loading
-      return isSuperAdmin;
-    }
-    
+  // Filter groups based on role
+  const visibleGroups = useMemo(() => sidebarGroups.filter(group => {
+    if (group.superAdminOnly) return !isLoading && isSuperAdmin;
     if (group.adminOnly) {
-      // During loading, show adminOnly groups (they'll be hidden if user doesn't have access after load)
       if (isLoading) return true;
-      // Show adminOnly groups only for org_admin, manager, super_admin
-      const isVisible = role === 'org_admin' || role === 'manager' || isSuperAdmin;
-      console.log(`[Sidebar Debug] Group "${group.labelKey}" adminOnly=${group.adminOnly}, visible=${isVisible}`);
-      return isVisible;
+      return role === 'org_admin' || role === 'manager' || isSuperAdmin;
     }
     return true;
-  });
+  }), [role, isSuperAdmin, isLoading]);
+
+  // Sidebar group ordering with drag & drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  const orderedGroups = useMemo(() => {
+    const saved = getSavedOrder();
+    if (!saved) return visibleGroups;
+    const ordered: typeof visibleGroups = [];
+    saved.forEach(id => {
+      const g = visibleGroups.find(g => g.id === id);
+      if (g) ordered.push(g);
+    });
+    visibleGroups.forEach(g => {
+      if (!ordered.find(o => o.id === g.id)) ordered.push(g);
+    });
+    return ordered;
+  }, [visibleGroups]);
+
+  const [groupOrder, setGroupOrder] = useState(orderedGroups.map(g => g.id));
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setGroupOrder(prev => {
+        const oldIndex = prev.indexOf(active.id as string);
+        const newIndex = prev.indexOf(over.id as string);
+        const newOrder = arrayMove(prev, oldIndex, newIndex);
+        saveOrder(newOrder);
+        return newOrder;
+      });
+    }
+  }, []);
+
+  const sortedGroups = useMemo(() => {
+    return groupOrder
+      .map(id => orderedGroups.find(g => g.id === id))
+      .filter(Boolean) as typeof orderedGroups;
+  }, [groupOrder, orderedGroups]);
 
   const isSettingsActive = location.pathname === settingsLink.href;
   const SettingsIcon = settingsLink.icon;
@@ -164,13 +253,17 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-            {visibleGroups.map((group) => (
-              <SidebarNavGroup
-                key={group.id}
-                group={group}
-                onNavigate={() => setIsSidebarOpen(false)}
-              />
-            ))}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={groupOrder} strategy={verticalListSortingStrategy}>
+                {sortedGroups.map((group) => (
+                  <SortableNavGroup
+                    key={group.id}
+                    group={group}
+                    onNavigate={() => setIsSidebarOpen(false)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
             
             {/* Settings link - always visible */}
             <Link

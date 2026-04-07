@@ -939,6 +939,12 @@ export const fr = {
   conversations: {
     title: 'Conversations',
     description: '{total} conversations au total • {agents} agents',
+    bulkDelete: {
+      button: 'Supprimer ({count})',
+      success: '{count} conversations supprimées',
+      selected: 'sélectionnée(s)',
+      selectAll: 'Tout sélectionner',
+    },
     allConversations: 'Toutes les conversations de vos agents vocaux',
     stats: {
       total: 'Total',
@@ -1813,6 +1819,7 @@ export const fr = {
   
   // Auth
   auth: {
+    rememberMe: 'Se souvenir de moi (30 jours)',
     login: 'Connexion',
     signup: 'Créer un compte',
     resetPassword: 'Nouveau mot de passe',

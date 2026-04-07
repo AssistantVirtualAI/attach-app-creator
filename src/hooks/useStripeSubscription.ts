@@ -11,7 +11,7 @@ export function useStripeSubscription() {
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
 
-  const createCheckoutSession = async (priceId: string) => {
+  const createCheckoutSession = async (priceId: string, trialDays?: number) => {
     if (!selectedOrganization?.id) {
       toast.error(t('messages.noOrganization'));
       return;
@@ -23,6 +23,7 @@ export function useStripeSubscription() {
         body: {
           organizationId: selectedOrganization.id,
           priceId,
+          trialDays: trialDays || undefined,
           successUrl: `${window.location.origin}/billing?success=true`,
           cancelUrl: `${window.location.origin}/billing?canceled=true`,
         },

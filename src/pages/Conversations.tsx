@@ -3,10 +3,11 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Clock, TrendingUp, TrendingDown, Minus,
   ChevronLeft, ChevronRight, Play, Sparkles, Search,
-  MessageCircle, Phone, User
+  MessageCircle, Phone, User, Trash2
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -28,13 +29,19 @@ import { PortalPageHeader } from '@/components/portal/PortalPageHeader';
 import { GlowBadge } from '@/components/portal/GlowBadge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLanguage } from '@/context/LanguageContext';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 const Conversations = () => {
   const { t } = useTranslation();
   const { language } = useLanguage();
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [filters, setFilters] = useState<Filters>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<{
     id: string;
     agentName: string;
@@ -96,6 +103,42 @@ const Conversations = () => {
     setPage(1);
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!data?.conversations) return;
+    if (selectedIds.size === data.conversations.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(data.conversations.map((c: any) => c.conversation_id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .delete()
+        .in('external_id', Array.from(selectedIds));
+      if (error) throw error;
+      toast.success(t('conversations.bulkDelete.success')?.replace('{count}', String(selectedIds.size)) || `${selectedIds.size} conversations supprimées`);
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ['all-agents-conversations'] });
+    } catch (err: any) {
+      toast.error(err.message || 'Erreur lors de la suppression');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Show setup message if no agents configured
   if (data?.requiresSetup) {
     return (
@@ -125,7 +168,20 @@ const Conversations = () => {
             description={t('conversations.description').replace('{total}', String(data?.total || 0)).replace('{agents}', String(data?.agents?.length || 0))}
             icon={MessageCircle}
           />
-          <ConversationExport 
+          <div className="flex items-center gap-2">
+            {selectedIds.size > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBulkDelete}
+                disabled={isDeleting}
+                className="gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                {t('conversations.bulkDelete.button')?.replace('{count}', String(selectedIds.size)) || `Supprimer (${selectedIds.size})`}
+              </Button>
+            )}
+            <ConversationExport
             conversations={data?.conversations || []} 
             filename="conversations"
           />
@@ -188,6 +244,21 @@ const Conversations = () => {
           transition={{ delay: 0.5 }}
           className="space-y-3"
         >
+          {/* Select All Bar */}
+          {data?.conversations?.length > 0 && (
+            <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-muted/50 border border-border">
+              <Checkbox
+                checked={data.conversations.length > 0 && selectedIds.size === data.conversations.length}
+                onCheckedChange={toggleSelectAll}
+              />
+              <span className="text-sm text-muted-foreground">
+                {selectedIds.size > 0 
+                  ? `${selectedIds.size} ${t('conversations.bulkDelete.selected') || 'sélectionnée(s)'}`
+                  : t('conversations.bulkDelete.selectAll') || 'Tout sélectionner'
+                }
+              </span>
+            </div>
+          )}
           {isLoading ? (
             Array.from({ length: 5 }).map((_, i) => (
               <Card key={i} className="border border-border bg-card">
@@ -236,6 +307,13 @@ const Conversations = () => {
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-4">
+                        {/* Selection Checkbox */}
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(conversation.conversation_id)}
+                            onCheckedChange={() => toggleSelect(conversation.conversation_id)}
+                          />
+                        </div>
                         {/* Avatar */}
                         <div className="relative">
                           <div className="absolute inset-0 bg-gradient-to-r from-primary to-secondary rounded-full blur opacity-40 group-hover:opacity-60 transition-opacity" />
