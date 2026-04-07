@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ const UniversalLoginContent = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const { loginUniversal } = usePortal();
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -159,6 +161,18 @@ const UniversalLoginContent = () => {
                   />
                 </div>
 
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="rememberMe"
+                      checked={rememberMe}
+                      onCheckedChange={(checked) => setRememberMe(checked === true)}
+                    />
+                    <Label htmlFor="rememberMe" className="text-sm text-muted-foreground cursor-pointer">
+                      {t('auth.rememberMe') || 'Se souvenir de moi (30 jours)'}
+                    </Label>
+                  </div>
+                </div>
                 <Button 
                   type="submit" 
                   className="w-full h-12 bg-gradient-to-r from-primary via-purple-500 to-pink-500 hover:opacity-90 transition-all shadow-lg shadow-primary/30 font-semibold" 
