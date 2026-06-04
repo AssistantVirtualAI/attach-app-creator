@@ -36,9 +36,9 @@ export const UserAvatar = () => {
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-56">
+      <DropdownMenuContent align="end" side="top" className="w-56 z-[60]">
         <div className="px-2 py-1.5">
-          <p className="text-sm font-medium">{user?.email}</p>
+          <p className="text-sm font-medium truncate">{user?.email}</p>
           <p className="text-xs text-muted-foreground">{t('profile.personalAccount') || 'Personal account'}</p>
         </div>
 
@@ -51,7 +51,7 @@ export const UserAvatar = () => {
 
         <DropdownMenuItem onClick={() => navigate('/settings')}>
           <Settings className="w-4 h-4 mr-2" />
-          {t('navigation.settings') || 'Settings'}
+          Settings
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -61,7 +61,7 @@ export const UserAvatar = () => {
           className="text-destructive focus:text-destructive"
         >
           <LogOut className="w-4 h-4 mr-2" />
-          {t('auth.signOut') || 'Sign out'}
+          Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
