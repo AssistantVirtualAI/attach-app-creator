@@ -180,13 +180,13 @@ const levelColor: Record<string, string> = {
 };
 
 export const DocumentationTab = () => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [query, setQuery] = useState('');
   const [activeModule, setActiveModule] = useState<string>('agents');
 
   const arr = (key: string): string[] => {
-    const v = t(key) as unknown;
-    return Array.isArray(v) ? (v as string[]) : [];
+    const value = key.split('.').reduce<any>((acc, part) => acc?.[part], translations[language]);
+    return Array.isArray(value) ? value : [];
   };
 
   const filteredModules = MODULES.map((m) => ({
