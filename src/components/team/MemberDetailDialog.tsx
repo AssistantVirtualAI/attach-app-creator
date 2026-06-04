@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useOrganization } from '@/context/OrganizationContext';
 import { TeamMember } from '@/hooks/useTeamMembers';
+import { useTranslation } from '@/hooks/useTranslation';
 
 type Role = 'org_admin' | 'manager' | 'agent' | 'viewer';
 
@@ -38,12 +39,14 @@ interface MemberDetailDialogProps {
   member: TeamMember | null;
   isOpen: boolean;
   onClose: () => void;
+  focusReset?: boolean;
 }
 
-export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDialogProps) {
+export function MemberDetailDialog({ member, isOpen, onClose, focusReset }: MemberDetailDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedOrgId, organizations, isSuperAdmin } = useOrganization();
+  const { t } = useTranslation();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -51,6 +54,7 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
   const [newPassword, setNewPassword] = useState('');
   const [addOrgId, setAddOrgId] = useState<string>('');
   const [addRole, setAddRole] = useState<Role>('viewer');
+  const resetRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!member) return;
@@ -62,7 +66,12 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
     setAddRole('viewer');
   }, [member]);
 
-  // Load all orgs the target user belongs to
+  useEffect(() => {
+    if (isOpen && focusReset) {
+      setTimeout(() => resetRef.current?.focus(), 100);
+    }
+  }, [isOpen, focusReset]);
+
   const userOrgsQuery = useQuery({
     queryKey: ['member-user-orgs', member?.user_id],
     enabled: !!member?.user_id && isOpen,
@@ -81,9 +90,12 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
     queryClient.invalidateQueries({ queryKey: ['member-user-orgs', member?.user_id] });
   };
 
+  const errToast = (e: Error) =>
+    toast({ title: t('common.error'), description: e.message, variant: 'destructive' });
+
   const updateProfile = useMutation({
     mutationFn: async () => {
-      if (!member || !selectedOrgId) throw new Error('Membre invalide');
+      if (!member || !selectedOrgId) throw new Error(t('team.detail.invalidMember'));
       const { data, error } = await supabase.functions.invoke('manage-org-roles', {
         body: {
           action: 'update_profile',
@@ -97,16 +109,15 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
       if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
-      toast({ title: 'Profil mis à jour' });
+      toast({ title: t('team.detail.profileUpdated') });
       invalidate();
     },
-    onError: (e: Error) =>
-      toast({ title: 'Erreur', description: e.message, variant: 'destructive' }),
+    onError: errToast,
   });
 
   const updateRole = useMutation({
     mutationFn: async (newRole: Role) => {
-      if (!member || !selectedOrgId) throw new Error('Membre invalide');
+      if (!member || !selectedOrgId) throw new Error(t('team.detail.invalidMember'));
       const { data, error } = await supabase.functions.invoke('manage-org-roles', {
         body: {
           action: 'update_role',
@@ -119,17 +130,16 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
       if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
-      toast({ title: 'Rôle mis à jour' });
+      toast({ title: t('team.detail.roleUpdated') });
       invalidate();
     },
-    onError: (e: Error) =>
-      toast({ title: 'Erreur', description: e.message, variant: 'destructive' }),
+    onError: errToast,
   });
 
   const resetPassword = useMutation({
     mutationFn: async () => {
-      if (!member || !selectedOrgId) throw new Error('Membre invalide');
-      if (newPassword.length < 8) throw new Error('8 caractères minimum');
+      if (!member || !selectedOrgId) throw new Error(t('team.detail.invalidMember'));
+      if (newPassword.length < 8) throw new Error(t('team.detail.minChars'));
       const { data, error } = await supabase.functions.invoke('manage-org-roles', {
         body: {
           action: 'reset_password',
@@ -142,16 +152,15 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
       if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
-      toast({ title: 'Mot de passe réinitialisé' });
+      toast({ title: t('team.detail.passwordReset') });
       setNewPassword('');
     },
-    onError: (e: Error) =>
-      toast({ title: 'Erreur', description: e.message, variant: 'destructive' }),
+    onError: errToast,
   });
 
   const addToOrg = useMutation({
     mutationFn: async () => {
-      if (!member || !addOrgId) throw new Error('Sélectionnez une organisation');
+      if (!member || !addOrgId) throw new Error(t('team.detail.selectOrg'));
       const { data, error } = await supabase.functions.invoke('manage-org-roles', {
         body: {
           action: 'add_to_org',
@@ -164,17 +173,16 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
       if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
-      toast({ title: 'Ajouté à l\'organisation' });
+      toast({ title: t('team.detail.addedToOrg') });
       setAddOrgId('');
       invalidate();
     },
-    onError: (e: Error) =>
-      toast({ title: 'Erreur', description: e.message, variant: 'destructive' }),
+    onError: errToast,
   });
 
   const removeFromOrg = useMutation({
     mutationFn: async (orgId: string) => {
-      if (!member) throw new Error('Membre invalide');
+      if (!member) throw new Error(t('team.detail.invalidMember'));
       const { data, error } = await supabase.functions.invoke('manage-org-roles', {
         body: {
           action: 'remove_from_org',
@@ -186,11 +194,10 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
       if (data?.error) throw new Error(data.error);
     },
     onSuccess: () => {
-      toast({ title: 'Retiré de l\'organisation' });
+      toast({ title: t('team.detail.removedFromOrg') });
       invalidate();
     },
-    onError: (e: Error) =>
-      toast({ title: 'Erreur', description: e.message, variant: 'destructive' }),
+    onError: errToast,
   });
 
   const currentOrgIds = new Set((userOrgsQuery.data || []).map((o) => o.id));
@@ -204,21 +211,19 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserCog className="h-5 w-5 text-primary" />
-            Détails du membre
+            {t('team.detail.title')}
           </DialogTitle>
-          <DialogDescription>
-            Modifier les informations, le mot de passe et les organisations.
-          </DialogDescription>
+          <DialogDescription>{t('team.detail.description')}</DialogDescription>
         </DialogHeader>
 
         {/* Profile */}
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label>Nom complet</Label>
+            <Label>{t('team.detail.fullName')}</Label>
             <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Email</Label>
+            <Label>{t('team.detail.email')}</Label>
             <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <Button
@@ -227,15 +232,15 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
             className="w-full"
           >
             {updateProfile.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Enregistrer le profil
+            {t('team.detail.saveProfile')}
           </Button>
         </div>
 
         <Separator />
 
-        {/* Role in current org */}
+        {/* Role */}
         <div className="space-y-2">
-          <Label>Rôle dans l'organisation actuelle</Label>
+          <Label>{t('team.detail.currentOrgRole')}</Label>
           <div className="flex gap-2">
             <Select
               value={role}
@@ -246,15 +251,13 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="org_admin">Admin</SelectItem>
-                <SelectItem value="manager">Manager</SelectItem>
-                <SelectItem value="agent">Agent</SelectItem>
-                <SelectItem value="viewer">Viewer</SelectItem>
+                <SelectItem value="org_admin">{t('roles.admin')}</SelectItem>
+                <SelectItem value="manager">{t('roles.manager')}</SelectItem>
+                <SelectItem value="agent">{t('roles.agent')}</SelectItem>
+                <SelectItem value="viewer">{t('roles.viewer')}</SelectItem>
               </SelectContent>
             </Select>
-            {updateRole.isPending && (
-              <Loader2 className="h-4 w-4 animate-spin self-center" />
-            )}
+            {updateRole.isPending && <Loader2 className="h-4 w-4 animate-spin self-center" />}
           </div>
         </div>
 
@@ -263,12 +266,13 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
         {/* Reset password */}
         <div className="space-y-2">
           <Label className="flex items-center gap-2">
-            <KeyRound className="h-4 w-4" /> Réinitialiser le mot de passe
+            <KeyRound className="h-4 w-4" /> {t('team.detail.resetPassword')}
           </Label>
           <div className="flex gap-2">
             <Input
+              ref={resetRef}
               type="password"
-              placeholder="Nouveau mot de passe (8+ caractères)"
+              placeholder={t('team.detail.newPasswordPlaceholder')}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
             />
@@ -277,7 +281,7 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
               disabled={resetPassword.isPending || newPassword.length < 8}
             >
               {resetPassword.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Définir
+              {t('team.detail.setPassword')}
             </Button>
           </div>
         </div>
@@ -286,7 +290,7 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
 
         {/* Organizations */}
         <div className="space-y-3">
-          <Label>Organisations</Label>
+          <Label>{t('team.detail.organizations')}</Label>
           {userOrgsQuery.isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
@@ -305,25 +309,25 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
                     size="icon"
                     onClick={() => removeFromOrg.mutate(o.id)}
                     disabled={removeFromOrg.isPending}
-                    title="Retirer de cette organisation"
+                    title={t('team.detail.removeFromOrg')}
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
               ))}
               {(userOrgsQuery.data || []).length === 0 && (
-                <p className="text-sm text-muted-foreground">Aucune organisation</p>
+                <p className="text-sm text-muted-foreground">{t('team.detail.noOrganization')}</p>
               )}
             </div>
           )}
 
           {addableOrgs.length > 0 && (
             <div className="space-y-2 rounded-md bg-muted/30 p-3">
-              <Label className="text-xs">Ajouter à une organisation</Label>
+              <Label className="text-xs">{t('team.detail.addToOrg')}</Label>
               <div className="flex gap-2">
                 <Select value={addOrgId} onValueChange={setAddOrgId}>
                   <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Choisir une organisation" />
+                    <SelectValue placeholder={t('team.detail.chooseOrg')} />
                   </SelectTrigger>
                   <SelectContent>
                     {addableOrgs.map((o) => (
@@ -334,10 +338,10 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
                 <Select value={addRole} onValueChange={(v) => setAddRole(v as Role)}>
                   <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="org_admin">Admin</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="agent">Agent</SelectItem>
-                    <SelectItem value="viewer">Viewer</SelectItem>
+                    <SelectItem value="org_admin">{t('roles.admin')}</SelectItem>
+                    <SelectItem value="manager">{t('roles.manager')}</SelectItem>
+                    <SelectItem value="agent">{t('roles.agent')}</SelectItem>
+                    <SelectItem value="viewer">{t('roles.viewer')}</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
@@ -354,7 +358,7 @@ export function MemberDetailDialog({ member, isOpen, onClose }: MemberDetailDial
               </div>
               {!isSuperAdmin && (
                 <p className="text-[11px] text-muted-foreground">
-                  Vous ne pouvez ajouter ce membre qu'aux organisations où vous êtes admin.
+                  {t('team.detail.onlyAdminOrgsHint')}
                 </p>
               )}
             </div>
