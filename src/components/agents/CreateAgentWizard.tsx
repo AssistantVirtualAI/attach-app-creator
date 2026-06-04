@@ -299,7 +299,7 @@ export function CreateAgentWizard({ open, onOpenChange }: CreateAgentWizardProps
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {PLATFORMS.map((platform) => {
+              {visiblePlatforms.map((platform) => {
                 const hasInt = hasIntegration(platform.id);
                 return (
                   <Card
