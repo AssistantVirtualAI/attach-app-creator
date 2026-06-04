@@ -9,11 +9,14 @@ interface OrganizationWithBilling {
   created_at: string;
   is_active: boolean | null;
   client_count?: number;
+  member_count?: number;
   billing_config?: {
     plan_tier: string | null;
     subscription_status: string | null;
     trial_ends_at: string | null;
     stripe_customer_id: string | null;
+    credits_used?: number | null;
+    credits_limit?: number | null;
   };
 }
 
@@ -28,6 +31,8 @@ interface SuperAdminStats {
   activeTrials: number;
   trialsExpiringSoon: number;
   totalClients: number;
+  totalMembers: number;
+  totalCreditsUsed: number;
   planDistribution: Record<string, number>;
   growthData: Array<{ month: string; organizations: number }>;
 }
@@ -49,7 +54,9 @@ export const useSuperAdminStats = () => {
             plan_tier,
             subscription_status,
             trial_ends_at,
-            stripe_customer_id
+            stripe_customer_id,
+            credits_used,
+            credits_limit
           )
         `)
         .order('created_at', { ascending: false });
@@ -63,6 +70,12 @@ export const useSuperAdminStats = () => {
       
       if (clientsError) throw clientsError;
 
+      // Fetch member counts per organization
+      const { data: memberRows, error: membersError } = await supabase
+        .from('organization_members')
+        .select('organization_id');
+      if (membersError) throw membersError;
+
       // Count clients per org
       const clientCountMap: Record<string, number> = {};
       clientCounts?.forEach(client => {
@@ -71,10 +84,18 @@ export const useSuperAdminStats = () => {
         }
       });
 
-      // Add client counts to organizations
+      const memberCountMap: Record<string, number> = {};
+      memberRows?.forEach(m => {
+        if (m.organization_id) {
+          memberCountMap[m.organization_id] = (memberCountMap[m.organization_id] || 0) + 1;
+        }
+      });
+
+      // Add client + member counts to organizations
       const organizations: OrganizationWithBilling[] = (orgs || []).map(org => ({
         ...org,
         client_count: clientCountMap[org.id] || 0,
+        member_count: memberCountMap[org.id] || 0,
         billing_config: Array.isArray(org.billing_config) 
           ? org.billing_config[0] 
           : org.billing_config,
@@ -107,6 +128,11 @@ export const useSuperAdminStats = () => {
           return trialEnd <= threeDaysFromNow && trialEnd >= now;
         }).length,
         totalClients: Object.values(clientCountMap).reduce((a, b) => a + b, 0),
+        totalMembers: Object.values(memberCountMap).reduce((a, b) => a + b, 0),
+        totalCreditsUsed: organizations.reduce(
+          (sum, o) => sum + (o.billing_config?.credits_used || 0),
+          0
+        ),
         planDistribution: {},
         growthData: [],
       };

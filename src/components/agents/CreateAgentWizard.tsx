@@ -22,6 +22,7 @@ import { AGENT_TEMPLATES, AgentTemplate } from '@/components/agent-builder/Agent
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useAllowedPlatforms } from '@/hooks/useAllowedPlatforms';
 import {
   ChevronLeft,
   ChevronRight,
@@ -109,6 +110,8 @@ export function CreateAgentWizard({ open, onOpenChange }: CreateAgentWizardProps
   const navigate = useNavigate();
   const { selectedOrgId } = useOrganization();
   const { createAgent, isCreating, progress } = useCreatePlatformAgent();
+  const { isAllowed } = useAllowedPlatforms();
+  const visiblePlatforms = PLATFORMS.filter((p) => isAllowed(p.id));
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState(0);
@@ -296,7 +299,7 @@ export function CreateAgentWizard({ open, onOpenChange }: CreateAgentWizardProps
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {PLATFORMS.map((platform) => {
+              {visiblePlatforms.map((platform) => {
                 const hasInt = hasIntegration(platform.id);
                 return (
                   <Card

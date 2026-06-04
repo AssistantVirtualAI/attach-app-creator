@@ -2104,6 +2104,7 @@ export type Database = {
       }
       organizations: {
         Row: {
+          allowed_platforms: string[] | null
           api_key: string | null
           baa_signed_at: string | null
           baa_signed_by: string | null
@@ -2139,6 +2140,7 @@ export type Database = {
           website_title: string | null
         }
         Insert: {
+          allowed_platforms?: string[] | null
           api_key?: string | null
           baa_signed_at?: string | null
           baa_signed_by?: string | null
@@ -2174,6 +2176,7 @@ export type Database = {
           website_title?: string | null
         }
         Update: {
+          allowed_platforms?: string[] | null
           api_key?: string | null
           baa_signed_at?: string | null
           baa_signed_by?: string | null

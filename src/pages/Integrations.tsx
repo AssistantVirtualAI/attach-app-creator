@@ -22,6 +22,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { fr, enUS } from 'date-fns/locale';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useAllowedPlatforms } from '@/hooks/useAllowedPlatforms';
 
 const twilioHelpHref =
   "https://www.twilio.com/console";
@@ -77,7 +78,8 @@ export default function Integrations() {
 
   const searchParams = new URLSearchParams(location.search);
   const fromAgents = searchParams.get('from') === 'agents';
-  const platforms = getPlatforms(t);
+  const { isAllowed } = useAllowedPlatforms();
+  const platforms = getPlatforms(t).filter((p) => isAllowed(p.value));
   const dateLocale = language === 'fr' ? fr : enUS;
 
   // Fetch integrations - works with or without organization

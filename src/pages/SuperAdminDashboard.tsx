@@ -231,13 +231,13 @@ const SuperAdminDashboard = () => {
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-2">
                   <Users className="w-4 h-4" />
-                  {texts.table.clients}
+                  {language === 'fr' ? 'Utilisateurs actifs' : 'Active Users'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{stats?.totalClients || 0}</div>
+                <div className="text-3xl font-bold">{stats?.totalMembers || 0}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {language === 'fr' ? 'Tous clients confondus' : 'Across all organizations'}
+                  {stats?.totalClients || 0} {language === 'fr' ? 'clients' : 'clients'} · {(stats?.totalCreditsUsed || 0).toLocaleString()} {language === 'fr' ? 'crédits utilisés' : 'credits used'}
                 </p>
               </CardContent>
             </Card>
@@ -378,8 +378,9 @@ const SuperAdminDashboard = () => {
                         <TableHead>{texts.table.plan}</TableHead>
                         <TableHead>{texts.table.status}</TableHead>
                         <TableHead>{texts.table.created}</TableHead>
-                        <TableHead>{texts.table.trialEnds}</TableHead>
+                        <TableHead className="text-right">{language === 'fr' ? 'Membres' : 'Members'}</TableHead>
                         <TableHead className="text-right">{texts.table.clients}</TableHead>
+                        <TableHead className="text-right">{language === 'fr' ? 'Usage' : 'Usage'}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -401,14 +402,17 @@ const SuperAdminDashboard = () => {
                           <TableCell className="text-sm text-muted-foreground">
                             {format(new Date(org.created_at), 'MMM d, yyyy')}
                           </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {org.billing_config?.trial_ends_at 
-                              ? format(new Date(org.billing_config.trial_ends_at), 'MMM d, yyyy')
-                              : '-'
-                            }
+                          <TableCell className="text-right">
+                            <Badge variant="outline">{(org as any).member_count || 0}</Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <Badge variant="outline">{org.client_count || 0}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {(org.billing_config as any)?.credits_used ?? 0}
+                            {(org.billing_config as any)?.credits_limit
+                              ? ` / ${(org.billing_config as any).credits_limit}`
+                              : ''}
                           </TableCell>
                         </TableRow>
                       ))}

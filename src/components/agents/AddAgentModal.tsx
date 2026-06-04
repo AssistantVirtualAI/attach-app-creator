@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { PlatformBadge } from './PlatformBadge';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useAllowedPlatforms } from '@/hooks/useAllowedPlatforms';
 
 const PLATFORMS = [
   { value: 'voiceflow', label: 'Voiceflow' },
@@ -38,6 +39,8 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
   const navigate = useNavigate();
   const { selectedOrgId } = useOrganization();
   const { t, language } = useTranslation();
+  const { isAllowed } = useAllowedPlatforms();
+  const visiblePlatforms = PLATFORMS.filter((p) => isAllowed(p.value));
   const [step, setStep] = useState(1);
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [selectedIntegration, setSelectedIntegration] = useState('');
@@ -165,7 +168,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
             <SelectValue placeholder={t('pages.addAgent.choosePlatform')} />
           </SelectTrigger>
           <SelectContent>
-            {PLATFORMS.map((platform) => (
+            {visiblePlatforms.map((platform) => (
               <SelectItem key={platform.value} value={platform.value}>
                 {platform.label}
               </SelectItem>
