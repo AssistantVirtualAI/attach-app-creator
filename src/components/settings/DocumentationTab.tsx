@@ -16,6 +16,8 @@ import {
   PlayCircle,
   CheckCircle2,
   Lightbulb,
+  BarChart3,
+  ShieldCheck,
 } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { motion } from 'framer-motion';
