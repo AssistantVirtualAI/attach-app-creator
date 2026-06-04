@@ -39,6 +39,8 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
   const navigate = useNavigate();
   const { selectedOrgId } = useOrganization();
   const { t, language } = useTranslation();
+  const { isAllowed } = useAllowedPlatforms();
+  const visiblePlatforms = PLATFORMS.filter((p) => isAllowed(p.value));
   const [step, setStep] = useState(1);
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [selectedIntegration, setSelectedIntegration] = useState('');
