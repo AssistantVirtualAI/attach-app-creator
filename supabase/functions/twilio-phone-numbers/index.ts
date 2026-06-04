@@ -53,9 +53,16 @@ serve(async (req) => {
     const { action, country, areaCode, phoneNumber, phoneNumberSid, organizationId } = await req.json();
     console.log('Twilio action:', action);
 
+    if (!organizationId) {
+      return jsonResponse(400, { error: 'organizationId required' });
+    }
+    const authCheck = await requireOrgRole(req, organizationId, ['org_admin', 'manager']);
+    if ('error' in authCheck) return authCheck.error;
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
 
     switch (action) {
       case 'search': {
