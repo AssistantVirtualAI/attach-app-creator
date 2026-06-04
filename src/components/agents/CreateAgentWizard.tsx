@@ -110,6 +110,8 @@ export function CreateAgentWizard({ open, onOpenChange }: CreateAgentWizardProps
   const navigate = useNavigate();
   const { selectedOrgId } = useOrganization();
   const { createAgent, isCreating, progress } = useCreatePlatformAgent();
+  const { isAllowed } = useAllowedPlatforms();
+  const visiblePlatforms = PLATFORMS.filter((p) => isAllowed(p.id));
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState(0);
