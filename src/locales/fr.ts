@@ -688,6 +688,7 @@ export const fr = {
     agentReports: 'Rapports Agents',
     knowledgeBase: 'Base de connaissances',
     clients: 'Clientèle',
+    upgradePlan: 'Mettre à niveau',
     leads: 'Leads',
     appointments: 'Rendez-vous',
     campaignsList: 'Campagnes',
