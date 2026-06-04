@@ -1,198 +1,403 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { 
-  BookOpen, 
-  ExternalLink, 
-  Download, 
-  Settings, 
-  Code, 
-  Zap, 
-  CreditCard, 
-  Mail, 
-  Webhook, 
-  Globe,
-  HelpCircle,
-  MessageCircle
-} from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import {
+  BookOpen,
+  Search,
+  Bot,
+  Users,
+  Settings as SettingsIcon,
+  Sparkles,
+  Plug,
+  Phone,
+  ChevronRight,
+  PlayCircle,
+  CheckCircle2,
+  Lightbulb,
+} from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
+import { motion } from 'framer-motion';
+import { translations } from '@/locales';
+
+
+type Lesson = {
+  id: string;
+  titleKey: string;
+  descKey: string;
+  stepsKey: string; // array key
+  tipKey?: string;
+  minutes: number;
+  level: 'beginner' | 'intermediate' | 'advanced';
+};
+
+type Module = {
+  id: string;
+  icon: typeof Bot;
+  color: string;
+  titleKey: string;
+  subtitleKey: string;
+  lessons: Lesson[];
+};
+
+const MODULES: Module[] = [
+  {
+    id: 'agents',
+    icon: Bot,
+    color: 'from-violet-500 to-fuchsia-500',
+    titleKey: 'training.modules.agents.title',
+    subtitleKey: 'training.modules.agents.subtitle',
+    lessons: [
+      {
+        id: 'create-agent',
+        titleKey: 'training.lessons.createAgent.title',
+        descKey: 'training.lessons.createAgent.desc',
+        stepsKey: 'training.lessons.createAgent.steps',
+        tipKey: 'training.lessons.createAgent.tip',
+        minutes: 5,
+        level: 'beginner',
+      },
+      {
+        id: 'tune-prompt',
+        titleKey: 'training.lessons.tunePrompt.title',
+        descKey: 'training.lessons.tunePrompt.desc',
+        stepsKey: 'training.lessons.tunePrompt.steps',
+        tipKey: 'training.lessons.tunePrompt.tip',
+        minutes: 7,
+        level: 'intermediate',
+      },
+      {
+        id: 'test-agent',
+        titleKey: 'training.lessons.testAgent.title',
+        descKey: 'training.lessons.testAgent.desc',
+        stepsKey: 'training.lessons.testAgent.steps',
+        minutes: 4,
+        level: 'beginner',
+      },
+    ],
+  },
+  {
+    id: 'clients',
+    icon: Users,
+    color: 'from-emerald-500 to-teal-500',
+    titleKey: 'training.modules.clients.title',
+    subtitleKey: 'training.modules.clients.subtitle',
+    lessons: [
+      {
+        id: 'create-client',
+        titleKey: 'training.lessons.createClient.title',
+        descKey: 'training.lessons.createClient.desc',
+        stepsKey: 'training.lessons.createClient.steps',
+        minutes: 4,
+        level: 'beginner',
+      },
+      {
+        id: 'assign-agents',
+        titleKey: 'training.lessons.assignAgents.title',
+        descKey: 'training.lessons.assignAgents.desc',
+        stepsKey: 'training.lessons.assignAgents.steps',
+        tipKey: 'training.lessons.assignAgents.tip',
+        minutes: 5,
+        level: 'beginner',
+      },
+      {
+        id: 'client-portal',
+        titleKey: 'training.lessons.clientPortal.title',
+        descKey: 'training.lessons.clientPortal.desc',
+        stepsKey: 'training.lessons.clientPortal.steps',
+        minutes: 6,
+        level: 'intermediate',
+      },
+    ],
+  },
+  {
+    id: 'settings',
+    icon: SettingsIcon,
+    color: 'from-blue-500 to-cyan-500',
+    titleKey: 'training.modules.settings.title',
+    subtitleKey: 'training.modules.settings.subtitle',
+    lessons: [
+      {
+        id: 'branding',
+        titleKey: 'training.lessons.branding.title',
+        descKey: 'training.lessons.branding.desc',
+        stepsKey: 'training.lessons.branding.steps',
+        minutes: 5,
+        level: 'beginner',
+      },
+      {
+        id: 'members',
+        titleKey: 'training.lessons.members.title',
+        descKey: 'training.lessons.members.desc',
+        stepsKey: 'training.lessons.members.steps',
+        tipKey: 'training.lessons.members.tip',
+        minutes: 4,
+        level: 'beginner',
+      },
+      {
+        id: 'billing',
+        titleKey: 'training.lessons.billing.title',
+        descKey: 'training.lessons.billing.desc',
+        stepsKey: 'training.lessons.billing.steps',
+        minutes: 3,
+        level: 'beginner',
+      },
+    ],
+  },
+  {
+    id: 'integrations',
+    icon: Plug,
+    color: 'from-orange-500 to-pink-500',
+    titleKey: 'training.modules.integrations.title',
+    subtitleKey: 'training.modules.integrations.subtitle',
+    lessons: [
+      {
+        id: 'elevenlabs',
+        titleKey: 'training.lessons.elevenlabs.title',
+        descKey: 'training.lessons.elevenlabs.desc',
+        stepsKey: 'training.lessons.elevenlabs.steps',
+        minutes: 6,
+        level: 'intermediate',
+      },
+      {
+        id: 'phone',
+        titleKey: 'training.lessons.phone.title',
+        descKey: 'training.lessons.phone.desc',
+        stepsKey: 'training.lessons.phone.steps',
+        tipKey: 'training.lessons.phone.tip',
+        minutes: 8,
+        level: 'advanced',
+      },
+    ],
+  },
+];
+
+const levelColor: Record<string, string> = {
+  beginner: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30',
+  intermediate: 'bg-amber-500/15 text-amber-500 border-amber-500/30',
+  advanced: 'bg-rose-500/15 text-rose-500 border-rose-500/30',
+};
 
 export const DocumentationTab = () => {
-  const navigate = useNavigate();
+  const { t, language } = useTranslation();
+  const [query, setQuery] = useState('');
+  const [activeModule, setActiveModule] = useState<string>('agents');
 
-  const sections = [
-    {
-      title: "Installation",
-      description: "Guide de déploiement et configuration initiale",
-      icon: Download,
-      color: "text-blue-500"
-    },
-    {
-      title: "Intégrations",
-      description: "ElevenLabs, Stripe, Email, Webhooks, Domaines",
-      icon: Settings,
-      color: "text-purple-500"
-    },
-    {
-      title: "API Reference",
-      description: "Endpoints, authentification et rate limits",
-      icon: Code,
-      color: "text-green-500"
-    }
-  ];
+  const arr = (key: string): string[] => {
+    const value = key.split('.').reduce<any>((acc, part) => acc?.[part], translations[language]);
+    return Array.isArray(value) ? value : [];
+  };
 
-  const quickLinks = [
-    {
-      title: "ElevenLabs",
-      description: "Configuration des agents vocaux",
-      icon: Zap,
-      href: "/docs#elevenlabs"
-    },
-    {
-      title: "Stripe",
-      description: "Paiements et abonnements",
-      icon: CreditCard,
-      href: "/docs#stripe"
-    },
-    {
-      title: "Email SMTP",
-      description: "Templates et configuration",
-      icon: Mail,
-      href: "/docs#email"
-    },
-    {
-      title: "Webhooks",
-      description: "Événements temps réel",
-      icon: Webhook,
-      href: "/docs#webhooks"
-    },
-    {
-      title: "Domaines",
-      description: "Configuration DNS",
-      icon: Globe,
-      href: "/docs#domains"
-    }
-  ];
+  const filteredModules = MODULES.map((m) => ({
+    ...m,
+    lessons: m.lessons.filter((l) => {
+      const q = query.toLowerCase().trim();
+      if (!q) return true;
+      return (
+        String(t(l.titleKey)).toLowerCase().includes(q) ||
+        String(t(l.descKey)).toLowerCase().includes(q)
+      );
+    }),
+  })).filter((m) => m.lessons.length > 0);
 
-  const helpLinks = [
-    {
-      title: "FAQ",
-      href: "/docs",
-      icon: HelpCircle,
-      internal: true
-    },
-    {
-      title: "Contenu de Formation",
-      href: "/docs?tab=training",
-      icon: BookOpen,
-      internal: true
-    },
-    {
-      title: "Tutoriels Vidéo",
-      href: "/docs?tab=videos",
-      icon: ExternalLink,
-      internal: true
-    }
-  ];
+  const totalLessons = MODULES.reduce((a, m) => a + m.lessons.length, 0);
+  const totalMinutes = MODULES.reduce(
+    (a, m) => a + m.lessons.reduce((b, l) => b + l.minutes, 0),
+    0,
+  );
+
+  const current = filteredModules.find((m) => m.id === activeModule) ?? filteredModules[0];
 
   return (
     <div className="space-y-6">
-      {/* Main CTA */}
-      <Card className="glass-card neon-border">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <CardTitle>Documentation AVA Statistics</CardTitle>
-                <CardDescription>Guide complet pour utiliser la plateforme</CardDescription>
-              </div>
+      {/* Hero */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/15 via-background to-secondary/15 p-6 md:p-8"
+      >
+        <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.3),transparent_60%)]" />
+        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="space-y-3 max-w-2xl">
+            <Badge className="bg-primary/20 text-primary border-primary/30 hover:bg-primary/20">
+              <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+              {t('training.hero.badge')}
+            </Badge>
+            <h2 className="text-2xl md:text-3xl font-bold gradient-text leading-tight">
+              {t('training.hero.title')}
+            </h2>
+            <p className="text-muted-foreground">{t('training.hero.subtitle')}</p>
+            <div className="flex flex-wrap gap-4 pt-1 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <BookOpen className="w-4 h-4 text-primary" />
+                {totalLessons} {t('training.stats.lessons')}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <PlayCircle className="w-4 h-4 text-primary" />
+                ~{totalMinutes} {t('training.stats.minutes')}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-primary" />
+                {MODULES.length} {t('training.stats.modules')}
+              </span>
             </div>
-            <Badge variant="secondary">v1.0.0</Badge>
           </div>
-        </CardHeader>
-        <CardContent>
-          <Button 
-            onClick={() => navigate('/docs')} 
-            className="w-full sm:w-auto gap-2"
-            size="lg"
-          >
-            <BookOpen className="w-5 h-5" />
-            Ouvrir la documentation
-            <ExternalLink className="w-4 h-4" />
-          </Button>
-        </CardContent>
-      </Card>
+          <div className="relative w-full md:w-80">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('training.searchPlaceholder')}
+              className="pl-9 bg-background/80 backdrop-blur"
+            />
+          </div>
+        </div>
+      </motion.div>
 
-      {/* Sections Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {sections.map((section) => {
-          const Icon = section.icon;
-          return (
-            <Card key={section.title} className="glass-card hover:border-primary/50 transition-all cursor-pointer" onClick={() => navigate('/docs')}>
-              <CardContent className="p-6">
-                <Icon className={`w-8 h-8 ${section.color} mb-3`} />
-                <h4 className="font-semibold mb-1">{section.title}</h4>
-                <p className="text-sm text-muted-foreground">{section.description}</p>
+      {/* Module nav + content */}
+      <div className="grid lg:grid-cols-[260px_1fr] gap-6">
+        <div className="space-y-2">
+          {filteredModules.map((m) => {
+            const Icon = m.icon;
+            const active = current?.id === m.id;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setActiveModule(m.id)}
+                className={`w-full text-left rounded-xl border transition-all p-3 flex items-center gap-3 group ${
+                  active
+                    ? 'border-primary/40 bg-primary/5 shadow-sm'
+                    : 'border-border hover:border-primary/30 hover:bg-muted/40'
+                }`}
+              >
+                <div
+                  className={`w-9 h-9 rounded-lg bg-gradient-to-br ${m.color} flex items-center justify-center shrink-0 shadow-md`}
+                >
+                  <Icon className="w-4.5 h-4.5 text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-foreground truncate">
+                    {t(m.titleKey)}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {m.lessons.length} {t('training.stats.lessons')}
+                  </div>
+                </div>
+                <ChevronRight
+                  className={`w-4 h-4 text-muted-foreground transition-transform ${
+                    active ? 'translate-x-0.5 text-primary' : 'group-hover:translate-x-0.5'
+                  }`}
+                />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="space-y-4">
+          {current && (
+            <motion.div
+              key={current.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-4"
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-10 h-10 rounded-xl bg-gradient-to-br ${current.color} flex items-center justify-center shadow-lg`}
+                >
+                  <current.icon className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-foreground">{t(current.titleKey)}</h3>
+                  <p className="text-sm text-muted-foreground">{t(current.subtitleKey)}</p>
+                </div>
+              </div>
+
+              <Card className="border-border/60">
+                <CardContent className="p-2 md:p-4">
+                  <Accordion type="single" collapsible defaultValue={current.lessons[0]?.id}>
+                    {current.lessons.map((lesson, i) => {
+                      const steps = arr(lesson.stepsKey);
+                      return (
+                        <AccordionItem
+                          key={lesson.id}
+                          value={lesson.id}
+                          className="border-border/60"
+                        >
+                          <AccordionTrigger className="hover:no-underline px-2 py-3">
+                            <div className="flex items-start gap-3 text-left flex-1 min-w-0">
+                              <div className="w-7 h-7 rounded-md bg-primary/10 border border-primary/20 text-primary text-xs font-bold flex items-center justify-center shrink-0">
+                                {i + 1}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-semibold text-foreground">
+                                    {t(lesson.titleKey)}
+                                  </span>
+                                  <Badge
+                                    variant="outline"
+                                    className={`text-[10px] py-0 px-1.5 ${levelColor[lesson.level]}`}
+                                  >
+                                    {t(`training.level.${lesson.level}`)}
+                                  </Badge>
+                                  <span className="text-[11px] text-muted-foreground">
+                                    · {lesson.minutes} {t('training.stats.min')}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                  {t(lesson.descKey)}
+                                </p>
+                              </div>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="px-2 pb-4">
+                            <div className="pl-10 space-y-3">
+                              <p className="text-sm text-muted-foreground">{t(lesson.descKey)}</p>
+                              <ol className="space-y-2">
+                                {steps.map((step, idx) => (
+                                  <li key={idx} className="flex gap-3 text-sm">
+                                    <span className="mt-0.5 w-5 h-5 rounded-full bg-primary/15 text-primary text-[11px] font-bold flex items-center justify-center shrink-0">
+                                      {idx + 1}
+                                    </span>
+                                    <span className="text-foreground/90 leading-relaxed">
+                                      {step}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ol>
+                              {lesson.tipKey && (
+                                <div className="flex gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                                  <Lightbulb className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                                  <p className="text-xs text-foreground/90">
+                                    <span className="font-semibold text-amber-500">
+                                      {t('training.tip')}:
+                                    </span>{' '}
+                                    {t(lesson.tipKey)}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      );
+                    })}
+                  </Accordion>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {filteredModules.length === 0 && (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                {t('training.noResults')}
               </CardContent>
             </Card>
-          );
-        })}
+          )}
+        </div>
       </div>
-
-      {/* Quick Links */}
-      <Card className="glass-card">
-        <CardHeader>
-          <CardTitle className="text-lg">Liens Rapides</CardTitle>
-          <CardDescription>Accès direct aux sections les plus consultées</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            {quickLinks.map((link) => {
-              const Icon = link.icon;
-              return (
-                <Button
-                  key={link.title}
-                  variant="outline"
-                  className="h-auto py-4 flex-col gap-2 hover:border-primary/50"
-                  onClick={() => navigate(link.href)}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="text-xs">{link.title}</span>
-                </Button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* External Help */}
-      <Card className="glass-card">
-        <CardHeader>
-          <CardTitle className="text-lg">Ressources Externes</CardTitle>
-          <CardDescription>Support, communauté et mises à jour</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
-            {helpLinks.map((link) => {
-              const Icon = link.icon;
-              return (
-                <Button
-                  key={link.title}
-                  variant="secondary"
-                  className="gap-2"
-                  onClick={() => link.internal ? navigate(link.href) : window.open(link.href, '_blank')}
-                >
-                  <Icon className="w-4 h-4" />
-                  {link.title}
-                </Button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

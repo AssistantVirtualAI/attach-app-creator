@@ -3109,4 +3109,142 @@ export const fr = {
       ambientCallCenter: "Centre d'appel",
     },
   },
+  training: {
+    hero: {
+      badge: 'Centre de formation',
+      title: 'Maîtrisez AVA Statistic en quelques minutes',
+      subtitle: 'Des leçons pas à pas qui couvrent tout, de la création de votre premier agent IA à l\'assignation de clients et la configuration des intégrations.',
+    },
+    searchPlaceholder: 'Rechercher une leçon…',
+    noResults: 'Aucune leçon ne correspond à votre recherche.',
+    tip: 'Astuce',
+    stats: {
+      lessons: 'leçons',
+      minutes: 'minutes',
+      min: 'min',
+      modules: 'modules',
+    },
+    level: {
+      beginner: 'Débutant',
+      intermediate: 'Intermédiaire',
+      advanced: 'Avancé',
+    },
+    modules: {
+      agents: { title: 'Agents IA', subtitle: 'Créez, ajustez et testez vos agents conversationnels.' },
+      clients: { title: 'Clients', subtitle: 'Intégrez vos clients et assignez-leur des agents.' },
+      settings: { title: 'Paramètres', subtitle: 'Personnalisez votre espace, invitez votre équipe, gérez la facturation.' },
+      integrations: { title: 'Intégrations', subtitle: 'Connectez les plateformes vocales et numéros de téléphone.' },
+    },
+    lessons: {
+      createAgent: {
+        title: 'Créer votre premier agent',
+        desc: 'Mettez en place un agent conversationnel en moins de cinq minutes.',
+        steps: [
+          'Ouvrez la page Agents depuis la barre latérale et cliquez sur « Nouvel agent ».',
+          'Choisissez un nom, une langue et la plateforme vocale (ElevenLabs est activé par défaut).',
+          'Sélectionnez un modèle de départ ou partez d\'un prompt vierge.',
+          'Cliquez sur « Créer » — l\'agent est déployé automatiquement sur la plateforme connectée.',
+        ],
+        tip: 'Gardez le premier prompt court. Vous pourrez affiner le ton et les règles plus tard avec l\'assistant IA.',
+      },
+      tunePrompt: {
+        title: 'Améliorer le prompt de l\'agent',
+        desc: 'Utilisez l\'assistant IA pour affiner le ton, les règles et le comportement de repli.',
+        steps: [
+          'Ouvrez un agent et accédez à l\'onglet « Prompt ».',
+          'Décrivez en langage naturel ce que vous voulez changer (ex. « sois plus concis, confirme toujours les numéros »).',
+          'Examinez la suggestion et cliquez sur « Appliquer ».',
+          'Testez le nouveau comportement dans le simulateur avant de publier.',
+        ],
+        tip: 'Conservez plusieurs versions de prompt — vous pouvez revenir en arrière en un clic.',
+      },
+      testAgent: {
+        title: 'Tester un agent dans le simulateur',
+        desc: 'Discutez en direct avec votre agent sans consommer de minutes réelles.',
+        steps: [
+          'Ouvrez l\'agent et cliquez sur « Aperçu ».',
+          'Tapez ou parlez — l\'agent répond avec le prompt actuel.',
+          'Utilisez le panneau de transcription pour voir les intentions et appels d\'outils.',
+        ],
+      },
+      createClient: {
+        title: 'Ajouter un nouveau client',
+        desc: 'Créez un compte client qui recevra son propre tableau de bord et ses rapports.',
+        steps: [
+          'Allez dans « Clients » depuis la barre latérale et cliquez sur « Nouveau client ».',
+          'Saisissez le nom, l\'email de contact et un numéro optionnel.',
+          'Indiquez si le client doit avoir accès au portail.',
+          'Cliquez sur « Créer ». Un email de bienvenue est envoyé automatiquement.',
+        ],
+      },
+      assignAgents: {
+        title: 'Assigner des agents à un client',
+        desc: 'Liez un ou plusieurs agents IA à un compte client précis.',
+        steps: [
+          'Ouvrez le client depuis la page Clients.',
+          'Allez dans l\'onglet « Agents » de la fiche client.',
+          'Cliquez sur « Assigner un agent » et choisissez dans la liste.',
+          'Enregistrez — le client voit immédiatement les agents dans son portail.',
+        ],
+        tip: 'Un même agent peut être partagé par plusieurs clients. Utilisez les étiquettes pour organiser les longues listes.',
+      },
+      clientPortal: {
+        title: 'Donner l\'accès portail à un client',
+        desc: 'Envoyez le lien de connexion pour que le client consulte ses conversations.',
+        steps: [
+          'Ouvrez le client et allez dans « Accès portail ».',
+          'Cliquez sur « Envoyer l\'invitation » — le client reçoit un email avec son lien.',
+          'Il pourra se connecter, modifier son mot de passe et voir uniquement ses agents.',
+        ],
+      },
+      branding: {
+        title: 'Personnaliser votre espace',
+        desc: 'Téléchargez votre logo, choisissez vos couleurs et personnalisez l\'expérience.',
+        steps: [
+          'Ouvrez Paramètres → Marque blanche.',
+          'Téléchargez votre logo et choisissez une couleur principale.',
+          'Prévisualisez et enregistrez.',
+        ],
+      },
+      members: {
+        title: 'Inviter votre équipe',
+        desc: 'Ajoutez vos collègues et attribuez le bon niveau de permission.',
+        steps: [
+          'Ouvrez Paramètres → Membres et cliquez sur « Inviter ».',
+          'Saisissez l\'email et choisissez un rôle (admin, manager, agent, observateur).',
+          'Ils reçoivent un email avec un lien d\'inscription.',
+        ],
+        tip: 'Utilisez le rôle « Manager » pour les personnes qui gèrent les clients sans toucher à la facturation.',
+      },
+      billing: {
+        title: 'Changer de plan',
+        desc: 'Passez à un plan supérieur ou mettez à jour votre paiement.',
+        steps: [
+          'Ouvrez Paramètres → Abonnement.',
+          'Choisissez le plan qui correspond à votre usage et cliquez sur « Passer au plan ».',
+          'Finalisez le paiement Stripe — les limites se mettent à jour immédiatement.',
+        ],
+      },
+      elevenlabs: {
+        title: 'Connecter ElevenLabs',
+        desc: 'Branchez votre compte ElevenLabs pour déployer des agents vocaux.',
+        steps: [
+          'Ouvrez Paramètres → Intégrations et sélectionnez ElevenLabs.',
+          'Collez votre clé API ElevenLabs et cliquez sur « Connecter ».',
+          'Choisissez une voix par défaut — elle sera utilisée pour les nouveaux agents.',
+        ],
+      },
+      phone: {
+        title: 'Configurer un numéro de téléphone',
+        desc: 'Provisionnez un numéro Twilio ou apportez votre propre tronc SIP.',
+        steps: [
+          'Ouvrez Numéros de téléphone depuis la barre latérale.',
+          'Cliquez sur « Ajouter un numéro » et choisissez Twilio ou SIP.',
+          'Assignez-le à un agent et enregistrez — les appels sont routés immédiatement.',
+        ],
+        tip: 'Testez le numéro avec le testeur intégré avant de le diffuser.',
+      },
+    },
+  },
 };
+

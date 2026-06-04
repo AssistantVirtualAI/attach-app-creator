@@ -3112,4 +3112,142 @@ export const en = {
       ambientCallCenter: 'Call Center',
     },
   },
+  training: {
+    hero: {
+      badge: 'Training Center',
+      title: 'Learn AVA Statistic in minutes',
+      subtitle: 'Step-by-step lessons covering everything from creating your first AI agent to assigning clients and configuring integrations.',
+    },
+    searchPlaceholder: 'Search lessons…',
+    noResults: 'No lessons match your search.',
+    tip: 'Pro tip',
+    stats: {
+      lessons: 'lessons',
+      minutes: 'minutes',
+      min: 'min',
+      modules: 'modules',
+    },
+    level: {
+      beginner: 'Beginner',
+      intermediate: 'Intermediate',
+      advanced: 'Advanced',
+    },
+    modules: {
+      agents: { title: 'AI Agents', subtitle: 'Create, fine-tune and test conversational agents.' },
+      clients: { title: 'Clients', subtitle: 'Onboard clients and assign agents to them.' },
+      settings: { title: 'Workspace settings', subtitle: 'Brand your workspace, invite your team, manage billing.' },
+      integrations: { title: 'Integrations', subtitle: 'Connect voice platforms and phone numbers.' },
+    },
+    lessons: {
+      createAgent: {
+        title: 'Create your first agent',
+        desc: 'Set up a brand-new conversational agent in under five minutes.',
+        steps: [
+          'Open the Agents page from the sidebar and click "New agent".',
+          'Choose a name, language and the voice platform (ElevenLabs is enabled by default).',
+          'Pick a starter template or start from a blank prompt.',
+          'Click "Create" — the agent is deployed automatically to the connected platform.',
+        ],
+        tip: 'Keep the first system prompt short. You can refine tone and rules later with the AI prompt assistant.',
+      },
+      tunePrompt: {
+        title: 'Improve the agent prompt',
+        desc: 'Use the AI assistant to refine tone, rules and fallback behaviour.',
+        steps: [
+          'Open an agent and go to the "Prompt" tab.',
+          'Describe what you want to change in plain English (e.g. "be more concise, always confirm phone numbers").',
+          'Review the suggested prompt diff and click "Apply".',
+          'Test the new behaviour in the simulator before publishing.',
+        ],
+        tip: 'Save several prompt versions — you can roll back instantly if a change hurts results.',
+      },
+      testAgent: {
+        title: 'Test an agent in the simulator',
+        desc: 'Talk to your agent live without spending real call minutes.',
+        steps: [
+          'Open the agent and click "Preview".',
+          'Type or speak a message — the agent responds with the current prompt.',
+          'Use the transcript panel to see tool calls and intents.',
+        ],
+      },
+      createClient: {
+        title: 'Add a new client',
+        desc: 'Add a client account that will receive its own dashboards and reports.',
+        steps: [
+          'Go to "Clients" from the sidebar and click "New client".',
+          'Enter the client name, contact email and optional phone number.',
+          'Choose whether the client should have portal access.',
+          'Click "Create". A welcome email is sent automatically.',
+        ],
+      },
+      assignAgents: {
+        title: 'Assign agents to a client',
+        desc: 'Link one or more AI agents to a specific client account.',
+        steps: [
+          'Open the client from the Clients page.',
+          'Switch to the "Agents" tab on the client detail screen.',
+          'Click "Assign agent" and pick from the dropdown.',
+          'Save — the client immediately sees the agents in their portal.',
+        ],
+        tip: 'A single agent can be shared by multiple clients. Use tags to organise large lists.',
+      },
+      clientPortal: {
+        title: 'Give a client portal access',
+        desc: 'Send the client login link so they can review conversations themselves.',
+        steps: [
+          'Open the client and go to "Portal access".',
+          'Click "Send invitation" — the client receives an email with their login link.',
+          'They can sign in, change their password and view their assigned agents only.',
+        ],
+      },
+      branding: {
+        title: 'Brand your workspace',
+        desc: 'Upload your logo, set colours and customise the welcome experience.',
+        steps: [
+          'Open Settings → White label.',
+          'Upload your logo and pick a primary colour.',
+          'Preview the changes in the live preview panel and save.',
+        ],
+      },
+      members: {
+        title: 'Invite teammates',
+        desc: 'Add coworkers and assign the right permission level.',
+        steps: [
+          'Open Settings → Members and click "Invite".',
+          'Enter the email and pick a role (admin, manager, agent, viewer).',
+          'They receive an email with a sign-up link.',
+        ],
+        tip: 'Use the "Manager" role for staff who should manage clients but not billing.',
+      },
+      billing: {
+        title: 'Upgrade your plan',
+        desc: 'Switch tiers or update your payment method.',
+        steps: [
+          'Open Settings → Subscription.',
+          'Pick the plan that matches your usage and click "Upgrade".',
+          'Complete the secure Stripe checkout — limits update instantly.',
+        ],
+      },
+      elevenlabs: {
+        title: 'Connect ElevenLabs',
+        desc: 'Plug in your ElevenLabs account to deploy voice agents.',
+        steps: [
+          'Open Settings → Integrations and select ElevenLabs.',
+          'Paste your ElevenLabs API key and click "Connect".',
+          'Pick a default voice — new agents will use it automatically.',
+        ],
+      },
+      phone: {
+        title: 'Set up a phone number',
+        desc: 'Provision a Twilio number or bring your own SIP trunk.',
+        steps: [
+          'Open Phone numbers from the sidebar.',
+          'Click "Add number" and choose Twilio provisioning or SIP.',
+          'Assign the number to an agent and save — calls route immediately.',
+        ],
+        tip: 'Test the number with the built-in call tester before sharing it publicly.',
+      },
+    },
+  },
 };
+
