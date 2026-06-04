@@ -57,14 +57,14 @@ const RETELL_LANGUAGES = [
   { value: 'multi', label: 'Multilingual' },
 ];
 
-const AMBIENT_SOUNDS = [
-  { value: 'none', label: 'Aucun' },
-  { value: 'coffee-shop', label: 'Café' },
-  { value: 'convention-hall', label: 'Hall de convention' },
-  { value: 'summer-outdoor', label: 'Extérieur été' },
-  { value: 'mountain-outdoor', label: 'Montagne' },
-  { value: 'static-noise', label: 'Bruit statique' },
-  { value: 'call-center', label: 'Centre d\'appel' },
+const AMBIENT_SOUNDS = (t: (k: string) => string) => [
+  { value: 'none', label: t('componentUi.retellConfig.ambientNone') },
+  { value: 'coffee-shop', label: t('componentUi.retellConfig.ambientCoffeeShop') },
+  { value: 'convention-hall', label: t('componentUi.retellConfig.ambientConventionHall') },
+  { value: 'summer-outdoor', label: t('componentUi.retellConfig.ambientSummerOutdoor') },
+  { value: 'mountain-outdoor', label: t('componentUi.retellConfig.ambientMountainOutdoor') },
+  { value: 'static-noise', label: t('componentUi.retellConfig.ambientStaticNoise') },
+  { value: 'call-center', label: t('componentUi.retellConfig.ambientCallCenter') },
 ];
 
 const LLM_MODELS = [
@@ -454,7 +454,7 @@ export function RetellFullConfigTab({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {AMBIENT_SOUNDS.map((s) => (
+                      {AMBIENT_SOUNDS(t).map((s) => (
                         <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                       ))}
                     </SelectContent>

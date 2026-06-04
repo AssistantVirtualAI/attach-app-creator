@@ -97,7 +97,7 @@ function AnalysisContent({
         {!isAuthError && !isCredits && (
           <Button onClick={handleRetry} variant="outline" className="gap-2">
             <RefreshCw className="w-4 h-4" />
-            Réessayer
+            {t('componentUi.conversations.retry')}
           </Button>
         )}
       </Card>

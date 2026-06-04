@@ -296,7 +296,7 @@ export default function PortalConversationsGeneric() {
                         <CardHeader className="py-3">
                           <CardTitle className="text-sm flex items-center gap-2">
                             <Brain className="h-4 w-4 text-primary" />
-                            Résumé
+                            {t('componentUi.conversations.summary')}
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="py-2">
