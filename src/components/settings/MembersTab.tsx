@@ -15,11 +15,13 @@ export function MembersTab() {
   const { t } = useTranslation();
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  const [resetMember, setResetMember] = useState<TeamMember | null>(null);
   const { members, isLoading, createMember, updateMemberRole, removeMember } = useTeamMembers();
   const { user } = useAuth();
   const { can } = usePermissions();
 
   const canManageMembers = can('manage:members');
+
 
 
   return (
@@ -94,10 +96,12 @@ export function MembersTab() {
               members={members}
               onUpdateRole={(userId, role) => updateMemberRole.mutate({ userId, newRole: role })}
               onRemoveMember={(userId) => removeMember.mutate(userId)}
+              onResetPassword={canManageMembers ? setResetMember : undefined}
               onSelectMember={canManageMembers ? setSelectedMember : undefined}
               currentUserId={user?.id}
             />
           )}
+
         </CardContent>
       </Card>
 
@@ -115,7 +119,16 @@ export function MembersTab() {
         isOpen={!!selectedMember}
         onClose={() => setSelectedMember(null)}
       />
+
+      {/* Reset Password Modal */}
+      <MemberDetailDialog
+        member={resetMember}
+        isOpen={!!resetMember}
+        onClose={() => setResetMember(null)}
+        focusReset
+      />
     </div>
   );
 }
+
 
