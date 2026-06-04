@@ -113,6 +113,7 @@ export const useFeatureAccess = () => {
   };
 
   const canAccessFeature = (feature: Feature): boolean => {
+    if (currentTier === 'enterprise') return true;
     // Add-ons are handled separately
     if (feature === 'hipaa_compliance') {
       return billingConfig?.plan_tier !== 'free'; // Available on paid plans
