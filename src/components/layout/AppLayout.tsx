@@ -83,7 +83,7 @@ interface AppLayoutProps {
 export const AppLayout = ({ children }: AppLayoutProps) => {
   const { role, isSuperAdmin } = usePermissions();
   const { selectedOrg, selectedOrgId, isLoading, userRole } = useOrganization();
-  useApplyBranding(selectedOrgId);
+  useApplyBranding(selectedOrgId, 'admin');
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
   const { t } = useTranslation();
