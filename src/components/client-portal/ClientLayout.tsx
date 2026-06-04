@@ -39,7 +39,7 @@ export const ClientLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  useApplyBranding(session?.organizationId);
+  useApplyBranding(session?.organizationId, 'client');
   const { language, setLanguage } = useLanguage();
   const [adminLoginAttempted, setAdminLoginAttempted] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);

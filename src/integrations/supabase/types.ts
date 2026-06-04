@@ -2109,6 +2109,10 @@ export type Database = {
           baa_signed_by: string | null
           backend_domain: string | null
           client_limit: number | null
+          client_portal_favicon_url: string | null
+          client_portal_logo_url: string | null
+          client_portal_primary_color: string | null
+          client_portal_title: string | null
           created_at: string
           domain: string | null
           email_domain: string | null
@@ -2140,6 +2144,10 @@ export type Database = {
           baa_signed_by?: string | null
           backend_domain?: string | null
           client_limit?: number | null
+          client_portal_favicon_url?: string | null
+          client_portal_logo_url?: string | null
+          client_portal_primary_color?: string | null
+          client_portal_title?: string | null
           created_at?: string
           domain?: string | null
           email_domain?: string | null
@@ -2171,6 +2179,10 @@ export type Database = {
           baa_signed_by?: string | null
           backend_domain?: string | null
           client_limit?: number | null
+          client_portal_favicon_url?: string | null
+          client_portal_logo_url?: string | null
+          client_portal_primary_color?: string | null
+          client_portal_title?: string | null
           created_at?: string
           domain?: string | null
           email_domain?: string | null
@@ -2400,6 +2412,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      platform_branding: {
+        Row: {
+          client_portal_favicon_url: string | null
+          client_portal_logo_url: string | null
+          client_portal_primary_color: string | null
+          client_portal_title: string | null
+          created_at: string
+          favicon_url: string | null
+          id: string
+          logo_url: string | null
+          primary_color: string | null
+          singleton: boolean
+          updated_at: string
+          updated_by: string | null
+          website_title: string | null
+        }
+        Insert: {
+          client_portal_favicon_url?: string | null
+          client_portal_logo_url?: string | null
+          client_portal_primary_color?: string | null
+          client_portal_title?: string | null
+          created_at?: string
+          favicon_url?: string | null
+          id?: string
+          logo_url?: string | null
+          primary_color?: string | null
+          singleton?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          website_title?: string | null
+        }
+        Update: {
+          client_portal_favicon_url?: string | null
+          client_portal_logo_url?: string | null
+          client_portal_primary_color?: string | null
+          client_portal_title?: string | null
+          created_at?: string
+          favicon_url?: string | null
+          id?: string
+          logo_url?: string | null
+          primary_color?: string | null
+          singleton?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          website_title?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
