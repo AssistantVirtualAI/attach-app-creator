@@ -3225,7 +3225,9 @@ export const fr = {
       agents: { title: 'Agents IA', subtitle: 'Créez, ajustez et testez vos agents conversationnels.' },
       clients: { title: 'Clients', subtitle: 'Intégrez vos clients et assignez-leur des agents.' },
       settings: { title: 'Paramètres', subtitle: 'Personnalisez votre espace, invitez votre équipe, gérez la facturation.' },
-      integrations: { title: 'Intégrations', subtitle: 'Connectez les plateformes vocales et numéros de téléphone.' },
+      integrations: { title: 'Intégrations', subtitle: 'Connectez plateformes vocales, numéros et webhooks.' },
+      analytics: { title: 'Analytique & insights', subtitle: 'Interprétez vos conversations, leads et performance.' },
+      security: { title: 'Sécurité & conformité', subtitle: 'Rôles, journaux d\'audit, RGPD, clés API.' },
     },
     lessons: {
       createAgent: {
@@ -3336,7 +3338,122 @@ export const fr = {
         ],
         tip: 'Testez le numéro avec le testeur intégré avant de le diffuser.',
       },
+      vapi: {
+        title: 'Connecter Vapi',
+        desc: 'Utilisez Vapi comme fournisseur vocal pour des appels à ultra-faible latence.',
+        steps: [
+          'Ouvrez Paramètres → Intégrations et sélectionnez Vapi.',
+          'Collez votre clé API Vapi et cliquez sur « Tester la connexion ».',
+          'Choisissez un modèle d\'assistant par défaut — les nouveaux agents en hériteront.',
+          'Enregistrez. Les agents existants peuvent être migrés depuis leur fiche.',
+        ],
+      },
+      retell: {
+        title: 'Connecter Retell AI',
+        desc: 'Branchez Retell AI pour des agents vocaux temps réel avec LLM personnalisé.',
+        steps: [
+          'Ouvrez Paramètres → Intégrations et choisissez Retell.',
+          'Collez votre clé API Retell et cliquez sur « Connecter ».',
+          'Choisissez le LLM (OpenAI, Anthropic, custom) et une voix par défaut.',
+          'Enregistrez — Retell devient disponible dans le builder d\'agent.',
+        ],
+      },
+      webhooks: {
+        title: 'Configurer des webhooks sortants',
+        desc: 'Envoyez en temps réel les événements (appels, leads, handoffs) vers votre stack.',
+        steps: [
+          'Ouvrez Paramètres → Webhooks et cliquez sur « Nouveau webhook ».',
+          'Collez l\'URL de destination (Make, Zapier, n8n, votre API…).',
+          'Sélectionnez les événements à écouter (conversation.completed, lead.created, handoff.requested).',
+          'Enregistrez. Chaque événement inclut un en-tête HMAC signé — vérifiez-le côté serveur.',
+          'Utilisez la vue Logs pour rejouer une livraison échouée.',
+        ],
+        tip: 'Commencez avec un seul événement et un endpoint de test (webhook.site) pour valider la charge utile avant la production.',
+      },
+      dashboard: {
+        title: 'Lire le tableau de bord principal',
+        desc: 'Comprenez les KPI en direct : volume, satisfaction, taux de succès, heures de pointe.',
+        steps: [
+          'Ouvrez Accueil ou Dashboard depuis la barre latérale.',
+          'Utilisez le sélecteur de période (en haut à droite) pour basculer entre aujourd\'hui / 7 jours / 30 jours.',
+          'Cliquez sur une carte KPI pour explorer les conversations sous-jacentes.',
+          'Survolez le graphique horaire — les pics aident à dimensionner votre équipe.',
+        ],
+      },
+      voiceAnalytics: {
+        title: 'Analyser la voix en profondeur',
+        desc: 'Suivez la durée d\'appel, le sentiment, le taux de résolution et la satisfaction par agent.',
+        steps: [
+          'Ouvrez Analytique vocale depuis la barre latérale.',
+          'Filtrez par agent, client ou période.',
+          'Alternez entre vues « Agrégée » et « Par appel » pour une analyse macro ou micro.',
+          'Exportez les données en CSV pour votre outil BI.',
+        ],
+        tip: 'Une baisse de satisfaction est souvent corrélée à une durée d\'appel anormalement longue. Croisez ces deux mesures.',
+      },
+      topics: {
+        title: 'Découvrir les sujets de conversation',
+        desc: 'Laissez l\'IA regrouper ce dont vos clients parlent vraiment.',
+        steps: [
+          'Ouvrez Sujets depuis la barre latérale.',
+          'Cliquez sur « Analyser » pour relancer un clustering récent.',
+          'Examinez les sujets principaux — volume, sentiment et exemples de transcriptions.',
+          'Utilisez ces insights pour ajuster votre prompt ou votre base de connaissances.',
+        ],
+      },
+      leads: {
+        title: 'Gérer les leads',
+        desc: 'Capturez et qualifiez les leads collectés par vos agents.',
+        steps: [
+          'Ouvrez Leads depuis la barre latérale.',
+          'Filtrez par statut (nouveau, qualifié, converti, perdu).',
+          'Cliquez sur un lead pour voir la conversation complète, les notes et infos de contact.',
+          'Faites évoluer les leads via le menu de statut — l\'analytique se met à jour en direct.',
+        ],
+      },
+      roles: {
+        title: 'Rôles & permissions',
+        desc: 'Attribuez le bon rôle à chaque coéquipier.',
+        steps: [
+          'Ouvrez Paramètres → Rôles & Permissions pour voir la matrice complète.',
+          'Admin pour le contrôle total, Manager pour la gestion clients/agents, Agent pour l\'opérationnel, Observateur pour la lecture seule.',
+          'Personnalisez les permissions par rôle si les valeurs par défaut ne conviennent pas.',
+        ],
+        tip: 'Auditez la matrice chaque trimestre — les équipes évoluent et les rôles dérivent.',
+      },
+      audit: {
+        title: 'Utiliser le journal d\'audit',
+        desc: 'Chaque action sensible est enregistrée — utilisez-le pour enquêter ou prouver la conformité.',
+        steps: [
+          'Ouvrez Paramètres → Journal d\'audit.',
+          'Filtrez par utilisateur, type de ressource ou action (création / mise à jour / suppression / connexion).',
+          'Cliquez sur une entrée pour voir les métadonnées avant / après.',
+          'Exportez en CSV pour vos preuves SOC 2 / ISO.',
+        ],
+      },
+      gdpr: {
+        title: 'Traiter les demandes RGPD',
+        desc: 'Exportez ou supprimez les données d\'un client sur demande pour rester conforme.',
+        steps: [
+          'Ouvrez Paramètres → Confidentialité.',
+          'Utilisez « Exporter les données » — l\'utilisateur reçoit une archive JSON par email.',
+          'Utilisez « Supprimer les données » pour un droit à l\'oubli — suppression douce puis purge après 30 jours.',
+          'Consignez la demande dans le journal d\'audit avec une note pour la traçabilité.',
+        ],
+        tip: 'Activez le mode HIPAA si vous traitez des données de santé — il active une journalisation étendue et une rétention plus stricte.',
+      },
+      apiKeys: {
+        title: 'Créer & faire tourner les clés API',
+        desc: 'Accédez à la plateforme depuis votre propre backend.',
+        steps: [
+          'Ouvrez Paramètres → Intégrations → Clés API.',
+          'Cliquez sur « Créer une clé », nommez-la et choisissez sa portée (lecture seule ou complète).',
+          'Copiez la clé immédiatement — elle n\'est affichée qu\'une fois.',
+          'Faites tourner les clés au moins tous les 90 jours et révoquez celles inutilisées.',
+        ],
+      },
     },
   },
 };
+
 

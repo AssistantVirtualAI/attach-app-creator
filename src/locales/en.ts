@@ -3228,7 +3228,9 @@ export const en = {
       agents: { title: 'AI Agents', subtitle: 'Create, fine-tune and test conversational agents.' },
       clients: { title: 'Clients', subtitle: 'Onboard clients and assign agents to them.' },
       settings: { title: 'Workspace settings', subtitle: 'Brand your workspace, invite your team, manage billing.' },
-      integrations: { title: 'Integrations', subtitle: 'Connect voice platforms and phone numbers.' },
+      integrations: { title: 'Integrations', subtitle: 'Connect voice platforms, phone numbers and webhooks.' },
+      analytics: { title: 'Analytics & insights', subtitle: 'Make sense of conversations, leads and performance.' },
+      security: { title: 'Security & compliance', subtitle: 'Roles, audit logs, GDPR, API keys.' },
     },
     lessons: {
       createAgent: {
@@ -3339,7 +3341,122 @@ export const en = {
         ],
         tip: 'Test the number with the built-in call tester before sharing it publicly.',
       },
+      vapi: {
+        title: 'Connect Vapi',
+        desc: 'Use Vapi as your voice provider for ultra-low-latency calls.',
+        steps: [
+          'Open Settings → Integrations and select Vapi.',
+          'Paste your Vapi API key and click "Test connection".',
+          'Pick a default assistant template — new agents will inherit it.',
+          'Save. Existing agents can be migrated from the agent detail page.',
+        ],
+      },
+      retell: {
+        title: 'Connect Retell AI',
+        desc: 'Plug Retell AI to power realtime voice agents with custom LLMs.',
+        steps: [
+          'Open Settings → Integrations and pick Retell.',
+          'Paste your Retell API key and click "Connect".',
+          'Choose the LLM (OpenAI, Anthropic, custom) and default voice.',
+          'Save — Retell agents become available in the agent builder.',
+        ],
+      },
+      webhooks: {
+        title: 'Set up outbound webhooks',
+        desc: 'Stream conversation events (calls, leads, handoffs) to your stack in real time.',
+        steps: [
+          'Open Settings → Webhooks and click "New webhook".',
+          'Paste the destination URL (Make, Zapier, n8n, your API…).',
+          'Pick the events you care about (conversation.completed, lead.created, handoff.requested).',
+          'Save. Every event includes a signed HMAC header — verify it on your side.',
+          'Use the logs view to replay any failed delivery.',
+        ],
+        tip: 'Start with a single event and a test endpoint (webhook.site) to validate the payload shape before wiring production systems.',
+      },
+      dashboard: {
+        title: 'Read the main dashboard',
+        desc: 'Understand the live KPIs: volume, satisfaction, success rate, busiest hours.',
+        steps: [
+          'Open Home or Dashboard from the sidebar.',
+          'Use the date range picker (top right) to switch between today / 7 days / 30 days.',
+          'Click any KPI card to drill into the underlying conversations.',
+          'Hover the hourly chart to see exact counts — peaks help you size your team.',
+        ],
+      },
+      voiceAnalytics: {
+        title: 'Dig into voice analytics',
+        desc: 'Track call duration, sentiment, resolution rate and customer satisfaction per agent.',
+        steps: [
+          'Open Voice analytics from the sidebar.',
+          'Filter by agent, client or date range.',
+          'Switch between "Aggregated" and "Per-call" views for macro or micro analysis.',
+          'Export the data as CSV for deeper analysis in your BI tool.',
+        ],
+        tip: 'A drop in satisfaction usually correlates with a longer-than-normal call duration. Cross-check both metrics.',
+      },
+      topics: {
+        title: 'Discover conversation topics',
+        desc: 'Let the AI cluster what your customers are talking about.',
+        steps: [
+          'Open Topics from the sidebar.',
+          'Click "Analyze" to run a fresh clustering across recent conversations.',
+          'Review the top topics — each one shows volume, sentiment and example transcripts.',
+          'Use the insights to update your prompt or your knowledge base.',
+        ],
+      },
+      leads: {
+        title: 'Manage leads from conversations',
+        desc: 'Capture and qualify the leads your agents collect.',
+        steps: [
+          'Open Leads from the sidebar.',
+          'Filter by status (new, qualified, converted, lost).',
+          'Click a lead to see the full conversation, attached notes and contact info.',
+          'Move leads through the pipeline with the status dropdown — analytics update live.',
+        ],
+      },
+      roles: {
+        title: 'Roles & permissions',
+        desc: 'Choose the right role for every teammate.',
+        steps: [
+          'Open Settings → Roles & Permissions to see the full matrix.',
+          'Use Admin for full control, Manager for client / agent management, Agent for day-to-day operations, Viewer for read-only.',
+          'Override individual permissions per role if the defaults don\'t fit your team.',
+        ],
+        tip: 'Audit the matrix every quarter — teams grow and roles drift.',
+      },
+      audit: {
+        title: 'Use the audit log',
+        desc: 'Every sensitive action is recorded — use it to investigate or prove compliance.',
+        steps: [
+          'Open Settings → Audit log.',
+          'Filter by user, resource type or action (create / update / delete / login).',
+          'Click any entry to see the before / after metadata.',
+          'Export to CSV for your SOC 2 / ISO evidence binder.',
+        ],
+      },
+      gdpr: {
+        title: 'Handle GDPR requests',
+        desc: 'Export or delete a customer\'s data on demand to stay compliant.',
+        steps: [
+          'Open Settings → Privacy.',
+          'Use "Export user data" — the user receives a JSON archive by email.',
+          'Use "Delete user data" for a right-to-erasure request — data is soft-deleted then purged after 30 days.',
+          'Log the request in the audit trail with a short note for traceability.',
+        ],
+        tip: 'Enable HIPAA mode if you handle PHI — it switches on extra logging and stricter retention.',
+      },
+      apiKeys: {
+        title: 'Create & rotate API keys',
+        desc: 'Programmatically access the platform from your own backend.',
+        steps: [
+          'Open Settings → Integrations → API keys.',
+          'Click "Create key", name it and choose its scope (read-only or full).',
+          'Copy the key immediately — it is shown only once.',
+          'Rotate keys at least every 90 days and revoke any key you no longer use.',
+        ],
+      },
     },
   },
 };
+
 

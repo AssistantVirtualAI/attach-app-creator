@@ -16,6 +16,8 @@ import {
   PlayCircle,
   CheckCircle2,
   Lightbulb,
+  BarChart3,
+  ShieldCheck,
 } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { motion } from 'framer-motion';
@@ -161,6 +163,22 @@ const MODULES: Module[] = [
         level: 'intermediate',
       },
       {
+        id: 'vapi',
+        titleKey: 'training.lessons.vapi.title',
+        descKey: 'training.lessons.vapi.desc',
+        stepsKey: 'training.lessons.vapi.steps',
+        minutes: 5,
+        level: 'intermediate',
+      },
+      {
+        id: 'retell',
+        titleKey: 'training.lessons.retell.title',
+        descKey: 'training.lessons.retell.desc',
+        stepsKey: 'training.lessons.retell.steps',
+        minutes: 5,
+        level: 'intermediate',
+      },
+      {
         id: 'phone',
         titleKey: 'training.lessons.phone.title',
         descKey: 'training.lessons.phone.desc',
@@ -168,6 +186,100 @@ const MODULES: Module[] = [
         tipKey: 'training.lessons.phone.tip',
         minutes: 8,
         level: 'advanced',
+      },
+      {
+        id: 'webhooks',
+        titleKey: 'training.lessons.webhooks.title',
+        descKey: 'training.lessons.webhooks.desc',
+        stepsKey: 'training.lessons.webhooks.steps',
+        tipKey: 'training.lessons.webhooks.tip',
+        minutes: 6,
+        level: 'advanced',
+      },
+    ],
+  },
+  {
+    id: 'analytics',
+    icon: BarChart3,
+    color: 'from-indigo-500 to-purple-500',
+    titleKey: 'training.modules.analytics.title',
+    subtitleKey: 'training.modules.analytics.subtitle',
+    lessons: [
+      {
+        id: 'dashboard',
+        titleKey: 'training.lessons.dashboard.title',
+        descKey: 'training.lessons.dashboard.desc',
+        stepsKey: 'training.lessons.dashboard.steps',
+        minutes: 4,
+        level: 'beginner',
+      },
+      {
+        id: 'voiceAnalytics',
+        titleKey: 'training.lessons.voiceAnalytics.title',
+        descKey: 'training.lessons.voiceAnalytics.desc',
+        stepsKey: 'training.lessons.voiceAnalytics.steps',
+        tipKey: 'training.lessons.voiceAnalytics.tip',
+        minutes: 6,
+        level: 'intermediate',
+      },
+      {
+        id: 'topics',
+        titleKey: 'training.lessons.topics.title',
+        descKey: 'training.lessons.topics.desc',
+        stepsKey: 'training.lessons.topics.steps',
+        minutes: 5,
+        level: 'intermediate',
+      },
+      {
+        id: 'leads',
+        titleKey: 'training.lessons.leads.title',
+        descKey: 'training.lessons.leads.desc',
+        stepsKey: 'training.lessons.leads.steps',
+        minutes: 5,
+        level: 'beginner',
+      },
+    ],
+  },
+  {
+    id: 'security',
+    icon: ShieldCheck,
+    color: 'from-rose-500 to-red-500',
+    titleKey: 'training.modules.security.title',
+    subtitleKey: 'training.modules.security.subtitle',
+    lessons: [
+      {
+        id: 'roles',
+        titleKey: 'training.lessons.roles.title',
+        descKey: 'training.lessons.roles.desc',
+        stepsKey: 'training.lessons.roles.steps',
+        tipKey: 'training.lessons.roles.tip',
+        minutes: 5,
+        level: 'intermediate',
+      },
+      {
+        id: 'audit',
+        titleKey: 'training.lessons.audit.title',
+        descKey: 'training.lessons.audit.desc',
+        stepsKey: 'training.lessons.audit.steps',
+        minutes: 4,
+        level: 'beginner',
+      },
+      {
+        id: 'gdpr',
+        titleKey: 'training.lessons.gdpr.title',
+        descKey: 'training.lessons.gdpr.desc',
+        stepsKey: 'training.lessons.gdpr.steps',
+        tipKey: 'training.lessons.gdpr.tip',
+        minutes: 6,
+        level: 'advanced',
+      },
+      {
+        id: 'apiKeys',
+        titleKey: 'training.lessons.apiKeys.title',
+        descKey: 'training.lessons.apiKeys.desc',
+        stepsKey: 'training.lessons.apiKeys.steps',
+        minutes: 4,
+        level: 'intermediate',
       },
     ],
   },
@@ -210,7 +322,7 @@ export const DocumentationTab = () => {
   const current = filteredModules.find((m) => m.id === activeModule) ?? filteredModules[0];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-32">
       {/* Hero */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
@@ -316,7 +428,7 @@ export const DocumentationTab = () => {
 
               <Card className="border-border/60">
                 <CardContent className="p-2 md:p-4">
-                  <Accordion type="single" collapsible defaultValue={current.lessons[0]?.id}>
+                  <Accordion type="multiple" defaultValue={current.lessons.map((l) => l.id)}>
                     {current.lessons.map((lesson, i) => {
                       const steps = arr(lesson.stepsKey);
                       return (
