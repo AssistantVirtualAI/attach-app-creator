@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+export type BrandingSurface = 'admin' | 'client';
+
 function hexToHsl(hex: string): string | null {
   const m = hex.trim().replace('#', '');
   if (!/^[0-9a-fA-F]{6}$/.test(m)) return null;
@@ -24,42 +26,105 @@ function hexToHsl(hex: string): string | null {
 }
 
 function setFavicon(url: string) {
-  let link = document.querySelector("link[rel='icon']") as HTMLLinkElement | null;
-  if (!link) {
-    link = document.createElement('link');
-    link.rel = 'icon';
-    document.head.appendChild(link);
+  // Remove ALL existing icon links so the browser picks up the new one
+  document.querySelectorAll("link[rel~='icon']").forEach((l) => l.parentElement?.removeChild(l));
+  const link = document.createElement('link');
+  link.rel = 'icon';
+  // Cache-bust so the browser refreshes immediately
+  link.href = url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`;
+  document.head.appendChild(link);
+}
+
+interface Resolved {
+  primary_color?: string | null;
+  favicon_url?: string | null;
+  logo_url?: string | null;
+  title?: string | null;
+}
+
+function pickOrg(org: any, surface: BrandingSurface): Resolved {
+  if (surface === 'client') {
+    return {
+      primary_color: org?.client_portal_primary_color || org?.primary_color,
+      favicon_url: org?.client_portal_favicon_url || org?.favicon_url,
+      logo_url: org?.client_portal_logo_url || org?.logo_url,
+      title: org?.client_portal_title || org?.website_title || org?.name,
+    };
   }
-  link.href = url;
+  return {
+    primary_color: org?.primary_color,
+    favicon_url: org?.favicon_url,
+    logo_url: org?.logo_url,
+    title: org?.website_title || org?.name,
+  };
+}
+
+function pickPlatform(p: any, surface: BrandingSurface): Resolved {
+  if (!p) return {};
+  if (surface === 'client') {
+    return {
+      primary_color: p.client_portal_primary_color || p.primary_color,
+      favicon_url: p.client_portal_favicon_url || p.favicon_url,
+      logo_url: p.client_portal_logo_url || p.logo_url,
+      title: p.client_portal_title || p.website_title,
+    };
+  }
+  return {
+    primary_color: p.primary_color,
+    favicon_url: p.favicon_url,
+    logo_url: p.logo_url,
+    title: p.website_title,
+  };
 }
 
 /**
- * Applies an organization's white-label branding (primary color, favicon, title)
- * to the current document. Reverts to defaults on unmount or org change.
+ * Applies branding (primary color, favicon, title) for the given surface.
+ * Per-organization branding wins; platform-wide branding is the fallback.
  */
-export function useApplyBranding(organizationId: string | null | undefined) {
+export function useApplyBranding(
+  organizationId: string | null | undefined,
+  surface: BrandingSurface = 'admin',
+) {
   useEffect(() => {
-    if (!organizationId) return;
     let cancelled = false;
     const root = document.documentElement;
     const originalPrimary = root.style.getPropertyValue('--primary');
     const originalTitle = document.title;
-    const originalFavicon = (document.querySelector("link[rel='icon']") as HTMLLinkElement | null)?.href;
+    const originalFavicon = (document.querySelector("link[rel~='icon']") as HTMLLinkElement | null)?.href;
 
     (async () => {
-      const { data } = await supabase
-        .from('organizations')
-        .select('primary_color, favicon_url, website_title, name')
-        .eq('id', organizationId)
-        .maybeSingle();
-      if (cancelled || !data) return;
+      const [orgRes, platformRes] = await Promise.all([
+        organizationId
+          ? supabase
+              .from('organizations')
+              .select(
+                'name, primary_color, favicon_url, logo_url, website_title, client_portal_primary_color, client_portal_favicon_url, client_portal_logo_url, client_portal_title',
+              )
+              .eq('id', organizationId)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+        supabase
+          .from('platform_branding')
+          .select(
+            'primary_color, favicon_url, logo_url, website_title, client_portal_primary_color, client_portal_favicon_url, client_portal_logo_url, client_portal_title',
+          )
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      if (cancelled) return;
 
-      if (data.primary_color) {
-        const hsl = hexToHsl(data.primary_color);
+      const orgPick = pickOrg(orgRes.data, surface);
+      const platformPick = pickPlatform(platformRes.data, surface);
+
+      const primary = orgPick.primary_color || platformPick.primary_color;
+      const favicon = orgPick.favicon_url || platformPick.favicon_url;
+      const title = orgPick.title || platformPick.title;
+
+      if (primary) {
+        const hsl = hexToHsl(primary);
         if (hsl) root.style.setProperty('--primary', hsl);
       }
-      if (data.favicon_url) setFavicon(data.favicon_url);
-      const title = data.website_title || data.name;
+      if (favicon) setFavicon(favicon);
       if (title) document.title = title;
     })();
 
@@ -70,5 +135,5 @@ export function useApplyBranding(organizationId: string | null | undefined) {
       if (originalTitle) document.title = originalTitle;
       if (originalFavicon) setFavicon(originalFavicon);
     };
-  }, [organizationId]);
+  }, [organizationId, surface]);
 }
