@@ -111,7 +111,7 @@ const Settings = () => {
           </TabsList>
 
           <TabsContent value="agency"><AgencyTab /></TabsContent>
-          <TabsContent value="organizations"><OrganizationsTab /></TabsContent>
+          {isSuperAdmin && <TabsContent value="organizations"><OrganizationsTab /></TabsContent>}
           <TabsContent value="whitelabel"><WhiteLabelTab /></TabsContent>
           <TabsContent value="members"><MembersTab /></TabsContent>
           <TabsContent value="integrations"><IntegrationsTab /></TabsContent>
