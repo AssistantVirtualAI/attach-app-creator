@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { PlatformBadge } from './PlatformBadge';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useAllowedPlatforms } from '@/hooks/useAllowedPlatforms';
 
 const PLATFORMS = [
   { value: 'voiceflow', label: 'Voiceflow' },
