@@ -1,32 +1,36 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@14.21.0";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import { requireOrgRole, getServiceClient, corsHeaders, jsonResponse } from "../_shared/auth.ts";
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) {
-      throw new Error("STRIPE_SECRET_KEY not configured");
+    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY not configured");
+
+    const { customerId, organizationId } = await req.json();
+    if (!customerId || !organizationId) {
+      return jsonResponse(400, { error: "customerId and organizationId are required" });
     }
 
-    const stripe = new Stripe(stripeKey, {
-      apiVersion: "2023-10-16",
-    });
+    const authCheck = await requireOrgRole(req, organizationId, ['org_admin', 'manager']);
+    if ('error' in authCheck) return authCheck.error;
 
-    const { customerId } = await req.json();
-    
-    if (!customerId) {
-      throw new Error("Customer ID is required");
+    // Verify the customerId belongs to that organization's billing config
+    const svc = getServiceClient();
+    const { data: billing } = await svc
+      .from('billing_config')
+      .select('stripe_customer_id')
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+    if (!billing || billing.stripe_customer_id !== customerId) {
+      return jsonResponse(403, { error: "Customer ID does not belong to your organization" });
     }
+
+    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
 
     console.log(`Fetching invoices for customer: ${customerId}`);
 
@@ -34,6 +38,7 @@ serve(async (req) => {
       customer: customerId,
       limit: 20,
     });
+
 
     const formattedInvoices = invoices.data.map((invoice: Stripe.Invoice) => ({
       id: invoice.id,
