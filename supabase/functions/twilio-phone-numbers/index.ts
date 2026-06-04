@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireOrgRole, jsonResponse } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,6 +9,7 @@ const corsHeaders = {
 
 const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
 const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
+
 
 async function twilioRequest(endpoint: string, method: string = 'GET', body?: Record<string, string>) {
   const auth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
@@ -51,9 +53,16 @@ serve(async (req) => {
     const { action, country, areaCode, phoneNumber, phoneNumberSid, organizationId } = await req.json();
     console.log('Twilio action:', action);
 
+    if (!organizationId) {
+      return jsonResponse(400, { error: 'organizationId required' });
+    }
+    const authCheck = await requireOrgRole(req, organizationId, ['org_admin', 'manager']);
+    if ('error' in authCheck) return authCheck.error;
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
 
     switch (action) {
       case 'search': {
@@ -107,12 +116,23 @@ serve(async (req) => {
       }
 
       case 'release': {
+        // Ensure the SID belongs to this organization before releasing
+        const { data: own } = await supabase
+          .from('phone_numbers')
+          .select('id')
+          .eq('organization_id', organizationId)
+          .eq('provider_sid', phoneNumberSid)
+          .maybeSingle();
+        if (!own) return jsonResponse(403, { error: 'Phone number not owned by your organization' });
+
         await twilioRequest(`/IncomingPhoneNumbers/${phoneNumberSid}.json`, 'DELETE');
+        await supabase.from('phone_numbers').delete().eq('id', own.id);
 
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
+
 
       case 'list': {
         const data = await twilioRequest('/IncomingPhoneNumbers.json');

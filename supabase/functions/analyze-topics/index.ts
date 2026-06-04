@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { requireOrgMember, corsHeaders } from "../_shared/auth.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -13,8 +9,15 @@ serve(async (req) => {
 
   try {
     const { organization_id, conversation_id, transcript, analyze_all } = await req.json();
-    
+
+    if (!organization_id) {
+      return new Response(JSON.stringify({ error: 'organization_id required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const authCheck = await requireOrgMember(req, organization_id);
+    if ('error' in authCheck) return authCheck.error;
+
     console.log('Analyzing topics for org:', organization_id);
+
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {

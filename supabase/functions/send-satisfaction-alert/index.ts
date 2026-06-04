@@ -24,11 +24,6 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const serviceClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     const { 
       conversationId, 
       agentId, 
@@ -38,7 +33,22 @@ const handler = async (req: Request): Promise<Response> => {
       summary 
     }: AlertRequest = await req.json();
 
+    if (!organizationId) {
+      return new Response(JSON.stringify({ error: 'organizationId required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Require authenticated org member
+    const { requireOrgMember } = await import("../_shared/auth.ts");
+    const authCheck = await requireOrgMember(req, organizationId);
+    if ('error' in authCheck) return authCheck.error;
+
+    const serviceClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
     console.log(`Processing low satisfaction alert for conversation ${conversationId}, score: ${satisfactionScore}`);
+
 
     // Vérifier si une alerte a déjà été envoyée pour cette conversation
     const { data: existingAlert } = await serviceClient

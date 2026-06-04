@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { organizationId, manual = false } = await req.json().catch(() => ({}));
+    const { organizationId } = await req.json().catch(() => ({}));
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -21,31 +21,48 @@ serve(async (req) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // If manual trigger, verify auth
-    if (manual) {
-      const authHeader = req.headers.get('Authorization');
-      if (!authHeader) {
-        return new Response(JSON.stringify({ error: 'Authorization required' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+    // Always require authentication. Allow service-role bearer for scheduled invocations.
+    const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Authorization required' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const token = authHeader.replace('Bearer ', '');
+    const isServiceRole = token === supabaseServiceKey;
 
-      const token = authHeader.replace('Bearer ', '');
-      const supabase = createClient(
-        supabaseUrl,
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { global: { headers: { Authorization: authHeader } } }
-      );
-
-      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-      if (userError || !user) {
+    if (!isServiceRole) {
+      const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+      if (userError || !userData?.user) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+      const userId = userData.user.id;
+      const { data: isSuper } = await supabaseAdmin.rpc('is_super_admin', { _user_id: userId });
+      if (organizationId) {
+        const { data: membership } = await supabaseAdmin
+          .from('organization_members')
+          .select('id')
+          .eq('organization_id', organizationId)
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (!membership && !isSuper) {
+          return new Response(JSON.stringify({ error: 'Forbidden' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      } else if (!isSuper) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
+
 
     // Get organizations to process
     let organizations;
