@@ -1,10 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { requireOrgRole, corsHeaders } from "../_shared/auth.ts";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,16 +8,20 @@ serve(async (req) => {
   }
 
   try {
+    const { action, organization_id, period_start, period_end } = await req.json();
+
+    if (!organization_id) {
+      return new Response(JSON.stringify({ error: 'organization_id is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const authCheck = await requireOrgRole(req, organization_id, ['org_admin', 'manager']);
+    if ('error' in authCheck) return authCheck.error;
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { action, organization_id, period_start, period_end } = await req.json();
-
-    if (!organization_id) {
-      throw new Error('organization_id is required');
-    }
 
     // Get billing config
     const { data: billingConfig, error: configError } = await supabaseClient
