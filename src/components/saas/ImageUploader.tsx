@@ -25,6 +25,7 @@ export const ImageUploader = ({
   onRemove,
   aspectRatio = 'square'
 }: ImageUploaderProps) => {
+  const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
