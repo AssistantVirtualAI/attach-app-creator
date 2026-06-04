@@ -13,11 +13,29 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Parse form data from Twilio
+    // Parse form data from Twilio (also keep raw object for signature validation)
     const formData = await req.formData();
-    const to = formData.get('To') as string;
-    const from = formData.get('From') as string;
-    const callSid = formData.get('CallSid') as string;
+    const dataObj: Record<string, string> = {};
+    formData.forEach((v, k) => { dataObj[k] = String(v); });
+
+    // Validate Twilio signature
+    const { validateTwilioSignature } = await import('../_shared/twilio.ts');
+    const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const signature = req.headers.get('X-Twilio-Signature') || '';
+    if (twilioAuthToken) {
+      const isValid = await validateTwilioSignature(twilioAuthToken, signature, req.url, dataObj);
+      if (!isValid) {
+        console.warn('Invalid Twilio signature on voice webhook');
+        return new Response(
+          `<?xml version="1.0" encoding="UTF-8"?><Response><Say>Unauthorized</Say></Response>`,
+          { status: 403, headers: corsHeaders }
+        );
+      }
+    }
+
+    const to = dataObj['To'];
+    const from = dataObj['From'];
+    const callSid = dataObj['CallSid'];
 
     console.log(`Incoming call: From=${from}, To=${to}, CallSid=${callSid}`);
 

@@ -51,6 +51,15 @@ serve(async (req) => {
       );
     }
 
+    // Prevent privilege escalation: only explicit roles allowed (never super_admin)
+    const ALLOWED_ROLES = ['org_admin', 'manager', 'agent', 'viewer'];
+    if (!ALLOWED_ROLES.includes(role)) {
+      return new Response(
+        JSON.stringify({ error: "Rôle invalide" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     if (password.length < 8) {
       return new Response(
         JSON.stringify({ error: "Le mot de passe doit contenir au moins 8 caractères" }),

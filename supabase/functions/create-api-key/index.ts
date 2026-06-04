@@ -63,6 +63,23 @@ serve(async (req) => {
       );
     }
 
+    // Only org_admin / super_admin can create API keys
+    const { data: isSuper } = await supabaseAdmin.rpc('is_super_admin', { _user_id: user.id });
+    if (!isSuper) {
+      const { data: roleRow } = await supabaseAdmin
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('organization_id', organizationId)
+        .maybeSingle();
+      if (!roleRow || roleRow.role !== 'org_admin') {
+        return new Response(
+          JSON.stringify({ error: "Only organization admins can create API keys" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Generate secure API key
     const keyBytes = new Uint8Array(32);
     crypto.getRandomValues(keyBytes);

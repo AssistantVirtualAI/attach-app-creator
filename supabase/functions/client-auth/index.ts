@@ -153,6 +153,76 @@ serve(async (req) => {
       }
     }
 
+    // Require organization admin JWT for sensitive admin actions that bypass RLS.
+    // Without this, anyone could take over portal accounts.
+    const ADMIN_ACTIONS = [
+      "set-password",
+      "admin-set-password",
+      "get-profile",
+      "update-profile",
+      "get-members",
+      "admin-add-member",
+      "admin-update-member",
+      "admin-delete-member",
+      "admin-reset-member-password",
+    ];
+    if (ADMIN_ACTIONS.includes(action)) {
+      const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: "Authentification requise" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: { user: adminUser } } = await supabase.auth.getUser(
+        authHeader.replace("Bearer ", "")
+      );
+      if (!adminUser) {
+        return new Response(JSON.stringify({ error: "Authentification invalide" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Resolve the organization that owns the target client/member
+      const { client_id: cid, member_id: mid } = params;
+      let targetClientId: string | null = cid || null;
+      if (!targetClientId && mid) {
+        const { data: mem } = await supabase
+          .from("client_members")
+          .select("client_id")
+          .eq("id", mid)
+          .maybeSingle();
+        targetClientId = mem?.client_id || null;
+      }
+      if (!targetClientId) {
+        return new Response(JSON.stringify({ error: "Client ID requis" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: targetClient } = await supabase
+        .from("clients")
+        .select("organization_id")
+        .eq("id", targetClientId)
+        .maybeSingle();
+      if (!targetClient) {
+        return new Response(JSON.stringify({ error: "Client introuvable" }), {
+          status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: isSuper } = await supabase.rpc("is_super_admin", { _user_id: adminUser.id });
+      if (!isSuper) {
+        const { data: roleRow } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", adminUser.id)
+          .eq("organization_id", targetClient.organization_id)
+          .maybeSingle();
+        if (!roleRow || !["org_admin", "manager"].includes(roleRow.role)) {
+          return new Response(JSON.stringify({ error: "Accès refusé" }), {
+            status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
+
     switch (action) {
       case "login": {
         const { login_id, password } = params;

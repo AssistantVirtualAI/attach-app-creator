@@ -36,6 +36,21 @@ serve(async (req) => {
       throw new Error('Missing required parameters: action, platform, organizationId');
     }
 
+    // Verify the caller is a member of the requested organization
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    const { data: isSuper } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+    if (!membership && !isSuper) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Forbidden' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log(`Connector proxy: ${action} for ${platform} in org ${organizationId}`);
 
     // Fetch integration config

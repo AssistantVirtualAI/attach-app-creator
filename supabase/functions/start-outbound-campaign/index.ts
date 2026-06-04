@@ -20,6 +20,20 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Require auth
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Get campaign details
     const { data: campaign, error: fetchError } = await supabase
       .from('outbound_campaigns')
@@ -38,6 +52,22 @@ serve(async (req) => {
 
     if (fetchError || !campaign) {
       throw new Error('Campaign not found');
+    }
+
+    // Verify manager+ for campaign org
+    const { data: isSuper } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+    if (!isSuper) {
+      const { data: roleRow } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('organization_id', campaign.organization_id)
+        .maybeSingle();
+      if (!roleRow || !['org_admin', 'manager'].includes(roleRow.role)) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     console.log('Campaign:', campaign.name, 'Status:', campaign.status);

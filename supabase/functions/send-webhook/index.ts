@@ -18,6 +18,20 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Require authenticated org admin/manager for the endpoint's org
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Get endpoint details
     const { data: endpoint, error: endpointError } = await supabase
       .from('webhook_endpoints')
@@ -27,6 +41,25 @@ serve(async (req) => {
 
     if (endpointError || !endpoint) {
       throw new Error('Webhook endpoint not found');
+    }
+
+    // Verify caller is org_admin/manager of the endpoint's org
+    const endpointOrgId = endpoint.organization_id;
+    if (endpointOrgId) {
+      const { data: isSuper } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+      if (!isSuper) {
+        const { data: roleRow } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('organization_id', endpointOrgId)
+          .maybeSingle();
+        if (!roleRow || !['org_admin', 'manager'].includes(roleRow.role)) {
+          return new Response(JSON.stringify({ error: 'Forbidden' }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
     }
 
     if (!endpoint.is_active) {
