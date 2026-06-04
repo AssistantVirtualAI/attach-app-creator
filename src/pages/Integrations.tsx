@@ -78,7 +78,8 @@ export default function Integrations() {
 
   const searchParams = new URLSearchParams(location.search);
   const fromAgents = searchParams.get('from') === 'agents';
-  const platforms = getPlatforms(t);
+  const { isAllowed } = useAllowedPlatforms();
+  const platforms = getPlatforms(t).filter((p) => isAllowed(p.value));
   const dateLocale = language === 'fr' ? fr : enUS;
 
   // Fetch integrations - works with or without organization
