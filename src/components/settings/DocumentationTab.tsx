@@ -18,7 +18,9 @@ import {
   Lightbulb,
 } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
+import { motion } from 'framer-motion';
 import { translations } from '@/locales';
+
 
 type Lesson = {
   id: string;
