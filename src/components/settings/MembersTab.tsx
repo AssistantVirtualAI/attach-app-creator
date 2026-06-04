@@ -15,11 +15,13 @@ export function MembersTab() {
   const { t } = useTranslation();
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  const [resetMember, setResetMember] = useState<TeamMember | null>(null);
   const { members, isLoading, createMember, updateMemberRole, removeMember } = useTeamMembers();
   const { user } = useAuth();
   const { can } = usePermissions();
 
   const canManageMembers = can('manage:members');
+
 
 
   return (
