@@ -168,7 +168,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
             <SelectValue placeholder={t('pages.addAgent.choosePlatform')} />
           </SelectTrigger>
           <SelectContent>
-            {PLATFORMS.map((platform) => (
+            {visiblePlatforms.map((platform) => (
               <SelectItem key={platform.value} value={platform.value}>
                 {platform.label}
               </SelectItem>
