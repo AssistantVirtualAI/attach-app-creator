@@ -402,14 +402,17 @@ const SuperAdminDashboard = () => {
                           <TableCell className="text-sm text-muted-foreground">
                             {format(new Date(org.created_at), 'MMM d, yyyy')}
                           </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {org.billing_config?.trial_ends_at 
-                              ? format(new Date(org.billing_config.trial_ends_at), 'MMM d, yyyy')
-                              : '-'
-                            }
+                          <TableCell className="text-right">
+                            <Badge variant="outline">{(org as any).member_count || 0}</Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <Badge variant="outline">{org.client_count || 0}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {(org.billing_config as any)?.credits_used ?? 0}
+                            {(org.billing_config as any)?.credits_limit
+                              ? ` / ${(org.billing_config as any).credits_limit}`
+                              : ''}
                           </TableCell>
                         </TableRow>
                       ))}
