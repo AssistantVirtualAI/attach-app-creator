@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 import { OrgSwitcher } from '@/components/layout/OrgSwitcher';
+import { useApplyBranding } from '@/hooks/useApplyBranding';
 
 const SIDEBAR_ORDER_KEY = 'sidebar-group-order';
 

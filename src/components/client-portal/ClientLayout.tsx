@@ -32,12 +32,14 @@ import { AvaLogo } from '@/components/shared/AvaLogo';
 import { GlowBadge } from '@/components/portal/GlowBadge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLanguage } from '@/context/LanguageContext';
+import { useApplyBranding } from '@/hooks/useApplyBranding';
 
 export const ClientLayout = () => {
   const { session, logout, isLoading: authLoading, isAuthenticated, loginAsAdmin } = useClient();
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  useApplyBranding(session?.organizationId);
   const { language, setLanguage } = useLanguage();
   const [adminLoginAttempted, setAdminLoginAttempted] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
