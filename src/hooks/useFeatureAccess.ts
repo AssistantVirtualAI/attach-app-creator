@@ -46,6 +46,21 @@ const FEATURE_MATRIX: Record<string, Feature[]> = {
     'priority_support',
     'dedicated_support',
   ],
+  enterprise: [
+    'unlimited_agents',
+    'custom_domain',
+    'stripe_billing',
+    'email_templates',
+    'custom_kpis',
+    'outbound_campaigns',
+    'whitelabel_email',
+    'whitelabel_backend',
+    'api_access',
+    'priority_support',
+    'dedicated_support',
+    'hipaa_compliance',
+    'saas_configurator',
+  ],
 };
 
 const FEATURE_LABELS: Record<Feature, string> = {
@@ -98,6 +113,7 @@ export const useFeatureAccess = () => {
   };
 
   const canAccessFeature = (feature: Feature): boolean => {
+    if (currentTier === 'enterprise') return true;
     // Add-ons are handled separately
     if (feature === 'hipaa_compliance') {
       return billingConfig?.plan_tier !== 'free'; // Available on paid plans
