@@ -199,9 +199,9 @@ export function AgencyTab() {
           {/* GDPR Toggle */}
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <Label>Conformité GDPR</Label>
+              <Label>{t('settings.agency.gdpr')}</Label>
               <p className="text-sm text-muted-foreground">
-                Activer les fonctionnalités de conformité GDPR
+                {t('settings.agency.gdprDesc')}
               </p>
             </div>
             <Switch
