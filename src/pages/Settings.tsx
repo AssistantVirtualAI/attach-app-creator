@@ -1,6 +1,7 @@
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building, Palette, Users, Plug, Webhook, CreditCard, BarChart3, Languages, Shield, FileText, BookOpen, KeySquare, Download } from 'lucide-react';
+import { Building, Building2, Palette, Users, Plug, Webhook, CreditCard, BarChart3, Languages, Shield, FileText, BookOpen, KeySquare, Download } from 'lucide-react';
+import { OrganizationsTab } from '@/components/settings/OrganizationsTab';
 import { AgencyTab } from '@/components/settings/AgencyTab';
 import { WhiteLabelTab } from '@/components/settings/WhiteLabelTab';
 import { MembersTab } from '@/components/settings/MembersTab';
@@ -41,6 +42,10 @@ const Settings = () => {
             <TabsTrigger value="agency" className="gap-2">
               <Building className="w-4 h-4" />
               <span className="hidden sm:inline">{t('settings.tabs.agency')}</span>
+            </TabsTrigger>
+            <TabsTrigger value="organizations" className="gap-2">
+              <Building2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Organisations</span>
             </TabsTrigger>
             <TabsTrigger value="whitelabel" className="gap-2">
               <Palette className="w-4 h-4" />
@@ -104,6 +109,7 @@ const Settings = () => {
           </TabsList>
 
           <TabsContent value="agency"><AgencyTab /></TabsContent>
+          <TabsContent value="organizations"><OrganizationsTab /></TabsContent>
           <TabsContent value="whitelabel"><WhiteLabelTab /></TabsContent>
           <TabsContent value="members"><MembersTab /></TabsContent>
           <TabsContent value="integrations"><IntegrationsTab /></TabsContent>

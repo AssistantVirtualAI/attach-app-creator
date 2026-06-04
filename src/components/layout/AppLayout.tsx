@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { NotificationsBell } from '@/components/notifications/NotificationsBell';
+import { OrgSwitcher } from '@/components/layout/OrgSwitcher';
 
 const SIDEBAR_ORDER_KEY = 'sidebar-group-order';
 
@@ -200,6 +201,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
               </Badge>
             )}
             <div className="flex items-center gap-1">
+              <OrgSwitcher />
               <NotificationsBell />
               {/* Language Toggle */}
               <DropdownMenu>

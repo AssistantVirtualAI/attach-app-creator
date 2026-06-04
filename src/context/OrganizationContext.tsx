@@ -17,15 +17,6 @@ interface Organization {
   hipaa_enabled?: boolean;
 }
 
-interface OrganizationMember {
-  id: string;
-  user_id: string;
-  organization_id: string;
-  invited_by?: string;
-  invited_at: string;
-  accepted_at?: string;
-}
-
 interface UserRole {
   id: string;
   user_id: string;
@@ -37,101 +28,112 @@ interface UserRole {
 interface OrganizationContextType {
   selectedOrg: Organization | null;
   selectedOrgId: string | null;
+  organizations: Organization[];
   userRole: UserRole | null;
   isLoading: boolean;
   refreshOrganization: () => Promise<void>;
+  setSelectedOrgId: (id: string) => void;
   isSuperAdmin: boolean;
 }
+
+const SELECTED_ORG_KEY = 'selected_organization_id';
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined);
 
 export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [selectedOrgId, setSelectedOrgIdState] = useState<string | null>(null);
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  // Load organization and user role
   useEffect(() => {
     if (user) {
-      loadOrganization();
+      loadOrganizations();
       checkSuperAdmin();
     } else {
+      setOrganizations([]);
       setSelectedOrg(null);
-      setSelectedOrgId(null);
+      setSelectedOrgIdState(null);
       setUserRole(null);
       setIsSuperAdmin(false);
       setIsLoading(false);
     }
   }, [user]);
 
-  // Load user role when organization changes
   useEffect(() => {
     if (selectedOrgId) {
+      const org = organizations.find((o) => o.id === selectedOrgId) || null;
+      setSelectedOrg(org);
       loadUserRole(selectedOrgId);
+      try { localStorage.setItem(SELECTED_ORG_KEY, selectedOrgId); } catch {}
     }
-  }, [selectedOrgId]);
+  }, [selectedOrgId, organizations]);
 
   const checkSuperAdmin = async () => {
     if (!user) return;
-
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
         .eq('role', 'super_admin')
         .maybeSingle();
-
-      if (error) throw error;
       setIsSuperAdmin(!!data);
-    } catch (error) {
-      console.error('Error checking super admin status:', error);
+    } catch {
       setIsSuperAdmin(false);
     }
   };
 
-  const loadOrganization = async () => {
+  const loadOrganizations = async () => {
     if (!user) return;
-
     try {
       setIsLoading(true);
 
-      // Get the user's organization membership
-      const { data: memberships, error: membershipError } = await supabase
+      const { data: memberships, error: mErr } = await supabase
         .from('organization_members')
         .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1);
+        .eq('user_id', user.id);
 
-      if (membershipError) throw membershipError;
+      if (mErr) throw mErr;
 
-      if (memberships && memberships.length > 0) {
-        const orgId = memberships[0].organization_id;
-
-        const { data: org, error: orgError } = await supabase
-          .from('organizations')
-          .select('*')
-          .eq('id', orgId)
-          .eq('is_active', true)
-          .single();
-
-        if (orgError) throw orgError;
-
-        setSelectedOrg(org);
-        setSelectedOrgId(org.id);
-      } else {
+      const orgIds = (memberships || []).map((m) => m.organization_id);
+      if (orgIds.length === 0) {
+        setOrganizations([]);
         setSelectedOrg(null);
-        setSelectedOrgId(null);
+        setSelectedOrgIdState(null);
+        return;
+      }
+
+      const { data: orgs, error: oErr } = await supabase
+        .from('organizations')
+        .select('*')
+        .in('id', orgIds)
+        .eq('is_active', true)
+        .order('name');
+
+      if (oErr) throw oErr;
+      const list = (orgs || []) as Organization[];
+      setOrganizations(list);
+
+      // Pick selected: localStorage > current > first
+      const stored = (() => { try { return localStorage.getItem(SELECTED_ORG_KEY); } catch { return null; } })();
+      const next =
+        (stored && list.find((o) => o.id === stored)) ||
+        (selectedOrgId && list.find((o) => o.id === selectedOrgId)) ||
+        list[0];
+      if (next) {
+        setSelectedOrgIdState(next.id);
+        setSelectedOrg(next);
       }
     } catch (error: any) {
-      console.error('Error loading organization:', error);
+      console.error('Error loading organizations:', error);
       toast({
         title: 'Erreur',
-        description: 'Impossible de charger l\'organisation',
+        description: "Impossible de charger les organisations",
         variant: 'destructive',
       });
     } finally {
@@ -141,25 +143,25 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const loadUserRole = async (orgId: string) => {
     if (!user || !orgId) return;
-
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('user_roles')
         .select('*')
         .eq('user_id', user.id)
         .eq('organization_id', orgId)
         .maybeSingle();
-
-      if (error) throw error;
       setUserRole(data);
-    } catch (error) {
-      console.error('Error loading user role:', error);
+    } catch {
       setUserRole(null);
     }
   };
 
+  const setSelectedOrgId = (id: string) => {
+    setSelectedOrgIdState(id);
+  };
+
   const refreshOrganization = async () => {
-    await loadOrganization();
+    await loadOrganizations();
   };
 
   return (
@@ -167,9 +169,11 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       value={{
         selectedOrg,
         selectedOrgId,
+        organizations,
         userRole,
         isLoading,
         refreshOrganization,
+        setSelectedOrgId,
         isSuperAdmin,
       }}
     >
