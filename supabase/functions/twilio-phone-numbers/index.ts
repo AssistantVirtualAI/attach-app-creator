@@ -116,12 +116,23 @@ serve(async (req) => {
       }
 
       case 'release': {
+        // Ensure the SID belongs to this organization before releasing
+        const { data: own } = await supabase
+          .from('phone_numbers')
+          .select('id')
+          .eq('organization_id', organizationId)
+          .eq('provider_sid', phoneNumberSid)
+          .maybeSingle();
+        if (!own) return jsonResponse(403, { error: 'Phone number not owned by your organization' });
+
         await twilioRequest(`/IncomingPhoneNumbers/${phoneNumberSid}.json`, 'DELETE');
+        await supabase.from('phone_numbers').delete().eq('id', own.id);
 
         return new Response(JSON.stringify({ success: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
+
 
       case 'list': {
         const data = await twilioRequest('/IncomingPhoneNumbers.json');
