@@ -231,13 +231,13 @@ const SuperAdminDashboard = () => {
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-2">
                   <Users className="w-4 h-4" />
-                  {texts.table.clients}
+                  {language === 'fr' ? 'Utilisateurs actifs' : 'Active Users'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{stats?.totalClients || 0}</div>
+                <div className="text-3xl font-bold">{stats?.totalMembers || 0}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {language === 'fr' ? 'Tous clients confondus' : 'Across all organizations'}
+                  {stats?.totalClients || 0} {language === 'fr' ? 'clients' : 'clients'} · {(stats?.totalCreditsUsed || 0).toLocaleString()} {language === 'fr' ? 'crédits utilisés' : 'credits used'}
                 </p>
               </CardContent>
             </Card>
