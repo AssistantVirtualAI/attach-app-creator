@@ -18,7 +18,7 @@ export const SidebarFooter = () => {
     <div className="p-4 border-t border-sidebar-border space-y-3 bg-muted/30">
       {/* Client Stats */}
       <div className="flex items-center justify-between text-sm px-3 py-2.5 rounded-lg bg-muted border border-border">
-        <span className="text-muted-foreground font-medium">Clientèle:</span>
+        <span className="text-muted-foreground font-medium">{t('sidebar.clients') || 'Clients'}:</span>
         <span className="font-semibold text-foreground">
           {activeClients} / {clientLimit}
         </span>
