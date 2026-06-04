@@ -3214,6 +3214,10 @@ export type Database = {
       }
     }
     Functions: {
+      create_organization_for_user: {
+        Args: { _name: string; _slug: string }
+        Returns: string
+      }
       generate_agent_slug: { Args: { agent_name: string }; Returns: string }
       generate_api_key: { Args: never; Returns: string }
       generate_unique_username: { Args: { base_name: string }; Returns: string }
