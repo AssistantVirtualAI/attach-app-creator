@@ -39,19 +39,19 @@ export const UserAvatar = () => {
       <DropdownMenuContent align="end" className="w-56">
         <div className="px-2 py-1.5">
           <p className="text-sm font-medium">{user?.email}</p>
-          <p className="text-xs text-muted-foreground">Compte personnel</p>
+          <p className="text-xs text-muted-foreground">{t('profile.personalAccount') || 'Personal account'}</p>
         </div>
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem onClick={() => navigate('/settings')}>
+        <DropdownMenuItem onClick={() => navigate('/profile')}>
           <User className="w-4 h-4 mr-2" />
-          Mon profil
+          {t('profile.myProfile') || 'My profile'}
         </DropdownMenuItem>
 
         <DropdownMenuItem onClick={() => navigate('/settings')}>
           <Settings className="w-4 h-4 mr-2" />
-          Paramètres
+          {t('navigation.settings') || 'Settings'}
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -61,7 +61,7 @@ export const UserAvatar = () => {
           className="text-destructive focus:text-destructive"
         >
           <LogOut className="w-4 h-4 mr-2" />
-          Déconnexion
+          {t('auth.signOut') || 'Sign out'}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
