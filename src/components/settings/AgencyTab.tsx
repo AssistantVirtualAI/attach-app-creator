@@ -241,13 +241,13 @@ export function AgencyTab() {
         <CardHeader>
           <CardTitle className="text-destructive flex items-center gap-2">
             <Trash2 className="w-5 h-5" />
-            Zone de Danger
+            {t('settings.agency.dangerZone')}
           </CardTitle>
-          <CardDescription>Actions irréversibles</CardDescription>
+          <CardDescription>{t('settings.agency.dangerDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           <Button variant="destructive" className="w-full">
-            Supprimer l'agence
+            {t('settings.agency.deleteAgency')}
           </Button>
         </CardContent>
       </Card>
