@@ -31,7 +31,7 @@ const roleLabels: Record<string, { label: string; color: string }> = {
   viewer: { label: 'Viewer', color: 'bg-gray-500/10 text-gray-500' },
 };
 
-export const MembersList = ({ members, onUpdateRole, onRemoveMember, currentUserId }: MembersListProps) => {
+export const MembersList = ({ members, onUpdateRole, onRemoveMember, onSelectMember, currentUserId }: MembersListProps) => {
   const getInitials = (name: string | null, email: string) => {
     if (name) {
       return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
