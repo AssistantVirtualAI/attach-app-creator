@@ -121,11 +121,14 @@ serve(async (req) => {
     const responseData = await emailResponse.json();
     console.log("OTP email sent successfully:", responseData);
 
-    // Return OTP code and expiry for verification (store securely in your app)
+    // SECURITY: Do NOT return the OTP code in the response.
+    // It must only be delivered through the user's email so that an
+    // unauthenticated caller cannot read it. Store the hashed code
+    // server-side (e.g., in client_credentials.password_reset_token) and
+    // verify it in a dedicated verify-otp function.
     return new Response(
       JSON.stringify({
         success: true,
-        otpCode, // Return for server-side verification
         expiresAt: expiresAt.toISOString(),
         messageId: responseData.id,
       }),
