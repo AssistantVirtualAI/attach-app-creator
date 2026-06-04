@@ -148,7 +148,7 @@ export function AgencyTab() {
 
           {/* Workspace ID */}
           <div className="space-y-2">
-            <Label>Workspace ID</Label>
+            <Label>{t('settings.agency.workspaceId')}</Label>
             <div className="flex gap-2">
               <Input
                 value={selectedOrgId || ''}
