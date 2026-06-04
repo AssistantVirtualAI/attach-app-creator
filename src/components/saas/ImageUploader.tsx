@@ -65,10 +65,10 @@ export const ImageUploader = ({
         .getPublicUrl(fileName);
 
       onUpload(publicUrl);
-      toast.success('Image téléchargée avec succès');
+      toast.success(t('settings.uploader.success'));
     } catch (error: any) {
       console.error('Upload error:', error);
-      toast.error('Erreur lors du téléchargement');
+      toast.error(t('settings.uploader.error'));
     } finally {
       setUploading(false);
     }
