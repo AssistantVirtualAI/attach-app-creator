@@ -1,3 +1,4 @@
+import { useTranslation } from '@/hooks/useTranslation';
 import { useState } from 'react';
 import {
   User, BarChart3, BookOpen, History, Volume2, Music, Mic,
@@ -37,6 +38,7 @@ interface ElevenLabsAPISectionsProps {
 }
 
 export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, voiceId }: ElevenLabsAPISectionsProps) {
+  const { t } = useTranslation();
   const proxyParams = { apiKey, organizationId };
   const isEnabled = !!(apiKey || organizationId);
 
@@ -66,7 +68,7 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
   const playBase64Audio = (base64: string) => {
     const audioUrl = `data:audio/mpeg;base64,${base64}`;
     const audio = new Audio(audioUrl);
-    audio.play().catch(() => toast.error('Erreur lecture audio'));
+    audio.play().catch(() => toast.error(t('componentUi.elevenLabsApi.audioError')));
   };
 
   const sub = userInfo?.subscription;
@@ -84,8 +86,8 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
               <User className="h-5 w-5 text-emerald-500" />
             </div>
             <div className="text-left">
-              <h3 className="font-semibold">Compte & Utilisation</h3>
-              <p className="text-sm text-muted-foreground">Abonnement, crédits et statistiques</p>
+              <h3 className="font-semibold">{t('componentUi.elevenLabsApi.accountUsage')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.elevenLabsApi.accountUsageDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
@@ -99,27 +101,27 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
             <div className="space-y-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Plan</p>
+                  <p className="text-xs text-muted-foreground">{t('componentUi.elevenLabsApi.plan')}</p>
                   <p className="font-semibold capitalize">{sub.tier || 'Free'}</p>
                 </div>
                 <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Statut</p>
+                  <p className="text-xs text-muted-foreground">{t('componentUi.elevenLabsApi.status')}</p>
                   <Badge variant={sub.status === 'active' ? 'default' : 'secondary'}>{sub.status || 'N/A'}</Badge>
                 </div>
                 <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Voix</p>
+                  <p className="text-xs text-muted-foreground">{t('componentUi.elevenLabsApi.voices')}</p>
                   <p className="font-semibold">{sub.voice_add_edit_counter || 0}/{sub.voice_limit || 0}</p>
                 </div>
                 <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Clonage</p>
+                  <p className="text-xs text-muted-foreground">{t('componentUi.elevenLabsApi.cloning')}</p>
                   <Badge variant={sub.can_use_instant_voice_cloning ? 'default' : 'secondary'}>
-                    {sub.can_use_instant_voice_cloning ? 'Activé' : 'Non'}
+                    {sub.can_use_instant_voice_cloning ? t('componentUi.elevenLabsApi.enabled') : t('componentUi.elevenLabsApi.no')}
                   </Badge>
                 </div>
               </div>
               <div>
                 <div className="flex justify-between mb-2">
-                  <Label>Caractères utilisés</Label>
+                  <Label>{t('componentUi.elevenLabsApi.charsUsed')}</Label>
                   <span className="text-sm text-muted-foreground">
                     {charUsed.toLocaleString()} / {charLimit.toLocaleString()}
                   </span>
@@ -127,13 +129,13 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
                 <Progress value={charPercent} className="h-3" />
                 <p className="text-xs text-muted-foreground mt-2">
                   {sub.next_character_count_reset_unix
-                    ? `Réinitialisation: ${new Date(sub.next_character_count_reset_unix * 1000).toLocaleDateString()}`
+                    ? `${t('componentUi.elevenLabsApi.resetDate')} ${new Date(sub.next_character_count_reset_unix * 1000).toLocaleDateString()}`
                     : ''}
                 </p>
               </div>
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">Impossible de charger les infos du compte</p>
+            <p className="text-muted-foreground text-sm">{t('componentUi.elevenLabsApi.cannotLoadAccount')}</p>
           )}
         </AccordionContent>
       </AccordionItem>
@@ -146,19 +148,19 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
               <Volume2 className="h-5 w-5 text-blue-500" />
             </div>
             <div className="text-left">
-              <h3 className="font-semibold">Text-to-Speech</h3>
-              <p className="text-sm text-muted-foreground">Tester la synthèse vocale</p>
+              <h3 className="font-semibold">{t('componentUi.elevenLabsApi.tts')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.elevenLabsApi.ttsDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
         <AccordionContent className="px-6 pb-6">
           <div className="space-y-4">
             <div>
-              <Label>Texte à convertir</Label>
+              <Label>{t('componentUi.elevenLabsApi.textToConvert')}</Label>
               <Textarea
                 value={ttsText}
                 onChange={(e) => setTtsText(e.target.value)}
-                placeholder="Entrez le texte à convertir en parole..."
+                {...{placeholder: t('componentUi.elevenLabsApi.textPlaceholder')}}
                 rows={3}
                 className="mt-2"
                 disabled={!canEdit}
@@ -166,7 +168,7 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>Modèle</Label>
+                <Label>{t('componentUi.elevenLabsApi.model')}</Label>
                 <Select value={ttsModel} onValueChange={setTtsModel} disabled={!canEdit}>
                   <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -177,7 +179,7 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
                 </Select>
               </div>
               <div>
-                <Label>Format de sortie</Label>
+                <Label>{t('componentUi.elevenLabsApi.outputFormat')}</Label>
                 <Select value={ttsFormat} onValueChange={setTtsFormat} disabled={!canEdit}>
                   <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -191,8 +193,8 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
             {canEdit && (
               <Button
                 onClick={async () => {
-                  if (!ttsText.trim()) { toast.error('Entrez un texte'); return; }
-                  if (!voiceId) { toast.error('Sélectionnez une voix dans la section TTS'); return; }
+                  if (!ttsText.trim()) { toast.error(t('componentUi.elevenLabsApi.enterText')); return; }
+                  if (!voiceId) { toast.error(t('componentUi.elevenLabsApi.selectVoiceInTts')); return; }
                   const result = await generateTTS.mutateAsync({
                     ...proxyParams,
                     voiceId,
@@ -205,7 +207,7 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
                 disabled={generateTTS.isPending}
               >
                 {generateTTS.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-                Générer & Écouter
+                {t('componentUi.elevenLabsApi.generateListen')}
               </Button>
             )}
           </div>
@@ -220,25 +222,25 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
               <Mic className="h-5 w-5 text-yellow-500" />
             </div>
             <div className="text-left">
-              <h3 className="font-semibold">Effets Sonores</h3>
-              <p className="text-sm text-muted-foreground">Générer des effets sonores par prompt</p>
+              <h3 className="font-semibold">{t('componentUi.elevenLabsApi.sfx')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.elevenLabsApi.sfxDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
         <AccordionContent className="px-6 pb-6">
           <div className="space-y-4">
             <div>
-              <Label>Description de l'effet</Label>
+              <Label>{t('componentUi.elevenLabsApi.effectDesc')}</Label>
               <Input
                 value={sfxText}
                 onChange={(e) => setSfxText(e.target.value)}
-                placeholder="Ex: Bruit de pluie sur un toit en métal..."
+                {...{placeholder: t('componentUi.elevenLabsApi.sfxPlaceholder')}}
                 className="mt-2"
                 disabled={!canEdit}
               />
             </div>
             <div>
-              <Label>Durée ({sfxDuration}s)</Label>
+              <Label>{t('componentUi.elevenLabsApi.duration')} ({sfxDuration}s)</Label>
               <Slider
                 value={[sfxDuration]}
                 onValueChange={([v]) => setSfxDuration(v)}
@@ -252,7 +254,7 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
             {canEdit && (
               <Button
                 onClick={async () => {
-                  if (!sfxText.trim()) { toast.error('Décrivez l\'effet sonore'); return; }
+                  if (!sfxText.trim()) { toast.error(t('componentUi.elevenLabsApi.describeSfx')); return; }
                   const result = await generateSFX.mutateAsync({
                     ...proxyParams,
                     text: sfxText,
@@ -263,7 +265,7 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
                 disabled={generateSFX.isPending}
               >
                 {generateSFX.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-                Générer Effet Sonore
+                {t('componentUi.elevenLabsApi.generateEffect')}
               </Button>
             )}
           </div>
@@ -278,26 +280,26 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
               <Music className="h-5 w-5 text-pink-500" />
             </div>
             <div className="text-left">
-              <h3 className="font-semibold">Génération Musicale</h3>
-              <p className="text-sm text-muted-foreground">Créer de la musique par prompt</p>
+              <h3 className="font-semibold">{t('componentUi.elevenLabsApi.music')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.elevenLabsApi.musicDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
         <AccordionContent className="px-6 pb-6">
           <div className="space-y-4">
             <div>
-              <Label>Description de la musique</Label>
+              <Label>{t('componentUi.elevenLabsApi.musicDescLabel')}</Label>
               <Textarea
                 value={musicPrompt}
                 onChange={(e) => setMusicPrompt(e.target.value)}
-                placeholder="Ex: Musique d'attente téléphonique douce et professionnelle..."
+                {...{placeholder: t('componentUi.elevenLabsApi.musicPlaceholder')}}
                 rows={2}
                 className="mt-2"
                 disabled={!canEdit}
               />
             </div>
             <div>
-              <Label>Durée ({musicDuration}s)</Label>
+              <Label>{t('componentUi.elevenLabsApi.duration')} ({musicDuration}s)</Label>
               <Slider
                 value={[musicDuration]}
                 onValueChange={([v]) => setMusicDuration(v)}
@@ -311,7 +313,7 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
             {canEdit && (
               <Button
                 onClick={async () => {
-                  if (!musicPrompt.trim()) { toast.error('Décrivez la musique'); return; }
+                  if (!musicPrompt.trim()) { toast.error(t('componentUi.elevenLabsApi.describeMusic')); return; }
                   const result = await generateMusic.mutateAsync({
                     ...proxyParams,
                     prompt: musicPrompt,
@@ -322,7 +324,7 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
                 disabled={generateMusic.isPending}
               >
                 {generateMusic.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
-                Générer Musique
+                {t('componentUi.elevenLabsApi.generateMusic')}
               </Button>
             )}
           </div>
@@ -337,8 +339,8 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
               <BookOpen className="h-5 w-5 text-indigo-500" />
             </div>
             <div className="text-left">
-              <h3 className="font-semibold">Dictionnaires de Prononciation</h3>
-              <p className="text-sm text-muted-foreground">Règles de prononciation personnalisées</p>
+              <h3 className="font-semibold">{t('componentUi.elevenLabsApi.pronunciation')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.elevenLabsApi.pronunciationDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
@@ -346,10 +348,10 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                {Array.isArray(pronunciationDicts) ? pronunciationDicts.length : 0} dictionnaire(s)
+                {Array.isArray(pronunciationDicts) ? pronunciationDicts.length : 0} {t('componentUi.elevenLabsApi.dictCount')}
               </p>
               <Button variant="outline" size="sm" onClick={() => refetchDicts()}>
-                <RefreshCw className="h-3 w-3 mr-1" /> Actualiser
+                <RefreshCw className="h-3 w-3 mr-1" /> {t('componentUi.elevenLabsApi.refresh')}
               </Button>
             </div>
             {Array.isArray(pronunciationDicts) && pronunciationDicts.length > 0 ? (
@@ -377,7 +379,7 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">Aucun dictionnaire</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{t('componentUi.elevenLabsApi.noDictionaries')}</p>
             )}
           </div>
         </AccordionContent>
@@ -391,8 +393,8 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
               <History className="h-5 w-5 text-slate-500" />
             </div>
             <div className="text-left">
-              <h3 className="font-semibold">Historique</h3>
-              <p className="text-sm text-muted-foreground">Éléments audio générés récemment</p>
+              <h3 className="font-semibold">{t('componentUi.elevenLabsApi.history')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.elevenLabsApi.historyDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
@@ -400,10 +402,10 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                {Array.isArray(historyItems) ? historyItems.length : 0} élément(s)
+                {Array.isArray(historyItems) ? historyItems.length : 0} {t('componentUi.elevenLabsApi.itemCount')}
               </p>
               <Button variant="outline" size="sm" onClick={() => refetchHistory()}>
-                <RefreshCw className="h-3 w-3 mr-1" /> Actualiser
+                <RefreshCw className="h-3 w-3 mr-1" /> {t('componentUi.elevenLabsApi.refresh')}
               </Button>
             </div>
             {Array.isArray(historyItems) && historyItems.length > 0 ? (
@@ -438,7 +440,7 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">Aucun historique</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{t('componentUi.elevenLabsApi.noHistory')}</p>
             )}
           </div>
         </AccordionContent>
@@ -452,8 +454,8 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
               <BarChart3 className="h-5 w-5 text-teal-500" />
             </div>
             <div className="text-left">
-              <h3 className="font-semibold">Modèles Disponibles</h3>
-              <p className="text-sm text-muted-foreground">Liste complète des modèles ElevenLabs</p>
+              <h3 className="font-semibold">{t('componentUi.elevenLabsApi.models')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.elevenLabsApi.modelsDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
@@ -473,17 +475,17 @@ export function ElevenLabsAPISections({ apiKey, organizationId, canEdit = true, 
                   <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{model.description}</p>
                   <div className="flex items-center gap-2 mt-2">
                     <span className="text-xs text-muted-foreground">
-                      Langues: {model.languages?.length || 0}
+                      {t('componentUi.elevenLabsApi.languages')}: {model.languages?.length || 0}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      Coût: {model.token_cost_factor}x
+                      {t('componentUi.elevenLabsApi.cost')}: {model.token_cost_factor}x
                     </span>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-4">Chargement des modèles...</p>
+            <p className="text-sm text-muted-foreground text-center py-4">{t('componentUi.elevenLabsApi.loadingModels')}</p>
           )}
         </AccordionContent>
       </AccordionItem>

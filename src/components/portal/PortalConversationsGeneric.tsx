@@ -137,7 +137,7 @@ export default function PortalConversationsGeneric() {
     link.href = URL.createObjectURL(blob);
     link.download = `conversations_${session?.platform}_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
-    toast.success('Export CSV téléchargé');
+    toast.success(t('componentUi.conversations.exportCSVSuccess'));
   };
 
   return (
@@ -151,7 +151,7 @@ export default function PortalConversationsGeneric() {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => refetch()}>
               <RefreshCw className="h-4 w-4 mr-2" />
-              Actualiser
+              {t('componentUi.conversations.refresh')}
             </Button>
             <Button variant="outline" size="sm" onClick={exportToCSV}>
               <Download className="h-4 w-4 mr-2" />
@@ -164,7 +164,7 @@ export default function PortalConversationsGeneric() {
       {conversationsError && (
         <Card className="bg-card/50 backdrop-blur-sm border-border/30">
           <CardContent className="py-6 text-sm text-muted-foreground">
-            Impossible de charger les conversations. Vérifiez l'intégration et réessayez.
+            {t('componentUi.conversations.cannotLoadConversations')}
           </CardContent>
         </Card>
       )}
@@ -266,15 +266,15 @@ export default function PortalConversationsGeneric() {
               <div className="p-4">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                   <TabsList className="grid w-full grid-cols-3 mb-4">
-                    <TabsTrigger value="overview">Aperçu</TabsTrigger>
-                    <TabsTrigger value="audio">Audio</TabsTrigger>
-                    <TabsTrigger value="transcript">Transcript</TabsTrigger>
+                    <TabsTrigger value="overview">{t('componentUi.conversations.overview')}</TabsTrigger>
+                    <TabsTrigger value="audio">{t('componentUi.conversations.audio')}</TabsTrigger>
+                    <TabsTrigger value="transcript">{t('componentUi.conversations.transcript')}</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="overview" className="space-y-4">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
-                        <p className="text-xs text-muted-foreground">Durée</p>
+                        <p className="text-xs text-muted-foreground">{t('componentUi.conversations.duration')}</p>
                         <p className="font-medium">
                           {formatDuration(
                             selectedDetails?.end_timestamp && selectedDetails?.start_timestamp 
@@ -284,7 +284,7 @@ export default function PortalConversationsGeneric() {
                         </p>
                       </div>
                       <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
-                        <p className="text-xs text-muted-foreground">Statut</p>
+                        <p className="text-xs text-muted-foreground">{t('componentUi.conversations.statusLabel')}</p>
                         <p className="font-medium capitalize">
                           {selectedDetails?.call_status || selectedConversation?.status || 'N/A'}
                         </p>
@@ -320,7 +320,7 @@ export default function PortalConversationsGeneric() {
                     ) : (
                       <Card className="p-8 text-center bg-muted/10 border-border/30">
                         <Volume2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                        <p className="text-muted-foreground">Audio non disponible</p>
+                        <p className="text-muted-foreground">{t('componentUi.conversations.audioNotAvailable')}</p>
                       </Card>
                     )}
                   </TabsContent>
@@ -351,7 +351,7 @@ export default function PortalConversationsGeneric() {
                     ) : (
                       <Card className="p-8 text-center bg-muted/10 border-border/30">
                         <MessageSquare className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                        <p className="text-muted-foreground">Transcript non disponible</p>
+                        <p className="text-muted-foreground">{t('componentUi.conversations.transcriptNotAvailable')}</p>
                       </Card>
                     )}
                   </TabsContent>
