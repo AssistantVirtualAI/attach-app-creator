@@ -34,7 +34,7 @@ export function OrganizationsTab() {
     }
     setIsCreating(true);
     try {
-      const { data, error } = await supabase.rpc('create_organization_for_user', {
+      const { data, error } = await (supabase.rpc as any)('create_organization_for_user', {
         _name: name.trim(),
         _slug: slug.trim() || slugify(name),
       });
