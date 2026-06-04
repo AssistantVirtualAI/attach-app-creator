@@ -168,11 +168,11 @@ export function AgencyTab() {
           {/* ChatDash API Key */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label>ChatDash API Key</Label>
+              <Label>{t('settings.agency.apiKey')}</Label>
               {!isUltimatePlan && (
                 <Badge variant="secondary" className="text-xs">
                   <Lock className="w-3 h-3 mr-1" />
-                  Plan Ultimate
+                  {t('settings.agency.ultimatePlan')}
                 </Badge>
               )}
             </div>
