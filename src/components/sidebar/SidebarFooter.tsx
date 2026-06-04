@@ -41,7 +41,7 @@ export const SidebarFooter = () => {
       >
         <Link to="/billing?tab=plans">
           <Zap className="w-4 h-4" />
-          Plan de mise à niveau
+          {t('sidebar.upgradePlan') || 'Upgrade plan'}
         </Link>
       </Button>
 
