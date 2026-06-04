@@ -378,8 +378,9 @@ const SuperAdminDashboard = () => {
                         <TableHead>{texts.table.plan}</TableHead>
                         <TableHead>{texts.table.status}</TableHead>
                         <TableHead>{texts.table.created}</TableHead>
-                        <TableHead>{texts.table.trialEnds}</TableHead>
+                        <TableHead className="text-right">{language === 'fr' ? 'Membres' : 'Members'}</TableHead>
                         <TableHead className="text-right">{texts.table.clients}</TableHead>
+                        <TableHead className="text-right">{language === 'fr' ? 'Usage' : 'Usage'}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
