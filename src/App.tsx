@@ -203,6 +203,14 @@ const App = () => (
                   }
                 />
                 <Route
+                  path="/profile"
+                  element={
+                    <ProtectedRoute>
+                      <Profile />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/clients"
                   element={
                     <ProtectedRoute>
