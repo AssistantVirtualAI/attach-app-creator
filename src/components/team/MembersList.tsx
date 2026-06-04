@@ -18,8 +18,10 @@ interface MembersListProps {
   members: TeamMember[];
   onUpdateRole: (userId: string, newRole: 'org_admin' | 'manager' | 'agent' | 'viewer') => void;
   onRemoveMember: (userId: string) => void;
+  onSelectMember?: (member: TeamMember) => void;
   currentUserId?: string;
 }
+
 
 const roleLabels: Record<string, { label: string; color: string }> = {
   super_admin: { label: 'Super Admin', color: 'bg-red-500/10 text-red-500' },
