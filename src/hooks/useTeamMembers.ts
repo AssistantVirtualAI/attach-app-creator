@@ -57,11 +57,14 @@ export const useTeamMembers = () => {
       const profilesMap = new Map(profilesRes.data?.map(p => [p.id, p]));
       const rolesMap = new Map(rolesRes.data?.map(r => [r.user_id, r]));
 
-      return members.map(m => ({
-        ...m,
-        profile: profilesMap.get(m.user_id) || null,
-        role: rolesMap.get(m.user_id) || null,
-      }));
+      return members
+        .map(m => ({
+          ...m,
+          profile: profilesMap.get(m.user_id) || null,
+          role: rolesMap.get(m.user_id) || null,
+        }))
+        .filter(m => m.role?.role !== 'super_admin');
+
     },
     enabled: !!selectedOrgId,
   });
