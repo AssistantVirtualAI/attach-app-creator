@@ -128,6 +128,11 @@ export const useSuperAdminStats = () => {
           return trialEnd <= threeDaysFromNow && trialEnd >= now;
         }).length,
         totalClients: Object.values(clientCountMap).reduce((a, b) => a + b, 0),
+        totalMembers: Object.values(memberCountMap).reduce((a, b) => a + b, 0),
+        totalCreditsUsed: organizations.reduce(
+          (sum, o) => sum + (o.billing_config?.credits_used || 0),
+          0
+        ),
         planDistribution: {},
         growthData: [],
       };
