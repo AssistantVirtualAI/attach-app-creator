@@ -75,8 +75,18 @@ serve(async (req) => {
       });
     }
 
-    // list is viewable by admin/manager; upsert is admin-only
+    // list is viewable by org members; upsert is admin-only
     if (action === "list") {
+      const [{ data: isSuperAdmin }, { data: membership }] = await Promise.all([
+        supabase.rpc("is_super_admin", { _user_id: userRes.user.id }),
+        supabase.from("organization_members").select("id").eq("organization_id", organization_id).eq("user_id", userRes.user.id).maybeSingle(),
+      ]);
+      if (!isSuperAdmin && !membership) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const { data: rows, error } = await supabase
         .from("org_role_permissions")
         .select("role, permission, allowed")
@@ -86,6 +96,7 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     if (action === "upsert") {
       const ok = await canManagePermissions(supabase, userRes.user.id, organization_id);
