@@ -105,8 +105,8 @@ export function AgencyTab() {
               <Building className="w-6 h-6 text-white" />
             </div>
             <div>
-              <CardTitle>Configuration de l'Agence</CardTitle>
-              <CardDescription>Paramètres généraux de votre organisation</CardDescription>
+              <CardTitle>{t('settings.agency.title')}</CardTitle>
+              <CardDescription>{t('settings.agency.description')}</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -114,7 +114,7 @@ export function AgencyTab() {
           {/* Logos */}
           <div className="grid md:grid-cols-2 gap-6">
             <ImageUploader
-              label="Logo Dashboard"
+              label={t('settings.agency.logoDashboard')}
               currentUrl={config.logo_dashboard_url}
               organizationId={selectedOrgId || ''}
               folder="logos"
