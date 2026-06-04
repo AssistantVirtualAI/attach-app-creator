@@ -92,7 +92,8 @@ export const MembersList = ({ members, onUpdateRole, onRemoveMember, onSelectMem
                   ? format(new Date(member.accepted_at), 'dd MMM yyyy', { locale: fr })
                   : 'En attente'}
               </TableCell>
-              <TableCell>
+              <TableCell onClick={(e) => e.stopPropagation()}>
+
                 {!isCurrentUser && role !== 'super_admin' && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
