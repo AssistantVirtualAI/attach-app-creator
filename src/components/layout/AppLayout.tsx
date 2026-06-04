@@ -195,58 +195,43 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
             </button>
           </div>
 
-          {/* Role Badge & Theme/Language Toggle */}
-          <div className="px-4 py-3 border-b border-sidebar-border flex items-center justify-between">
-            {role && (
-              <Badge variant="outline" className="text-xs border-primary/40 bg-primary/10 text-foreground font-medium">
-                {getRoleBadge()}
-              </Badge>
-            )}
-            <div className="flex items-center gap-1">
-              <OrgSwitcher />
-              <NotificationsBell />
-              {/* Language Toggle */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 hover:bg-muted"
-                  >
-                    <Globe className="w-4 h-4 text-muted-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem 
-                    onClick={() => setLanguage('en')}
-                    className={language === 'en' ? 'bg-primary/10' : ''}
-                  >
-                    🇬🇧 English
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={() => setLanguage('fr')}
-                    className={language === 'fr' ? 'bg-primary/10' : ''}
-                  >
-                    🇫🇷 Français
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Theme Toggle */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleTheme}
-                className="h-8 w-8 hover:bg-muted"
-              >
-                {theme === 'dark' ? (
-                  <Sun className="w-4 h-4 text-warning" />
-                ) : (
-                  <Moon className="w-4 h-4 text-primary" />
-                )}
-              </Button>
+          {/* Org Switcher + Toolbar */}
+          <div className="px-4 py-3 border-b border-sidebar-border space-y-2">
+            <OrgSwitcher />
+            <div className="flex items-center justify-between gap-2">
+              {role && (
+                <Badge variant="outline" className="text-[10px] px-2 py-0.5 border-primary/40 bg-primary/10 text-foreground font-medium whitespace-nowrap truncate max-w-[120px]">
+                  {getRoleBadge()}
+                </Badge>
+              )}
+              <div className="flex items-center gap-0.5 ml-auto">
+                <NotificationsBell />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted">
+                      <Globe className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setLanguage('en')} className={language === 'en' ? 'bg-primary/10' : ''}>
+                      🇬🇧 English
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setLanguage('fr')} className={language === 'fr' ? 'bg-primary/10' : ''}>
+                      🇫🇷 Français
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8 hover:bg-muted">
+                  {theme === 'dark' ? (
+                    <Sun className="w-4 h-4 text-warning" />
+                  ) : (
+                    <Moon className="w-4 h-4 text-primary" />
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
+
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
