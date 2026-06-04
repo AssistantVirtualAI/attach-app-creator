@@ -691,6 +691,7 @@ export const en = {
     agentReports: 'Agent Reports',
     knowledgeBase: 'Knowledge Base',
     clients: 'Clients',
+    upgradePlan: 'Upgrade plan',
     leads: 'Leads',
     appointments: 'Appointments',
     campaignsList: 'Campaigns',
