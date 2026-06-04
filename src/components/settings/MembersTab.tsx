@@ -91,6 +91,7 @@ export function MembersTab() {
               members={members}
               onUpdateRole={(userId, role) => updateMemberRole.mutate({ userId, newRole: role })}
               onRemoveMember={(userId) => removeMember.mutate(userId)}
+              onSelectMember={canManageMembers ? setSelectedMember : undefined}
               currentUserId={user?.id}
             />
           )}
@@ -104,6 +105,14 @@ export function MembersTab() {
         onCreateMember={(data) => createMember.mutateAsync(data)}
         isLoading={createMember.isPending}
       />
+
+      {/* Detail Modal */}
+      <MemberDetailDialog
+        member={selectedMember}
+        isOpen={!!selectedMember}
+        onClose={() => setSelectedMember(null)}
+      />
     </div>
   );
 }
+
