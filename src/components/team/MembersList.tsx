@@ -56,7 +56,12 @@ export const MembersList = ({ members, onUpdateRole, onRemoveMember, onSelectMem
           const isCurrentUser = member.user_id === currentUserId;
 
           return (
-            <TableRow key={member.id}>
+            <TableRow
+              key={member.id}
+              className={onSelectMember ? 'cursor-pointer hover:bg-muted/40' : undefined}
+              onClick={() => onSelectMember?.(member)}
+            >
+
               <TableCell>
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
