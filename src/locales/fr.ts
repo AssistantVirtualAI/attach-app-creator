@@ -3225,7 +3225,9 @@ export const fr = {
       agents: { title: 'Agents IA', subtitle: 'Créez, ajustez et testez vos agents conversationnels.' },
       clients: { title: 'Clients', subtitle: 'Intégrez vos clients et assignez-leur des agents.' },
       settings: { title: 'Paramètres', subtitle: 'Personnalisez votre espace, invitez votre équipe, gérez la facturation.' },
-      integrations: { title: 'Intégrations', subtitle: 'Connectez les plateformes vocales et numéros de téléphone.' },
+      integrations: { title: 'Intégrations', subtitle: 'Connectez plateformes vocales, numéros et webhooks.' },
+      analytics: { title: 'Analytique & insights', subtitle: 'Interprétez vos conversations, leads et performance.' },
+      security: { title: 'Sécurité & conformité', subtitle: 'Rôles, journaux d\'audit, RGPD, clés API.' },
     },
     lessons: {
       createAgent: {
