@@ -47,7 +47,7 @@ const ClientAgentPortalContent = () => {
   const location = useLocation();
   const { t } = useTranslation();
   const { language, setLanguage } = useLanguage();
-  useApplyBranding(session?.organizationId);
+  useApplyBranding(session?.organizationId, 'client');
   const [adminLoginAttempted, setAdminLoginAttempted] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
   
