@@ -266,7 +266,7 @@ serve(async (req) => {
         .eq('id', integration.id);
 
       return new Response(
-        JSON.stringify({ success: true, access_token: tokens.access_token }),
+        JSON.stringify({ success: true }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
