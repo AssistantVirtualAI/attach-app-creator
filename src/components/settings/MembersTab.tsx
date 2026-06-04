@@ -119,7 +119,16 @@ export function MembersTab() {
         isOpen={!!selectedMember}
         onClose={() => setSelectedMember(null)}
       />
+
+      {/* Reset Password Modal */}
+      <MemberDetailDialog
+        member={resetMember}
+        isOpen={!!resetMember}
+        onClose={() => setResetMember(null)}
+        focusReset
+      />
     </div>
   );
 }
+
 
