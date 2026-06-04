@@ -214,14 +214,14 @@ export function AgencyTab() {
           <div className="flex items-center justify-between">
             <div className="space-y-1 flex-1">
               <div className="flex items-center gap-2">
-                <Label>Conformité HIPAA</Label>
+                <Label>{t('settings.agency.hipaa')}</Label>
                 <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-500 border-blue-500/30">
                   <Shield className="w-3 h-3 mr-1" />
-                  Get HIPAA Compliance
+                  {t('settings.agency.getHipaa')}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Activer les fonctionnalités de conformité HIPAA pour les données de santé
+                {t('settings.agency.hipaaDesc')}
               </p>
             </div>
             <Switch
