@@ -46,6 +46,21 @@ const FEATURE_MATRIX: Record<string, Feature[]> = {
     'priority_support',
     'dedicated_support',
   ],
+  enterprise: [
+    'unlimited_agents',
+    'custom_domain',
+    'stripe_billing',
+    'email_templates',
+    'custom_kpis',
+    'outbound_campaigns',
+    'whitelabel_email',
+    'whitelabel_backend',
+    'api_access',
+    'priority_support',
+    'dedicated_support',
+    'hipaa_compliance',
+    'saas_configurator',
+  ],
 };
 
 const FEATURE_LABELS: Record<Feature, string> = {
