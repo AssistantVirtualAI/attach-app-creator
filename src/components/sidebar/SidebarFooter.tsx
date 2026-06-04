@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useClientStats } from '@/hooks/useClientStats';
 import { useAICredits } from '@/hooks/useAICredits';
 import { useTheme } from '@/context/ThemeContext';
+import { useTranslation } from '@/hooks/useTranslation';
 import { UserAvatar } from './UserAvatar';
 import { motion } from 'framer-motion';
 
@@ -11,6 +12,7 @@ export const SidebarFooter = () => {
   const { activeClients, clientLimit } = useClientStats();
   const { credits } = useAICredits();
   const { theme, toggleTheme } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <div className="p-4 border-t border-sidebar-border space-y-3 bg-muted/30">
