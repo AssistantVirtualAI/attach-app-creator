@@ -3109,4 +3109,4 @@ export const fr = {
       ambientCallCenter: "Centre d'appel",
     },
   },
-;
+};
