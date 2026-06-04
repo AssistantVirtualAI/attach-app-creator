@@ -428,7 +428,7 @@ export const DocumentationTab = () => {
 
               <Card className="border-border/60">
                 <CardContent className="p-2 md:p-4">
-                  <Accordion type="single" collapsible defaultValue={current.lessons[0]?.id}>
+                  <Accordion type="multiple" defaultValue={current.lessons.map((l) => l.id)}>
                     {current.lessons.map((lesson, i) => {
                       const steps = arr(lesson.stepsKey);
                       return (
