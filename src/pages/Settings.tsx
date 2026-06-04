@@ -43,10 +43,12 @@ const Settings = () => {
               <Building className="w-4 h-4" />
               <span className="hidden sm:inline">{t('settings.tabs.agency')}</span>
             </TabsTrigger>
-            <TabsTrigger value="organizations" className="gap-2">
-              <Building2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Organisations</span>
-            </TabsTrigger>
+            {isSuperAdmin && (
+              <TabsTrigger value="organizations" className="gap-2">
+                <Building2 className="w-4 h-4" />
+                <span className="hidden sm:inline">{t('settings.tabs.organizations')}</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="whitelabel" className="gap-2">
               <Palette className="w-4 h-4" />
               <span className="hidden sm:inline">{t('settings.tabs.whitelabel')}</span>
