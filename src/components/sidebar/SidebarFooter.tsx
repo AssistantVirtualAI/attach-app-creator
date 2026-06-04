@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useClientStats } from '@/hooks/useClientStats';
 import { useAICredits } from '@/hooks/useAICredits';
 import { useTheme } from '@/context/ThemeContext';
+import { useTranslation } from '@/hooks/useTranslation';
 import { UserAvatar } from './UserAvatar';
 import { motion } from 'framer-motion';
 
@@ -11,12 +12,13 @@ export const SidebarFooter = () => {
   const { activeClients, clientLimit } = useClientStats();
   const { credits } = useAICredits();
   const { theme, toggleTheme } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <div className="p-4 border-t border-sidebar-border space-y-3 bg-muted/30">
       {/* Client Stats */}
       <div className="flex items-center justify-between text-sm px-3 py-2.5 rounded-lg bg-muted border border-border">
-        <span className="text-muted-foreground font-medium">Clientèle:</span>
+        <span className="text-muted-foreground font-medium">{t('sidebar.clients') || 'Clients'}:</span>
         <span className="font-semibold text-foreground">
           {activeClients} / {clientLimit}
         </span>
@@ -39,7 +41,7 @@ export const SidebarFooter = () => {
       >
         <Link to="/billing?tab=plans">
           <Zap className="w-4 h-4" />
-          Plan de mise à niveau
+          {t('sidebar.upgradePlan') || 'Upgrade plan'}
         </Link>
       </Button>
 

@@ -20,6 +20,7 @@ import Conversations from "./pages/Conversations";
 import ConversationDetail from "./pages/ConversationDetail";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import Settings from "./pages/Settings";
+import Profile from "./pages/Profile";
 import Clients from "./pages/Clients";
 import Integrations from "./pages/Integrations";
 import WebhookLogs from "./pages/WebhookLogs";
@@ -198,6 +199,14 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <Settings />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/profile"
+                  element={
+                    <ProtectedRoute>
+                      <Profile />
                     </ProtectedRoute>
                   }
                 />
