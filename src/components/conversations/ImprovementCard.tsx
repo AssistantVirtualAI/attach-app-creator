@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export interface Improvement {
   category: 'tone' | 'response_speed' | 'knowledge' | 'clarity' | 'problem_solving' | 'handoff';
@@ -31,37 +32,31 @@ interface ImprovementCardProps {
 const categoryConfig = {
   tone: {
     icon: MessageSquare,
-    label: 'Ton & Empathie',
     color: 'text-purple-500',
     bgColor: 'bg-purple-500/10'
   },
   response_speed: {
     icon: Zap,
-    label: 'Rapidité',
     color: 'text-yellow-500',
     bgColor: 'bg-yellow-500/10'
   },
   knowledge: {
     icon: BookOpen,
-    label: 'Connaissances',
     color: 'text-blue-500',
     bgColor: 'bg-blue-500/10'
   },
   clarity: {
     icon: Eye,
-    label: 'Clarté',
     color: 'text-cyan-500',
     bgColor: 'bg-cyan-500/10'
   },
   problem_solving: {
     icon: Wrench,
-    label: 'Résolution',
     color: 'text-green-500',
     bgColor: 'bg-green-500/10'
   },
   handoff: {
     icon: UserCheck,
-    label: 'Transfert',
     color: 'text-orange-500',
     bgColor: 'bg-orange-500/10'
   }
@@ -70,21 +65,18 @@ const categoryConfig = {
 const priorityConfig = {
   high: {
     icon: AlertTriangle,
-    label: 'Priorité haute',
     color: 'text-red-500',
     bgColor: 'bg-red-500/10',
     borderColor: 'border-red-500/30'
   },
   medium: {
     icon: AlertCircle,
-    label: 'Priorité moyenne',
     color: 'text-orange-500',
     bgColor: 'bg-orange-500/10',
     borderColor: 'border-orange-500/30'
   },
   low: {
     icon: Info,
-    label: 'Priorité basse',
     color: 'text-blue-500',
     bgColor: 'bg-blue-500/10',
     borderColor: 'border-blue-500/30'
@@ -92,10 +84,26 @@ const priorityConfig = {
 };
 
 export function ImprovementCard({ improvement, index = 0 }: ImprovementCardProps) {
+  const { t } = useTranslation();
   const category = categoryConfig[improvement.category] || categoryConfig.knowledge;
   const priority = priorityConfig[improvement.priority] || priorityConfig.medium;
   const CategoryIcon = category.icon;
   const PriorityIcon = priority.icon;
+
+  const categoryLabel: Record<string, string> = {
+    tone: t('componentUi.improvementCard.tone'),
+    response_speed: t('componentUi.improvementCard.responseSpeed'),
+    knowledge: t('componentUi.improvementCard.knowledge'),
+    clarity: t('componentUi.improvementCard.clarity'),
+    problem_solving: t('componentUi.improvementCard.problemSolving'),
+    handoff: t('componentUi.improvementCard.handoff'),
+  };
+
+  const priorityLabel: Record<string, string> = {
+    high: t('componentUi.improvementCard.highPriority'),
+    medium: t('componentUi.improvementCard.mediumPriority'),
+    low: t('componentUi.improvementCard.lowPriority'),
+  };
 
   return (
     <motion.div
@@ -117,7 +125,7 @@ export function ImprovementCard({ improvement, index = 0 }: ImprovementCardProps
                 <CategoryIcon className={cn("w-4 h-4", category.color)} />
               </div>
               <CardTitle className="text-sm font-medium">
-                {category.label}
+                {categoryLabel[improvement.category] || improvement.category}
               </CardTitle>
             </div>
             <Badge 
@@ -129,7 +137,7 @@ export function ImprovementCard({ improvement, index = 0 }: ImprovementCardProps
               )}
             >
               <PriorityIcon className="w-3 h-3 mr-1" />
-              {priority.label}
+              {priorityLabel[improvement.priority] || improvement.priority}
             </Badge>
           </div>
         </CardHeader>
@@ -145,7 +153,7 @@ export function ImprovementCard({ improvement, index = 0 }: ImprovementCardProps
           {/* Exemple tiré de la conversation */}
           {improvement.example && (
             <div className="pl-6">
-              <div className="text-xs text-muted-foreground mb-1">Exemple:</div>
+              <div className="text-xs text-muted-foreground mb-1">{t('componentUi.improvementCard.example')}</div>
               <div className="text-xs bg-muted/50 rounded-lg p-2 italic">
                 "{improvement.example}"
               </div>
@@ -155,7 +163,7 @@ export function ImprovementCard({ improvement, index = 0 }: ImprovementCardProps
           {/* Action recommandée */}
           {improvement.recommended_action && (
             <div className="pl-6 pt-2 border-t border-border/50">
-              <div className="text-xs text-muted-foreground mb-1">Action recommandée:</div>
+              <div className="text-xs text-muted-foreground mb-1">{t('componentUi.improvementCard.recommendedAction')}</div>
               <div className="text-sm text-primary font-medium">
                 → {improvement.recommended_action}
               </div>
@@ -172,12 +180,14 @@ interface ImprovementsListProps {
 }
 
 export function ImprovementsList({ improvements }: ImprovementsListProps) {
+  const { t } = useTranslation();
+
   if (!improvements || improvements.length === 0) {
     return (
       <Card className="glass-card p-6 text-center">
         <div className="text-4xl mb-2">🎉</div>
         <p className="text-muted-foreground">
-          Aucune amélioration suggérée - Excellent travail!
+          {t('componentUi.improvementCard.noImprovements')}
         </p>
       </Card>
     );

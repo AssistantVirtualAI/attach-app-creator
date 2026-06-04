@@ -1,3 +1,4 @@
+import { useTranslation } from '@/hooks/useTranslation';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -56,14 +57,14 @@ const RETELL_LANGUAGES = [
   { value: 'multi', label: 'Multilingual' },
 ];
 
-const AMBIENT_SOUNDS = [
-  { value: 'none', label: 'Aucun' },
-  { value: 'coffee-shop', label: 'Café' },
-  { value: 'convention-hall', label: 'Hall de convention' },
-  { value: 'summer-outdoor', label: 'Extérieur été' },
-  { value: 'mountain-outdoor', label: 'Montagne' },
-  { value: 'static-noise', label: 'Bruit statique' },
-  { value: 'call-center', label: 'Centre d\'appel' },
+const AMBIENT_SOUNDS = (t: (k: string) => string) => [
+  { value: 'none', label: t('componentUi.retellConfig.ambientNone') },
+  { value: 'coffee-shop', label: t('componentUi.retellConfig.ambientCoffeeShop') },
+  { value: 'convention-hall', label: t('componentUi.retellConfig.ambientConventionHall') },
+  { value: 'summer-outdoor', label: t('componentUi.retellConfig.ambientSummerOutdoor') },
+  { value: 'mountain-outdoor', label: t('componentUi.retellConfig.ambientMountainOutdoor') },
+  { value: 'static-noise', label: t('componentUi.retellConfig.ambientStaticNoise') },
+  { value: 'call-center', label: t('componentUi.retellConfig.ambientCallCenter') },
 ];
 
 const LLM_MODELS = [
@@ -82,6 +83,7 @@ export function RetellFullConfigTab({
   apiKey,
   canEdit = true,
 }: RetellFullConfigTabProps) {
+  const { t } = useTranslation();
   const { data: config, isLoading, refetch } = useRetellFullAgentConfig({
     agentId: platformAgentId,
     organizationId,
@@ -211,7 +213,7 @@ export function RetellFullConfigTab({
       <Card className="p-8 text-center">
         <Settings2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
         <p className="text-muted-foreground">
-          Configurez d'abord l'ID de l'agent Retell dans l'onglet Config
+          {t('componentUi.retellConfig.configureFirst')}
         </p>
       </Card>
     );
@@ -236,19 +238,19 @@ export function RetellFullConfigTab({
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-semibold">Configuration Retell AI</h2>
+            <h2 className="text-xl font-semibold">{t('componentUi.retellConfig.title')}</h2>
             <Badge variant="secondary" className="bg-orange-500/10 text-orange-600 border-orange-500/20">
               Retell AI
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            Paramétrez tous les aspects de votre agent vocal Retell
+            {t('componentUi.retellConfig.desc')}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-2" />
-            Actualiser
+            {t('componentUi.retellConfig.refresh')}
           </Button>
           {canEdit && (
             <Button size="sm" variant="secondary" onClick={handlePublish} disabled={publishAgent.isPending}>
@@ -268,30 +270,30 @@ export function RetellFullConfigTab({
                 <Brain className="h-5 w-5 text-primary" />
               </div>
               <div className="text-left">
-                <h3 className="font-semibold">Prompt & LLM</h3>
-                <p className="text-sm text-muted-foreground">Instructions, premier message et modèle</p>
+                <h3 className="font-semibold">{t('componentUi.retellConfig.promptLlm')}</h3>
+                <p className="text-sm text-muted-foreground">{t('componentUi.retellConfig.promptLlmDesc')}</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-6">
               <div>
-                <Label className="text-base font-medium">Prompt Système</Label>
+                <Label className="text-base font-medium">{t('componentUi.retellConfig.systemPrompt')}</Label>
                 <Textarea
                   value={generalPrompt}
                   onChange={(e) => setGeneralPrompt(e.target.value)}
-                  placeholder="Instructions pour l'agent..."
+                  {...{placeholder: t('componentUi.retellConfig.instructionsPlaceholder')}}
                   className="mt-2 min-h-[200px] font-mono text-sm"
                   disabled={!canEdit}
                 />
               </div>
 
               <div>
-                <Label className="text-base font-medium">Premier Message</Label>
+                <Label className="text-base font-medium">{t('componentUi.retellConfig.firstMessage')}</Label>
                 <Textarea
                   value={beginMessage}
                   onChange={(e) => setBeginMessage(e.target.value)}
-                  placeholder="Bonjour, comment puis-je vous aider ?"
+                  {...{placeholder: t('componentUi.retellConfig.beginMessagePlaceholder')}}
                   className="mt-2 min-h-[80px]"
                   disabled={!canEdit}
                 />
@@ -299,7 +301,7 @@ export function RetellFullConfigTab({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label>Modèle LLM</Label>
+                  <Label>{t('componentUi.retellConfig.llmModel')}</Label>
                   <Select value={llmModel} onValueChange={setLlmModel} disabled={!canEdit}>
                     <SelectTrigger className="mt-2">
                       <SelectValue />
@@ -313,7 +315,7 @@ export function RetellFullConfigTab({
                 </div>
 
                 <div>
-                  <Label>Température ({modelTemperature.toFixed(1)})</Label>
+                  <Label>{t('componentUi.retellConfig.temperature')} ({modelTemperature.toFixed(1)})</Label>
                   <Slider
                     value={[modelTemperature]}
                     onValueChange={([v]) => setModelTemperature(v)}
@@ -324,7 +326,7 @@ export function RetellFullConfigTab({
                     disabled={!canEdit}
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    0 = Déterministe, 1 = Créatif
+                    {t('componentUi.retellConfig.deterministic')} = 0, 1 = {t('componentUi.retellConfig.creative')}
                   </p>
                 </div>
               </div>
@@ -332,7 +334,7 @@ export function RetellFullConfigTab({
               {/* Knowledge Base Selection */}
               {knowledgeBases && knowledgeBases.length > 0 && (
                 <div>
-                  <Label className="text-base font-medium">Bases de Connaissances</Label>
+                  <Label className="text-base font-medium">{t('componentUi.retellConfig.kbLabel')}</Label>
                   <div className="grid grid-cols-1 gap-2 mt-2">
                     {knowledgeBases.map((kb: any) => (
                       <div key={kb.knowledge_base_id} className="flex items-center gap-3 p-3 rounded-lg border">
@@ -367,7 +369,7 @@ export function RetellFullConfigTab({
                 >
                   {updateLLM.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   <Save className="h-4 w-4 mr-2" />
-                  Sauvegarder Prompt & LLM
+                  {t('componentUi.retellConfig.savePromptLlm')}
                 </Button>
               )}
 
@@ -375,7 +377,7 @@ export function RetellFullConfigTab({
                 <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
                   <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
                   <p className="text-sm text-amber-600">
-                    Cet agent n'utilise pas un Retell LLM. Le prompt ne peut pas être modifié ici.
+                    {t('componentUi.retellConfig.notRetellLlm')}
                   </p>
                 </div>
               )}
@@ -391,18 +393,18 @@ export function RetellFullConfigTab({
                 <Volume2 className="h-5 w-5 text-purple-500" />
               </div>
               <div className="text-left">
-                <h3 className="font-semibold">Voix & Audio</h3>
-                <p className="text-sm text-muted-foreground">Configuration vocale et son ambiant</p>
+                <h3 className="font-semibold">{t('componentUi.retellConfig.voiceAudio')}</h3>
+                <p className="text-sm text-muted-foreground">{t('componentUi.retellConfig.voiceAudioDesc')}</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-6">
               <div>
-                <Label>Voix</Label>
+                <Label>{t('componentUi.retellConfig.voice')}</Label>
                 <Select value={voiceId} onValueChange={setVoiceId} disabled={!canEdit}>
                   <SelectTrigger className="mt-2">
-                    <SelectValue placeholder="Sélectionner une voix" />
+                    <SelectValue {...{placeholder: t('componentUi.retellConfig.selectVoice')}} />
                   </SelectTrigger>
                   <SelectContent className="max-h-[300px]">
                     {voices?.map((voice) => (
@@ -420,18 +422,18 @@ export function RetellFullConfigTab({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label>Température voix ({voiceTemperature.toFixed(1)})</Label>
+                  <Label>{t('componentUi.retellConfig.voiceTemperature')} ({voiceTemperature.toFixed(1)})</Label>
                   <Slider value={[voiceTemperature]} onValueChange={([v]) => setVoiceTemperature(v)} min={0} max={2} step={0.1} className="mt-4" disabled={!canEdit} />
-                  <p className="text-xs text-muted-foreground mt-2">Variabilité de la voix</p>
+                  <p className="text-xs text-muted-foreground mt-2">{t('componentUi.retellConfig.voiceVariability')}</p>
                 </div>
                 <div>
-                  <Label>Vitesse ({voiceSpeed.toFixed(1)}x)</Label>
+                  <Label>{t('componentUi.retellConfig.speed')} ({voiceSpeed.toFixed(1)}x)</Label>
                   <Slider value={[voiceSpeed]} onValueChange={([v]) => setVoiceSpeed(v)} min={0.5} max={2} step={0.1} className="mt-4" disabled={!canEdit} />
                 </div>
               </div>
 
               <div>
-                <Label>Langue</Label>
+                <Label>{t('componentUi.retellConfig.language')}</Label>
                 <Select value={language} onValueChange={setLanguage} disabled={!canEdit}>
                   <SelectTrigger className="mt-2">
                     <SelectValue />
@@ -446,13 +448,13 @@ export function RetellFullConfigTab({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label>Son ambiant</Label>
+                  <Label>{t('componentUi.retellConfig.ambientSound')}</Label>
                   <Select value={ambientSound} onValueChange={setAmbientSound} disabled={!canEdit}>
                     <SelectTrigger className="mt-2">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {AMBIENT_SOUNDS.map((s) => (
+                      {AMBIENT_SOUNDS(t).map((s) => (
                         <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                       ))}
                     </SelectContent>
@@ -460,7 +462,7 @@ export function RetellFullConfigTab({
                 </div>
                 {ambientSound !== 'none' && (
                   <div>
-                    <Label>Volume ambiant ({Math.round(ambientSoundVolume * 100)}%)</Label>
+                    <Label>{t('componentUi.retellConfig.ambientVolume')} ({Math.round(ambientSoundVolume * 100)}%)</Label>
                     <Slider value={[ambientSoundVolume]} onValueChange={([v]) => setAmbientSoundVolume(v)} min={0} max={2} step={0.1} className="mt-4" disabled={!canEdit} />
                   </div>
                 )}
@@ -477,8 +479,8 @@ export function RetellFullConfigTab({
                 <Zap className="h-5 w-5 text-green-500" />
               </div>
               <div className="text-left">
-                <h3 className="font-semibold">Comportement</h3>
-                <p className="text-sm text-muted-foreground">Réactivité, interruptions et mots-clés</p>
+                <h3 className="font-semibold">{t('componentUi.retellConfig.behavior')}</h3>
+                <p className="text-sm text-muted-foreground">{t('componentUi.retellConfig.behaviorDesc')}</p>
               </div>
             </div>
           </AccordionTrigger>
@@ -486,27 +488,27 @@ export function RetellFullConfigTab({
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label>Réactivité ({responsiveness.toFixed(1)})</Label>
+                  <Label>{t('componentUi.retellConfig.responsiveness')} ({responsiveness.toFixed(1)})</Label>
                   <Slider value={[responsiveness]} onValueChange={([v]) => setResponsiveness(v)} min={0} max={1} step={0.1} className="mt-4" disabled={!canEdit} />
-                  <p className="text-xs text-muted-foreground mt-2">0 = Attente longue, 1 = Réponse rapide</p>
+                  <p className="text-xs text-muted-foreground mt-2">{t('componentUi.retellConfig.slowResponse')} = 0, 1 = {t('componentUi.retellConfig.fastResponse')}</p>
                 </div>
                 <div>
-                  <Label>Sensibilité interruption ({interruptionSensitivity.toFixed(1)})</Label>
+                  <Label>{t('componentUi.retellConfig.interruptSensitivity')} ({interruptionSensitivity.toFixed(1)})</Label>
                   <Slider value={[interruptionSensitivity]} onValueChange={([v]) => setInterruptionSensitivity(v)} min={0} max={1} step={0.1} className="mt-4" disabled={!canEdit} />
-                  <p className="text-xs text-muted-foreground mt-2">0 = Ignore interruptions, 1 = Très sensible</p>
+                  <p className="text-xs text-muted-foreground mt-2">{t('componentUi.retellConfig.ignoreInterruptions')} = 0, 1 = {t('componentUi.retellConfig.verySensitive')}</p>
                 </div>
               </div>
 
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
-                  <Label className="text-base">Backchannel</Label>
-                  <p className="text-sm text-muted-foreground">L'agent émet des sons d'écoute (hmm, oui...)</p>
+                  <Label className="text-base">{t('componentUi.retellConfig.backchannel')}</Label>
+                  <p className="text-sm text-muted-foreground">{t('componentUi.retellConfig.backchannelDesc')}</p>
                 </div>
                 <Switch checked={enableBackchannel} onCheckedChange={setEnableBackchannel} disabled={!canEdit} />
               </div>
 
               <div>
-                <Label>Mots-clés boostés</Label>
+                <Label>{t('componentUi.retellConfig.boostedKeywords')}</Label>
                 <Input
                   value={boostedKeywords}
                   onChange={(e) => setBoostedKeywords(e.target.value)}
@@ -514,7 +516,7 @@ export function RetellFullConfigTab({
                   className="mt-2"
                   disabled={!canEdit}
                 />
-                <p className="text-xs text-muted-foreground mt-2">Améliore la reconnaissance de termes spécifiques</p>
+                <p className="text-xs text-muted-foreground mt-2">{t('componentUi.retellConfig.improveRecognition')}</p>
               </div>
             </div>
           </AccordionContent>
@@ -528,8 +530,8 @@ export function RetellFullConfigTab({
                 <Phone className="h-5 w-5 text-blue-500" />
               </div>
               <div className="text-left">
-                <h3 className="font-semibold">Paramètres d'Appel</h3>
-                <p className="text-sm text-muted-foreground">Durée, silence et messagerie vocale</p>
+                <h3 className="font-semibold">{t('componentUi.retellConfig.callSettings')}</h3>
+                <p className="text-sm text-muted-foreground">{t('componentUi.retellConfig.callSettingsDesc')}</p>
               </div>
             </div>
           </AccordionTrigger>
@@ -537,7 +539,7 @@ export function RetellFullConfigTab({
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label>Fin d'appel après silence ({Math.round(endCallAfterSilenceMs / 1000)}s)</Label>
+                  <Label>{t('componentUi.retellConfig.endAfterSilence')} ({Math.round(endCallAfterSilenceMs / 1000)}s)</Label>
                   <Slider
                     value={[endCallAfterSilenceMs]}
                     onValueChange={([v]) => setEndCallAfterSilenceMs(v)}
@@ -547,10 +549,10 @@ export function RetellFullConfigTab({
                     className="mt-4"
                     disabled={!canEdit}
                   />
-                  <p className="text-xs text-muted-foreground mt-2">Durée de silence avant de raccrocher</p>
+                  <p className="text-xs text-muted-foreground mt-2">{t('componentUi.retellConfig.silenceDuration')}</p>
                 </div>
                 <div>
-                  <Label>Durée max d'appel ({Math.round(maxCallDurationMs / 60000)} min)</Label>
+                  <Label>{t('componentUi.retellConfig.maxCallDuration')} ({Math.round(maxCallDurationMs / 60000)} min)</Label>
                   <Slider
                     value={[maxCallDurationMs]}
                     onValueChange={([v]) => setMaxCallDurationMs(v)}
@@ -565,14 +567,14 @@ export function RetellFullConfigTab({
 
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
-                  <Label className="text-base">Détection messagerie vocale</Label>
-                  <p className="text-sm text-muted-foreground">Détecte si l'appel tombe sur une boîte vocale</p>
+                  <Label className="text-base">{t('componentUi.retellConfig.voicemailDetection')}</Label>
+                  <p className="text-sm text-muted-foreground">{t('componentUi.retellConfig.voicemailDetectionDesc')}</p>
                 </div>
                 <Switch checked={enableVoicemailDetection} onCheckedChange={setEnableVoicemailDetection} disabled={!canEdit} />
               </div>
 
               <div>
-                <Label>URL Webhook</Label>
+                <Label>{t('componentUi.retellConfig.webhookUrl')}</Label>
                 <Input
                   value={webhookUrl}
                   onChange={(e) => setWebhookUrl(e.target.value)}
@@ -581,14 +583,14 @@ export function RetellFullConfigTab({
                   disabled={!canEdit}
                 />
                 <p className="text-xs text-muted-foreground mt-2">
-                  URL pour recevoir les événements d'appel en temps réel
+                  {t('componentUi.retellConfig.webhookDesc')}
                 </p>
               </div>
 
               {/* Phone Numbers Info */}
               {phoneNumbers && phoneNumbers.length > 0 && (
                 <div>
-                  <Label className="text-base font-medium">Numéros de téléphone</Label>
+                  <Label className="text-base font-medium">{t('componentUi.retellConfig.phoneNumbers')}</Label>
                   <div className="grid grid-cols-1 gap-2 mt-2">
                     {phoneNumbers.map((pn: any, idx: number) => (
                       <div key={idx} className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
@@ -620,8 +622,8 @@ export function RetellFullConfigTab({
                 <Shield className="h-5 w-5 text-red-500" />
               </div>
               <div className="text-left">
-                <h3 className="font-semibold">Confidentialité</h3>
-                <p className="text-sm text-muted-foreground">Données sensibles et stockage</p>
+                <h3 className="font-semibold">{t('componentUi.retellConfig.privacy')}</h3>
+                <p className="text-sm text-muted-foreground">{t('componentUi.retellConfig.privacyDesc')}</p>
               </div>
             </div>
           </AccordionTrigger>
@@ -629,9 +631,9 @@ export function RetellFullConfigTab({
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
-                  <Label className="text-base">Exclure le stockage de données sensibles</Label>
+                  <Label className="text-base">{t('componentUi.retellConfig.excludeSensitiveData')}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Empêche le stockage de données sensibles comme les transcriptions et les enregistrements
+                    {t('componentUi.retellConfig.excludeSensitiveDataDesc')}
                   </p>
                 </div>
                 <Switch checked={optOutSensitiveData} onCheckedChange={setOptOutSensitiveData} disabled={!canEdit} />
@@ -648,38 +650,38 @@ export function RetellFullConfigTab({
                 <Settings2 className="h-5 w-5 text-muted-foreground" />
               </div>
               <div className="text-left">
-                <h3 className="font-semibold">Informations</h3>
-                <p className="text-sm text-muted-foreground">Détails techniques</p>
+                <h3 className="font-semibold">{t('componentUi.retellConfig.info')}</h3>
+                <p className="text-sm text-muted-foreground">{t('componentUi.retellConfig.infoDesc')}</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="p-3 rounded-lg bg-muted/50">
-                <p className="text-xs text-muted-foreground">Agent ID</p>
+                <p className="text-xs text-muted-foreground">{t('componentUi.retellConfig.agentId')}</p>
                 <p className="font-mono text-sm truncate">{platformAgentId}</p>
               </div>
               {config?.agent?.agent_name && (
                 <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Nom</p>
+                  <p className="text-xs text-muted-foreground">{t('componentUi.retellConfig.nameLabel')}</p>
                   <p className="font-medium">{config.agent.agent_name}</p>
                 </div>
               )}
               {config?.llm?.llm_id && (
                 <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">LLM ID</p>
+                  <p className="text-xs text-muted-foreground">{t('componentUi.retellConfig.llmId')}</p>
                   <p className="font-mono text-sm truncate">{config.llm.llm_id}</p>
                 </div>
               )}
               {config?.agent?.response_engine?.type && (
                 <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-xs text-muted-foreground">Response Engine</p>
+                  <p className="text-xs text-muted-foreground">{t('componentUi.retellConfig.responseEngine')}</p>
                   <p className="font-medium">{config.agent.response_engine.type}</p>
                 </div>
               )}
               {voiceId && (
                 <div className="p-3 rounded-lg bg-muted/50 col-span-2">
-                  <p className="text-xs text-muted-foreground">Voice ID</p>
+                  <p className="text-xs text-muted-foreground">{t('componentUi.retellConfig.voiceIdLabel')}</p>
                   <p className="font-mono text-sm">{voiceId}</p>
                 </div>
               )}
@@ -694,13 +696,13 @@ export function RetellFullConfigTab({
           <Button onClick={handleSaveAgentSettings} disabled={isSaving} className="flex-1">
             {updateAgent.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             <Save className="h-4 w-4 mr-2" />
-            Sauvegarder Configuration Agent
+            {t('componentUi.retellConfig.saveAgentConfig')}
           </Button>
           {config?.llm && (
             <Button onClick={handleSaveLLMSettings} disabled={isSaving} variant="secondary" className="flex-1">
               {updateLLM.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               <Save className="h-4 w-4 mr-2" />
-              Sauvegarder LLM
+              {t('componentUi.retellConfig.saveLlm')}
             </Button>
           )}
         </div>

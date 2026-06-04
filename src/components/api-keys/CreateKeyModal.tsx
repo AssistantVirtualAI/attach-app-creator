@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Key, Copy, Check, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface CreateKeyModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ interface CreateKeyModalProps {
 }
 
 export const CreateKeyModal = ({ isOpen, onClose, onCreate, availableScopes, isLoading }: CreateKeyModalProps) => {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [selectedScopes, setSelectedScopes] = useState<string[]>(['read:analytics', 'read:conversations']);
   const [expiresInDays, setExpiresInDays] = useState<string>('');
@@ -35,7 +37,7 @@ export const CreateKeyModal = ({ isOpen, onClose, onCreate, availableScopes, isL
     if (createdKey) {
       await navigator.clipboard.writeText(createdKey);
       setCopied(true);
-      toast({ title: 'Clé copiée dans le presse-papier' });
+      toast({ title: t('componentUi.apiKeys.keyCopied') });
       setTimeout(() => setCopied(false), 2000);
     }
   };
@@ -62,14 +64,14 @@ export const CreateKeyModal = ({ isOpen, onClose, onCreate, availableScopes, isL
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-green-500">
               <Check className="h-5 w-5" />
-              Clé API créée
+              {t('componentUi.apiKeys.apiKeyCreated')}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                Copiez cette clé maintenant. Vous ne pourrez plus la voir après avoir fermé cette fenêtre.
+                {t('componentUi.apiKeys.copyNow')}
               </AlertDescription>
             </Alert>
             <div className="flex gap-2">
@@ -82,7 +84,7 @@ export const CreateKeyModal = ({ isOpen, onClose, onCreate, availableScopes, isL
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={handleClose}>Fermer</Button>
+            <Button onClick={handleClose}>{t('common.close')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -95,12 +97,12 @@ export const CreateKeyModal = ({ isOpen, onClose, onCreate, availableScopes, isL
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Key className="h-5 w-5 text-primary" />
-            Créer une clé API
+            {t('componentUi.apiKeys.createApiKey')}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Nom de la clé</Label>
+            <Label htmlFor="name">{t('componentUi.apiKeys.keyName')}</Label>
             <Input
               id="name"
               placeholder="Ex: Production API"
@@ -111,7 +113,7 @@ export const CreateKeyModal = ({ isOpen, onClose, onCreate, availableScopes, isL
           </div>
 
           <div className="space-y-2">
-            <Label>Permissions</Label>
+            <Label>{t('componentUi.apiKeys.permissions')}</Label>
             <div className="grid grid-cols-2 gap-2 p-3 border rounded-lg">
               {availableScopes.map((scope) => (
                 <div key={scope} className="flex items-center space-x-2">
@@ -132,11 +134,11 @@ export const CreateKeyModal = ({ isOpen, onClose, onCreate, availableScopes, isL
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="expires">Expiration (jours)</Label>
+            <Label htmlFor="expires">{t('componentUi.apiKeys.expiration')}</Label>
             <Input
               id="expires"
               type="number"
-              placeholder="Laisser vide pour jamais"
+              placeholder={t('componentUi.apiKeys.leaveEmptyNever')}
               value={expiresInDays}
               onChange={(e) => setExpiresInDays(e.target.value)}
               min="1"
@@ -145,11 +147,11 @@ export const CreateKeyModal = ({ isOpen, onClose, onCreate, availableScopes, isL
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose}>
-              Annuler
+              {t('common.cancel')}
             </Button>
             <Button type="submit" disabled={isLoading || !name || selectedScopes.length === 0}>
               {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Créer
+              {t('componentUi.apiKeys.create')}
             </Button>
           </DialogFooter>
         </form>

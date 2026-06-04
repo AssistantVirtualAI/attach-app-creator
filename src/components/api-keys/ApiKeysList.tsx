@@ -4,8 +4,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Key, Trash2, Ban, Clock, CheckCircle } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS } from 'date-fns/locale';
 import { ApiKey } from '@/hooks/useApiKeys';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface ApiKeysListProps {
   apiKeys: ApiKey[];
@@ -14,13 +15,16 @@ interface ApiKeysListProps {
 }
 
 export const ApiKeysList = ({ apiKeys, onRevoke, onDelete }: ApiKeysListProps) => {
+  const { t, language } = useTranslation();
+  const dateLocale = language === 'fr' ? fr : enUS;
+
   if (apiKeys.length === 0) {
     return (
       <div className="text-center py-12">
         <Key className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <p className="text-muted-foreground">Aucune clé API créée</p>
+        <p className="text-muted-foreground">{t('componentUi.apiKeys.noKeysCreated')}</p>
         <p className="text-sm text-muted-foreground mt-1">
-          Créez une clé API pour intégrer vos services
+          {t('componentUi.apiKeys.createToIntegrate')}
         </p>
       </div>
     );
@@ -30,12 +34,12 @@ export const ApiKeysList = ({ apiKeys, onRevoke, onDelete }: ApiKeysListProps) =
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Nom</TableHead>
-          <TableHead>Clé</TableHead>
+          <TableHead>{t('componentUi.apiKeys.keyName')}</TableHead>
+          <TableHead>{t('componentUi.apiKeys.keyCol')}</TableHead>
           <TableHead>Scopes</TableHead>
-          <TableHead>Statut</TableHead>
-          <TableHead>Dernière utilisation</TableHead>
-          <TableHead>Expire</TableHead>
+          <TableHead>{t('componentUi.apiKeys.statusCol')}</TableHead>
+          <TableHead>{t('componentUi.apiKeys.lastUsed')}</TableHead>
+          <TableHead>{t('componentUi.apiKeys.expires')}</TableHead>
           <TableHead className="w-[100px]"></TableHead>
         </TableRow>
       </TableHeader>
@@ -73,12 +77,12 @@ export const ApiKeysList = ({ apiKeys, onRevoke, onDelete }: ApiKeysListProps) =
               {key.is_active ? (
                 <Badge className="bg-green-500/10 text-green-500">
                   <CheckCircle className="h-3 w-3 mr-1" />
-                  Active
+                  {t('componentUi.apiKeys.active')}
                 </Badge>
               ) : (
                 <Badge variant="destructive">
                   <Ban className="h-3 w-3 mr-1" />
-                  Révoquée
+                  {t('componentUi.apiKeys.revoked')}
                 </Badge>
               )}
             </TableCell>
@@ -88,17 +92,17 @@ export const ApiKeysList = ({ apiKeys, onRevoke, onDelete }: ApiKeysListProps) =
                   <Clock className="h-3 w-3" />
                   {formatDistanceToNow(new Date(key.last_used_at), {
                     addSuffix: true,
-                    locale: fr,
+                    locale: dateLocale,
                   })}
                 </span>
               ) : (
-                'Jamais'
+                t('componentUi.apiKeys.never')
               )}
             </TableCell>
             <TableCell className="text-muted-foreground text-sm">
               {key.expires_at
-                ? format(new Date(key.expires_at), 'dd MMM yyyy', { locale: fr })
-                : 'Jamais'}
+                ? format(new Date(key.expires_at), 'dd MMM yyyy', { locale: dateLocale })
+                : t('componentUi.apiKeys.never')}
             </TableCell>
             <TableCell>
               <div className="flex gap-2">
@@ -113,7 +117,7 @@ export const ApiKeysList = ({ apiKeys, onRevoke, onDelete }: ApiKeysListProps) =
                         <Ban className="h-4 w-4 text-orange-500" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Révoquer</TooltipContent>
+                    <TooltipContent>{t('componentUi.apiKeys.revoke')}</TooltipContent>
                   </Tooltip>
                 )}
                 <Tooltip>
@@ -126,7 +130,7 @@ export const ApiKeysList = ({ apiKeys, onRevoke, onDelete }: ApiKeysListProps) =
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Supprimer</TooltipContent>
+                  <TooltipContent>{t('componentUi.apiKeys.delete')}</TooltipContent>
                 </Tooltip>
               </div>
             </TableCell>

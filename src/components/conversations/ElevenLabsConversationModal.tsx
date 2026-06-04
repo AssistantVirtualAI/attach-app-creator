@@ -18,6 +18,7 @@ import {
 import { motion } from 'framer-motion';
 import { useConversationDetails, useConversationAudio } from '@/hooks/useAllAgentsConversations';
 import { useEnhancedConversationAnalysis } from '@/hooks/useEnhancedConversationAnalysis';
+import { useTranslation } from '@/hooks/useTranslation';
 import { 
   normalizeTranscript, 
   transcriptToAudioPlayerFormat,
@@ -42,6 +43,7 @@ function AnalysisContent({
   generateAnalysis: (params: any) => void;
   transcriptToText: (msgs: any[]) => string;
 }) {
+  const { t } = useTranslation();
   const [analysisStartTime, setAnalysisStartTime] = useState<number | null>(null);
   const [showTimeout, setShowTimeout] = useState(false);
 
@@ -81,21 +83,21 @@ function AnalysisContent({
       <Card className="p-8 text-center glass-card border-destructive/50">
         <AlertCircle className="w-12 h-12 mx-auto mb-4 text-destructive" />
         <p className="text-destructive font-medium mb-2">
-          {isAuthError ? 'Session expirée' : 
-           isRateLimit ? 'Limite de requêtes atteinte' :
-           isCredits ? 'Crédits IA épuisés' : 
+          {isAuthError ? t('componentUi.conversations.sessionExpired') : 
+           isRateLimit ? t('componentUi.conversations.rateLimitReached') :
+           isCredits ? t('componentUi.conversations.creditsExhausted') : 
            'Erreur lors de l\'analyse'}
         </p>
         <p className="text-muted-foreground text-sm mb-4">
-          {isAuthError ? 'Veuillez vous reconnecter pour continuer.' :
-           isRateLimit ? 'Veuillez patienter quelques minutes.' :
-           isCredits ? 'Contactez votre administrateur.' :
+          {isAuthError ? t('componentUi.conversations.reconnect') :
+           isRateLimit ? t('componentUi.conversations.waitMinutes') :
+           isCredits ? t('componentUi.conversations.contactAdmin') :
            errorMessage}
         </p>
         {!isAuthError && !isCredits && (
           <Button onClick={handleRetry} variant="outline" className="gap-2">
             <RefreshCw className="w-4 h-4" />
-            Réessayer
+            {t('componentUi.conversations.retry')}
           </Button>
         )}
       </Card>
@@ -107,10 +109,8 @@ function AnalysisContent({
     return (
       <Card className="p-8 text-center glass-card">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-        <p className="text-muted-foreground">Analyse IA en cours...</p>
-        <p className="text-xs text-muted-foreground mt-2">
-          Génération du score de satisfaction et des recommandations
-        </p>
+        <p className="text-muted-foreground">{t('componentUi.conversations.analysisInProgress')}</p>
+        <p className="text-xs text-muted-foreground mt-2">{t('componentUi.conversations.analysisGenerating')}</p>
         
         {showTimeout && (
           <motion.div 
@@ -120,10 +120,10 @@ function AnalysisContent({
           >
             <div className="flex items-center justify-center gap-2 text-warning mb-2">
               <Clock className="w-4 h-4" />
-              <span className="text-sm font-medium">L'analyse prend plus de temps que prévu</span>
+              <span className="text-sm font-medium">{t('componentUi.conversations.analysisTakingLong')}</span>
             </div>
             <p className="text-xs text-muted-foreground mb-3">
-              Cela peut arriver pour les longues conversations. Patientez ou réessayez.
+              {t('componentUi.conversations.longConversationNote')}
             </p>
             <Button 
               onClick={handleRetry} 
@@ -132,7 +132,7 @@ function AnalysisContent({
               className="gap-2"
             >
               <RefreshCw className="w-3 h-3" />
-              Relancer l'analyse
+              {t('componentUi.conversations.retryAnalysis')}
             </Button>
           </motion.div>
         )}
@@ -146,7 +146,7 @@ function AnalysisContent({
       <Card className="p-8 text-center glass-card">
         <Brain className="w-12 h-12 mx-auto mb-4 text-primary" />
         <p className="text-muted-foreground mb-4">
-          Générez une analyse IA complète de cette conversation
+          {t('componentUi.conversations.generateCompleteAnalysis')}
         </p>
         <Button 
           onClick={() => {
@@ -157,11 +157,11 @@ function AnalysisContent({
           disabled={transcriptMessages.length === 0}
         >
           <Sparkles className="w-4 h-4" />
-          Générer l'Analyse
+          {t('componentUi.conversations.generateAnalysis')}
         </Button>
         {transcriptMessages.length === 0 && (
           <p className="text-xs text-muted-foreground mt-2">
-            Aucune transcription disponible
+            {t('componentUi.conversations.noTranscriptAvailable')}
           </p>
         )}
       </Card>
@@ -189,6 +189,7 @@ export function ElevenLabsConversationModal({
   platformAgentId,
   initialTranscript,
 }: ElevenLabsConversationModalProps) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('overview');
   
   const { data: conversationDetails, isLoading: isLoadingDetails } = useConversationDetails(conversationId, {
@@ -292,9 +293,9 @@ export function ElevenLabsConversationModal({
 
   const getSentimentLabel = (sentiment: string) => {
     switch (sentiment) {
-      case 'positive': return 'Positif';
-      case 'negative': return 'Négatif';
-      default: return 'Neutre';
+      case 'positive': return t('componentUi.conversations.sentimentPositive');
+      case 'negative': return t('componentUi.conversations.sentimentNegative');
+      default: return t('componentUi.conversations.sentimentNeutral');
     }
   };
 
@@ -328,7 +329,7 @@ export function ElevenLabsConversationModal({
           <div className="flex items-center justify-between">
             <DialogTitle className="text-xl font-bold gradient-text flex items-center gap-2">
               <Volume2 className="w-5 h-5 text-primary" />
-              {agentName ? `Conversation - ${agentName}` : 'Détails de la conversation'}
+              {agentName ? `Conversation - ${agentName}` : t('componentUi.conversations.conversationDetails')}
             </DialogTitle>
             <div className="flex items-center gap-2">
               {displayScore !== null && displayScore !== undefined && (
@@ -352,12 +353,12 @@ export function ElevenLabsConversationModal({
         ) : hasAnyData ? (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden">
             <TabsList className="grid w-full grid-cols-4 glass-card">
-              <TabsTrigger value="overview">Aperçu</TabsTrigger>
-              <TabsTrigger value="audio">Audio</TabsTrigger>
-              <TabsTrigger value="transcript">Transcript</TabsTrigger>
+              <TabsTrigger value="overview">{t('componentUi.conversations.overview')}</TabsTrigger>
+              <TabsTrigger value="audio">{t('componentUi.conversations.audio')}</TabsTrigger>
+              <TabsTrigger value="transcript">{t('componentUi.conversations.transcript')}</TabsTrigger>
               <TabsTrigger value="analysis" className="flex items-center gap-1">
                 <Sparkles className="w-4 h-4" />
-                Analyse IA
+                {t('componentUi.conversations.aiAnalysis')}
               </TabsTrigger>
             </TabsList>
 
@@ -373,7 +374,7 @@ export function ElevenLabsConversationModal({
                   </Card>
                   <Card className="glass-card">
                     <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">Durée</p>
+                      <p className="text-sm text-muted-foreground">{t('componentUi.conversations.duration')}</p>
                       <p className="font-semibold">
                         {formatDuration(
                           conversationDetails?.call_duration_secs ||
@@ -384,7 +385,7 @@ export function ElevenLabsConversationModal({
                   </Card>
                   <Card className="glass-card">
                     <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">Satisfaction</p>
+                      <p className="text-sm text-muted-foreground">{t('componentUi.conversations.satisfactionScore')}</p>
                       <p className="font-semibold">
                         {displayScore !== undefined && displayScore !== null
                           ? typeof displayScore === 'number' && displayScore <= 1
@@ -396,7 +397,7 @@ export function ElevenLabsConversationModal({
                   </Card>
                   <Card className="glass-card">
                     <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">Sentiment</p>
+                      <p className="text-sm text-muted-foreground">{t('componentUi.conversations.globalSentiment')}</p>
                       <div className="flex items-center gap-2">
                         {displaySentiment ? (
                           <>
@@ -406,7 +407,7 @@ export function ElevenLabsConversationModal({
                             </span>
                           </>
                         ) : isAnalyzing ? (
-                          <span className="text-muted-foreground">Analyse...</span>
+                          <span className="text-muted-foreground">{t('componentUi.conversations.analyzingProgress')}</span>
                         ) : (
                           <span className="text-muted-foreground">N/A</span>
                         )}
@@ -421,7 +422,7 @@ export function ElevenLabsConversationModal({
                     <CardHeader className="pb-2">
                       <CardTitle className="flex items-center gap-2 text-sm">
                         <Brain className="w-4 h-4 text-primary" />
-                        Résumé IA
+                        {t('componentUi.conversations.aiSummary')}
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -436,7 +437,7 @@ export function ElevenLabsConversationModal({
                 {transcriptMessages.length > 0 && (
                   <Card className="glass-card">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">Aperçu de la conversation</CardTitle>
+                      <CardTitle className="text-sm">{t('componentUi.conversations.conversationPreview')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2 max-h-40 overflow-hidden">
@@ -458,7 +459,7 @@ export function ElevenLabsConversationModal({
                               className="h-auto px-0 text-xs"
                               onClick={() => setActiveTab('transcript')}
                             >
-                              Voir les {transcriptMessages.length} messages
+                              {t('componentUi.conversations.seeMessages').replace('{count}', String(transcriptMessages.length))}
                             </Button>
                           </div>
                         )}
@@ -472,7 +473,7 @@ export function ElevenLabsConversationModal({
                 {isLoadingAudio ? (
                   <Card className="p-8 text-center glass-card">
                     <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4" />
-                    <p className="text-muted-foreground">Chargement de l'audio...</p>
+                    <p className="text-muted-foreground">{t('componentUi.conversations.loadingAudio')}</p>
                   </Card>
                 ) : audioData?.audio_url ? (
                   <AdvancedAudioPlayer
@@ -487,7 +488,7 @@ export function ElevenLabsConversationModal({
                 ) : (
                   <Card className="p-8 text-center glass-card">
                     <Volume2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-muted-foreground">Audio non disponible pour cette conversation</p>
+                    <p className="text-muted-foreground">{t('componentUi.conversations.audioUnavailable')}</p>
                   </Card>
                 )}
               </TabsContent>
@@ -514,7 +515,7 @@ export function ElevenLabsConversationModal({
                                   {isAgent ? <Bot className="w-3 h-3 text-primary" /> : <User className="w-3 h-3" />}
                                 </div>
                                 <span className={`text-xs font-medium ${isAgent ? 'text-primary' : ''}`}>
-                                  {isAgent ? 'Agent IA' : 'Client'}
+                                  {isAgent ? t('componentUi.conversations.aiAgent') : t('componentUi.conversations.client')}
                                 </span>
                                 {msg.time_in_call_secs !== undefined && (
                                   <span className="text-xs text-muted-foreground">
@@ -537,7 +538,7 @@ export function ElevenLabsConversationModal({
                   </ScrollArea>
                 ) : (
                   <Card className="p-8 text-center glass-card">
-                    <p className="text-muted-foreground">Aucune transcription disponible</p>
+                    <p className="text-muted-foreground">{t('componentUi.conversations.noTranscriptAvailable')}</p>
                   </Card>
                 )}
               </TabsContent>
@@ -565,7 +566,7 @@ export function ElevenLabsConversationModal({
                         <CardHeader className="pb-2">
                           <CardTitle className="flex items-center gap-2 text-primary text-sm">
                             <Target className="w-4 h-4" />
-                            Score de Satisfaction
+                            {t('componentUi.conversations.satisfactionScore')}
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="flex justify-center py-4">
@@ -577,7 +578,7 @@ export function ElevenLabsConversationModal({
                         <CardHeader className="pb-2">
                           <CardTitle className="flex items-center gap-2 text-sm">
                             {getSentimentIcon(analysis.sentiment)}
-                            Sentiment Global
+                            {t('componentUi.conversations.globalSentiment')}
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="flex items-center justify-center py-4">
@@ -589,7 +590,7 @@ export function ElevenLabsConversationModal({
                               </p>
                               {analysis.confidence && (
                                 <p className="text-xs text-muted-foreground">
-                                  Confiance: {(analysis.confidence * 100).toFixed(0)}%
+                                  {t('componentUi.conversations.confidence')}: {(analysis.confidence * 100).toFixed(0)}%
                                 </p>
                               )}
                             </div>
@@ -602,7 +603,7 @@ export function ElevenLabsConversationModal({
                     {analysis.sentiment_timeline && analysis.sentiment_timeline.length > 0 && (
                       <Card className="glass-card">
                         <CardHeader>
-                          <CardTitle className="text-sm">Évolution du Sentiment</CardTitle>
+                          <CardTitle className="text-sm">{t('componentUi.conversations.sentimentEvolution')}</CardTitle>
                         </CardHeader>
                         <CardContent>
                           <SentimentTimeline timeline={analysis.sentiment_timeline} />
@@ -631,7 +632,7 @@ export function ElevenLabsConversationModal({
                         <CardHeader>
                           <CardTitle className="flex items-center gap-2 text-sm text-primary">
                             <Lightbulb className="w-4 h-4" />
-                            Recommandations
+                            {t('componentUi.conversations.recommendations')}
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
@@ -646,7 +647,7 @@ export function ElevenLabsConversationModal({
           </Tabs>
         ) : (
           <div className="p-8 text-center">
-            <p className="text-muted-foreground">Impossible de charger les détails de la conversation</p>
+            <p className="text-muted-foreground">{t('componentUi.conversations.cannotLoadDetails')}</p>
           </div>
         )}
       </DialogContent>

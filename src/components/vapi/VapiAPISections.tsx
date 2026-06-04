@@ -1,3 +1,4 @@
+import { useTranslation } from '@/hooks/useTranslation';
 import { useState } from 'react';
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
@@ -51,6 +52,7 @@ interface VapiAPISectionsProps {
 }
 
 export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit = true }: VapiAPISectionsProps) {
+  const { t } = useTranslation();
   const hookParams = { organizationId, apiKey };
   const [timeframe, setTimeframe] = useState('7d');
   const [logLevel, setLogLevel] = useState<string | undefined>();
@@ -145,8 +147,8 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-blue-500/10"><MessageSquare className="h-5 w-5 text-blue-500" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Configuration Assistant</h3>
-                <p className="text-sm text-muted-foreground">Prompt, voix, modèle LLM</p>
+                <h3 className="font-semibold">{t('componentUi.vapiApi.assistantConfig')}</h3>
+                <p className="text-sm text-muted-foreground">{t('componentUi.vapiApi.assistantConfigDesc')}</p>
               </div>
             </div>
           </AccordionTrigger>
@@ -154,64 +156,64 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
             {loadingAssistant ? <Skeleton className="h-40 w-full" /> : (
               <div className="space-y-6">
                 <div>
-                  <Label>Prompt Système</Label>
+                  <Label>{t('componentUi.vapiApi.systemPrompt')}</Label>
                   <Textarea value={systemPrompt} onChange={e => setSystemPrompt(e.target.value)} rows={8} className="mt-2 font-mono text-sm" disabled={!canEdit} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>Premier Message</Label>
+                    <Label>{t('componentUi.vapiApi.firstMessage')}</Label>
                     <Textarea value={firstMessage} onChange={e => setFirstMessage(e.target.value)} rows={3} className="mt-2" disabled={!canEdit} />
                   </div>
                   <div>
-                    <Label>Message de fin d'appel</Label>
+                    <Label>{t('componentUi.vapiApi.endCallMessage')}</Label>
                     <Textarea value={endCallMessage} onChange={e => setEndCallMessage(e.target.value)} rows={3} className="mt-2" disabled={!canEdit} />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>Modèle LLM</Label>
+                    <Label>{t('componentUi.vapiApi.llmModel')}</Label>
                     <Input value={assistantConfig?.model?.model || 'gpt-4o-mini'} disabled className="mt-2" />
                   </div>
                   <div>
-                    <Label>Provider</Label>
+                    <Label>{t('componentUi.vapiApi.provider')}</Label>
                     <Input value={assistantConfig?.model?.provider || 'openai'} disabled className="mt-2" />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>Température ({temperature.toFixed(1)})</Label>
+                    <Label>{t('componentUi.vapiApi.temperature')} ({temperature.toFixed(1)})</Label>
                     <Slider value={[temperature]} onValueChange={([v]) => setTemperature(v)} min={0} max={2} step={0.1} className="mt-4" disabled={!canEdit} />
                   </div>
                   <div>
-                    <Label>Max Tokens ({maxTokens})</Label>
+                    <Label>{t('componentUi.vapiApi.maxTokens')} ({maxTokens})</Label>
                     <Slider value={[maxTokens]} onValueChange={([v]) => setMaxTokens(v)} min={100} max={8000} step={100} className="mt-4" disabled={!canEdit} />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>Timeout silence ({silenceTimeout}s)</Label>
+                    <Label>{t('componentUi.vapiApi.silenceTimeout')} ({silenceTimeout}s)</Label>
                     <Slider value={[silenceTimeout]} onValueChange={([v]) => setSilenceTimeout(v)} min={5} max={60} step={1} className="mt-4" disabled={!canEdit} />
                   </div>
                   <div>
-                    <Label>Durée max ({Math.round(maxDuration / 60)} min)</Label>
+                    <Label>{t('componentUi.vapiApi.maxDuration')} ({Math.round(maxDuration / 60)} min)</Label>
                     <Slider value={[maxDuration]} onValueChange={([v]) => setMaxDuration(v)} min={60} max={7200} step={60} className="mt-4" disabled={!canEdit} />
                   </div>
                 </div>
                 <div>
-                  <Label>Server URL (Webhook)</Label>
+                  <Label>{t('componentUi.vapiApi.serverUrl')}</Label>
                   <Input value={serverUrl} onChange={e => setServerUrl(e.target.value)} placeholder="https://..." className="mt-2" disabled={!canEdit} />
                 </div>
                 {/* Voice info */}
                 {assistantConfig?.voice && (
                   <div className="p-3 rounded-lg bg-muted/50">
-                    <p className="text-sm text-muted-foreground">Voix actuelle</p>
+                    <p className="text-sm text-muted-foreground">{t('componentUi.vapiApi.currentVoice')}</p>
                     <p className="font-medium">{assistantConfig.voice.provider} — {assistantConfig.voice.voiceId}</p>
                   </div>
                 )}
                 {canEdit && (
                   <Button onClick={handleSaveAssistant} disabled={updateAssistant.isPending}>
                     {updateAssistant.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    <Save className="h-4 w-4 mr-2" /> Sauvegarder
+                    <Save className="h-4 w-4 mr-2" /> {t('componentUi.vapiApi.save')}
                   </Button>
                 )}
               </div>
@@ -226,8 +228,8 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-purple-500/10"><Users className="h-5 w-5 text-purple-500" /></div>
             <div className="text-left">
-              <h3 className="font-semibold">Squads</h3>
-              <p className="text-sm text-muted-foreground">Équipes d'assistants</p>
+              <h3 className="font-semibold">{t('componentUi.vapiApi.squads')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.vapiApi.squadsDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
@@ -236,7 +238,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
             <div key={s.id} className="flex items-center justify-between p-3 rounded-lg border">
               <div>
                 <p className="font-medium text-sm">{s.name || s.id}</p>
-                <p className="text-xs text-muted-foreground">{s.members?.length || 0} membres</p>
+                <p className="text-xs text-muted-foreground">{s.members?.length || 0} {t('componentUi.vapiApi.members')}</p>
               </div>
               {canEdit && (
                 <Button variant="ghost" size="icon" onClick={() => deleteSquad.mutate({ organizationId, apiKey: apiKey || undefined, squadId: s.id })}>
@@ -244,7 +246,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
                 </Button>
               )}
             </div>
-          ), 'Aucun squad configuré')}
+          ), t('componentUi.vapiApi.noSquads'))}
         </AccordionContent>
       </AccordionItem>
 
@@ -254,8 +256,8 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-green-500/10"><Phone className="h-5 w-5 text-green-500" /></div>
             <div className="text-left">
-              <h3 className="font-semibold">Numéros de Téléphone</h3>
-              <p className="text-sm text-muted-foreground">Gestion des numéros</p>
+              <h3 className="font-semibold">{t('componentUi.vapiApi.phones')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.vapiApi.phonesDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
@@ -272,7 +274,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
                 </Button>
               )}
             </div>
-          ), 'Aucun numéro configuré')}
+          ), t('componentUi.vapiApi.noPhones'))}
         </AccordionContent>
       </AccordionItem>
 
@@ -282,8 +284,8 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-orange-500/10"><Megaphone className="h-5 w-5 text-orange-500" /></div>
             <div className="text-left">
-              <h3 className="font-semibold">Campagnes</h3>
-              <p className="text-sm text-muted-foreground">Campagnes d'appels en masse</p>
+              <h3 className="font-semibold">{t('componentUi.vapiApi.campaigns')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.vapiApi.campaignsDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
@@ -292,7 +294,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
             <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border">
               <div>
                 <p className="font-medium text-sm">{c.name || c.id}</p>
-                <p className="text-xs text-muted-foreground">{c.status || 'draft'} — {c.customers?.length || 0} contacts</p>
+                <p className="text-xs text-muted-foreground">{c.status || 'draft'} — {c.customers?.length || 0} {t('componentUi.vapiApi.contacts')}</p>
               </div>
               {canEdit && (
                 <Button variant="ghost" size="icon" onClick={() => deleteCampaign.mutate({ organizationId, apiKey: apiKey || undefined, campaignId: c.id })}>
@@ -300,7 +302,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
                 </Button>
               )}
             </div>
-          ), 'Aucune campagne')}
+          ), t('componentUi.vapiApi.noCampaigns'))}
         </AccordionContent>
       </AccordionItem>
 
@@ -310,8 +312,8 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-cyan-500/10"><Wrench className="h-5 w-5 text-cyan-500" /></div>
             <div className="text-left">
-              <h3 className="font-semibold">Outils</h3>
-              <p className="text-sm text-muted-foreground">Fonctions et intégrations</p>
+              <h3 className="font-semibold">{t('componentUi.vapiApi.tools')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.vapiApi.toolsDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
@@ -328,7 +330,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
                 </Button>
               )}
             </div>
-          ), 'Aucun outil configuré')}
+          ), t('componentUi.vapiApi.noTools'))}
         </AccordionContent>
       </AccordionItem>
 
@@ -338,8 +340,8 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-pink-500/10"><Puzzle className="h-5 w-5 text-pink-500" /></div>
             <div className="text-left">
-              <h3 className="font-semibold">Blocs</h3>
-              <p className="text-sm text-muted-foreground">Blocs de conversation</p>
+              <h3 className="font-semibold">{t('componentUi.vapiApi.blocks')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.vapiApi.blocksDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
@@ -356,7 +358,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
                 </Button>
               )}
             </div>
-          ), 'Aucun bloc')}
+          ), t('componentUi.vapiApi.noBlocks'))}
         </AccordionContent>
       </AccordionItem>
 
@@ -366,8 +368,8 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-amber-500/10"><FileText className="h-5 w-5 text-amber-500" /></div>
             <div className="text-left">
-              <h3 className="font-semibold">Fichiers</h3>
-              <p className="text-sm text-muted-foreground">Fichiers uploadés</p>
+              <h3 className="font-semibold">{t('componentUi.vapiApi.files')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.vapiApi.filesDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
@@ -384,7 +386,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
                 </Button>
               )}
             </div>
-          ), 'Aucun fichier')}
+          ), t('componentUi.vapiApi.noFiles'))}
         </AccordionContent>
       </AccordionItem>
 
@@ -394,7 +396,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-indigo-500/10"><BookOpen className="h-5 w-5 text-indigo-500" /></div>
             <div className="text-left">
-              <h3 className="font-semibold">Bases de connaissances</h3>
+              <h3 className="font-semibold">{t('componentUi.vapiApi.kb')}</h3>
               <p className="text-sm text-muted-foreground">Knowledge bases Vapi</p>
             </div>
           </div>
@@ -404,7 +406,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
             <div key={kb.id} className="flex items-center justify-between p-3 rounded-lg border">
               <div>
                 <p className="font-medium text-sm">{kb.name || kb.id}</p>
-                <p className="text-xs text-muted-foreground">{kb.fileIds?.length || 0} fichiers</p>
+                <p className="text-xs text-muted-foreground">{kb.fileIds?.length || 0} {t('componentUi.vapiApi.kbFiles')}</p>
               </div>
               {canEdit && (
                 <Button variant="ghost" size="icon" onClick={() => deleteKB.mutate({ organizationId, apiKey: apiKey || undefined, knowledgeBaseId: kb.id })}>
@@ -412,7 +414,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
                 </Button>
               )}
             </div>
-          ), 'Aucune base de connaissances')}
+          ), t('componentUi.vapiApi.noKB'))}
         </AccordionContent>
       </AccordionItem>
 
@@ -422,8 +424,8 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-emerald-500/10"><BarChart3 className="h-5 w-5 text-emerald-500" /></div>
             <div className="text-left">
-              <h3 className="font-semibold">Analytiques</h3>
-              <p className="text-sm text-muted-foreground">Métriques et statistiques</p>
+              <h3 className="font-semibold">{t('componentUi.vapiApi.analytics')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.vapiApi.analyticsDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
@@ -440,22 +442,22 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="p-4 rounded-lg bg-muted/50 text-center">
                   <p className="text-2xl font-bold">{analytics.totalCalls || 0}</p>
-                  <p className="text-xs text-muted-foreground">Total appels</p>
+                  <p className="text-xs text-muted-foreground">{t('componentUi.vapiApi.totalCalls')}</p>
                 </div>
                 <div className="p-4 rounded-lg bg-muted/50 text-center">
                   <p className="text-2xl font-bold">{analytics.completedCalls || 0}</p>
-                  <p className="text-xs text-muted-foreground">Complétés</p>
+                  <p className="text-xs text-muted-foreground">{t('componentUi.vapiApi.completed')}</p>
                 </div>
                 <div className="p-4 rounded-lg bg-muted/50 text-center">
                   <p className="text-2xl font-bold">{analytics.successRate || 0}%</p>
-                  <p className="text-xs text-muted-foreground">Taux réussite</p>
+                  <p className="text-xs text-muted-foreground">{t('componentUi.vapiApi.successRate')}</p>
                 </div>
                 <div className="p-4 rounded-lg bg-muted/50 text-center">
                   <p className="text-2xl font-bold">{analytics.avgDuration || 0}s</p>
-                  <p className="text-xs text-muted-foreground">Durée moy.</p>
+                  <p className="text-xs text-muted-foreground">{t('componentUi.vapiApi.avgDuration')}</p>
                 </div>
               </div>
-            ) : <p className="text-sm text-muted-foreground">Aucune donnée</p>}
+            ) : <p className="text-sm text-muted-foreground">{t('componentUi.vapiApi.noData')}</p>}
           </div>
         </AccordionContent>
       </AccordionItem>
@@ -466,8 +468,8 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-gray-500/10"><ScrollText className="h-5 w-5 text-gray-500" /></div>
             <div className="text-left">
-              <h3 className="font-semibold">Logs</h3>
-              <p className="text-sm text-muted-foreground">Journaux d'événements</p>
+              <h3 className="font-semibold">{t('componentUi.vapiApi.logs')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.vapiApi.logsDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
@@ -476,7 +478,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
             <div className="flex gap-2">
               {[undefined, 'info', 'warn', 'error'].map(lvl => (
                 <Button key={lvl || 'all'} variant={logLevel === lvl ? 'default' : 'outline'} size="sm" onClick={() => setLogLevel(lvl)}>
-                  {lvl || 'Tous'}
+                  {lvl || t('componentUi.vapiApi.all')}
                 </Button>
               ))}
             </div>
@@ -492,7 +494,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
                     </div>
                     <p className="mt-1 break-all">{log.message || JSON.stringify(log).slice(0, 200)}</p>
                   </div>
-                )) : <p className="text-sm text-muted-foreground">Aucun log disponible</p>}
+                )) : <p className="text-sm text-muted-foreground">{t('componentUi.vapiApi.noLogs')}</p>}
               </div>
             )}
           </div>
@@ -505,8 +507,8 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-red-500/10"><Phone className="h-5 w-5 text-red-500" /></div>
             <div className="text-left">
-              <h3 className="font-semibold">Appels récents</h3>
-              <p className="text-sm text-muted-foreground">Historique des appels</p>
+              <h3 className="font-semibold">{t('componentUi.vapiApi.calls')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.vapiApi.callsDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
@@ -523,7 +525,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
                 {c.customer?.number || 'Web call'} — {new Date(c.createdAt).toLocaleString()}
               </p>
             </div>
-          ), 'Aucun appel récent')}
+          ), t('componentUi.vapiApi.noRecentCalls'))}
         </AccordionContent>
       </AccordionItem>
 
@@ -533,8 +535,8 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-teal-500/10"><Layers className="h-5 w-5 text-teal-500" /></div>
             <div className="text-left">
-              <h3 className="font-semibold">Sessions</h3>
-              <p className="text-sm text-muted-foreground">Sessions actives et passées</p>
+              <h3 className="font-semibold">{t('componentUi.vapiApi.sessions')}</h3>
+              <p className="text-sm text-muted-foreground">{t('componentUi.vapiApi.sessionsDesc')}</p>
             </div>
           </div>
         </AccordionTrigger>
@@ -544,7 +546,7 @@ export function VapiAPISections({ organizationId, apiKey, assistantId, canEdit =
               <p className="font-medium text-sm">{s.name || s.id}</p>
               <p className="text-xs text-muted-foreground">{s.status || 'active'}</p>
             </div>
-          ), 'Aucune session')}
+          ), t('componentUi.vapiApi.noSessions'))}
         </AccordionContent>
       </AccordionItem>
     </Accordion>
