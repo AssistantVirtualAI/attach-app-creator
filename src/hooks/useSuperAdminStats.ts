@@ -9,11 +9,14 @@ interface OrganizationWithBilling {
   created_at: string;
   is_active: boolean | null;
   client_count?: number;
+  member_count?: number;
   billing_config?: {
     plan_tier: string | null;
     subscription_status: string | null;
     trial_ends_at: string | null;
     stripe_customer_id: string | null;
+    credits_used?: number | null;
+    credits_limit?: number | null;
   };
 }
 
