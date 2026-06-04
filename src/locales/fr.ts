@@ -1145,6 +1145,7 @@ export const fr = {
     selectLanguage: 'Sélectionner la langue',
     tabs: {
       agency: 'Agence',
+      organizations: 'Organisations',
       whitelabel: 'Marque blanche',
       members: 'Membres',
       integrations: 'Intégrations',
