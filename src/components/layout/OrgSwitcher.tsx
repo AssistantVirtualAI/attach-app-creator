@@ -19,15 +19,17 @@ export function OrgSwitcher() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
-          className="h-8 max-w-[160px] gap-1.5 px-2 hover:bg-muted"
+          className="h-9 w-full justify-between gap-2 px-3 bg-background/50 hover:bg-muted"
         >
-          <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
-          <span className="truncate text-xs font-medium">
-            {selectedOrg?.name || 'Organisation'}
-          </span>
-          <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
+          <div className="flex items-center gap-2 min-w-0">
+            <Building2 className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span className="truncate text-xs font-medium">
+              {selectedOrg?.name || 'Organisation'}
+            </span>
+          </div>
+          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
