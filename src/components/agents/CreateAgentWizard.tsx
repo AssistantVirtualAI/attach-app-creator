@@ -22,6 +22,7 @@ import { AGENT_TEMPLATES, AgentTemplate } from '@/components/agent-builder/Agent
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useAllowedPlatforms } from '@/hooks/useAllowedPlatforms';
 import {
   ChevronLeft,
   ChevronRight,
