@@ -24,6 +24,7 @@ interface OrgConfig {
 }
 
 export function AgencyTab() {
+  const { t } = useTranslation();
   const { selectedOrg, selectedOrgId, refreshOrganization } = useOrganization();
   const { currentPlan } = useBillingConfig();
   const [isSaving, setIsSaving] = useState(false);
