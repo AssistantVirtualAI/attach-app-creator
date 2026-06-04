@@ -2825,4 +2825,18 @@ export const fr = {
       tagged: 'Taguées',
     },
   },
+  profile: {
+    title: 'Profil',
+    description: 'Gérez votre compte',
+    account: 'Compte',
+    personalAccount: 'Compte personnel',
+    myProfile: 'Mon profil',
+    changePassword: 'Changer le mot de passe',
+    changePasswordDesc: 'Choisissez un mot de passe robuste (min. 8 caractères).',
+    newPassword: 'Nouveau mot de passe',
+    confirmPassword: 'Confirmer le mot de passe',
+    updatePassword: 'Mettre à jour le mot de passe',
+    passwordTooShort: 'Le mot de passe doit contenir au moins 8 caractères',
+    passwordsDoNotMatch: 'Les mots de passe ne correspondent pas',
+  },
 };
