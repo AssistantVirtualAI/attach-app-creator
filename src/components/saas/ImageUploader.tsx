@@ -39,13 +39,13 @@ export const ImageUploader = ({
   const processFile = async (file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast.error('Veuillez sélectionner une image');
+      toast.error(t('settings.uploader.selectImage'));
       return;
     }
 
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('L\'image ne doit pas dépasser 2MB');
+      toast.error(t('settings.uploader.maxSize'));
       return;
     }
 
