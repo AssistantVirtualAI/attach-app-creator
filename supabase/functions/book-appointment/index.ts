@@ -380,6 +380,34 @@ serve(async (req) => {
       );
     }
 
+    if (action === 'cancel' || action === 'list') {
+      // Require authenticated org member for sensitive actions
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+      if (!user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      const { data: isSuper } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+      if (!membership && !isSuper) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     if (action === 'cancel') {
       if (!validateUUID(appointmentId)) {
         return new Response(
@@ -387,6 +415,7 @@ serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+
 
       // Get appointment
       const { data: appointment, error: fetchError } = await supabase
