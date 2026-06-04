@@ -123,7 +123,7 @@ export function AgencyTab() {
               aspectRatio="wide"
             />
             <ImageUploader
-              label="Logo Page de Connexion"
+              label={t('settings.agency.logoLogin')}
               currentUrl={config.logo_login_url}
               organizationId={selectedOrgId || ''}
               folder="logos"
