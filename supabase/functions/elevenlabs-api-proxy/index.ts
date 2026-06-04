@@ -26,6 +26,35 @@ serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
     const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Require authenticated user; require org membership if orgId provided
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { data: { user } } = await supabaseService.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if (organizationId) {
+      const { data: membership } = await supabaseService
+        .from('organization_members')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      const { data: isSuper } = await supabaseService.rpc('is_super_admin', { _user_id: user.id });
+      if (!membership && !isSuper) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+
     if (!apiKey) {
       if (organizationId) {
         const { data: integration } = await supabaseService
