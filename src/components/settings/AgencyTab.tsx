@@ -231,7 +231,7 @@ export function AgencyTab() {
           </div>
 
           <Button onClick={handleSave} disabled={isSaving} className="w-full">
-            {isSaving ? 'Enregistrement...' : 'Enregistrer les modifications'}
+            {isSaving ? t('settings.agency.saving') : t('settings.agency.save')}
           </Button>
         </CardContent>
       </Card>
