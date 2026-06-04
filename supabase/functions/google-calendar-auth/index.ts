@@ -92,6 +92,24 @@ serve(async (req) => {
       }
     }
 
+    // Verify caller is org_admin (or super_admin) for write/sensitive actions on this org
+    if (organizationId && ['exchange-code', 'refresh-token', 'disconnect'].includes(action)) {
+      const { data: isSuper } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+      if (!isSuper) {
+        const { data: roleRow } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('organization_id', organizationId)
+          .maybeSingle();
+        if (!roleRow || roleRow.role !== 'org_admin') {
+          return new Response(JSON.stringify({ error: 'Forbidden' }), {
+            status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+    }
+
     // Validate redirectUri for actions that need it
     if (['get-auth-url', 'exchange-code'].includes(action) && redirectUri) {
       if (!isValidUrl(redirectUri)) {
