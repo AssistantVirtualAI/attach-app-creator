@@ -96,10 +96,12 @@ export function MembersTab() {
               members={members}
               onUpdateRole={(userId, role) => updateMemberRole.mutate({ userId, newRole: role })}
               onRemoveMember={(userId) => removeMember.mutate(userId)}
+              onResetPassword={canManageMembers ? setResetMember : undefined}
               onSelectMember={canManageMembers ? setSelectedMember : undefined}
               currentUserId={user?.id}
             />
           )}
+
         </CardContent>
       </Card>
 
