@@ -82,10 +82,10 @@ export function AgencyTab() {
         .eq('id', selectedOrgId);
 
       if (error) throw error;
-      toast.success('Configuration sauvegardée');
+      toast.success(t('settings.agency.saved'));
       refreshOrganization();
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la sauvegarde');
+      toast.error(error.message || t('settings.agency.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -93,7 +93,7 @@ export function AgencyTab() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success('Copié !');
+    toast.success(t('settings.agency.copied'));
   };
 
   return (
