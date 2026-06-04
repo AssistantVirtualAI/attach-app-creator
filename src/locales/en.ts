@@ -2828,4 +2828,18 @@ export const en = {
       tagged: 'Tagged',
     },
   },
+  profile: {
+    title: 'Profile',
+    description: 'Manage your account',
+    account: 'Account',
+    personalAccount: 'Personal account',
+    myProfile: 'My profile',
+    changePassword: 'Change password',
+    changePasswordDesc: 'Choose a strong password (min. 8 characters).',
+    newPassword: 'New password',
+    confirmPassword: 'Confirm password',
+    updatePassword: 'Update password',
+    passwordTooShort: 'Password must be at least 8 characters',
+    passwordsDoNotMatch: 'Passwords do not match',
+  },
 };
