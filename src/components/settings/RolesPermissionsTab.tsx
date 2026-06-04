@@ -10,13 +10,7 @@ import { useOrganization } from '@/context/OrganizationContext';
 import { Switch } from '@/components/ui/switch';
 import { ALL_PERMISSIONS, DEFAULT_PERMISSIONS_MATRIX, type Permission, type Role } from '@/lib/permissions';
 import { useOrgRolePermissions, useUpsertOrgRolePermission } from '@/hooks/useRolePermissionsManagement';
-
-const ROLE_DESCRIPTIONS: Record<string, string> = {
-  org_admin: 'Accès complet (gestion rôles, intégrations, facturation).',
-  manager: 'Gestion opérationnelle (agents, conversations, analytics).',
-  agent: 'Accès aux conversations et knowledge base.',
-  viewer: 'Lecture seule.',
-};
+import { useTranslation } from '@/hooks/useTranslation';
 
 const PERMISSIONS: Array<{ permission: string; roles: string[] }> = [
   { permission: 'manage:organization', roles: ['org_admin'] },
@@ -28,6 +22,7 @@ const PERMISSIONS: Array<{ permission: string; roles: string[] }> = [
 ];
 
 export const RolesPermissionsTab = () => {
+  const { t } = useTranslation();
   const { role, isSuperAdmin, can } = usePermissions();
   const { selectedOrgId } = useOrganization();
   const { members, isLoading, updateMemberRole, removeMember } = useTeamMembers();
@@ -48,6 +43,13 @@ export const RolesPermissionsTab = () => {
     return (DEFAULT_PERMISSIONS_MATRIX[r] || []).includes(p);
   };
 
+  const ROLE_DESCRIPTIONS: Record<string, string> = {
+    org_admin: t('team.rolesPermissions.rolesDesc.org_admin'),
+    manager: t('team.rolesPermissions.rolesDesc.manager'),
+    agent: t('team.rolesPermissions.rolesDesc.agent'),
+    viewer: t('team.rolesPermissions.rolesDesc.viewer'),
+  };
+
   const canManageRoles = can('manage:roles');
   const canSee = isSuperAdmin || role === 'org_admin' || role === 'manager' || canManageRoles;
 
@@ -55,8 +57,8 @@ export const RolesPermissionsTab = () => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Rôles & permissions</CardTitle>
-          <CardDescription>Disponible uniquement pour Admin/Manager.</CardDescription>
+          <CardTitle>{t('team.rolesPermissions.title')}</CardTitle>
+          <CardDescription>{t('team.rolesPermissions.onlyAdminManager')}</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -68,16 +70,16 @@ export const RolesPermissionsTab = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
-            Rôles & permissions
+            {t('team.rolesPermissions.title')}
           </CardTitle>
-          <CardDescription>Gestion des rôles avec trail d’audit automatique.</CardDescription>
+          <CardDescription>{t('team.rolesPermissions.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Rôle</TableHead>
-                <TableHead>Description</TableHead>
+                <TableHead>{t('team.rolesPermissions.role')}</TableHead>
+                <TableHead>{t('team.rolesPermissions.descriptionCol')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -96,22 +98,20 @@ export const RolesPermissionsTab = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Permissions (matrice)</CardTitle>
-          <CardDescription>
-            Personnalisez les permissions par rôle (enforced côté serveur). Seuls les admins peuvent modifier.
-          </CardDescription>
+          <CardTitle className="text-sm">{t('team.rolesPermissions.matrixTitle')}</CardTitle>
+          <CardDescription>{t('team.rolesPermissions.matrixDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           {matrix.isLoading ? (
-            <div className="text-sm text-muted-foreground">Chargement…</div>
+            <div className="text-sm text-muted-foreground">{t('team.rolesPermissions.loading')}</div>
           ) : !selectedOrgId ? (
-            <div className="text-sm text-muted-foreground">Aucune organisation sélectionnée.</div>
+            <div className="text-sm text-muted-foreground">{t('team.rolesPermissions.noOrg')}</div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Permission</TableHead>
+                    <TableHead>{t('team.rolesPermissions.permission')}</TableHead>
                     {rolesForMatrix.map((r) => (
                       <TableHead key={r} className="text-center">
                         <Badge variant="outline">{r}</Badge>
@@ -154,14 +154,12 @@ export const RolesPermissionsTab = () => {
 
       <Card className="bg-card/50 backdrop-blur-sm border-border/50">
         <CardHeader>
-          <CardTitle className="text-sm">Membres & rôles</CardTitle>
-          <CardDescription>
-            Seuls les admins peuvent modifier les rôles. Les changements sont journalisés.
-          </CardDescription>
+          <CardTitle className="text-sm">{t('team.rolesPermissions.membersRoles')}</CardTitle>
+          <CardDescription>{t('team.rolesPermissions.membersRolesDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-sm text-muted-foreground">Chargement…</div>
+            <div className="text-sm text-muted-foreground">{t('team.rolesPermissions.loading')}</div>
           ) : (
             <MembersList
               members={members}
@@ -175,15 +173,15 @@ export const RolesPermissionsTab = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Permissions (résumé)</CardTitle>
-          <CardDescription>Vue rapide des permissions clés par rôle.</CardDescription>
+          <CardTitle className="text-sm">{t('team.rolesPermissions.summaryTitle')}</CardTitle>
+          <CardDescription>{t('team.rolesPermissions.summaryDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Permission</TableHead>
-                <TableHead>Rôles</TableHead>
+                <TableHead>{t('team.rolesPermissions.permission')}</TableHead>
+                <TableHead>{t('team.rolesPermissions.rolesCol')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -206,4 +204,3 @@ export const RolesPermissionsTab = () => {
     </div>
   );
 };
-
