@@ -22,6 +22,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { fr, enUS } from 'date-fns/locale';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useAllowedPlatforms } from '@/hooks/useAllowedPlatforms';
 
 const twilioHelpHref =
   "https://www.twilio.com/console";
