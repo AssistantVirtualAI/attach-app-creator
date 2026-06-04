@@ -12,6 +12,7 @@ import { useOrganization } from '@/context/OrganizationContext';
 import { useBillingConfig } from '@/hooks/useBillingConfig';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface OrgConfig {
   name: string;
