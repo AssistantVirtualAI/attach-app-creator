@@ -1148,6 +1148,7 @@ export const en = {
     selectLanguage: 'Select language',
     tabs: {
       agency: 'Agency',
+      organizations: 'Organizations',
       whitelabel: 'White-label',
       members: 'Members',
       integrations: 'Integrations',
