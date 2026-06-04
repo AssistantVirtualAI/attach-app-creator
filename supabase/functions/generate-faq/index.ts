@@ -30,6 +30,32 @@ serve(async (req) => {
       throw new Error('organization_id is required');
     }
 
+    // Require authenticated org member
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { data: { user } } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { data: membership } = await supabaseClient
+      .from('organization_members')
+      .select('id')
+      .eq('organization_id', organization_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    const { data: isSuper } = await supabaseClient.rpc('is_super_admin', { _user_id: user.id });
+    if (!membership && !isSuper) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Fetch conversations for analysis
     let query = supabaseClient
       .from('conversations')
