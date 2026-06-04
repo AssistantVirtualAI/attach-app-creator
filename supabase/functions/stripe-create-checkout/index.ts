@@ -40,10 +40,19 @@ serve(async (req) => {
       throw new Error("Unauthorized");
     }
 
-    const { organizationId, priceId, successUrl, cancelUrl, isAnnual } = await req.json();
+    const body = await req.json();
+    const { organizationId, successUrl, cancelUrl } = body;
+    let { priceId, isAnnual } = body;
 
     if (!organizationId || !priceId) {
       throw new Error("Missing required parameters");
+    }
+
+    // Accept either plain tier ("growth") or formatted "price_<tier>_<monthly|annual>"
+    const match = String(priceId).match(/^price_([a-z]+)_(monthly|annual)$/i);
+    if (match) {
+      priceId = match[1].toLowerCase();
+      isAnnual = match[2].toLowerCase() === "annual";
     }
 
     // Validate plan exists
