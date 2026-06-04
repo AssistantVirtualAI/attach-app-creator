@@ -4,6 +4,7 @@ import { Upload, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface ImageUploaderProps {
   label: string;
@@ -24,6 +25,7 @@ export const ImageUploader = ({
   onRemove,
   aspectRatio = 'square'
 }: ImageUploaderProps) => {
+  const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -37,13 +39,13 @@ export const ImageUploader = ({
   const processFile = async (file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast.error('Veuillez sélectionner une image');
+      toast.error(t('settings.uploader.selectImage'));
       return;
     }
 
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('L\'image ne doit pas dépasser 2MB');
+      toast.error(t('settings.uploader.maxSize'));
       return;
     }
 
@@ -63,10 +65,10 @@ export const ImageUploader = ({
         .getPublicUrl(fileName);
 
       onUpload(publicUrl);
-      toast.success('Image téléchargée avec succès');
+      toast.success(t('settings.uploader.success'));
     } catch (error: any) {
       console.error('Upload error:', error);
-      toast.error('Erreur lors du téléchargement');
+      toast.error(t('settings.uploader.error'));
     } finally {
       setUploading(false);
     }
@@ -140,7 +142,7 @@ export const ImageUploader = ({
           ) : (
             <div className="flex flex-col items-center gap-1 text-muted-foreground">
               <Upload className={cn("w-6 h-6", isDragging && "text-primary")} />
-              {isDragging && <span className="text-xs text-primary">Déposer</span>}
+              {isDragging && <span className="text-xs text-primary">{t('settings.uploader.drop')}</span>}
             </div>
           )}
         </div>
@@ -151,10 +153,10 @@ export const ImageUploader = ({
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
           >
-            {uploading ? 'Téléchargement...' : 'Télécharger'}
+            {uploading ? t('settings.uploader.uploading') : t('settings.uploader.upload')}
           </Button>
           <p className="text-xs text-muted-foreground">
-            Glisser-déposer ou cliquer
+            {t('settings.uploader.dragOrClick')}
           </p>
           <input
             ref={fileInputRef}

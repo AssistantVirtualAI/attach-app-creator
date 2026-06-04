@@ -12,6 +12,7 @@ import { useOrganization } from '@/context/OrganizationContext';
 import { useBillingConfig } from '@/hooks/useBillingConfig';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface OrgConfig {
   name: string;
@@ -23,6 +24,7 @@ interface OrgConfig {
 }
 
 export function AgencyTab() {
+  const { t } = useTranslation();
   const { selectedOrg, selectedOrgId, refreshOrganization } = useOrganization();
   const { currentPlan } = useBillingConfig();
   const [isSaving, setIsSaving] = useState(false);
@@ -80,10 +82,10 @@ export function AgencyTab() {
         .eq('id', selectedOrgId);
 
       if (error) throw error;
-      toast.success('Configuration sauvegardée');
+      toast.success(t('settings.agency.saved'));
       refreshOrganization();
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la sauvegarde');
+      toast.error(error.message || t('settings.agency.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -91,7 +93,7 @@ export function AgencyTab() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success('Copié !');
+    toast.success(t('settings.agency.copied'));
   };
 
   return (
@@ -103,8 +105,8 @@ export function AgencyTab() {
               <Building className="w-6 h-6 text-white" />
             </div>
             <div>
-              <CardTitle>Configuration de l'Agence</CardTitle>
-              <CardDescription>Paramètres généraux de votre organisation</CardDescription>
+              <CardTitle>{t('settings.agency.title')}</CardTitle>
+              <CardDescription>{t('settings.agency.description')}</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -112,7 +114,7 @@ export function AgencyTab() {
           {/* Logos */}
           <div className="grid md:grid-cols-2 gap-6">
             <ImageUploader
-              label="Logo Dashboard"
+              label={t('settings.agency.logoDashboard')}
               currentUrl={config.logo_dashboard_url}
               organizationId={selectedOrgId || ''}
               folder="logos"
@@ -121,7 +123,7 @@ export function AgencyTab() {
               aspectRatio="wide"
             />
             <ImageUploader
-              label="Logo Page de Connexion"
+              label={t('settings.agency.logoLogin')}
               currentUrl={config.logo_login_url}
               organizationId={selectedOrgId || ''}
               folder="logos"
@@ -135,7 +137,7 @@ export function AgencyTab() {
 
           {/* Nom agence */}
           <div className="space-y-2">
-            <Label htmlFor="agencyName">Nom de l'agence</Label>
+            <Label htmlFor="agencyName">{t('settings.agency.agencyName')}</Label>
             <Input
               id="agencyName"
               value={config.name}
@@ -146,7 +148,7 @@ export function AgencyTab() {
 
           {/* Workspace ID */}
           <div className="space-y-2">
-            <Label>Workspace ID</Label>
+            <Label>{t('settings.agency.workspaceId')}</Label>
             <div className="flex gap-2">
               <Input
                 value={selectedOrgId || ''}
@@ -166,11 +168,11 @@ export function AgencyTab() {
           {/* ChatDash API Key */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label>ChatDash API Key</Label>
+              <Label>{t('settings.agency.apiKey')}</Label>
               {!isUltimatePlan && (
                 <Badge variant="secondary" className="text-xs">
                   <Lock className="w-3 h-3 mr-1" />
-                  Plan Ultimate
+                  {t('settings.agency.ultimatePlan')}
                 </Badge>
               )}
             </div>
@@ -197,9 +199,9 @@ export function AgencyTab() {
           {/* GDPR Toggle */}
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <Label>Conformité GDPR</Label>
+              <Label>{t('settings.agency.gdpr')}</Label>
               <p className="text-sm text-muted-foreground">
-                Activer les fonctionnalités de conformité GDPR
+                {t('settings.agency.gdprDesc')}
               </p>
             </div>
             <Switch
@@ -212,14 +214,14 @@ export function AgencyTab() {
           <div className="flex items-center justify-between">
             <div className="space-y-1 flex-1">
               <div className="flex items-center gap-2">
-                <Label>Conformité HIPAA</Label>
+                <Label>{t('settings.agency.hipaa')}</Label>
                 <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-500 border-blue-500/30">
                   <Shield className="w-3 h-3 mr-1" />
-                  Get HIPAA Compliance
+                  {t('settings.agency.getHipaa')}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Activer les fonctionnalités de conformité HIPAA pour les données de santé
+                {t('settings.agency.hipaaDesc')}
               </p>
             </div>
             <Switch
@@ -229,7 +231,7 @@ export function AgencyTab() {
           </div>
 
           <Button onClick={handleSave} disabled={isSaving} className="w-full">
-            {isSaving ? 'Enregistrement...' : 'Enregistrer les modifications'}
+            {isSaving ? t('settings.agency.saving') : t('settings.agency.save')}
           </Button>
         </CardContent>
       </Card>
@@ -239,13 +241,13 @@ export function AgencyTab() {
         <CardHeader>
           <CardTitle className="text-destructive flex items-center gap-2">
             <Trash2 className="w-5 h-5" />
-            Zone de Danger
+            {t('settings.agency.dangerZone')}
           </CardTitle>
-          <CardDescription>Actions irréversibles</CardDescription>
+          <CardDescription>{t('settings.agency.dangerDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           <Button variant="destructive" className="w-full">
-            Supprimer l'agence
+            {t('settings.agency.deleteAgency')}
           </Button>
         </CardContent>
       </Card>
