@@ -68,27 +68,35 @@ export const useTeamMembers = () => {
 
   // Create member directly (new approach)
   const createMember = useMutation({
-    mutationFn: async ({ email, password, full_name, role }: { 
-      email: string; 
+    mutationFn: async ({
+      email,
+      password,
+      full_name,
+      role,
+      organization_id,
+    }: {
+      email: string;
       password: string;
       full_name: string;
-      role: 'org_admin' | 'manager' | 'agent' | 'viewer' 
+      role: 'org_admin' | 'manager' | 'agent' | 'viewer';
+      organization_id?: string;
     }) => {
-      if (!selectedOrgId) throw new Error(t('messages.noOrganization'));
+      const targetOrg = organization_id || selectedOrgId;
+      if (!targetOrg) throw new Error(t('messages.noOrganization'));
 
       const { data, error } = await supabase.functions.invoke('create-org-member', {
         body: {
           email,
           password,
           full_name,
-          organization_id: selectedOrgId,
+          organization_id: targetOrg,
           role,
         },
       });
 
       if (error) throw new Error(error.message);
       if (data?.error) throw new Error(data.error);
-      
+
       return data;
     },
     onSuccess: () => {
@@ -99,6 +107,7 @@ export const useTeamMembers = () => {
       toast({ title: t('common.error'), description: error.message, variant: 'destructive' });
     },
   });
+
 
   // Legacy invite member (kept for backwards compatibility)
   const inviteMember = useMutation({
