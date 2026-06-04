@@ -31,6 +31,8 @@ interface SuperAdminStats {
   activeTrials: number;
   trialsExpiringSoon: number;
   totalClients: number;
+  totalMembers: number;
+  totalCreditsUsed: number;
   planDistribution: Record<string, number>;
   growthData: Array<{ month: string; organizations: number }>;
 }
