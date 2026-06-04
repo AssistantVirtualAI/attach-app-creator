@@ -137,7 +137,7 @@ export function AgencyTab() {
 
           {/* Nom agence */}
           <div className="space-y-2">
-            <Label htmlFor="agencyName">Nom de l'agence</Label>
+            <Label htmlFor="agencyName">{t('settings.agency.agencyName')}</Label>
             <Input
               id="agencyName"
               value={config.name}
