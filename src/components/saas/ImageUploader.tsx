@@ -142,7 +142,7 @@ export const ImageUploader = ({
           ) : (
             <div className="flex flex-col items-center gap-1 text-muted-foreground">
               <Upload className={cn("w-6 h-6", isDragging && "text-primary")} />
-              {isDragging && <span className="text-xs text-primary">Déposer</span>}
+              {isDragging && <span className="text-xs text-primary">{t('settings.uploader.drop')}</span>}
             </div>
           )}
         </div>
@@ -153,10 +153,10 @@ export const ImageUploader = ({
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
           >
-            {uploading ? 'Téléchargement...' : 'Télécharger'}
+            {uploading ? t('settings.uploader.uploading') : t('settings.uploader.upload')}
           </Button>
           <p className="text-xs text-muted-foreground">
-            Glisser-déposer ou cliquer
+            {t('settings.uploader.dragOrClick')}
           </p>
           <input
             ref={fileInputRef}
