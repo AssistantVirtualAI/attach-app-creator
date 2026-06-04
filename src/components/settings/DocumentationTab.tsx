@@ -322,7 +322,7 @@ export const DocumentationTab = () => {
   const current = filteredModules.find((m) => m.id === activeModule) ?? filteredModules[0];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-32">
       {/* Hero */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
