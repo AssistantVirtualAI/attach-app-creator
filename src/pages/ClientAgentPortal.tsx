@@ -38,6 +38,7 @@ import { AvaLogo } from '@/components/shared/AvaLogo';
 import { GlowBadge } from '@/components/portal/GlowBadge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLanguage } from '@/context/LanguageContext';
+import { useApplyBranding } from '@/hooks/useApplyBranding';
 
 const ClientAgentPortalContent = () => {
   const { isAuthenticated, isLoading: authLoading, session, logout, loginAsAdmin } = useClient();
@@ -46,6 +47,7 @@ const ClientAgentPortalContent = () => {
   const location = useLocation();
   const { t } = useTranslation();
   const { language, setLanguage } = useLanguage();
+  useApplyBranding(session?.organizationId);
   const [adminLoginAttempted, setAdminLoginAttempted] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
   

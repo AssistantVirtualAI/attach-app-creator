@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 import { OrgSwitcher } from '@/components/layout/OrgSwitcher';
+import { useApplyBranding } from '@/hooks/useApplyBranding';
 
 const SIDEBAR_ORDER_KEY = 'sidebar-group-order';
 
@@ -81,7 +82,8 @@ interface AppLayoutProps {
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
   const { role, isSuperAdmin } = usePermissions();
-  const { selectedOrg, isLoading, userRole } = useOrganization();
+  const { selectedOrg, selectedOrgId, isLoading, userRole } = useOrganization();
+  useApplyBranding(selectedOrgId);
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
   const { t } = useTranslation();
