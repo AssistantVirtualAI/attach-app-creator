@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MembersList } from '@/components/team/MembersList';
 import { InviteMemberModal } from '@/components/team/InviteMemberModal';
-import { useTeamMembers } from '@/hooks/useTeamMembers';
+import { MemberDetailDialog } from '@/components/team/MemberDetailDialog';
+import { useTeamMembers, TeamMember } from '@/hooks/useTeamMembers';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Users, UserPlus, Shield } from 'lucide-react';
@@ -11,11 +12,13 @@ import { Badge } from '@/components/ui/badge';
 
 export function MembersTab() {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const { members, isLoading, createMember, updateMemberRole, removeMember } = useTeamMembers();
   const { user } = useAuth();
   const { can } = usePermissions();
 
   const canManageMembers = can('manage:members');
+
 
   return (
     <div className="space-y-6">
@@ -88,6 +91,7 @@ export function MembersTab() {
               members={members}
               onUpdateRole={(userId, role) => updateMemberRole.mutate({ userId, newRole: role })}
               onRemoveMember={(userId) => removeMember.mutate(userId)}
+              onSelectMember={canManageMembers ? setSelectedMember : undefined}
               currentUserId={user?.id}
             />
           )}
@@ -101,6 +105,14 @@ export function MembersTab() {
         onCreateMember={(data) => createMember.mutateAsync(data)}
         isLoading={createMember.isPending}
       />
+
+      {/* Detail Modal */}
+      <MemberDetailDialog
+        member={selectedMember}
+        isOpen={!!selectedMember}
+        onClose={() => setSelectedMember(null)}
+      />
     </div>
   );
 }
+

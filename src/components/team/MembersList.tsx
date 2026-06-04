@@ -18,8 +18,10 @@ interface MembersListProps {
   members: TeamMember[];
   onUpdateRole: (userId: string, newRole: 'org_admin' | 'manager' | 'agent' | 'viewer') => void;
   onRemoveMember: (userId: string) => void;
+  onSelectMember?: (member: TeamMember) => void;
   currentUserId?: string;
 }
+
 
 const roleLabels: Record<string, { label: string; color: string }> = {
   super_admin: { label: 'Super Admin', color: 'bg-red-500/10 text-red-500' },
@@ -29,7 +31,7 @@ const roleLabels: Record<string, { label: string; color: string }> = {
   viewer: { label: 'Viewer', color: 'bg-gray-500/10 text-gray-500' },
 };
 
-export const MembersList = ({ members, onUpdateRole, onRemoveMember, currentUserId }: MembersListProps) => {
+export const MembersList = ({ members, onUpdateRole, onRemoveMember, onSelectMember, currentUserId }: MembersListProps) => {
   const getInitials = (name: string | null, email: string) => {
     if (name) {
       return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -54,7 +56,12 @@ export const MembersList = ({ members, onUpdateRole, onRemoveMember, currentUser
           const isCurrentUser = member.user_id === currentUserId;
 
           return (
-            <TableRow key={member.id}>
+            <TableRow
+              key={member.id}
+              className={onSelectMember ? 'cursor-pointer hover:bg-muted/40' : undefined}
+              onClick={() => onSelectMember?.(member)}
+            >
+
               <TableCell>
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
@@ -85,7 +92,8 @@ export const MembersList = ({ members, onUpdateRole, onRemoveMember, currentUser
                   ? format(new Date(member.accepted_at), 'dd MMM yyyy', { locale: fr })
                   : 'En attente'}
               </TableCell>
-              <TableCell>
+              <TableCell onClick={(e) => e.stopPropagation()}>
+
                 {!isCurrentUser && role !== 'super_admin' && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
