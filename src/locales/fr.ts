@@ -1138,6 +1138,9 @@ export const fr = {
       title: 'Aucun document',
       description: 'Ajoutez des documents pour enrichir la connaissance de vos agents IA.',
     },
+    noAgentSelected: 'Aucun agent sélectionné',
+    noAgentConfigured: 'Aucun agent configuré. Créez un agent avec une plateforme IA vocale.',
+    selectAgent: 'Sélectionnez un agent pour voir sa base de connaissances.',
     categories: {
       faq: 'FAQ',
       documentation: 'Documentation',
