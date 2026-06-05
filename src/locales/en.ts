@@ -1142,6 +1142,9 @@ export const en = {
       title: 'No documents',
       description: 'Add documents to enrich your AI agents knowledge.',
     },
+    noAgentSelected: 'No agent selected',
+    noAgentConfigured: 'No agent configured. Create an agent with a voice AI platform.',
+    selectAgent: 'Select an agent to view its knowledge base.',
     categories: {
       faq: 'FAQ',
       documentation: 'Documentation',
