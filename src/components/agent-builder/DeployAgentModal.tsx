@@ -136,14 +136,14 @@ export function DeployAgentModal({
 
               {!config.systemPrompt && (
                 <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">
-                  ⚠️ Le System Prompt n'est pas défini. Votre agent pourrait ne pas fonctionner correctement.
+                  ⚠️ The System Prompt is not set. Your agent may not work correctly.
                 </div>
               )}
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Annuler
+                Cancel
               </Button>
               <Button onClick={handleDeploy} disabled={isSaving || !agentName}>
                 {isSaving ? (

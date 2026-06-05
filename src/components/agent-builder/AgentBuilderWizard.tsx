@@ -31,11 +31,11 @@ interface AgentBuilderWizardProps {
 }
 
 const WIZARD_STEPS = [
-  { id: 1, title: 'Template', icon: Sparkles, description: 'Choisissez un point de départ' },
-  { id: 2, title: 'Personnalité', icon: MessageSquare, description: 'Définissez le comportement' },
-  { id: 3, title: 'Message d\'accueil', icon: MessageSquare, description: 'Premier contact' },
-  { id: 4, title: 'Paramètres', icon: Settings, description: 'Affinez les réglages' },
-  { id: 5, title: 'Déployer', icon: Rocket, description: 'Mettez en ligne' },
+  { id: 1, title: 'Template', icon: Sparkles, description: 'Choose a starting point' },
+  { id: 2, title: 'Personality', icon: MessageSquare, description: 'Define the behavior' },
+  { id: 3, title: 'Welcome message', icon: MessageSquare, description: 'First contact' },
+  { id: 4, title: 'Settings', icon: Settings, description: 'Fine-tune settings' },
+  { id: 5, title: 'Deploy', icon: Rocket, description: 'Go live' },
 ];
 
 export function AgentBuilderWizard({
@@ -211,9 +211,9 @@ export function AgentBuilderWizard({
         return (
           <div className="space-y-6 max-w-2xl mx-auto">
             <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold mb-2">Paramètres avancés</h2>
+              <h2 className="text-2xl font-bold mb-2">Advanced Settings</h2>
               <p className="text-muted-foreground">
-                Affinez le comportement de votre agent
+                Fine-tune your agent behavior
               </p>
             </div>
 

@@ -14,42 +14,42 @@ const nodeTypes: NodeType[] = [
     label: 'System Prompt', 
     icon: <MessageSquare className="h-4 w-4" />, 
     color: 'bg-primary',
-    description: 'Instructions et personnalité'
+    description: 'Instructions and personality'
   },
   { 
     type: 'firstMessage', 
-    label: 'Premier Message', 
+    label: 'First Message', 
     icon: <MessageCircle className="h-4 w-4" />, 
     color: 'bg-green-500',
-    description: 'Message d\'accueil'
+    description: 'Welcome message'
   },
   { 
     type: 'voiceSettings', 
-    label: 'Paramètres Voix', 
+    label: 'Voice Settings', 
     icon: <Mic className="h-4 w-4" />, 
     color: 'bg-amber-500',
-    description: 'Voix et tonalité'
+    description: 'Voice and tone'
   },
   { 
     type: 'knowledgeBase', 
-    label: 'Base de Connaissances', 
+    label: 'Knowledge Base', 
     icon: <BookOpen className="h-4 w-4" />, 
     color: 'bg-cyan-500',
     description: 'Documents et FAQ'
   },
   { 
     type: 'tools', 
-    label: 'Outils Agent', 
+    label: 'Agent Tools', 
     icon: <Wrench className="h-4 w-4" />, 
     color: 'bg-purple-500',
     description: 'Actions disponibles'
   },
   { 
     type: 'responseSettings', 
-    label: 'Paramètres Réponse', 
+    label: 'Response Settings', 
     icon: <Settings2 className="h-4 w-4" />, 
     color: 'bg-rose-500',
-    description: 'Température et tokens'
+    description: 'Temperature and tokens'
   },
 ];
 
@@ -60,9 +60,9 @@ interface AgentBuilderSidebarProps {
 export function AgentBuilderSidebar({ onDragStart }: AgentBuilderSidebarProps) {
   return (
     <div className="w-72 bg-card border-r p-4 overflow-y-auto">
-      <h3 className="font-semibold mb-2">Composants Agent</h3>
+      <h3 className="font-semibold mb-2">Agent Components</h3>
       <p className="text-xs text-muted-foreground mb-4">
-        Glissez-déposez les blocs sur le canvas pour construire votre agent
+        Drag and drop blocks onto the canvas to build your agent
       </p>
       
       <div className="space-y-2">
