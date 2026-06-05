@@ -115,18 +115,17 @@ export function usePbxMockModeToggle() {
   });
 }
 
-type SyncFn = 'fusionpbx-sync-cdr' | 'fusionpbx-sync-config';
-
-/** Manual “Refresh from PBX” — invokes a sync edge function and re-fetches affected tables. */
+/** Manual "Refresh from PBX" — invokes fusionpbx-proxy and re-fetches affected tables. */
 export function usePbxSync() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (kind: 'cdr' | 'config' | 'devices' | 'ivr-queues') => {
-      const fn: SyncFn = kind === 'cdr' ? 'fusionpbx-sync-cdr' : 'fusionpbx-sync-config';
-      const { data, error } = await supabase.functions.invoke(fn, {
-        body: { organization_id: LEMTEL_ORG, scope: kind },
+    mutationFn: async (kind: 'cdr' | 'config' | 'devices' | 'ivr-queues' | 'all') => {
+      const action = kind === 'cdr' ? 'sync-cdrs' : 'sync-all';
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action, organization_id: LEMTEL_ORG },
       });
       if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).message || (data as any).error);
       return data;
     },
     onSuccess: (_d, kind) => {
@@ -136,6 +135,37 @@ export function usePbxSync() {
     onError: (e: any) => {
       toast.error(e?.message || 'Sync failed. See audit logs for details.');
     },
+  });
+}
+
+/** Live SIP registrations from FusionPBX (polled). */
+export function usePbxRegistrations(intervalMs = 30000) {
+  return useQuery({
+    queryKey: ['pbx', 'registrations'],
+    refetchInterval: intervalMs,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'list-registrations', organization_id: LEMTEL_ORG },
+      });
+      if (error) return [];
+      return ((data as any)?.data ?? []) as any[];
+    },
+  });
+}
+
+/** Ping FusionPBX directly (Test Connection button). */
+export function usePbxPing() {
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'ping', organization_id: LEMTEL_ORG },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).message || (data as any).error);
+      return data as { status: string; latency_ms: number; extensions_count: number };
+    },
+    onSuccess: (d) => toast.success(`PBX OK — ${d.extensions_count} ext, ${d.latency_ms}ms`),
+    onError: (e: any) => toast.error(e?.message || 'PBX ping failed'),
   });
 }
 
