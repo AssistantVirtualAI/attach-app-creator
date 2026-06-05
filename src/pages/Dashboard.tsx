@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { MetricsGrid } from '@/components/dashboard/MetricsGrid';
 import { ConversationsChart } from '@/components/dashboard/ConversationsChart';
@@ -48,6 +48,10 @@ const Dashboard = () => {
   
   // Fetch reports data for report generator
   const { data: reportsData } = useAgentReports(selectedAgentId || undefined, dateRange);
+
+  useEffect(() => {
+    setSelectedAgentId(null);
+  }, [selectedOrgId]);
 
   // Use agent-specific metrics if an agent is selected, otherwise use global
   const isLoading = selectedAgentId ? isLoadingAgent : isLoadingGlobal;
