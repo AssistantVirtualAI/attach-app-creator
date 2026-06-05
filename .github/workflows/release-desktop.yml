@@ -38,29 +38,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
-          cache-dependency-path: apps/ava-softphone-desktop/package-lock.json
-      - name: Cleanup root configs (Windows)
-        if: runner.os == 'Windows'
+      - name: Remove root PostCSS config
         shell: pwsh
         run: |
-          $files = @(
-            "postcss.config.js",
-            "postcss.config.cjs",
-            "postcss.config.mjs",
-            "tailwind.config.js",
-            "tailwind.config.ts"
-          )
-          foreach ($f in $files) {
-            if (Test-Path $f) {
-              Remove-Item $f -Force
-              Write-Host "Deleted: $f"
-            } else {
-              Write-Host "Not found: $f"
-            }
+          $target = "postcss.config.js"
+          if (Test-Path $target) {
+            Remove-Item $target -Force
+            Write-Host "✅ Deleted $target"
+          } else {
+            Write-Host "ℹ️ $target not found at root"
           }
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
       - name: Build Windows
         run: npm run build:win
@@ -90,17 +79,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
-          cache-dependency-path: apps/ava-softphone-desktop/package-lock.json
-      - name: Cleanup root configs (Ubuntu/Mac)
-        if: runner.os != 'Windows'
+      - name: Remove root PostCSS config
         shell: bash
         run: |
-          for f in postcss.config.js postcss.config.cjs postcss.config.mjs tailwind.config.js tailwind.config.ts; do
-            [ -f "$f" ] && rm "$f" && echo "Deleted $f" || echo "Not found: $f"
-          done
+          if [ -f "postcss.config.js" ]; then
+            rm -f postcss.config.js
+            echo "✅ Deleted postcss.config.js"
+          else
+            echo "ℹ️ postcss.config.js not found at root"
+          fi
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
       - name: Build Mac
         run: npm run build:mac
@@ -132,8 +121,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
-          cache-dependency-path: apps/ava-softphone-desktop/package-lock.json
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
@@ -142,15 +129,17 @@ jobs:
             libcups2-dev libxss1 libxtst6 xvfb \
             libx11-xcb1 libxcb-dri3-0 libdrm2 \
             libgbm1 libnss3 libatk-bridge2.0-0
-      - name: Cleanup root configs (Ubuntu/Mac)
-        if: runner.os != 'Windows'
+      - name: Remove root PostCSS config
         shell: bash
         run: |
-          for f in postcss.config.js postcss.config.cjs postcss.config.mjs tailwind.config.js tailwind.config.ts; do
-            [ -f "$f" ] && rm "$f" && echo "Deleted $f" || echo "Not found: $f"
-          done
+          if [ -f "postcss.config.js" ]; then
+            rm -f postcss.config.js
+            echo "✅ Deleted postcss.config.js"
+          else
+            echo "ℹ️ postcss.config.js not found at root"
+          fi
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
       - name: Build Linux
         run: npm run build:linux
