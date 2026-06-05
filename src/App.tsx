@@ -528,6 +528,8 @@ const App = () => (
                 <Route path="/org/lemtel/telephony/ai" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyAI /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/webphone" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyWebphone /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/settings" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonySettings /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/telephony/voicemail" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyVoicemail /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/telephony/diagnostics" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyDiagnostics /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
 
                 {/* /org/lemtel/portal/* customer routes (PortalGuard enforces customer scope) */}
                 <Route path="/org/lemtel/portal/dashboard" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><TelephonyDashboard /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
