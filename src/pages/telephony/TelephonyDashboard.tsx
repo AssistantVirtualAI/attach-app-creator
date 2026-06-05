@@ -3,9 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, MessageSquare, Smartphone, Voicemail, Brain, Plus, RefreshCw, Bot, Activity } from 'lucide-react';
+import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, MessageSquare, Smartphone, Voicemail, Brain, Plus, RefreshCw, Bot, Activity, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend } from 'recharts';
-import { usePbxCallRecords, usePbxExtensions, usePbxSmsThreads, usePbxIntegration, usePbxAgents, usePbxDevices, usePbxSync, usePbxRegistrations } from '@/hooks/usePbxData';
+import { usePbxCallRecords, usePbxExtensions, usePbxSmsThreads, usePbxIntegration, usePbxAgents, usePbxDevices, usePbxSync, usePbxRegistrations, usePbxSyncJobs } from '@/hooks/usePbxData';
 import { formatDistanceToNow } from 'date-fns';
 
 const COLORS = ['#22c55e', '#3b82f6', '#ef4444'];
@@ -19,6 +19,7 @@ export default function TelephonyDashboard() {
   const { data: integration } = usePbxIntegration();
   const { data: registrations = [] } = usePbxRegistrations(30000);
   const sync = usePbxSync();
+  const { data: syncJobs = [] } = usePbxSyncJobs(3);
 
   const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
   const today = startOfDay(new Date());
@@ -68,15 +69,24 @@ export default function TelephonyDashboard() {
   const liveReg = (registrations as any[]).length;
   const lastSync = integration?.last_sync_at ? formatDistanceToNow(new Date(integration.last_sync_at), { addSuffix: true }) : 'never';
 
-  const kpi = (label: string, value: string | number, Icon: any, color: string) => (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm text-muted-foreground">{label}</CardTitle>
-        <Icon className={`w-4 h-4 ${color}`} />
-      </CardHeader>
-      <CardContent><div className="text-3xl font-bold">{value}</div></CardContent>
-    </Card>
-  );
+  const kpi = (label: string, value: string | number, Icon: any, color: string, sub?: React.ReactNode, href?: string) => {
+    const inner = (
+      <Card className={href ? 'hover:bg-muted/40 transition cursor-pointer' : ''}>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm text-muted-foreground">{label}</CardTitle>
+          <Icon className={`w-4 h-4 ${color}`} />
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold">{value}</div>
+          {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
+        </CardContent>
+      </Card>
+    );
+    return href ? <Link to={href} key={label}>{inner}</Link> : inner;
+  };
+
+  const lastJob = syncJobs[0] as any;
+  const lastJobAgo = lastJob ? (Date.now() - new Date(lastJob.completed_at || lastJob.created_at).getTime()) / 60000 : null;
 
   return (
     <div className="space-y-6">
@@ -96,15 +106,20 @@ export default function TelephonyDashboard() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {kpi('Calls Today', todayCalls.length, Phone, 'text-blue-500')}
+        {kpi('Calls Today', todayCalls.length, Phone, 'text-blue-500',
+          <span>{answered} answered · <span className={missed > 0 ? 'text-red-600' : ''}>{missed} missed</span></span>,
+          '/org/lemtel/telephony/calls')}
         {kpi('Missed Calls', missed, PhoneMissed, 'text-red-500')}
         {kpi('Avg Duration', `${avgDur}s`, Activity, 'text-purple-500')}
         {kpi('Answered Rate', `${answerRate}%`, PhoneIncoming, 'text-green-500')}
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {kpi('Active Extensions', extensions.length, Smartphone, 'text-indigo-500')}
-        {kpi(`Registered (live)`, `${liveReg} / ${extensions.length}`, Voicemail, 'text-cyan-500')}
-        {kpi('Unread SMS', unread, MessageSquare, 'text-orange-500')}
+        {kpi('Active Extensions', extensions.length, Smartphone, 'text-indigo-500',
+          `${extensions.length} / ${extensions.length} active`, '/org/lemtel/telephony/extensions')}
+        {kpi(`Registered (live)`, `${liveReg} / ${extensions.length}`, Voicemail, 'text-cyan-500',
+          liveReg > 0 ? <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /> live</span> : 'no live registrations')}
+        {kpi('Unread SMS', unread, MessageSquare, 'text-orange-500',
+          `${(sms as any[]).length} conversations`, '/org/lemtel/telephony/messages')}
         {kpi('Voice Agents', agents.length, Bot, 'text-pink-500')}
       </div>
 
@@ -183,12 +198,38 @@ export default function TelephonyDashboard() {
         <Card>
           <CardHeader><CardTitle>Sync Status</CardTitle></CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <div className="flex items-center justify-between"><span className="text-muted-foreground">Last CDR sync</span><span>{lastSync}</span></div>
-            <div className="flex items-center justify-between"><span className="text-muted-foreground">Integration status</span><Badge variant={integration?.status === 'configured' ? 'default' : 'outline'}>{integration?.status || 'pending'}</Badge></div>
+            {lastJob?.status === 'failed' && (
+              <div className="p-2 rounded bg-red-500/10 text-red-600 text-xs flex items-center justify-between">
+                <span>❌ Last sync failed</span>
+                <Button size="sm" variant="outline" className="h-6" onClick={() => sync.mutate('all')}>Retry</Button>
+              </div>
+            )}
+            {lastJobAgo !== null && lastJobAgo > 10 && lastJob?.status !== 'failed' && (
+              <div className="p-2 rounded bg-orange-500/10 text-orange-600 text-xs">
+                ⚠️ Last sync was {Math.round(lastJobAgo)} min ago
+              </div>
+            )}
+            <div className="space-y-1">
+              {syncJobs.length === 0 && <div className="text-muted-foreground text-xs">No sync jobs yet</div>}
+              {(syncJobs as any[]).map(j => (
+                <div key={j.id} className="flex items-center justify-between text-xs border-b last:border-0 py-1">
+                  <span className="inline-flex items-center gap-2">
+                    {j.status === 'completed' ? <CheckCircle2 className="w-3 h-3 text-green-500" />
+                      : j.status === 'failed' ? <XCircle className="w-3 h-3 text-red-500" />
+                      : <Loader2 className="w-3 h-3 animate-spin text-yellow-500" />}
+                    <span className="font-mono">{j.job_type}</span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    {j.completed_at ? formatDistanceToNow(new Date(j.completed_at), { addSuffix: true }) : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
             <div className="flex items-center justify-between"><span className="text-muted-foreground">Mock mode</span><Badge variant={integration?.config?.mock_mode ? 'secondary' : 'outline'}>{integration?.config?.mock_mode ? 'On' : 'Off'}</Badge></div>
             <div className="flex gap-2 pt-2">
               <Button size="sm" variant="outline" onClick={() => sync.mutate('cdr')}><RefreshCw className="w-3 h-3 mr-1" /> CDR</Button>
               <Button size="sm" variant="outline" onClick={() => sync.mutate('config')}><RefreshCw className="w-3 h-3 mr-1" /> Config</Button>
+              <Button size="sm" onClick={() => sync.mutate('all')}><RefreshCw className="w-3 h-3 mr-1" /> Full</Button>
             </div>
           </CardContent>
         </Card>

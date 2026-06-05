@@ -370,17 +370,20 @@ Deno.serve(async (req) => {
 
     // ---- CDRs (list / sync) ----
     if (action === "list-cdrs" || action === "sync-cdrs" || action === "get-cdrs") {
-      let startDate: string | undefined = params.start_date;
+      const b: any = body;
+      let startDate: string | undefined = params.start_date ?? b.start_date;
+      const endDate: string | undefined = params.end_date ?? b.end_date;
+      const extension: string | undefined = params.extension ?? b.extension;
       if (action === "sync-cdrs" && !startDate) {
         const { data: last } = await admin.from("pbx_sync_jobs")
           .select("completed_at").eq("job_type", "sync-cdrs").eq("status", "completed")
           .order("completed_at", { ascending: false }).limit(1).maybeSingle();
         if (last?.completed_at) startDate = last.completed_at;
       }
-      const extra: Record<string, string> = { limit: String(params.limit || 100) };
+      const extra: Record<string, string> = { limit: String(params.limit ?? b.limit ?? 100) };
       if (startDate) extra.start_date = startDate;
-      if (params.end_date) extra.end_date = params.end_date;
-      if (params.extension) extra.extension = params.extension;
+      if (endDate) extra.end_date = endDate;
+      if (extension) extra.extension = extension;
 
       const r = await fetchCdrsWithFallback(extra);
       if (!r.ok) {
@@ -409,14 +412,17 @@ Deno.serve(async (req) => {
     // ---- Full sync ----
     if (action === "sync-all") {
       const t0 = Date.now();
-      const results = await Promise.all([
-        pbxFetch(`extensions?${domainQ}`).then((r) => ({ k: "extensions", r })),
-        pbxFetch(`devices?${domainQ}`).then((r) => ({ k: "devices", r })),
-        pbxFetch(`ivr_menus?${domainQ}`).then((r) => ({ k: "ivr_menus", r })),
-        pbxFetch(`call_center_queues?${domainQ}`).then((r) => ({ k: "call_center_queues", r })),
-        pbxFetch(`ring_groups?${domainQ}`).then((r) => ({ k: "ring_groups", r })),
-      ]);
-      const cdrResult = await fetchCdrsWithFallback({ limit: "200" });
+      // Optional resources filter: ['extensions','devices','ivrs','queues','ring_groups','destinations','cdrs']
+      const requested: string[] | null = Array.isArray((body as any).resources) ? (body as any).resources : null;
+      const want = (k: string) => !requested || requested.includes(k);
+      const tasks: Promise<{ k: string; r: any }>[] = [];
+      if (want("extensions"))   tasks.push(pbxFetch(`extensions?${domainQ}`).then((r) => ({ k: "extensions", r })));
+      if (want("devices"))      tasks.push(pbxFetch(`devices?${domainQ}`).then((r) => ({ k: "devices", r })));
+      if (want("ivrs"))         tasks.push(pbxFetch(`ivr_menus?${domainQ}`).then((r) => ({ k: "ivr_menus", r })));
+      if (want("queues"))       tasks.push(pbxFetch(`call_center_queues?${domainQ}`).then((r) => ({ k: "call_center_queues", r })));
+      if (want("ring_groups"))  tasks.push(pbxFetch(`ring_groups?${domainQ}`).then((r) => ({ k: "ring_groups", r })));
+      const results = await Promise.all(tasks);
+      const cdrResult = want("cdrs") ? await fetchCdrsWithFallback({ limit: "200" }) : null;
       const stats: Record<string, number> = {};
       const errors: string[] = [];
       const doUpsert = async (table: string, rows: any[], conflict: string, k: string) => {
@@ -445,10 +451,10 @@ Deno.serve(async (req) => {
           await doUpsert("pbx_ring_groups", rows, "organization_id,pbx_uuid", "ring_groups");
         }
       }
-      if (cdrResult.ok) {
+      if (cdrResult?.ok) {
         const rows = cdrResult.records.map(mapCdr).filter((x: any) => x.pbx_uuid);
         await doUpsert("pbx_call_records", rows, "pbx_uuid", "cdrs");
-      } else {
+      } else if (cdrResult) {
         errors.push(`cdrs: no working endpoint (tried ${cdrResult.attempts.length})`);
         stats["cdrs"] = 0;
       }

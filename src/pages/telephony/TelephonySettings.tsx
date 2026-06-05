@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePbxIntegration, usePbxMockModeToggle, usePbxPing, usePbxSync, LEMTEL_ORG } from '@/hooks/usePbxData';
 import { useTelephonyStatus, type ServiceStatus } from '@/hooks/useTelephonyStatus';
+import { SyncDiagnosticsPanel } from '@/components/lemtel/SyncDiagnosticsPanel';
 
 const FIELDS = [
   { key: 'FUSIONPBX_URL', label: 'Server URL', secret: false, section: 'fusionpbx' },
@@ -156,6 +157,8 @@ export default function TelephonySettings() {
         </CardHeader>
         <CardContent className="space-y-4">{fieldsOf('fusionpbx').map(renderField)}</CardContent>
       </Card>
+
+      <SyncDiagnosticsPanel />
 
       {/* Telnyx */}
       <Card>

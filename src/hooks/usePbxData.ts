@@ -115,25 +115,69 @@ export function usePbxMockModeToggle() {
   });
 }
 
+type SyncKind = 'cdr' | 'config' | 'devices' | 'ivr-queues' | 'all' | 'extensions';
+type SyncOpts = {
+  kind?: SyncKind;
+  resources?: string[];
+  start_date?: string;
+  end_date?: string;
+  extension?: string;
+};
+
 /** Manual "Refresh from PBX" — invokes fusionpbx-proxy and re-fetches affected tables. */
 export function usePbxSync() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (kind: 'cdr' | 'config' | 'devices' | 'ivr-queues' | 'all') => {
+    mutationFn: async (arg: SyncKind | SyncOpts) => {
+      const opts: SyncOpts = typeof arg === 'string' ? { kind: arg } : arg;
+      const kind = opts.kind ?? 'all';
       const action = kind === 'cdr' ? 'sync-cdrs' : 'sync-all';
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action, organization_id: LEMTEL_ORG },
-      });
+      const body: Record<string, unknown> = { action, organization_id: LEMTEL_ORG };
+      if (opts.resources) body.resources = opts.resources;
+      if (opts.start_date) body.start_date = opts.start_date;
+      if (opts.end_date) body.end_date = opts.end_date;
+      if (opts.extension) body.extension = opts.extension;
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).message || (data as any).error);
       return data;
     },
-    onSuccess: (_d, kind) => {
+    onSuccess: (data: any) => {
       qc.invalidateQueries({ queryKey: ['pbx'] });
-      toast.success(`Synced ${kind} from PBX`);
+      const s = data?.stats;
+      const msg = s ? Object.entries(s).filter(([k]) => k !== 'duration_ms').map(([k,v]) => `${k}: ${v}`).join(' · ') : 'Synced';
+      toast.success(msg || 'Sync complete');
     },
     onError: (e: any) => {
       toast.error(e?.message || 'Sync failed. See audit logs for details.');
+    },
+  });
+}
+
+/** Recent sync jobs (for diagnostics panel). */
+export function usePbxSyncJobs(limit = 10) {
+  return useQuery({
+    queryKey: ['pbx', 'sync_jobs', limit],
+    refetchInterval: 15000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from('pbx_sync_jobs')
+        .select('*').eq('organization_id', LEMTEL_ORG)
+        .order('created_at', { ascending: false }).limit(limit);
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+  });
+}
+
+/** Test CDR endpoint detection. */
+export function usePbxTestCdrEndpoint() {
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'test-cdr-endpoint', organization_id: LEMTEL_ORG },
+      });
+      if (error) throw error;
+      return data as { ok: boolean; endpoint: string | null; record_count: number; attempts: any[] };
     },
   });
 }
