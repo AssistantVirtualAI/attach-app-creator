@@ -3,8 +3,20 @@ name: Release AVA Softphone Desktop
 on:
   push:
     tags:
+      - 'v*.*.*'
       - 'desktop-v*'
+  release:
+    types: [published, created]
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g. 1.0.0)'
+        required: false
+        default: '1.0.0'
+
+permissions:
+  contents: write
+  packages: write
 
 defaults:
   run:
