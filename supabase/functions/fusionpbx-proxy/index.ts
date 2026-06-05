@@ -370,17 +370,20 @@ Deno.serve(async (req) => {
 
     // ---- CDRs (list / sync) ----
     if (action === "list-cdrs" || action === "sync-cdrs" || action === "get-cdrs") {
-      let startDate: string | undefined = params.start_date;
+      const b: any = body;
+      let startDate: string | undefined = params.start_date ?? b.start_date;
+      const endDate: string | undefined = params.end_date ?? b.end_date;
+      const extension: string | undefined = params.extension ?? b.extension;
       if (action === "sync-cdrs" && !startDate) {
         const { data: last } = await admin.from("pbx_sync_jobs")
           .select("completed_at").eq("job_type", "sync-cdrs").eq("status", "completed")
           .order("completed_at", { ascending: false }).limit(1).maybeSingle();
         if (last?.completed_at) startDate = last.completed_at;
       }
-      const extra: Record<string, string> = { limit: String(params.limit || 100) };
+      const extra: Record<string, string> = { limit: String(params.limit ?? b.limit ?? 100) };
       if (startDate) extra.start_date = startDate;
-      if (params.end_date) extra.end_date = params.end_date;
-      if (params.extension) extra.extension = params.extension;
+      if (endDate) extra.end_date = endDate;
+      if (extension) extra.extension = extension;
 
       const r = await fetchCdrsWithFallback(extra);
       if (!r.ok) {
