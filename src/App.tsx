@@ -454,6 +454,15 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
+                <Route
+                  path="/audit-logs"
+                  element={
+                    <ProtectedRoute>
+                      <AuditLogs />
+                    </ProtectedRoute>
+                  }
+                />
+                
                 
                 {/* Client Portal Routes - Separate authentication */}
                 <Route
