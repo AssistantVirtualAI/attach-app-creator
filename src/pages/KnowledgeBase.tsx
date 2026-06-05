@@ -28,8 +28,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { KnowledgeDocumentViewer } from '@/components/knowledge/KnowledgeDocumentViewer';
 import { AddKnowledgeDocumentModal } from '@/components/knowledge/AddKnowledgeDocumentModal';
 
+import { useTranslation } from '@/hooks/useTranslation';
 
 const KnowledgeBase = () => {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -388,11 +390,11 @@ const KnowledgeBase = () => {
         {!selectedAgentId && !isLoadingAgents && (
           <Card className="p-12 text-center border-border">
             <Bot className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">Aucun agent sélectionné</h3>
+            <h3 className="text-lg font-semibold mb-2">{t('knowledgeBase.noAgentSelected')}</h3>
             <p className="text-muted-foreground mb-4">
-              {agents.length === 0 
-                ? 'Aucun agent configuré. Créez un agent avec une plateforme IA vocale.'
-                : 'Sélectionnez un agent pour voir sa base de connaissances.'}
+              {agents.length === 0
+                ? t('knowledgeBase.noAgentConfigured')
+                : t('knowledgeBase.selectAgent')}
             </p>
           </Card>
         )}
