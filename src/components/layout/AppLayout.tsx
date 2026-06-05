@@ -242,8 +242,15 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                   {userRole?.role || (isSuperAdmin ? 'super_admin' : 'member')}
                 </Badge>
               </div>
-              <div className="mt-1 text-sidebar-foreground/70">
-                {organizationMemberships.length} membership{organizationMemberships.length === 1 ? '' : 's'} • active session org
+              <div className="mt-1 space-y-1 text-sidebar-foreground/70">
+                {organizationMemberships.map((membership) => (
+                  <div key={membership.organization.id} className="flex items-center justify-between gap-2">
+                    <span className="truncate">
+                      {membership.isSelected ? '● ' : ''}{membership.organization.name}
+                    </span>
+                    <span className="shrink-0 text-[10px]">{membership.role || 'member'}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
