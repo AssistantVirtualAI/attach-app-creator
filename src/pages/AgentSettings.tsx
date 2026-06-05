@@ -83,24 +83,24 @@ const AgentSettingsPage = () => {
 
   const navSections: NavSection[] = [
     {
-      title: 'Général',
+      title: 'General',
       items: [
-        { id: 'overview', label: 'Aperçu', icon: Bot },
-        { id: 'config', label: 'Connexion', icon: Key },
+        { id: 'overview', label: 'Overview', icon: Bot },
+        { id: 'config', label: 'Connection', icon: Key },
         { id: 'clients', label: 'Clients', icon: Users },
       ],
     },
     {
       title: 'Configuration',
       items: [
-        { id: 'advanced', label: 'Paramètres', icon: Settings2 },
-        { id: 'knowledge', label: 'Base de connaissances', icon: Brain },
-        { id: 'mcp', label: 'Serveurs MCP', icon: Wrench },
+        { id: 'advanced', label: 'Settings', icon: Settings2 },
+        { id: 'knowledge', label: 'Knowledge base', icon: Brain },
+        { id: 'mcp', label: 'MCP servers', icon: Wrench },
         { id: 'webhooks', label: 'Webhooks', icon: Webhook },
       ],
     },
     {
-      title: 'Apparence',
+      title: 'Appearance',
       items: [
         { id: 'widget', label: 'Widget', icon: Palette },
         { id: 'embed', label: 'Intégration', icon: Code },
