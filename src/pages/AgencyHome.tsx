@@ -400,7 +400,7 @@ const AgencyHome = () => {
                   </p>
                   <Button 
                     variant="outline" 
-                    onClick={() => toast.info("Configuration dans Paramètres → Domaines")}
+                    onClick={() => toast.info("Configuration is available in Settings → Domains")}
                     className="border-vivid-purple/50 hover:bg-vivid-purple/10"
                   >
                     Configure a domain
@@ -413,8 +413,8 @@ const AgencyHome = () => {
                 <AlertCircle className="h-4 w-4 text-sunset-orange" />
                 <AlertTitle className="text-sunset-orange">DNS Configuration</AlertTitle>
                 <AlertDescription className="text-muted-foreground">
-                  Pour connecter votre domaine, ajoutez un enregistrement A pointant vers <code className="bg-muted px-1 rounded">185.158.133.1</code> et un enregistrement TXT pour la vérification. 
-                  La propagation DNS peut prendre jusqu'à 72 heures.
+                  To connect your domain, add an A record pointing to <code className="bg-muted px-1 rounded">185.158.133.1</code> and a TXT record for verification. 
+                  DNS propagation can take up to 72 hours.
                 </AlertDescription>
               </Alert>
             </CardContent>
@@ -426,7 +426,7 @@ const AgencyHome = () => {
           <h3 className="text-2xl font-bold flex items-center gap-2">
             <BookOpen className="h-6 w-6 text-hot-pink" />
             <span className="bg-gradient-to-r from-hot-pink to-sunset-orange bg-clip-text text-transparent">
-              Ressources
+              Resources
             </span>
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -463,7 +463,7 @@ const AgencyHome = () => {
           </div>
         </motion.div>
 
-        {/* Section Aide Supplémentaire */}
+        {/* Additional Help Section */}
         <motion.div variants={itemVariants}>
           <Card className="relative overflow-hidden border-neon-green/20 bg-gradient-to-br from-neon-green/5 to-cyber-cyan/5">
             <div className="absolute bottom-0 right-0 w-64 h-64 bg-gradient-to-tl from-neon-green/10 to-transparent rounded-full blur-3xl" />
@@ -478,9 +478,9 @@ const AgencyHome = () => {
                 </motion.div>
                 <div>
                   <CardTitle className="bg-gradient-to-r from-neon-green to-cyber-cyan bg-clip-text text-transparent">
-                    Besoin d'aide ?
+                    Need help?
                   </CardTitle>
-                  <CardDescription>Notre équipe est là pour vous accompagner</CardDescription>
+                  <CardDescription>Our team is here to support you</CardDescription>
                 </div>
               </div>
             </CardHeader>
