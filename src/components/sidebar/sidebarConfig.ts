@@ -112,6 +112,24 @@ export const sidebarGroups: NavGroup[] = [
       { nameKey: 'sidebar.superAdmin', href: '/super-admin', icon: Building2 },
     ]
   },
+  {
+    id: 'lemtel',
+    labelKey: '📞 Lemtel',
+    icon: PhoneCall,
+    lemtelOnly: true,
+    items: [
+      { nameKey: 'Dashboard', href: '/lemtel/dashboard', icon: LayoutDashboard },
+      { nameKey: 'Customers', href: '/lemtel/customers', icon: Users },
+      { nameKey: 'Phone Numbers', href: '/lemtel/dids', icon: Phone },
+      { nameKey: 'Extensions', href: '/lemtel/extensions', icon: Smartphone },
+      { nameKey: 'Call Queues', href: '/lemtel/queues', icon: Headphones },
+      { nameKey: 'Auto-Attendant', href: '/lemtel/ivr', icon: Voicemail },
+      { nameKey: 'Voice Agents', href: '/lemtel/voice-agents', icon: Bot },
+      { nameKey: 'Messages (SMS)', href: '/lemtel/messages', icon: MessageSquare },
+      { nameKey: 'Softphone Users', href: '/lemtel/softphone-users', icon: Smartphone },
+      { nameKey: 'Lemtel Settings', href: '/lemtel/settings', icon: Settings },
+    ]
+  },
 ];
 
 export const settingsLink: NavItem = {
