@@ -53,10 +53,10 @@ export default function TelephonyDiagnostics() {
         <CardHeader><CardTitle className="text-base">Provider Status</CardTitle></CardHeader>
         <CardContent className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            ['FusionPBX', status.fusionpbx],
-            ['Telnyx', status.telnyx],
-            ['ElevenLabs', status.elevenlabs],
-            ['AI Gateway', status.ai],
+            ['FusionPBX', status?.services?.fusionpbx],
+            ['Telnyx', status?.services?.telnyx],
+            ['ElevenLabs', status?.services?.elevenlabs],
+            ['AI Gateway', status?.services?.ai],
           ].map(([label, s]: any) => (
             <div key={label} className="flex items-center justify-between border rounded-lg px-3 py-2">
               <span className="text-sm">{label}</span>
