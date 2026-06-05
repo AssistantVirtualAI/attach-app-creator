@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import TitleBar from './components/TitleBar';
 import SetupWizard from './components/SetupWizard';
 import SettingsPage from './components/SettingsPage';
+import UpdateBanner from './components/UpdateBanner';
 
 type Creds = { portalUrl: string; email: string; extension: string } | null;
 
@@ -49,6 +50,7 @@ export default function App() {
           <SoftphonePane onOpenSettings={() => setView('settings')} creds={creds} />
         )}
       </div>
+      <UpdateBanner />
     </div>
   );
 }
