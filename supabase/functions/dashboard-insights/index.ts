@@ -24,11 +24,13 @@ serve(async (req) => {
     // Parse request body for date range
     let startDate: string | undefined;
     let endDate: string | undefined;
+    let requestedOrganizationId: string | undefined;
     
     try {
       const body = await req.json();
       startDate = body.startDate;
       endDate = body.endDate;
+      requestedOrganizationId = body.organizationId;
     } catch {
       // No body or invalid JSON, use defaults
     }
@@ -52,21 +54,37 @@ serve(async (req) => {
       });
     }
 
-    // Get user's organization
-    const { data: orgMember } = await serviceClient
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .single();
+    let organizationId = typeof requestedOrganizationId === 'string' && requestedOrganizationId.length > 0 ? requestedOrganizationId : null;
 
-    if (!orgMember) {
+    if (organizationId) {
+      const { data: membership } = await serviceClient
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .eq('organization_id', organizationId)
+        .maybeSingle();
+
+      if (!membership) {
+        return new Response(JSON.stringify({ error: 'Forbidden for selected organization' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    } else {
+      const { data: memberships } = await serviceClient
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1);
+      organizationId = memberships?.[0]?.organization_id ?? null;
+    }
+
+    if (!organizationId) {
       return new Response(JSON.stringify({ error: 'No organization found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    const organizationId = orgMember.organization_id;
 
     // Calculate date ranges based on input or defaults
     const now = new Date();
