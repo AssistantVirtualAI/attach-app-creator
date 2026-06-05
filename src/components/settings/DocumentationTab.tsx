@@ -22,6 +22,45 @@ import {
 import { useTranslation } from '@/hooks/useTranslation';
 import { motion } from 'framer-motion';
 import { translations } from '@/locales';
+import shotAgents from '@/assets/docs/agents.png.asset.json';
+import shotAgentBuilder from '@/assets/docs/agent-builder.png.asset.json';
+import shotClients from '@/assets/docs/clients.png.asset.json';
+import shotSettings from '@/assets/docs/settings.png.asset.json';
+import shotIntegrations from '@/assets/docs/integrations.png.asset.json';
+import shotDashboard from '@/assets/docs/dashboard.png.asset.json';
+import shotAnalytics from '@/assets/docs/analytics.png.asset.json';
+import shotTopics from '@/assets/docs/topics.png.asset.json';
+import shotLeads from '@/assets/docs/leads.png.asset.json';
+import shotPhone from '@/assets/docs/phone.png.asset.json';
+import shotApiKeys from '@/assets/docs/api-keys.png.asset.json';
+import shotBilling from '@/assets/docs/billing.png.asset.json';
+import shotTeam from '@/assets/docs/team.png.asset.json';
+import shotWebhooks from '@/assets/docs/webhooks.png.asset.json';
+
+const LESSON_IMAGES: Record<string, string> = {
+  'create-agent': shotAgents.url,
+  'tune-prompt': shotAgentBuilder.url,
+  'test-agent': shotAgentBuilder.url,
+  'create-client': shotClients.url,
+  'assign-agents': shotClients.url,
+  'client-portal': shotClients.url,
+  branding: shotSettings.url,
+  members: shotTeam.url,
+  billing: shotBilling.url,
+  elevenlabs: shotIntegrations.url,
+  vapi: shotIntegrations.url,
+  retell: shotIntegrations.url,
+  phone: shotPhone.url,
+  webhooks: shotWebhooks.url,
+  dashboard: shotDashboard.url,
+  voiceAnalytics: shotAnalytics.url,
+  topics: shotTopics.url,
+  leads: shotLeads.url,
+  roles: shotSettings.url,
+  audit: shotSettings.url,
+  gdpr: shotSettings.url,
+  apiKeys: shotApiKeys.url,
+};
 
 
 type Lesson = {
@@ -465,6 +504,16 @@ export const DocumentationTab = () => {
                           </AccordionTrigger>
                           <AccordionContent className="px-2 pb-4">
                             <div className="pl-10 space-y-3">
+                              {LESSON_IMAGES[lesson.id] && (
+                                <div className="rounded-lg border border-border overflow-hidden bg-muted/20">
+                                  <img
+                                    src={LESSON_IMAGES[lesson.id]}
+                                    alt={String(t(lesson.titleKey))}
+                                    loading="lazy"
+                                    className="w-full h-auto block"
+                                  />
+                                </div>
+                              )}
                               <p className="text-sm text-muted-foreground">{t(lesson.descKey)}</p>
                               <ol className="space-y-2">
                                 {steps.map((step, idx) => (
