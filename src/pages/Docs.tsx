@@ -1095,28 +1095,28 @@ const Docs = () => {
                   Authentification API
                 </CardTitle>
                 <CardDescription>
-                  Utilisez des clés API pour accéder aux endpoints de l'API
+                  Use API keys to access API endpoints
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <h4 className="font-medium mb-2">Créer une Clé API</h4>
+                  <h4 className="font-medium mb-2">Create an API Key</h4>
                   <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-                    <li>Accédez à Paramètres → Clés API</li>
-                    <li>Cliquez sur "Créer une clé"</li>
-                    <li>Sélectionnez les scopes nécessaires</li>
-                    <li>Copiez la clé (affichée une seule fois)</li>
+                    <li>Go to Settings → API Keys</li>
+                    <li>Click "Create key"</li>
+                    <li>Select the required scopes</li>
+                    <li>Copy the key (shown only once)</li>
                   </ol>
                 </div>
                 <Separator />
                 <div>
-                  <h4 className="font-medium mb-2">Utilisation</h4>
+                  <h4 className="font-medium mb-2">Usage</h4>
                   <div className="bg-muted rounded-lg p-4 font-mono text-sm">
                     <code>Authorization: Bearer YOUR_API_KEY</code>
                   </div>
                 </div>
                 <div>
-                  <h4 className="font-medium mb-2">Scopes Disponibles</h4>
+                  <h4 className="font-medium mb-2">Available Scopes</h4>
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       "read:analytics",
@@ -1153,19 +1153,19 @@ const Docs = () => {
                         <EndpointItem
                           method="GET"
                           path="/api/conversations"
-                          description="Liste toutes les conversations"
+                          description="List all conversations"
                           scope="read:conversations"
                         />
                         <EndpointItem
                           method="GET"
                           path="/api/conversations/:id"
-                          description="Détails d'une conversation"
+                          description="Conversation details"
                           scope="read:conversations"
                         />
                         <EndpointItem
                           method="DELETE"
                           path="/api/conversations/:id"
-                          description="Supprimer une conversation"
+                          description="Delete a conversation"
                           scope="write:conversations"
                         />
                       </div>
@@ -1182,25 +1182,25 @@ const Docs = () => {
                         <EndpointItem
                           method="GET"
                           path="/api/agents"
-                          description="Liste tous les agents"
+                          description="List all agents"
                           scope="read:agents"
                         />
                         <EndpointItem
                           method="POST"
                           path="/api/agents"
-                          description="Créer un agent"
+                          description="Create an agent"
                           scope="write:agents"
                         />
                         <EndpointItem
                           method="PUT"
                           path="/api/agents/:id"
-                          description="Modifier un agent"
+                          description="Edit an agent"
                           scope="write:agents"
                         />
                         <EndpointItem
                           method="DELETE"
                           path="/api/agents/:id"
-                          description="Supprimer un agent"
+                          description="Delete an agent"
                           scope="write:agents"
                         />
                       </div>
@@ -1217,25 +1217,25 @@ const Docs = () => {
                         <EndpointItem
                           method="GET"
                           path="/api/clients"
-                          description="Liste tous les clients"
+                          description="List all clients"
                           scope="read:clients"
                         />
                         <EndpointItem
                           method="POST"
                           path="/api/clients"
-                          description="Créer un client"
+                          description="Create a client"
                           scope="write:clients"
                         />
                         <EndpointItem
                           method="PUT"
                           path="/api/clients/:id"
-                          description="Modifier un client"
+                          description="Edit a client"
                           scope="write:clients"
                         />
                         <EndpointItem
                           method="DELETE"
                           path="/api/clients/:id"
-                          description="Supprimer un client"
+                          description="Delete a client"
                           scope="write:clients"
                         />
                       </div>
@@ -1287,13 +1287,13 @@ const Docs = () => {
                         <EndpointItem
                           method="POST"
                           path="/api/webhooks"
-                          description="Créer un endpoint"
+                          description="Create an endpoint"
                           scope="admin:settings"
                         />
                         <EndpointItem
                           method="DELETE"
                           path="/api/webhooks/:id"
-                          description="Supprimer un endpoint"
+                          description="Delete an endpoint"
                           scope="admin:settings"
                         />
                       </div>
