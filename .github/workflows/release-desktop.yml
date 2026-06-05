@@ -39,7 +39,6 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: apps/ava-softphone-desktop/package-lock.json
       - name: Cleanup root configs (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -60,7 +59,7 @@ jobs:
             }
           }
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
       - name: Build Windows
         run: npm run build:win
@@ -91,7 +90,6 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: apps/ava-softphone-desktop/package-lock.json
       - name: Cleanup root configs (Ubuntu/Mac)
         if: runner.os != 'Windows'
         shell: bash
@@ -100,7 +98,7 @@ jobs:
             [ -f "$f" ] && rm "$f" && echo "Deleted $f" || echo "Not found: $f"
           done
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
       - name: Build Mac
         run: npm run build:mac
@@ -133,7 +131,6 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: apps/ava-softphone-desktop/package-lock.json
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
@@ -150,7 +147,7 @@ jobs:
             [ -f "$f" ] && rm "$f" && echo "Deleted $f" || echo "Not found: $f"
           done
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
       - name: Build Linux
         run: npm run build:linux
