@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Eye, EyeOff, Loader2, FlaskConical, Activity, CheckCircle2, XCircle, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { usePbxIntegration, usePbxMockModeToggle, LEMTEL_ORG } from '@/hooks/usePbxData';
+import { usePbxIntegration, usePbxMockModeToggle, usePbxPing, usePbxSync, LEMTEL_ORG } from '@/hooks/usePbxData';
 import { useTelephonyStatus, type ServiceStatus } from '@/hooks/useTelephonyStatus';
 
 const FIELDS = [
@@ -35,6 +35,24 @@ function pill(s?: ServiceStatus) {
     ? <Badge variant="default" className="gap-1"><CheckCircle2 className="w-3 h-3" />{s.latency_ms}ms</Badge>
     : <Badge variant="destructive" className="gap-1"><XCircle className="w-3 h-3" />{s.error || 'failed'}</Badge>;
 }
+
+function TestAndSyncButtons() {
+  const ping = usePbxPing();
+  const sync = usePbxSync();
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => ping.mutate()} disabled={ping.isPending}>
+        {ping.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Activity className="w-3 h-3 mr-1" />}
+        Test
+      </Button>
+      <Button size="sm" onClick={() => sync.mutate('all')} disabled={sync.isPending}>
+        {sync.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
+        Sync Now
+      </Button>
+    </>
+  );
+}
+
 
 export default function TelephonySettings() {
   const { toast } = useToast();
@@ -130,7 +148,10 @@ export default function TelephonySettings() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>FusionPBX Connection</CardTitle>
-            {pill(status?.services.fusionpbx)}
+            <div className="flex items-center gap-2">
+              {pill(status?.services.fusionpbx)}
+              <TestAndSyncButtons />
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">{fieldsOf('fusionpbx').map(renderField)}</CardContent>

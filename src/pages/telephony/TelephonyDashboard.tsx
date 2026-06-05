@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, MessageSquare, Smartphone, Voicemail, Brain, Plus, RefreshCw, Bot, Activity } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend } from 'recharts';
-import { usePbxCallRecords, usePbxExtensions, usePbxSmsThreads, usePbxIntegration, usePbxAgents, usePbxDevices, usePbxSync } from '@/hooks/usePbxData';
+import { usePbxCallRecords, usePbxExtensions, usePbxSmsThreads, usePbxIntegration, usePbxAgents, usePbxDevices, usePbxSync, usePbxRegistrations } from '@/hooks/usePbxData';
 import { formatDistanceToNow } from 'date-fns';
 
 const COLORS = ['#22c55e', '#3b82f6', '#ef4444'];
@@ -17,6 +17,7 @@ export default function TelephonyDashboard() {
   const { data: sms = [] } = usePbxSmsThreads();
   const { data: agents = [] } = usePbxAgents();
   const { data: integration } = usePbxIntegration();
+  const { data: registrations = [] } = usePbxRegistrations(30000);
   const sync = usePbxSync();
 
   const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
@@ -64,6 +65,7 @@ export default function TelephonyDashboard() {
   const smsPreview = (sms as any[]).slice(0, 5);
   const unread = (sms as any[]).reduce((s,t) => s + (t.unread_count || 0), 0);
   const registered = (devices as any[]).filter(d => d.registration_status === 'registered').length;
+  const liveReg = (registrations as any[]).length;
   const lastSync = integration?.last_sync_at ? formatDistanceToNow(new Date(integration.last_sync_at), { addSuffix: true }) : 'never';
 
   const kpi = (label: string, value: string | number, Icon: any, color: string) => (
@@ -101,7 +103,7 @@ export default function TelephonyDashboard() {
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {kpi('Active Extensions', extensions.length, Smartphone, 'text-indigo-500')}
-        {kpi('Registered Devices', registered, Voicemail, 'text-cyan-500')}
+        {kpi(`Registered (live)`, `${liveReg} / ${extensions.length}`, Voicemail, 'text-cyan-500')}
         {kpi('Unread SMS', unread, MessageSquare, 'text-orange-500')}
         {kpi('Voice Agents', agents.length, Bot, 'text-pink-500')}
       </div>
