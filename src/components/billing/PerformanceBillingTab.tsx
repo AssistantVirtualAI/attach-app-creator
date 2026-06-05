@@ -149,11 +149,11 @@ export function PerformanceBillingTab() {
                   <p className="text-lg font-semibold">{currentMetrics?.conversations_count || 0}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-card border">
-                  <p className="text-sm text-muted-foreground">Durée totale</p>
+                  <p className="text-sm text-muted-foreground">Total duration</p>
                   <p className="text-lg font-semibold">{currentMetrics?.total_duration_minutes || 0} min</p>
                 </div>
                 <div className="p-3 rounded-lg bg-card border">
-                  <p className="text-sm text-muted-foreground">Leads générés</p>
+                  <p className="text-sm text-muted-foreground">Generated leads</p>
                   <p className="text-lg font-semibold">{currentMetrics?.leads_generated || 0}</p>
                 </div>
               </div>
@@ -169,14 +169,14 @@ export function PerformanceBillingTab() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
-                Configuration des Tarifs
+                Rate Configuration
               </CardTitle>
               <CardDescription>
-                Définissez vos tarifs par type de performance
+                Define your rates by performance type
               </CardDescription>
             </div>
             <Button variant="ghost" size="sm" onClick={() => setShowConfig(!showConfig)}>
-              {showConfig ? 'Masquer' : 'Modifier'}
+              {showConfig ? 'Hide' : 'Edit'}
             </Button>
           </div>
         </CardHeader>
@@ -184,7 +184,7 @@ export function PerformanceBillingTab() {
           <CardContent>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Prix par RDV booké ($)</label>
+                <label className="text-sm font-medium">Price per booked appointment ($)</label>
                 <Input 
                   type="number" 
                   value={priceAppointment}
@@ -194,7 +194,7 @@ export function PerformanceBillingTab() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Prix par lead qualifié ($)</label>
+                <label className="text-sm font-medium">Price per qualified lead ($)</label>
                 <Input 
                   type="number" 
                   value={priceQualified}
@@ -228,10 +228,10 @@ export function PerformanceBillingTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            Historique des Périodes
+            Period History
           </CardTitle>
           <CardDescription>
-            Performances des mois précédents
+            Previous month performance
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -244,8 +244,8 @@ export function PerformanceBillingTab() {
           ) : history.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Aucun historique disponible</p>
-              <p className="text-sm">Les données seront enregistrées à la fin de chaque période</p>
+              <p>No history available</p>
+              <p className="text-sm">Data will be saved at the end of each period</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -256,20 +256,20 @@ export function PerformanceBillingTab() {
                 >
                   <div>
                     <p className="font-medium">
-                      {format(new Date(period.period_start), 'MMMM yyyy', { locale: fr })}
+                      {format(new Date(period.period_start), 'MMMM yyyy', { locale: enUS })}
                     </p>
                     <div className="flex gap-4 mt-1 text-sm text-muted-foreground">
-                      <span>{period.appointments_booked} RDV</span>
-                      <span>{period.leads_qualified} leads qualifiés</span>
-                      <span>{period.leads_converted} convertis</span>
+                      <span>{period.appointments_booked} appointments</span>
+                      <span>{period.leads_qualified} qualified leads</span>
+                      <span>{period.leads_converted} converted</span>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold">${period.billable_amount?.toFixed(2)}</p>
                     {period.billed_at ? (
-                      <Badge variant="secondary" className="text-xs">Facturé</Badge>
+                      <Badge variant="secondary" className="text-xs">Billed</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-xs">En attente</Badge>
+                      <Badge variant="outline" className="text-xs">Pending</Badge>
                     )}
                   </div>
                 </div>

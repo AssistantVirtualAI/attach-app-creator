@@ -250,12 +250,12 @@ const ClientAgentKnowledge = () => {
           {canEdit ? (
             <Button onClick={() => setIsAddModalOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Ajouter
+              Add
             </Button>
           ) : (
             <Badge variant="secondary" className="flex items-center gap-1">
               <Lock className="h-3 w-3" />
-              Lecture seule
+              Read only
             </Badge>
           )}
         </div>
@@ -266,7 +266,7 @@ const ClientAgentKnowledge = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Rechercher..."
+            placeholder="Search..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -274,10 +274,10 @@ const ClientAgentKnowledge = () => {
         </div>
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
           <SelectTrigger className="w-48">
-            <SelectValue placeholder="Catégorie" />
+            <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Toutes les catégories</SelectItem>
+            <SelectItem value="all">All categories</SelectItem>
             {categories.map((cat: string) => (
               <SelectItem key={cat} value={cat}>{cat}</SelectItem>
             ))}
@@ -290,20 +290,20 @@ const ClientAgentKnowledge = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BookOpen className="h-5 w-5" />
-            {filteredItems.length} élément{filteredItems.length !== 1 ? 's' : ''}
+            {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {!apiKey || !platformAgentId ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">Configuration ElevenLabs manquante pour cet agent</p>
+              <p className="text-muted-foreground">ElevenLabs configuration is missing for this agent</p>
             </div>
           ) : error ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 mx-auto text-destructive/50 mb-4" />
-              <p className="text-muted-foreground mb-4">Erreur lors du chargement de la base de connaissances</p>
-              <Button variant="outline" onClick={() => refetch()}>Réessayer</Button>
+              <p className="text-muted-foreground mb-4">Error loading the knowledge base</p>
+              <Button variant="outline" onClick={() => refetch()}>Try again</Button>
             </div>
           ) : isLoading ? (
             <div className="space-y-3">
@@ -316,8 +316,8 @@ const ClientAgentKnowledge = () => {
               <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground">
                 {searchTerm || selectedCategory !== 'all' 
-                  ? 'Aucun résultat trouvé' 
-                  : 'La base de connaissances est vide'
+                  ? 'No results found' 
+                  : 'The knowledge base is empty'
                 }
               </p>
               {canEdit && !searchTerm && selectedCategory === 'all' && (
@@ -327,7 +327,7 @@ const ClientAgentKnowledge = () => {
                   onClick={() => setIsAddModalOpen(true)}
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Ajouter le premier élément
+                  Add first item
                 </Button>
               )}
             </div>
@@ -357,11 +357,11 @@ const ClientAgentKnowledge = () => {
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-2">
-                          {item.content || item.url || 'Cliquer pour voir le contenu complet'}
+                          {item.content || item.url || 'Click to view full content'}
                         </p>
                         {item.created_at && (
                           <p className="text-xs text-muted-foreground mt-2">
-                            Créé le {new Date(item.created_at).toLocaleDateString('fr-FR')}
+                            Created on {new Date(item.created_at).toLocaleDateString('en-US')}
                           </p>
                         )}
                       </div>
