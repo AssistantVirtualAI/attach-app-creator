@@ -26,12 +26,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('update-tray-status', status),
 
   // Updates
-  onUpdateAvailable: (cb: () => void) =>
-    ipcRenderer.on('update-available', cb),
-  onUpdateDownloaded: (cb: () => void) =>
-    ipcRenderer.on('update-downloaded', cb),
-  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
-  installUpdate: () => ipcRenderer.invoke('install-update'),
+  getAppVersion: () => ipcRenderer.invoke('updater:app-version'),
+  checkForUpdates: () => ipcRenderer.invoke('updater:check'),
+  installUpdate: () => ipcRenderer.invoke('updater:install'),
+  onUpdateAvailable: (cb: (info: { version: string }) => void) =>
+    ipcRenderer.on('update-available', (_e, i) => cb(i)),
+  onUpdateProgress: (cb: (p: { percent: number; bps: number }) => void) =>
+    ipcRenderer.on('update-progress', (_e, p) => cb(p)),
+  onUpdateDownloaded: (cb: (info: { version: string }) => void) =>
+    ipcRenderer.on('update-downloaded', (_e, i) => cb(i)),
+  onUpdateError: (cb: (msg: string) => void) =>
+    ipcRenderer.on('update-error', (_e, m) => cb(m)),
 
   // Status from tray
   onSetStatus: (cb: (status: string) => void) =>
