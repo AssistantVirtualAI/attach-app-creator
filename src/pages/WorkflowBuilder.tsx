@@ -140,7 +140,7 @@ export default function WorkflowBuilder() {
               value={workflowName}
               onChange={(e) => setWorkflowName(e.target.value)}
               className="w-64 font-semibold"
-              placeholder="Nom du workflow"
+                placeholder="Workflow name"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -153,19 +153,19 @@ export default function WorkflowBuilder() {
                 {workflow?.is_active ? (
                   <>
                     <Pause className="h-4 w-4 mr-2" />
-                    Désactiver
+                    Deactivate
                   </>
                 ) : (
                   <>
                     <Play className="h-4 w-4 mr-2" />
-                    Activer
+                    Activate
                   </>
                 )}
               </Button>
             )}
             <Button onClick={() => handleSave(nodes, edges)} disabled={saveMutation.isPending}>
               <Save className="h-4 w-4 mr-2" />
-              Sauvegarder
+              Save
             </Button>
           </div>
         </div>

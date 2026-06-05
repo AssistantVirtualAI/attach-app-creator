@@ -75,7 +75,7 @@ const PortalPrompt = () => {
         <div className="flex items-center gap-2">
           {!canEdit && (
             <Badge variant="secondary" className="gap-1">
-              <Eye className="h-3 w-3" />Lecture seule
+              <Eye className="h-3 w-3" />Read only
             </Badge>
           )}
           {canEdit && hasChanges && (
@@ -85,7 +85,7 @@ const PortalPrompt = () => {
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              Sauvegarder
+              Save
             </Button>
           )}
         </div>

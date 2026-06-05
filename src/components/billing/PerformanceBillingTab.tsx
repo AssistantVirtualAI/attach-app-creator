@@ -204,7 +204,7 @@ export function PerformanceBillingTab() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Prix par lead converti ($)</label>
+                <label className="text-sm font-medium">Price per converted lead ($)</label>
                 <Input 
                   type="number" 
                   value={priceConverted}
@@ -216,7 +216,7 @@ export function PerformanceBillingTab() {
             </div>
             <div className="flex justify-end mt-4">
               <Button onClick={handleSaveConfig}>
-                Sauvegarder les tarifs
+                Save rates
               </Button>
             </div>
           </CardContent>

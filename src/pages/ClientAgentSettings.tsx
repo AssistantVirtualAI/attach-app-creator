@@ -313,7 +313,7 @@ const ClientAgentSettings = () => {
                   <Button onClick={handleSavePrompt} disabled={updatePromptMutation.isPending}>
                     {updatePromptMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <Save className="h-4 w-4 mr-2" />
-                    Sauvegarder Prompt
+                    Save Prompt
                   </Button>
                 )}
               </div>
@@ -434,7 +434,7 @@ const ClientAgentSettings = () => {
                     disabled={!canEdit}
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    0 = Haute qualité, 4 = Faible latence
+                    0 = High quality, 4 = Low latency
                   </p>
                 </div>
 
@@ -442,7 +442,7 @@ const ClientAgentSettings = () => {
                   <Button onClick={handleSaveTTS} disabled={updateTTS.isPending}>
                     {updateTTS.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <Save className="h-4 w-4 mr-2" />
-                    Sauvegarder TTS
+                    Save TTS
                   </Button>
                 )}
               </div>
@@ -516,7 +516,7 @@ const ClientAgentSettings = () => {
                     disabled={!canEdit}
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    Séparez les mots-clés par des virgules. Améliore la reconnaissance de termes spécifiques.
+                    Separate keywords with commas. Improves recognition of specific terms.
                   </p>
                 </div>
 
@@ -524,7 +524,7 @@ const ClientAgentSettings = () => {
                   <Button onClick={handleSaveASR} disabled={updateASR.isPending}>
                     {updateASR.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <Save className="h-4 w-4 mr-2" />
-                    Sauvegarder ASR
+                    Save ASR
                   </Button>
                 )}
               </div>
@@ -592,7 +592,7 @@ const ClientAgentSettings = () => {
                       className="mt-4"
                       disabled={!canEdit}
                     />
-                    <p className="text-xs text-muted-foreground mt-2">Silence avant fin automatique</p>
+                    <p className="text-xs text-muted-foreground mt-2">Silence before automatic ending</p>
                   </div>
                 </div>
 
@@ -600,7 +600,7 @@ const ClientAgentSettings = () => {
                   <Button onClick={handleSaveTurn} disabled={updateTurn.isPending}>
                     {updateTurn.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <Save className="h-4 w-4 mr-2" />
-                    Sauvegarder Tours
+                    Save Turns
                   </Button>
                 )}
               </div>
@@ -666,7 +666,7 @@ const ClientAgentSettings = () => {
                   <Button onClick={handleSaveConversation} disabled={updateConversation.isPending}>
                     {updateConversation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <Save className="h-4 w-4 mr-2" />
-                    Sauvegarder Conversation
+                    Save Conversation
                   </Button>
                 )}
               </div>
@@ -717,7 +717,7 @@ const ClientAgentSettings = () => {
                       max={32000}
                     />
                     <p className="text-xs text-muted-foreground mt-2">
-                      Nombre maximum de tokens par réponse
+                      Maximum tokens per response
                     </p>
                   </div>
                 </div>
@@ -726,7 +726,7 @@ const ClientAgentSettings = () => {
                   <Button onClick={handleSaveLLM} disabled={updateLLM.isPending}>
                     {updateLLM.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <Save className="h-4 w-4 mr-2" />
-                    Sauvegarder LLM
+                    Save LLM
                   </Button>
                 )}
               </div>
@@ -772,7 +772,7 @@ const ClientAgentSettings = () => {
                   <div>
                     <p className="font-medium text-sm">Désactiver l'interruption du premier message</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      L'utilisateur ne pourra pas interrompre le message de bienvenue
+                      The user will not be able to interrupt the welcome message
                     </p>
                   </div>
                   <Switch
@@ -786,7 +786,7 @@ const ClientAgentSettings = () => {
                   <Button onClick={handleSaveAdvanced} disabled={updateAdvanced.isPending}>
                     {updateAdvanced.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <Save className="h-4 w-4 mr-2" />
-                    Sauvegarder Avancé
+                    Save Advanced
                   </Button>
                 )}
               </div>
