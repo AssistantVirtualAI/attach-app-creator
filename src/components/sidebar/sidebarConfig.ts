@@ -132,7 +132,9 @@ export const sidebarGroups: NavGroup[] = [
       { nameKey: 'Voice Agents', href: '/org/lemtel/telephony/agents', icon: Bot },
       { nameKey: 'AI Intelligence', href: '/org/lemtel/telephony/ai', icon: Brain },
       { nameKey: 'Softphone', href: '/org/lemtel/telephony/webphone', icon: Phone },
+      { nameKey: 'Voicemail', href: '/org/lemtel/telephony/voicemail', icon: Voicemail },
       { nameKey: 'PBX Settings', href: '/org/lemtel/telephony/settings', icon: Settings },
+      { nameKey: 'Diagnostics', href: '/org/lemtel/telephony/diagnostics', icon: Activity },
     ]
   },
   {
