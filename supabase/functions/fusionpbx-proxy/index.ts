@@ -325,36 +325,34 @@ Deno.serve(async (req) => {
       ]);
       const stats: Record<string, number> = {};
       const errors: string[] = [];
+      const doUpsert = async (table: string, rows: any[], conflict: string, k: string) => {
+        if (!rows.length) { stats[k] = 0; return; }
+        const { error, count, data } = await admin.from(table).upsert(rows, { onConflict: conflict, count: "exact" }).select("id");
+        if (error) { errors.push(`${table}: ${error.message}`); stats[k] = 0; }
+        else stats[k] = count ?? (data?.length ?? rows.length);
+      };
       for (const { k, r } of results) {
         if (!r.ok) { errors.push(`${k}: ${(r as any).message || (r as any).error}`); stats[k] = 0; continue; }
         const list = collection(r.data, k);
-        try {
-          if (k === "extensions") {
-            const rows = list.map(mapExtension).filter((x) => x.pbx_uuid);
-            if (rows.length) await admin.from("pbx_extensions").upsert(rows, { onConflict: "organization_id,pbx_uuid" });
-            stats.extensions = rows.length;
-          } else if (k === "devices") {
-            const rows = list.map(mapDevice).filter((x) => x.pbx_uuid);
-            if (rows.length) await admin.from("pbx_devices").upsert(rows, { onConflict: "organization_id,pbx_uuid" });
-            stats.devices = rows.length;
-          } else if (k === "ivr_menus") {
-            const rows = list.map(mapIvr).filter((x) => x.pbx_uuid);
-            if (rows.length) await admin.from("pbx_ivrs").upsert(rows, { onConflict: "organization_id,pbx_uuid" });
-            stats.ivrs = rows.length;
-          } else if (k === "call_center_queues") {
-            const rows = list.map(mapQueue).filter((x) => x.pbx_uuid);
-            if (rows.length) await admin.from("pbx_call_queues").upsert(rows, { onConflict: "organization_id,pbx_uuid" });
-            stats.queues = rows.length;
-          } else if (k === "ring_groups") {
-            const rows = list.map(mapRingGroup).filter((x) => x.pbx_uuid);
-            if (rows.length) await admin.from("pbx_ring_groups").upsert(rows, { onConflict: "organization_id,pbx_uuid" });
-            stats.ring_groups = rows.length;
-          } else if (k === "xml_cdrs") {
-            const rows = list.map(mapCdr).filter((x) => x.pbx_uuid);
-            if (rows.length) await admin.from("pbx_call_records").upsert(rows, { onConflict: "pbx_uuid" });
-            stats.cdrs = rows.length;
-          }
-        } catch (e: any) { errors.push(`upsert ${k}: ${e?.message || e}`); }
+        if (k === "extensions") {
+          const rows = list.map(mapExtension).filter((x) => x.pbx_uuid);
+          await doUpsert("pbx_extensions", rows, "organization_id,pbx_uuid", "extensions");
+        } else if (k === "devices") {
+          const rows = list.map(mapDevice).filter((x) => x.pbx_uuid);
+          await doUpsert("pbx_devices", rows, "organization_id,pbx_uuid", "devices");
+        } else if (k === "ivr_menus") {
+          const rows = list.map(mapIvr).filter((x) => x.pbx_uuid);
+          await doUpsert("pbx_ivrs", rows, "organization_id,pbx_uuid", "ivrs");
+        } else if (k === "call_center_queues") {
+          const rows = list.map(mapQueue).filter((x) => x.pbx_uuid);
+          await doUpsert("pbx_call_queues", rows, "organization_id,pbx_uuid", "queues");
+        } else if (k === "ring_groups") {
+          const rows = list.map(mapRingGroup).filter((x) => x.pbx_uuid);
+          await doUpsert("pbx_ring_groups", rows, "organization_id,pbx_uuid", "ring_groups");
+        } else if (k === "xml_cdrs") {
+          const rows = list.map(mapCdr).filter((x) => x.pbx_uuid);
+          await doUpsert("pbx_call_records", rows, "pbx_uuid", "cdrs");
+        }
       }
       const duration_ms = Date.now() - t0;
       await admin.from("pbx_sync_jobs").insert({
@@ -362,7 +360,7 @@ Deno.serve(async (req) => {
         status: errors.length ? "completed_with_errors" : "completed",
         completed_at: new Date().toISOString(),
         stats: { ...stats, duration_ms },
-        error_message: errors.length ? errors.join("; ") : null,
+        error: errors.length ? errors.join("; ").slice(0, 2000) : null,
       });
       await admin.from("pbx_integrations").update({ last_sync_at: new Date().toISOString() }).eq("organization_id", organization_id);
       return json({ success: errors.length === 0, stats: { ...stats, duration_ms }, errors });
