@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
 
     const { data: sp } = await supabase
       .from("pbx_softphone_users")
-      .select("extension, sip_password, organization_id, extension_id, display_name")
+      .select("extension, organization_id, extension_id, display_name")
       .eq("portal_user_id", user.id)
       .maybeSingle();
 
