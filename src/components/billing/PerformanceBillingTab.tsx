@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 
 export function PerformanceBillingTab() {
   const { 
@@ -57,10 +57,10 @@ export function PerformanceBillingTab() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
-                Facturation Basée sur la Performance
+                Performance-Based Billing
               </CardTitle>
               <CardDescription>
-                Facturez vos clients en fonction des résultats obtenus
+                Bill your clients based on achieved results
               </CardDescription>
             </div>
             <Switch 
@@ -76,14 +76,14 @@ export function PerformanceBillingTab() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Période en Cours</CardTitle>
+              <CardTitle>Current Period</CardTitle>
               <CardDescription>
-                Métriques du mois en cours
+                Current month metrics
               </CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={() => recalculate()}>
               <RefreshCw className={`h-4 w-4 mr-2 ${isCalculating ? 'animate-spin' : ''}`} />
-              Actualiser
+              Refresh
             </Button>
           </div>
         </CardHeader>
@@ -100,7 +100,7 @@ export function PerformanceBillingTab() {
                 <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
                   <div className="flex items-center gap-2 mb-2">
                     <Calendar className="h-4 w-4 text-blue-400" />
-                    <span className="text-sm text-muted-foreground">RDV Bookés</span>
+                    <span className="text-sm text-muted-foreground">Booked appointments</span>
                   </div>
                   <p className="text-2xl font-bold">{currentMetrics?.appointments_booked || 0}</p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -111,7 +111,7 @@ export function PerformanceBillingTab() {
                 <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
                   <div className="flex items-center gap-2 mb-2">
                     <Users className="h-4 w-4 text-purple-400" />
-                    <span className="text-sm text-muted-foreground">Leads Qualifiés</span>
+                    <span className="text-sm text-muted-foreground">Qualified leads</span>
                   </div>
                   <p className="text-2xl font-bold">{currentMetrics?.leads_qualified || 0}</p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -122,7 +122,7 @@ export function PerformanceBillingTab() {
                 <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
                   <div className="flex items-center gap-2 mb-2">
                     <UserCheck className="h-4 w-4 text-green-400" />
-                    <span className="text-sm text-muted-foreground">Leads Convertis</span>
+                    <span className="text-sm text-muted-foreground">Converted leads</span>
                   </div>
                   <p className="text-2xl font-bold">{currentMetrics?.leads_converted || 0}</p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -133,7 +133,7 @@ export function PerformanceBillingTab() {
                 <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
                   <div className="flex items-center gap-2 mb-2">
                     <DollarSign className="h-4 w-4 text-primary" />
-                    <span className="text-sm text-muted-foreground">Total Facturable</span>
+                    <span className="text-sm text-muted-foreground">Billable total</span>
                   </div>
                   <p className="text-2xl font-bold">${currentMetrics?.billable_amount?.toFixed(2) || '0.00'}</p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -149,11 +149,11 @@ export function PerformanceBillingTab() {
                   <p className="text-lg font-semibold">{currentMetrics?.conversations_count || 0}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-card border">
-                  <p className="text-sm text-muted-foreground">Durée totale</p>
+                  <p className="text-sm text-muted-foreground">Total duration</p>
                   <p className="text-lg font-semibold">{currentMetrics?.total_duration_minutes || 0} min</p>
                 </div>
                 <div className="p-3 rounded-lg bg-card border">
-                  <p className="text-sm text-muted-foreground">Leads générés</p>
+                  <p className="text-sm text-muted-foreground">Generated leads</p>
                   <p className="text-lg font-semibold">{currentMetrics?.leads_generated || 0}</p>
                 </div>
               </div>
@@ -169,14 +169,14 @@ export function PerformanceBillingTab() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5" />
-                Configuration des Tarifs
+                Rate Configuration
               </CardTitle>
               <CardDescription>
-                Définissez vos tarifs par type de performance
+                Define your rates by performance type
               </CardDescription>
             </div>
             <Button variant="ghost" size="sm" onClick={() => setShowConfig(!showConfig)}>
-              {showConfig ? 'Masquer' : 'Modifier'}
+              {showConfig ? 'Hide' : 'Edit'}
             </Button>
           </div>
         </CardHeader>
@@ -184,7 +184,7 @@ export function PerformanceBillingTab() {
           <CardContent>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Prix par RDV booké ($)</label>
+                <label className="text-sm font-medium">Price per booked appointment ($)</label>
                 <Input 
                   type="number" 
                   value={priceAppointment}
@@ -194,7 +194,7 @@ export function PerformanceBillingTab() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Prix par lead qualifié ($)</label>
+                <label className="text-sm font-medium">Price per qualified lead ($)</label>
                 <Input 
                   type="number" 
                   value={priceQualified}
@@ -204,7 +204,7 @@ export function PerformanceBillingTab() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Prix par lead converti ($)</label>
+                <label className="text-sm font-medium">Price per converted lead ($)</label>
                 <Input 
                   type="number" 
                   value={priceConverted}
@@ -216,7 +216,7 @@ export function PerformanceBillingTab() {
             </div>
             <div className="flex justify-end mt-4">
               <Button onClick={handleSaveConfig}>
-                Sauvegarder les tarifs
+                Save rates
               </Button>
             </div>
           </CardContent>
@@ -228,10 +228,10 @@ export function PerformanceBillingTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            Historique des Périodes
+            Period History
           </CardTitle>
           <CardDescription>
-            Performances des mois précédents
+            Previous month performance
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -244,8 +244,8 @@ export function PerformanceBillingTab() {
           ) : history.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Aucun historique disponible</p>
-              <p className="text-sm">Les données seront enregistrées à la fin de chaque période</p>
+              <p>No history available</p>
+              <p className="text-sm">Data will be saved at the end of each period</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -256,20 +256,20 @@ export function PerformanceBillingTab() {
                 >
                   <div>
                     <p className="font-medium">
-                      {format(new Date(period.period_start), 'MMMM yyyy', { locale: fr })}
+                      {format(new Date(period.period_start), 'MMMM yyyy', { locale: enUS })}
                     </p>
                     <div className="flex gap-4 mt-1 text-sm text-muted-foreground">
-                      <span>{period.appointments_booked} RDV</span>
-                      <span>{period.leads_qualified} leads qualifiés</span>
-                      <span>{period.leads_converted} convertis</span>
+                      <span>{period.appointments_booked} appointments</span>
+                      <span>{period.leads_qualified} qualified leads</span>
+                      <span>{period.leads_converted} converted</span>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-lg font-bold">${period.billable_amount?.toFixed(2)}</p>
                     {period.billed_at ? (
-                      <Badge variant="secondary" className="text-xs">Facturé</Badge>
+                      <Badge variant="secondary" className="text-xs">Billed</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-xs">En attente</Badge>
+                      <Badge variant="outline" className="text-xs">Pending</Badge>
                     )}
                   </div>
                 </div>

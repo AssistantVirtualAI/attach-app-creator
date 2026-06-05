@@ -95,42 +95,42 @@ const Docs = () => {
 
   const trainingContent = [
     {
-      title: "Créer votre Premier Agent",
-      description: "Guide étape par étape pour configurer un agent vocal IA fonctionnel",
+      title: "Create Your First Agent",
+      description: "Step-by-step guide to configure a working AI voice agent",
       duration: "15 min",
-      level: "Débutant",
+      level: "Beginner",
       icon: Rocket,
       color: "text-blue-500"
     },
     {
-      title: "Personnaliser la Voix et le Comportement",
-      description: "Ajustez les paramètres vocaux, le ton et la personnalité de votre agent",
+      title: "Customize Voice and Behavior",
+      description: "Adjust voice settings, tone, and your agent's personality",
       duration: "20 min",
-      level: "Intermédiaire",
+      level: "Intermediate",
       icon: Settings,
       color: "text-purple-500"
     },
     {
-      title: "Gérer vos Clients Efficacement",
-      description: "Organisation, permissions et portail client white-label",
+      title: "Manage Your Clients Efficiently",
+      description: "Organization, permissions, and white-label client portal",
       duration: "25 min",
-      level: "Intermédiaire",
+      level: "Intermediate",
       icon: Users,
       color: "text-green-500"
     },
     {
-      title: "Analyser les Conversations",
-      description: "Comprendre les métriques, sentiment et insights de vos conversations",
+      title: "Analyze Conversations",
+      description: "Understand metrics, sentiment, and insights from your conversations",
       duration: "20 min",
-      level: "Avancé",
+      level: "Advanced",
       icon: Target,
       color: "text-orange-500"
     },
     {
-      title: "Automatiser avec les Workflows",
-      description: "Créer des automatisations et webhooks pour connecter vos outils",
+      title: "Automate with Workflows",
+      description: "Create automations and webhooks to connect your tools",
       duration: "30 min",
-      level: "Avancé",
+      level: "Advanced",
       icon: Zap,
       color: "text-yellow-500"
     },
@@ -172,57 +172,57 @@ const Docs = () => {
     },
     {
       title: "Analytics Avancés",
-      description: "Analysez les performances avec des graphiques détaillés et des insights actionnables.",
+      description: "Analyze performance with detailed charts and actionable insights.",
       icon: <BarChart3 className="w-8 h-8" />,
-      highlights: ["Métriques détaillées", "Rapports exportables", "Tendances temporelles"]
+      highlights: ["Detailed metrics", "Exportable reports", "Time trends"]
     }
   ];
 
   const agentConfigSlides: Slide[] = [
     {
-      title: "Créer un Nouvel Agent",
-      description: "Commencez par donner un nom et une description à votre agent vocal.",
+      title: "Create a New Agent",
+      description: "Start by giving your voice agent a name and description.",
       icon: <Bot className="w-8 h-8" />,
-      highlights: ["Nom unique", "Description claire", "Sélection de plateforme"]
+      highlights: ["Unique name", "Clear description", "Platform selection"]
     },
     {
-      title: "Sélectionner la Voix",
-      description: "Choisissez parmi les voix ElevenLabs disponibles et ajustez les paramètres vocaux.",
+      title: "Select the Voice",
+      description: "Choose from available ElevenLabs voices and adjust voice settings.",
       icon: <Settings className="w-8 h-8" />,
-      highlights: ["Stabilité vocale", "Clarté/Similarité", "Style expressif"]
+      highlights: ["Voice stability", "Clarity/Similarity", "Expressive style"]
     },
     {
-      title: "Configurer le Prompt",
-      description: "Définissez le comportement et la personnalité de votre agent avec un prompt système.",
+      title: "Configure the Prompt",
+      description: "Define your agent's behavior and personality with a system prompt.",
       icon: <FileText className="w-8 h-8" />,
-      highlights: ["Contexte métier", "Instructions précises", "Exemples de réponses"]
+      highlights: ["Business context", "Precise instructions", "Response examples"]
     },
     {
-      title: "Base de Connaissances",
-      description: "Ajoutez des documents et FAQ pour enrichir les réponses de l'agent.",
+      title: "Knowledge Base",
+      description: "Add documents and FAQs to enrich your agent's answers.",
       icon: <BookOpen className="w-8 h-8" />,
-      highlights: ["Upload documents", "FAQ dynamique", "Synchronisation auto"]
+      highlights: ["Upload documents", "Dynamic FAQ", "Auto sync"]
     },
     {
-      title: "Déployer et Tester",
-      description: "Testez votre agent dans le prototype avant de le déployer en production.",
+      title: "Deploy and Test",
+      description: "Test your agent in the prototype before deploying to production.",
       icon: <Rocket className="w-8 h-8" />,
-      highlights: ["Test en direct", "Widget intégrable", "Monitoring actif"]
+      highlights: ["Live test", "Embeddable widget", "Active monitoring"]
     }
   ];
 
   const clientPortalSlides: Slide[] = [
     {
-      title: "Créer un Client",
-      description: "Ajoutez un nouveau client avec ses informations de contact et préférences.",
+      title: "Create a Client",
+      description: "Add a new client with contact information and preferences.",
       icon: <UserPlus className="w-8 h-8" />,
-      highlights: ["Informations de base", "Email de contact", "Langue préférée"]
+      highlights: ["Basic information", "Contact email", "Preferred language"]
     },
     {
-      title: "Assigner des Agents",
-      description: "Associez un ou plusieurs agents au client pour leur utilisation.",
+      title: "Assign Agents",
+      description: "Associate one or more agents with the client for use.",
       icon: <Bot className="w-8 h-8" />,
-      highlights: ["Multi-agents", "Permissions granulaires", "Limites d'usage"]
+      highlights: ["Multiple agents", "Granular permissions", "Usage limits"]
     },
     {
       title: "Personnaliser le Branding",
@@ -312,10 +312,10 @@ const Docs = () => {
 
   const campaignsSlides: Slide[] = [
     {
-      title: "Créer une Campagne",
-      description: "Définissez le nom, la description et les paramètres de votre campagne d'appels.",
+      title: "Create a Campaign",
+      description: "Define the name, description, and settings for your calling campaign.",
       icon: <Phone className="w-8 h-8" />,
-      highlights: ["Objectifs clairs", "Agent assigné", "Horaires d'appel"]
+      highlights: ["Clear goals", "Assigned agent", "Calling hours"]
     },
     {
       title: "Importer les Contacts",
@@ -391,26 +391,26 @@ const Docs = () => {
   const quickStartSteps = [
     {
       step: 1,
-      title: "Connecter ElevenLabs",
-      description: "Ajoutez votre clé API ElevenLabs dans les paramètres d'intégration",
+      title: "Connect ElevenLabs",
+      description: "Add your ElevenLabs API key in integration settings",
       completed: false
     },
     {
       step: 2,
-      title: "Créer un Agent",
-      description: "Utilisez l'Agent Builder pour configurer votre premier agent vocal",
+      title: "Create an Agent",
+      description: "Use the Agent Builder to configure your first voice agent",
       completed: false
     },
     {
       step: 3,
-      title: "Ajouter un Client",
-      description: "Créez un client et assignez-lui un agent",
+      title: "Add a Client",
+      description: "Create a client and assign an agent to them",
       completed: false
     },
     {
       step: 4,
-      title: "Tester le Widget",
-      description: "Testez le widget vocal sur la page de prototype",
+      title: "Test the Widget",
+      description: "Test the voice widget on the prototype page",
       completed: false
     }
   ];
@@ -422,7 +422,7 @@ const Docs = () => {
         <div className="mb-6">
           <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-4 w-4" />
-            Retour à l'accueil
+            Back to home
           </Link>
         </div>
 
@@ -430,10 +430,10 @@ const Docs = () => {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <BookOpen className="h-10 w-10 text-primary" />
-            <h1 className="text-4xl font-bold">Centre d'Aide AVA Statistics</h1>
+            <h1 className="text-4xl font-bold">AVA Statistics Help Center</h1>
           </div>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Guides, tutoriels et documentation complète pour maîtriser la plateforme
+            Guides, tutorials, and complete documentation to master the platform
           </p>
           <Badge variant="secondary" className="mt-4">v1.0.0</Badge>
         </div>
@@ -444,7 +444,7 @@ const Docs = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Rechercher dans la documentation..."
+              placeholder="Search the documentation..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 pr-10"
@@ -463,8 +463,8 @@ const Docs = () => {
           {searchQuery && (
             <p className="text-sm text-muted-foreground mt-2 text-center">
               {hasResults 
-                ? `${matchedSections.length} section(s) trouvée(s)` 
-                : "Aucun résultat trouvé"}
+                ? `${matchedSections.length} section(s) found` 
+                : "No results found"}
             </p>
           )}
         </div>
@@ -1095,28 +1095,28 @@ const Docs = () => {
                   Authentification API
                 </CardTitle>
                 <CardDescription>
-                  Utilisez des clés API pour accéder aux endpoints de l'API
+                  Use API keys to access API endpoints
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <h4 className="font-medium mb-2">Créer une Clé API</h4>
+                  <h4 className="font-medium mb-2">Create an API Key</h4>
                   <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-                    <li>Accédez à Paramètres → Clés API</li>
-                    <li>Cliquez sur "Créer une clé"</li>
-                    <li>Sélectionnez les scopes nécessaires</li>
-                    <li>Copiez la clé (affichée une seule fois)</li>
+                    <li>Go to Settings → API Keys</li>
+                    <li>Click "Create key"</li>
+                    <li>Select the required scopes</li>
+                    <li>Copy the key (shown only once)</li>
                   </ol>
                 </div>
                 <Separator />
                 <div>
-                  <h4 className="font-medium mb-2">Utilisation</h4>
+                  <h4 className="font-medium mb-2">Usage</h4>
                   <div className="bg-muted rounded-lg p-4 font-mono text-sm">
                     <code>Authorization: Bearer YOUR_API_KEY</code>
                   </div>
                 </div>
                 <div>
-                  <h4 className="font-medium mb-2">Scopes Disponibles</h4>
+                  <h4 className="font-medium mb-2">Available Scopes</h4>
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       "read:analytics",
@@ -1153,19 +1153,19 @@ const Docs = () => {
                         <EndpointItem
                           method="GET"
                           path="/api/conversations"
-                          description="Liste toutes les conversations"
+                          description="List all conversations"
                           scope="read:conversations"
                         />
                         <EndpointItem
                           method="GET"
                           path="/api/conversations/:id"
-                          description="Détails d'une conversation"
+                          description="Conversation details"
                           scope="read:conversations"
                         />
                         <EndpointItem
                           method="DELETE"
                           path="/api/conversations/:id"
-                          description="Supprimer une conversation"
+                          description="Delete a conversation"
                           scope="write:conversations"
                         />
                       </div>
@@ -1182,25 +1182,25 @@ const Docs = () => {
                         <EndpointItem
                           method="GET"
                           path="/api/agents"
-                          description="Liste tous les agents"
+                          description="List all agents"
                           scope="read:agents"
                         />
                         <EndpointItem
                           method="POST"
                           path="/api/agents"
-                          description="Créer un agent"
+                          description="Create an agent"
                           scope="write:agents"
                         />
                         <EndpointItem
                           method="PUT"
                           path="/api/agents/:id"
-                          description="Modifier un agent"
+                          description="Edit an agent"
                           scope="write:agents"
                         />
                         <EndpointItem
                           method="DELETE"
                           path="/api/agents/:id"
-                          description="Supprimer un agent"
+                          description="Delete an agent"
                           scope="write:agents"
                         />
                       </div>
@@ -1217,25 +1217,25 @@ const Docs = () => {
                         <EndpointItem
                           method="GET"
                           path="/api/clients"
-                          description="Liste tous les clients"
+                          description="List all clients"
                           scope="read:clients"
                         />
                         <EndpointItem
                           method="POST"
                           path="/api/clients"
-                          description="Créer un client"
+                          description="Create a client"
                           scope="write:clients"
                         />
                         <EndpointItem
                           method="PUT"
                           path="/api/clients/:id"
-                          description="Modifier un client"
+                          description="Edit a client"
                           scope="write:clients"
                         />
                         <EndpointItem
                           method="DELETE"
                           path="/api/clients/:id"
-                          description="Supprimer un client"
+                          description="Delete a client"
                           scope="write:clients"
                         />
                       </div>
@@ -1287,13 +1287,13 @@ const Docs = () => {
                         <EndpointItem
                           method="POST"
                           path="/api/webhooks"
-                          description="Créer un endpoint"
+                          description="Create an endpoint"
                           scope="admin:settings"
                         />
                         <EndpointItem
                           method="DELETE"
                           path="/api/webhooks/:id"
-                          description="Supprimer un endpoint"
+                          description="Delete an endpoint"
                           scope="admin:settings"
                         />
                       </div>

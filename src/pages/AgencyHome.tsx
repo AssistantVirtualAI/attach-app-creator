@@ -58,7 +58,7 @@ const AgencyHome = () => {
     if (customDomain) {
       navigator.clipboard.writeText(customDomain);
       setCopiedDomain(true);
-      toast.success("Domaine copié dans le presse-papier");
+      toast.success("Domain copied to clipboard");
       setTimeout(() => setCopiedDomain(false), 2000);
     }
   };
@@ -70,13 +70,13 @@ const AgencyHome = () => {
   };
 
   const handleRemoveDomain = () => {
-    toast.info("Fonctionnalité de suppression de domaine à venir");
+    toast.info("Domain removal feature coming soon");
   };
 
   // Statistiques principales avec animations
   const mainStats = [
     {
-      title: "Clients Actifs",
+      title: "Active Clients",
       value: clientMetrics?.activeClients || 0,
       icon: Users,
       gradient: "from-electric-blue to-vivid-purple",
@@ -85,7 +85,7 @@ const AgencyHome = () => {
       trendPositive: true
     },
     {
-      title: "Agents IA",
+      title: "AI Agents",
       value: clientMetrics?.assignedAgents || 0,
       icon: Bot,
       gradient: "from-vivid-purple to-hot-pink",
@@ -116,32 +116,32 @@ const AgencyHome = () => {
 
   const resources = [
     {
-      title: "Centre de démonstration",
-      description: "Découvrez toutes les fonctionnalités de la plateforme",
+      title: "Demo Center",
+      description: "Discover all the features of the platform",
       icon: PlayCircle,
       href: "/demo",
       gradient: "from-electric-blue to-cyber-cyan",
       internal: true
     },
     {
-      title: "Centre d'aide",
-      description: "Documentation et guides d'utilisation",
+      title: "Help Center",
+      description: "Documentation and user guides",
       icon: BookOpen,
       href: "/docs",
       gradient: "from-vivid-purple to-hot-pink",
       internal: true
     },
     {
-      title: "Contenu de formation",
-      description: "Guides et tutoriels pour maîtriser la plateforme",
+      title: "Training Content",
+      description: "Guides and tutorials to master the platform",
       icon: Youtube,
       href: "/docs?tab=training",
       gradient: "from-sunset-orange to-hot-pink",
       internal: true
     },
     {
-      title: "Tutoriels vidéo",
-      description: "Apprenez visuellement avec nos vidéos",
+      title: "Video Tutorials",
+      description: "Learn visually with our videos",
       icon: PlayCircle,
       href: "/docs?tab=videos",
       gradient: "from-neon-green to-electric-blue",
@@ -151,24 +151,24 @@ const AgencyHome = () => {
 
   const helpOptions = [
     {
-      title: "Contacter le support",
-      description: "Notre équipe est là pour vous aider",
+      title: "Contact Support",
+      description: "Our team is here to help you",
       icon: Mail,
       action: () => window.open('mailto:support@example.com', '_blank'),
       variant: "default" as const,
       gradient: "from-electric-blue to-vivid-purple"
     },
     {
-      title: "Signaler un problème",
-      description: "Signalez un bug ou un dysfonctionnement",
+      title: "Report an issue",
+      description: "Report a bug or malfunction",
       icon: Bug,
-      action: () => toast.info("Formulaire de signalement à venir"),
+      action: () => toast.info("Reporting form coming soon"),
       variant: "outline" as const,
       gradient: "from-sunset-orange to-hot-pink"
     },
     {
-      title: "Planifier un appel",
-      description: "Réservez un créneau avec notre équipe",
+      title: "Schedule a call",
+      description: "Book a slot with our team",
       icon: Calendar,
       action: () => window.open('https://calendly.com', '_blank'),
       variant: "outline" as const,
@@ -249,7 +249,7 @@ const AgencyHome = () => {
                 transition={{ delay: 0.3 }}
               >
                 <Sparkles className="h-5 w-5 text-vivid-purple animate-pulse" />
-                Bienvenue, {selectedOrg?.name || 'Agence'}
+                Welcome, {selectedOrg?.name || 'Agency'}
                 <Sparkles className="h-5 w-5 text-hot-pink animate-pulse" />
               </motion.p>
             </div>
@@ -284,7 +284,7 @@ const AgencyHome = () => {
           <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
             <Activity className="h-6 w-6 text-electric-blue" />
             <span className="bg-gradient-to-r from-electric-blue to-vivid-purple bg-clip-text text-transparent">
-              Vue d'ensemble
+              Overview
             </span>
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -312,7 +312,7 @@ const AgencyHome = () => {
                           </div>
                           <div className={`flex items-center gap-1 text-xs ${stat.trendPositive ? 'text-neon-green' : 'text-destructive'}`}>
                             <TrendingUp className="h-3 w-3" />
-                            {stat.trend} ce mois
+                            {stat.trend} this month
                           </div>
                         </div>
                         <motion.div 
@@ -331,7 +331,7 @@ const AgencyHome = () => {
           </div>
         </motion.div>
 
-        {/* Section Domaine Personnalisé */}
+        {/* Section Custom Domain */}
         <motion.div variants={itemVariants}>
           <Card className="relative overflow-hidden border-vivid-purple/20 bg-gradient-to-br from-vivid-purple/5 to-hot-pink/5">
             <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-vivid-purple/10 to-transparent rounded-full blur-2xl" />
@@ -347,9 +347,9 @@ const AgencyHome = () => {
                   </motion.div>
                   <div>
                     <CardTitle className="bg-gradient-to-r from-electric-blue to-vivid-purple bg-clip-text text-transparent">
-                      Domaine Personnalisé
+                      Custom Domain
                     </CardTitle>
-                    <CardDescription>Configurez votre domaine personnalisé</CardDescription>
+                    <CardDescription>Configure your custom domain</CardDescription>
                   </div>
                 </div>
                 {hasCustomDomain && (
@@ -396,14 +396,14 @@ const AgencyHome = () => {
                     <Globe className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                   </motion.div>
                   <p className="text-muted-foreground mb-4">
-                    Aucun domaine personnalisé configuré
+                    No custom domain configured
                   </p>
                   <Button 
                     variant="outline" 
-                    onClick={() => toast.info("Configuration dans Paramètres → Domaines")}
+                    onClick={() => toast.info("Configuration is available in Settings → Domains")}
                     className="border-vivid-purple/50 hover:bg-vivid-purple/10"
                   >
-                    Configurer un domaine
+                    Configure a domain
                   </Button>
                 </div>
               )}
@@ -411,10 +411,10 @@ const AgencyHome = () => {
               {/* Notice DNS/Cloudflare */}
               <Alert className="mt-4 border-sunset-orange/30 bg-sunset-orange/5">
                 <AlertCircle className="h-4 w-4 text-sunset-orange" />
-                <AlertTitle className="text-sunset-orange">Configuration DNS</AlertTitle>
+                <AlertTitle className="text-sunset-orange">DNS Configuration</AlertTitle>
                 <AlertDescription className="text-muted-foreground">
-                  Pour connecter votre domaine, ajoutez un enregistrement A pointant vers <code className="bg-muted px-1 rounded">185.158.133.1</code> et un enregistrement TXT pour la vérification. 
-                  La propagation DNS peut prendre jusqu'à 72 heures.
+                  To connect your domain, add an A record pointing to <code className="bg-muted px-1 rounded">185.158.133.1</code> and a TXT record for verification. 
+                  DNS propagation can take up to 72 hours.
                 </AlertDescription>
               </Alert>
             </CardContent>
@@ -426,7 +426,7 @@ const AgencyHome = () => {
           <h3 className="text-2xl font-bold flex items-center gap-2">
             <BookOpen className="h-6 w-6 text-hot-pink" />
             <span className="bg-gradient-to-r from-hot-pink to-sunset-orange bg-clip-text text-transparent">
-              Ressources
+              Resources
             </span>
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -463,7 +463,7 @@ const AgencyHome = () => {
           </div>
         </motion.div>
 
-        {/* Section Aide Supplémentaire */}
+        {/* Additional Help Section */}
         <motion.div variants={itemVariants}>
           <Card className="relative overflow-hidden border-neon-green/20 bg-gradient-to-br from-neon-green/5 to-cyber-cyan/5">
             <div className="absolute bottom-0 right-0 w-64 h-64 bg-gradient-to-tl from-neon-green/10 to-transparent rounded-full blur-3xl" />
@@ -478,9 +478,9 @@ const AgencyHome = () => {
                 </motion.div>
                 <div>
                   <CardTitle className="bg-gradient-to-r from-neon-green to-cyber-cyan bg-clip-text text-transparent">
-                    Besoin d'aide ?
+                    Need help?
                   </CardTitle>
-                  <CardDescription>Notre équipe est là pour vous accompagner</CardDescription>
+                  <CardDescription>Our team is here to support you</CardDescription>
                 </div>
               </div>
             </CardHeader>

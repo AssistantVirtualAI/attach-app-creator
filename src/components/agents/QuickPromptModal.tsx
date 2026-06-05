@@ -324,7 +324,7 @@ export function QuickPromptModal({
                   ) : (
                     <Save className="h-4 w-4 mr-2" />
                   )}
-                  Sauvegarder & Sync
+                  Save & Sync
                 </Button>
               </div>
             </div>

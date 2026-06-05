@@ -179,12 +179,12 @@ const PortalSettings = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success('Membre ajouté avec succès');
+      toast.success('Member added successfully');
       setShowAddModal(false);
       setAddName(''); setAddEmail(''); setAddLoginId(''); setAddPassword(''); setAddRole('member');
       fetchMembers();
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de l\'ajout');
+      toast.error(error.message || 'Error while adding');
     } finally {
       setIsAdding(false);
     }
@@ -199,12 +199,12 @@ const PortalSettings = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success('Membre mis à jour');
+      toast.success('Member updated');
       setShowEditModal(false);
       setEditingMember(null);
       fetchMembers();
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la mise à jour');
+      toast.error(error.message || 'Error while updating');
     } finally {
       setIsEditing(false);
     }
@@ -218,11 +218,11 @@ const PortalSettings = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success('Mot de passe réinitialisé');
+      toast.success('Password reset');
       setShowResetModal(false);
       setResetPassword('');
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la réinitialisation');
+      toast.error(error.message || 'Error while resetting');
     } finally {
       setIsResetting(false);
     }
@@ -237,12 +237,12 @@ const PortalSettings = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success('Membre supprimé');
+      toast.success('Member deleted');
       setShowDeleteDialog(false);
       setDeletingMember(null);
       fetchMembers();
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la suppression');
+      toast.error(error.message || 'Error while deleting');
     } finally {
       setIsDeleting(false);
     }
@@ -285,8 +285,8 @@ const PortalSettings = () => {
         <div className="w-24 h-24 rounded-2xl bg-muted/20 flex items-center justify-center mb-6">
           <Settings className="h-12 w-12 text-muted-foreground/30" />
         </div>
-        <h2 className="text-xl font-semibold mb-2">Accès refusé</h2>
-        <p className="text-muted-foreground">Vous n'avez pas les permissions pour accéder à cette page</p>
+        <h2 className="text-xl font-semibold mb-2">Access denied</h2>
+        <p className="text-muted-foreground">You do not have permission to access this page</p>
       </motion.div>
     );
   }
@@ -359,16 +359,16 @@ const PortalSettings = () => {
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-6">
               <div>
-                <Label>Prompt Système</Label>
-                <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={6} className="mt-2 font-mono text-sm" placeholder="Vous êtes un assistant IA..." />
+                <Label>System Prompt</Label>
+                <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={6} className="mt-2 font-mono text-sm" placeholder="You are an AI assistant..." />
               </div>
               <div>
-                <Label>Premier Message</Label>
-                <Textarea value={firstMessage} onChange={(e) => setFirstMessage(e.target.value)} rows={2} className="mt-2" placeholder="Bonjour, comment puis-je vous aider ?" />
+                <Label>First Message</Label>
+                <Textarea value={firstMessage} onChange={(e) => setFirstMessage(e.target.value)} rows={2} className="mt-2" placeholder="Hello, how can I help you?" />
               </div>
               <Button onClick={handleSavePrompt} disabled={updatePrompt.isPending} className="gap-2 bg-gradient-to-r from-pink-500 to-purple-500">
                 {updatePrompt.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Sauvegarder Prompt
+                Save Prompt
               </Button>
             </div>
           </AccordionContent>
@@ -380,37 +380,37 @@ const PortalSettings = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary/10"><Volume2 className="h-5 w-5 text-primary" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Voix & TTS</h3>
-                <p className="text-sm text-muted-foreground">Synthèse vocale et caractéristiques</p>
+                <h3 className="font-semibold">Voice & TTS</h3>
+                <p className="text-sm text-muted-foreground">Speech synthesis and characteristics</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-6">
               <div>
-                <Label className="text-base font-medium mb-4 block">Sélectionner une voix</Label>
+                <Label className="text-base font-medium mb-4 block">Select a voice</Label>
                 <VoiceSelector selectedVoiceId={ttsSettings.voice_id} onSelect={(voice) => setTtsSettings(prev => ({ ...prev, voice_id: voice.voice_id }))} organizationId={session?.organizationId} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label>Modèle TTS</Label>
+                  <Label>TTS Model</Label>
                   <Select value={ttsSettings.model_id || 'eleven_turbo_v2_5'} onValueChange={(v) => setTtsSettings(prev => ({ ...prev, model_id: v }))}>
                     <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
                     <SelectContent>{TTS_MODELS.map(model => (<SelectItem key={model.id} value={model.id}>{model.name}</SelectItem>))}</SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label>Vitesse ({ttsSettings.speed?.toFixed(1)}x)</Label>
+                  <Label>Speed ({ttsSettings.speed?.toFixed(1)}x)</Label>
                   <Slider value={[ttsSettings.speed || 1]} onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, speed: v }))} min={0.5} max={2} step={0.1} className="mt-4" />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                  <Label>Stabilité ({Math.round((ttsSettings.stability || 0.5) * 100)}%)</Label>
+                  <Label>Stability ({Math.round((ttsSettings.stability || 0.5) * 100)}%)</Label>
                   <Slider value={[ttsSettings.stability || 0.5]} onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, stability: v }))} min={0} max={1} step={0.01} className="mt-4" />
                 </div>
                 <div>
-                  <Label>Similarité ({Math.round((ttsSettings.similarity_boost || 0.75) * 100)}%)</Label>
+                  <Label>Similarity ({Math.round((ttsSettings.similarity_boost || 0.75) * 100)}%)</Label>
                   <Slider value={[ttsSettings.similarity_boost || 0.75]} onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, similarity_boost: v }))} min={0} max={1} step={0.01} className="mt-4" />
                 </div>
                 <div>
@@ -420,7 +420,7 @@ const PortalSettings = () => {
               </div>
               <Button onClick={handleSaveTTS} disabled={updateTTS.isPending} className="gap-2 bg-gradient-to-r from-primary to-purple-500">
                 {updateTTS.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Sauvegarder Voix
+                Save Voice
               </Button>
             </div>
           </AccordionContent>
@@ -432,31 +432,31 @@ const PortalSettings = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-purple-500/10"><Mic className="h-5 w-5 text-purple-500" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Reconnaissance Vocale (ASR)</h3>
-                <p className="text-sm text-muted-foreground">Paramètres de transcription</p>
+                <h3 className="font-semibold">Speech Recognition (ASR)</h3>
+                <p className="text-sm text-muted-foreground">Transcription settings</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-6">
               <div>
-                <Label>Qualité</Label>
+                <Label>Quality</Label>
                 <Select value={asrSettings.quality || 'high'} onValueChange={(v: any) => setAsrSettings(prev => ({ ...prev, quality: v }))}>
                   <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="high">Haute (recommandé)</SelectItem>
+                    <SelectItem value="high">High (recommended)</SelectItem>
                     <SelectItem value="standard">Standard</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>Mots-clés personnalisés</Label>
+                <Label>Custom keywords</Label>
                 <Input value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="mot1, mot2, mot3..." className="mt-2" />
-                <p className="text-xs text-muted-foreground mt-2">Séparez les mots-clés par des virgules.</p>
+                <p className="text-xs text-muted-foreground mt-2">Separate keywords with commas.</p>
               </div>
               <Button onClick={handleSaveASR} disabled={updateASR.isPending} className="gap-2">
                 {updateASR.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Sauvegarder ASR
+                Save ASR
               </Button>
             </div>
           </AccordionContent>
@@ -468,15 +468,15 @@ const PortalSettings = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-orange-500/10"><Clock className="h-5 w-5 text-orange-500" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Gestion des Tours</h3>
-                <p className="text-sm text-muted-foreground">Timing et interruptions</p>
+                <h3 className="font-semibold">Turn Management</h3>
+                <p className="text-sm text-muted-foreground">Timing and interruptions</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-6">
               <div>
-                <Label>Réactivité de l'agent</Label>
+                <Label>Agent responsiveness</Label>
                 <div className="grid grid-cols-3 gap-3 mt-3">
                   {TURN_EAGERNESS_OPTIONS.map(option => (
                     <Card key={option.value} className={`p-4 cursor-pointer transition-all ${turnSettings.turn_eagerness === option.value ? 'border-primary bg-primary/5' : 'hover:border-primary/50'}`} onClick={() => setTurnSettings(prev => ({ ...prev, turn_eagerness: option.value as any }))}>
@@ -488,17 +488,17 @@ const PortalSettings = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label>Timeout de tour ({turnSettings.turn_timeout}s)</Label>
+                  <Label>Turn timeout ({turnSettings.turn_timeout}s)</Label>
                   <Slider value={[turnSettings.turn_timeout || 10]} onValueChange={([v]) => setTurnSettings(prev => ({ ...prev, turn_timeout: v }))} min={5} max={30} step={1} className="mt-4" />
                 </div>
                 <div>
-                  <Label>Fin d'appel sur silence ({turnSettings.silence_end_call_timeout}s)</Label>
+                  <Label>End call on silence ({turnSettings.silence_end_call_timeout}s)</Label>
                   <Slider value={[turnSettings.silence_end_call_timeout || 30]} onValueChange={([v]) => setTurnSettings(prev => ({ ...prev, silence_end_call_timeout: v }))} min={10} max={120} step={5} className="mt-4" />
                 </div>
               </div>
               <Button onClick={handleSaveTurn} disabled={updateTurn.isPending} className="gap-2">
                 {updateTurn.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Sauvegarder Tours
+                Save Turns
               </Button>
             </div>
           </AccordionContent>
@@ -510,19 +510,19 @@ const PortalSettings = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-green-500/10"><Settings2 className="h-5 w-5 text-green-500" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Paramètres de Conversation</h3>
-                <p className="text-sm text-muted-foreground">Durée et événements</p>
+                <h3 className="font-semibold">Conversation Settings</h3>
+                <p className="text-sm text-muted-foreground">Duration and events</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-6">
               <div>
-                <Label>Durée maximale ({Math.round((conversationSettings.max_duration_seconds || 600) / 60)} min)</Label>
+                <Label>Maximum duration ({Math.round((conversationSettings.max_duration_seconds || 600) / 60)} min)</Label>
                 <Slider value={[conversationSettings.max_duration_seconds || 600]} onValueChange={([v]) => setConversationSettings(prev => ({ ...prev, max_duration_seconds: v }))} min={60} max={3600} step={60} className="mt-4" />
               </div>
               <div>
-                <Label className="mb-3 block">Événements Client</Label>
+                <Label className="mb-3 block">Client Events</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {ELEVENLABS_CLIENT_EVENTS.map(event => (
                     <div key={event.id} className="flex items-start gap-3 p-3 rounded-lg border">
@@ -547,7 +547,7 @@ const PortalSettings = () => {
               </div>
               <Button onClick={handleSaveConversation} disabled={updateConversation.isPending} className="gap-2">
                 {updateConversation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Sauvegarder Conversation
+                Save Conversation
               </Button>
             </div>
           </AccordionContent>
@@ -559,8 +559,8 @@ const PortalSettings = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-cyan-500/10"><Brain className="h-5 w-5 text-cyan-500" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Paramètres LLM</h3>
-                <p className="text-sm text-muted-foreground">Température et limites du modèle</p>
+                <h3 className="font-semibold">LLM Settings</h3>
+                <p className="text-sm text-muted-foreground">Temperature and model limits</p>
               </div>
             </div>
           </AccordionTrigger>
@@ -568,19 +568,19 @@ const PortalSettings = () => {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label>Température ({llmSettings.temperature?.toFixed(1)})</Label>
+                  <Label>Temperature ({llmSettings.temperature?.toFixed(1)})</Label>
                   <Slider value={[llmSettings.temperature || 0.7]} onValueChange={([v]) => setLlmSettings(prev => ({ ...prev, temperature: v }))} min={0} max={2} step={0.1} className="mt-4" />
-                  <p className="text-xs text-muted-foreground mt-2">Plus bas = plus prévisible, plus haut = plus créatif</p>
+                  <p className="text-xs text-muted-foreground mt-2">Lower = more predictable, higher = more creative</p>
                 </div>
                 <div>
                   <Label>Max Tokens</Label>
                   <Input type="number" value={llmSettings.max_tokens || 1000} onChange={(e) => setLlmSettings(prev => ({ ...prev, max_tokens: parseInt(e.target.value) || 1000 }))} className="mt-2" min={100} max={32000} />
-                  <p className="text-xs text-muted-foreground mt-2">Nombre maximum de tokens par réponse</p>
+                  <p className="text-xs text-muted-foreground mt-2">Maximum tokens per response</p>
                 </div>
               </div>
               <Button onClick={handleSaveLLM} disabled={updateLLM.isPending} className="gap-2">
                 {updateLLM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Sauvegarder LLM
+                Save LLM
               </Button>
             </div>
           </AccordionContent>
@@ -592,15 +592,15 @@ const PortalSettings = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-amber-500/10"><Globe className="h-5 w-5 text-amber-500" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Langue & Avancé</h3>
-                <p className="text-sm text-muted-foreground">Langue et paramètres avancés</p>
+                <h3 className="font-semibold">Language & Advanced</h3>
+                <p className="text-sm text-muted-foreground">Language and advanced settings</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-6">
               <div>
-                <Label>Langue de l'agent</Label>
+                <Label>Agent language</Label>
                 <Select value={language} onValueChange={setLanguage}>
                   <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
                   <SelectContent>{ELEVENLABS_LANGUAGES.map(lang => (<SelectItem key={lang.code} value={lang.code}>{lang.name}</SelectItem>))}</SelectContent>
@@ -608,14 +608,14 @@ const PortalSettings = () => {
               </div>
               <div className="flex items-center justify-between p-4 rounded-lg border">
                 <div>
-                  <p className="font-medium text-sm">Désactiver l'interruption du premier message</p>
-                  <p className="text-xs text-muted-foreground mt-1">L'utilisateur ne pourra pas interrompre le message de bienvenue</p>
+                  <p className="font-medium text-sm">Disable first message interruption</p>
+                  <p className="text-xs text-muted-foreground mt-1">The user will not be able to interrupt the welcome message</p>
                 </div>
                 <Switch checked={disableFirstMessageInterruption} onCheckedChange={setDisableFirstMessageInterruption} />
               </div>
               <Button onClick={handleSaveAdvanced} disabled={updateAdvanced.isPending} className="gap-2">
                 {updateAdvanced.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Sauvegarder Avancé
+                Save Advanced
               </Button>
             </div>
           </AccordionContent>
@@ -627,34 +627,34 @@ const PortalSettings = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary/10"><Users className="h-5 w-5 text-primary" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Membres ({members.length})</h3>
-                <p className="text-sm text-muted-foreground">Gestion des accès au portail</p>
+                <h3 className="font-semibold">Members ({members.length})</h3>
+                <p className="text-sm text-muted-foreground">Manage portal access</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button onClick={() => setShowAddModal(true)} className="gap-2"><UserPlus className="h-4 w-4" />Ajouter un membre</Button>
+                <Button onClick={() => setShowAddModal(true)} className="gap-2"><UserPlus className="h-4 w-4" />Add member</Button>
               </div>
               {isMembersLoading ? (
                 <div className="flex items-center justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
               ) : members.length === 0 ? (
                 <div className="text-center py-8">
                   <Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                  <p className="text-muted-foreground">Aucun membre ajouté</p>
-                  <Button variant="outline" className="mt-4 gap-2" onClick={() => setShowAddModal(true)}><Plus className="h-4 w-4" />Ajouter le premier membre</Button>
+                  <p className="text-muted-foreground">No members added</p>
+                  <Button variant="outline" className="mt-4 gap-2" onClick={() => setShowAddModal(true)}><Plus className="h-4 w-4" />Add first member</Button>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nom</TableHead>
+                      <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Login ID</TableHead>
-                      <TableHead>Rôle</TableHead>
-                      <TableHead>Statut</TableHead>
-                      <TableHead>Dernière connexion</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last login</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -664,11 +664,11 @@ const PortalSettings = () => {
                         <TableCell className="font-medium">{member.name}</TableCell>
                         <TableCell>{member.email}</TableCell>
                         <TableCell><code className="text-xs bg-muted px-2 py-1 rounded">{member.login_id || '-'}</code></TableCell>
-                        <TableCell><GlowBadge variant={member.role === 'admin' ? 'warning' : 'secondary'}>{member.role === 'admin' ? 'Admin' : 'Membre'}</GlowBadge></TableCell>
+                        <TableCell><GlowBadge variant={member.role === 'admin' ? 'warning' : 'secondary'}>{member.role === 'admin' ? 'Admin' : 'Member'}</GlowBadge></TableCell>
                         <TableCell>
-                          {member.status === 'active' ? <span className="flex items-center gap-1 text-green-500"><CheckCircle className="h-4 w-4" />Actif</span> : <span className="flex items-center gap-1 text-red-500"><XCircle className="h-4 w-4" />Inactif</span>}
+                          {member.status === 'active' ? <span className="flex items-center gap-1 text-green-500"><CheckCircle className="h-4 w-4" />Active</span> : <span className="flex items-center gap-1 text-red-500"><XCircle className="h-4 w-4" />Inactive</span>}
                         </TableCell>
-                        <TableCell>{member.last_login_at ? new Date(member.last_login_at).toLocaleDateString('fr-FR') : 'Jamais'}</TableCell>
+                        <TableCell>{member.last_login_at ? new Date(member.last_login_at).toLocaleDateString('en-US') : 'Never'}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Button variant="ghost" size="sm" onClick={() => openEditModal(member)}><Edit className="h-4 w-4" /></Button>
@@ -689,7 +689,7 @@ const PortalSettings = () => {
       {/* ElevenLabs Extended API */}
       {session?.organizationId && (
         <div className="mt-6">
-          <h2 className="text-lg font-semibold mb-4">API ElevenLabs Étendue</h2>
+          <h2 className="text-lg font-semibold mb-4">Extended ElevenLabs API</h2>
           <ElevenLabsAPISections organizationId={session.organizationId} canEdit={canEdit} voiceId={ttsSettings.voice_id} />
         </div>
       )}
@@ -703,9 +703,9 @@ const PortalSettings = () => {
                 <Sparkles className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold mb-2 flex items-center gap-2">Conseil IA<Zap className="h-3 w-3 text-yellow-400" /></h3>
+                <h3 className="font-semibold mb-2 flex items-center gap-2">AI Tip<Zap className="h-3 w-3 text-yellow-400" /></h3>
                 <p className="text-sm text-muted-foreground">
-                  Pour de meilleurs résultats, ajustez la stabilité entre 0.3 et 0.7. Utilisez les mots-clés pour améliorer la reconnaissance de termes spécifiques.
+                  For best results, keep stability between 0.3 and 0.7. Use keywords to improve recognition of specific terms.
                 </p>
               </div>
             </div>
@@ -717,15 +717,15 @@ const PortalSettings = () => {
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Ajouter un membre</DialogTitle>
-            <DialogDescription>Créez un nouveau compte membre pour accéder au portail</DialogDescription>
+            <DialogTitle>Add member</DialogTitle>
+            <DialogDescription>Create a new member account to access the portal</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2"><Label>Nom *</Label><Input value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="Jean Dupont" /></div>
-            <div className="space-y-2"><Label>Email *</Label><Input type="email" value={addEmail} onChange={(e) => setAddEmail(e.target.value)} placeholder="jean@example.com" /></div>
-            <div className="space-y-2"><Label>Identifiant de connexion *</Label><Input value={addLoginId} onChange={(e) => setAddLoginId(e.target.value)} placeholder="jean.dupont" /></div>
+            <div className="space-y-2"><Label>Name *</Label><Input value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="John Smith" /></div>
+            <div className="space-y-2"><Label>Email *</Label><Input type="email" value={addEmail} onChange={(e) => setAddEmail(e.target.value)} placeholder="john@example.com" /></div>
+            <div className="space-y-2"><Label>Login ID *</Label><Input value={addLoginId} onChange={(e) => setAddLoginId(e.target.value)} placeholder="john.smith" /></div>
             <div className="space-y-2">
-              <Label>Mot de passe * (min. 8 caractères)</Label>
+              <Label>Password * (min. 8 characters)</Label>
               <div className="relative">
                 <Input type={showAddPassword ? 'text' : 'password'} value={addPassword} onChange={(e) => setAddPassword(e.target.value)} placeholder="••••••••" />
                 <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowAddPassword(!showAddPassword)}>
@@ -734,14 +734,14 @@ const PortalSettings = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Rôle</Label>
-              <Select value={addRole} onValueChange={setAddRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="member">Membre (lecture seule)</SelectItem><SelectItem value="admin">Admin (gestion complète)</SelectItem></SelectContent></Select>
+              <Label>Role</Label>
+              <Select value={addRole} onValueChange={setAddRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="member">Member (read only)</SelectItem><SelectItem value="admin">Admin (full management)</SelectItem></SelectContent></Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddModal(false)}>Annuler</Button>
+            <Button variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button>
             <Button onClick={handleAddMember} disabled={isAdding || !addName || !addEmail || !addLoginId || addPassword.length < 8}>
-              {isAdding && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Ajouter
+              {isAdding && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Add
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -749,26 +749,26 @@ const PortalSettings = () => {
 
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Modifier le membre</DialogTitle><DialogDescription>Modifiez les informations de {editingMember?.name}</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Edit member</DialogTitle><DialogDescription>Edit information for {editingMember?.name}</DialogDescription></DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2"><Label>Nom</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Name</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} /></div>
             <div className="space-y-2"><Label>Email</Label><Input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Rôle</Label><Select value={editRole} onValueChange={setEditRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="member">Membre</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div>
-            <div className="space-y-2"><Label>Statut</Label><Select value={editStatus} onValueChange={setEditStatus}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Actif</SelectItem><SelectItem value="inactive">Inactif</SelectItem></SelectContent></Select></div>
+            <div className="space-y-2"><Label>Role</Label><Select value={editRole} onValueChange={setEditRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="member">Member</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div>
+            <div className="space-y-2"><Label>Status</Label><Select value={editStatus} onValueChange={setEditStatus}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent></Select></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditModal(false)}>Annuler</Button>
-            <Button onClick={handleEditMember} disabled={isEditing}>{isEditing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Enregistrer</Button>
+            <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
+            <Button onClick={handleEditMember} disabled={isEditing}>{isEditing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={showResetModal} onOpenChange={setShowResetModal}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Réinitialiser le mot de passe</DialogTitle><DialogDescription>Nouveau mot de passe pour {resetMemberName}</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Reset password</DialogTitle><DialogDescription>New password for {resetMemberName}</DialogDescription></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Nouveau mot de passe (min. 8 caractères)</Label>
+              <Label>New password (min. 8 characters)</Label>
               <div className="relative">
                 <Input type={showResetPassword ? 'text' : 'password'} value={resetPassword} onChange={(e) => setResetPassword(e.target.value)} placeholder="••••••••" />
                 <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowResetPassword(!showResetPassword)}>
@@ -778,19 +778,19 @@ const PortalSettings = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowResetModal(false)}>Annuler</Button>
-            <Button onClick={handleResetPassword} disabled={isResetting || resetPassword.length < 8}>{isResetting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Réinitialiser</Button>
+            <Button variant="outline" onClick={() => setShowResetModal(false)}>Cancel</Button>
+            <Button onClick={handleResetPassword} disabled={isResetting || resetPassword.length < 8}>{isResetting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Reset</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Supprimer le membre ?</AlertDialogTitle><AlertDialogDescription>Êtes-vous sûr de vouloir supprimer {deletingMember?.name} ? Cette action est irréversible.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Delete member?</AlertDialogTitle><AlertDialogDescription>Are you sure you want to delete {deletingMember?.name}? This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteMember} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Supprimer
+              {isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

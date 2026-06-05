@@ -48,74 +48,74 @@ const marketplaceApps: MarketplaceApp[] = [
   {
     id: "zapier",
     name: "Zapier",
-    description: "Connectez vos agents à plus de 5000 applications",
+    description: "Connect your agents to over 5,000 applications",
     icon: <Zap className="h-6 w-6" />,
-    category: "Automatisation",
+    category: "Automation",
     requiresHipaa: false,
-    features: ["Webhooks", "Triggers", "Actions automatisées"]
+    features: ["Webhooks", "Triggers", "Automated actions"]
   },
   {
     id: "calendly",
     name: "Calendly",
-    description: "Planification automatique de rendez-vous",
+    description: "Automatic appointment scheduling",
     icon: <Calendar className="h-6 w-6" />,
-    category: "Planification",
+    category: "Scheduling",
     requiresHipaa: false,
-    features: ["Réservation en ligne", "Rappels automatiques", "Synchronisation calendrier"]
+    features: ["Online booking", "Automatic reminders", "Calendar sync"]
   },
   {
     id: "mailchimp",
     name: "Mailchimp",
-    description: "Marketing par email automatisé",
+    description: "Automated email marketing",
     icon: <Mail className="h-6 w-6" />,
     category: "Marketing",
     requiresHipaa: false,
-    features: ["Campagnes email", "Segmentation", "Analytics"]
+    features: ["Email campaigns", "Segmentation", "Analytics"]
   },
   {
     id: "slack",
     name: "Slack",
-    description: "Notifications et alertes en temps réel",
+    description: "Real-time notifications and alerts",
     icon: <MessageSquare className="h-6 w-6" />,
     category: "Communication",
     requiresHipaa: false,
-    features: ["Notifications", "Canaux dédiés", "Alertes personnalisées"]
+    features: ["Notifications", "Dedicated channels", "Custom alerts"]
   },
   {
     id: "hubspot",
     name: "HubSpot CRM",
-    description: "Synchronisation CRM automatique",
+    description: "Automatic CRM synchronization",
     icon: <Users className="h-6 w-6" />,
     category: "CRM",
     requiresHipaa: true,
-    features: ["Contacts", "Deals", "Notes automatiques"]
+    features: ["Contacts", "Deals", "Automatic notes"]
   },
   {
     id: "analytics",
     name: "Google Analytics",
-    description: "Suivi des performances avancé",
+    description: "Advanced performance tracking",
     icon: <BarChart3 className="h-6 w-6" />,
     category: "Analytics",
     requiresHipaa: false,
-    features: ["Événements", "Conversions", "Rapports personnalisés"]
+    features: ["Events", "Conversions", "Custom reports"]
   },
   {
     id: "notion",
     name: "Notion",
-    description: "Documentation et notes automatiques",
+    description: "Automatic documentation and notes",
     icon: <FileText className="h-6 w-6" />,
-    category: "Productivité",
+    category: "Productivity",
     requiresHipaa: true,
-    features: ["Pages automatiques", "Base de données", "Templates"]
+    features: ["Automatic pages", "Database", "Templates"]
   },
   {
     id: "make",
     name: "Make (Integromat)",
-    description: "Automatisations visuelles complexes",
+    description: "Complex visual automations",
     icon: <Settings className="h-6 w-6" />,
-    category: "Automatisation",
+    category: "Automation",
     requiresHipaa: false,
-    features: ["Scénarios", "Modules", "Filtres avancés"]
+    features: ["Scenarios", "Modules", "Advanced filters"]
   }
 ];
 
@@ -343,7 +343,7 @@ export default function Workflows() {
                             onClick={() => toggleMutation.mutate({ id: workflow.id, isActive: !workflow.is_active })}
                           >
                             <Edit className="h-3 w-3 mr-1" />
-                            Éditer
+                            Edit
                           </Button>
                           <Button
                             variant="outline"
@@ -374,9 +374,9 @@ export default function Workflows() {
             {marketplaceWorkflows.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Applications installées</CardTitle>
+                  <CardTitle className="text-lg">Installed applications</CardTitle>
                   <CardDescription>
-                    Gérez vos intégrations actives
+                    Manage your active integrations
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -402,7 +402,7 @@ export default function Workflows() {
                           <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-muted-foreground">
-                                {workflow.is_active ? "Actif" : "Inactif"}
+                                {workflow.is_active ? "Active" : "Inactive"}
                               </span>
                               <Switch
                                 checked={workflow.is_active || false}
@@ -434,13 +434,13 @@ export default function Workflows() {
                   <div>
                     <CardTitle className="text-lg">Marketplace</CardTitle>
                     <CardDescription>
-                      Découvrez et installez de nouvelles intégrations
+                      Discover and install new integrations
                     </CardDescription>
                   </div>
                   <div className="relative w-64">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Rechercher des applications..."
+                      placeholder="Search applications..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
@@ -487,11 +487,11 @@ export default function Workflows() {
                           onClick={() => handleInstall(app)}
                         >
                           {isInstalled(app.id) ? (
-                            "Installée"
+                            "Installed"
                           ) : (
                             <>
                               <Plus className="h-4 w-4 mr-1" />
-                              Installer
+                              Install
                             </>
                           )}
                         </Button>
@@ -510,21 +510,21 @@ export default function Workflows() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Shield className="h-5 w-5 text-primary" />
-                Conformité HIPAA requise
+                HIPAA compliance required
               </DialogTitle>
               <DialogDescription>
-                L'application {selectedApp?.name} nécessite la conformité HIPAA car elle peut traiter des données de santé protégées.
+                The {selectedApp?.name} application requires HIPAA compliance because it may process protected health data.
               </DialogDescription>
             </DialogHeader>
             
             <div className="space-y-4 py-4">
               <div className="p-4 bg-muted rounded-lg space-y-2">
-                <h4 className="font-medium">Exigences HIPAA :</h4>
+                <h4 className="font-medium">HIPAA requirements:</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Chiffrement des données en transit et au repos</li>
-                  <li>• Journalisation des accès aux données</li>
-                  <li>• Contrôles d'accès stricts</li>
-                  <li>• Accord de partenariat commercial (BAA)</li>
+                  <li>• Data encryption in transit and at rest</li>
+                  <li>• Data access audit logging</li>
+                  <li>• Strict access controls</li>
+                  <li>• Business Associate Agreement (BAA)</li>
                 </ul>
               </div>
               
@@ -535,17 +535,17 @@ export default function Workflows() {
                   onCheckedChange={(checked) => setHipaaAccepted(checked as boolean)}
                 />
                 <label htmlFor="hipaa-accept" className="text-sm">
-                  Je confirme que mon organisation est conforme aux exigences HIPAA et que j'ai l'autorisation d'activer cette intégration.
+                  I confirm that my organization meets HIPAA requirements and that I am authorized to enable this integration.
                 </label>
               </div>
             </div>
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setHipaaModalOpen(false)}>
-                Annuler
+                Cancel
               </Button>
               <Button onClick={confirmHipaaInstall} disabled={!hipaaAccepted}>
-                Confirmer et installer
+                Confirm and install
               </Button>
             </DialogFooter>
           </DialogContent>

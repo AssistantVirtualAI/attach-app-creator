@@ -134,7 +134,7 @@ export default function EmailTemplates() {
                               }}
                             >
                               <Plus className="w-4 h-4 mr-1" />
-                              Créer
+                              Create
                             </Button>
                           )}
                         </div>
@@ -172,15 +172,15 @@ export default function EmailTemplates() {
       <AlertDialog open={!!templateToDelete} onOpenChange={() => setTemplateToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce template ?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this template?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est irréversible. Le template sera définitivement supprimé.
+              This action cannot be undone. The template will be permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteTemplate} className="bg-destructive">
-              Supprimer
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

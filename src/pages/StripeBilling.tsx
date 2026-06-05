@@ -263,7 +263,7 @@ export default function StripeBilling() {
                             <div className="flex items-center justify-between">
                               <div>
                                 <span className="text-2xl font-bold">${addon.price}</span>
-                                <span className="text-muted-foreground">/{language === 'fr' ? 'mois' : 'month'}</span>
+                                <span className="text-muted-foreground">/{language === 'fr' ? 'month' : 'month'}</span>
                               </div>
                               {isAvailable ? (
                                 <Button 

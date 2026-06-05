@@ -70,7 +70,7 @@ const AgentSettingsPage = () => {
     return (
       <AppLayout>
         <div className="flex flex-col items-center justify-center h-[60vh]">
-          <p className="text-muted-foreground mb-4">Agent non trouvé</p>
+          <p className="text-muted-foreground mb-4">Agent not found</p>
           <Button onClick={() => navigate('/agents')}>
             Retour aux agents
           </Button>
@@ -83,27 +83,27 @@ const AgentSettingsPage = () => {
 
   const navSections: NavSection[] = [
     {
-      title: 'Général',
+      title: 'General',
       items: [
-        { id: 'overview', label: 'Aperçu', icon: Bot },
-        { id: 'config', label: 'Connexion', icon: Key },
+        { id: 'overview', label: 'Overview', icon: Bot },
+        { id: 'config', label: 'Connection', icon: Key },
         { id: 'clients', label: 'Clients', icon: Users },
       ],
     },
     {
       title: 'Configuration',
       items: [
-        { id: 'advanced', label: 'Paramètres', icon: Settings2 },
-        { id: 'knowledge', label: 'Base de connaissances', icon: Brain },
-        { id: 'mcp', label: 'Serveurs MCP', icon: Wrench },
+        { id: 'advanced', label: 'Settings', icon: Settings2 },
+        { id: 'knowledge', label: 'Knowledge base', icon: Brain },
+        { id: 'mcp', label: 'MCP servers', icon: Wrench },
         { id: 'webhooks', label: 'Webhooks', icon: Webhook },
       ],
     },
     {
-      title: 'Apparence',
+      title: 'Appearance',
       items: [
         { id: 'widget', label: 'Widget', icon: Palette },
-        { id: 'embed', label: 'Intégration', icon: Code },
+        { id: 'embed', label: 'Integration', icon: Code },
       ],
     },
     {

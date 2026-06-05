@@ -40,7 +40,7 @@ export const EmailTemplateEditor = ({ template, onSave, isSaving }: EmailTemplat
     return (
       <Card className="glass-card">
         <CardContent className="flex items-center justify-center h-[400px] text-muted-foreground">
-          Sélectionnez un template à éditer
+          Select a template to edit
         </CardContent>
       </Card>
     );
@@ -49,19 +49,19 @@ export const EmailTemplateEditor = ({ template, onSave, isSaving }: EmailTemplat
   return (
     <Card className="glass-card">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Éditer le template</CardTitle>
+        <CardTitle>Edit template</CardTitle>
         <Button onClick={handleSave} disabled={isSaving}>
           {isSaving ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
           ) : (
             <Save className="w-4 h-4 mr-2" />
           )}
-          Sauvegarder
+          Save
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="subject">Sujet de l'email</Label>
+          <Label htmlFor="subject">Email subject</Label>
           <Input
             id="subject"
             value={subject}

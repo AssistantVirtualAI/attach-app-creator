@@ -85,13 +85,13 @@ export default function WorkflowBuilder() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['workflows'] });
-      toast.success('Workflow sauvegardé');
+      toast.success('Workflow saved');
       if (isNewWorkflow && data) {
         navigate(`/workflow-builder/${data.id}`, { replace: true });
       }
     },
     onError: () => {
-      toast.error('Erreur lors de la sauvegarde');
+      toast.error('Error while saving');
     }
   });
 
@@ -107,7 +107,7 @@ export default function WorkflowBuilder() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workflow', workflowId] });
-      toast.success(workflow?.is_active ? 'Workflow désactivé' : 'Workflow activé');
+      toast.success(workflow?.is_active ? 'Workflow disabled' : 'Workflow enabled');
     }
   });
 
@@ -140,7 +140,7 @@ export default function WorkflowBuilder() {
               value={workflowName}
               onChange={(e) => setWorkflowName(e.target.value)}
               className="w-64 font-semibold"
-              placeholder="Nom du workflow"
+                placeholder="Workflow name"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -153,19 +153,19 @@ export default function WorkflowBuilder() {
                 {workflow?.is_active ? (
                   <>
                     <Pause className="h-4 w-4 mr-2" />
-                    Désactiver
+                    Deactivate
                   </>
                 ) : (
                   <>
                     <Play className="h-4 w-4 mr-2" />
-                    Activer
+                    Activate
                   </>
                 )}
               </Button>
             )}
             <Button onClick={() => handleSave(nodes, edges)} disabled={saveMutation.isPending}>
               <Save className="h-4 w-4 mr-2" />
-              Sauvegarder
+              Save
             </Button>
           </div>
         </div>

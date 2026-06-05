@@ -113,27 +113,27 @@ export default function SmsTemplates() {
           <DialogTrigger asChild>
             <Button>
               <Plus className="h-4 w-4 mr-2" />
-              Nouveau Template
+              New Template
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>
-                {editingTemplate ? "Modifier le template" : "Créer un template SMS"}
+                {editingTemplate ? "Edit template" : "Create SMS template"}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Nom du template *</Label>
+                  <Label>Template name *</Label>
                   <Input
                     value={formData.name}
                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Ex: Confirmation RDV"
+                    placeholder="Example: Appointment confirmation"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Catégorie</Label>
+                  <Label>Category</Label>
                   <Select
                     value={formData.category}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
@@ -152,9 +152,9 @@ export default function SmsTemplates() {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>Contenu du message *</Label>
+                  <Label>Message content *</Label>
                   <span className="text-xs text-muted-foreground">
-                    {charCount} caractères ({smsCount} SMS)
+                    {charCount} characters ({smsCount} SMS)
                   </span>
                 </div>
                 <Textarea
@@ -168,7 +168,7 @@ export default function SmsTemplates() {
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Variable className="h-4 w-4" />
-                  Variables disponibles
+                  Available variables
                 </Label>
                 <div className="flex flex-wrap gap-2">
                   {AVAILABLE_VARIABLES.map(variable => (
@@ -190,7 +190,7 @@ export default function SmsTemplates() {
                   checked={formData.is_active}
                   onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
                 />
-                <Label>Template actif</Label>
+                <Label>Active template</Label>
               </div>
 
               <div className="flex justify-end gap-2">
@@ -198,10 +198,10 @@ export default function SmsTemplates() {
                   resetForm();
                   setIsCreateOpen(false);
                 }}>
-                  Annuler
+                  Cancel
                 </Button>
                 <Button onClick={handleSubmit}>
-                  {editingTemplate ? "Mettre à jour" : "Créer"}
+                  {editingTemplate ? "Update" : "Create"}
                 </Button>
               </div>
             </div>

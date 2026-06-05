@@ -38,9 +38,9 @@ export function SubscriptionTab() {
 
   const getPriceLabel = (plan: typeof PLANS[0]) => {
     const price = getPrice(plan);
-    if (price === null) return language === 'fr' ? 'Sur mesure' : 'Custom';
-    if (price === 0) return language === 'fr' ? 'Gratuit' : 'Free';
-    return `$${price}/${language === 'fr' ? 'mois' : 'month'}`;
+    if (price === null) return language === 'fr' ? 'Custom' : 'Custom';
+    if (price === 0) return language === 'fr' ? 'Free' : 'Free';
+    return `$${price}/${language === 'fr' ? 'month' : 'month'}`;
   };
 
   if (isLoading) {
@@ -68,15 +68,15 @@ export function SubscriptionTab() {
             <div className="flex items-center gap-3">
               <CreditCard className="w-6 h-6 text-primary" />
               <div>
-                <CardTitle>{language === 'fr' ? 'Plan actuel' : 'Current Plan'}</CardTitle>
-                <CardDescription>{language === 'fr' ? 'Votre abonnement actif' : 'Your active subscription'}</CardDescription>
+                <CardTitle>{language === 'fr' ? 'Current Plan' : 'Current Plan'}</CardTitle>
+                <CardDescription>{language === 'fr' ? 'Your active subscription' : 'Your active subscription'}</CardDescription>
               </div>
             </div>
             <div className="flex items-center gap-2">
               {isTrialActive && (
                 <Badge variant="secondary" className="bg-amber-500/10 text-amber-600">
                   <Clock className="w-3 h-3 mr-1" />
-                  {trialDaysRemaining} {language === 'fr' ? 'jours restants' : 'days left'}
+                  {trialDaysRemaining} {language === 'fr' ? 'days left' : 'days left'}
                 </Badge>
               )}
               <Badge variant="default" className="text-lg px-4 py-2">
@@ -89,24 +89,24 @@ export function SubscriptionTab() {
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <p className="text-2xl font-bold">
-                {currentPlan.price === 0 ? (language === 'fr' ? 'Gratuit' : 'Free') : `$${currentPlan.price}/${language === 'fr' ? 'mois' : 'month'}`}
+                {currentPlan.price === 0 ? (language === 'fr' ? 'Free' : 'Free') : `$${currentPlan.price}/${language === 'fr' ? 'month' : 'month'}`}
               </p>
               {isTrialActive && trialEndsAt && (
                 <p className="text-sm text-amber-600 flex items-center gap-1">
                   <AlertTriangle className="w-4 h-4" />
-                  {language === 'fr' ? 'Essai se termine le' : 'Trial ends on'} {trialEndsAt.toLocaleDateString()}
+                  {language === 'fr' ? 'Trial ends on' : 'Trial ends on'} {trialEndsAt.toLocaleDateString()}
                 </p>
               )}
               {billingConfig?.subscription_ends_at && !isTrialActive && (
                 <p className="text-sm text-muted-foreground">
-                  {language === 'fr' ? 'Renouvellement le' : 'Renewal on'} {new Date(billingConfig.subscription_ends_at).toLocaleDateString()}
+                  {language === 'fr' ? 'Renewal on' : 'Renewal on'} {new Date(billingConfig.subscription_ends_at).toLocaleDateString()}
                 </p>
               )}
             </div>
             {billingConfig?.stripe_customer_id && (
               <Button variant="outline" onClick={openCustomerPortal} disabled={isActionLoading}>
                 <ExternalLink className="w-4 h-4 mr-2" />
-                {language === 'fr' ? 'Gérer l\'abonnement' : 'Manage subscription'}
+                {language === 'fr' ? 'Manage subscription' : 'Manage subscription'}
               </Button>
             )}
           </div>
@@ -115,10 +115,10 @@ export function SubscriptionTab() {
 
       {/* Billing Toggle */}
       <div className="flex items-center justify-center gap-4 py-4">
-        <Label className={cn(!isAnnual && 'font-bold')}>{language === 'fr' ? 'Mensuel' : 'Monthly'}</Label>
+        <Label className={cn(!isAnnual && 'font-bold')}>{language === 'fr' ? 'Monthly' : 'Monthly'}</Label>
         <Switch checked={isAnnual} onCheckedChange={setIsAnnual} />
         <Label className={cn(isAnnual && 'font-bold')}>
-          {language === 'fr' ? 'Annuel' : 'Annual'}
+          {language === 'fr' ? 'Annual' : 'Annual'}
           <Badge variant="secondary" className="ml-2 bg-green-500/10 text-green-500">
             -20%
           </Badge>
@@ -144,7 +144,7 @@ export function SubscriptionTab() {
             >
               {isPopular && (
                 <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary">
-                  {language === 'fr' ? 'Populaire' : 'Popular'}
+                  {language === 'fr' ? 'Popular' : 'Popular'}
                 </Badge>
               )}
               <CardHeader className="pb-2">
@@ -159,7 +159,7 @@ export function SubscriptionTab() {
                 </div>
                 {isAnnual && plan.priceAnnual && plan.price && (
                   <p className="text-xs text-muted-foreground">
-                    ${plan.priceAnnual}/{language === 'fr' ? 'an' : 'year'}
+                    ${plan.priceAnnual}/{language === 'fr' ? 'year' : 'year'}
                   </p>
                 )}
               </CardHeader>
@@ -198,7 +198,7 @@ export function SubscriptionTab() {
 
                 {isCurrentPlan ? (
                   <Button className="w-full" disabled variant="outline">
-                    {language === 'fr' ? 'Plan actuel' : 'Current Plan'}
+                    {language === 'fr' ? 'Current Plan' : 'Current Plan'}
                   </Button>
                 ) : plan.isCustom ? (
                   <Button
@@ -207,7 +207,7 @@ export function SubscriptionTab() {
                     onClick={() => setShowContactModal(true)}
                   >
                     <MessageSquare className="w-4 h-4 mr-2" />
-                    {language === 'fr' ? 'Nous contacter' : 'Contact Us'}
+                    {language === 'fr' ? 'Contact Us' : 'Contact Us'}
                   </Button>
                 ) : priceId ? (
                   <Button
@@ -217,12 +217,12 @@ export function SubscriptionTab() {
                     disabled={isActionLoading}
                   >
                     {plan.price! > (currentPlan.price || 0) 
-                      ? (language === 'fr' ? 'Upgrader' : 'Upgrade') 
-                      : (language === 'fr' ? 'Choisir' : 'Select')}
+                      ? (language === 'fr' ? 'Upgrade' : 'Upgrade') 
+                      : (language === 'fr' ? 'Select' : 'Select')}
                   </Button>
                 ) : (
                   <Button className="w-full" variant="outline" disabled>
-                    {language === 'fr' ? 'Plan gratuit' : 'Free Plan'}
+                    {language === 'fr' ? 'Free Plan' : 'Free Plan'}
                   </Button>
                 )}
               </CardContent>
@@ -235,7 +235,7 @@ export function SubscriptionTab() {
       {billingConfig?.stripe_customer_id && (
         <div className="text-center">
           <Button variant="link" onClick={openCustomerPortal} disabled={isActionLoading}>
-            {language === 'fr' ? 'Modifier les informations de facturation et voir les factures' : 'Edit billing info and view invoices'}
+            {language === 'fr' ? 'Edit billing info and view invoices' : 'Edit billing info and view invoices'}
             <ExternalLink className="w-4 h-4 ml-2" />
           </Button>
         </div>

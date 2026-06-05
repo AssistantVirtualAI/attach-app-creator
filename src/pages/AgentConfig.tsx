@@ -15,18 +15,18 @@ const AgentConfig = () => {
       <div className="container mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2 gradient-text">Configuration Agent IA</h1>
+          <h1 className="text-4xl font-bold mb-2 gradient-text">AI Agent Configuration</h1>
           <p className="text-muted-foreground text-lg">
-            Personnalisez le comportement de votre assistant vocal
+            Customize your voice assistant behavior
           </p>
         </div>
 
         <Tabs defaultValue="general" className="space-y-6">
           <TabsList className="glass-card">
-            <TabsTrigger value="general">Général</TabsTrigger>
-            <TabsTrigger value="voice">Voix</TabsTrigger>
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="voice">Voice</TabsTrigger>
             <TabsTrigger value="conversation">Conversation</TabsTrigger>
-            <TabsTrigger value="behavior">Comportement</TabsTrigger>
+            <TabsTrigger value="behavior">Behavior</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-6">
@@ -37,14 +37,14 @@ const AgentConfig = () => {
                     <Bot className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <CardTitle>Informations Générales</CardTitle>
-                    <CardDescription>Configuration de base de l'agent</CardDescription>
+                    <CardTitle>General Information</CardTitle>
+                    <CardDescription>Basic agent configuration</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Nom de l'agent</Label>
+                  <Label htmlFor="name">Agent name</Label>
                   <Input
                     id="name"
                     defaultValue="AVA Assistant"
@@ -53,33 +53,33 @@ const AgentConfig = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="prompt">Prompt Système</Label>
+                  <Label htmlFor="prompt">System Prompt</Label>
                   <Textarea
                     id="prompt"
-                    placeholder="Vous êtes un assistant vocal IA intelligent..."
+                    placeholder="You are an intelligent AI voice assistant..."
                     rows={8}
-                    defaultValue="Vous êtes AVA, un assistant vocal IA professionnel et serviable. Votre objectif est d'aider les utilisateurs avec leurs questions de manière claire et concise."
+                    defaultValue="You are AVA, a professional and helpful AI voice assistant. Your goal is to help users with their questions clearly and concisely."
                     className="bg-background/50 font-mono text-sm"
                   />
                   <p className="text-sm text-muted-foreground">
-                    Définit le comportement global et la personnalité de l'agent
+                    Defines the agent's overall behavior and personality
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="firstMessage">Premier Message</Label>
+                  <Label htmlFor="firstMessage">First Message</Label>
                   <Input
                     id="firstMessage"
-                    defaultValue="Bonjour ! Comment puis-je vous aider aujourd'hui ?"
+                    defaultValue="Hello! How can I help you today?"
                     className="bg-background/50"
                   />
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <Label>Agent Actif</Label>
+                    <Label>Active Agent</Label>
                     <p className="text-sm text-muted-foreground">
-                      Activer ou désactiver cet agent
+                      Enable or disable this agent
                     </p>
                   </div>
                   <Switch defaultChecked />
@@ -91,12 +91,12 @@ const AgentConfig = () => {
           <TabsContent value="voice" className="space-y-6">
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle>Paramètres Vocaux</CardTitle>
-                <CardDescription>Configurez la voix de l'agent</CardDescription>
+                <CardTitle>Voice Settings</CardTitle>
+                <CardDescription>Configure the agent voice</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="voiceId">ID de la Voix (ElevenLabs)</Label>
+                  <Label htmlFor="voiceId">Voice ID (ElevenLabs)</Label>
                   <Input
                     id="voiceId"
                     placeholder="21m00Tcm4TlvDq8ikWAM"
@@ -107,23 +107,23 @@ const AgentConfig = () => {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <Label>Stabilité</Label>
+                      <Label>Stability</Label>
                       <span className="text-sm text-muted-foreground">0.5</span>
                     </div>
                     <Slider defaultValue={[0.5]} max={1} step={0.01} />
                     <p className="text-sm text-muted-foreground">
-                      Contrôle la cohérence de la voix
+                      Controls voice consistency
                     </p>
                   </div>
 
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <Label>Similarité</Label>
+                      <Label>Similarity</Label>
                       <span className="text-sm text-muted-foreground">0.75</span>
                     </div>
                     <Slider defaultValue={[0.75]} max={1} step={0.01} />
                     <p className="text-sm text-muted-foreground">
-                      Proximité avec la voix originale
+                      Closeness to the original voice
                     </p>
                   </div>
 
@@ -134,7 +134,7 @@ const AgentConfig = () => {
                     </div>
                     <Slider defaultValue={[0]} max={1} step={0.01} />
                     <p className="text-sm text-muted-foreground">
-                      Expressivité de la voix
+                      Voice expressiveness
                     </p>
                   </div>
                 </div>
@@ -145,19 +145,19 @@ const AgentConfig = () => {
           <TabsContent value="conversation" className="space-y-6">
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle>Paramètres de Conversation</CardTitle>
-                <CardDescription>Configuration du modèle LLM</CardDescription>
+                <CardTitle>Conversation Settings</CardTitle>
+                <CardDescription>LLM model configuration</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <Label>Température</Label>
+                      <Label>Temperature</Label>
                       <span className="text-sm text-muted-foreground">0.8</span>
                     </div>
                     <Slider defaultValue={[0.8]} max={2} step={0.1} />
                     <p className="text-sm text-muted-foreground">
-                      Créativité des réponses (0 = précis, 2 = créatif)
+                      Response creativity (0 = precise, 2 = creative)
                     </p>
                   </div>
 
@@ -170,7 +170,7 @@ const AgentConfig = () => {
                       className="bg-background/50"
                     />
                     <p className="text-sm text-muted-foreground">
-                      Longueur maximale des réponses
+                      Maximum response length
                     </p>
                   </div>
                 </div>
@@ -181,15 +181,15 @@ const AgentConfig = () => {
           <TabsContent value="behavior" className="space-y-6">
             <Card className="glass-card">
               <CardHeader>
-                <CardTitle>Comportement</CardTitle>
-                <CardDescription>Options avancées de comportement</CardDescription>
+                <CardTitle>Behavior</CardTitle>
+                <CardDescription>Advanced behavior options</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <Label>Interruptions Autorisées</Label>
+                    <Label>Interruptions Allowed</Label>
                     <p className="text-sm text-muted-foreground">
-                      Permettre à l'utilisateur d'interrompre l'agent
+                      Allow the user to interrupt the agent
                     </p>
                   </div>
                   <Switch defaultChecked />
@@ -197,9 +197,9 @@ const AgentConfig = () => {
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <Label>Détection de Sentiment</Label>
+                    <Label>Sentiment Detection</Label>
                     <p className="text-sm text-muted-foreground">
-                      Adapter les réponses selon l'émotion détectée
+                      Adapt responses based on detected emotion
                     </p>
                   </div>
                   <Switch defaultChecked />
@@ -207,9 +207,9 @@ const AgentConfig = () => {
 
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <Label>Logs Détaillés</Label>
+                    <Label>Detailed Logs</Label>
                     <p className="text-sm text-muted-foreground">
-                      Enregistrer toutes les interactions
+                      Record all interactions
                     </p>
                   </div>
                   <Switch defaultChecked />
@@ -223,7 +223,7 @@ const AgentConfig = () => {
         <div className="flex justify-end mt-8">
           <Button size="lg" className="gap-2 bg-gradient-to-r from-primary to-accent">
             <Save className="w-5 h-5" />
-            Enregistrer la Configuration
+            Save Configuration
           </Button>
         </div>
       </div>

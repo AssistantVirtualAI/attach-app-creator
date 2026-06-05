@@ -199,17 +199,17 @@ const ClientAgentSettings = () => {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Configuration</h1>
-          <p className="text-muted-foreground">Paramètres de {agentName}</p>
+          <p className="text-muted-foreground">Settings for {agentName}</p>
         </div>
         <Card>
           <CardContent className="py-12">
             <div className="text-center">
               <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground">
-                Configuration {platform ? platform.toUpperCase() : 'plateforme'} manquante pour cet agent
+                Missing {platform ? platform.toUpperCase() : 'platform'} configuration for this agent
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                Vérifiez que l'agent dispose d'un ID de plateforme et d'une clé API valide.
+                Verify that the agent has a valid platform ID and API key.
               </p>
             </div>
           </CardContent>
@@ -225,7 +225,7 @@ const ClientAgentSettings = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Configuration</h1>
-          <p className="text-muted-foreground">Paramètres de {agentName}</p>
+          <p className="text-muted-foreground">Settings for {agentName}</p>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="capitalize">{platform}</Badge>
@@ -235,7 +235,7 @@ const ClientAgentSettings = () => {
           {!canEdit && (
             <Badge variant="secondary" className="flex items-center gap-1">
               <Lock className="h-3 w-3" />
-              Lecture seule
+              Read only
             </Badge>
           )}
         </div>
@@ -264,7 +264,7 @@ const ClientAgentSettings = () => {
         <Card className="p-8 text-center">
           <Settings2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
           <p className="text-muted-foreground">
-            La configuration avancée n'est pas encore disponible pour {(platform as string)?.toUpperCase()}.
+            Advanced configuration is not available yet for {(platform as string)?.toUpperCase()}.
           </p>
         </Card>
       ) : (
@@ -278,19 +278,19 @@ const ClientAgentSettings = () => {
                   <MessageSquare className="h-5 w-5 text-blue-500" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Prompt & Premier Message</h3>
-                  <p className="text-sm text-muted-foreground">Instructions et message de bienvenue</p>
+                  <h3 className="font-semibold">Prompt & First Message</h3>
+                  <p className="text-sm text-muted-foreground">Instructions and welcome message</p>
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
               <div className="space-y-6">
                 <div>
-                  <Label className="text-base font-medium">Prompt Système</Label>
+                  <Label className="text-base font-medium">System Prompt</Label>
                   <Textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Instructions pour l'agent..."
+                    placeholder="Instructions for the agent..."
                     rows={10}
                     disabled={!canEdit}
                     className="mt-2 font-mono text-sm"
@@ -298,11 +298,11 @@ const ClientAgentSettings = () => {
                 </div>
 
                 <div>
-                  <Label className="text-base font-medium">Premier Message</Label>
+                  <Label className="text-base font-medium">First Message</Label>
                   <Textarea
                     value={firstMessage}
                     onChange={(e) => setFirstMessage(e.target.value)}
-                    placeholder="Message de bienvenue de l'agent..."
+                    placeholder="Agent welcome message..."
                     rows={3}
                     disabled={!canEdit}
                     className="mt-2"
@@ -313,7 +313,7 @@ const ClientAgentSettings = () => {
                   <Button onClick={handleSavePrompt} disabled={updatePromptMutation.isPending}>
                     {updatePromptMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <Save className="h-4 w-4 mr-2" />
-                    Sauvegarder Prompt
+                    Save Prompt
                   </Button>
                 )}
               </div>
@@ -328,15 +328,15 @@ const ClientAgentSettings = () => {
                   <Volume2 className="h-5 w-5 text-primary" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Voix & TTS</h3>
-                  <p className="text-sm text-muted-foreground">Paramètres de synthèse vocale</p>
+                  <h3 className="font-semibold">Voice & TTS</h3>
+                  <p className="text-sm text-muted-foreground">Speech synthesis settings</p>
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
               <div className="space-y-6">
                 <div>
-                  <Label className="text-base font-medium mb-4 block">Sélectionner une voix</Label>
+                  <Label className="text-base font-medium mb-4 block">Select a voice</Label>
                   <VoiceSelector
                     selectedVoiceId={ttsSettings.voice_id}
                     onSelect={(voice) => setTtsSettings(prev => ({ ...prev, voice_id: voice.voice_id }))}
@@ -347,7 +347,7 @@ const ClientAgentSettings = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <Label>Modèle TTS</Label>
+                    <Label>TTS Model</Label>
                     <Select
                       value={ttsSettings.model_id || 'eleven_turbo_v2_5'}
                       onValueChange={(v) => setTtsSettings(prev => ({ ...prev, model_id: v }))}
@@ -370,7 +370,7 @@ const ClientAgentSettings = () => {
                   </div>
 
                   <div>
-                    <Label>Vitesse ({ttsSettings.speed?.toFixed(1)}x)</Label>
+                    <Label>Speed ({ttsSettings.speed?.toFixed(1)}x)</Label>
                     <Slider
                       value={[ttsSettings.speed || 1]}
                       onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, speed: v }))}
@@ -385,7 +385,7 @@ const ClientAgentSettings = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <Label>Stabilité ({Math.round((ttsSettings.stability || 0.5) * 100)}%)</Label>
+                    <Label>Stability ({Math.round((ttsSettings.stability || 0.5) * 100)}%)</Label>
                     <Slider
                       value={[ttsSettings.stability || 0.5]}
                       onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, stability: v }))}
@@ -397,7 +397,7 @@ const ClientAgentSettings = () => {
                     />
                   </div>
                   <div>
-                    <Label>Similarité ({Math.round((ttsSettings.similarity_boost || 0.75) * 100)}%)</Label>
+                    <Label>Similarity ({Math.round((ttsSettings.similarity_boost || 0.75) * 100)}%)</Label>
                     <Slider
                       value={[ttsSettings.similarity_boost || 0.75]}
                       onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, similarity_boost: v }))}
@@ -423,7 +423,7 @@ const ClientAgentSettings = () => {
                 </div>
 
                 <div>
-                  <Label>Optimisation latence streaming (0-4)</Label>
+                  <Label>Streaming latency optimization (0-4)</Label>
                   <Slider
                     value={[ttsSettings.optimize_streaming_latency || 3]}
                     onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, optimize_streaming_latency: v }))}
@@ -434,7 +434,7 @@ const ClientAgentSettings = () => {
                     disabled={!canEdit}
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    0 = Haute qualité, 4 = Faible latence
+                    0 = High quality, 4 = Low latency
                   </p>
                 </div>
 
@@ -442,7 +442,7 @@ const ClientAgentSettings = () => {
                   <Button onClick={handleSaveTTS} disabled={updateTTS.isPending}>
                     {updateTTS.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <Save className="h-4 w-4 mr-2" />
-                    Sauvegarder TTS
+                    Save TTS
                   </Button>
                 )}
               </div>
@@ -457,8 +457,8 @@ const ClientAgentSettings = () => {
                   <Mic className="h-5 w-5 text-purple-500" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Reconnaissance Vocale (ASR)</h3>
-                  <p className="text-sm text-muted-foreground">Paramètres de transcription</p>
+                  <h3 className="font-semibold">Speech Recognition (ASR)</h3>
+                  <p className="text-sm text-muted-foreground">Transcription settings</p>
                 </div>
               </div>
             </AccordionTrigger>
@@ -466,7 +466,7 @@ const ClientAgentSettings = () => {
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <Label>Fournisseur ASR</Label>
+                    <Label>ASR Provider</Label>
                     <Select
                       value={asrSettings.provider || 'elevenlabs'}
                       onValueChange={(v: any) => setAsrSettings(prev => ({ ...prev, provider: v }))}
@@ -489,7 +489,7 @@ const ClientAgentSettings = () => {
                   </div>
 
                   <div>
-                    <Label>Qualité</Label>
+                    <Label>Quality</Label>
                     <Select
                       value={asrSettings.quality || 'high'}
                       onValueChange={(v: any) => setAsrSettings(prev => ({ ...prev, quality: v }))}
@@ -499,7 +499,7 @@ const ClientAgentSettings = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="high">Haute (recommandé)</SelectItem>
+                        <SelectItem value="high">High (recommended)</SelectItem>
                         <SelectItem value="standard">Standard</SelectItem>
                       </SelectContent>
                     </Select>
@@ -507,16 +507,16 @@ const ClientAgentSettings = () => {
                 </div>
 
                 <div>
-                  <Label>Mots-clés personnalisés</Label>
+                  <Label>Custom keywords</Label>
                   <Input
                     value={keywords}
                     onChange={(e) => setKeywords(e.target.value)}
-                    placeholder="mot1, mot2, mot3..."
+                    placeholder="word1, word2, word3..."
                     className="mt-2"
                     disabled={!canEdit}
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    Séparez les mots-clés par des virgules. Améliore la reconnaissance de termes spécifiques.
+                    Separate keywords with commas. Improves recognition of specific terms.
                   </p>
                 </div>
 
@@ -524,7 +524,7 @@ const ClientAgentSettings = () => {
                   <Button onClick={handleSaveASR} disabled={updateASR.isPending}>
                     {updateASR.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <Save className="h-4 w-4 mr-2" />
-                    Sauvegarder ASR
+                    Save ASR
                   </Button>
                 )}
               </div>
@@ -539,15 +539,15 @@ const ClientAgentSettings = () => {
                   <Clock className="h-5 w-5 text-orange-500" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Gestion des Tours</h3>
-                  <p className="text-sm text-muted-foreground">Timing et interruptions</p>
+                  <h3 className="font-semibold">Turn Management</h3>
+                  <p className="text-sm text-muted-foreground">Timing and interruptions</p>
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
               <div className="space-y-6">
                 <div>
-                  <Label>Réactivité de l'agent</Label>
+                  <Label>Agent responsiveness</Label>
                   <div className="grid grid-cols-3 gap-3 mt-3">
                     {TURN_EAGERNESS_OPTIONS.map(option => (
                       <div
@@ -568,7 +568,7 @@ const ClientAgentSettings = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <Label>Timeout de tour ({turnSettings.turn_timeout}s)</Label>
+                    <Label>Turn timeout ({turnSettings.turn_timeout}s)</Label>
                     <Slider
                       value={[turnSettings.turn_timeout || 10]}
                       onValueChange={([v]) => setTurnSettings(prev => ({ ...prev, turn_timeout: v }))}
@@ -578,11 +578,11 @@ const ClientAgentSettings = () => {
                       className="mt-4"
                       disabled={!canEdit}
                     />
-                    <p className="text-xs text-muted-foreground mt-2">Temps avant que l'agent relance</p>
+                    <p className="text-xs text-muted-foreground mt-2">Time before the agent follows up</p>
                   </div>
 
                   <div>
-                    <Label>Silence fin d'appel ({turnSettings.silence_end_call_timeout}s)</Label>
+                    <Label>End call on silence ({turnSettings.silence_end_call_timeout}s)</Label>
                     <Slider
                       value={[turnSettings.silence_end_call_timeout || 30]}
                       onValueChange={([v]) => setTurnSettings(prev => ({ ...prev, silence_end_call_timeout: v }))}
@@ -592,7 +592,7 @@ const ClientAgentSettings = () => {
                       className="mt-4"
                       disabled={!canEdit}
                     />
-                    <p className="text-xs text-muted-foreground mt-2">Silence avant fin automatique</p>
+                    <p className="text-xs text-muted-foreground mt-2">Silence before automatic ending</p>
                   </div>
                 </div>
 
@@ -600,7 +600,7 @@ const ClientAgentSettings = () => {
                   <Button onClick={handleSaveTurn} disabled={updateTurn.isPending}>
                     {updateTurn.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <Save className="h-4 w-4 mr-2" />
-                    Sauvegarder Tours
+                    Save Turns
                   </Button>
                 )}
               </div>
@@ -615,15 +615,15 @@ const ClientAgentSettings = () => {
                   <Settings className="h-5 w-5 text-green-500" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Paramètres de Conversation</h3>
-                  <p className="text-sm text-muted-foreground">Durée et événements</p>
+                  <h3 className="font-semibold">Conversation Settings</h3>
+                  <p className="text-sm text-muted-foreground">Duration and events</p>
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
               <div className="space-y-6">
                 <div>
-                  <Label>Durée maximale ({Math.round((conversationSettings.max_duration_seconds || 600) / 60)} min)</Label>
+                  <Label>Maximum duration ({Math.round((conversationSettings.max_duration_seconds || 600) / 60)} min)</Label>
                   <Slider
                     value={[conversationSettings.max_duration_seconds || 600]}
                     onValueChange={([v]) => setConversationSettings(prev => ({ ...prev, max_duration_seconds: v }))}
@@ -636,7 +636,7 @@ const ClientAgentSettings = () => {
                 </div>
 
                 <div>
-                  <Label className="mb-3 block">Événements Client</Label>
+                  <Label className="mb-3 block">Client Events</Label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {ELEVENLABS_CLIENT_EVENTS.map(event => (
                       <div key={event.id} className="flex items-start gap-3 p-3 rounded-lg border">
@@ -666,7 +666,7 @@ const ClientAgentSettings = () => {
                   <Button onClick={handleSaveConversation} disabled={updateConversation.isPending}>
                     {updateConversation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <Save className="h-4 w-4 mr-2" />
-                    Sauvegarder Conversation
+                    Save Conversation
                   </Button>
                 )}
               </div>
@@ -681,8 +681,8 @@ const ClientAgentSettings = () => {
                   <Brain className="h-5 w-5 text-cyan-500" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Paramètres LLM</h3>
-                  <p className="text-sm text-muted-foreground">Température et limites du modèle</p>
+                  <h3 className="font-semibold">LLM Settings</h3>
+                  <p className="text-sm text-muted-foreground">Temperature and model limits</p>
                 </div>
               </div>
             </AccordionTrigger>
@@ -690,7 +690,7 @@ const ClientAgentSettings = () => {
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <Label>Température ({llmSettings.temperature?.toFixed(1)})</Label>
+                    <Label>Temperature ({llmSettings.temperature?.toFixed(1)})</Label>
                     <Slider
                       value={[llmSettings.temperature || 0.7]}
                       onValueChange={([v]) => setLlmSettings(prev => ({ ...prev, temperature: v }))}
@@ -701,7 +701,7 @@ const ClientAgentSettings = () => {
                       disabled={!canEdit}
                     />
                     <p className="text-xs text-muted-foreground mt-2">
-                      Plus bas = plus prévisible, plus haut = plus créatif
+                      Lower = more predictable, higher = more creative
                     </p>
                   </div>
 
@@ -717,7 +717,7 @@ const ClientAgentSettings = () => {
                       max={32000}
                     />
                     <p className="text-xs text-muted-foreground mt-2">
-                      Nombre maximum de tokens par réponse
+                      Maximum tokens per response
                     </p>
                   </div>
                 </div>
@@ -726,7 +726,7 @@ const ClientAgentSettings = () => {
                   <Button onClick={handleSaveLLM} disabled={updateLLM.isPending}>
                     {updateLLM.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <Save className="h-4 w-4 mr-2" />
-                    Sauvegarder LLM
+                    Save LLM
                   </Button>
                 )}
               </div>
@@ -741,15 +741,15 @@ const ClientAgentSettings = () => {
                   <Globe className="h-5 w-5 text-amber-500" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Langue & Avancé</h3>
-                  <p className="text-sm text-muted-foreground">Langue et paramètres avancés</p>
+                  <h3 className="font-semibold">Language & Advanced</h3>
+                  <p className="text-sm text-muted-foreground">Language and advanced settings</p>
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
               <div className="space-y-6">
                 <div>
-                  <Label>Langue de l'agent</Label>
+                  <Label>Agent language</Label>
                   <Select
                     value={language}
                     onValueChange={setLanguage}
@@ -770,9 +770,9 @@ const ClientAgentSettings = () => {
 
                 <div className="flex items-center justify-between p-4 rounded-lg border">
                   <div>
-                    <p className="font-medium text-sm">Désactiver l'interruption du premier message</p>
+                    <p className="font-medium text-sm">Disable first message interruption</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      L'utilisateur ne pourra pas interrompre le message de bienvenue
+                      The user will not be able to interrupt the welcome message
                     </p>
                   </div>
                   <Switch
@@ -786,7 +786,7 @@ const ClientAgentSettings = () => {
                   <Button onClick={handleSaveAdvanced} disabled={updateAdvanced.isPending}>
                     {updateAdvanced.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <Save className="h-4 w-4 mr-2" />
-                    Sauvegarder Avancé
+                    Save Advanced
                   </Button>
                 )}
               </div>
@@ -801,15 +801,15 @@ const ClientAgentSettings = () => {
                   <Info className="h-5 w-5 text-gray-500" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Informations</h3>
-                  <p className="text-sm text-muted-foreground">Détails techniques de l'agent</p>
+                  <h3 className="font-semibold">Information</h3>
+                  <p className="text-sm text-muted-foreground">Technical agent details</p>
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-sm text-muted-foreground">Plateforme</p>
+                  <p className="text-sm text-muted-foreground">Platform</p>
                   <p className="font-medium capitalize">{platform}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
@@ -818,7 +818,7 @@ const ClientAgentSettings = () => {
                 </div>
                 {config?.name && (
                   <div className="p-3 rounded-lg bg-muted/50 col-span-2">
-                    <p className="text-sm text-muted-foreground">Nom de l'Agent</p>
+                    <p className="text-sm text-muted-foreground">Agent Name</p>
                     <p className="font-medium">{config.name}</p>
                   </div>
                 )}
@@ -834,7 +834,7 @@ const ClientAgentSettings = () => {
         </Accordion>
 
         <div className="mt-6">
-          <h2 className="text-lg font-semibold mb-4">API ElevenLabs Étendue</h2>
+          <h2 className="text-lg font-semibold mb-4">Extended ElevenLabs API</h2>
           <ElevenLabsAPISections
             apiKey={apiKey}
             organizationId={organizationId}

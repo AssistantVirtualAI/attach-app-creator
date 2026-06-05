@@ -23,13 +23,13 @@ export function ResponseSettingsNode({ data }: ResponseSettingsNodeProps) {
           <div className="p-1.5 rounded bg-rose-500 text-white">
             <Settings2 className="h-4 w-4" />
           </div>
-          Paramètres Réponse
+          Response Settings
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">
         <div className="space-y-1">
           <Label className="text-xs">
-            Température: {(data.temperature || 0.7).toFixed(1)}
+            Temperature: {(data.temperature || 0.7).toFixed(1)}
           </Label>
           <Slider
             value={[(data.temperature || 0.7) * 100]}

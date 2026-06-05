@@ -97,13 +97,13 @@ const useClientUpdateKnowledgeDocument = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['client-elevenlabs-knowledge-base', variables.agentId] });
       queryClient.invalidateQueries({ queryKey: ['client-elevenlabs-kb-document'] });
-      toast.success('Document modifié avec succès');
+      toast.success('Document updated successfully');
     },
     onError: (error: any) => {
-      if (error.message?.includes('403') || error.message?.includes('Accès refusé')) {
-        toast.error('Accès refusé. Seuls les administrateurs peuvent modifier des documents.');
+      if (error.message?.includes('403') || error.message?.includes('Access denied')) {
+        toast.error('Access denied. Only administrators can edit documents.');
       } else {
-        toast.error(error.message || 'Erreur lors de la modification');
+        toast.error(error.message || 'Error while editing');
       }
     },
   });
@@ -156,7 +156,7 @@ const ClientAgentKnowledge = () => {
   const handleAddItem = async () => {
     if ((!apiKey && !organizationId) || !platformAgentId) return;
     if (!newItem.title || !newItem.content) {
-      toast.error('Veuillez remplir tous les champs');
+      toast.error('Please fill in all fields');
       return;
     }
 
@@ -166,7 +166,7 @@ const ClientAgentKnowledge = () => {
         agentId: platformAgentId,
         title: newItem.title,
         content: newItem.content,
-        category: newItem.category || 'Général',
+        category: newItem.category || 'General',
         organizationId,
       });
 
@@ -210,7 +210,7 @@ const ClientAgentKnowledge = () => {
 
   const handleSaveEdit = async () => {
     if ((!apiKey && !organizationId) || !platformAgentId || !viewDocumentId || !editName.trim() || !editContent.trim()) {
-      toast.error('Veuillez remplir tous les champs');
+      toast.error('Please fill in all fields');
       return;
     }
 
@@ -250,12 +250,12 @@ const ClientAgentKnowledge = () => {
           {canEdit ? (
             <Button onClick={() => setIsAddModalOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Ajouter
+              Add
             </Button>
           ) : (
             <Badge variant="secondary" className="flex items-center gap-1">
               <Lock className="h-3 w-3" />
-              Lecture seule
+              Read only
             </Badge>
           )}
         </div>
@@ -266,7 +266,7 @@ const ClientAgentKnowledge = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Rechercher..."
+            placeholder="Search..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -274,10 +274,10 @@ const ClientAgentKnowledge = () => {
         </div>
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
           <SelectTrigger className="w-48">
-            <SelectValue placeholder="Catégorie" />
+            <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Toutes les catégories</SelectItem>
+            <SelectItem value="all">All categories</SelectItem>
             {categories.map((cat: string) => (
               <SelectItem key={cat} value={cat}>{cat}</SelectItem>
             ))}
@@ -290,20 +290,20 @@ const ClientAgentKnowledge = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BookOpen className="h-5 w-5" />
-            {filteredItems.length} élément{filteredItems.length !== 1 ? 's' : ''}
+            {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {!apiKey || !platformAgentId ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">Configuration ElevenLabs manquante pour cet agent</p>
+              <p className="text-muted-foreground">ElevenLabs configuration is missing for this agent</p>
             </div>
           ) : error ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 mx-auto text-destructive/50 mb-4" />
-              <p className="text-muted-foreground mb-4">Erreur lors du chargement de la base de connaissances</p>
-              <Button variant="outline" onClick={() => refetch()}>Réessayer</Button>
+              <p className="text-muted-foreground mb-4">Error loading the knowledge base</p>
+              <Button variant="outline" onClick={() => refetch()}>Try again</Button>
             </div>
           ) : isLoading ? (
             <div className="space-y-3">
@@ -316,8 +316,8 @@ const ClientAgentKnowledge = () => {
               <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground">
                 {searchTerm || selectedCategory !== 'all' 
-                  ? 'Aucun résultat trouvé' 
-                  : 'La base de connaissances est vide'
+                  ? 'No results found' 
+                  : 'The knowledge base is empty'
                 }
               </p>
               {canEdit && !searchTerm && selectedCategory === 'all' && (
@@ -327,7 +327,7 @@ const ClientAgentKnowledge = () => {
                   onClick={() => setIsAddModalOpen(true)}
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Ajouter le premier élément
+                  Add first item
                 </Button>
               )}
             </div>
@@ -357,11 +357,11 @@ const ClientAgentKnowledge = () => {
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-2">
-                          {item.content || item.url || 'Cliquer pour voir le contenu complet'}
+                          {item.content || item.url || 'Click to view full content'}
                         </p>
                         {item.created_at && (
                           <p className="text-xs text-muted-foreground mt-2">
-                            Créé le {new Date(item.created_at).toLocaleDateString('fr-FR')}
+                            Created on {new Date(item.created_at).toLocaleDateString('en-US')}
                           </p>
                         )}
                       </div>
@@ -408,10 +408,10 @@ const ClientAgentKnowledge = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              {isEditMode ? 'Modifier le document' : (documentData?.document?.name || 'Document')}
+              {isEditMode ? 'Edit document' : (documentData?.document?.name || 'Document')}
             </DialogTitle>
             <DialogDescription>
-              {isEditMode ? 'Modifiez le contenu du document' : 'Contenu complet du document'}
+              {isEditMode ? 'Edit the document content' : 'Full document content'}
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
@@ -422,19 +422,19 @@ const ClientAgentKnowledge = () => {
             ) : isEditMode ? (
               <div className="space-y-4 p-1">
                 <div className="space-y-2">
-                  <Label>Nom du document</Label>
+                  <Label>Document name</Label>
                   <Input
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Nom du document"
+                    placeholder="Document name"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Contenu</Label>
+                  <Label>Content</Label>
                   <Textarea
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
-                    placeholder="Contenu du document..."
+                    placeholder="Document content..."
                     rows={12}
                     className="font-mono text-sm"
                   />
@@ -446,7 +446,7 @@ const ClientAgentKnowledge = () => {
               </div>
             ) : documentData?.document?.url ? (
               <div className="p-4">
-                <p className="text-sm text-muted-foreground mb-2">Document lié à une URL:</p>
+                <p className="text-sm text-muted-foreground mb-2">Document linked to a URL:</p>
                 <a 
                   href={documentData.document.url} 
                   target="_blank" 
@@ -462,34 +462,34 @@ const ClientAgentKnowledge = () => {
                 <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                 <p className="text-muted-foreground">
                   {documentData.document.content_unavailable_reason === 'binary_or_not_extractible' 
-                    ? 'Ce fichier est binaire ou son contenu ne peut pas être extrait.'
-                    : 'Le contenu de ce document n\'est pas disponible.'}
+                    ? 'This file is binary or its content cannot be extracted.'
+                    : 'This document content is not available.'}
                 </p>
               </div>
             ) : (
-              <p className="text-muted-foreground p-4 text-center">Aucun contenu disponible</p>
+              <p className="text-muted-foreground p-4 text-center">No content available</p>
             )}
           </ScrollArea>
           <DialogFooter className="gap-2">
             {isEditMode ? (
               <>
                 <Button variant="outline" onClick={() => setIsEditMode(false)}>
-                  Annuler
+                  Cancel
                 </Button>
                 <Button onClick={handleSaveEdit} disabled={updateMutation.isPending} className="gap-2">
                   {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Sauvegarder
+                  Save
                 </Button>
               </>
             ) : (
               <>
                 <Button variant="outline" onClick={() => setViewDocumentId(null)}>
-                  Fermer
+                  Close
                 </Button>
                 {canEdit && documentData?.document?.type !== 'url' && documentData?.document?.content && (
                   <Button onClick={handleStartEdit} className="gap-2">
                     <Edit className="h-4 w-4" />
-                    Modifier
+                    Edit
                   </Button>
                 )}
               </>
@@ -502,47 +502,47 @@ const ClientAgentKnowledge = () => {
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Ajouter à la base de connaissances</DialogTitle>
+            <DialogTitle>Add to knowledge base</DialogTitle>
             <DialogDescription>
-              Ajoutez du contenu texte qui sera utilisé par l'agent
+              Add text content that will be used by the agent
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Titre</Label>
+              <Label htmlFor="title">Title</Label>
               <Input
                 id="title"
                 value={newItem.title}
                 onChange={(e) => setNewItem(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Titre de l'élément"
+                placeholder="Item title"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="category">Catégorie</Label>
+              <Label htmlFor="category">Category</Label>
               <Input
                 id="category"
                 value={newItem.category}
                 onChange={(e) => setNewItem(prev => ({ ...prev, category: e.target.value }))}
-                placeholder="Ex: FAQ, Produits, Services..."
+                placeholder="Example: FAQ, Products, Services..."
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="content">Contenu</Label>
+              <Label htmlFor="content">Content</Label>
               <Textarea
                 id="content"
                 value={newItem.content}
                 onChange={(e) => setNewItem(prev => ({ ...prev, content: e.target.value }))}
-                placeholder="Contenu de l'élément..."
+                placeholder="Item content..."
                 rows={8}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
-              Annuler
+              Cancel
             </Button>
             <Button onClick={handleAddItem} disabled={addMutation.isPending}>
-              {addMutation.isPending ? 'Ajout...' : 'Ajouter'}
+              {addMutation.isPending ? 'Adding...' : 'Add'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -552,19 +552,19 @@ const ClientAgentKnowledge = () => {
       <AlertDialog open={!!deleteDocumentId} onOpenChange={(open) => !open && setDeleteDocumentId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce document ?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this document?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est irréversible. Le document sera définitivement supprimé de la base de connaissances.
+              This action cannot be undone. The document will be permanently removed from the knowledge base.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteItem}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? 'Suppression...' : 'Supprimer'}
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

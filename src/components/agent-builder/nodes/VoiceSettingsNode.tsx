@@ -37,12 +37,12 @@ export function VoiceSettingsNode({ data }: VoiceSettingsNodeProps) {
           <div className="p-1.5 rounded bg-amber-500 text-white">
             <Mic className="h-4 w-4" />
           </div>
-          Paramètres Voix
+          Voice Settings
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">
         <div className="space-y-1">
-          <Label className="text-xs">Voix</Label>
+          <Label className="text-xs">Voice</Label>
           <Select value={data.voiceId || undefined} onValueChange={data.onVoiceChange}>
             <SelectTrigger className="h-8 text-xs">
               <SelectValue placeholder="Sélectionner une voix" />
