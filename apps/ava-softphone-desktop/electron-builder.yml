@@ -1,0 +1,28 @@
+appId: com.ava-telecom.softphone
+productName: AVA Softphone
+directories:
+  output: release
+files:
+  - dist/**/*
+  - electron/**/*
+  - assets/**/*
+  - package.json
+mac:
+  category: public.app-category.business
+  target:
+    - dmg
+    - zip
+win:
+  target:
+    - nsis
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Office
+publish:
+  - provider: github
+    owner: AssistantVirtualAI
+    repo: attach-app-creator
+    private: false
+    releaseType: release
