@@ -510,19 +510,19 @@ const PortalSettings = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-green-500/10"><Settings2 className="h-5 w-5 text-green-500" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Paramètres de Conversation</h3>
-                <p className="text-sm text-muted-foreground">Durée et événements</p>
+                <h3 className="font-semibold">Conversation Settings</h3>
+                <p className="text-sm text-muted-foreground">Duration and events</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-6">
               <div>
-                <Label>Durée maximale ({Math.round((conversationSettings.max_duration_seconds || 600) / 60)} min)</Label>
+                <Label>Maximum duration ({Math.round((conversationSettings.max_duration_seconds || 600) / 60)} min)</Label>
                 <Slider value={[conversationSettings.max_duration_seconds || 600]} onValueChange={([v]) => setConversationSettings(prev => ({ ...prev, max_duration_seconds: v }))} min={60} max={3600} step={60} className="mt-4" />
               </div>
               <div>
-                <Label className="mb-3 block">Événements Client</Label>
+                <Label className="mb-3 block">Client Events</Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {ELEVENLABS_CLIENT_EVENTS.map(event => (
                     <div key={event.id} className="flex items-start gap-3 p-3 rounded-lg border">
@@ -547,7 +547,7 @@ const PortalSettings = () => {
               </div>
               <Button onClick={handleSaveConversation} disabled={updateConversation.isPending} className="gap-2">
                 {updateConversation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Sauvegarder Conversation
+                Save Conversation
               </Button>
             </div>
           </AccordionContent>
@@ -559,8 +559,8 @@ const PortalSettings = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-cyan-500/10"><Brain className="h-5 w-5 text-cyan-500" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Paramètres LLM</h3>
-                <p className="text-sm text-muted-foreground">Température et limites du modèle</p>
+                <h3 className="font-semibold">LLM Settings</h3>
+                <p className="text-sm text-muted-foreground">Temperature and model limits</p>
               </div>
             </div>
           </AccordionTrigger>
@@ -568,19 +568,19 @@ const PortalSettings = () => {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label>Température ({llmSettings.temperature?.toFixed(1)})</Label>
+                  <Label>Temperature ({llmSettings.temperature?.toFixed(1)})</Label>
                   <Slider value={[llmSettings.temperature || 0.7]} onValueChange={([v]) => setLlmSettings(prev => ({ ...prev, temperature: v }))} min={0} max={2} step={0.1} className="mt-4" />
-                  <p className="text-xs text-muted-foreground mt-2">Plus bas = plus prévisible, plus haut = plus créatif</p>
+                  <p className="text-xs text-muted-foreground mt-2">Lower = more predictable, higher = more creative</p>
                 </div>
                 <div>
                   <Label>Max Tokens</Label>
                   <Input type="number" value={llmSettings.max_tokens || 1000} onChange={(e) => setLlmSettings(prev => ({ ...prev, max_tokens: parseInt(e.target.value) || 1000 }))} className="mt-2" min={100} max={32000} />
-                  <p className="text-xs text-muted-foreground mt-2">Nombre maximum de tokens par réponse</p>
+                  <p className="text-xs text-muted-foreground mt-2">Maximum tokens per response</p>
                 </div>
               </div>
               <Button onClick={handleSaveLLM} disabled={updateLLM.isPending} className="gap-2">
                 {updateLLM.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Sauvegarder LLM
+                Save LLM
               </Button>
             </div>
           </AccordionContent>
