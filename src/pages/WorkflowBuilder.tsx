@@ -85,13 +85,13 @@ export default function WorkflowBuilder() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['workflows'] });
-      toast.success('Workflow sauvegardé');
+      toast.success('Workflow saved');
       if (isNewWorkflow && data) {
         navigate(`/workflow-builder/${data.id}`, { replace: true });
       }
     },
     onError: () => {
-      toast.error('Erreur lors de la sauvegarde');
+      toast.error('Error while saving');
     }
   });
 
@@ -107,7 +107,7 @@ export default function WorkflowBuilder() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workflow', workflowId] });
-      toast.success(workflow?.is_active ? 'Workflow désactivé' : 'Workflow activé');
+      toast.success(workflow?.is_active ? 'Workflow disabled' : 'Workflow enabled');
     }
   });
 

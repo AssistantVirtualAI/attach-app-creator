@@ -179,12 +179,12 @@ const PortalSettings = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success('Membre ajouté avec succès');
+      toast.success('Member added successfully');
       setShowAddModal(false);
       setAddName(''); setAddEmail(''); setAddLoginId(''); setAddPassword(''); setAddRole('member');
       fetchMembers();
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de l\'ajout');
+      toast.error(error.message || 'Error while adding');
     } finally {
       setIsAdding(false);
     }
@@ -199,12 +199,12 @@ const PortalSettings = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success('Membre mis à jour');
+      toast.success('Member updated');
       setShowEditModal(false);
       setEditingMember(null);
       fetchMembers();
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la mise à jour');
+      toast.error(error.message || 'Error while updating');
     } finally {
       setIsEditing(false);
     }
@@ -218,11 +218,11 @@ const PortalSettings = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success('Mot de passe réinitialisé');
+      toast.success('Password reset');
       setShowResetModal(false);
       setResetPassword('');
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la réinitialisation');
+      toast.error(error.message || 'Error while resetting');
     } finally {
       setIsResetting(false);
     }
@@ -237,12 +237,12 @@ const PortalSettings = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success('Membre supprimé');
+      toast.success('Member deleted');
       setShowDeleteDialog(false);
       setDeletingMember(null);
       fetchMembers();
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la suppression');
+      toast.error(error.message || 'Error while deleting');
     } finally {
       setIsDeleting(false);
     }
@@ -285,8 +285,8 @@ const PortalSettings = () => {
         <div className="w-24 h-24 rounded-2xl bg-muted/20 flex items-center justify-center mb-6">
           <Settings className="h-12 w-12 text-muted-foreground/30" />
         </div>
-        <h2 className="text-xl font-semibold mb-2">Accès refusé</h2>
-        <p className="text-muted-foreground">Vous n'avez pas les permissions pour accéder à cette page</p>
+        <h2 className="text-xl font-semibold mb-2">Access denied</h2>
+        <p className="text-muted-foreground">You do not have permission to access this page</p>
       </motion.div>
     );
   }
