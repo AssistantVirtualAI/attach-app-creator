@@ -38,7 +38,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
       - name: Cleanup root configs (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -89,7 +88,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
       - name: Cleanup root configs (Ubuntu/Mac)
         if: runner.os != 'Windows'
         shell: bash
@@ -130,7 +128,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
