@@ -41,9 +41,11 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
   
   const handleDelete = async (agentId: string) => {
     try {
+      const agent = agents.find((item) => item.id === agentId);
       const { error } = await supabase
         .from('agents')
         .delete()
+        .eq('organization_id', agent?.organization_id)
         .eq('id', agentId);
 
       if (error) throw error;
