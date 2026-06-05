@@ -18,6 +18,9 @@ permissions:
   contents: write
   packages: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   verify-version:
     runs-on: ubuntu-latest
@@ -34,28 +37,28 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: apps/ava-softphone-desktop/package-lock.json
-      - name: Isolate app from root configs
+      - name: Cleanup root configs (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          node -e "
-            const fs = require('fs');
-            const files = [
-              'postcss.config.js',
-              'postcss.config.cjs',
-              'postcss.config.mjs'
-            ];
-            files.forEach(f => {
-              if (fs.existsSync(f)) {
-                fs.unlinkSync(f);
-                console.log('Deleted: ' + f);
-              } else {
-                console.log('Not found: ' + f);
-              }
-            });
-          "
-        working-directory: ${{ github.workspace }}
+          $files = @(
+            "postcss.config.js",
+            "postcss.config.cjs",
+            "postcss.config.mjs",
+            "tailwind.config.js",
+            "tailwind.config.ts"
+          )
+          foreach ($f in $files) {
+            if (Test-Path $f) {
+              Remove-Item $f -Force
+              Write-Host "Deleted: $f"
+            } else {
+              Write-Host "Not found: $f"
+            }
+          }
       - name: Install dependencies
         run: npm install
         working-directory: apps/ava-softphone-desktop
@@ -86,28 +89,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: apps/ava-softphone-desktop/package-lock.json
-      - name: Isolate app from root configs
+      - name: Cleanup root configs (Ubuntu/Mac)
+        if: runner.os != 'Windows'
+        shell: bash
         run: |
-          node -e "
-            const fs = require('fs');
-            const files = [
-              'postcss.config.js',
-              'postcss.config.cjs',
-              'postcss.config.mjs'
-            ];
-            files.forEach(f => {
-              if (fs.existsSync(f)) {
-                fs.unlinkSync(f);
-                console.log('Deleted: ' + f);
-              } else {
-                console.log('Not found: ' + f);
-              }
-            });
-          "
-        working-directory: ${{ github.workspace }}
+          for f in postcss.config.js postcss.config.cjs postcss.config.mjs tailwind.config.js tailwind.config.ts; do
+            [ -f "$f" ] && rm "$f" && echo "Deleted $f" || echo "Not found: $f"
+          done
       - name: Install dependencies
         run: npm install
         working-directory: apps/ava-softphone-desktop
@@ -140,7 +131,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: apps/ava-softphone-desktop/package-lock.json
       - name: Install Linux dependencies
@@ -151,25 +142,13 @@ jobs:
             libcups2-dev libxss1 libxtst6 xvfb \
             libx11-xcb1 libxcb-dri3-0 libdrm2 \
             libgbm1 libnss3 libatk-bridge2.0-0
-      - name: Isolate app from root configs
+      - name: Cleanup root configs (Ubuntu/Mac)
+        if: runner.os != 'Windows'
+        shell: bash
         run: |
-          node -e "
-            const fs = require('fs');
-            const files = [
-              'postcss.config.js',
-              'postcss.config.cjs',
-              'postcss.config.mjs'
-            ];
-            files.forEach(f => {
-              if (fs.existsSync(f)) {
-                fs.unlinkSync(f);
-                console.log('Deleted: ' + f);
-              } else {
-                console.log('Not found: ' + f);
-              }
-            });
-          "
-        working-directory: ${{ github.workspace }}
+          for f in postcss.config.js postcss.config.cjs postcss.config.mjs tailwind.config.js tailwind.config.ts; do
+            [ -f "$f" ] && rm "$f" && echo "Deleted $f" || echo "Not found: $f"
+          done
       - name: Install dependencies
         run: npm install
         working-directory: apps/ava-softphone-desktop
