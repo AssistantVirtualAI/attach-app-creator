@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Eye, EyeOff, Loader2, FlaskConical, Activity } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { usePbxIntegration, usePbxMockModeToggle } from '@/hooks/usePbxData';
 
 const FIELDS: { key: string; label: string; secret: boolean; section: string }[] = [
   { key: 'FUSIONPBX_URL', label: 'FusionPBX URL', secret: false, section: 'FusionPBX' },
@@ -18,7 +20,6 @@ const FIELDS: { key: string; label: string; secret: boolean; section: string }[]
   { key: 'TELNYX_MESSAGING_PROFILE_ID', label: 'Messaging Profile ID', secret: false, section: 'Telnyx SMS' },
   { key: 'ELEVENLABS_VOICE_ID_DEFAULT', label: 'Default Voice ID', secret: false, section: 'ElevenLabs' },
   { key: 'ANTHROPIC_API_KEY', label: 'Claude API Key', secret: true, section: 'AI (Claude)' },
-  { key: 'mock_mode', label: 'Use Mock Data', secret: false, section: 'Mock Data' },
 ];
 
 export default function LemtelSettings() {
@@ -27,6 +28,10 @@ export default function LemtelSettings() {
   const [show, setShow] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const { data: integration, isLoading: integLoading } = usePbxIntegration();
+  const toggleMock = usePbxMockModeToggle();
+  const mockEnabled = !!integration?.config?.mock_mode;
 
   useEffect(() => {
     (async () => {
@@ -58,6 +63,39 @@ export default function LemtelSettings() {
         <p className="text-muted-foreground">Configure telecom integrations</p>
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><FlaskConical className="w-5 h-5" /> Data Source</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label htmlFor="mock_mode" className="text-base">Use Mock Data (UI Testing Mode)</Label>
+              <p className="text-sm text-muted-foreground">When enabled, edge functions return seeded mock responses instead of calling FusionPBX.</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {integLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Badge variant={mockEnabled ? 'secondary' : 'default'} className="gap-1">
+                  <Activity className="w-3 h-3" />
+                  {mockEnabled ? 'Mock' : 'Live'}
+                </Badge>
+              )}
+              <Switch
+                id="mock_mode"
+                checked={mockEnabled}
+                disabled={toggleMock.isPending || integLoading}
+                onCheckedChange={(v) => toggleMock.mutate(v)}
+              />
+            </div>
+          </div>
+          {integration?.status && (
+            <p className="text-xs text-muted-foreground">Integration status: <span className="font-mono">{integration.status}</span>{integration.last_sync_at ? ` · last sync ${new Date(integration.last_sync_at).toLocaleString()}` : ''}</p>
+          )}
+        </CardContent>
+      </Card>
+
       {sections.map((sec) => (
         <Card key={sec}>
           <CardHeader>
@@ -67,27 +105,19 @@ export default function LemtelSettings() {
             {FIELDS.filter((f) => f.section === sec).map((f) => (
               <div key={f.key} className="space-y-2">
                 <Label htmlFor={f.key}>{f.label}</Label>
-                {f.key === 'mock_mode' ? (
-                  <Switch
+                <div className="flex gap-2">
+                  <Input
                     id={f.key}
-                    checked={values[f.key] === 'true'}
-                    onCheckedChange={(v) => setValues({ ...values, [f.key]: v ? 'true' : 'false' })}
+                    type={f.secret && !show[f.key] ? 'password' : 'text'}
+                    value={values[f.key] ?? ''}
+                    onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
                   />
-                ) : (
-                  <div className="flex gap-2">
-                    <Input
-                      id={f.key}
-                      type={f.secret && !show[f.key] ? 'password' : 'text'}
-                      value={values[f.key] ?? ''}
-                      onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
-                    />
-                    {f.secret && (
-                      <Button variant="outline" size="icon" type="button" onClick={() => setShow({ ...show, [f.key]: !show[f.key] })}>
-                        {show[f.key] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </Button>
-                    )}
-                  </div>
-                )}
+                  {f.secret && (
+                    <Button variant="outline" size="icon" type="button" onClick={() => setShow({ ...show, [f.key]: !show[f.key] })}>
+                      {show[f.key] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </CardContent>
