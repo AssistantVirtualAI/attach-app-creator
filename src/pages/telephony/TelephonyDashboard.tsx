@@ -106,15 +106,20 @@ export default function TelephonyDashboard() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {kpi('Calls Today', todayCalls.length, Phone, 'text-blue-500')}
+        {kpi('Calls Today', todayCalls.length, Phone, 'text-blue-500',
+          <span>{answered} answered · <span className={missed > 0 ? 'text-red-600' : ''}>{missed} missed</span></span>,
+          '/org/lemtel/telephony/calls')}
         {kpi('Missed Calls', missed, PhoneMissed, 'text-red-500')}
         {kpi('Avg Duration', `${avgDur}s`, Activity, 'text-purple-500')}
         {kpi('Answered Rate', `${answerRate}%`, PhoneIncoming, 'text-green-500')}
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {kpi('Active Extensions', extensions.length, Smartphone, 'text-indigo-500')}
-        {kpi(`Registered (live)`, `${liveReg} / ${extensions.length}`, Voicemail, 'text-cyan-500')}
-        {kpi('Unread SMS', unread, MessageSquare, 'text-orange-500')}
+        {kpi('Active Extensions', extensions.length, Smartphone, 'text-indigo-500',
+          `${extensions.length} / ${extensions.length} active`, '/org/lemtel/telephony/extensions')}
+        {kpi(`Registered (live)`, `${liveReg} / ${extensions.length}`, Voicemail, 'text-cyan-500',
+          liveReg > 0 ? <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /> live</span> : 'no live registrations')}
+        {kpi('Unread SMS', unread, MessageSquare, 'text-orange-500',
+          `${(sms as any[]).length} conversations`, '/org/lemtel/telephony/messages')}
         {kpi('Voice Agents', agents.length, Bot, 'text-pink-500')}
       </div>
 
