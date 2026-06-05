@@ -703,9 +703,9 @@ const PortalSettings = () => {
                 <Sparkles className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold mb-2 flex items-center gap-2">Conseil IA<Zap className="h-3 w-3 text-yellow-400" /></h3>
+                <h3 className="font-semibold mb-2 flex items-center gap-2">AI Tip<Zap className="h-3 w-3 text-yellow-400" /></h3>
                 <p className="text-sm text-muted-foreground">
-                  Pour de meilleurs résultats, ajustez la stabilité entre 0.3 et 0.7. Utilisez les mots-clés pour améliorer la reconnaissance de termes spécifiques.
+                  For best results, keep stability between 0.3 and 0.7. Use keywords to improve recognition of specific terms.
                 </p>
               </div>
             </div>
@@ -717,15 +717,15 @@ const PortalSettings = () => {
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Ajouter un membre</DialogTitle>
-            <DialogDescription>Créez un nouveau compte membre pour accéder au portail</DialogDescription>
+            <DialogTitle>Add member</DialogTitle>
+            <DialogDescription>Create a new member account to access the portal</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2"><Label>Nom *</Label><Input value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="Jean Dupont" /></div>
-            <div className="space-y-2"><Label>Email *</Label><Input type="email" value={addEmail} onChange={(e) => setAddEmail(e.target.value)} placeholder="jean@example.com" /></div>
-            <div className="space-y-2"><Label>Identifiant de connexion *</Label><Input value={addLoginId} onChange={(e) => setAddLoginId(e.target.value)} placeholder="jean.dupont" /></div>
+            <div className="space-y-2"><Label>Name *</Label><Input value={addName} onChange={(e) => setAddName(e.target.value)} placeholder="John Smith" /></div>
+            <div className="space-y-2"><Label>Email *</Label><Input type="email" value={addEmail} onChange={(e) => setAddEmail(e.target.value)} placeholder="john@example.com" /></div>
+            <div className="space-y-2"><Label>Login ID *</Label><Input value={addLoginId} onChange={(e) => setAddLoginId(e.target.value)} placeholder="john.smith" /></div>
             <div className="space-y-2">
-              <Label>Mot de passe * (min. 8 caractères)</Label>
+              <Label>Password * (min. 8 characters)</Label>
               <div className="relative">
                 <Input type={showAddPassword ? 'text' : 'password'} value={addPassword} onChange={(e) => setAddPassword(e.target.value)} placeholder="••••••••" />
                 <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowAddPassword(!showAddPassword)}>
@@ -734,14 +734,14 @@ const PortalSettings = () => {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Rôle</Label>
-              <Select value={addRole} onValueChange={setAddRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="member">Membre (lecture seule)</SelectItem><SelectItem value="admin">Admin (gestion complète)</SelectItem></SelectContent></Select>
+              <Label>Role</Label>
+              <Select value={addRole} onValueChange={setAddRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="member">Member (read only)</SelectItem><SelectItem value="admin">Admin (full management)</SelectItem></SelectContent></Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddModal(false)}>Annuler</Button>
+            <Button variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button>
             <Button onClick={handleAddMember} disabled={isAdding || !addName || !addEmail || !addLoginId || addPassword.length < 8}>
-              {isAdding && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Ajouter
+              {isAdding && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Add
             </Button>
           </DialogFooter>
         </DialogContent>
