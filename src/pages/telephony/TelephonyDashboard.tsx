@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, MessageSquare, Smartphone, Voicemail, Brain, Plus, RefreshCw, Bot, Activity } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend } from 'recharts';
-import { usePbxCallRecords, usePbxExtensions, usePbxSmsThreads, usePbxIntegration, usePbxAgents, usePbxDevices, usePbxSync } from '@/hooks/usePbxData';
+import { usePbxCallRecords, usePbxExtensions, usePbxSmsThreads, usePbxIntegration, usePbxAgents, usePbxDevices, usePbxSync, usePbxRegistrations } from '@/hooks/usePbxData';
 import { formatDistanceToNow } from 'date-fns';
 
 const COLORS = ['#22c55e', '#3b82f6', '#ef4444'];
