@@ -103,7 +103,7 @@ export default function TelephonyDashboard() {
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {kpi('Active Extensions', extensions.length, Smartphone, 'text-indigo-500')}
-        {kpi('Registered Devices', registered, Voicemail, 'text-cyan-500')}
+        {kpi(`Registered (live)`, `${liveReg} / ${extensions.length}`, Voicemail, 'text-cyan-500')}
         {kpi('Unread SMS', unread, MessageSquare, 'text-orange-500')}
         {kpi('Voice Agents', agents.length, Bot, 'text-pink-500')}
       </div>
