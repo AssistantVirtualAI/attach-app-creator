@@ -1246,6 +1246,20 @@ serve(async (req) => {
           }
         }
 
+        return new Response(
+          JSON.stringify({
+            success: true,
+            agent_id: createdAgent.agent_id,
+            agent: createdAgent,
+            organization_tag: organizationId ? `org:${organizationId}` : null,
+            organization_name: orgName || null,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+
+
 
       default:
         throw new Error(`Action non supportée: ${action}`);
