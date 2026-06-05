@@ -443,8 +443,8 @@ export function WhiteLabelTab() {
 
             <TabsContent value="client" className="space-y-6 pt-4">
               <p className="text-sm text-muted-foreground">
-                Personnalisez l'apparence du portail vu par vos clients. Les champs vides reprennent la
-                marque du portail admin.
+                Customize the portal appearance your clients see. Empty fields fall back to the
+                admin portal brand.
               </p>
               <div className="grid md:grid-cols-2 gap-4">
                 <ImageUploader
@@ -491,7 +491,7 @@ export function WhiteLabelTab() {
           {/* Loading Icon */}
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Icône de chargement</Label>
+              <Label>Loading icon</Label>
               <Select
                 value={config.loading_icon}
                 onValueChange={(value) => setConfig({ ...config, loading_icon: value })}
@@ -505,16 +505,16 @@ export function WhiteLabelTab() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Taille de l'icône</Label>
+              <Label>Icon size</Label>
               <Select
                 value={config.loading_icon_size}
                 onValueChange={(value) => setConfig({ ...config, loading_icon_size: value })}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="sm">Petit</SelectItem>
-                  <SelectItem value="md">Moyen</SelectItem>
-                  <SelectItem value="lg">Grand</SelectItem>
+                  <SelectItem value="sm">Small</SelectItem>
+                  <SelectItem value="md">Medium</SelectItem>
+                  <SelectItem value="lg">Large</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -528,9 +528,9 @@ export function WhiteLabelTab() {
           <div className="flex items-center gap-3">
             <Eye className="w-6 h-6 text-primary" />
             <div>
-              <CardTitle>Aperçu en direct</CardTitle>
+              <CardTitle>Live preview</CardTitle>
               <CardDescription>
-                Visualisez à quoi ressembleront les portails avec vos paramètres actuels.
+                Preview how portals will look with your current settings.
               </CardDescription>
             </div>
           </div>
@@ -565,25 +565,25 @@ export function WhiteLabelTab() {
           <div className="flex items-center gap-3">
             <Globe className="w-6 h-6 text-primary" />
             <div>
-              <CardTitle>Domaines personnalisés</CardTitle>
-              <CardDescription>Configurez vos domaines</CardDescription>
+              <CardTitle>Custom domains</CardTitle>
+              <CardDescription>Configure your domains</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="frontendDomain">Domaine Frontend</Label>
+            <Label htmlFor="frontendDomain">Frontend domain</Label>
             <Input
               id="frontendDomain"
               value={config.domain}
               onChange={(e) => setConfig({ ...config, domain: e.target.value })}
-              placeholder="app.votredomaine.com"
+              placeholder="app.yourdomain.com"
             />
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label htmlFor="backendDomain">Domaine Backend</Label>
+              <Label htmlFor="backendDomain">Backend domain</Label>
               {!isUltimatePlan && (
                 <Badge variant="secondary" className="text-xs">
                   <Lock className="w-3 h-3 mr-1" />Plan Ultimate
@@ -594,7 +594,7 @@ export function WhiteLabelTab() {
               id="backendDomain"
               value={config.backend_domain}
               onChange={(e) => setConfig({ ...config, backend_domain: e.target.value })}
-              placeholder="api.votredomaine.com"
+              placeholder="api.yourdomain.com"
               disabled={!isUltimatePlan}
             />
           </div>
@@ -615,36 +615,36 @@ export function WhiteLabelTab() {
               )}
             </div>
           </div>
-          <CardDescription>Personnalisez les emails envoyés à vos clients</CardDescription>
+          <CardDescription>Customize emails sent to your clients</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Domaine d'envoi</Label>
+              <Label>Sending domain</Label>
               <Input
                 value={config.email_domain}
                 onChange={(e) => setConfig({ ...config, email_domain: e.target.value })}
-                placeholder="mail.votredomaine.com"
+                placeholder="mail.yourdomain.com"
                 disabled={!isGrowthOrHigher}
               />
             </div>
             <div className="space-y-2">
-              <Label>Adresse expéditeur</Label>
+              <Label>Sender address</Label>
               <Input
                 value={config.email_sender}
                 onChange={(e) => setConfig({ ...config, email_sender: e.target.value })}
-                placeholder="noreply@votredomaine.com"
+                placeholder="noreply@yourdomain.com"
                 disabled={!isGrowthOrHigher}
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label>Nom de l'expéditeur</Label>
+            <Label>Sender name</Label>
             <Input
               value={config.email_sender_name}
               onChange={(e) => setConfig({ ...config, email_sender_name: e.target.value })}
-              placeholder="Votre Entreprise"
+              placeholder="Your Company"
               disabled={!isGrowthOrHigher}
             />
           </div>
@@ -661,14 +661,14 @@ export function WhiteLabelTab() {
 
           {isGrowthOrHigher && (
             <Button variant="outline" onClick={() => navigate('/email-templates')}>
-              Gérer les templates email
+              Manage email templates
             </Button>
           )}
         </CardContent>
       </Card>
 
       <Button onClick={handleSave} disabled={isSaving} className="w-full">
-        {isSaving ? 'Saving...' : 'Enregistrer les modifications'}
+        {isSaving ? 'Saving...' : 'Save changes'}
       </Button>
     </div>
   );
