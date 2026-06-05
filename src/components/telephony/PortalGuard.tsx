@@ -32,10 +32,10 @@ export function PortalGuard({ children }: Props) {
           if (!cancelled) setState("allowed");
           return;
         }
-        const { data: cl } = await supabase
+        const { data: cl } = await (supabase as any)
           .from("clients")
           .select("id")
-          .eq("portal_user_id" as any, user.id)
+          .eq("portal_user_id", user.id)
           .limit(1);
         if (!cancelled) setState(cl && cl.length > 0 ? "allowed" : "denied");
       } catch {
