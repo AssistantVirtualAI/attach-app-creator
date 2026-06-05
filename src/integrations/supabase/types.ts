@@ -3006,23 +3006,36 @@ export type Database = {
           codec: string | null
           created_at: string | null
           destination: string | null
+          destination_number: string | null
           direction: string | null
+          domain_name: string | null
+          domain_uuid: string | null
           duration_seconds: number | null
           end_at: string | null
           extension: string | null
+          extension_uuid: string | null
+          hangup_cause: string | null
           has_recording: boolean | null
           id: string
+          ivr_menu_uuid: string | null
           missed_call: boolean | null
           mos: number | null
           organization_id: string
           pbx_uuid: string | null
           pdd: number | null
+          pdd_ms: number | null
           raw_data: Json | null
+          recording_name: string | null
+          recording_path: string | null
           recording_url: string | null
+          ring_group_uuid: string | null
+          sip_call_id: string | null
+          source_number: string | null
           start_at: string | null
           transcribed: boolean | null
           tta: number | null
-          voicemail_message: boolean | null
+          voicemail_message: string | null
+          waitsec: number | null
         }
         Insert: {
           ai_processing?: boolean | null
@@ -3036,23 +3049,36 @@ export type Database = {
           codec?: string | null
           created_at?: string | null
           destination?: string | null
+          destination_number?: string | null
           direction?: string | null
+          domain_name?: string | null
+          domain_uuid?: string | null
           duration_seconds?: number | null
           end_at?: string | null
           extension?: string | null
+          extension_uuid?: string | null
+          hangup_cause?: string | null
           has_recording?: boolean | null
           id?: string
+          ivr_menu_uuid?: string | null
           missed_call?: boolean | null
           mos?: number | null
           organization_id: string
           pbx_uuid?: string | null
           pdd?: number | null
+          pdd_ms?: number | null
           raw_data?: Json | null
+          recording_name?: string | null
+          recording_path?: string | null
           recording_url?: string | null
+          ring_group_uuid?: string | null
+          sip_call_id?: string | null
+          source_number?: string | null
           start_at?: string | null
           transcribed?: boolean | null
           tta?: number | null
-          voicemail_message?: boolean | null
+          voicemail_message?: string | null
+          waitsec?: number | null
         }
         Update: {
           ai_processing?: boolean | null
@@ -3066,23 +3092,36 @@ export type Database = {
           codec?: string | null
           created_at?: string | null
           destination?: string | null
+          destination_number?: string | null
           direction?: string | null
+          domain_name?: string | null
+          domain_uuid?: string | null
           duration_seconds?: number | null
           end_at?: string | null
           extension?: string | null
+          extension_uuid?: string | null
+          hangup_cause?: string | null
           has_recording?: boolean | null
           id?: string
+          ivr_menu_uuid?: string | null
           missed_call?: boolean | null
           mos?: number | null
           organization_id?: string
           pbx_uuid?: string | null
           pdd?: number | null
+          pdd_ms?: number | null
           raw_data?: Json | null
+          recording_name?: string | null
+          recording_path?: string | null
           recording_url?: string | null
+          ring_group_uuid?: string | null
+          sip_call_id?: string | null
+          source_number?: string | null
           start_at?: string | null
           transcribed?: boolean | null
           tta?: number | null
-          voicemail_message?: boolean | null
+          voicemail_message?: string | null
+          waitsec?: number | null
         }
         Relationships: [
           {

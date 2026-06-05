@@ -198,26 +198,47 @@ Deno.serve(async (req) => {
 
   function mapCdr(c: any) {
     const recName = c.record_name ?? null;
-    const rec = recName && recName !== "";
-    const answer = c.answer_stamp ?? c.answer_at ?? null;
+    const hasRec = !!(recName && recName !== "");
+    let answer = c.answer_stamp ?? null;
+    if (!answer || answer === "1969-12-31 19:00:00-05" || c.answer_epoch === "0" || c.answer_epoch === 0) {
+      answer = null;
+    }
+    const billsec = c.billsec != null ? parseInt(c.billsec) : 0;
+    const direction = c.direction ?? null;
+    let missed: boolean | null = null;
+    if (c.missed_call === "true" || c.missed_call === true) missed = true;
+    else if (c.missed_call === "false" || c.missed_call === false) missed = false;
+    else missed = (billsec === 0 && direction === "inbound");
     return {
       organization_id,
       pbx_uuid: c.xml_cdr_uuid ?? c.cdr_uuid ?? c.uuid,
-      direction: c.direction ?? null,
-      call_status: c.hangup_cause ?? null,
-      extension: c.extension ?? null,
-      caller_name: c.caller_id_name ?? c.caller_name ?? null,
-      caller_number: c.caller_id_number ?? c.caller_number ?? null,
-      destination: c.caller_destination ?? c.destination ?? null,
-      start_at: c.start_stamp ?? c.start_at ?? c.start_time ?? null,
+      extension_uuid: c.extension_uuid ?? null,
+      domain_uuid: c.domain_uuid ?? null,
+      domain_name: c.domain_name ?? null,
+      direction,
+      caller_name: c.caller_id_name ?? null,
+      caller_number: c.caller_id_number ?? null,
+      destination: c.caller_destination ?? c.destination_number ?? null,
+      source_number: c.source_number ?? null,
+      destination_number: c.destination_number ?? null,
+      start_at: c.start_stamp ?? null,
       answer_at: answer,
-      end_at: c.end_stamp ?? c.end_at ?? null,
+      end_at: c.end_stamp ?? null,
       duration_seconds: c.duration ? parseInt(c.duration) : 0,
-      billsec: c.billsec ? parseInt(c.billsec) : (c.bill_seconds ? parseInt(c.bill_seconds) : 0),
+      billsec,
       mos: c.rtp_audio_in_mos ? parseFloat(c.rtp_audio_in_mos) : null,
-      missed_call: c.missed_call === "true" || c.missed_call === true || (!answer && c.direction === "inbound"),
-      has_recording: !!rec,
-      recording_url: rec ? `${c.record_path || ""}/${recName}` : null,
+      missed_call: missed,
+      voicemail_message: c.voicemail_message ?? null,
+      has_recording: hasRec,
+      recording_path: c.record_path ?? null,
+      recording_name: recName,
+      hangup_cause: c.hangup_cause ?? null,
+      sip_call_id: c.sip_call_id ?? null,
+      call_status: c.status ?? null,
+      ivr_menu_uuid: c.ivr_menu_uuid ?? null,
+      ring_group_uuid: c.ring_group_uuid ?? null,
+      waitsec: c.waitsec != null ? parseInt(c.waitsec) : null,
+      pdd_ms: c.pdd_ms != null ? parseInt(c.pdd_ms) : null,
       raw_data: c,
     };
   }
@@ -281,8 +302,8 @@ Deno.serve(async (req) => {
 
     // ---- CDR endpoint fallback helper ----
     const CDR_ENDPOINTS = [
-      "/app/api/7/xml_cdrs",
       "/app/api/7/xml_cdr",
+      "/app/api/7/xml_cdrs",
       "/app/api/7/cdrs",
       "/app/api/7/cdr",
       "/app/xml_cdr/xml_cdr.php",
@@ -300,7 +321,7 @@ Deno.serve(async (req) => {
 
       for (const ep of ordered) {
         const isPhp = ep.endsWith(".php");
-        const qp = new URLSearchParams({ domain_uuid: FUSIONPBX_DOMAIN_UUID, order: "desc", ...extraQp });
+        const qp = new URLSearchParams({ domain_uuid: FUSIONPBX_DOMAIN_UUID, order: "desc", limit: "100", ...extraQp });
         if (isPhp) {
           qp.set("key", FUSIONPBX_API_KEY);
           qp.set("username", FUSIONPBX_USERNAME);
@@ -318,7 +339,7 @@ Deno.serve(async (req) => {
           try { parsed = JSON.parse(text); }
           catch { attempts.push({ endpoint: ep, status: res.status, error: "invalid_json", sample: text.slice(0, 200) }); continue; }
           const records =
-            parsed?.xml_cdrs || parsed?.xml_cdr || parsed?.cdrs || parsed?.cdr ||
+            parsed?.xml_cdr || parsed?.xml_cdrs || parsed?.cdrs || parsed?.cdr ||
             (Array.isArray(parsed) ? parsed : null);
           if (Array.isArray(records)) {
             if (integ && cachedEp !== ep) {
