@@ -36,6 +36,22 @@ function pill(s?: ServiceStatus) {
     : <Badge variant="destructive" className="gap-1"><XCircle className="w-3 h-3" />{s.error || 'failed'}</Badge>;
 }
 
+function TestAndSyncButtons() {
+  const ping = usePbxPing();
+  const sync = usePbxSync();
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => ping.mutate()} disabled={ping.isPending}>
+        {ping.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Activity className="w-3 h-3 mr-1" />}
+        Test
+      </Button>
+      <Button size="sm" onClick={() => sync.mutate('all')} disabled={sync.isPending}>
+        {sync.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
+        Sync Now
+      </Button>
+    </>
+  );
+
 export default function TelephonySettings() {
   const { toast } = useToast();
   const [values, setValues] = useState<Record<string, string>>({});
