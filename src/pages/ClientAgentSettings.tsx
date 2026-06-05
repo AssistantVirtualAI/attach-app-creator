@@ -199,17 +199,17 @@ const ClientAgentSettings = () => {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Configuration</h1>
-          <p className="text-muted-foreground">Paramètres de {agentName}</p>
+          <p className="text-muted-foreground">Settings for {agentName}</p>
         </div>
         <Card>
           <CardContent className="py-12">
             <div className="text-center">
               <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground">
-                Configuration {platform ? platform.toUpperCase() : 'plateforme'} manquante pour cet agent
+                Missing {platform ? platform.toUpperCase() : 'platform'} configuration for this agent
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                Vérifiez que l'agent dispose d'un ID de plateforme et d'une clé API valide.
+                Verify that the agent has a valid platform ID and API key.
               </p>
             </div>
           </CardContent>
@@ -225,7 +225,7 @@ const ClientAgentSettings = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Configuration</h1>
-          <p className="text-muted-foreground">Paramètres de {agentName}</p>
+          <p className="text-muted-foreground">Settings for {agentName}</p>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="capitalize">{platform}</Badge>
@@ -235,7 +235,7 @@ const ClientAgentSettings = () => {
           {!canEdit && (
             <Badge variant="secondary" className="flex items-center gap-1">
               <Lock className="h-3 w-3" />
-              Lecture seule
+              Read only
             </Badge>
           )}
         </div>
@@ -264,7 +264,7 @@ const ClientAgentSettings = () => {
         <Card className="p-8 text-center">
           <Settings2 className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
           <p className="text-muted-foreground">
-            La configuration avancée n'est pas encore disponible pour {(platform as string)?.toUpperCase()}.
+            Advanced configuration is not available yet for {(platform as string)?.toUpperCase()}.
           </p>
         </Card>
       ) : (
@@ -278,19 +278,19 @@ const ClientAgentSettings = () => {
                   <MessageSquare className="h-5 w-5 text-blue-500" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Prompt & Premier Message</h3>
-                  <p className="text-sm text-muted-foreground">Instructions et message de bienvenue</p>
+                  <h3 className="font-semibold">Prompt & First Message</h3>
+                  <p className="text-sm text-muted-foreground">Instructions and welcome message</p>
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
               <div className="space-y-6">
                 <div>
-                  <Label className="text-base font-medium">Prompt Système</Label>
+                  <Label className="text-base font-medium">System Prompt</Label>
                   <Textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="Instructions pour l'agent..."
+                    placeholder="Instructions for the agent..."
                     rows={10}
                     disabled={!canEdit}
                     className="mt-2 font-mono text-sm"
@@ -298,11 +298,11 @@ const ClientAgentSettings = () => {
                 </div>
 
                 <div>
-                  <Label className="text-base font-medium">Premier Message</Label>
+                  <Label className="text-base font-medium">First Message</Label>
                   <Textarea
                     value={firstMessage}
                     onChange={(e) => setFirstMessage(e.target.value)}
-                    placeholder="Message de bienvenue de l'agent..."
+                    placeholder="Agent welcome message..."
                     rows={3}
                     disabled={!canEdit}
                     className="mt-2"
