@@ -64,8 +64,8 @@ export function SyncDiagnosticsPanel() {
                     <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No sync jobs recorded yet</TableCell></TableRow>
                   )}
                   {jobs.map((j: any) => (
-                    <>
-                      <TableRow key={j.id}>
+                    <Fragment key={j.id}>
+                      <TableRow>
                         <TableCell className="font-mono text-xs">{j.job_type}</TableCell>
                         <TableCell><StatusPill s={j.status} /></TableCell>
                         <TableCell className="text-xs text-muted-foreground">
@@ -83,13 +83,13 @@ export function SyncDiagnosticsPanel() {
                         </TableCell>
                       </TableRow>
                       {expandedErr === j.id && j.error && (
-                        <TableRow key={`${j.id}-err`}>
+                        <TableRow>
                           <TableCell colSpan={6}>
                             <pre className="text-xs text-red-600 bg-red-500/5 p-2 rounded whitespace-pre-wrap break-all">{j.error}</pre>
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>
