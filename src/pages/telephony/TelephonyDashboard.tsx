@@ -69,15 +69,24 @@ export default function TelephonyDashboard() {
   const liveReg = (registrations as any[]).length;
   const lastSync = integration?.last_sync_at ? formatDistanceToNow(new Date(integration.last_sync_at), { addSuffix: true }) : 'never';
 
-  const kpi = (label: string, value: string | number, Icon: any, color: string) => (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm text-muted-foreground">{label}</CardTitle>
-        <Icon className={`w-4 h-4 ${color}`} />
-      </CardHeader>
-      <CardContent><div className="text-3xl font-bold">{value}</div></CardContent>
-    </Card>
-  );
+  const kpi = (label: string, value: string | number, Icon: any, color: string, sub?: React.ReactNode, href?: string) => {
+    const inner = (
+      <Card className={href ? 'hover:bg-muted/40 transition cursor-pointer' : ''}>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm text-muted-foreground">{label}</CardTitle>
+          <Icon className={`w-4 h-4 ${color}`} />
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold">{value}</div>
+          {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
+        </CardContent>
+      </Card>
+    );
+    return href ? <Link to={href} key={label}>{inner}</Link> : inner;
+  };
+
+  const lastJob = syncJobs[0] as any;
+  const lastJobAgo = lastJob ? (Date.now() - new Date(lastJob.completed_at || lastJob.created_at).getTime()) / 60000 : null;
 
   return (
     <div className="space-y-6">
