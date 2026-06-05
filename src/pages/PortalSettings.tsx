@@ -592,15 +592,15 @@ const PortalSettings = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-amber-500/10"><Globe className="h-5 w-5 text-amber-500" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Langue & Avancé</h3>
-                <p className="text-sm text-muted-foreground">Langue et paramètres avancés</p>
+                <h3 className="font-semibold">Language & Advanced</h3>
+                <p className="text-sm text-muted-foreground">Language and advanced settings</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-6">
               <div>
-                <Label>Langue de l'agent</Label>
+                <Label>Agent language</Label>
                 <Select value={language} onValueChange={setLanguage}>
                   <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
                   <SelectContent>{ELEVENLABS_LANGUAGES.map(lang => (<SelectItem key={lang.code} value={lang.code}>{lang.name}</SelectItem>))}</SelectContent>
@@ -608,14 +608,14 @@ const PortalSettings = () => {
               </div>
               <div className="flex items-center justify-between p-4 rounded-lg border">
                 <div>
-                  <p className="font-medium text-sm">Désactiver l'interruption du premier message</p>
-                  <p className="text-xs text-muted-foreground mt-1">L'utilisateur ne pourra pas interrompre le message de bienvenue</p>
+                  <p className="font-medium text-sm">Disable first message interruption</p>
+                  <p className="text-xs text-muted-foreground mt-1">The user will not be able to interrupt the welcome message</p>
                 </div>
                 <Switch checked={disableFirstMessageInterruption} onCheckedChange={setDisableFirstMessageInterruption} />
               </div>
               <Button onClick={handleSaveAdvanced} disabled={updateAdvanced.isPending} className="gap-2">
                 {updateAdvanced.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Sauvegarder Avancé
+                Save Advanced
               </Button>
             </div>
           </AccordionContent>
