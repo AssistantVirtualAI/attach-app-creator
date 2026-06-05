@@ -408,10 +408,10 @@ const ClientAgentKnowledge = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              {isEditMode ? 'Modifier le document' : (documentData?.document?.name || 'Document')}
+              {isEditMode ? 'Edit document' : (documentData?.document?.name || 'Document')}
             </DialogTitle>
             <DialogDescription>
-              {isEditMode ? 'Modifiez le contenu du document' : 'Contenu complet du document'}
+              {isEditMode ? 'Edit the document content' : 'Full document content'}
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh]">
@@ -422,19 +422,19 @@ const ClientAgentKnowledge = () => {
             ) : isEditMode ? (
               <div className="space-y-4 p-1">
                 <div className="space-y-2">
-                  <Label>Nom du document</Label>
+                  <Label>Document name</Label>
                   <Input
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Nom du document"
+                    placeholder="Document name"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Contenu</Label>
+                  <Label>Content</Label>
                   <Textarea
                     value={editContent}
                     onChange={(e) => setEditContent(e.target.value)}
-                    placeholder="Contenu du document..."
+                    placeholder="Document content..."
                     rows={12}
                     className="font-mono text-sm"
                   />
@@ -446,7 +446,7 @@ const ClientAgentKnowledge = () => {
               </div>
             ) : documentData?.document?.url ? (
               <div className="p-4">
-                <p className="text-sm text-muted-foreground mb-2">Document lié à une URL:</p>
+                <p className="text-sm text-muted-foreground mb-2">Document linked to a URL:</p>
                 <a 
                   href={documentData.document.url} 
                   target="_blank" 
@@ -489,7 +489,7 @@ const ClientAgentKnowledge = () => {
                 {canEdit && documentData?.document?.type !== 'url' && documentData?.document?.content && (
                   <Button onClick={handleStartEdit} className="gap-2">
                     <Edit className="h-4 w-4" />
-                    Modifier
+                    Edit
                   </Button>
                 )}
               </>
@@ -502,47 +502,47 @@ const ClientAgentKnowledge = () => {
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Ajouter à la base de connaissances</DialogTitle>
+            <DialogTitle>Add to knowledge base</DialogTitle>
             <DialogDescription>
-              Ajoutez du contenu texte qui sera utilisé par l'agent
+              Add text content that will be used by the agent
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Titre</Label>
+              <Label htmlFor="title">Title</Label>
               <Input
                 id="title"
                 value={newItem.title}
                 onChange={(e) => setNewItem(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Titre de l'élément"
+                placeholder="Item title"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="category">Catégorie</Label>
+              <Label htmlFor="category">Category</Label>
               <Input
                 id="category"
                 value={newItem.category}
                 onChange={(e) => setNewItem(prev => ({ ...prev, category: e.target.value }))}
-                placeholder="Ex: FAQ, Produits, Services..."
+                placeholder="Example: FAQ, Products, Services..."
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="content">Contenu</Label>
+              <Label htmlFor="content">Content</Label>
               <Textarea
                 id="content"
                 value={newItem.content}
                 onChange={(e) => setNewItem(prev => ({ ...prev, content: e.target.value }))}
-                placeholder="Contenu de l'élément..."
+                placeholder="Item content..."
                 rows={8}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
-              Annuler
+              Cancel
             </Button>
             <Button onClick={handleAddItem} disabled={addMutation.isPending}>
-              {addMutation.isPending ? 'Ajout...' : 'Ajouter'}
+              {addMutation.isPending ? 'Adding...' : 'Add'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -552,19 +552,19 @@ const ClientAgentKnowledge = () => {
       <AlertDialog open={!!deleteDocumentId} onOpenChange={(open) => !open && setDeleteDocumentId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce document ?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this document?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est irréversible. Le document sera définitivement supprimé de la base de connaissances.
+              This action cannot be undone. The document will be permanently removed from the knowledge base.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteItem}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? 'Suppression...' : 'Supprimer'}
+              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
