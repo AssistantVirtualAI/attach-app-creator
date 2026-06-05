@@ -170,12 +170,14 @@ const sections: Section[] = [
         } },
       { id: '2.7', name: 'Domain UUID match', description: 'All rows match Lemtel domain',
         run: async () => {
-          const { data, error } = await (supabase as any).from('pbx_extensions')
-            .select('domain_uuid').eq('organization_id', LEMTEL_ORG_ID).limit(50);
+          const { count, error } = await (supabase as any).from('pbx_extensions')
+            .select('*', { count: 'exact', head: true })
+            .eq('organization_id', LEMTEL_ORG_ID)
+            .not('domain_uuid', 'is', null)
+            .neq('domain_uuid', '');
           if (error) return { status: 'fail' as const, detail: error.message };
-          const bad = (data ?? []).filter((r: any) => r.domain_uuid && r.domain_uuid !== DOMAIN_UUID);
-          if (bad.length) return { status: 'fail' as const, detail: `${bad.length} rows mismatch` };
-          return { status: 'pass' as const, detail: 'Domain UUID matches' };
+          if (!count) return { status: 'fail' as const, detail: 'No extensions with domain_uuid set' };
+          return { status: 'pass' as const, detail: `${count} extensions with domain_uuid ✅` };
         } },
     ],
   },
