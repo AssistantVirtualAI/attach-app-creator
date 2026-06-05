@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Settings } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface SetupIntegrationCardProps {
   title: string;
@@ -9,6 +10,7 @@ interface SetupIntegrationCardProps {
 }
 
 export const SetupIntegrationCard = ({ title, message }: SetupIntegrationCardProps) => {
+  const { t } = useTranslation();
   return (
     <Card className="glass-card border-primary/30">
       <CardHeader>
@@ -17,24 +19,21 @@ export const SetupIntegrationCard = ({ title, message }: SetupIntegrationCardPro
           <div>
             <CardTitle>{title}</CardTitle>
             <CardDescription>
-              {message || 'Configuration ElevenLabs requise pour afficher les données'}
+              {message || t('setupIntegration.description')}
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-muted-foreground">
-          Pour commencer à utiliser cette fonctionnalité, vous devez configurer votre intégration ElevenLabs
-          dans les paramètres. Vous aurez besoin de :
-        </p>
+        <p className="text-muted-foreground">{t('setupIntegration.intro')}</p>
         <ul className="list-disc list-inside space-y-2 text-muted-foreground ml-4">
-          <li>Votre API Key ElevenLabs</li>
-          <li>L'ID de votre Agent ConvAI (optionnel)</li>
+          <li>{t('setupIntegration.apiKey')}</li>
+          <li>{t('setupIntegration.agentId')}</li>
         </ul>
         <Link to="/settings">
           <Button className="w-full" size="lg">
             <Settings className="mr-2 h-4 w-4" />
-            Configurer maintenant
+            {t('setupIntegration.cta')}
           </Button>
         </Link>
       </CardContent>
