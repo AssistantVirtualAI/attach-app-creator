@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -25,10 +26,18 @@ interface UserRole {
   created_at: string;
 }
 
+export interface OrganizationMembershipStatus {
+  organization: Organization;
+  role: UserRole['role'] | null;
+  accepted_at: string | null;
+  isSelected: boolean;
+}
+
 interface OrganizationContextType {
   selectedOrg: Organization | null;
   selectedOrgId: string | null;
   organizations: Organization[];
+  organizationMemberships: OrganizationMembershipStatus[];
   userRole: UserRole | null;
   isLoading: boolean;
   refreshOrganization: () => Promise<void>;
@@ -43,7 +52,9 @@ const OrganizationContext = createContext<OrganizationContextType | undefined>(u
 export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [organizationMemberships, setOrganizationMemberships] = useState<OrganizationMembershipStatus[]>([]);
   const [selectedOrgId, setSelectedOrgIdState] = useState<string | null>(null);
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -56,6 +67,7 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       checkSuperAdmin();
     } else {
       setOrganizations([]);
+      setOrganizationMemberships([]);
       setSelectedOrg(null);
       setSelectedOrgIdState(null);
       setUserRole(null);
