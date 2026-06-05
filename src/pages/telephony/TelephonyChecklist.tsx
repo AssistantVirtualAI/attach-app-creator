@@ -471,9 +471,9 @@ export default function TelephonyChecklist() {
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="ghost" onClick={() => runOne(check)}>Test</Button>
-                      {check.fixHref && r.status !== 'pass' && (
+                      {check.fixHref && r.status === 'fail' && (
                         <Button asChild size="sm" variant="outline">
-                          <Link to={check.fixHref}>Fix</Link>
+                          <Link to={check.fixHref}>{check.fixLabel ?? 'Fix'}</Link>
                         </Button>
                       )}
                     </div>
