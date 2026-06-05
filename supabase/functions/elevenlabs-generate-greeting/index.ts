@@ -3,10 +3,49 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Content-Type": "application/json",
 };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  const body = await req.json().catch(() => ({} as any));
+
+  // ---- TEST action: connectivity probe ----
+  if (body?.action === "test") {
+    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
+    if (!ELEVENLABS_API_KEY) {
+      return new Response(JSON.stringify({ status: "error", error: "MISSING_SECRET", secret: "ELEVENLABS_API_KEY" }),
+        { status: 200, headers: corsHeaders });
+    }
+    const start = Date.now();
+    try {
+      const res = await fetch("https://api.elevenlabs.io/v1/user", {
+        headers: { "xi-api-key": ELEVENLABS_API_KEY },
+      });
+      const latency = Date.now() - start;
+      if (res.ok) {
+        const user = await res.json();
+        return new Response(JSON.stringify({
+          status: "ok",
+          message: "ElevenLabs connected",
+          latency_ms: latency,
+          characters_used: user.subscription?.character_count,
+          characters_limit: user.subscription?.character_limit,
+          tier: user.subscription?.tier,
+        }), { status: 200, headers: corsHeaders });
+      }
+      const errText = await res.text();
+      return new Response(JSON.stringify({
+        status: "error", error: "ELEVENLABS_API_ERROR", http_status: res.status, details: errText,
+      }), { status: 200, headers: corsHeaders });
+    } catch (e: any) {
+      return new Response(JSON.stringify({ status: "error", error: "ELEVENLABS_UNREACHABLE", message: e.message }),
+        { status: 200, headers: corsHeaders });
+    }
+  }
+
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
@@ -17,7 +56,7 @@ Deno.serve(async (req) => {
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { script_text, voice_id, language = "fr", ivr_id, organization_id } = await req.json();
+    const { script_text, voice_id, language = "fr", ivr_id, organization_id } = body;
     if (!script_text || !organization_id) {
       return new Response(JSON.stringify({ error: "script_text and organization_id required" }), { status: 400, headers: corsHeaders });
     }
@@ -49,9 +88,7 @@ Deno.serve(async (req) => {
       storage_path: path, elevenlabs_voice_id: vid, language, status: "ready",
     }).select().single();
 
-    return new Response(JSON.stringify({ audio_url: signed?.signedUrl, storage_path: path, id: row?.id }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ audio_url: signed?.signedUrl, storage_path: path, id: row?.id }), { headers: corsHeaders });
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
   }

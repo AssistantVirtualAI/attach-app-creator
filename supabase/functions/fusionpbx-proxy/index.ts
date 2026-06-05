@@ -406,6 +406,12 @@ Deno.serve(async (req) => {
         completed_at: new Date().toISOString(),
         stats: { cdrs: upserted, fetched: cdrs.length, endpoint: r.endpoint, duration_ms: r.latency_ms },
       });
+      try {
+        await admin.from("audit_logs").insert({
+          organization_id, action: "pbx_sync_completed", resource_type: "pbx_integration",
+          metadata: { job_type: action, stats: { cdrs: upserted, fetched: cdrs.length, endpoint: r.endpoint }, duration_ms: r.latency_ms, timestamp: new Date().toISOString() },
+        });
+      } catch (auditErr: any) { console.warn("Audit log failed:", auditErr?.message); }
       return json({ ok: true, endpoint: r.endpoint, data: action === "list-cdrs" ? cdrs : undefined, stats: { cdrs: upserted, fetched: cdrs.length } });
     }
 
@@ -467,6 +473,12 @@ Deno.serve(async (req) => {
         error: errors.length ? errors.join("; ").slice(0, 2000) : null,
       });
       await admin.from("pbx_integrations").update({ last_sync_at: new Date().toISOString() }).eq("organization_id", organization_id);
+      try {
+        await admin.from("audit_logs").insert({
+          organization_id, action: "pbx_sync_completed", resource_type: "pbx_integration",
+          metadata: { job_type: "sync-all", stats, duration_ms, errors: errors.length, timestamp: new Date().toISOString() },
+        });
+      } catch (auditErr: any) { console.warn("Audit log failed:", auditErr?.message); }
       return json({ success: errors.length === 0, stats: { ...stats, duration_ms }, errors });
     }
 
