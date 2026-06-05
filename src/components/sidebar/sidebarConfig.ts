@@ -108,6 +108,7 @@ export const sidebarGroups: NavGroup[] = [
     superAdminOnly: true,
     items: [
       { nameKey: 'sidebar.superAdmin', href: '/super-admin', icon: Building2 },
+      { nameKey: 'Audit Logs', href: '/audit-logs', icon: Shield },
     ]
   },
 ];
