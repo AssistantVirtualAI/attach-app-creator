@@ -10,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 const FNS = ['telephony-ping', 'fusionpbx-proxy', 'telnyx-sms', 'telnyx-webhook', 'elevenlabs-generate-greeting', 'ai-transcribe-call', 'ai-analyze-call'];
 
 export default function TelephonyDiagnostics() {
-  const status = useTelephonyStatus();
+  const { data: status } = useTelephonyStatus();
 
   const { data: syncJobs = [], refetch } = useQuery({
     queryKey: ['diag-sync-jobs'],
