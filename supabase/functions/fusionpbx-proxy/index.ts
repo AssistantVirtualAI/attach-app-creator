@@ -473,6 +473,12 @@ Deno.serve(async (req) => {
         error: errors.length ? errors.join("; ").slice(0, 2000) : null,
       });
       await admin.from("pbx_integrations").update({ last_sync_at: new Date().toISOString() }).eq("organization_id", organization_id);
+      try {
+        await admin.from("audit_logs").insert({
+          organization_id, action: "pbx_sync_completed", resource_type: "pbx_integration",
+          metadata: { job_type: "sync-all", stats, duration_ms, errors: errors.length, timestamp: new Date().toISOString() },
+        });
+      } catch (auditErr: any) { console.warn("Audit log failed:", auditErr?.message); }
       return json({ success: errors.length === 0, stats: { ...stats, duration_ms }, errors });
     }
 
