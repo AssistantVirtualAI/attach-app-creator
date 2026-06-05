@@ -3,14 +3,13 @@
   "version": "1.0.0",
   "description": "AVA Softphone — Professional Communication App",
   "main": "electron/main.js",
-  "type": "module",
   "author": "AVA Télécom",
   "scripts": {
-    "dev": "concurrently \"vite --config vite.config.ts\" \"electron .\"",
-    "build": "vite build --config vite.config.ts && tsc -p electron/tsconfig.json",
-    "build:win": "vite build --config vite.config.ts && tsc -p electron/tsconfig.json && electron-builder --win",
-    "build:mac": "vite build --config vite.config.ts && tsc -p electron/tsconfig.json && electron-builder --mac --x64 --arm64",
-    "build:linux": "vite build --config vite.config.ts && tsc -p electron/tsconfig.json && electron-builder --linux",
+    "dev": "concurrently \"vite --config vite.config.mts\" \"electron .\"",
+    "build": "vite build --config vite.config.mts && tsc -p electron/tsconfig.json",
+    "build:win": "vite build --config vite.config.mts && tsc -p electron/tsconfig.json && electron-builder --win",
+    "build:mac": "vite build --config vite.config.mts && tsc -p electron/tsconfig.json && electron-builder --mac --x64 --arm64",
+    "build:linux": "vite build --config vite.config.mts && tsc -p electron/tsconfig.json && electron-builder --linux",
     "dist": "npm run build"
   },
   "dependencies": {
