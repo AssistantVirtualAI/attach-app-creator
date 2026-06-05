@@ -448,10 +448,10 @@ Deno.serve(async (req) => {
           await doUpsert("pbx_ring_groups", rows, "organization_id,pbx_uuid", "ring_groups");
         }
       }
-      if (cdrResult.ok) {
+      if (cdrResult?.ok) {
         const rows = cdrResult.records.map(mapCdr).filter((x: any) => x.pbx_uuid);
         await doUpsert("pbx_call_records", rows, "pbx_uuid", "cdrs");
-      } else {
+      } else if (cdrResult) {
         errors.push(`cdrs: no working endpoint (tried ${cdrResult.attempts.length})`);
         stats["cdrs"] = 0;
       }
