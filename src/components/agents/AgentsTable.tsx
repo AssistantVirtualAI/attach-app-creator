@@ -73,7 +73,7 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
   const handleOpenPortal = (agent: Agent) => {
     const slug = getAgentSlug(agent);
     if (!slug) {
-      toast.error('Aucun slug configuré pour cet agent. Allez dans Paramètres pour en définir un.');
+      toast.error('No slug is configured for this agent. Go to Settings to define one.');
       return;
     }
 
@@ -197,16 +197,16 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                     <DropdownMenuContent align="end" className="bg-popover border-border shadow-lg z-50 min-w-[180px]">
                       <DropdownMenuItem onClick={() => navigate(`/agent-settings/${agent.id}`)}>
                         <Settings className="h-4 w-4 mr-2" />
-                        Paramètres
+                        Settings
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleOpenPrompt(agent)}>
                         <MessageSquare className="h-4 w-4 mr-2" />
-                        Modifier Prompt
+                        Edit Prompt
                       </DropdownMenuItem>
                       <DropdownMenuSeparator className="bg-border" />
                       <DropdownMenuItem onClick={() => handleOpenPortal(agent)}>
                         <ExternalLink className="h-4 w-4 mr-2" />
-                        Ouvrir le portail
+                        Open portal
                       </DropdownMenuItem>
                       <DropdownMenuSeparator className="bg-border" />
                       <AlertDialog>
@@ -216,23 +216,23 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
                             className="text-destructive focus:text-destructive"
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Supprimer
+                            Delete
                           </DropdownMenuItem>
                         </AlertDialogTrigger>
                         <AlertDialogContent className="bg-popover border-border">
                           <AlertDialogHeader>
-                            <AlertDialogTitle className="text-foreground">Supprimer l'agent ?</AlertDialogTitle>
+                            <AlertDialogTitle className="text-foreground">Delete agent?</AlertDialogTitle>
                             <AlertDialogDescription className="text-muted-foreground">
-                              Cette action est irréversible. L'agent "{agent.name}" sera définitivement supprimé.
+                              This action cannot be undone. The agent "{agent.name}" will be permanently deleted.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
-                            <AlertDialogCancel className="border-slate-700">Annuler</AlertDialogCancel>
+                            <AlertDialogCancel className="border-slate-700">Cancel</AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => handleDelete(agent.id)}
                               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
-                              Supprimer
+                              Delete
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>

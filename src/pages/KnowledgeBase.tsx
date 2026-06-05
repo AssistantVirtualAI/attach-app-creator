@@ -161,7 +161,7 @@ const KnowledgeBase = () => {
 
   const handleDeleteItem = async (item: ElevenLabsKBItem) => {
     if (!selectedAgentId) return;
-    if (!confirm(`Supprimer "${item.name}" ?`)) return;
+    if (!confirm(`Delete "${item.name}"?`)) return;
 
     await deleteMutation.mutateAsync({
       agentId: selectedAgentId,
@@ -184,7 +184,7 @@ const KnowledgeBase = () => {
   });
 
   const handleDeleteRetellKb = async (knowledgeBaseId: string, name?: string) => {
-    if (!confirm(`Supprimer "${name || 'cette base'}" ?`)) return;
+    if (!confirm(`Delete "${name || 'this base'}"?`)) return;
     await deleteRetellKb.mutateAsync({ knowledgeBaseId });
   };
 
@@ -734,15 +734,15 @@ const KnowledgeBase = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>URL (optionnel si contenu)</Label>
+                  <Label>URL (optional if content is provided)</Label>
                   <Input value={retellNewUrl} onChange={(e) => setRetellNewUrl(e.target.value)} placeholder="https://…" />
                 </div>
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Annuler</Button>
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
                 <Button onClick={handleCreateRetellKb} disabled={createRetellKb.isPending}>
-                  {createRetellKb.isPending ? 'Ajout…' : 'Ajouter'}
+                  {createRetellKb.isPending ? 'Adding…' : 'Add'}
                 </Button>
               </DialogFooter>
             </DialogContent>
