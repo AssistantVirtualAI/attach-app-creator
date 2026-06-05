@@ -1129,9 +1129,22 @@ serve(async (req) => {
           },
         };
         
-        // Add optional name
+        // Add optional name, prefixed with the organization name so the
+        // agent is easily identifiable on the ElevenLabs side when multiple
+        // workspaces share the same ElevenLabs API key.
+        let orgPrefix = '';
+        if (organizationId) {
+          const { data: orgRow } = await supabaseService
+            .from('organizations')
+            .select('name')
+            .eq('id', organizationId)
+            .maybeSingle();
+          if (orgRow?.name) orgPrefix = `[${orgRow.name}] `;
+        }
         if (agentName) {
-          createPayload.name = agentName;
+          createPayload.name = `${orgPrefix}${agentName}`;
+        } else if (orgPrefix) {
+          createPayload.name = `${orgPrefix}Agent`;
         }
         
         // Add ASR settings if provided
