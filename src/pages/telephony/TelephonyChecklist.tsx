@@ -369,7 +369,9 @@ export default function TelephonyChecklist() {
     toast.success('All checks complete');
   }, [runOne]);
 
-  const passed = Object.values(results).filter(r => r.status === 'pass').length;
+  // Warnings count as pass; only failures reduce the score.
+  const passed = Object.values(results).filter(r => r.status === 'pass' || r.status === 'warn').length;
+  const failed = Object.values(results).filter(r => r.status === 'fail').length;
   const pct = (passed / TOTAL) * 100;
   let statusBadge: { label: string; cls: string };
   if (passed >= TOTAL) statusBadge = { label: '🟢 READY TO GO LIVE', cls: 'bg-green-500' };
