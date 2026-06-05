@@ -861,10 +861,18 @@ export const fr = {
       actions: 'Actions',
     },
     empty: {
-      title: 'Aucun agent',
-      description: 'Créez votre premier agent IA pour commencer.',
+      title: 'Aucun agent configuré',
+      description: 'Créez votre premier agent IA pour commencer à gérer vos interactions conversationnelles.',
       createButton: 'Créer un agent',
     },
+  },
+
+  setupIntegration: {
+    description: 'Configuration ElevenLabs requise pour afficher les données',
+    intro: 'Pour commencer à utiliser cette fonctionnalité, vous devez configurer votre intégration ElevenLabs dans les paramètres. Vous aurez besoin de :',
+    apiKey: 'Votre API Key ElevenLabs',
+    agentId: "L'ID de votre Agent ConvAI (optionnel)",
+    cta: 'Configurer maintenant',
   },
 
   // Clients
