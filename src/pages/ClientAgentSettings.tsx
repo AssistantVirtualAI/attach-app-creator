@@ -328,15 +328,15 @@ const ClientAgentSettings = () => {
                   <Volume2 className="h-5 w-5 text-primary" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Voix & TTS</h3>
-                  <p className="text-sm text-muted-foreground">Paramètres de synthèse vocale</p>
+                  <h3 className="font-semibold">Voice & TTS</h3>
+                  <p className="text-sm text-muted-foreground">Speech synthesis settings</p>
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
               <div className="space-y-6">
                 <div>
-                  <Label className="text-base font-medium mb-4 block">Sélectionner une voix</Label>
+                  <Label className="text-base font-medium mb-4 block">Select a voice</Label>
                   <VoiceSelector
                     selectedVoiceId={ttsSettings.voice_id}
                     onSelect={(voice) => setTtsSettings(prev => ({ ...prev, voice_id: voice.voice_id }))}
@@ -347,7 +347,7 @@ const ClientAgentSettings = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <Label>Modèle TTS</Label>
+                    <Label>TTS Model</Label>
                     <Select
                       value={ttsSettings.model_id || 'eleven_turbo_v2_5'}
                       onValueChange={(v) => setTtsSettings(prev => ({ ...prev, model_id: v }))}
@@ -370,7 +370,7 @@ const ClientAgentSettings = () => {
                   </div>
 
                   <div>
-                    <Label>Vitesse ({ttsSettings.speed?.toFixed(1)}x)</Label>
+                    <Label>Speed ({ttsSettings.speed?.toFixed(1)}x)</Label>
                     <Slider
                       value={[ttsSettings.speed || 1]}
                       onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, speed: v }))}
@@ -385,7 +385,7 @@ const ClientAgentSettings = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <Label>Stabilité ({Math.round((ttsSettings.stability || 0.5) * 100)}%)</Label>
+                    <Label>Stability ({Math.round((ttsSettings.stability || 0.5) * 100)}%)</Label>
                     <Slider
                       value={[ttsSettings.stability || 0.5]}
                       onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, stability: v }))}
@@ -397,7 +397,7 @@ const ClientAgentSettings = () => {
                     />
                   </div>
                   <div>
-                    <Label>Similarité ({Math.round((ttsSettings.similarity_boost || 0.75) * 100)}%)</Label>
+                    <Label>Similarity ({Math.round((ttsSettings.similarity_boost || 0.75) * 100)}%)</Label>
                     <Slider
                       value={[ttsSettings.similarity_boost || 0.75]}
                       onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, similarity_boost: v }))}
@@ -423,7 +423,7 @@ const ClientAgentSettings = () => {
                 </div>
 
                 <div>
-                  <Label>Optimisation latence streaming (0-4)</Label>
+                  <Label>Streaming latency optimization (0-4)</Label>
                   <Slider
                     value={[ttsSettings.optimize_streaming_latency || 3]}
                     onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, optimize_streaming_latency: v }))}
@@ -457,8 +457,8 @@ const ClientAgentSettings = () => {
                   <Mic className="h-5 w-5 text-purple-500" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Reconnaissance Vocale (ASR)</h3>
-                  <p className="text-sm text-muted-foreground">Paramètres de transcription</p>
+                  <h3 className="font-semibold">Speech Recognition (ASR)</h3>
+                  <p className="text-sm text-muted-foreground">Transcription settings</p>
                 </div>
               </div>
             </AccordionTrigger>
@@ -466,7 +466,7 @@ const ClientAgentSettings = () => {
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <Label>Fournisseur ASR</Label>
+                    <Label>ASR Provider</Label>
                     <Select
                       value={asrSettings.provider || 'elevenlabs'}
                       onValueChange={(v: any) => setAsrSettings(prev => ({ ...prev, provider: v }))}
@@ -489,7 +489,7 @@ const ClientAgentSettings = () => {
                   </div>
 
                   <div>
-                    <Label>Qualité</Label>
+                    <Label>Quality</Label>
                     <Select
                       value={asrSettings.quality || 'high'}
                       onValueChange={(v: any) => setAsrSettings(prev => ({ ...prev, quality: v }))}
@@ -499,7 +499,7 @@ const ClientAgentSettings = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="high">Haute (recommandé)</SelectItem>
+                        <SelectItem value="high">High (recommended)</SelectItem>
                         <SelectItem value="standard">Standard</SelectItem>
                       </SelectContent>
                     </Select>
@@ -507,11 +507,11 @@ const ClientAgentSettings = () => {
                 </div>
 
                 <div>
-                  <Label>Mots-clés personnalisés</Label>
+                  <Label>Custom keywords</Label>
                   <Input
                     value={keywords}
                     onChange={(e) => setKeywords(e.target.value)}
-                    placeholder="mot1, mot2, mot3..."
+                    placeholder="word1, word2, word3..."
                     className="mt-2"
                     disabled={!canEdit}
                   />
