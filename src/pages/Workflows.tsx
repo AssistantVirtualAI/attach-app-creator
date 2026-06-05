@@ -48,74 +48,74 @@ const marketplaceApps: MarketplaceApp[] = [
   {
     id: "zapier",
     name: "Zapier",
-    description: "Connectez vos agents à plus de 5000 applications",
+    description: "Connect your agents to over 5,000 applications",
     icon: <Zap className="h-6 w-6" />,
-    category: "Automatisation",
+    category: "Automation",
     requiresHipaa: false,
-    features: ["Webhooks", "Triggers", "Actions automatisées"]
+    features: ["Webhooks", "Triggers", "Automated actions"]
   },
   {
     id: "calendly",
     name: "Calendly",
-    description: "Planification automatique de rendez-vous",
+    description: "Automatic appointment scheduling",
     icon: <Calendar className="h-6 w-6" />,
-    category: "Planification",
+    category: "Scheduling",
     requiresHipaa: false,
-    features: ["Réservation en ligne", "Rappels automatiques", "Synchronisation calendrier"]
+    features: ["Online booking", "Automatic reminders", "Calendar sync"]
   },
   {
     id: "mailchimp",
     name: "Mailchimp",
-    description: "Marketing par email automatisé",
+    description: "Automated email marketing",
     icon: <Mail className="h-6 w-6" />,
     category: "Marketing",
     requiresHipaa: false,
-    features: ["Campagnes email", "Segmentation", "Analytics"]
+    features: ["Email campaigns", "Segmentation", "Analytics"]
   },
   {
     id: "slack",
     name: "Slack",
-    description: "Notifications et alertes en temps réel",
+    description: "Real-time notifications and alerts",
     icon: <MessageSquare className="h-6 w-6" />,
     category: "Communication",
     requiresHipaa: false,
-    features: ["Notifications", "Canaux dédiés", "Alertes personnalisées"]
+    features: ["Notifications", "Dedicated channels", "Custom alerts"]
   },
   {
     id: "hubspot",
     name: "HubSpot CRM",
-    description: "Synchronisation CRM automatique",
+    description: "Automatic CRM synchronization",
     icon: <Users className="h-6 w-6" />,
     category: "CRM",
     requiresHipaa: true,
-    features: ["Contacts", "Deals", "Notes automatiques"]
+    features: ["Contacts", "Deals", "Automatic notes"]
   },
   {
     id: "analytics",
     name: "Google Analytics",
-    description: "Suivi des performances avancé",
+    description: "Advanced performance tracking",
     icon: <BarChart3 className="h-6 w-6" />,
     category: "Analytics",
     requiresHipaa: false,
-    features: ["Événements", "Conversions", "Rapports personnalisés"]
+    features: ["Events", "Conversions", "Custom reports"]
   },
   {
     id: "notion",
     name: "Notion",
-    description: "Documentation et notes automatiques",
+    description: "Automatic documentation and notes",
     icon: <FileText className="h-6 w-6" />,
-    category: "Productivité",
+    category: "Productivity",
     requiresHipaa: true,
-    features: ["Pages automatiques", "Base de données", "Templates"]
+    features: ["Automatic pages", "Database", "Templates"]
   },
   {
     id: "make",
     name: "Make (Integromat)",
-    description: "Automatisations visuelles complexes",
+    description: "Complex visual automations",
     icon: <Settings className="h-6 w-6" />,
-    category: "Automatisation",
+    category: "Automation",
     requiresHipaa: false,
-    features: ["Scénarios", "Modules", "Filtres avancés"]
+    features: ["Scenarios", "Modules", "Advanced filters"]
   }
 ];
 

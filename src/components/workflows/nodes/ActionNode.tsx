@@ -13,11 +13,11 @@ const actionIcons: Record<string, React.ReactNode> = {
 };
 
 const actionLabels: Record<string, string> = {
-  'send-email': 'Envoyer Email',
-  'send-sms': 'Envoyer SMS',
-  'create-lead': 'Créer Lead',
-  'notify-slack': 'Notifier Slack',
-  'update-crm': 'Mettre à jour CRM',
+  'send-email': 'Send Email',
+  'send-sms': 'Send SMS',
+  'create-lead': 'Create Lead',
+  'notify-slack': 'Notify Slack',
+  'update-crm': 'Update CRM',
   'webhook': 'Webhook'
 };
 
