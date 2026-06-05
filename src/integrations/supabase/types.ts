@@ -3319,6 +3319,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           do_not_disturb: boolean | null
+          domain_uuid: string | null
           effective_cid_name: string | null
           effective_cid_number: string | null
           enabled: boolean | null
@@ -3339,6 +3340,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           do_not_disturb?: boolean | null
+          domain_uuid?: string | null
           effective_cid_name?: string | null
           effective_cid_number?: string | null
           enabled?: boolean | null
@@ -3359,6 +3361,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           do_not_disturb?: boolean | null
+          domain_uuid?: string | null
           effective_cid_name?: string | null
           effective_cid_number?: string | null
           enabled?: boolean | null
