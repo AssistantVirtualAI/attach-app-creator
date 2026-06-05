@@ -95,42 +95,42 @@ const Docs = () => {
 
   const trainingContent = [
     {
-      title: "Créer votre Premier Agent",
-      description: "Guide étape par étape pour configurer un agent vocal IA fonctionnel",
+      title: "Create Your First Agent",
+      description: "Step-by-step guide to configure a working AI voice agent",
       duration: "15 min",
-      level: "Débutant",
+      level: "Beginner",
       icon: Rocket,
       color: "text-blue-500"
     },
     {
-      title: "Personnaliser la Voix et le Comportement",
-      description: "Ajustez les paramètres vocaux, le ton et la personnalité de votre agent",
+      title: "Customize Voice and Behavior",
+      description: "Adjust voice settings, tone, and your agent's personality",
       duration: "20 min",
-      level: "Intermédiaire",
+      level: "Intermediate",
       icon: Settings,
       color: "text-purple-500"
     },
     {
-      title: "Gérer vos Clients Efficacement",
-      description: "Organisation, permissions et portail client white-label",
+      title: "Manage Your Clients Efficiently",
+      description: "Organization, permissions, and white-label client portal",
       duration: "25 min",
-      level: "Intermédiaire",
+      level: "Intermediate",
       icon: Users,
       color: "text-green-500"
     },
     {
-      title: "Analyser les Conversations",
-      description: "Comprendre les métriques, sentiment et insights de vos conversations",
+      title: "Analyze Conversations",
+      description: "Understand metrics, sentiment, and insights from your conversations",
       duration: "20 min",
-      level: "Avancé",
+      level: "Advanced",
       icon: Target,
       color: "text-orange-500"
     },
     {
-      title: "Automatiser avec les Workflows",
-      description: "Créer des automatisations et webhooks pour connecter vos outils",
+      title: "Automate with Workflows",
+      description: "Create automations and webhooks to connect your tools",
       duration: "30 min",
-      level: "Avancé",
+      level: "Advanced",
       icon: Zap,
       color: "text-yellow-500"
     },
