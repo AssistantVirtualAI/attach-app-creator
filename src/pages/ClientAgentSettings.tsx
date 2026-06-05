@@ -539,15 +539,15 @@ const ClientAgentSettings = () => {
                   <Clock className="h-5 w-5 text-orange-500" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Gestion des Tours</h3>
-                  <p className="text-sm text-muted-foreground">Timing et interruptions</p>
+                  <h3 className="font-semibold">Turn Management</h3>
+                  <p className="text-sm text-muted-foreground">Timing and interruptions</p>
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
               <div className="space-y-6">
                 <div>
-                  <Label>Réactivité de l'agent</Label>
+                  <Label>Agent responsiveness</Label>
                   <div className="grid grid-cols-3 gap-3 mt-3">
                     {TURN_EAGERNESS_OPTIONS.map(option => (
                       <div
@@ -568,7 +568,7 @@ const ClientAgentSettings = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <Label>Timeout de tour ({turnSettings.turn_timeout}s)</Label>
+                    <Label>Turn timeout ({turnSettings.turn_timeout}s)</Label>
                     <Slider
                       value={[turnSettings.turn_timeout || 10]}
                       onValueChange={([v]) => setTurnSettings(prev => ({ ...prev, turn_timeout: v }))}
@@ -578,11 +578,11 @@ const ClientAgentSettings = () => {
                       className="mt-4"
                       disabled={!canEdit}
                     />
-                    <p className="text-xs text-muted-foreground mt-2">Temps avant que l'agent relance</p>
+                    <p className="text-xs text-muted-foreground mt-2">Time before the agent follows up</p>
                   </div>
 
                   <div>
-                    <Label>Silence fin d'appel ({turnSettings.silence_end_call_timeout}s)</Label>
+                    <Label>End call on silence ({turnSettings.silence_end_call_timeout}s)</Label>
                     <Slider
                       value={[turnSettings.silence_end_call_timeout || 30]}
                       onValueChange={([v]) => setTurnSettings(prev => ({ ...prev, silence_end_call_timeout: v }))}
@@ -615,15 +615,15 @@ const ClientAgentSettings = () => {
                   <Settings className="h-5 w-5 text-green-500" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Paramètres de Conversation</h3>
-                  <p className="text-sm text-muted-foreground">Durée et événements</p>
+                  <h3 className="font-semibold">Conversation Settings</h3>
+                  <p className="text-sm text-muted-foreground">Duration and events</p>
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
               <div className="space-y-6">
                 <div>
-                  <Label>Durée maximale ({Math.round((conversationSettings.max_duration_seconds || 600) / 60)} min)</Label>
+                  <Label>Maximum duration ({Math.round((conversationSettings.max_duration_seconds || 600) / 60)} min)</Label>
                   <Slider
                     value={[conversationSettings.max_duration_seconds || 600]}
                     onValueChange={([v]) => setConversationSettings(prev => ({ ...prev, max_duration_seconds: v }))}
@@ -636,7 +636,7 @@ const ClientAgentSettings = () => {
                 </div>
 
                 <div>
-                  <Label className="mb-3 block">Événements Client</Label>
+                  <Label className="mb-3 block">Client Events</Label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {ELEVENLABS_CLIENT_EVENTS.map(event => (
                       <div key={event.id} className="flex items-start gap-3 p-3 rounded-lg border">
@@ -681,8 +681,8 @@ const ClientAgentSettings = () => {
                   <Brain className="h-5 w-5 text-cyan-500" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Paramètres LLM</h3>
-                  <p className="text-sm text-muted-foreground">Température et limites du modèle</p>
+                  <h3 className="font-semibold">LLM Settings</h3>
+                  <p className="text-sm text-muted-foreground">Temperature and model limits</p>
                 </div>
               </div>
             </AccordionTrigger>
@@ -690,7 +690,7 @@ const ClientAgentSettings = () => {
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <Label>Température ({llmSettings.temperature?.toFixed(1)})</Label>
+                    <Label>Temperature ({llmSettings.temperature?.toFixed(1)})</Label>
                     <Slider
                       value={[llmSettings.temperature || 0.7]}
                       onValueChange={([v]) => setLlmSettings(prev => ({ ...prev, temperature: v }))}
@@ -701,7 +701,7 @@ const ClientAgentSettings = () => {
                       disabled={!canEdit}
                     />
                     <p className="text-xs text-muted-foreground mt-2">
-                      Plus bas = plus prévisible, plus haut = plus créatif
+                      Lower = more predictable, higher = more creative
                     </p>
                   </div>
 
