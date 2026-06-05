@@ -277,9 +277,76 @@ Deno.serve(async (req) => {
     if (action === "update-queue") return json(await writeCollection("call_center_queues", "call_center_queues", params));
     if (action === "create-ring-group") return json(await writeCollection("ring_groups", "ring_groups", params));
 
-    // ---- CDRs ----
+    // ---- CDR endpoint fallback helper ----
+    const CDR_ENDPOINTS = [
+      "/app/api/7/xml_cdrs",
+      "/app/api/7/xml_cdr",
+      "/app/api/7/cdrs",
+      "/app/api/7/cdr",
+      "/app/xml_cdr/xml_cdr.php",
+    ];
+
+    async function fetchCdrsWithFallback(extraQp: Record<string, string> = {}) {
+      // Try cached endpoint first
+      const { data: integ } = await admin.from("pbx_integrations")
+        .select("id, config").eq("organization_id", organization_id).maybeSingle();
+      const cachedEp: string | undefined = (integ?.config as any)?.cdr_endpoint;
+      const ordered = cachedEp
+        ? [cachedEp, ...CDR_ENDPOINTS.filter((e) => e !== cachedEp)]
+        : CDR_ENDPOINTS;
+      const attempts: { endpoint: string; status: number; error?: string; sample?: string }[] = [];
+
+      for (const ep of ordered) {
+        const isPhp = ep.endsWith(".php");
+        const qp = new URLSearchParams({ domain_uuid: FUSIONPBX_DOMAIN_UUID, order: "desc", ...extraQp });
+        if (isPhp) {
+          qp.set("key", FUSIONPBX_API_KEY);
+          qp.set("username", FUSIONPBX_USERNAME);
+        }
+        const url = `${FUSIONPBX_API_URL}${ep}?${qp.toString()}`;
+        const started = Date.now();
+        try {
+          const res = await fetch(url, { headers: { Authorization: basicHeader, Accept: "application/json" } });
+          const text = await res.text();
+          if (!res.ok) {
+            attempts.push({ endpoint: ep, status: res.status, sample: text.slice(0, 200) });
+            continue;
+          }
+          let parsed: any;
+          try { parsed = JSON.parse(text); }
+          catch { attempts.push({ endpoint: ep, status: res.status, error: "invalid_json", sample: text.slice(0, 200) }); continue; }
+          const records =
+            parsed?.xml_cdrs || parsed?.xml_cdr || parsed?.cdrs || parsed?.cdr ||
+            (Array.isArray(parsed) ? parsed : null);
+          if (Array.isArray(records)) {
+            if (integ && cachedEp !== ep) {
+              await admin.from("pbx_integrations")
+                .update({ config: { ...(integ.config as any || {}), cdr_endpoint: ep } })
+                .eq("id", integ.id);
+            }
+            return { ok: true, endpoint: ep, records, latency_ms: Date.now() - started, attempts };
+          }
+          attempts.push({ endpoint: ep, status: res.status, error: "no_array_in_response", sample: text.slice(0, 200) });
+        } catch (e: any) {
+          attempts.push({ endpoint: ep, status: 0, error: e?.message || String(e) });
+        }
+      }
+      return { ok: false, endpoint: null, records: [] as any[], attempts };
+    }
+
+    // ---- CDR endpoint diagnostic ----
+    if (action === "test-cdr-endpoint") {
+      const r = await fetchCdrsWithFallback({ limit: "1" });
+      return json({
+        ok: r.ok,
+        endpoint: r.endpoint,
+        record_count: r.records.length,
+        attempts: r.attempts,
+      });
+    }
+
+    // ---- CDRs (list / sync) ----
     if (action === "list-cdrs" || action === "sync-cdrs" || action === "get-cdrs") {
-      // Find last sync timestamp when doing incremental sync
       let startDate: string | undefined = params.start_date;
       if (action === "sync-cdrs" && !startDate) {
         const { data: last } = await admin.from("pbx_sync_jobs")
@@ -287,17 +354,21 @@ Deno.serve(async (req) => {
           .order("completed_at", { ascending: false }).limit(1).maybeSingle();
         if (last?.completed_at) startDate = last.completed_at;
       }
-      const qp = new URLSearchParams({ [`domain_uuid`]: FUSIONPBX_DOMAIN_UUID, order: "desc", limit: String(params.limit || 100) });
-      if (startDate) qp.set("start_date", startDate);
-      if (params.end_date) qp.set("end_date", params.end_date);
-      if (params.extension) qp.set("extension", params.extension);
+      const extra: Record<string, string> = { limit: String(params.limit || 100) };
+      if (startDate) extra.start_date = startDate;
+      if (params.end_date) extra.end_date = params.end_date;
+      if (params.extension) extra.extension = params.extension;
 
-      const r = await pbxFetch(`xml_cdrs?${qp.toString()}`);
+      const r = await fetchCdrsWithFallback(extra);
       if (!r.ok) {
-        await admin.from("pbx_sync_jobs").insert({ organization_id, job_type: action, status: "failed", error_message: (r as any).message || (r as any).error, stats: {} });
-        return json(r, r.status || 500);
+        await admin.from("pbx_sync_jobs").insert({
+          organization_id, job_type: action, status: "failed",
+          error: `No working CDR endpoint. Attempts: ${JSON.stringify(r.attempts).slice(0, 1500)}`,
+          stats: {},
+        });
+        return json({ error: "NO_CDR_ENDPOINT", attempts: r.attempts }, 502);
       }
-      const cdrs = collection(r.data, "xml_cdrs");
+      const cdrs = r.records;
       let upserted = 0;
       if (cdrs.length > 0) {
         const rows = cdrs.map(mapCdr).filter((x) => x.pbx_uuid);
@@ -307,9 +378,9 @@ Deno.serve(async (req) => {
       await admin.from("pbx_sync_jobs").insert({
         organization_id, job_type: action, status: "completed",
         completed_at: new Date().toISOString(),
-        stats: { cdrs: upserted, fetched: cdrs.length, duration_ms: r.latency_ms },
+        stats: { cdrs: upserted, fetched: cdrs.length, endpoint: r.endpoint, duration_ms: r.latency_ms },
       });
-      return json({ ok: true, data: action === "list-cdrs" ? cdrs : undefined, stats: { cdrs: upserted, fetched: cdrs.length } });
+      return json({ ok: true, endpoint: r.endpoint, data: action === "list-cdrs" ? cdrs : undefined, stats: { cdrs: upserted, fetched: cdrs.length } });
     }
 
     // ---- Full sync ----
