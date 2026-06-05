@@ -1133,19 +1133,40 @@ serve(async (req) => {
         // agent is easily identifiable on the ElevenLabs side when multiple
         // workspaces share the same ElevenLabs API key.
         let orgPrefix = '';
+        let orgName = '';
         if (organizationId) {
           const { data: orgRow } = await supabaseService
             .from('organizations')
             .select('name')
             .eq('id', organizationId)
             .maybeSingle();
-          if (orgRow?.name) orgPrefix = `[${orgRow.name}] `;
+          if (orgRow?.name) {
+            orgName = orgRow.name;
+            orgPrefix = `[${orgRow.name}] `;
+          }
         }
         if (agentName) {
           createPayload.name = `${orgPrefix}${agentName}`;
         } else if (orgPrefix) {
           createPayload.name = `${orgPrefix}Agent`;
         }
+
+        // Tag metadata + tags so the agent is always identifiable by org
+        // both in the ElevenLabs dashboard and in webhook payloads.
+        if (organizationId) {
+          createPayload.tags = Array.from(new Set([
+            ...(Array.isArray(createPayload.tags) ? createPayload.tags : []),
+            `org:${organizationId}`,
+            ...(orgName ? [`org_name:${orgName}`] : []),
+          ]));
+          createPayload.metadata = {
+            ...(createPayload.metadata || {}),
+            organization_id: organizationId,
+            organization_name: orgName || undefined,
+            created_via: 'ava-statistic',
+          };
+        }
+        
         
         // Add ASR settings if provided
         if (createAsrSettings) {
@@ -1205,16 +1226,40 @@ serve(async (req) => {
 
         const createdAgent = await createResponse.json();
         console.log('[elevenlabs-agent-config] Successfully created agent:', createdAgent.agent_id);
-        
+
+        // Audit log (best-effort, never blocks the response)
+        if (organizationId) {
+          try {
+            await supabaseService.from('audit_logs').insert({
+              organization_id: organizationId,
+              action: 'create',
+              resource_type: 'agents',
+              metadata: {
+                platform: 'elevenlabs',
+                platform_agent_id: createdAgent.agent_id,
+                name: createPayload.name,
+                org_tag: `org:${organizationId}`,
+              },
+            });
+          } catch (e) {
+            console.warn('[elevenlabs-agent-config] audit log insert failed', e);
+          }
+        }
+
         return new Response(
-          JSON.stringify({ 
-            success: true, 
+          JSON.stringify({
+            success: true,
             agent_id: createdAgent.agent_id,
-            agent: createdAgent 
+            agent: createdAgent,
+            organization_tag: organizationId ? `org:${organizationId}` : null,
+            organization_name: orgName || null,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+
+
+
 
       default:
         throw new Error(`Action non supportée: ${action}`);

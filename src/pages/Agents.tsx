@@ -4,7 +4,8 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Search, Bot, Zap, TrendingUp } from 'lucide-react';
+import { Plus, Search, Bot, Zap, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AgentsTable } from '@/components/agents/AgentsTable';
 import { CreateAgentWizard } from '@/components/agents/CreateAgentWizard';
 import { EmptyState } from '@/components/agents/EmptyState';
@@ -23,11 +24,20 @@ export default function Agents() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { data: agents, isLoading, refetch } = useQuery({
+  const { data: agents, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['agents', selectedOrgId],
     queryFn: async () => {
       if (!selectedOrgId) return [];
-      
+
+      // Audit log: record agent listing for tenant-isolation debugging
+      supabase.rpc('log_agent_access', {
+        _org_id: selectedOrgId,
+        _action: 'list',
+        _metadata: { source: 'agents_page' } as any,
+      }).then(({ error: logErr }) => {
+        if (logErr) console.warn('[audit] log_agent_access failed', logErr);
+      });
+
       const { data, error } = await supabase
         .from('agents_safe')
         .select('*')
@@ -35,22 +45,29 @@ export default function Agents() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
-      // Fetch assigned clients from client_agent_assignments table
+
+      // Defensive client-side check: drop any row that doesn't match selectedOrgId
+      const isolated = (data || []).filter((a: any) => a.organization_id === selectedOrgId);
+      if (isolated.length !== (data || []).length) {
+        console.error('[isolation] Dropped agents from other org', {
+          selectedOrgId,
+          received: data?.length,
+          kept: isolated.length,
+        });
+      }
+
       const agentsWithClients = await Promise.all(
-        (data || []).map(async (agent) => {
-          // First check client_agent_assignments (many-to-many relationship)
+        isolated.map(async (agent: any) => {
           const { data: assignments } = await supabase
             .from('client_agent_assignments')
             .select('client:clients(id, name)')
             .eq('agent_id', agent.id)
             .limit(1);
-          
+
           if (assignments && assignments.length > 0 && assignments[0].client) {
             return { ...agent, client: assignments[0].client };
           }
-          
-          // Fallback to direct client_id if exists
+
           if (agent.client_id) {
             const { data: clientData } = await supabase
               .from('clients')
@@ -59,17 +76,18 @@ export default function Agents() {
               .maybeSingle();
             return { ...agent, client: clientData };
           }
-          
+
           return { ...agent, client: null };
         })
       );
-      
+
       return agentsWithClients;
     },
     enabled: !!selectedOrgId,
+    retry: 1,
   });
 
-  const filteredAgents = agents?.filter(agent => 
+  const filteredAgents = agents?.filter(agent =>
     agent.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     agent.platform.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
@@ -145,6 +163,22 @@ export default function Agents() {
             </motion.div>
           ))}
         </div>
+
+        {isError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Could not load agents</AlertTitle>
+            <AlertDescription className="space-y-3">
+              <div className="text-sm font-mono break-all">
+                {(error as Error)?.message || 'Unknown error while fetching agents from the database.'}
+              </div>
+              <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {agents && agents.length > 0 ? (
           <>

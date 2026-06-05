@@ -3301,6 +3301,10 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      log_agent_access: {
+        Args: { _action: string; _metadata?: Json; _org_id: string }
+        Returns: undefined
+      }
       run_security_audit: { Args: { _org_id: string }; Returns: Json }
       setup_new_user_organization: {
         Args: { _full_name?: string; _user_email: string; _user_id: string }
