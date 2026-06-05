@@ -864,10 +864,24 @@ export const en = {
       actions: 'Actions',
     },
     empty: {
-      title: 'No agents yet',
-      description: 'Create your first AI agent to get started.',
+      title: 'No agents configured',
+      description: 'Create your first AI agent to start managing your conversational interactions.',
       createButton: 'Create agent',
     },
+  },
+
+  setupIntegration: {
+    description: 'ElevenLabs configuration required to display data',
+    intro: 'To start using this feature, you need to configure your ElevenLabs integration in settings. You will need:',
+    apiKey: 'Your ElevenLabs API Key',
+    agentId: 'Your ConvAI Agent ID (optional)',
+    cta: 'Configure now',
+  },
+
+  knowledgeBase: {
+    noAgentSelected: 'No agent selected',
+    noAgentConfigured: 'No agent configured. Create an agent with a voice AI platform.',
+    selectAgent: 'Select an agent to view its knowledge base.',
   },
 
   // Clients
