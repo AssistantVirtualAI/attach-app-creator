@@ -37,6 +37,11 @@ jobs:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: apps/ava-softphone-desktop/package-lock.json
+      - name: Remove root postcss config interference
+        shell: bash
+        run: |
+          [ -f postcss.config.js ] && mv postcss.config.js postcss.config.js.bak || true
+          [ -f postcss.config.cjs ] && mv postcss.config.cjs postcss.config.cjs.bak || true
       - name: Install dependencies
         run: npm install
         working-directory: apps/ava-softphone-desktop
@@ -70,6 +75,11 @@ jobs:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: apps/ava-softphone-desktop/package-lock.json
+      - name: Remove root postcss config interference
+        shell: bash
+        run: |
+          [ -f postcss.config.js ] && mv postcss.config.js postcss.config.js.bak || true
+          [ -f postcss.config.cjs ] && mv postcss.config.cjs postcss.config.cjs.bak || true
       - name: Install dependencies
         run: npm install
         working-directory: apps/ava-softphone-desktop
@@ -113,6 +123,11 @@ jobs:
             libcups2-dev libxss1 libxtst6 xvfb \
             libx11-xcb1 libxcb-dri3-0 libdrm2 \
             libgbm1 libnss3 libatk-bridge2.0-0
+      - name: Remove root postcss config interference
+        shell: bash
+        run: |
+          [ -f postcss.config.js ] && mv postcss.config.js postcss.config.js.bak || true
+          [ -f postcss.config.cjs ] && mv postcss.config.cjs postcss.config.cjs.bak || true
       - name: Install dependencies
         run: npm install
         working-directory: apps/ava-softphone-desktop
