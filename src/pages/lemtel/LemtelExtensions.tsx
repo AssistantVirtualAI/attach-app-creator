@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Smartphone, Plus, Circle, Loader2 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Smartphone, Plus, Circle, Loader2, X, BellOff, PhoneForwarded, AlertCircle } from 'lucide-react';
 import { usePbxExtensions } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
 import { formatDistanceToNow } from 'date-fns';
@@ -24,15 +25,13 @@ function getExtensionType(e: any): ExtType {
   return { label: '🔌 Extension', cls: 'bg-muted text-muted-foreground' };
 }
 
+const NOTABLE_AI_EXT = '5143122929';
+
 export default function LemtelExtensions() {
   const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const { data: extensions = [], isLoading } = usePbxExtensions();
   const all = extensions as any[];
-  const exts = all.filter(e =>
-    !search || e.extension?.includes(search) ||
-    e.effective_cid_name?.toLowerCase().includes(search.toLowerCase()) ||
-    e.description?.toLowerCase().includes(search.toLowerCase())
-  );
 
   const stats = useMemo(() => {
     const s: Record<string, number> = {};
@@ -40,17 +39,30 @@ export default function LemtelExtensions() {
     return s;
   }, [all]);
 
+  const exts = all.filter(e => {
+    if (typeFilter && getExtensionType(e).label !== typeFilter) return false;
+    if (!search) return true;
+    return e.extension?.includes(search) ||
+      e.effective_cid_name?.toLowerCase().includes(search.toLowerCase()) ||
+      e.description?.toLowerCase().includes(search.toLowerCase());
+  });
+
   const lastSync = useMemo(() => {
     const dates = all.map(e => e.synced_at).filter(Boolean).sort().reverse();
-    return dates[0] ? formatDistanceToNow(new Date(dates[0]), { addSuffix: true }) : 'never';
+    return dates[0] ? { iso: dates[0], rel: formatDistanceToNow(new Date(dates[0]), { addSuffix: true }) } : null;
   }, [all]);
+  const syncStale = lastSync ? (Date.now() - new Date(lastSync.iso).getTime()) / 60000 > 30 : false;
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2"><Smartphone className="w-7 h-7" /> Extensions</h1>
-          <p className="text-muted-foreground">FusionPBX SIP extensions — last synced {lastSync}</p>
+          <p className="text-muted-foreground">
+            Last synced {lastSync?.rel ?? 'never'}
+            {syncStale && <span className="ml-2 text-orange-600">⚠️ may be outdated</span>}
+          </p>
         </div>
         <div className="flex gap-2">
           <PbxRefreshButton kind="config" />
@@ -58,18 +70,33 @@ export default function LemtelExtensions() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(stats).map(([k, v]) => (
-          <Badge key={k} variant="outline" className="text-sm py-1 px-3">{k}: {v}</Badge>
-        ))}
+      <div className="flex flex-wrap gap-2 items-center">
+        {Object.entries(stats).map(([k, v]) => {
+          const active = typeFilter === k;
+          return (
+            <button key={k} onClick={() => setTypeFilter(active ? null : k)}
+              className={`text-sm py-1 px-3 rounded-md border transition ${active ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:bg-muted'}`}>
+              {k}: {v}
+            </button>
+          );
+        })}
         <Badge variant="default" className="text-sm py-1 px-3">Total: {all.length}</Badge>
+        {typeFilter && (
+          <Button size="sm" variant="ghost" onClick={() => setTypeFilter(null)} className="h-7">
+            <X className="w-3 h-3 mr-1" /> Clear filter
+          </Button>
+        )}
       </div>
 
       <Card>
         <CardHeader><CardTitle>{exts.length} extensions</CardTitle></CardHeader>
         <CardContent>
           <Input className="mb-4 max-w-sm" placeholder="Search extension, name..." value={search} onChange={e => setSearch(e.target.value)} />
-          {isLoading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div> : (
+          {isLoading ? (
+            <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-10 bg-muted/40 rounded animate-pulse" />
+            ))}</div>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -77,22 +104,43 @@ export default function LemtelExtensions() {
                 <TableHead>Type</TableHead>
                 <TableHead>Display Name</TableHead>
                 <TableHead>Caller ID</TableHead>
+                <TableHead>Flags</TableHead>
                 <TableHead>Voicemail</TableHead>
-                <TableHead>Recording</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {exts.map((e: any) => {
                 const t = getExtensionType(e);
+                const notable = String(e.extension) === NOTABLE_AI_EXT;
                 return (
-                  <TableRow key={e.id}>
-                    <TableCell className="font-mono font-bold">{e.extension}</TableCell>
+                  <TableRow key={e.id} className={notable ? 'border-l-4 border-l-orange-500' : ''}>
+                    <TableCell className="font-mono font-bold">
+                      {notable ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex items-center gap-1">{e.extension}<AlertCircle className="w-3 h-3 text-orange-500" /></span>
+                          </TooltipTrigger>
+                          <TooltipContent>AI Voice Agent — verify ElevenLabs connection</TooltipContent>
+                        </Tooltip>
+                      ) : e.extension}
+                    </TableCell>
                     <TableCell><Badge variant="outline" className={t.cls}>{t.label}</Badge></TableCell>
                     <TableCell>{e.effective_cid_name || e.description || '-'}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{e.effective_cid_number || '-'}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {e.do_not_disturb && (
+                          <Tooltip><TooltipTrigger><BellOff className="w-4 h-4 text-muted-foreground" /></TooltipTrigger>
+                            <TooltipContent>Do Not Disturb</TooltipContent></Tooltip>
+                        )}
+                        {e.forward_user_not_registered_enabled && (
+                          <Tooltip><TooltipTrigger><PhoneForwarded className="w-4 h-4 text-blue-500" /></TooltipTrigger>
+                            <TooltipContent>Forwarded to {e.forward_user_not_registered_destination || '—'}</TooltipContent></Tooltip>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>{e.voicemail_enabled ? <Badge variant="secondary">On</Badge> : <Badge variant="outline">Off</Badge>}</TableCell>
-                    <TableCell><Badge variant="outline">{e.call_recording || 'none'}</Badge></TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-1 text-sm">
                         <Circle className={`w-2.5 h-2.5 ${e.enabled ? 'fill-green-500 text-green-500' : 'fill-muted text-muted'}`} />
@@ -107,6 +155,8 @@ export default function LemtelExtensions() {
           )}
         </CardContent>
       </Card>
+      <p className="text-xs text-muted-foreground text-right">Press R to refresh</p>
     </div>
+    </TooltipProvider>
   );
 }
