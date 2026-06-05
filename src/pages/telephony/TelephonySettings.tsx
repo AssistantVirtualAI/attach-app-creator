@@ -158,6 +158,8 @@ export default function TelephonySettings() {
         <CardContent className="space-y-4">{fieldsOf('fusionpbx').map(renderField)}</CardContent>
       </Card>
 
+      <SyncDiagnosticsPanel />
+
       {/* Telnyx */}
       <Card>
         <CardHeader>
