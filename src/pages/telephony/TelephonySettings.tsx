@@ -51,6 +51,8 @@ function TestAndSyncButtons() {
       </Button>
     </>
   );
+}
+
 
 export default function TelephonySettings() {
   const { toast } = useToast();
