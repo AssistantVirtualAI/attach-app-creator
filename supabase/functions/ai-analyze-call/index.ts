@@ -3,10 +3,50 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Content-Type": "application/json",
 };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  // Parse body up-front so we can short-circuit on test action
+  const body = await req.json().catch(() => ({} as any));
+
+  // ---- TEST action: connectivity probe ----
+  if (body?.action === "test") {
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) {
+      return new Response(JSON.stringify({ status: "error", error: "MISSING_SECRET", secret: "ANTHROPIC_API_KEY" }),
+        { status: 200, headers: corsHeaders });
+    }
+    const start = Date.now();
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 10,
+          messages: [{ role: "user", content: "Reply OK" }],
+        }),
+      });
+      const latency = Date.now() - start;
+      if (res.ok) {
+        return new Response(JSON.stringify({
+          status: "ok", message: "Claude API connected", latency_ms: latency, model: "claude-sonnet-4-20250514",
+        }), { status: 200, headers: corsHeaders });
+      }
+      const errText = await res.text();
+      return new Response(JSON.stringify({
+        status: "error", error: "CLAUDE_API_ERROR", http_status: res.status, details: errText,
+      }), { status: 200, headers: corsHeaders });
+    } catch (e: any) {
+      return new Response(JSON.stringify({ status: "error", error: "CLAUDE_UNREACHABLE", message: e.message }),
+        { status: 200, headers: corsHeaders });
+    }
+  }
+
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
@@ -17,7 +57,7 @@ Deno.serve(async (req) => {
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { call_record_id, transcript_text, organization_id } = await req.json();
+    const { call_record_id, transcript_text, organization_id } = body;
     if (!call_record_id || !transcript_text || !organization_id) {
       return new Response(JSON.stringify({ error: "required fields missing" }), { status: 400, headers: corsHeaders });
     }
@@ -60,7 +100,7 @@ ${transcript_text}` }],
     });
     await admin.from("pbx_call_records").update({ analyzed: true, ai_processing: false }).eq("id", call_record_id);
 
-    return new Response(JSON.stringify(insights), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify(insights), { headers: corsHeaders });
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
   }
