@@ -1,55 +1,54 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Sparkles, Play } from 'lucide-react';
+import { Loader2, Sparkles, Play, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-
-interface CDR {
-  id: string;
-  call_uuid: string;
-  direction: string | null;
-  caller_id_number: string | null;
-  caller_destination: string | null;
-  duration: number;
-  start_stamp: string | null;
-  record_path: string | null;
-  analyzed: boolean;
-  ai_processing: boolean;
-}
+import { usePbxCallRecords, LEMTEL_ORG } from '@/hooks/usePbxData';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function LemtelPortalCalls() {
   const { toast } = useToast();
-  const [cdrs, setCdrs] = useState<CDR[]>([]);
-  const [loading, setLoading] = useState(true);
+  const qc = useQueryClient();
+  const { data: cdrs = [], isLoading } = usePbxCallRecords(100);
   const [analyzing, setAnalyzing] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
-  const load = async () => {
-    const { data } = await supabase.from('lemtel_cdrs_cache').select('*').order('start_stamp', { ascending: false }).limit(100);
-    setCdrs((data as any) || []);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const analyze = async (call_uuid: string) => {
-    setAnalyzing(call_uuid);
-    // Stub: real flow fetches recording, transcribes, analyzes. Here we send mock transcript.
-    const { error } = await supabase.functions.invoke('ai-call-analysis', {
-      body: { call_uuid, transcript: 'Agent: Hello, how can I help? Caller: I need support with my account.' },
+  const analyze = async (call_record_id: string) => {
+    setAnalyzing(call_record_id);
+    const { error } = await supabase.functions.invoke('ai-analyze-call', {
+      body: {
+        call_record_id,
+        transcript_text: 'Agent: Bonjour, comment puis-je vous aider? Caller: J\'ai besoin de support.',
+        organization_id: LEMTEL_ORG,
+      },
     });
     setAnalyzing(null);
     if (error) toast({ title: 'Analysis failed', description: error.message, variant: 'destructive' });
-    else { toast({ title: 'Analyzed', description: 'AI analysis complete' }); load(); }
+    else { toast({ title: 'Analyzed', description: 'AI analysis complete' }); qc.invalidateQueries({ queryKey: ['pbx', 'pbx_call_records'] }); }
   };
 
-  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin" /></div>;
+  const sync = async () => {
+    setSyncing(true);
+    const { error } = await supabase.functions.invoke('fusionpbx-sync-cdr', { body: { organization_id: LEMTEL_ORG } });
+    setSyncing(false);
+    if (error) toast({ title: 'Sync failed', description: error.message, variant: 'destructive' });
+    else { toast({ title: 'Synced', description: 'CDR sync complete' }); qc.invalidateQueries({ queryKey: ['pbx', 'pbx_call_records'] }); }
+  };
+
+  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin" /></div>;
 
   return (
     <div className="space-y-6">
-      <div><h1 className="text-3xl font-bold">Call History</h1><p className="text-muted-foreground">{cdrs.length} calls</p></div>
+      <div className="flex items-center justify-between">
+        <div><h1 className="text-3xl font-bold">Call History</h1><p className="text-muted-foreground">{cdrs.length} calls</p></div>
+        <Button onClick={sync} disabled={syncing} variant="outline">
+          {syncing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+          Sync from PBX
+        </Button>
+      </div>
       <Card className="overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-muted text-xs uppercase text-muted-foreground">
@@ -65,19 +64,19 @@ export default function LemtelPortalCalls() {
           </thead>
           <tbody>
             {cdrs.length === 0 ? (
-              <tr><td colSpan={7} className="text-center p-8 text-muted-foreground">No calls yet. Configure FusionPBX to sync CDRs.</td></tr>
-            ) : cdrs.map((c) => (
+              <tr><td colSpan={7} className="text-center p-8 text-muted-foreground">No calls yet.</td></tr>
+            ) : cdrs.map((c: any) => (
               <tr key={c.id} className="border-t hover:bg-muted/30">
-                <td className="p-3">{c.direction === 'inbound' ? '🟢' : c.direction === 'outbound' ? '🔵' : '⚪'}</td>
-                <td className="p-3">{c.start_stamp ? format(new Date(c.start_stamp), 'PP HH:mm') : '-'}</td>
-                <td className="p-3">{c.caller_id_number || '-'}</td>
-                <td className="p-3">{c.caller_destination || '-'}</td>
-                <td className="p-3">{Math.floor(c.duration / 60)}:{String(c.duration % 60).padStart(2, '0')}</td>
-                <td className="p-3">{c.record_path ? <Button size="sm" variant="ghost"><Play className="w-3 h-3" /></Button> : '-'}</td>
+                <td className="p-3">{c.direction === 'inbound' ? '🟢' : c.direction === 'outbound' ? '🔵' : c.direction === 'missed' ? '🔴' : '⚪'}</td>
+                <td className="p-3">{c.start_at ? format(new Date(c.start_at), 'PP HH:mm') : '-'}</td>
+                <td className="p-3">{c.caller_number || '-'}</td>
+                <td className="p-3">{c.destination || '-'}</td>
+                <td className="p-3">{Math.floor((c.duration_seconds || 0) / 60)}:{String((c.duration_seconds || 0) % 60).padStart(2, '0')}</td>
+                <td className="p-3">{c.has_recording ? <Button size="sm" variant="ghost"><Play className="w-3 h-3" /></Button> : '-'}</td>
                 <td className="p-3">
                   {c.analyzed ? <Badge variant="default">Analyzed</Badge> : (
-                    <Button size="sm" variant="outline" onClick={() => analyze(c.call_uuid)} disabled={analyzing === c.call_uuid || c.ai_processing}>
-                      {analyzing === c.call_uuid ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Sparkles className="w-3 h-3 mr-1" />Analyze</>}
+                    <Button size="sm" variant="outline" onClick={() => analyze(c.id)} disabled={analyzing === c.id || c.ai_processing}>
+                      {analyzing === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Sparkles className="w-3 h-3 mr-1" />Analyze</>}
                     </Button>
                   )}
                 </td>
