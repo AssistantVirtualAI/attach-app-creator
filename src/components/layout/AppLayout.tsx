@@ -40,7 +40,7 @@ import {
 import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 import { OrgSwitcher } from '@/components/layout/OrgSwitcher';
 import { useApplyBranding } from '@/hooks/useApplyBranding';
-import { LemtelSoftphone } from '@/components/lemtel/LemtelSoftphone';
+import { SoftphoneWidget } from '@/components/softphone/SoftphoneWidget';
 
 const SIDEBAR_ORDER_KEY = 'sidebar-group-order';
 
