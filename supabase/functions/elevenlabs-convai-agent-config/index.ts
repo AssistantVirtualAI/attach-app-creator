@@ -1226,16 +1226,26 @@ serve(async (req) => {
 
         const createdAgent = await createResponse.json();
         console.log('[elevenlabs-agent-config] Successfully created agent:', createdAgent.agent_id);
-        
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            agent_id: createdAgent.agent_id,
-            agent: createdAgent 
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+
+        // Audit log (best-effort, never blocks the response)
+        if (organizationId) {
+          try {
+            await supabaseService.from('audit_logs').insert({
+              organization_id: organizationId,
+              action: 'create',
+              resource_type: 'agents',
+              metadata: {
+                platform: 'elevenlabs',
+                platform_agent_id: createdAgent.agent_id,
+                name: createPayload.name,
+                org_tag: `org:${organizationId}`,
+              },
+            });
+          } catch (e) {
+            console.warn('[elevenlabs-agent-config] audit log insert failed', e);
+          }
+        }
+
 
       default:
         throw new Error(`Action non supportée: ${action}`);
