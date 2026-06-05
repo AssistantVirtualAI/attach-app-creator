@@ -162,6 +162,7 @@ serve(async (req) => {
       limit = 50, 
       filters = {} as ConversationFilters,
       action = 'list',
+      organizationId,
       conversationId,
       platformAgentId,
       format = 'mp3'
@@ -215,14 +216,33 @@ serve(async (req) => {
       });
     }
 
-    // Get user's organization
-    const { data: orgMember } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .single();
+    const requestedOrgId = typeof organizationId === 'string' && organizationId.length > 0 ? organizationId : null;
+    let orgId = requestedOrgId;
 
-    if (!orgMember) {
+    if (requestedOrgId) {
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .eq('organization_id', requestedOrgId)
+        .maybeSingle();
+
+      if (!membership) {
+        return new Response(JSON.stringify({ error: 'Forbidden for selected organization' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    } else {
+      const { data: memberships } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1);
+      orgId = memberships?.[0]?.organization_id ?? null;
+    }
+
+    if (!orgId) {
       return new Response(JSON.stringify({ error: 'No organization found' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -233,7 +253,7 @@ serve(async (req) => {
     const { data: agents, error: agentsError } = await supabase
       .from('agents')
       .select('id, name, platform_agent_id, platform_api_key, platform, config')
-      .eq('organization_id', orgMember.organization_id);
+      .eq('organization_id', orgId);
 
     if (agentsError) {
       console.error('Error fetching agents:', agentsError);
@@ -245,7 +265,7 @@ serve(async (req) => {
       .from('organization_integrations')
       .select('id, agent_id, api_key, platform, additional_config')
       .eq('is_active', true)
-      .or(`organization_id.eq.${orgMember.organization_id},user_id.eq.${user.id}`);
+      .or(`organization_id.eq.${orgId},user_id.eq.${user.id}`);
 
     // Build integration API keys map by platform
     const integrationApiKeys: Record<string, Record<string, string>> = {
