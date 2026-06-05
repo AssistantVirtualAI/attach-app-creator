@@ -381,7 +381,7 @@ export default function TelephonyChecklist() {
 
   const sectionStats = sections.map(s => ({
     title: s.title,
-    pass: s.checks.filter(c => results[c.id]?.status === 'pass').length,
+    pass: s.checks.filter(c => { const st = results[c.id]?.status; return st === 'pass' || st === 'warn'; }).length,
     total: s.checks.length,
   }));
 
