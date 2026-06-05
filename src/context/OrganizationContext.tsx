@@ -76,15 +76,6 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [user]);
 
-  useEffect(() => {
-    if (selectedOrgId) {
-      const org = organizations.find((o) => o.id === selectedOrgId) || null;
-      setSelectedOrg(org);
-      loadUserRole(selectedOrgId);
-      try { localStorage.setItem(SELECTED_ORG_KEY, selectedOrgId); } catch {}
-    }
-  }, [selectedOrgId, organizations]);
-
   const checkSuperAdmin = async () => {
     if (!user) return;
     try {
@@ -107,29 +98,48 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       const { data: memberships, error: mErr } = await supabase
         .from('organization_members')
-        .select('organization_id')
+        .select('organization_id, accepted_at')
         .eq('user_id', user.id);
 
       if (mErr) throw mErr;
 
-      const orgIds = (memberships || []).map((m) => m.organization_id);
+      const orgIds = (memberships || []).map((m) => m.organization_id).filter(Boolean);
       if (orgIds.length === 0) {
         setOrganizations([]);
+        setOrganizationMemberships([]);
         setSelectedOrg(null);
         setSelectedOrgIdState(null);
+        setUserRole(null);
         return;
       }
 
-      const { data: orgs, error: oErr } = await supabase
+      const [{ data: orgs, error: oErr }, { data: roles, error: rErr }] = await Promise.all([
+        supabase
         .from('organizations')
         .select('*')
         .in('id', orgIds)
         .eq('is_active', true)
-        .order('name');
+          .order('name'),
+        supabase
+          .from('user_roles')
+          .select('*')
+          .eq('user_id', user.id)
+          .in('organization_id', orgIds),
+      ]);
 
       if (oErr) throw oErr;
+      if (rErr) throw rErr;
       const list = (orgs || []) as Organization[];
+      const rolesList = (roles || []) as UserRole[];
       setOrganizations(list);
+      setOrganizationMemberships(
+        list.map((org) => ({
+          organization: org,
+          role: rolesList.find((role) => role.organization_id === org.id)?.role || null,
+          accepted_at: (memberships || []).find((membership) => membership.organization_id === org.id)?.accepted_at || null,
+          isSelected: org.id === selectedOrgId,
+        }))
+      );
 
       // Pick selected: localStorage > current > first
       const stored = (() => { try { return localStorage.getItem(SELECTED_ORG_KEY); } catch { return null; } })();
@@ -176,12 +186,30 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     await loadOrganizations();
   };
 
+  useEffect(() => {
+    if (selectedOrgId) {
+      const org = organizations.find((o) => o.id === selectedOrgId) || null;
+      setSelectedOrg(org);
+      loadUserRole(selectedOrgId);
+      setOrganizationMemberships((current) => current.map((membership) => ({
+        ...membership,
+        isSelected: membership.organization.id === selectedOrgId,
+      })));
+      try { localStorage.setItem(SELECTED_ORG_KEY, selectedOrgId); } catch {}
+      queryClient.invalidateQueries({ refetchType: 'active' });
+    } else {
+      setSelectedOrg(null);
+      setUserRole(null);
+    }
+  }, [selectedOrgId, organizations, queryClient]);
+
   return (
     <OrganizationContext.Provider
       value={{
         selectedOrg,
         selectedOrgId,
         organizations,
+        organizationMemberships,
         userRole,
         isLoading,
         refreshOrganization,
