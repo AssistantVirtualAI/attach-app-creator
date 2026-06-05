@@ -129,13 +129,15 @@ jobs:
             libcups2-dev libxss1 libxtst6 xvfb \
             libx11-xcb1 libxcb-dri3-0 libdrm2 \
             libgbm1 libnss3 libatk-bridge2.0-0
-      - name: Cleanup root configs (Ubuntu/Mac)
-        if: runner.os != 'Windows'
+      - name: Remove root PostCSS config
         shell: bash
         run: |
-          for f in postcss.config.js postcss.config.cjs postcss.config.mjs tailwind.config.js tailwind.config.ts; do
-            [ -f "$f" ] && rm "$f" && echo "Deleted $f" || echo "Not found: $f"
-          done
+          if [ -f "postcss.config.js" ]; then
+            rm -f postcss.config.js
+            echo "✅ Deleted postcss.config.js"
+          else
+            echo "ℹ️ postcss.config.js not found at root"
+          fi
       - name: Install dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
