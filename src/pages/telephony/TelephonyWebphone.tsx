@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { useState } from 'react';
+import { DesktopDownloadCard } from '@/components/telephony/DesktopDownloadCard';
 
 export default function TelephonyWebphone() {
   const [search, setSearch] = useState('');
@@ -45,6 +46,8 @@ export default function TelephonyWebphone() {
         <h1 className="text-3xl font-bold flex items-center gap-2"><Phone className="w-7 h-7" /> Softphone</h1>
         <p className="text-muted-foreground">Make and receive calls in the browser via WebRTC</p>
       </div>
+
+      <DesktopDownloadCard />
 
       <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr_360px] gap-4">
         <Card className="h-[600px] flex flex-col">
