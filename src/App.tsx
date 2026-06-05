@@ -91,6 +91,7 @@ import LemtelQueues from "./pages/lemtel/LemtelQueues";
 import LemtelIVR from "./pages/lemtel/LemtelIVR";
 import LemtelVoiceAgents from "./pages/lemtel/LemtelVoiceAgents";
 import LemtelSoftphoneUsers from "./pages/lemtel/LemtelSoftphoneUsers";
+import LemtelDevices from "./pages/lemtel/LemtelDevices";
 import LemtelAnalytics from "./pages/lemtel/LemtelAnalytics";
 
 // Portal pages
@@ -486,6 +487,7 @@ const App = () => (
                 <Route path="/lemtel/customers" element={<ProtectedRoute><LemtelGuard><LemtelCustomers /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/lemtel/dids" element={<ProtectedRoute><LemtelGuard><LemtelDIDs /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/lemtel/extensions" element={<ProtectedRoute><LemtelGuard><LemtelExtensions /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/devices" element={<ProtectedRoute><LemtelGuard><LemtelDevices /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/lemtel/queues" element={<ProtectedRoute><LemtelGuard><LemtelQueues /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/lemtel/ivr" element={<ProtectedRoute><LemtelGuard><LemtelIVR /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/lemtel/voice-agents" element={<ProtectedRoute><LemtelGuard><LemtelVoiceAgents /></LemtelGuard></ProtectedRoute>} />
