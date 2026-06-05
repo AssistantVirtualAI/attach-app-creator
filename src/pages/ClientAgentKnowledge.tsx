@@ -462,29 +462,29 @@ const ClientAgentKnowledge = () => {
                 <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                 <p className="text-muted-foreground">
                   {documentData.document.content_unavailable_reason === 'binary_or_not_extractible' 
-                    ? 'Ce fichier est binaire ou son contenu ne peut pas être extrait.'
-                    : 'Le contenu de ce document n\'est pas disponible.'}
+                    ? 'This file is binary or its content cannot be extracted.'
+                    : 'This document content is not available.'}
                 </p>
               </div>
             ) : (
-              <p className="text-muted-foreground p-4 text-center">Aucun contenu disponible</p>
+              <p className="text-muted-foreground p-4 text-center">No content available</p>
             )}
           </ScrollArea>
           <DialogFooter className="gap-2">
             {isEditMode ? (
               <>
                 <Button variant="outline" onClick={() => setIsEditMode(false)}>
-                  Annuler
+                  Cancel
                 </Button>
                 <Button onClick={handleSaveEdit} disabled={updateMutation.isPending} className="gap-2">
                   {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Sauvegarder
+                  Save
                 </Button>
               </>
             ) : (
               <>
                 <Button variant="outline" onClick={() => setViewDocumentId(null)}>
-                  Fermer
+                  Close
                 </Button>
                 {canEdit && documentData?.document?.type !== 'url' && documentData?.document?.content && (
                   <Button onClick={handleStartEdit} className="gap-2">

@@ -158,7 +158,7 @@ export function KnowledgeBaseEditor({ item, onSave, onCancel }: KnowledgeBaseEdi
               className="bg-gradient-to-r from-purple-neon to-cyan-electric hover:from-purple-neon/80 hover:to-cyan-electric/80"
             >
               <Save className="w-4 h-4 mr-2" />
-              Sauvegarder
+              Save
             </Button>
             
             <Button

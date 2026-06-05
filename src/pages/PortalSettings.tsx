@@ -359,16 +359,16 @@ const PortalSettings = () => {
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-6">
               <div>
-                <Label>Prompt Système</Label>
-                <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={6} className="mt-2 font-mono text-sm" placeholder="Vous êtes un assistant IA..." />
+                <Label>System Prompt</Label>
+                <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={6} className="mt-2 font-mono text-sm" placeholder="You are an AI assistant..." />
               </div>
               <div>
-                <Label>Premier Message</Label>
-                <Textarea value={firstMessage} onChange={(e) => setFirstMessage(e.target.value)} rows={2} className="mt-2" placeholder="Bonjour, comment puis-je vous aider ?" />
+                <Label>First Message</Label>
+                <Textarea value={firstMessage} onChange={(e) => setFirstMessage(e.target.value)} rows={2} className="mt-2" placeholder="Hello, how can I help you?" />
               </div>
               <Button onClick={handleSavePrompt} disabled={updatePrompt.isPending} className="gap-2 bg-gradient-to-r from-pink-500 to-purple-500">
                 {updatePrompt.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Sauvegarder Prompt
+                Save Prompt
               </Button>
             </div>
           </AccordionContent>
@@ -380,37 +380,37 @@ const PortalSettings = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary/10"><Volume2 className="h-5 w-5 text-primary" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Voix & TTS</h3>
-                <p className="text-sm text-muted-foreground">Synthèse vocale et caractéristiques</p>
+                <h3 className="font-semibold">Voice & TTS</h3>
+                <p className="text-sm text-muted-foreground">Speech synthesis and characteristics</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-6">
               <div>
-                <Label className="text-base font-medium mb-4 block">Sélectionner une voix</Label>
+                <Label className="text-base font-medium mb-4 block">Select a voice</Label>
                 <VoiceSelector selectedVoiceId={ttsSettings.voice_id} onSelect={(voice) => setTtsSettings(prev => ({ ...prev, voice_id: voice.voice_id }))} organizationId={session?.organizationId} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label>Modèle TTS</Label>
+                  <Label>TTS Model</Label>
                   <Select value={ttsSettings.model_id || 'eleven_turbo_v2_5'} onValueChange={(v) => setTtsSettings(prev => ({ ...prev, model_id: v }))}>
                     <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
                     <SelectContent>{TTS_MODELS.map(model => (<SelectItem key={model.id} value={model.id}>{model.name}</SelectItem>))}</SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label>Vitesse ({ttsSettings.speed?.toFixed(1)}x)</Label>
+                  <Label>Speed ({ttsSettings.speed?.toFixed(1)}x)</Label>
                   <Slider value={[ttsSettings.speed || 1]} onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, speed: v }))} min={0.5} max={2} step={0.1} className="mt-4" />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                  <Label>Stabilité ({Math.round((ttsSettings.stability || 0.5) * 100)}%)</Label>
+                  <Label>Stability ({Math.round((ttsSettings.stability || 0.5) * 100)}%)</Label>
                   <Slider value={[ttsSettings.stability || 0.5]} onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, stability: v }))} min={0} max={1} step={0.01} className="mt-4" />
                 </div>
                 <div>
-                  <Label>Similarité ({Math.round((ttsSettings.similarity_boost || 0.75) * 100)}%)</Label>
+                  <Label>Similarity ({Math.round((ttsSettings.similarity_boost || 0.75) * 100)}%)</Label>
                   <Slider value={[ttsSettings.similarity_boost || 0.75]} onValueChange={([v]) => setTtsSettings(prev => ({ ...prev, similarity_boost: v }))} min={0} max={1} step={0.01} className="mt-4" />
                 </div>
                 <div>
@@ -420,7 +420,7 @@ const PortalSettings = () => {
               </div>
               <Button onClick={handleSaveTTS} disabled={updateTTS.isPending} className="gap-2 bg-gradient-to-r from-primary to-purple-500">
                 {updateTTS.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Sauvegarder Voix
+                Save Voice
               </Button>
             </div>
           </AccordionContent>
