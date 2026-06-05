@@ -197,25 +197,27 @@ Deno.serve(async (req) => {
   }
 
   function mapCdr(c: any) {
-    const rec = c.record_name && c.record_name !== "";
+    const recName = c.record_name ?? null;
+    const rec = recName && recName !== "";
+    const answer = c.answer_stamp ?? c.answer_at ?? null;
     return {
       organization_id,
-      pbx_uuid: c.xml_cdr_uuid,
-      direction: c.direction,
+      pbx_uuid: c.xml_cdr_uuid ?? c.cdr_uuid ?? c.uuid,
+      direction: c.direction ?? null,
       call_status: c.hangup_cause ?? null,
       extension: c.extension ?? null,
-      caller_name: c.caller_id_name ?? null,
-      caller_number: c.caller_id_number ?? null,
-      destination: c.caller_destination ?? null,
-      start_at: c.start_stamp ?? null,
-      answer_at: c.answer_stamp ?? null,
-      end_at: c.end_stamp ?? null,
+      caller_name: c.caller_id_name ?? c.caller_name ?? null,
+      caller_number: c.caller_id_number ?? c.caller_number ?? null,
+      destination: c.caller_destination ?? c.destination ?? null,
+      start_at: c.start_stamp ?? c.start_at ?? c.start_time ?? null,
+      answer_at: answer,
+      end_at: c.end_stamp ?? c.end_at ?? null,
       duration_seconds: c.duration ? parseInt(c.duration) : 0,
-      billsec: c.billsec ? parseInt(c.billsec) : 0,
+      billsec: c.billsec ? parseInt(c.billsec) : (c.bill_seconds ? parseInt(c.bill_seconds) : 0),
       mos: c.rtp_audio_in_mos ? parseFloat(c.rtp_audio_in_mos) : null,
-      missed_call: c.missed_call === "true" || c.missed_call === true,
+      missed_call: c.missed_call === "true" || c.missed_call === true || (!answer && c.direction === "inbound"),
       has_recording: !!rec,
-      recording_url: rec ? `${c.record_path || ""}/${c.record_name}` : null,
+      recording_url: rec ? `${c.record_path || ""}/${recName}` : null,
       raw_data: c,
     };
   }
