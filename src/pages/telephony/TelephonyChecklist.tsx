@@ -65,10 +65,18 @@ const sections: Section[] = [
         } },
       { id: '1.6', name: 'Storage buckets', description: 'IVR audio + recordings buckets',
         run: async () => {
-          const { data, error } = await supabase.storage.listBuckets();
-          if (error) return { status: 'fail' as const, detail: error.message };
-          const names = (data ?? []).map(b => b.name);
           const want = ['lemtel-ivr-audio', 'lemtel-recordings'];
+          const { data: buckets } = await supabase.storage.listBuckets();
+          let names = (buckets ?? []).map(b => b.name);
+          // Fallback: listBuckets often requires elevated perms — probe each bucket directly
+          if (!names.length) {
+            const probes = await Promise.all(want.map(async n => {
+              const { error } = await supabase.storage.from(n).list('', { limit: 1 });
+              // "Bucket not found" => missing; other errors (RLS, etc.) => exists
+              return error && /not found/i.test(error.message) ? null : n;
+            }));
+            names = probes.filter(Boolean) as string[];
+          }
           const missing = want.filter(w => !names.includes(w));
           return missing.length
             ? { status: 'fail' as const, detail: `Missing: ${missing.join(', ')}` }
