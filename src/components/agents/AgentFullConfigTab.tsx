@@ -355,14 +355,14 @@ function ElevenLabsFullConfigTab({ agentId, platformAgentId, apiKey }: { agentId
                   className="mt-4"
                 />
                 <p className="text-xs text-muted-foreground mt-2">
-                  0 = Haute qualité, 4 = Faible latence
+                  0 = High quality, 4 = Low latency
                 </p>
               </div>
 
               <Button onClick={handleSaveTTS} disabled={updateTTS.isPending}>
                 {updateTTS.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 <Save className="h-4 w-4 mr-2" />
-                Sauvegarder TTS
+                Save TTS
               </Button>
             </div>
           </AccordionContent>
@@ -432,14 +432,14 @@ function ElevenLabsFullConfigTab({ agentId, platformAgentId, apiKey }: { agentId
                   className="mt-2"
                 />
                 <p className="text-xs text-muted-foreground mt-2">
-                  Séparez les mots-clés par des virgules. Améliore la reconnaissance de termes spécifiques.
+                  Separate keywords with commas. Improves recognition of specific terms.
                 </p>
               </div>
 
               <Button onClick={handleSaveASR} disabled={updateASR.isPending}>
                 {updateASR.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 <Save className="h-4 w-4 mr-2" />
-                Sauvegarder ASR
+                Save ASR
               </Button>
             </div>
           </AccordionContent>
@@ -507,7 +507,7 @@ function ElevenLabsFullConfigTab({ agentId, platformAgentId, apiKey }: { agentId
                     className="mt-4"
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    Durée de silence avant fin automatique
+                    Silence duration before automatic ending
                   </p>
                 </div>
               </div>
@@ -515,7 +515,7 @@ function ElevenLabsFullConfigTab({ agentId, platformAgentId, apiKey }: { agentId
               <Button onClick={handleSaveTurn} disabled={updateTurn.isPending}>
                 {updateTurn.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 <Save className="h-4 w-4 mr-2" />
-                Sauvegarder Tours
+                Save Turns
               </Button>
             </div>
           </AccordionContent>
@@ -585,7 +585,7 @@ function ElevenLabsFullConfigTab({ agentId, platformAgentId, apiKey }: { agentId
               <Button onClick={handleSaveConversation} disabled={updateConversation.isPending}>
                 {updateConversation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 <Save className="h-4 w-4 mr-2" />
-                Sauvegarder Conversation
+                Save Conversation
               </Button>
             </div>
           </AccordionContent>
@@ -638,7 +638,7 @@ function ElevenLabsFullConfigTab({ agentId, platformAgentId, apiKey }: { agentId
               <Button onClick={handleSaveAdvanced} disabled={updateAdvanced.isPending}>
                 {updateAdvanced.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 <Save className="h-4 w-4 mr-2" />
-                Sauvegarder Agent
+                Save Agent
               </Button>
             </div>
           </AccordionContent>
@@ -677,14 +677,14 @@ function ElevenLabsFullConfigTab({ agentId, platformAgentId, apiKey }: { agentId
                   onChange={(e) => setFirstMessage(e.target.value)}
                   rows={3}
                   className="mt-2"
-                  placeholder="Bonjour, comment puis-je vous aider ?"
+                  placeholder="Hello, how can I help you?"
                 />
               </div>
 
               <Button onClick={handleSavePrompt} disabled={updatePrompt.isPending}>
                 {updatePrompt.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 <Save className="h-4 w-4 mr-2" />
-                Sauvegarder Prompt
+                Save Prompt
               </Button>
             </div>
           </AccordionContent>
@@ -732,7 +732,7 @@ function ElevenLabsFullConfigTab({ agentId, platformAgentId, apiKey }: { agentId
                     className="mt-4"
                   />
                   <p className="text-xs text-muted-foreground mt-2">
-                    Longueur maximale de la réponse
+                    Maximum response length
                   </p>
                 </div>
               </div>
@@ -740,7 +740,7 @@ function ElevenLabsFullConfigTab({ agentId, platformAgentId, apiKey }: { agentId
               <Button onClick={handleSaveLLM} disabled={updateLLM.isPending}>
                 {updateLLM.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 <Save className="h-4 w-4 mr-2" />
-                Sauvegarder LLM
+                Save LLM
               </Button>
             </div>
           </AccordionContent>
