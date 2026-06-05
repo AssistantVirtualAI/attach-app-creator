@@ -55,19 +55,24 @@ export class AppErrorBoundary extends Component<Props, State> {
             </div>
             
             <div className="space-y-2">
-              <h1 className="text-2xl font-bold text-foreground">Une erreur est survenue</h1>
+              <h1 className="text-2xl font-bold text-foreground">Something went wrong</h1>
               <p className="text-muted-foreground">
-                Nous sommes désolés, quelque chose s'est mal passé. Veuillez réessayer.
+                A runtime error was thrown while rendering. Full message and stack trace below.
               </p>
             </div>
 
-            {import.meta.env.DEV && this.state.error && (
-              <div className="text-left bg-muted/50 rounded-lg p-4 overflow-auto max-h-40">
-                <p className="text-sm font-mono text-destructive">
+            {this.state.error && (
+              <div className="text-left bg-muted/50 rounded-lg p-4 overflow-auto max-h-60">
+                <p className="text-sm font-mono text-destructive break-all">
                   {this.state.error.toString()}
                 </p>
+                {this.state.error.stack && (
+                  <pre className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap break-all">
+                    {this.state.error.stack}
+                  </pre>
+                )}
                 {this.state.errorInfo?.componentStack && (
-                  <pre className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap">
+                  <pre className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap break-all">
                     {this.state.errorInfo.componentStack}
                   </pre>
                 )}
@@ -77,17 +82,16 @@ export class AppErrorBoundary extends Component<Props, State> {
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button variant="outline" onClick={this.handleGoBack} className="gap-2">
                 <ArrowLeft className="w-4 h-4" />
-                Retour
+                Go back
               </Button>
-              <Button onClick={this.handleReload} className="gap-2">
+              <Button onClick={this.handleReset} className="gap-2">
                 <RefreshCw className="w-4 h-4" />
-                Recharger la page
+                Retry
+              </Button>
+              <Button variant="ghost" onClick={this.handleReload} className="gap-2">
+                Reload page
               </Button>
             </div>
-
-            <Button variant="link" onClick={this.handleReset} className="text-sm">
-              Réessayer sans recharger
-            </Button>
           </div>
         </div>
       );

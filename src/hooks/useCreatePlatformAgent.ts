@@ -167,28 +167,46 @@ export function useCreatePlatformAgent() {
     mutationFn: async (params: CreateAgentParams): Promise<CreateAgentResult> => {
       if (!selectedOrgId) throw new Error('No organization selected');
 
+      const traceId = (crypto as any)?.randomUUID?.() ?? `trace_${Date.now()}`;
+      const t0 = performance.now();
+      const trace = (step: string, extra: Record<string, unknown> = {}) => {
+        console.info('[create-agent]', { traceId, step, organizationId: selectedOrgId, platform: params.platform, elapsedMs: Math.round(performance.now() - t0), ...extra });
+      };
+      trace('start');
+
+      // Audit: record create intent (helps cross-org debugging)
+      supabase.rpc('log_agent_access', {
+        _org_id: selectedOrgId,
+        _action: 'create_attempt',
+        _metadata: { traceId, platform: params.platform, name: params.name } as any,
+      }).then(({ error }) => { if (error) console.warn('[create-agent] audit insert failed', { traceId, error }); });
+
       setProgress('Creating agent on platform...');
 
       let platformResult: { agent_id: string; agent: any };
 
-      // Create agent on the selected platform
-      switch (params.platform) {
-        case 'elevenlabs':
-          platformResult = await createElevenLabsAgent(selectedOrgId, params);
-          break;
-        case 'vapi':
-          platformResult = await createVapiAgent(selectedOrgId, params);
-          break;
-        case 'retell':
-          platformResult = await createRetellAgent(selectedOrgId, params);
-          break;
-        default:
-          throw new Error(`Unsupported platform: ${params.platform}`);
+      try {
+        switch (params.platform) {
+          case 'elevenlabs':
+            platformResult = await createElevenLabsAgent(selectedOrgId, params);
+            break;
+          case 'vapi':
+            platformResult = await createVapiAgent(selectedOrgId, params);
+            break;
+          case 'retell':
+            platformResult = await createRetellAgent(selectedOrgId, params);
+            break;
+          default:
+            throw new Error(`Unsupported platform: ${params.platform}`);
+        }
+        trace('platform_created', { platformAgentId: platformResult.agent_id });
+      } catch (err: any) {
+        trace('platform_error', { message: err?.message, stack: err?.stack });
+        throw new Error(`[${params.platform}] ${err?.message || 'platform create failed'} (trace ${traceId})`);
       }
 
       setProgress('Saving agent to database...');
 
-      // Save agent to Supabase
       const agentData = {
         name: params.name,
         organization_id: selectedOrgId,
@@ -205,6 +223,7 @@ export function useCreatePlatformAgent() {
           llmSettings: params.llmSettings,
           asrSettings: params.asrSettings,
           platformAgent: platformResult.agent,
+          traceId,
         })),
       };
 
@@ -214,15 +233,15 @@ export function useCreatePlatformAgent() {
         .select('id')
         .single();
 
-      if (saveError) throw new Error(`Failed to save agent: ${saveError.message}`);
+      if (saveError) {
+        trace('db_save_error', { message: saveError.message, code: saveError.code, details: saveError.details });
+        throw new Error(`DB save failed: ${saveError.message} (trace ${traceId})`);
+      }
+      trace('db_saved', { agentId: savedAgent.id });
 
       setProgress('');
 
-      return {
-        agentId: savedAgent.id,
-        platformAgentId: platformResult.agent_id,
-        success: true,
-      };
+      return { agentId: savedAgent.id, platformAgentId: platformResult.agent_id, success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agents'] });

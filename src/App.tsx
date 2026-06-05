@@ -75,6 +75,7 @@ import TwilioManagement from "./pages/TwilioManagement";
 import FeaturesPage from "./pages/Features";
 import DemoRequestPage from "./pages/DemoRequest";
 import ContactUs from "./pages/ContactUs";
+import AuditLogs from "./pages/AuditLogs";
 
 // Portal pages
 import PortalLogin from "./pages/PortalLogin";
@@ -453,6 +454,15 @@ const App = () => (
                     </ProtectedRoute>
                   }
                 />
+                <Route
+                  path="/audit-logs"
+                  element={
+                    <ProtectedRoute>
+                      <AuditLogs />
+                    </ProtectedRoute>
+                  }
+                />
+                
                 
                 {/* Client Portal Routes - Separate authentication */}
                 <Route
