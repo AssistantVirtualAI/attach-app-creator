@@ -432,31 +432,31 @@ const PortalSettings = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-purple-500/10"><Mic className="h-5 w-5 text-purple-500" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Reconnaissance Vocale (ASR)</h3>
-                <p className="text-sm text-muted-foreground">Paramètres de transcription</p>
+                <h3 className="font-semibold">Speech Recognition (ASR)</h3>
+                <p className="text-sm text-muted-foreground">Transcription settings</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-6">
               <div>
-                <Label>Qualité</Label>
+                <Label>Quality</Label>
                 <Select value={asrSettings.quality || 'high'} onValueChange={(v: any) => setAsrSettings(prev => ({ ...prev, quality: v }))}>
                   <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="high">Haute (recommandé)</SelectItem>
+                    <SelectItem value="high">High (recommended)</SelectItem>
                     <SelectItem value="standard">Standard</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>Mots-clés personnalisés</Label>
+                <Label>Custom keywords</Label>
                 <Input value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="mot1, mot2, mot3..." className="mt-2" />
-                <p className="text-xs text-muted-foreground mt-2">Séparez les mots-clés par des virgules.</p>
+                <p className="text-xs text-muted-foreground mt-2">Separate keywords with commas.</p>
               </div>
               <Button onClick={handleSaveASR} disabled={updateASR.isPending} className="gap-2">
                 {updateASR.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Sauvegarder ASR
+                Save ASR
               </Button>
             </div>
           </AccordionContent>
@@ -468,15 +468,15 @@ const PortalSettings = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-orange-500/10"><Clock className="h-5 w-5 text-orange-500" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Gestion des Tours</h3>
-                <p className="text-sm text-muted-foreground">Timing et interruptions</p>
+                <h3 className="font-semibold">Turn Management</h3>
+                <p className="text-sm text-muted-foreground">Timing and interruptions</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-6">
               <div>
-                <Label>Réactivité de l'agent</Label>
+                <Label>Agent responsiveness</Label>
                 <div className="grid grid-cols-3 gap-3 mt-3">
                   {TURN_EAGERNESS_OPTIONS.map(option => (
                     <Card key={option.value} className={`p-4 cursor-pointer transition-all ${turnSettings.turn_eagerness === option.value ? 'border-primary bg-primary/5' : 'hover:border-primary/50'}`} onClick={() => setTurnSettings(prev => ({ ...prev, turn_eagerness: option.value as any }))}>
@@ -488,17 +488,17 @@ const PortalSettings = () => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label>Timeout de tour ({turnSettings.turn_timeout}s)</Label>
+                  <Label>Turn timeout ({turnSettings.turn_timeout}s)</Label>
                   <Slider value={[turnSettings.turn_timeout || 10]} onValueChange={([v]) => setTurnSettings(prev => ({ ...prev, turn_timeout: v }))} min={5} max={30} step={1} className="mt-4" />
                 </div>
                 <div>
-                  <Label>Fin d'appel sur silence ({turnSettings.silence_end_call_timeout}s)</Label>
+                  <Label>End call on silence ({turnSettings.silence_end_call_timeout}s)</Label>
                   <Slider value={[turnSettings.silence_end_call_timeout || 30]} onValueChange={([v]) => setTurnSettings(prev => ({ ...prev, silence_end_call_timeout: v }))} min={10} max={120} step={5} className="mt-4" />
                 </div>
               </div>
               <Button onClick={handleSaveTurn} disabled={updateTurn.isPending} className="gap-2">
                 {updateTurn.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Sauvegarder Tours
+                Save Turns
               </Button>
             </div>
           </AccordionContent>
