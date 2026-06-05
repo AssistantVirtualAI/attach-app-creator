@@ -28,8 +28,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { KnowledgeDocumentViewer } from '@/components/knowledge/KnowledgeDocumentViewer';
 import { AddKnowledgeDocumentModal } from '@/components/knowledge/AddKnowledgeDocumentModal';
 
+import { useTranslation } from '@/hooks/useTranslation';
 
 const KnowledgeBase = () => {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
