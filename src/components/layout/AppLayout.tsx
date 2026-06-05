@@ -40,6 +40,7 @@ import {
 import { NotificationsBell } from '@/components/notifications/NotificationsBell';
 import { OrgSwitcher } from '@/components/layout/OrgSwitcher';
 import { useApplyBranding } from '@/hooks/useApplyBranding';
+import { LemtelSoftphone } from '@/components/lemtel/LemtelSoftphone';
 
 const SIDEBAR_ORDER_KEY = 'sidebar-group-order';
 
@@ -93,8 +94,9 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Debug: log sidebar visibility info
   console.log('[Sidebar Debug] Role:', role, 'isSuperAdmin:', isSuperAdmin, 'isLoading:', isLoading, 'userRole:', userRole);
 
-  // Filter groups based on role
-  const visibleGroups = useMemo(() => sidebarGroups, []);
+  // Filter groups based on role and Lemtel org membership
+  const isLemtelMember = isSuperAdmin || organizationMemberships.some(m => m.organization.id === '71755d33-ed64-4ad5-a828-61c9d2029eb7');
+  const visibleGroups = useMemo(() => sidebarGroups.filter(g => !g.lemtelOnly || isLemtelMember), [isLemtelMember]);
 
   // Sidebar group ordering with drag & drop
   const sensors = useSensors(
@@ -304,6 +306,9 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
           gdprEnabled={selectedOrg.gdpr_enabled} 
         />
       )}
+
+      {/* Lemtel Softphone (only visible to Lemtel members) */}
+      <LemtelSoftphone />
     </div>
   );
 };

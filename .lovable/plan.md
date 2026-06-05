@@ -1,63 +1,72 @@
-# Multi-Organization Management
 
-Bring back multiple organizations so a user can create new orgs from Settings, assign members (including org admins), and let each org admin create agents and assign them to their own clients.
+# Lemtel Telecom Module — Integration Plan
 
-## What the user will see
+Adds a new module to the existing AVA Statistic portal without rebuilding anything. All routes, sidebar entries, tables, and edge functions are scoped to the Lemtel organization only.
 
-1. **New "Organizations" tab in Settings** (visible to super_admin and any user who belongs to ≥1 org)
-   - List of all orgs the user belongs to, with role badge per org
-   - "Create new organization" button → modal asking for name + slug (auto-generated, editable) + optional logo
-   - For each org row: switch to it, rename, deactivate (org_admin/super_admin only)
-   - "Members" sub-section per org: list members with role, invite by email, change role (org_admin, manager, agent, viewer), remove member
-   - Creator of a new org is automatically added as `org_admin` and a default `billing_config` is initialized (reuses existing `setup_new_user_organization` pattern via a new lighter SQL function `create_organization_for_user`)
+## Scoping rule (applies everywhere)
+- A single org gate: `useLemtelAccess()` hook checks `selectedOrg.slug === 'lemtel'` (or matches a `LEMTEL_ORG_ID` constant resolved at runtime from `organizations` table).
+- Sidebar group, routes, and edge function calls all short-circuit if the user is not in the Lemtel org (or `super_admin`).
+- All Lemtel tables include `organization_id` defaulting to the Lemtel org id, with RLS policies that require membership in that org.
 
-2. **Org switcher in the top bar** (AppLayout header)
-   - Dropdown showing all orgs the user is a member of with the current one checked
-   - Selecting an org updates `OrganizationContext` and persists choice in `localStorage` (`selected_organization_id`)
-   - All existing pages (Clients, Agents, Conversations, Analytics, etc.) already read `selectedOrgId` from context → they will automatically scope to the active org with no further changes
+## Phase 1 — Foundation (this build)
 
-3. **Clients & Agents flow (already mostly in place, small adjustments)**
-   - Clients page already filters by `organization_id` — confirmed working per org
-   - Agent creation modal: the `client_id` selector will be filtered to clients of the **currently selected org**
-   - Org admins of a given org can create agents inside that org and assign them to one of that org's clients via the existing assign-client field on the agent form
+### 1. Database migration
+Create tables (all with `organization_id uuid NOT NULL` + RLS scoped to Lemtel org members via `has_role`/`organization_members`):
+- `lemtel_config` (key/value, admin-only write)
+- `lemtel_customers`
+- `lemtel_dids`
+- `lemtel_cdrs_cache`
+- `lemtel_transcriptions`
+- `lemtel_voice_agents`
+- `lemtel_sms_threads`
+- `lemtel_softphone_users` (sip_password stored encrypted via pgsodium / never read client-side)
+- `lemtel_ivr_audio`
 
-## Technical details
+Each: GRANTs for `authenticated` + `service_role`, RLS enabled, policies restricted to Lemtel org members. Sensitive columns (`sip_password`, all `lemtel_config.value` for keys, recording URLs) readable only by `service_role` via `_safe` views for client.
 
-### Database
-No new tables needed — `organizations`, `organization_members`, `user_roles`, `billing_config` already exist with proper RLS.
+Storage buckets (private): `lemtel-ivr-audio`, `lemtel-recordings`.
 
-Add one SECURITY DEFINER helper to safely bootstrap a brand-new org for the calling user (mirrors `setup_new_user_organization` but callable any time):
+Enable Realtime on `lemtel_sms_threads`, `lemtel_cdrs_cache`, `lemtel_softphone_users`.
 
-```sql
-create or replace function public.create_organization_for_user(
-  _name text, _slug text
-) returns uuid
-language plpgsql security definer set search_path = public as $$
-declare _org_id uuid; _uid uuid := auth.uid();
-begin
-  if _uid is null then raise exception 'not authenticated'; end if;
-  insert into organizations(name, slug, onboarding_completed) values (_name, _slug, true) returning id into _org_id;
-  insert into organization_members(user_id, organization_id, accepted_at) values (_uid, _org_id, now());
-  insert into user_roles(user_id, organization_id, role) values (_uid, _org_id, 'org_admin');
-  insert into billing_config(organization_id, plan_tier, subscription_status) values (_org_id, 'free', 'active');
-  return _org_id;
-end; $$;
-```
+### 2. Secrets
+Add via secrets tool: `FUSIONPBX_URL`, `FUSIONPBX_USERNAME`, `FUSIONPBX_API_KEY`, `FUSIONPBX_WSS_URL`, `FUSIONPBX_DOMAIN`, `TELNYX_API_KEY`, `TELNYX_MESSAGING_PROFILE_ID`, `TELNYX_WEBHOOK_PUBLIC_KEY`, `ANTHROPIC_API_KEY`. ElevenLabs key already present.
 
-### Frontend changes
-- `src/context/OrganizationContext.tsx` — load **all** memberships (not just first), expose `organizations[]` and `setSelectedOrgId(id)`, persist choice to `localStorage`.
-- `src/components/layout/AppLayout.tsx` — add `<OrgSwitcher />` dropdown next to the notifications bell.
-- `src/components/sidebar/OrgSwitcher.tsx` (new) — reads context, lists orgs, switches active org.
-- `src/pages/Settings.tsx` — add `Organizations` tab between `agency` and `members`.
-- `src/components/settings/OrganizationsTab.tsx` (new) — list + create modal + per-org members panel. Reuses existing `MembersTab` patterns and the `create-org-member` edge function (already accepts `organization_id`).
-- `src/components/agents/CreateAgentModal.tsx` — make sure the client selector filter uses `selectedOrgId` (verify, adjust if hardcoded).
-- Locales: add new strings under `settings.organizations.*` in `src/locales/en.ts` and `fr.ts`.
+### 3. Edge functions (stubs that work with mock mode)
+- `fusionpbx-proxy` — JWT-verified, validates Lemtel membership, forwards `{endpoint, method, body}` to FusionPBX with API key as query params.
+- `telnyx-sms` — POST send / GET history; logs to `lemtel_sms_threads`.
+- `telnyx-webhook` (public, signature-verified) — upserts inbound SMS, broadcasts `lemtel-sms-inbox`.
+- `ai-call-analysis` — Claude `claude-sonnet-4-20250514` transcript + JSON analysis → `lemtel_transcriptions`.
+- `ivr-script-generator` — Claude script → ElevenLabs TTS → upload to `lemtel-ivr-audio` bucket.
 
-### Permissions
-- Anyone authenticated can create a new org via the RPC (they become its `org_admin`).
-- Only `org_admin`/`super_admin` of an org can rename/deactivate it or manage that org's members (already enforced by existing RLS + `manage-org-roles` / `create-org-member` edge functions).
+### 4. Frontend skeleton
+- New sidebar group `lemtel` added to `src/components/sidebar/sidebarConfig.ts`, conditionally rendered (new `lemtelOnly: true` flag handled in `AppLayout.tsx`).
+- Admin items vs portal items split by role (`org_admin`/`super_admin` vs Lemtel customer portal user).
+- Routes added to `App.tsx` under `/lemtel/*` and `/lemtel/portal/*` with a `<LemtelGuard>` wrapper.
+- All admin and portal pages created as routed shells with titles + loading/empty states.
+
+### 5. Phase 1 functional pages
+- `/lemtel/settings` — full credential editor, test buttons per service, Mock Data toggle (stored in `lemtel_config`).
+- `/lemtel/dashboard` — status banner, 4 stat cards, recent calls + SMS preview, agent perf chart (mock-first).
+- `/lemtel/portal/calls` — CDR table with audio player, "Analyze" action calling `ai-call-analysis`.
+- `/lemtel/messages` — 3-panel SMS UI wired to `telnyx-sms` + Realtime.
+- Softphone widget v1: minimized button + DIAL tab, JsSIP registration to WSS, status dot.
+
+### 6. Mock Data mode
+Single `useMockMode()` hook reading `lemtel_config.mock_mode`. All hooks (`useLemtelCustomers`, `useLemtelCdrs`, etc.) return canned datasets when ON.
+
+## Phase 2 (after Phase 1 sign-off)
+Full softphone (all 4 tabs, hold/transfer/conference/DTMF), all customer portal pages, IVR visual builder + AI generation UI, voice agent analytics, BLF presence polling, PDF export, FR/EN i18n strings for the new module.
+
+## Technical notes
+- JsSIP loaded via CDN in `index.html`, typed via ambient `declare global` shim.
+- Audio playback via `<audio>` + `setSinkId`; ringtone as base64 data URI.
+- Telnyx webhook signature verified with Ed25519 public key.
+- Claude calls use Anthropic REST API directly from edge functions (no SDK needed).
+- Recharts already present for dashboard chart.
+- Wavesurfer.js added via `bun add wavesurfer.js` in Phase 2 recordings page.
 
 ## Out of scope
-- Cross-org data merging or analytics aggregation
-- Billing per org beyond initializing a free plan row (existing billing UI keeps working per active org)
-- Migrating existing super-admin shortcuts
+- No changes to existing non-Lemtel pages, hooks, or org logic.
+- No multi-org rollout of this module — Lemtel-only.
+
+Reply "go" (or pick a Phase 1 subset to start with) and I'll implement.

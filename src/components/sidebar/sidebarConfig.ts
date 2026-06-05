@@ -3,7 +3,7 @@ import {
   Bot, Sparkles, FileQuestion, Users, UserPlus, Calendar,
   Phone, MessageCircle, GitBranch, Sliders, Webhook,
   CreditCard, Settings, Tag, Headphones, LayoutDashboard, Radio, Globe,
-  Shield, Building2
+  Shield, Building2, PhoneCall, Voicemail, Smartphone
 } from 'lucide-react';
 
 export interface NavItem {
@@ -19,6 +19,7 @@ export interface NavGroup {
   items: NavItem[];
   adminOnly?: boolean;
   superAdminOnly?: boolean;
+  lemtelOnly?: boolean;
 }
 
 export const sidebarGroups: NavGroup[] = [
@@ -109,6 +110,24 @@ export const sidebarGroups: NavGroup[] = [
     superAdminOnly: true,
     items: [
       { nameKey: 'sidebar.superAdmin', href: '/super-admin', icon: Building2 },
+    ]
+  },
+  {
+    id: 'lemtel',
+    labelKey: '📞 Lemtel',
+    icon: PhoneCall,
+    lemtelOnly: true,
+    items: [
+      { nameKey: 'Dashboard', href: '/lemtel/dashboard', icon: LayoutDashboard },
+      { nameKey: 'Customers', href: '/lemtel/customers', icon: Users },
+      { nameKey: 'Phone Numbers', href: '/lemtel/dids', icon: Phone },
+      { nameKey: 'Extensions', href: '/lemtel/extensions', icon: Smartphone },
+      { nameKey: 'Call Queues', href: '/lemtel/queues', icon: Headphones },
+      { nameKey: 'Auto-Attendant', href: '/lemtel/ivr', icon: Voicemail },
+      { nameKey: 'Voice Agents', href: '/lemtel/voice-agents', icon: Bot },
+      { nameKey: 'Messages (SMS)', href: '/lemtel/messages', icon: MessageSquare },
+      { nameKey: 'Softphone Users', href: '/lemtel/softphone-users', icon: Smartphone },
+      { nameKey: 'Lemtel Settings', href: '/lemtel/settings', icon: Settings },
     ]
   },
 ];
