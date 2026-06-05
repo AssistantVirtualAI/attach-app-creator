@@ -627,34 +627,34 @@ const PortalSettings = () => {
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-primary/10"><Users className="h-5 w-5 text-primary" /></div>
               <div className="text-left">
-                <h3 className="font-semibold">Membres ({members.length})</h3>
-                <p className="text-sm text-muted-foreground">Gestion des accès au portail</p>
+                <h3 className="font-semibold">Members ({members.length})</h3>
+                <p className="text-sm text-muted-foreground">Manage portal access</p>
               </div>
             </div>
           </AccordionTrigger>
           <AccordionContent className="px-6 pb-6">
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button onClick={() => setShowAddModal(true)} className="gap-2"><UserPlus className="h-4 w-4" />Ajouter un membre</Button>
+                <Button onClick={() => setShowAddModal(true)} className="gap-2"><UserPlus className="h-4 w-4" />Add member</Button>
               </div>
               {isMembersLoading ? (
                 <div className="flex items-center justify-center py-8"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
               ) : members.length === 0 ? (
                 <div className="text-center py-8">
                   <Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                  <p className="text-muted-foreground">Aucun membre ajouté</p>
-                  <Button variant="outline" className="mt-4 gap-2" onClick={() => setShowAddModal(true)}><Plus className="h-4 w-4" />Ajouter le premier membre</Button>
+                  <p className="text-muted-foreground">No members added</p>
+                  <Button variant="outline" className="mt-4 gap-2" onClick={() => setShowAddModal(true)}><Plus className="h-4 w-4" />Add first member</Button>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nom</TableHead>
+                      <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Login ID</TableHead>
-                      <TableHead>Rôle</TableHead>
-                      <TableHead>Statut</TableHead>
-                      <TableHead>Dernière connexion</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Last login</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -664,11 +664,11 @@ const PortalSettings = () => {
                         <TableCell className="font-medium">{member.name}</TableCell>
                         <TableCell>{member.email}</TableCell>
                         <TableCell><code className="text-xs bg-muted px-2 py-1 rounded">{member.login_id || '-'}</code></TableCell>
-                        <TableCell><GlowBadge variant={member.role === 'admin' ? 'warning' : 'secondary'}>{member.role === 'admin' ? 'Admin' : 'Membre'}</GlowBadge></TableCell>
+                        <TableCell><GlowBadge variant={member.role === 'admin' ? 'warning' : 'secondary'}>{member.role === 'admin' ? 'Admin' : 'Member'}</GlowBadge></TableCell>
                         <TableCell>
-                          {member.status === 'active' ? <span className="flex items-center gap-1 text-green-500"><CheckCircle className="h-4 w-4" />Actif</span> : <span className="flex items-center gap-1 text-red-500"><XCircle className="h-4 w-4" />Inactif</span>}
+                          {member.status === 'active' ? <span className="flex items-center gap-1 text-green-500"><CheckCircle className="h-4 w-4" />Active</span> : <span className="flex items-center gap-1 text-red-500"><XCircle className="h-4 w-4" />Inactive</span>}
                         </TableCell>
-                        <TableCell>{member.last_login_at ? new Date(member.last_login_at).toLocaleDateString('fr-FR') : 'Jamais'}</TableCell>
+                        <TableCell>{member.last_login_at ? new Date(member.last_login_at).toLocaleDateString('en-US') : 'Never'}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Button variant="ghost" size="sm" onClick={() => openEditModal(member)}><Edit className="h-4 w-4" /></Button>
@@ -689,7 +689,7 @@ const PortalSettings = () => {
       {/* ElevenLabs Extended API */}
       {session?.organizationId && (
         <div className="mt-6">
-          <h2 className="text-lg font-semibold mb-4">API ElevenLabs Étendue</h2>
+          <h2 className="text-lg font-semibold mb-4">Extended ElevenLabs API</h2>
           <ElevenLabsAPISections organizationId={session.organizationId} canEdit={canEdit} voiceId={ttsSettings.voice_id} />
         </div>
       )}
