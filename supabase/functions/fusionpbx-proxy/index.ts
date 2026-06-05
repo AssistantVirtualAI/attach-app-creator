@@ -302,6 +302,60 @@ Deno.serve(async (req) => {
 
     // ---- CDR endpoint fallback helper ----
     const CDR_ENDPOINTS = [
+      "/app/api/7/xml_cdr",
+      "/app/api/7/xml_cdrs",
+      "/app/api/7/cdrs",
+      "/app/api/7/cdr",
+      "/app/xml_cdr/xml_cdr.php",
+    ];
+
+    async function fetchCdrsWithFallback(extraQp: Record<string, string> = {}) {
+      // Try cached endpoint first
+      const { data: integ } = await admin.from("pbx_integrations")
+        .select("id, config").eq("organization_id", organization_id).maybeSingle();
+      const cachedEp: string | undefined = (integ?.config as any)?.cdr_endpoint;
+      const ordered = cachedEp
+        ? [cachedEp, ...CDR_ENDPOINTS.filter((e) => e !== cachedEp)]
+        : CDR_ENDPOINTS;
+      const attempts: { endpoint: string; status: number; error?: string; sample?: string }[] = [];
+
+      for (const ep of ordered) {
+        const isPhp = ep.endsWith(".php");
+        const qp = new URLSearchParams({ domain_uuid: FUSIONPBX_DOMAIN_UUID, order: "desc", limit: "100", ...extraQp });
+        if (isPhp) {
+          qp.set("key", FUSIONPBX_API_KEY);
+          qp.set("username", FUSIONPBX_USERNAME);
+        }
+        const url = `${FUSIONPBX_API_URL}${ep}?${qp.toString()}`;
+        const started = Date.now();
+        try {
+          const res = await fetch(url, { headers: { Authorization: basicHeader, Accept: "application/json" } });
+          const text = await res.text();
+          if (!res.ok) {
+            attempts.push({ endpoint: ep, status: res.status, sample: text.slice(0, 200) });
+            continue;
+          }
+          let parsed: any;
+          try { parsed = JSON.parse(text); }
+          catch { attempts.push({ endpoint: ep, status: res.status, error: "invalid_json", sample: text.slice(0, 200) }); continue; }
+          const records =
+            parsed?.xml_cdr || parsed?.xml_cdrs || parsed?.cdrs || parsed?.cdr ||
+            (Array.isArray(parsed) ? parsed : null);
+          if (Array.isArray(records)) {
+            if (integ && cachedEp !== ep) {
+              await admin.from("pbx_integrations")
+                .update({ config: { ...(integ.config as any || {}), cdr_endpoint: ep } })
+                .eq("id", integ.id);
+            }
+            return { ok: true, endpoint: ep, records, latency_ms: Date.now() - started, attempts };
+          }
+          attempts.push({ endpoint: ep, status: res.status, error: "no_array_in_response", sample: text.slice(0, 200) });
+        } catch (e: any) {
+          attempts.push({ endpoint: ep, status: 0, error: e?.message || String(e) });
+        }
+      }
+      return { ok: false, endpoint: null, records: [] as any[], attempts };
+    }
       "/app/api/7/xml_cdrs",
       "/app/api/7/xml_cdr",
       "/app/api/7/cdrs",
