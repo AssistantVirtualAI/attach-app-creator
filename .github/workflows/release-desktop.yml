@@ -38,24 +38,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Cleanup root configs (Windows)
-        if: runner.os == 'Windows'
+      - name: Remove root PostCSS config
         shell: pwsh
         run: |
-          $files = @(
-            "postcss.config.js",
-            "postcss.config.cjs",
-            "postcss.config.mjs",
-            "tailwind.config.js",
-            "tailwind.config.ts"
-          )
-          foreach ($f in $files) {
-            if (Test-Path $f) {
-              Remove-Item $f -Force
-              Write-Host "Deleted: $f"
-            } else {
-              Write-Host "Not found: $f"
-            }
+          $target = "postcss.config.js"
+          if (Test-Path $target) {
+            Remove-Item $target -Force
+            Write-Host "✅ Deleted $target"
+          } else {
+            Write-Host "ℹ️ $target not found at root"
           }
       - name: Install dependencies
         run: npm install --legacy-peer-deps
