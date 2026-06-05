@@ -85,7 +85,7 @@ export const useDashboardAgents = () => {
 
       return (agents || []).map(agent => ({
         ...agent,
-        conversations: agentConversationCounts[agent.platform_agent_id] || 0
+        conversations: agentConversationCounts[agent.id] || 0
       }));
     },
     enabled: !!selectedOrgId,
