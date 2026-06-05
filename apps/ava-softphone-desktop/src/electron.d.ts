@@ -13,10 +13,13 @@ declare global {
       openExternal: (url: string) => Promise<void>;
       setLaunchOnStartup: (enabled: boolean) => Promise<void>;
       updateTrayStatus: (status: string) => Promise<void>;
-      onUpdateAvailable: (cb: () => void) => void;
-      onUpdateDownloaded: (cb: () => void) => void;
+      getAppVersion: () => Promise<string>;
       checkForUpdates: () => Promise<void>;
       installUpdate: () => Promise<void>;
+      onUpdateAvailable: (cb: (info: { version: string }) => void) => void;
+      onUpdateProgress: (cb: (p: { percent: number; bps: number }) => void) => void;
+      onUpdateDownloaded: (cb: (info: { version: string }) => void) => void;
+      onUpdateError?: (cb: (msg: string) => void) => void;
       onSetStatus: (cb: (s: string) => void) => void;
       platform: NodeJS.Platform;
     };
