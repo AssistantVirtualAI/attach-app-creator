@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Smartphone, Plus, Circle, Loader2 } from 'lucide-react';
 import { usePbxExtensions } from '@/hooks/usePbxData';
+import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
 
 export default function LemtelExtensions() {
   const [search, setSearch] = useState('');
@@ -23,7 +24,10 @@ export default function LemtelExtensions() {
           <h1 className="text-3xl font-bold flex items-center gap-2"><Smartphone className="w-7 h-7" /> Extensions</h1>
           <p className="text-muted-foreground">FusionPBX SIP extensions</p>
         </div>
-        <Button><Plus className="w-4 h-4 mr-2" /> Provision Extension</Button>
+        <div className="flex gap-2">
+          <PbxRefreshButton kind="config" />
+          <Button><Plus className="w-4 h-4 mr-2" /> Provision Extension</Button>
+        </div>
       </div>
       <Card>
         <CardHeader><CardTitle>{exts.length} extensions</CardTitle></CardHeader>
