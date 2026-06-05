@@ -120,14 +120,23 @@ const sections: Section[] = [
           if (count < 16) return { status: 'warn' as const, detail: `${count} extensions (expected 16+)` };
           return { status: 'pass' as const, detail: `${count} extensions synced ✅` };
         } },
-      { id: '2.5', name: 'CDRs present', description: 'Call records loaded',
+      { id: '2.5', name: 'CDR endpoint working', description: 'Detect FusionPBX CDR endpoint',
+        fixHref: '/org/lemtel/telephony/settings',
+        run: async () => {
+          const { data, error } = await callProxy('test-cdr-endpoint');
+          if (error) return { status: 'fail' as const, detail: error.message };
+          if (data?.ok) return { status: 'pass' as const, detail: `Endpoint: ${data.endpoint} (${data.record_count} records)` };
+          const tried = (data?.attempts ?? []).map((a: any) => `${a.endpoint}[${a.status}]`).join(', ');
+          return { status: 'fail' as const, detail: `No endpoint responding — tried: ${tried}` };
+        } },
+      { id: '2.5b', name: 'CDRs synced to Supabase', description: 'Call records in database',
         fixHref: '/org/lemtel/telephony/settings',
         run: async () => {
           const { count } = await (supabase as any).from('pbx_call_records')
             .select('*', { count: 'exact', head: true })
             .eq('organization_id', LEMTEL_ORG_ID);
-          if (!count) return { status: 'warn' as const, detail: '0 CDRs — run sync' };
-          return { status: 'pass' as const, detail: `${count} CDR records` };
+          if (!count) return { status: 'warn' as const, detail: '0 records — CDR sync may be failing' };
+          return { status: 'pass' as const, detail: `${count} call records` };
         } },
       { id: '2.6', name: 'Last sync recent', description: 'Sync ran within 1 hour',
         fixHref: '/org/lemtel/telephony/settings',
