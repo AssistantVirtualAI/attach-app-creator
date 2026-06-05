@@ -25,12 +25,18 @@ Deno.serve(async (req) => {
   let userId: string | null = null;
   let organization_id: string | undefined;
   const authHeader = req.headers.get("Authorization") || "";
+  const apiKeyHeader = req.headers.get("apikey") || "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const isServiceCall = authHeader === `Bearer ${serviceKey}`;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  // pg_cron calls send only `apikey` header (anon or service) — treat as trusted server-side call
+  const isServiceCall =
+    authHeader === `Bearer ${serviceKey}` ||
+    apiKeyHeader === serviceKey ||
+    apiKeyHeader === anonKey;
 
   if (!isServiceCall) {
     if (!authHeader) return json({ error: "Unauthorized" }, 401);
-    const supa = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+    const supa = createClient(Deno.env.get("SUPABASE_URL")!, anonKey, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user } } = await supa.auth.getUser();
