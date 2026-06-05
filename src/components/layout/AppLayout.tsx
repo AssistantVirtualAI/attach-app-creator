@@ -1,4 +1,4 @@
-import { ReactNode, useState, useCallback, useMemo } from 'react';
+import { ReactNode, useState, useCallback, useMemo, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Moon, Sun, Globe, GripVertical } from 'lucide-react';
 import { AvaLogo } from '@/components/shared/AvaLogo';
