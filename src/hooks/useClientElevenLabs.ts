@@ -168,7 +168,7 @@ export const useClientAddKnowledgeBaseText = () => {
     },
     onError: (error: any) => {
       if (error.message?.includes('403') || error.message?.includes('Accès refusé')) {
-        toast.error('Accès refusé. Seuls les administrateurs peuvent ajouter des documents.');
+        toast.error('Access denied. Only administrators can add documents.');
       } else {
         toast.error(error.message || 'Erreur lors de l\'ajout');
       }
@@ -207,7 +207,7 @@ export const useClientDeleteKnowledgeBaseItem = () => {
     },
     onError: (error: any) => {
       if (error.message?.includes('403') || error.message?.includes('Accès refusé')) {
-        toast.error('Accès refusé. Seuls les administrateurs peuvent supprimer des documents.');
+        toast.error('Access denied. Only administrators can delete documents.');
       } else {
         toast.error(error.message || 'Erreur lors de la suppression');
       }
@@ -343,10 +343,10 @@ export const useClientUpdateAgentVoice = () => {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['client-elevenlabs-agent-config', variables.agentId] });
-      toast.success('Paramètres vocaux mis à jour');
+      toast.success('Voice settings updated');
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Erreur lors de la mise à jour des paramètres vocaux');
+      toast.error(error.message || 'Error updating voice settings');
     },
   });
 };

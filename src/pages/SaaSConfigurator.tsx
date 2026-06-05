@@ -112,7 +112,7 @@ export default function SaaSConfigurator() {
       description: 'Agent designed to qualify leads and support the sales process',
       icon: <ShoppingCart className="w-6 h-6" />,
       category: 'Sales',
-      systemPrompt: 'Tu es un assistant commercial expert. Qualifie les prospects, présente les produits et guide vers l\'achat.',
+      systemPrompt: 'You are an expert sales assistant. Qualify prospects, present products, and guide prospects toward purchase.',
       features: ['Lead qualification', 'Product presentation', 'Quote follow-up'],
       isActive: true,
     },
@@ -143,7 +143,7 @@ export default function SaaSConfigurator() {
       icon: <Phone className="w-6 h-6" />,
       category: 'Telephony',
       systemPrompt: 'You are a professional phone receptionist. Greet callers, direct calls, and take messages.',
-      features: ['Transfert d\'appels', 'Prise de messages', 'IVR intelligent'],
+      features: ['Call transfer', 'Message taking', 'Smart IVR'],
       isActive: false,
     },
   ]);
@@ -235,8 +235,8 @@ export default function SaaSConfigurator() {
             <AlertCircle className="h-4 w-4 text-yellow-500" />
             <AlertTitle className="text-yellow-500">Prerequisite: Stripe required</AlertTitle>
             <AlertDescription className="text-yellow-500/80">
-              Connectez-vous à Stripe pour débloquer toutes les fonctionnalités de configuration SaaS, 
-              notamment la gestion des plans tarifaires personnalisés.
+              Connect Stripe to unlock all SaaS configuration features, 
+              including custom pricing plan management.
               <Link to="/stripe-billing" className="ml-2 underline hover:no-underline">
                 Connect Stripe →
               </Link>
@@ -377,7 +377,7 @@ export default function SaaSConfigurator() {
                     id="domain"
                     value={config.domain}
                     onChange={(e) => updateConfig('domain', e.target.value)}
-                    placeholder="app.votre-domaine.com"
+                    placeholder="app.your-domain.com"
                   />
                   <p className="text-xs text-muted-foreground">
                     Point a CNAME record to: app.avastatistic.com
@@ -390,12 +390,12 @@ export default function SaaSConfigurator() {
                     id="backendDomain"
                     value={config.backend_domain}
                     onChange={(e) => updateConfig('backend_domain', e.target.value)}
-                    placeholder="api.votre-domaine.com"
+                    placeholder="api.your-domain.com"
                   />
                 </div>
 
                 <Button onClick={handleSave} disabled={isUpdating}>
-                  {isUpdating ? 'Saving...' : 'Saving...
+                  {isUpdating ? 'Saving...' : 'Save'}
                 </Button>
               </CardContent>
             </Card>
