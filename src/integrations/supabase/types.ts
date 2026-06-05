@@ -5149,6 +5149,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_sms_unread: { Args: { thread_id: string }; Returns: undefined }
       is_lemtel_admin: { Args: { _user_id: string }; Returns: boolean }
       is_lemtel_member: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
