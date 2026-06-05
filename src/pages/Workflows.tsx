@@ -343,7 +343,7 @@ export default function Workflows() {
                             onClick={() => toggleMutation.mutate({ id: workflow.id, isActive: !workflow.is_active })}
                           >
                             <Edit className="h-3 w-3 mr-1" />
-                            Éditer
+                            Edit
                           </Button>
                           <Button
                             variant="outline"
@@ -374,9 +374,9 @@ export default function Workflows() {
             {marketplaceWorkflows.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Applications installées</CardTitle>
+                  <CardTitle className="text-lg">Installed applications</CardTitle>
                   <CardDescription>
-                    Gérez vos intégrations actives
+                    Manage your active integrations
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -402,7 +402,7 @@ export default function Workflows() {
                           <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-muted-foreground">
-                                {workflow.is_active ? "Actif" : "Inactif"}
+                                {workflow.is_active ? "Active" : "Inactive"}
                               </span>
                               <Switch
                                 checked={workflow.is_active || false}
@@ -434,13 +434,13 @@ export default function Workflows() {
                   <div>
                     <CardTitle className="text-lg">Marketplace</CardTitle>
                     <CardDescription>
-                      Découvrez et installez de nouvelles intégrations
+                      Discover and install new integrations
                     </CardDescription>
                   </div>
                   <div className="relative w-64">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Rechercher des applications..."
+                      placeholder="Search applications..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9"
@@ -487,11 +487,11 @@ export default function Workflows() {
                           onClick={() => handleInstall(app)}
                         >
                           {isInstalled(app.id) ? (
-                            "Installée"
+                            "Installed"
                           ) : (
                             <>
                               <Plus className="h-4 w-4 mr-1" />
-                              Installer
+                              Install
                             </>
                           )}
                         </Button>
@@ -510,21 +510,21 @@ export default function Workflows() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Shield className="h-5 w-5 text-primary" />
-                Conformité HIPAA requise
+                HIPAA compliance required
               </DialogTitle>
               <DialogDescription>
-                L'application {selectedApp?.name} nécessite la conformité HIPAA car elle peut traiter des données de santé protégées.
+                The {selectedApp?.name} application requires HIPAA compliance because it may process protected health data.
               </DialogDescription>
             </DialogHeader>
             
             <div className="space-y-4 py-4">
               <div className="p-4 bg-muted rounded-lg space-y-2">
-                <h4 className="font-medium">Exigences HIPAA :</h4>
+                <h4 className="font-medium">HIPAA requirements:</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Chiffrement des données en transit et au repos</li>
-                  <li>• Journalisation des accès aux données</li>
-                  <li>• Contrôles d'accès stricts</li>
-                  <li>• Accord de partenariat commercial (BAA)</li>
+                  <li>• Data encryption in transit and at rest</li>
+                  <li>• Data access audit logging</li>
+                  <li>• Strict access controls</li>
+                  <li>• Business Associate Agreement (BAA)</li>
                 </ul>
               </div>
               
@@ -535,17 +535,17 @@ export default function Workflows() {
                   onCheckedChange={(checked) => setHipaaAccepted(checked as boolean)}
                 />
                 <label htmlFor="hipaa-accept" className="text-sm">
-                  Je confirme que mon organisation est conforme aux exigences HIPAA et que j'ai l'autorisation d'activer cette intégration.
+                  I confirm that my organization meets HIPAA requirements and that I am authorized to enable this integration.
                 </label>
               </div>
             </div>
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setHipaaModalOpen(false)}>
-                Annuler
+                Cancel
               </Button>
               <Button onClick={confirmHipaaInstall} disabled={!hipaaAccepted}>
-                Confirmer et installer
+                Confirm and install
               </Button>
             </DialogFooter>
           </DialogContent>
