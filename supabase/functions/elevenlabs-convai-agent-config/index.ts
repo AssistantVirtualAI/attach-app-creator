@@ -1133,19 +1133,40 @@ serve(async (req) => {
         // agent is easily identifiable on the ElevenLabs side when multiple
         // workspaces share the same ElevenLabs API key.
         let orgPrefix = '';
+        let orgName = '';
         if (organizationId) {
           const { data: orgRow } = await supabaseService
             .from('organizations')
             .select('name')
             .eq('id', organizationId)
             .maybeSingle();
-          if (orgRow?.name) orgPrefix = `[${orgRow.name}] `;
+          if (orgRow?.name) {
+            orgName = orgRow.name;
+            orgPrefix = `[${orgRow.name}] `;
+          }
         }
         if (agentName) {
           createPayload.name = `${orgPrefix}${agentName}`;
         } else if (orgPrefix) {
           createPayload.name = `${orgPrefix}Agent`;
         }
+
+        // Tag metadata + tags so the agent is always identifiable by org
+        // both in the ElevenLabs dashboard and in webhook payloads.
+        if (organizationId) {
+          createPayload.tags = Array.from(new Set([
+            ...(Array.isArray(createPayload.tags) ? createPayload.tags : []),
+            `org:${organizationId}`,
+            ...(orgName ? [`org_name:${orgName}`] : []),
+          ]));
+          createPayload.metadata = {
+            ...(createPayload.metadata || {}),
+            organization_id: organizationId,
+            organization_name: orgName || undefined,
+            created_via: 'ava-statistic',
+          };
+        }
+        
         
         // Add ASR settings if provided
         if (createAsrSettings) {
