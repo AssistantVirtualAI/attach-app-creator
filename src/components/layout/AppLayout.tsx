@@ -124,6 +124,18 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
   const [groupOrder, setGroupOrder] = useState(orderedGroups.map(g => g.id));
 
+  // Keep groupOrder in sync when visible groups change (e.g. role loads after initial render)
+  useEffect(() => {
+    setGroupOrder(prev => {
+      const visibleIds = orderedGroups.map(g => g.id);
+      const kept = prev.filter(id => visibleIds.includes(id));
+      const added = visibleIds.filter(id => !kept.includes(id));
+      const next = [...kept, ...added];
+      const changed = next.length !== prev.length || next.some((id, i) => id !== prev[i]);
+      return changed ? next : prev;
+    });
+  }, [orderedGroups]);
+
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
