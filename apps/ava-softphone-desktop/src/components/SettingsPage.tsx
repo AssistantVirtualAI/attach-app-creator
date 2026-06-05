@@ -97,7 +97,7 @@ export default function SettingsPage({
             onClick={(e) => {
               e.preventDefault();
               window.electronAPI.openExternal(
-                'https://github.com/AssistantVirtualAI/ava-softphone-releases/releases'
+                'https://github.com/AssistantVirtualAI/attach-app-creator/releases'
               );
             }}
             href="#"

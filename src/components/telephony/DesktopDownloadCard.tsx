@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-const REPO = "AssistantVirtualAI/ava-softphone-releases";
+const REPO = "AssistantVirtualAI/attach-app-creator";
 const RELEASES = `https://github.com/${REPO}/releases/latest/download`;
 const API_LATEST = `https://api.github.com/repos/${REPO}/releases/latest`;
 
