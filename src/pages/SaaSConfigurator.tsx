@@ -71,7 +71,7 @@ export default function SaaSConfigurator() {
       name: 'Starter',
       price: 19,
       interval: 'month',
-      features: ['3 clients', 'Support email', 'Analytics de base'],
+      features: ['3 clients', 'Email support', 'Basic analytics'],
       clientLimit: 3,
     },
     {
@@ -79,7 +79,7 @@ export default function SaaSConfigurator() {
       name: 'Growth',
       price: 49,
       interval: 'month',
-      features: ['10 clients', 'Support prioritaire', 'Analytics avancés', 'White-label email'],
+      features: ['10 clients', 'Priority support', 'Advanced analytics', 'White-label email'],
       clientLimit: 10,
       isPopular: true,
     },
@@ -88,7 +88,7 @@ export default function SaaSConfigurator() {
       name: 'Ultimate',
       price: 149,
       interval: 'month',
-      features: ['Clients illimités', 'Support dédié', 'API accès', 'Domaine personnalisé', 'HIPAA'],
+      features: ['Unlimited clients', 'Dedicated support', 'API access', 'Custom domain', 'HIPAA'],
       clientLimit: -1,
     },
   ]);
@@ -98,51 +98,51 @@ export default function SaaSConfigurator() {
   const [agentTemplates, setAgentTemplates] = useState<AgentTemplate[]>([
     {
       id: 'customer-support',
-      name: 'Support Client',
-      description: 'Agent spécialisé dans le support client et la résolution de problèmes',
+      name: 'Customer Support',
+      description: 'Agent specialized in customer support and problem resolution',
       icon: <Headphones className="w-6 h-6" />,
       category: 'Support',
-      systemPrompt: 'Tu es un agent de support client professionnel et empathique. Aide les utilisateurs à résoudre leurs problèmes de manière efficace et courtoise.',
-      features: ['FAQ automatique', 'Escalade tickets', 'Historique client'],
+      systemPrompt: 'You are a professional and empathetic customer support agent. Help users solve their problems efficiently and courteously.',
+      features: ['Auto FAQ', 'Ticket escalation', 'Customer history'],
       isActive: true,
     },
     {
       id: 'sales-assistant',
-      name: 'Assistant Commercial',
-      description: 'Agent conçu pour qualifier les leads et accompagner le processus de vente',
+      name: 'Sales Assistant',
+      description: 'Agent designed to qualify leads and support the sales process',
       icon: <ShoppingCart className="w-6 h-6" />,
-      category: 'Ventes',
+      category: 'Sales',
       systemPrompt: 'Tu es un assistant commercial expert. Qualifie les prospects, présente les produits et guide vers l\'achat.',
-      features: ['Qualification leads', 'Présentation produits', 'Suivi devis'],
+      features: ['Lead qualification', 'Product presentation', 'Quote follow-up'],
       isActive: true,
     },
     {
       id: 'appointment-scheduler',
-      name: 'Planificateur RDV',
-      description: 'Agent spécialisé dans la prise et gestion de rendez-vous',
+      name: 'Appointment Scheduler',
+      description: 'Agent specialized in appointment booking and management',
       icon: <Calendar className="w-6 h-6" />,
-      category: 'Planification',
-      systemPrompt: 'Tu es un assistant de planification. Aide les utilisateurs à trouver et réserver des créneaux de rendez-vous disponibles.',
-      features: ['Calendrier intégré', 'Rappels automatiques', 'Gestion conflits'],
+      category: 'Scheduling',
+      systemPrompt: 'You are a scheduling assistant. Help users find and book available appointment slots.',
+      features: ['Integrated calendar', 'Automated reminders', 'Conflict management'],
       isActive: false,
     },
     {
       id: 'general-assistant',
-      name: 'Assistant Général',
-      description: 'Agent polyvalent pour répondre aux questions générales',
+      name: 'General Assistant',
+      description: 'Versatile agent for answering general questions',
       icon: <MessageSquare className="w-6 h-6" />,
-      category: 'Général',
-      systemPrompt: 'Tu es un assistant virtuel polyvalent. Réponds aux questions des utilisateurs de manière claire et utile.',
-      features: ['Multi-langues', 'Base de connaissances', 'Personnalisable'],
+      category: 'General',
+      systemPrompt: 'You are a versatile virtual assistant. Answer users\' questions clearly and helpfully.',
+      features: ['Multi-language', 'Knowledge base', 'Customizable'],
       isActive: true,
     },
     {
       id: 'phone-receptionist',
-      name: 'Réceptionniste Téléphonique',
-      description: 'Agent vocal pour gérer les appels entrants',
+      name: 'Phone Receptionist',
+      description: 'Voice agent to manage incoming calls',
       icon: <Phone className="w-6 h-6" />,
-      category: 'Téléphonie',
-      systemPrompt: 'Tu es un réceptionniste téléphonique professionnel. Accueille les appelants, dirige les appels et prends les messages.',
+      category: 'Telephony',
+      systemPrompt: 'You are a professional phone receptionist. Greet callers, direct calls, and take messages.',
       features: ['Transfert d\'appels', 'Prise de messages', 'IVR intelligent'],
       isActive: false,
     },
@@ -185,12 +185,12 @@ export default function SaaSConfigurator() {
       });
       await refreshOrganization();
       toast({
-        title: 'Configuration sauvegardée',
-        description: 'Les paramètres ont été mis à jour avec succès',
+        title: 'Configuration saved',
+        description: 'Settings have been successfully updated',
       });
     } catch (error: any) {
       toast({
-        title: 'Erreur',
+        title: 'Error',
         description: error.message,
         variant: 'destructive',
       });
@@ -211,7 +211,7 @@ export default function SaaSConfigurator() {
     return (
       <AppLayout>
         <div className="p-8 flex items-center justify-center h-full">
-          <p className="text-muted-foreground">Sélectionnez une organisation</p>
+          <p className="text-muted-foreground">Select an organization</p>
         </div>
       </AppLayout>
     );
@@ -222,10 +222,10 @@ export default function SaaSConfigurator() {
       <div className="p-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold gradient-text mb-2">
-            Configurateur SaaS
+            SaaS Configurator
           </h1>
           <p className="text-muted-foreground">
-            Personnalisez votre plateforme en marque blanche
+            Customize your white-label platform
           </p>
         </div>
 
@@ -233,12 +233,12 @@ export default function SaaSConfigurator() {
         {!billingLoading && !isStripeConnected && (
           <Alert className="mb-6 border-yellow-500/50 bg-yellow-500/10">
             <AlertCircle className="h-4 w-4 text-yellow-500" />
-            <AlertTitle className="text-yellow-500">Prérequis : Stripe requis</AlertTitle>
+            <AlertTitle className="text-yellow-500">Prerequisite: Stripe required</AlertTitle>
             <AlertDescription className="text-yellow-500/80">
               Connectez-vous à Stripe pour débloquer toutes les fonctionnalités de configuration SaaS, 
               notamment la gestion des plans tarifaires personnalisés.
               <Link to="/stripe-billing" className="ml-2 underline hover:no-underline">
-                Connecter Stripe →
+                Connect Stripe →
               </Link>
             </AlertDescription>
           </Alert>
@@ -246,15 +246,15 @@ export default function SaaSConfigurator() {
 
         <Tabs defaultValue="branding" className="space-y-6">
           <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="branding">Marque</TabsTrigger>
-            <TabsTrigger value="domain">Domaine</TabsTrigger>
+            <TabsTrigger value="branding">Branding</TabsTrigger>
+            <TabsTrigger value="domain">Domain</TabsTrigger>
             <TabsTrigger value="email">Email</TabsTrigger>
             <TabsTrigger value="pricing" disabled={!isStripeConnected}>
               Plans
             </TabsTrigger>
             <TabsTrigger value="templates">Templates</TabsTrigger>
-            <TabsTrigger value="legal">Légal</TabsTrigger>
-            <TabsTrigger value="compliance">Conformité</TabsTrigger>
+            <TabsTrigger value="legal">Legal</TabsTrigger>
+            <TabsTrigger value="compliance">Compliance</TabsTrigger>
           </TabsList>
 
           <TabsContent value="branding" className="space-y-6">
@@ -263,38 +263,38 @@ export default function SaaSConfigurator() {
                 <div className="flex items-center gap-3">
                   <Palette className="w-6 h-6 text-primary" />
                   <div>
-                    <CardTitle>Identité visuelle</CardTitle>
+                    <CardTitle>Visual Identity</CardTitle>
                     <CardDescription>
-                      Personnalisez l'apparence de votre plateforme
+                      Customize the appearance of your platform
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="orgName">Nom de l'organisation</Label>
+                  <Label htmlFor="orgName">Organization Name</Label>
                   <Input
                     id="orgName"
                     value={config.name}
                     onChange={(e) => updateConfig('name', e.target.value)}
-                    placeholder="Mon Entreprise"
+                    placeholder="My Company"
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="websiteTitle">Titre du site</Label>
+                  <Label htmlFor="websiteTitle">Site Title</Label>
                   <Input
                     id="websiteTitle"
                     value={config.website_title}
                     onChange={(e) => updateConfig('website_title', e.target.value)}
-                    placeholder="Mon Dashboard - Gestion des agents IA"
+                    placeholder="My Dashboard - AI Agent Management"
                   />
                 </div>
 
                 <Separator />
 
                 <ImageUploader
-                  label="Logo du tableau de bord"
+                  label="Dashboard Logo"
                   currentUrl={config.logo_dashboard_url}
                   organizationId={selectedOrganization.id}
                   folder="logos"
@@ -304,7 +304,7 @@ export default function SaaSConfigurator() {
                 />
 
                 <ImageUploader
-                  label="Logo de la page de connexion"
+                  label="Login Page Logo"
                   currentUrl={config.logo_login_url}
                   organizationId={selectedOrganization.id}
                   folder="logos"
@@ -325,7 +325,7 @@ export default function SaaSConfigurator() {
                 <Separator />
 
                 <div className="space-y-2">
-                  <Label htmlFor="primaryColor">Couleur primaire</Label>
+                  <Label htmlFor="primaryColor">Primary Color</Label>
                   <div className="flex gap-4">
                     <Input
                       id="primaryColor"
@@ -347,10 +347,10 @@ export default function SaaSConfigurator() {
                   {isUpdating ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Sauvegarde...
+                      Saving...
                     </>
                   ) : (
-                    'Sauvegarder'
+                    'Save'
                   )}
                 </Button>
               </CardContent>
@@ -363,16 +363,16 @@ export default function SaaSConfigurator() {
                 <div className="flex items-center gap-3">
                   <Globe className="w-6 h-6 text-primary" />
                   <div>
-                    <CardTitle>Domaine personnalisé</CardTitle>
+                    <CardTitle>Custom Domain</CardTitle>
                     <CardDescription>
-                      Configurez vos noms de domaine
+                      Configure your domain names
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="domain">Domaine frontend</Label>
+                  <Label htmlFor="domain">Frontend Domain</Label>
                   <Input
                     id="domain"
                     value={config.domain}
@@ -380,12 +380,12 @@ export default function SaaSConfigurator() {
                     placeholder="app.votre-domaine.com"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Pointez un enregistrement CNAME vers: app.avastatistic.com
+                    Point a CNAME record to: app.avastatistic.com
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="backendDomain">Domaine backend (API)</Label>
+                  <Label htmlFor="backendDomain">Backend Domain (API)</Label>
                   <Input
                     id="backendDomain"
                     value={config.backend_domain}
@@ -395,7 +395,7 @@ export default function SaaSConfigurator() {
                 </div>
 
                 <Button onClick={handleSave} disabled={isUpdating}>
-                  {isUpdating ? 'Sauvegarde...' : 'Sauvegarder'}
+                  {isUpdating ? 'Saving...' : 'Saving...
                 </Button>
               </CardContent>
             </Card>
@@ -407,16 +407,16 @@ export default function SaaSConfigurator() {
                 <div className="flex items-center gap-3">
                   <Mail className="w-6 h-6 text-primary" />
                   <div>
-                    <CardTitle>Configuration Email</CardTitle>
+                    <CardTitle>Email Configuration</CardTitle>
                     <CardDescription>
-                      Paramètres d'envoi d'emails
+                      Email delivery settings
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <ImageUploader
-                  label="Logo pour les emails"
+                  label="Email Logo"
                   currentUrl={config.email_logo_url}
                   organizationId={selectedOrganization.id}
                   folder="email"
@@ -428,7 +428,7 @@ export default function SaaSConfigurator() {
                 <Separator />
 
                 <div className="space-y-2">
-                  <Label htmlFor="emailDomain">Domaine email</Label>
+                  <Label htmlFor="emailDomain">Email Domain</Label>
                   <Input
                     id="emailDomain"
                     value={config.email_domain}
@@ -439,7 +439,7 @@ export default function SaaSConfigurator() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="emailSender">Email expéditeur</Label>
+                    <Label htmlFor="emailSender">Sender Email</Label>
                     <Input
                       id="emailSender"
                       value={config.email_sender}
@@ -448,18 +448,18 @@ export default function SaaSConfigurator() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="emailSenderName">Nom expéditeur</Label>
+                    <Label htmlFor="emailSenderName">Sender Name</Label>
                     <Input
                       id="emailSenderName"
                       value={config.email_sender_name}
                       onChange={(e) => updateConfig('email_sender_name', e.target.value)}
-                      placeholder="Mon Entreprise"
+                      placeholder="My Company"
                     />
                   </div>
                 </div>
 
                 <Button onClick={handleSave} disabled={isUpdating}>
-                  {isUpdating ? 'Sauvegarde...' : 'Sauvegarder'}
+                  {isUpdating ? 'Saving...' : 'Saving...
                 </Button>
               </CardContent>
             </Card>
@@ -471,9 +471,9 @@ export default function SaaSConfigurator() {
                 <div className="flex items-center gap-3">
                   <DollarSign className="w-6 h-6 text-primary" />
                   <div>
-                    <CardTitle>Plans tarifaires</CardTitle>
+                    <CardTitle>Pricing Plans</CardTitle>
                     <CardDescription>
-                      Configurez les plans proposés à vos clients
+                      Configure plans offered to your clients
                     </CardDescription>
                   </div>
                 </div>
@@ -487,7 +487,7 @@ export default function SaaSConfigurator() {
                     >
                       {plan.isPopular && (
                         <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
-                          Populaire
+                          Popular
                         </Badge>
                       )}
                       <CardHeader>
@@ -506,22 +506,22 @@ export default function SaaSConfigurator() {
                             onChange={(e) => updatePlan(plan.id, 'price', Number(e.target.value))}
                             className="w-20 text-3xl font-bold h-auto py-1 px-2"
                           />
-                          <span className="text-muted-foreground">/mois</span>
+                          <span className="text-muted-foreground">/month</span>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="space-y-2">
-                          <Label className="text-xs">Limite de clients</Label>
+                          <Label className="text-xs">Client Limit</Label>
                           <Input
                             type="number"
                             value={plan.clientLimit === -1 ? '' : plan.clientLimit}
-                            placeholder="Illimité"
+                            placeholder="Unlimited"
                             onChange={(e) => updatePlan(plan.id, 'clientLimit', e.target.value ? Number(e.target.value) : -1)}
                           />
                         </div>
                         
                         <div className="space-y-2">
-                          <Label className="text-xs">Fonctionnalités (une par ligne)</Label>
+                          <Label className="text-xs">Features (one per line)</Label>
                           <Textarea
                             value={plan.features.join('\n')}
                             onChange={(e) => updatePlan(plan.id, 'features', e.target.value.split('\n').filter(f => f.trim()))}
@@ -540,7 +540,7 @@ export default function SaaSConfigurator() {
                               );
                             }}
                           />
-                          <Label className="text-sm">Plan populaire</Label>
+                          <Label className="text-sm">Popular plan</Label>
                         </div>
                       </CardContent>
                     </Card>
@@ -550,11 +550,11 @@ export default function SaaSConfigurator() {
                 <div className="mt-6 flex justify-end">
                   <Button onClick={() => {
                     toast({
-                      title: 'Plans sauvegardés',
-                      description: 'La configuration des plans a été enregistrée',
+                      title: 'Plans saved',
+                      description: 'Plan configuration has been saved',
                     });
                   }}>
-                    Sauvegarder les plans
+                    Saving...es plans
                   </Button>
                 </div>
               </CardContent>
@@ -567,9 +567,9 @@ export default function SaaSConfigurator() {
                 <div className="flex items-center gap-3">
                   <Bot className="w-6 h-6 text-primary" />
                   <div>
-                    <CardTitle>Templates d'agents</CardTitle>
+                    <CardTitle>Agent Templates</CardTitle>
                     <CardDescription>
-                      Activez les templates prédéfinis pour vos clients
+                      Enable predefined templates for your clients
                     </CardDescription>
                   </div>
                 </div>
@@ -625,19 +625,19 @@ export default function SaaSConfigurator() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium">
-                      {agentTemplates.filter(t => t.isActive).length} template(s) actif(s)
+                      {agentTemplates.filter(t => t.isActive).length} active template(s)
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Les clients pourront utiliser ces templates pour créer leurs agents
+                      Clients will be able to use these templates to create their agents
                     </p>
                   </div>
                   <Button onClick={() => {
                     toast({
-                      title: 'Templates sauvegardés',
-                      description: 'La configuration des templates a été enregistrée',
+                      title: 'Templates saved',
+                      description: 'Template configuration has been saved',
                     });
                   }}>
-                    Sauvegarder les templates
+                    Saving...es templates
                   </Button>
                 </div>
               </CardContent>
@@ -650,16 +650,16 @@ export default function SaaSConfigurator() {
                 <div className="flex items-center gap-3">
                   <FileText className="w-6 h-6 text-primary" />
                   <div>
-                    <CardTitle>Mentions légales</CardTitle>
+                    <CardTitle>Legal Mentions</CardTitle>
                     <CardDescription>
-                      Configurez vos documents légaux
+                      Configure your legal documents
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="privacy">Politique de confidentialité (URL)</Label>
+                  <Label htmlFor="privacy">Privacy Policy (URL)</Label>
                   <Input
                     id="privacy"
                     placeholder="https://votre-site.com/privacy"
@@ -667,7 +667,7 @@ export default function SaaSConfigurator() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="terms">Conditions d'utilisation (URL)</Label>
+                  <Label htmlFor="terms">Terms of Service (URL)</Label>
                   <Input
                     id="terms"
                     placeholder="https://votre-site.com/terms"
@@ -675,15 +675,15 @@ export default function SaaSConfigurator() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="footerText">Texte du footer</Label>
+                  <Label htmlFor="footerText">Footer Text</Label>
                   <Textarea
                     id="footerText"
-                    placeholder="© 2025 Votre Entreprise. Tous droits réservés."
+                    placeholder="© 2025 Your Company. All rights reserved."
                   />
                 </div>
 
                 <Button onClick={handleSave} disabled={isUpdating}>
-                  {isUpdating ? 'Sauvegarde...' : 'Sauvegarder'}
+                  {isUpdating ? 'Saving...' : 'Saving...
                 </Button>
               </CardContent>
             </Card>
@@ -695,9 +695,9 @@ export default function SaaSConfigurator() {
                 <div className="flex items-center gap-3">
                   <Shield className="w-6 h-6 text-primary" />
                   <div>
-                    <CardTitle>Conformité</CardTitle>
+                    <CardTitle>Compliance</CardTitle>
                     <CardDescription>
-                      Activez les fonctionnalités de conformité
+                      Enable compliance features
                     </CardDescription>
                   </div>
                 </div>
@@ -707,7 +707,7 @@ export default function SaaSConfigurator() {
                   <div className="space-y-1">
                     <Label>RGPD / GDPR</Label>
                     <p className="text-sm text-muted-foreground">
-                      Activer les fonctionnalités de conformité RGPD (consentement, droit à l'oubli, export de données)
+                      Enable GDPR compliance features (consent, right to be forgotten, data export)
                     </p>
                   </div>
                   <Switch
@@ -720,7 +720,7 @@ export default function SaaSConfigurator() {
                   <div className="space-y-1">
                     <Label>HIPAA</Label>
                     <p className="text-sm text-muted-foreground">
-                      Activer les fonctionnalités de conformité HIPAA (chiffrement renforcé, audit logs)
+                      Enable HIPAA compliance features (reinforced encryption, audit logs)
                     </p>
                   </div>
                   <Switch
@@ -730,7 +730,7 @@ export default function SaaSConfigurator() {
                 </div>
 
                 <Button onClick={handleSave} disabled={isUpdating}>
-                  {isUpdating ? 'Sauvegarde...' : 'Sauvegarder'}
+                  {isUpdating ? 'Saving...' : 'Saving...
                 </Button>
               </CardContent>
             </Card>

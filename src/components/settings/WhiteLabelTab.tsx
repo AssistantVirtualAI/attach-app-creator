@@ -18,11 +18,11 @@ import { BrandingPreview } from './BrandingPreview';
 
 const colorPresets = [
   { name: 'Violet', value: '#8B5CF6' },
-  { name: 'Bleu', value: '#3B82F6' },
-  { name: 'Vert', value: '#10B981' },
+  { name: 'Blue', value: '#3B82F6' },
+  { name: 'Green', value: '#10B981' },
   { name: 'Orange', value: '#F59E0B' },
-  { name: 'Rouge', value: '#EF4444' },
-  { name: 'Rose', value: '#EC4899' },
+  { name: 'Red', value: '#EF4444' },
+  { name: 'Pink', value: '#EC4899' },
 ];
 
 const loadingIcons = [
@@ -206,10 +206,10 @@ export function WhiteLabelTab() {
     try {
       const { error } = await supabase.from('organizations').update(config).eq('id', selectedOrgId);
       if (error) throw error;
-      toast.success('Configuration sauvegardée');
+      toast.success('Configuration saved');
       refreshOrganization();
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la sauvegarde');
+      toast.error(error.message || 'Error saving');
     } finally {
       setIsSaving(false);
     }
@@ -243,9 +243,9 @@ export function WhiteLabelTab() {
         if (error) throw error;
         setPlatform((p) => ({ ...p, id: (data as any).id }));
       }
-      toast.success('Marque blanche globale sauvegardée');
+      toast.success('Global white label saved');
     } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la sauvegarde');
+      toast.error(error.message || 'Error saving');
     } finally {
       setIsSavingPlatform(false);
     }
@@ -285,9 +285,9 @@ export function WhiteLabelTab() {
                 <Shield className="w-6 h-6 text-white" />
               </div>
               <div>
-                <CardTitle>Marque blanche globale (Super Admin)</CardTitle>
+                <CardTitle>Global White Label (Super Admin)</CardTitle>
                 <CardDescription>
-                  Définit la marque par défaut pour toute la plateforme. Chaque organisation peut la surcharger.
+                  Sets the default branding for the entire platform. Each organization can override it.
                 </CardDescription>
               </div>
             </div>
@@ -295,8 +295,8 @@ export function WhiteLabelTab() {
           <CardContent className="space-y-6">
             <Tabs defaultValue="admin">
               <TabsList>
-                <TabsTrigger value="admin">Portail Admin</TabsTrigger>
-                <TabsTrigger value="client">Portail Client</TabsTrigger>
+                <TabsTrigger value="admin">Admin Portal</TabsTrigger>
+                <TabsTrigger value="client">Client Portal</TabsTrigger>
               </TabsList>
               <TabsContent value="admin" className="space-y-4 pt-4">
                 <div className="grid md:grid-cols-2 gap-4">
@@ -320,15 +320,15 @@ export function WhiteLabelTab() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Titre du site</Label>
+                  <Label>Site Title</Label>
                   <Input
                     value={platform.website_title}
                     onChange={(e) => setPlatform({ ...platform, website_title: e.target.value })}
-                    placeholder="Ma Plateforme"
+                    placeholder="My Platform"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Couleur principale</Label>
+                  <Label>Primary Color</Label>
                   <ColorPicker
                     value={platform.primary_color}
                     onChange={(v) => setPlatform({ ...platform, primary_color: v })}
@@ -338,7 +338,7 @@ export function WhiteLabelTab() {
               <TabsContent value="client" className="space-y-4 pt-4">
                 <div className="grid md:grid-cols-2 gap-4">
                   <ImageUploader
-                    label="Logo portail client"
+                    label="Client portal logo"
                     currentUrl={platform.client_portal_logo_url}
                     organizationId={selectedOrgId || ''}
                     folder="platform"
@@ -347,7 +347,7 @@ export function WhiteLabelTab() {
                     aspectRatio="wide"
                   />
                   <ImageUploader
-                    label="Favicon portail client"
+                    label="Client portal favicon"
                     currentUrl={platform.client_portal_favicon_url}
                     organizationId={selectedOrgId || ''}
                     folder="platform"
@@ -357,15 +357,15 @@ export function WhiteLabelTab() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Titre portail client</Label>
+                  <Label>Client portal title</Label>
                   <Input
                     value={platform.client_portal_title}
                     onChange={(e) => setPlatform({ ...platform, client_portal_title: e.target.value })}
-                    placeholder="Espace Client"
+                    placeholder="Client Area"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Couleur portail client</Label>
+                  <Label>Client portal color</Label>
                   <ColorPicker
                     value={platform.client_portal_primary_color || platform.primary_color}
                     onChange={(v) => setPlatform({ ...platform, client_portal_primary_color: v })}
@@ -374,7 +374,7 @@ export function WhiteLabelTab() {
               </TabsContent>
             </Tabs>
             <Button onClick={handleSavePlatform} disabled={isSavingPlatform} className="w-full">
-              {isSavingPlatform ? 'Enregistrement...' : 'Enregistrer la marque globale'}
+              {isSavingPlatform ? 'Saving...' : 'Save global branding'}
             </Button>
           </CardContent>
         </Card>
@@ -388,16 +388,16 @@ export function WhiteLabelTab() {
               <Palette className="w-6 h-6 text-white" />
             </div>
             <div>
-              <CardTitle>Marque Blanche</CardTitle>
-              <CardDescription>Personnalisez l'apparence pour votre organisation</CardDescription>
+              <CardTitle>White Label</CardTitle>
+              <CardDescription>Customize the appearance for your organization</CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <Tabs defaultValue="admin">
             <TabsList>
-              <TabsTrigger value="admin">Portail Admin</TabsTrigger>
-              <TabsTrigger value="client">Portail Client</TabsTrigger>
+              <TabsTrigger value="admin">Admin Portal</TabsTrigger>
+              <TabsTrigger value="client">Client Portal</TabsTrigger>
             </TabsList>
 
             <TabsContent value="admin" className="space-y-6 pt-4">
@@ -423,17 +423,17 @@ export function WhiteLabelTab() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="websiteTitle">Titre du site web</Label>
+                <Label htmlFor="websiteTitle">Website Title</Label>
                 <Input
                   id="websiteTitle"
                   value={config.website_title}
                   onChange={(e) => setConfig({ ...config, website_title: e.target.value })}
-                  placeholder="Mon Application"
+                  placeholder="My Application"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Couleur principale</Label>
+                <Label>Primary Color</Label>
                 <ColorPicker
                   value={config.primary_color}
                   onChange={(v) => setConfig({ ...config, primary_color: v })}
@@ -448,7 +448,7 @@ export function WhiteLabelTab() {
               </p>
               <div className="grid md:grid-cols-2 gap-4">
                 <ImageUploader
-                  label="Logo portail client"
+                  label="Client portal logo"
                   currentUrl={config.client_portal_logo_url}
                   organizationId={selectedOrgId || ''}
                   folder="client-branding"
@@ -457,7 +457,7 @@ export function WhiteLabelTab() {
                   aspectRatio="wide"
                 />
                 <ImageUploader
-                  label="Favicon portail client"
+                  label="Client portal favicon"
                   currentUrl={config.client_portal_favicon_url}
                   organizationId={selectedOrgId || ''}
                   folder="client-branding"
@@ -468,16 +468,16 @@ export function WhiteLabelTab() {
               </div>
 
               <div className="space-y-2">
-                <Label>Titre portail client</Label>
+                <Label>Client portal title</Label>
                 <Input
                   value={config.client_portal_title}
                   onChange={(e) => setConfig({ ...config, client_portal_title: e.target.value })}
-                  placeholder="Espace Client"
+                  placeholder="Client Area"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Couleur portail client</Label>
+                <Label>Client portal color</Label>
                 <ColorPicker
                   value={config.client_portal_primary_color || config.primary_color}
                   onChange={(v) => setConfig({ ...config, client_portal_primary_color: v })}
@@ -538,7 +538,7 @@ export function WhiteLabelTab() {
         <CardContent className="space-y-6">
           <div className="grid lg:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <div className="text-sm font-medium text-muted-foreground">Portail Admin</div>
+              <div className="text-sm font-medium text-muted-foreground">Admin Portal</div>
               <BrandingPreview
                 surface="admin"
                 primaryColor={adminPreviewColor}
@@ -547,7 +547,7 @@ export function WhiteLabelTab() {
               />
             </div>
             <div className="space-y-2">
-              <div className="text-sm font-medium text-muted-foreground">Portail Client</div>
+              <div className="text-sm font-medium text-muted-foreground">Client Portal</div>
               <BrandingPreview
                 surface="client"
                 primaryColor={clientPreviewColor}
@@ -668,7 +668,7 @@ export function WhiteLabelTab() {
       </Card>
 
       <Button onClick={handleSave} disabled={isSaving} className="w-full">
-        {isSaving ? 'Enregistrement...' : 'Enregistrer les modifications'}
+        {isSaving ? 'Saving...' : 'Enregistrer les modifications'}
       </Button>
     </div>
   );
