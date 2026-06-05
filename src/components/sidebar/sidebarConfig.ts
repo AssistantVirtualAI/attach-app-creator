@@ -3,7 +3,7 @@ import {
   Bot, Sparkles, FileQuestion, Users, UserPlus, Calendar,
   Phone, MessageCircle, GitBranch, Sliders, Webhook,
   CreditCard, Settings, Tag, Headphones, LayoutDashboard, Radio, Globe,
-  Shield, Building2, PhoneCall, Voicemail, Smartphone, Disc, Bell, Brain, Router, Activity
+  Shield, Building2, PhoneCall, Voicemail, Smartphone, Disc, Bell, Brain, Router, Activity, CheckSquare
 } from 'lucide-react';
 
 export interface NavItem {
@@ -135,6 +135,7 @@ export const sidebarGroups: NavGroup[] = [
       { nameKey: 'Voicemail', href: '/org/lemtel/telephony/voicemail', icon: Voicemail },
       { nameKey: 'PBX Settings', href: '/org/lemtel/telephony/settings', icon: Settings },
       { nameKey: 'Diagnostics', href: '/org/lemtel/telephony/diagnostics', icon: Activity },
+      { nameKey: '✅ Go-Live Checklist', href: '/org/lemtel/telephony/checklist', icon: CheckSquare },
     ]
   },
   {
