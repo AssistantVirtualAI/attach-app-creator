@@ -147,6 +147,7 @@ export const useAgentSettings = (agentId: string | undefined) => {
   const updateAgentMutation = useMutation({
     mutationFn: async (updates: Partial<AgentSettings>) => {
       if (!agentId) throw new Error('No agent ID');
+      if (!selectedOrgId) throw new Error('No organization selected');
       
       const { error } = await supabase
         .from('agents')
@@ -157,7 +158,7 @@ export const useAgentSettings = (agentId: string | undefined) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agent-settings', agentId] });
+      queryClient.invalidateQueries({ queryKey: ['agent-settings', selectedOrgId, agentId] });
       toast.success('Agent mis à jour');
     },
     onError: () => {
