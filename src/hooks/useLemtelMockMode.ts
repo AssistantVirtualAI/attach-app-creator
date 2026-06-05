@@ -20,7 +20,8 @@ export function useLemtelMockMode() {
           .select('use_mock_data')
           .eq('organization_id', LEMTEL_ORG_ID)
           .maybeSingle();
-        if (active) setUseMock(data?.use_mock_data ?? true);
+        const row = data as { use_mock_data?: boolean } | null;
+        if (active) setUseMock(row?.use_mock_data ?? true);
       } catch {
         if (active) setUseMock(true);
       } finally {
