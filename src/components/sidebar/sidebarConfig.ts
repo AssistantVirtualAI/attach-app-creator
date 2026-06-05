@@ -3,7 +3,7 @@ import {
   Bot, Sparkles, FileQuestion, Users, UserPlus, Calendar,
   Phone, MessageCircle, GitBranch, Sliders, Webhook,
   CreditCard, Settings, Tag, Headphones, LayoutDashboard, Radio, Globe,
-  Shield, Building2
+  Shield, Building2, PhoneCall, Voicemail, Smartphone
 } from 'lucide-react';
 
 export interface NavItem {
@@ -19,6 +19,7 @@ export interface NavGroup {
   items: NavItem[];
   adminOnly?: boolean;
   superAdminOnly?: boolean;
+  lemtelOnly?: boolean;
 }
 
 export const sidebarGroups: NavGroup[] = [
