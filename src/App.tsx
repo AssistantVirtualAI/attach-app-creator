@@ -84,6 +84,14 @@ import LemtelSettings from "./pages/lemtel/LemtelSettings";
 import LemtelMessages from "./pages/lemtel/LemtelMessages";
 import LemtelPortalCalls from "./pages/lemtel/LemtelPortalCalls";
 import LemtelStub from "./pages/lemtel/LemtelStub";
+import LemtelCustomers from "./pages/lemtel/LemtelCustomers";
+import LemtelExtensions from "./pages/lemtel/LemtelExtensions";
+import LemtelDIDs from "./pages/lemtel/LemtelDIDs";
+import LemtelQueues from "./pages/lemtel/LemtelQueues";
+import LemtelIVR from "./pages/lemtel/LemtelIVR";
+import LemtelVoiceAgents from "./pages/lemtel/LemtelVoiceAgents";
+import LemtelSoftphoneUsers from "./pages/lemtel/LemtelSoftphoneUsers";
+import LemtelAnalytics from "./pages/lemtel/LemtelAnalytics";
 
 // Portal pages
 import PortalLogin from "./pages/PortalLogin";
@@ -475,21 +483,22 @@ const App = () => (
                 <Route path="/lemtel/dashboard" element={<ProtectedRoute><LemtelGuard><LemtelDashboard /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/lemtel/settings" element={<ProtectedRoute><LemtelGuard><LemtelSettings /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/lemtel/messages" element={<ProtectedRoute><LemtelGuard><LemtelMessages /></LemtelGuard></ProtectedRoute>} />
-                <Route path="/lemtel/customers" element={<ProtectedRoute><LemtelGuard><LemtelStub title="Customers" description="Lemtel end-clients" /></LemtelGuard></ProtectedRoute>} />
-                <Route path="/lemtel/dids" element={<ProtectedRoute><LemtelGuard><LemtelStub title="Phone Numbers (DIDs)" /></LemtelGuard></ProtectedRoute>} />
-                <Route path="/lemtel/extensions" element={<ProtectedRoute><LemtelGuard><LemtelStub title="Extensions" /></LemtelGuard></ProtectedRoute>} />
-                <Route path="/lemtel/queues" element={<ProtectedRoute><LemtelGuard><LemtelStub title="Call Queues" /></LemtelGuard></ProtectedRoute>} />
-                <Route path="/lemtel/ivr" element={<ProtectedRoute><LemtelGuard><LemtelStub title="Auto-Attendant (IVR)" /></LemtelGuard></ProtectedRoute>} />
-                <Route path="/lemtel/voice-agents" element={<ProtectedRoute><LemtelGuard><LemtelStub title="Voice Agents" /></LemtelGuard></ProtectedRoute>} />
-                <Route path="/lemtel/softphone-users" element={<ProtectedRoute><LemtelGuard><LemtelStub title="Softphone Users" /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/customers" element={<ProtectedRoute><LemtelGuard><LemtelCustomers /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/dids" element={<ProtectedRoute><LemtelGuard><LemtelDIDs /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/extensions" element={<ProtectedRoute><LemtelGuard><LemtelExtensions /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/queues" element={<ProtectedRoute><LemtelGuard><LemtelQueues /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/ivr" element={<ProtectedRoute><LemtelGuard><LemtelIVR /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/voice-agents" element={<ProtectedRoute><LemtelGuard><LemtelVoiceAgents /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/softphone-users" element={<ProtectedRoute><LemtelGuard><LemtelSoftphoneUsers /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/analytics" element={<ProtectedRoute><LemtelGuard><LemtelAnalytics /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/lemtel/portal/calls" element={<ProtectedRoute><LemtelGuard><LemtelPortalCalls /></LemtelGuard></ProtectedRoute>} />
-                <Route path="/lemtel/portal/dashboard" element={<ProtectedRoute><LemtelGuard><LemtelStub title="My Dashboard" /></LemtelGuard></ProtectedRoute>} />
-                <Route path="/lemtel/portal/extensions" element={<ProtectedRoute><LemtelGuard><LemtelStub title="My Extensions" /></LemtelGuard></ProtectedRoute>} />
-                <Route path="/lemtel/portal/recordings" element={<ProtectedRoute><LemtelGuard><LemtelStub title="Recordings" /></LemtelGuard></ProtectedRoute>} />
-                <Route path="/lemtel/portal/queues" element={<ProtectedRoute><LemtelGuard><LemtelStub title="My Queues" /></LemtelGuard></ProtectedRoute>} />
-                <Route path="/lemtel/portal/ivr" element={<ProtectedRoute><LemtelGuard><LemtelStub title="My IVR" /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/portal/dashboard" element={<ProtectedRoute><LemtelGuard><LemtelDashboard /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/portal/extensions" element={<ProtectedRoute><LemtelGuard><LemtelExtensions /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/portal/recordings" element={<ProtectedRoute><LemtelGuard><LemtelStub title="Recordings" description="Call recordings will appear here once FusionPBX is connected." /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/portal/queues" element={<ProtectedRoute><LemtelGuard><LemtelQueues /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/portal/ivr" element={<ProtectedRoute><LemtelGuard><LemtelIVR /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/lemtel/portal/messages" element={<ProtectedRoute><LemtelGuard><LemtelMessages /></LemtelGuard></ProtectedRoute>} />
-                <Route path="/lemtel/portal/agents" element={<ProtectedRoute><LemtelGuard><LemtelStub title="My Voice Agents" /></LemtelGuard></ProtectedRoute>} />
+                <Route path="/lemtel/portal/agents" element={<ProtectedRoute><LemtelGuard><LemtelVoiceAgents /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/lemtel/portal/softphone" element={<ProtectedRoute><LemtelGuard><LemtelStub title="Softphone" description="Use the floating softphone widget at the bottom-right." /></LemtelGuard></ProtectedRoute>} />
                 
                 <Route
