@@ -70,7 +70,7 @@ const AgentSettingsPage = () => {
     return (
       <AppLayout>
         <div className="flex flex-col items-center justify-center h-[60vh]">
-          <p className="text-muted-foreground mb-4">Agent non trouvé</p>
+          <p className="text-muted-foreground mb-4">Agent not found</p>
           <Button onClick={() => navigate('/agents')}>
             Retour aux agents
           </Button>
@@ -103,7 +103,7 @@ const AgentSettingsPage = () => {
       title: 'Appearance',
       items: [
         { id: 'widget', label: 'Widget', icon: Palette },
-        { id: 'embed', label: 'Intégration', icon: Code },
+        { id: 'embed', label: 'Integration', icon: Code },
       ],
     },
     {

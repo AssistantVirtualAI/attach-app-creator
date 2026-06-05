@@ -15,18 +15,18 @@ const AgentConfig = () => {
       <div className="container mx-auto px-6 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2 gradient-text">Configuration Agent IA</h1>
+          <h1 className="text-4xl font-bold mb-2 gradient-text">AI Agent Configuration</h1>
           <p className="text-muted-foreground text-lg">
-            Personnalisez le comportement de votre assistant vocal
+            Customize your voice assistant behavior
           </p>
         </div>
 
         <Tabs defaultValue="general" className="space-y-6">
           <TabsList className="glass-card">
-            <TabsTrigger value="general">Général</TabsTrigger>
-            <TabsTrigger value="voice">Voix</TabsTrigger>
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="voice">Voice</TabsTrigger>
             <TabsTrigger value="conversation">Conversation</TabsTrigger>
-            <TabsTrigger value="behavior">Comportement</TabsTrigger>
+            <TabsTrigger value="behavior">Behavior</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-6">
@@ -37,14 +37,14 @@ const AgentConfig = () => {
                     <Bot className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <CardTitle>Informations Générales</CardTitle>
-                    <CardDescription>Configuration de base de l'agent</CardDescription>
+                    <CardTitle>General Information</CardTitle>
+                    <CardDescription>Basic agent configuration</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Nom de l'agent</Label>
+                  <Label htmlFor="name">Agent name</Label>
                   <Input
                     id="name"
                     defaultValue="AVA Assistant"
@@ -53,24 +53,24 @@ const AgentConfig = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="prompt">Prompt Système</Label>
+                  <Label htmlFor="prompt">System Prompt</Label>
                   <Textarea
                     id="prompt"
-                    placeholder="Vous êtes un assistant vocal IA intelligent..."
+                    placeholder="You are an intelligent AI voice assistant..."
                     rows={8}
-                    defaultValue="Vous êtes AVA, un assistant vocal IA professionnel et serviable. Votre objectif est d'aider les utilisateurs avec leurs questions de manière claire et concise."
+                    defaultValue="You are AVA, a professional and helpful AI voice assistant. Your goal is to help users with their questions clearly and concisely."
                     className="bg-background/50 font-mono text-sm"
                   />
                   <p className="text-sm text-muted-foreground">
-                    Définit le comportement global et la personnalité de l'agent
+                    Defines the agent's overall behavior and personality
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="firstMessage">Premier Message</Label>
+                  <Label htmlFor="firstMessage">First Message</Label>
                   <Input
                     id="firstMessage"
-                    defaultValue="Bonjour ! Comment puis-je vous aider aujourd'hui ?"
+                    defaultValue="Hello! How can I help you today?"
                     className="bg-background/50"
                   />
                 </div>
