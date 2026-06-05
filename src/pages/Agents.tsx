@@ -164,6 +164,22 @@ export default function Agents() {
           ))}
         </div>
 
+        {isError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Could not load agents</AlertTitle>
+            <AlertDescription className="space-y-3">
+              <div className="text-sm font-mono break-all">
+                {(error as Error)?.message || 'Unknown error while fetching agents from the database.'}
+              </div>
+              <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {agents && agents.length > 0 ? (
           <>
             {/* Search */}
