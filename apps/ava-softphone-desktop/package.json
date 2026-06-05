@@ -6,10 +6,10 @@
   "author": "AVA Télécom",
   "scripts": {
     "dev": "concurrently \"vite\" \"electron .\"",
-    "build": "vite build && tsc -p electron/tsconfig.json && electron-builder",
-    "build:win": "vite build && tsc -p electron/tsconfig.json && electron-builder --win",
-    "build:mac": "vite build && tsc -p electron/tsconfig.json && electron-builder --mac",
-    "build:linux": "vite build && tsc -p electron/tsconfig.json && electron-builder --linux",
+    "build": "vite build && tsc -p electron/tsconfig.json",
+    "build:win": "npm run build && electron-builder --win --x64",
+    "build:mac": "npm run build && electron-builder --mac --x64 --arm64",
+    "build:linux": "npm run build && electron-builder --linux --x64",
     "dist": "npm run build"
   },
   "dependencies": {

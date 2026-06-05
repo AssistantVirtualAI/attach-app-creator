@@ -1,7 +1,7 @@
 appId: com.ava-telecom.softphone
 productName: AVA Softphone
 directories:
-  output: release
+  output: dist-electron
 files:
   - dist/**/*
   - electron/**/*
