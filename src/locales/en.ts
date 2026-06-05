@@ -878,11 +878,6 @@ export const en = {
     cta: 'Configure now',
   },
 
-  knowledgeBase: {
-    noAgentSelected: 'No agent selected',
-    noAgentConfigured: 'No agent configured. Create an agent with a voice AI platform.',
-    selectAgent: 'Select an agent to view its knowledge base.',
-  },
 
   // Clients
   clients: {
