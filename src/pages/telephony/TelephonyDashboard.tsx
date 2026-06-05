@@ -3,9 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, MessageSquare, Smartphone, Voicemail, Brain, Plus, RefreshCw, Bot, Activity } from 'lucide-react';
+import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, MessageSquare, Smartphone, Voicemail, Brain, Plus, RefreshCw, Bot, Activity, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend } from 'recharts';
-import { usePbxCallRecords, usePbxExtensions, usePbxSmsThreads, usePbxIntegration, usePbxAgents, usePbxDevices, usePbxSync, usePbxRegistrations } from '@/hooks/usePbxData';
+import { usePbxCallRecords, usePbxExtensions, usePbxSmsThreads, usePbxIntegration, usePbxAgents, usePbxDevices, usePbxSync, usePbxRegistrations, usePbxSyncJobs } from '@/hooks/usePbxData';
 import { formatDistanceToNow } from 'date-fns';
 
 const COLORS = ['#22c55e', '#3b82f6', '#ef4444'];
