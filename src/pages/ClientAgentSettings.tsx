@@ -741,15 +741,15 @@ const ClientAgentSettings = () => {
                   <Globe className="h-5 w-5 text-amber-500" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Langue & Avancé</h3>
-                  <p className="text-sm text-muted-foreground">Langue et paramètres avancés</p>
+                  <h3 className="font-semibold">Language & Advanced</h3>
+                  <p className="text-sm text-muted-foreground">Language and advanced settings</p>
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
               <div className="space-y-6">
                 <div>
-                  <Label>Langue de l'agent</Label>
+                  <Label>Agent language</Label>
                   <Select
                     value={language}
                     onValueChange={setLanguage}
@@ -770,7 +770,7 @@ const ClientAgentSettings = () => {
 
                 <div className="flex items-center justify-between p-4 rounded-lg border">
                   <div>
-                    <p className="font-medium text-sm">Désactiver l'interruption du premier message</p>
+                    <p className="font-medium text-sm">Disable first message interruption</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       The user will not be able to interrupt the welcome message
                     </p>
@@ -801,15 +801,15 @@ const ClientAgentSettings = () => {
                   <Info className="h-5 w-5 text-gray-500" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold">Informations</h3>
-                  <p className="text-sm text-muted-foreground">Détails techniques de l'agent</p>
+                  <h3 className="font-semibold">Information</h3>
+                  <p className="text-sm text-muted-foreground">Technical agent details</p>
                 </div>
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-sm text-muted-foreground">Plateforme</p>
+                  <p className="text-sm text-muted-foreground">Platform</p>
                   <p className="font-medium capitalize">{platform}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
@@ -818,7 +818,7 @@ const ClientAgentSettings = () => {
                 </div>
                 {config?.name && (
                   <div className="p-3 rounded-lg bg-muted/50 col-span-2">
-                    <p className="text-sm text-muted-foreground">Nom de l'Agent</p>
+                    <p className="text-sm text-muted-foreground">Agent Name</p>
                     <p className="font-medium">{config.name}</p>
                   </div>
                 )}
@@ -834,7 +834,7 @@ const ClientAgentSettings = () => {
         </Accordion>
 
         <div className="mt-6">
-          <h2 className="text-lg font-semibold mb-4">API ElevenLabs Étendue</h2>
+          <h2 className="text-lg font-semibold mb-4">Extended ElevenLabs API</h2>
           <ElevenLabsAPISections
             apiKey={apiKey}
             organizationId={organizationId}
