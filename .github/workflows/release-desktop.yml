@@ -149,6 +149,8 @@ jobs:
         run: npm run build:linux
         working-directory: apps/ava-softphone-desktop
         env:
+          VITE_CONFIG_FILE: ./apps/ava-softphone-desktop/vite.config.ts
+          VITE_ROOT: ./apps/ava-softphone-desktop
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Upload artifact
