@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale';
 
 export function PerformanceBillingTab() {
   const { 
@@ -57,10 +57,10 @@ export function PerformanceBillingTab() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
-                Facturation Basée sur la Performance
+                Performance-Based Billing
               </CardTitle>
               <CardDescription>
-                Facturez vos clients en fonction des résultats obtenus
+                Bill your clients based on achieved results
               </CardDescription>
             </div>
             <Switch 
@@ -76,14 +76,14 @@ export function PerformanceBillingTab() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Période en Cours</CardTitle>
+              <CardTitle>Current Period</CardTitle>
               <CardDescription>
-                Métriques du mois en cours
+                Current month metrics
               </CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={() => recalculate()}>
               <RefreshCw className={`h-4 w-4 mr-2 ${isCalculating ? 'animate-spin' : ''}`} />
-              Actualiser
+              Refresh
             </Button>
           </div>
         </CardHeader>
@@ -100,7 +100,7 @@ export function PerformanceBillingTab() {
                 <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
                   <div className="flex items-center gap-2 mb-2">
                     <Calendar className="h-4 w-4 text-blue-400" />
-                    <span className="text-sm text-muted-foreground">RDV Bookés</span>
+                    <span className="text-sm text-muted-foreground">Booked appointments</span>
                   </div>
                   <p className="text-2xl font-bold">{currentMetrics?.appointments_booked || 0}</p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -111,7 +111,7 @@ export function PerformanceBillingTab() {
                 <div className="p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
                   <div className="flex items-center gap-2 mb-2">
                     <Users className="h-4 w-4 text-purple-400" />
-                    <span className="text-sm text-muted-foreground">Leads Qualifiés</span>
+                    <span className="text-sm text-muted-foreground">Qualified leads</span>
                   </div>
                   <p className="text-2xl font-bold">{currentMetrics?.leads_qualified || 0}</p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -122,7 +122,7 @@ export function PerformanceBillingTab() {
                 <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
                   <div className="flex items-center gap-2 mb-2">
                     <UserCheck className="h-4 w-4 text-green-400" />
-                    <span className="text-sm text-muted-foreground">Leads Convertis</span>
+                    <span className="text-sm text-muted-foreground">Converted leads</span>
                   </div>
                   <p className="text-2xl font-bold">{currentMetrics?.leads_converted || 0}</p>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -133,7 +133,7 @@ export function PerformanceBillingTab() {
                 <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
                   <div className="flex items-center gap-2 mb-2">
                     <DollarSign className="h-4 w-4 text-primary" />
-                    <span className="text-sm text-muted-foreground">Total Facturable</span>
+                    <span className="text-sm text-muted-foreground">Billable total</span>
                   </div>
                   <p className="text-2xl font-bold">${currentMetrics?.billable_amount?.toFixed(2) || '0.00'}</p>
                   <p className="text-xs text-muted-foreground mt-1">

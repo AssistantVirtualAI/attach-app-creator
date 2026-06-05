@@ -24,7 +24,7 @@ export function KnowledgeBaseEditor({ item, onSave, onCancel }: KnowledgeBaseEdi
   const [formData, setFormData] = useState({
     title: item?.title || '',
     content: item?.content || '',
-    category: item?.category || 'Général',
+    category: item?.category || 'General',
     tags: item?.tags || [] as string[],
   });
 
@@ -63,38 +63,38 @@ export function KnowledgeBaseEditor({ item, onSave, onCancel }: KnowledgeBaseEdi
       <Card className="bg-black/40 border border-purple-neon/30">
         <CardHeader>
           <CardTitle className="text-purple-neon">
-            {item?.id ? "Éditer l'article" : 'Nouvel article'}
+            {item?.id ? 'Edit article' : 'New article'}
           </CardTitle>
         </CardHeader>
         
         <CardContent className="space-y-4">
-          {/* Titre */}
+          {/* Title */}
           <div className="space-y-2">
-            <Label htmlFor="title">Titre</Label>
+            <Label htmlFor="title">Title</Label>
             <Input
               id="title"
               value={formData.title}
               onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-              placeholder="Titre de l'article..."
+              placeholder="Article title..."
               className="bg-black/40 border-purple-neon/30"
             />
           </div>
 
-          {/* Catégorie */}
+          {/* Category */}
           <div className="space-y-2">
-            <Label htmlFor="category">Catégorie</Label>
+            <Label htmlFor="category">Category</Label>
             <Input
               id="category"
               value={formData.category}
               onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-              placeholder="FAQ, Tutoriel, Support..."
+              placeholder="FAQ, Tutorial, Support..."
               className="bg-black/40 border-purple-neon/30"
             />
           </div>
 
-          {/* Contenu avec TinyMCE */}
+          {/* Content with TinyMCE */}
           <div className="space-y-2">
-            <Label htmlFor="content">Contenu</Label>
+            <Label htmlFor="content">Content</Label>
             <div className="border border-purple-neon/30 rounded-lg overflow-hidden">
               <Editor
                 apiKey="no-api-key-required"
@@ -139,7 +139,7 @@ export function KnowledgeBaseEditor({ item, onSave, onCancel }: KnowledgeBaseEdi
               id="tags"
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
-              placeholder="Ajouter un tag (Entrée pour confirmer)..."
+              placeholder="Add a tag (press Enter to confirm)..."
               className="bg-black/40 border-purple-neon/30"
               onKeyPress={(e) => {
                 if (e.key === 'Enter') {
@@ -166,7 +166,7 @@ export function KnowledgeBaseEditor({ item, onSave, onCancel }: KnowledgeBaseEdi
               onClick={onCancel}
               className="border-purple-neon/30 hover:border-purple-neon"
             >
-              Annuler
+              Cancel
             </Button>
           </div>
         </CardContent>

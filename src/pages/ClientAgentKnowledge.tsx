@@ -97,13 +97,13 @@ const useClientUpdateKnowledgeDocument = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['client-elevenlabs-knowledge-base', variables.agentId] });
       queryClient.invalidateQueries({ queryKey: ['client-elevenlabs-kb-document'] });
-      toast.success('Document modifié avec succès');
+      toast.success('Document updated successfully');
     },
     onError: (error: any) => {
-      if (error.message?.includes('403') || error.message?.includes('Accès refusé')) {
-        toast.error('Accès refusé. Seuls les administrateurs peuvent modifier des documents.');
+      if (error.message?.includes('403') || error.message?.includes('Access denied')) {
+        toast.error('Access denied. Only administrators can edit documents.');
       } else {
-        toast.error(error.message || 'Erreur lors de la modification');
+        toast.error(error.message || 'Error while editing');
       }
     },
   });
@@ -156,7 +156,7 @@ const ClientAgentKnowledge = () => {
   const handleAddItem = async () => {
     if ((!apiKey && !organizationId) || !platformAgentId) return;
     if (!newItem.title || !newItem.content) {
-      toast.error('Veuillez remplir tous les champs');
+      toast.error('Please fill in all fields');
       return;
     }
 
@@ -166,7 +166,7 @@ const ClientAgentKnowledge = () => {
         agentId: platformAgentId,
         title: newItem.title,
         content: newItem.content,
-        category: newItem.category || 'Général',
+        category: newItem.category || 'General',
         organizationId,
       });
 
@@ -210,7 +210,7 @@ const ClientAgentKnowledge = () => {
 
   const handleSaveEdit = async () => {
     if ((!apiKey && !organizationId) || !platformAgentId || !viewDocumentId || !editName.trim() || !editContent.trim()) {
-      toast.error('Veuillez remplir tous les champs');
+      toast.error('Please fill in all fields');
       return;
     }
 
