@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useOrganization } from '@/context/OrganizationContext';
 
 export interface AgentSettings {
   id: string;
@@ -34,9 +35,10 @@ export interface ElevenLabsAnalytics {
 
 export const useAgentSettings = (agentId: string | undefined) => {
   const queryClient = useQueryClient();
+  const { selectedOrgId } = useOrganization();
 
   const { data: agent, isLoading } = useQuery({
-    queryKey: ['agent-settings', agentId],
+    queryKey: ['agent-settings', selectedOrgId, agentId],
     queryFn: async () => {
       if (!agentId) return null;
       
@@ -44,13 +46,14 @@ export const useAgentSettings = (agentId: string | undefined) => {
       const { data, error } = await supabase
         .from('agents_safe')
         .select('*')
+        .eq('organization_id', selectedOrgId)
         .eq('id', agentId)
         .single();
 
       if (error) throw error;
       return data as AgentSettings;
     },
-    enabled: !!agentId,
+    enabled: !!selectedOrgId && !!agentId,
   });
 
   const { data: client } = useQuery({
@@ -61,13 +64,14 @@ export const useAgentSettings = (agentId: string | undefined) => {
       const { data, error } = await supabase
         .from('clients')
         .select('id, name, email')
+        .eq('organization_id', selectedOrgId)
         .eq('id', agent.client_id)
         .single();
 
       if (error) throw error;
       return data;
     },
-    enabled: !!agent?.client_id,
+    enabled: !!selectedOrgId && !!agent?.client_id,
   });
 
   const { data: conversations } = useQuery({
@@ -78,6 +82,7 @@ export const useAgentSettings = (agentId: string | undefined) => {
       const { data, error } = await supabase
         .from('conversations')
         .select('id, created_at, duration, sentiment, satisfaction_score')
+        .eq('organization_id', selectedOrgId)
         .eq('agent_id', agentId)
         .order('created_at', { ascending: false })
         .limit(100);
@@ -85,7 +90,7 @@ export const useAgentSettings = (agentId: string | undefined) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!agentId,
+    enabled: !!selectedOrgId && !!agentId,
   });
 
   // Fetch linked integration for API key and agent ID
@@ -98,13 +103,14 @@ export const useAgentSettings = (agentId: string | undefined) => {
       const { data, error } = await supabase
         .from('organization_integrations')
         .select('id, platform, api_key, agent_id')
+        .eq('organization_id', selectedOrgId)
         .eq('id', integrationId)
         .single();
 
       if (error) throw error;
       return data;
     },
-    enabled: !!integrationId,
+    enabled: !!selectedOrgId && !!integrationId,
   });
 
   // Fetch ElevenLabs real-time analytics
@@ -145,6 +151,7 @@ export const useAgentSettings = (agentId: string | undefined) => {
       const { error } = await supabase
         .from('agents')
         .update(updates)
+        .eq('organization_id', selectedOrgId)
         .eq('id', agentId);
 
       if (error) throw error;
