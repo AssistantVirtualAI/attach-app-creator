@@ -98,6 +98,8 @@ import TelephonyRecordings from "./pages/telephony/TelephonyRecordings";
 import TelephonyRingGroups from "./pages/telephony/TelephonyRingGroups";
 import TelephonyAI from "./pages/telephony/TelephonyAI";
 import TelephonyWebphone from "./pages/telephony/TelephonyWebphone";
+import TelephonyVoicemail from "./pages/telephony/TelephonyVoicemail";
+import TelephonyDiagnostics from "./pages/telephony/TelephonyDiagnostics";
 import { TelephonyLayout } from "./components/telephony/TelephonyLayout";
 import { PortalGuard } from "./components/telephony/PortalGuard";
 import LemtelAnalytics from "./pages/lemtel/LemtelAnalytics";
