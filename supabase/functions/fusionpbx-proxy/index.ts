@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
 
   let FUSIONPBX_API_URL: string, FUSIONPBX_USERNAME: string, FUSIONPBX_API_KEY: string, FUSIONPBX_DOMAIN_UUID: string;
   try {
-    FUSIONPBX_API_URL = required("FUSIONPBX_API_URL").replace(/\/+$/, "");
+    FUSIONPBX_API_URL = required("FUSIONPBX_API_URL").replace(/\/+$/, "").replace(/\/app\/api(\/\d+)?$/, "");
     FUSIONPBX_USERNAME = required("FUSIONPBX_USERNAME");
     FUSIONPBX_API_KEY = required("FUSIONPBX_API_KEY");
     FUSIONPBX_DOMAIN_UUID = required("FUSIONPBX_DOMAIN_UUID");
