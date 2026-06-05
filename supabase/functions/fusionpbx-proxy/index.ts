@@ -394,8 +394,8 @@ Deno.serve(async (req) => {
         pbxFetch(`ivr_menus?${domainQ}`).then((r) => ({ k: "ivr_menus", r })),
         pbxFetch(`call_center_queues?${domainQ}`).then((r) => ({ k: "call_center_queues", r })),
         pbxFetch(`ring_groups?${domainQ}`).then((r) => ({ k: "ring_groups", r })),
-        pbxFetch(`xml_cdrs?${domainQ}&order=desc&limit=200`).then((r) => ({ k: "xml_cdrs", r })),
       ]);
+      const cdrResult = await fetchCdrsWithFallback({ limit: "200" });
       const stats: Record<string, number> = {};
       const errors: string[] = [];
       const doUpsert = async (table: string, rows: any[], conflict: string, k: string) => {
@@ -422,10 +422,14 @@ Deno.serve(async (req) => {
         } else if (k === "ring_groups") {
           const rows = list.map(mapRingGroup).filter((x) => x.pbx_uuid);
           await doUpsert("pbx_ring_groups", rows, "organization_id,pbx_uuid", "ring_groups");
-        } else if (k === "xml_cdrs") {
-          const rows = list.map(mapCdr).filter((x) => x.pbx_uuid);
-          await doUpsert("pbx_call_records", rows, "pbx_uuid", "cdrs");
         }
+      }
+      if (cdrResult.ok) {
+        const rows = cdrResult.records.map(mapCdr).filter((x: any) => x.pbx_uuid);
+        await doUpsert("pbx_call_records", rows, "pbx_uuid", "cdrs");
+      } else {
+        errors.push(`cdrs: no working endpoint (tried ${cdrResult.attempts.length})`);
+        stats["cdrs"] = 0;
       }
       const duration_ms = Date.now() - t0;
       await admin.from("pbx_sync_jobs").insert({
