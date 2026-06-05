@@ -172,42 +172,42 @@ const Docs = () => {
     },
     {
       title: "Analytics Avancés",
-      description: "Analysez les performances avec des graphiques détaillés et des insights actionnables.",
+      description: "Analyze performance with detailed charts and actionable insights.",
       icon: <BarChart3 className="w-8 h-8" />,
-      highlights: ["Métriques détaillées", "Rapports exportables", "Tendances temporelles"]
+      highlights: ["Detailed metrics", "Exportable reports", "Time trends"]
     }
   ];
 
   const agentConfigSlides: Slide[] = [
     {
-      title: "Créer un Nouvel Agent",
-      description: "Commencez par donner un nom et une description à votre agent vocal.",
+      title: "Create a New Agent",
+      description: "Start by giving your voice agent a name and description.",
       icon: <Bot className="w-8 h-8" />,
-      highlights: ["Nom unique", "Description claire", "Sélection de plateforme"]
+      highlights: ["Unique name", "Clear description", "Platform selection"]
     },
     {
-      title: "Sélectionner la Voix",
-      description: "Choisissez parmi les voix ElevenLabs disponibles et ajustez les paramètres vocaux.",
+      title: "Select the Voice",
+      description: "Choose from available ElevenLabs voices and adjust voice settings.",
       icon: <Settings className="w-8 h-8" />,
-      highlights: ["Stabilité vocale", "Clarté/Similarité", "Style expressif"]
+      highlights: ["Voice stability", "Clarity/Similarity", "Expressive style"]
     },
     {
-      title: "Configurer le Prompt",
-      description: "Définissez le comportement et la personnalité de votre agent avec un prompt système.",
+      title: "Configure the Prompt",
+      description: "Define your agent's behavior and personality with a system prompt.",
       icon: <FileText className="w-8 h-8" />,
-      highlights: ["Contexte métier", "Instructions précises", "Exemples de réponses"]
+      highlights: ["Business context", "Precise instructions", "Response examples"]
     },
     {
-      title: "Base de Connaissances",
-      description: "Ajoutez des documents et FAQ pour enrichir les réponses de l'agent.",
+      title: "Knowledge Base",
+      description: "Add documents and FAQs to enrich your agent's answers.",
       icon: <BookOpen className="w-8 h-8" />,
-      highlights: ["Upload documents", "FAQ dynamique", "Synchronisation auto"]
+      highlights: ["Upload documents", "Dynamic FAQ", "Auto sync"]
     },
     {
-      title: "Déployer et Tester",
-      description: "Testez votre agent dans le prototype avant de le déployer en production.",
+      title: "Deploy and Test",
+      description: "Test your agent in the prototype before deploying to production.",
       icon: <Rocket className="w-8 h-8" />,
-      highlights: ["Test en direct", "Widget intégrable", "Monitoring actif"]
+      highlights: ["Live test", "Embeddable widget", "Active monitoring"]
     }
   ];
 
