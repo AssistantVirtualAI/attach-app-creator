@@ -125,7 +125,7 @@ const sections: Section[] = [
         run: async () => {
           const { data, error } = await callProxy('test-cdr-endpoint');
           if (error) return { status: 'fail' as const, detail: error.message };
-          if (data?.ok) return { status: 'pass' as const, detail: `Endpoint: ${data.endpoint} (${data.record_count} records)` };
+          if (data?.ok) return { status: 'pass' as const, detail: `CDR endpoint confirmed: ${data.endpoint} — ${data.record_count} records` };
           const tried = (data?.attempts ?? []).map((a: any) => `${a.endpoint}[${a.status}]`).join(', ');
           return { status: 'fail' as const, detail: `No endpoint responding — tried: ${tried}` };
         } },
