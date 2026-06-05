@@ -433,7 +433,7 @@ export default function SaaSConfigurator() {
                     id="emailDomain"
                     value={config.email_domain}
                     onChange={(e) => updateConfig('email_domain', e.target.value)}
-                    placeholder="mail.votre-domaine.com"
+                    placeholder="mail.your-domain.com"
                   />
                 </div>
 
@@ -444,7 +444,7 @@ export default function SaaSConfigurator() {
                       id="emailSender"
                       value={config.email_sender}
                       onChange={(e) => updateConfig('email_sender', e.target.value)}
-                      placeholder="noreply@votre-domaine.com"
+                      placeholder="noreply@your-domain.com"
                     />
                   </div>
                   <div className="space-y-2">
@@ -459,7 +459,7 @@ export default function SaaSConfigurator() {
                 </div>
 
                 <Button onClick={handleSave} disabled={isUpdating}>
-                  {isUpdating ? 'Saving...' : 'Saving...
+                  {isUpdating ? 'Saving...' : 'Save'}
                 </Button>
               </CardContent>
             </Card>
@@ -554,7 +554,7 @@ export default function SaaSConfigurator() {
                       description: 'Plan configuration has been saved',
                     });
                   }}>
-                    Saving...es plans
+                    Save plans
                   </Button>
                 </div>
               </CardContent>
@@ -637,7 +637,7 @@ export default function SaaSConfigurator() {
                       description: 'Template configuration has been saved',
                     });
                   }}>
-                    Saving...es templates
+                    Save templates
                   </Button>
                 </div>
               </CardContent>
@@ -662,7 +662,7 @@ export default function SaaSConfigurator() {
                   <Label htmlFor="privacy">Privacy Policy (URL)</Label>
                   <Input
                     id="privacy"
-                    placeholder="https://votre-site.com/privacy"
+                    placeholder="https://your-site.com/privacy"
                   />
                 </div>
 
@@ -670,7 +670,7 @@ export default function SaaSConfigurator() {
                   <Label htmlFor="terms">Terms of Service (URL)</Label>
                   <Input
                     id="terms"
-                    placeholder="https://votre-site.com/terms"
+                    placeholder="https://your-site.com/terms"
                   />
                 </div>
 
@@ -683,7 +683,7 @@ export default function SaaSConfigurator() {
                 </div>
 
                 <Button onClick={handleSave} disabled={isUpdating}>
-                  {isUpdating ? 'Saving...' : 'Saving...
+                  {isUpdating ? 'Saving...' : 'Save'}
                 </Button>
               </CardContent>
             </Card>
@@ -730,7 +730,7 @@ export default function SaaSConfigurator() {
                 </div>
 
                 <Button onClick={handleSave} disabled={isUpdating}>
-                  {isUpdating ? 'Saving...' : 'Saving...
+                  {isUpdating ? 'Saving...' : 'Save'}
                 </Button>
               </CardContent>
             </Card>
