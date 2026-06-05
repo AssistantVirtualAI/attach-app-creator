@@ -749,26 +749,26 @@ const PortalSettings = () => {
 
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Modifier le membre</DialogTitle><DialogDescription>Modifiez les informations de {editingMember?.name}</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Edit member</DialogTitle><DialogDescription>Edit information for {editingMember?.name}</DialogDescription></DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2"><Label>Nom</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Name</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} /></div>
             <div className="space-y-2"><Label>Email</Label><Input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Rôle</Label><Select value={editRole} onValueChange={setEditRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="member">Membre</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div>
-            <div className="space-y-2"><Label>Statut</Label><Select value={editStatus} onValueChange={setEditStatus}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Actif</SelectItem><SelectItem value="inactive">Inactif</SelectItem></SelectContent></Select></div>
+            <div className="space-y-2"><Label>Role</Label><Select value={editRole} onValueChange={setEditRole}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="member">Member</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div>
+            <div className="space-y-2"><Label>Status</Label><Select value={editStatus} onValueChange={setEditStatus}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem><SelectItem value="inactive">Inactive</SelectItem></SelectContent></Select></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditModal(false)}>Annuler</Button>
-            <Button onClick={handleEditMember} disabled={isEditing}>{isEditing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Enregistrer</Button>
+            <Button variant="outline" onClick={() => setShowEditModal(false)}>Cancel</Button>
+            <Button onClick={handleEditMember} disabled={isEditing}>{isEditing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={showResetModal} onOpenChange={setShowResetModal}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Réinitialiser le mot de passe</DialogTitle><DialogDescription>Nouveau mot de passe pour {resetMemberName}</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Reset password</DialogTitle><DialogDescription>New password for {resetMemberName}</DialogDescription></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Nouveau mot de passe (min. 8 caractères)</Label>
+              <Label>New password (min. 8 characters)</Label>
               <div className="relative">
                 <Input type={showResetPassword ? 'text' : 'password'} value={resetPassword} onChange={(e) => setResetPassword(e.target.value)} placeholder="••••••••" />
                 <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => setShowResetPassword(!showResetPassword)}>
@@ -778,19 +778,19 @@ const PortalSettings = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowResetModal(false)}>Annuler</Button>
-            <Button onClick={handleResetPassword} disabled={isResetting || resetPassword.length < 8}>{isResetting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Réinitialiser</Button>
+            <Button variant="outline" onClick={() => setShowResetModal(false)}>Cancel</Button>
+            <Button onClick={handleResetPassword} disabled={isResetting || resetPassword.length < 8}>{isResetting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Reset</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Supprimer le membre ?</AlertDialogTitle><AlertDialogDescription>Êtes-vous sûr de vouloir supprimer {deletingMember?.name} ? Cette action est irréversible.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Delete member?</AlertDialogTitle><AlertDialogDescription>Are you sure you want to delete {deletingMember?.name}? This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteMember} disabled={isDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              {isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Supprimer
+              {isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
