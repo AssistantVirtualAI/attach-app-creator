@@ -94,14 +94,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   console.log('[Sidebar Debug] Role:', role, 'isSuperAdmin:', isSuperAdmin, 'isLoading:', isLoading, 'userRole:', userRole);
 
   // Filter groups based on role
-  const visibleGroups = useMemo(() => sidebarGroups.filter(group => {
-    if (group.superAdminOnly) return !isLoading && isSuperAdmin;
-    if (group.adminOnly) {
-      if (isLoading) return true;
-      return role === 'org_admin' || role === 'manager' || isSuperAdmin;
-    }
-    return true;
-  }), [role, isSuperAdmin, isLoading]);
+  const visibleGroups = useMemo(() => sidebarGroups, []);
 
   // Sidebar group ordering with drag & drop
   const sensors = useSensors(
