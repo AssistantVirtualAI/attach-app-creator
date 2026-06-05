@@ -450,7 +450,7 @@ export default function TelephonyChecklist() {
                 <Icon className="h-5 w-5" />
                 {section.title}
                 <Badge variant="outline" className="ml-2">
-                  {section.checks.filter(c => results[c.id]?.status === 'pass').length}/{section.checks.length}
+                  {section.checks.filter(c => { const st = results[c.id]?.status; return st === 'pass' || st === 'warn'; }).length}/{section.checks.length}
                 </Badge>
               </CardTitle>
             </CardHeader>
