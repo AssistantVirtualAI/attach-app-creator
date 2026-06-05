@@ -198,12 +198,38 @@ export default function TelephonyDashboard() {
         <Card>
           <CardHeader><CardTitle>Sync Status</CardTitle></CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <div className="flex items-center justify-between"><span className="text-muted-foreground">Last CDR sync</span><span>{lastSync}</span></div>
-            <div className="flex items-center justify-between"><span className="text-muted-foreground">Integration status</span><Badge variant={integration?.status === 'configured' ? 'default' : 'outline'}>{integration?.status || 'pending'}</Badge></div>
+            {lastJob?.status === 'failed' && (
+              <div className="p-2 rounded bg-red-500/10 text-red-600 text-xs flex items-center justify-between">
+                <span>❌ Last sync failed</span>
+                <Button size="sm" variant="outline" className="h-6" onClick={() => sync.mutate('all')}>Retry</Button>
+              </div>
+            )}
+            {lastJobAgo !== null && lastJobAgo > 10 && lastJob?.status !== 'failed' && (
+              <div className="p-2 rounded bg-orange-500/10 text-orange-600 text-xs">
+                ⚠️ Last sync was {Math.round(lastJobAgo)} min ago
+              </div>
+            )}
+            <div className="space-y-1">
+              {syncJobs.length === 0 && <div className="text-muted-foreground text-xs">No sync jobs yet</div>}
+              {(syncJobs as any[]).map(j => (
+                <div key={j.id} className="flex items-center justify-between text-xs border-b last:border-0 py-1">
+                  <span className="inline-flex items-center gap-2">
+                    {j.status === 'completed' ? <CheckCircle2 className="w-3 h-3 text-green-500" />
+                      : j.status === 'failed' ? <XCircle className="w-3 h-3 text-red-500" />
+                      : <Loader2 className="w-3 h-3 animate-spin text-yellow-500" />}
+                    <span className="font-mono">{j.job_type}</span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    {j.completed_at ? formatDistanceToNow(new Date(j.completed_at), { addSuffix: true }) : '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
             <div className="flex items-center justify-between"><span className="text-muted-foreground">Mock mode</span><Badge variant={integration?.config?.mock_mode ? 'secondary' : 'outline'}>{integration?.config?.mock_mode ? 'On' : 'Off'}</Badge></div>
             <div className="flex gap-2 pt-2">
               <Button size="sm" variant="outline" onClick={() => sync.mutate('cdr')}><RefreshCw className="w-3 h-3 mr-1" /> CDR</Button>
               <Button size="sm" variant="outline" onClick={() => sync.mutate('config')}><RefreshCw className="w-3 h-3 mr-1" /> Config</Button>
+              <Button size="sm" onClick={() => sync.mutate('all')}><RefreshCw className="w-3 h-3 mr-1" /> Full</Button>
             </div>
           </CardContent>
         </Card>
