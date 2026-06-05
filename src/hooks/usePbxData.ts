@@ -87,12 +87,13 @@ export function usePbxMockModeToggle() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (enabled: boolean) => {
-      const { data: integ, error: e1 } = await supabase
+      const { data: integRaw, error: e1 } = await supabase
         .from('pbx_integrations' as any)
         .select('id, config')
         .eq('organization_id', LEMTEL_ORG)
         .maybeSingle();
       if (e1) throw e1;
+      const integ = integRaw as { id?: string; config?: Record<string, unknown> } | null;
       const nextConfig = { ...(integ?.config || {}), mock_mode: enabled };
       if (integ?.id) {
         const { error } = await supabase.from('pbx_integrations' as any)
