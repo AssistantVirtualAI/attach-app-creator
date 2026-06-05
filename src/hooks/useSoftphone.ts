@@ -13,7 +13,10 @@ export function useSoftphone() {
   const [loading, setLoading] = useState(false);
   const [userStatus, setUserStatus] = useState<UserStatus>("available");
 
-  useEffect(() => sipProvider.subscribe(setSnap), []);
+  useEffect(() => {
+    const unsub = sipProvider.subscribe(setSnap);
+    return () => { unsub(); };
+  }, []);
 
   // Initialize once per user
   useEffect(() => {
