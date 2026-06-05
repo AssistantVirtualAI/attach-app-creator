@@ -130,7 +130,10 @@ export default function TelephonySettings() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>FusionPBX Connection</CardTitle>
-            {pill(status?.services.fusionpbx)}
+            <div className="flex items-center gap-2">
+              {pill(status?.services.fusionpbx)}
+              <TestAndSyncButtons />
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">{fieldsOf('fusionpbx').map(renderField)}</CardContent>
