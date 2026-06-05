@@ -228,8 +228,11 @@ const sections: Section[] = [
       { id: '4.2', name: 'Telnyx API reachable', description: 'Messaging profile responding',
         run: async () => {
           const { data, error } = await supabase.functions.invoke('telnyx-sms', { body: { action: 'test' } });
-          if (error) return { status: 'warn' as const, detail: 'test action not implemented' };
-          return { status: 'pass' as const, detail: 'API connected' };
+          if (error) return { status: 'warn' as const, detail: error.message };
+          const d: any = data;
+          const profile = d?.profile_name || d?.profile?.name || 'profile';
+          const enabled = d?.enabled ?? d?.profile?.enabled;
+          return { status: 'pass' as const, detail: `${profile} · ${enabled ? 'enabled' : 'reachable'}` };
         } },
       { id: '4.3', name: 'Telnyx webhook URL', description: 'Configured on Telnyx portal',
         run: async () => ({ status: 'warn' as const,
