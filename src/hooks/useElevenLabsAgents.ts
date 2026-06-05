@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/context/OrganizationContext';
 
 export interface ElevenLabsAgent {
   id: string;
@@ -10,29 +11,33 @@ export interface ElevenLabsAgent {
 }
 
 export const useElevenLabsAgents = () => {
+  const { selectedOrgId } = useOrganization();
+
   return useQuery({
-    queryKey: ['elevenlabs-agents'],
+    queryKey: ['elevenlabs-agents', selectedOrgId],
+    enabled: !!selectedOrgId,
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
+      if (!selectedOrgId) return { agents: [] as ElevenLabsAgent[], fallbackAgentId: null };
 
-      // Get agents with ElevenLabs platform using safe view (excludes platform_api_key)
+      // Strict tenant isolation: only agents that belong to the selected org
       const { data: agents, error } = await supabase
         .from('agents_safe')
-        .select('id, name, platform_agent_id, description, config')
+        .select('id, name, platform_agent_id, description, config, organization_id')
         .eq('platform', 'elevenlabs')
+        .eq('organization_id', selectedOrgId)
         .not('platform_agent_id', 'is', null);
 
       if (error) throw error;
 
-      // Also check organization integrations for fallback API key
       const { data: integration } = await supabase
         .from('organization_integrations_safe')
         .select('agent_id')
-        .eq('user_id', user.id)
+        .eq('organization_id', selectedOrgId)
         .eq('platform', 'elevenlabs')
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
       return {
         agents: (agents || []) as ElevenLabsAgent[],
