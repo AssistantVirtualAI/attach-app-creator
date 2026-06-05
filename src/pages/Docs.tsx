@@ -312,10 +312,10 @@ const Docs = () => {
 
   const campaignsSlides: Slide[] = [
     {
-      title: "Créer une Campagne",
-      description: "Définissez le nom, la description et les paramètres de votre campagne d'appels.",
+      title: "Create a Campaign",
+      description: "Define the name, description, and settings for your calling campaign.",
       icon: <Phone className="w-8 h-8" />,
-      highlights: ["Objectifs clairs", "Agent assigné", "Horaires d'appel"]
+      highlights: ["Clear goals", "Assigned agent", "Calling hours"]
     },
     {
       title: "Importer les Contacts",

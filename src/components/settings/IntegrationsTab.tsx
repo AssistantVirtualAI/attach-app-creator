@@ -160,7 +160,7 @@ export function IntegrationsTab() {
               />
             </div>
             <div>
-              <Label htmlFor="agentId">Agent ID (optionnel)</Label>
+              <Label htmlFor="agentId">Agent ID (optional)</Label>
               <Input
                 id="agentId"
                 value={agentId}
@@ -169,7 +169,7 @@ export function IntegrationsTab() {
               />
             </div>
             <Button onClick={handleSave} disabled={testing || !apiKey} className="w-full">
-              {testing ? 'Test en cours...' : 'Sauvegarder'}
+              {testing ? 'Testing...' : 'Save'}
             </Button>
           </div>
         </DialogContent>

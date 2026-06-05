@@ -311,7 +311,7 @@ export function AgentKnowledgePromptTab({ agent }: AgentKnowledgePromptTabProps)
                       ) : (
                         <Save className="w-4 h-4 mr-2" />
                       )}
-                      Sauvegarder & Sync
+                      Save & Sync
                     </Button>
                   </div>
                 </>
