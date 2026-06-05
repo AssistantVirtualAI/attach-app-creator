@@ -22,12 +22,14 @@ import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Plus, Settings, Zap, ArrowRight, Sparkles, Brain, Bot, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/context/OrganizationContext';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { subDays } from 'date-fns';
 
 const Dashboard = () => {
   const { t } = useTranslation();
+  const { selectedOrgId } = useOrganization();
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
@@ -93,7 +95,7 @@ const Dashboard = () => {
     setIsSyncing(true);
     try {
       const { data, error } = await supabase.functions.invoke('sync-elevenlabs-conversations', {
-        body: { action: 'sync' }
+        body: { action: 'sync', organizationId: selectedOrgId }
       });
       
       if (error) throw error;
