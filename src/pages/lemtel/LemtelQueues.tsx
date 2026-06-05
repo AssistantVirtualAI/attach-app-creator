@@ -2,10 +2,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Headphones, Plus, Users, Clock } from 'lucide-react';
-import { MOCK_QUEUES } from '@/lib/lemtelMockData';
+import { Headphones, Plus, Loader2 } from 'lucide-react';
+import { usePbxQueues } from '@/hooks/usePbxData';
 
 export default function LemtelQueues() {
+  const { data: queues = [], isLoading } = usePbxQueues();
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -16,33 +17,29 @@ export default function LemtelQueues() {
         <Button><Plus className="w-4 h-4 mr-2" /> New Queue</Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Queues</CardTitle></CardHeader><CardContent><div className="text-3xl font-bold">{MOCK_QUEUES.length}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Callers Waiting</CardTitle></CardHeader><CardContent><div className="text-3xl font-bold">{MOCK_QUEUES.reduce((s, q) => s + q.waiting, 0)}</div></CardContent></Card>
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Abandoned Today</CardTitle></CardHeader><CardContent><div className="text-3xl font-bold">{MOCK_QUEUES.reduce((s, q) => s + q.abandoned_today, 0)}</div></CardContent></Card>
-      </div>
-
       <Card>
-        <CardHeader><CardTitle>Queues</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{queues.length} queues</CardTitle></CardHeader>
         <CardContent>
+          {isLoading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div> : (
           <Table>
             <TableHeader><TableRow>
-              <TableHead>Name</TableHead><TableHead>Customer</TableHead><TableHead>Strategy</TableHead>
-              <TableHead>Agents</TableHead><TableHead>Waiting</TableHead><TableHead>Abandoned</TableHead>
+              <TableHead>Name</TableHead><TableHead>Extension</TableHead><TableHead>Strategy</TableHead>
+              <TableHead>Max Wait</TableHead><TableHead>Recording</TableHead><TableHead>Status</TableHead>
             </TableRow></TableHeader>
             <TableBody>
-              {MOCK_QUEUES.map(q => (
+              {(queues as any[]).map((q: any) => (
                 <TableRow key={q.id}>
                   <TableCell className="font-medium">{q.name}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{q.customer_name}</TableCell>
+                  <TableCell className="font-mono">{q.extension || '-'}</TableCell>
                   <TableCell><Badge variant="outline">{q.strategy}</Badge></TableCell>
-                  <TableCell className="inline-flex items-center gap-1"><Users className="w-3 h-3" /> {q.members}</TableCell>
-                  <TableCell className="inline-flex items-center gap-1"><Clock className="w-3 h-3" /> {q.waiting}</TableCell>
-                  <TableCell>{q.abandoned_today}</TableCell>
+                  <TableCell>{q.max_wait_time}s</TableCell>
+                  <TableCell>{q.record_enabled ? <Badge>On</Badge> : <Badge variant="outline">Off</Badge>}</TableCell>
+                  <TableCell>{q.enabled ? <Badge variant="default">Enabled</Badge> : <Badge variant="outline">Disabled</Badge>}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
     </div>
