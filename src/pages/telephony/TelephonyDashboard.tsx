@@ -65,6 +65,7 @@ export default function TelephonyDashboard() {
   const smsPreview = (sms as any[]).slice(0, 5);
   const unread = (sms as any[]).reduce((s,t) => s + (t.unread_count || 0), 0);
   const registered = (devices as any[]).filter(d => d.registration_status === 'registered').length;
+  const liveReg = (registrations as any[]).length;
   const lastSync = integration?.last_sync_at ? formatDistanceToNow(new Date(integration.last_sync_at), { addSuffix: true }) : 'never';
 
   const kpi = (label: string, value: string | number, Icon: any, color: string) => (
