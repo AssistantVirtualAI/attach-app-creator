@@ -41,8 +41,9 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const mock = integ?.config && (integ.config as any).mock_mode === true;
-    const wssUrl = (integ?.config as any)?.wss_url || "wss://portal.lemtel.tel:7443";
-    const sipDomain = sp.sip_domain || integ?.domain || "portal.lemtel.tel";
+    const wssUrl = Deno.env.get("FUSIONPBX_WSS_URL") || (integ?.config as any)?.wss_url || "wss://portal.lemtel.tel:7443";
+    const sipDomain = Deno.env.get("FUSIONPBX_SIP_DOMAIN") || sp.sip_domain || integ?.domain || "portal.lemtel.tel";
+
 
     let password = "";
     if (mock) {
