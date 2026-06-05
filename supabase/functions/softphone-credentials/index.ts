@@ -39,8 +39,8 @@ Deno.serve(async (req) => {
     const sipDomain = Deno.env.get("FUSIONPBX_SIP_DOMAIN") || "lemtel.lemtel.tel";
     const wssUrl = Deno.env.get("FUSIONPBX_WSS_URL") || "wss://lemtel.lemtel.tel:7443";
 
-    let password: string = (sp as any).sip_password || "";
-    if (!password && sp.extension_id) {
+    let password = "";
+    if (sp.extension_id) {
       const { data: ext } = await supabase
         .from("pbx_extensions").select("raw_data").eq("id", sp.extension_id).maybeSingle();
       password = (ext?.raw_data as any)?.password || (ext?.raw_data as any)?.sip_password || "";
