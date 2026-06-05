@@ -504,6 +504,16 @@ export const DocumentationTab = () => {
                           </AccordionTrigger>
                           <AccordionContent className="px-2 pb-4">
                             <div className="pl-10 space-y-3">
+                              {LESSON_IMAGES[lesson.id] && (
+                                <div className="rounded-lg border border-border overflow-hidden bg-muted/20">
+                                  <img
+                                    src={LESSON_IMAGES[lesson.id]}
+                                    alt={String(t(lesson.titleKey))}
+                                    loading="lazy"
+                                    className="w-full h-auto block"
+                                  />
+                                </div>
+                              )}
                               <p className="text-sm text-muted-foreground">{t(lesson.descKey)}</p>
                               <ol className="space-y-2">
                                 {steps.map((step, idx) => (
