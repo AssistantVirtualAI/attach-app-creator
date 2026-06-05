@@ -11,17 +11,40 @@ defaults:
     working-directory: apps/ava-softphone-desktop
 
 jobs:
+  verify-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#desktop-v}"
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag $TAG ≠ package.json $PKG"; exit 1
+          fi
+          echo "OK: $TAG"
+
   build-windows:
+    needs: verify-version
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+        with: { node-version: '20' }
       - run: npm install
       - run: npm run build:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+      - name: Verify Authenticode signature
+        shell: pwsh
+        run: |
+          Get-ChildItem release -Filter *.exe -Recurse | ForEach-Object {
+            $sig = Get-AuthenticodeSignature $_.FullName
+            Write-Host "$($_.Name): $($sig.Status)"
+            if ($sig.Status -ne 'Valid') { Write-Warning "Unsigned: $($_.Name)" }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: windows
@@ -31,31 +54,45 @@ jobs:
             apps/ava-softphone-desktop/release/*.blockmap
 
   build-mac:
+    needs: verify-version
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+        with: { node-version: '20' }
       - run: npm install
       - run: npm run build:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Verify codesign & notarization
+        run: |
+          for f in release/*.dmg release/mac*/*.app; do
+            [ -e "$f" ] || continue
+            echo "→ $f"
+            codesign --verify --deep --strict --verbose=2 "$f" || true
+            spctl -a -vv -t install "$f" || true
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: macos
           path: |
             apps/ava-softphone-desktop/release/*.dmg
+            apps/ava-softphone-desktop/release/*.zip
             apps/ava-softphone-desktop/release/*.yml
             apps/ava-softphone-desktop/release/*.blockmap
 
   build-linux:
+    needs: verify-version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+        with: { node-version: '20' }
       - run: npm install
       - run: npm run build:linux
         env:
@@ -71,12 +108,12 @@ jobs:
   create-release:
     needs: [build-windows, build-mac, build-linux]
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    permissions: { contents: write }
     steps:
       - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
+        with: { path: artifacts }
+      - name: List artifacts
+        run: find artifacts -type f | sort
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -85,3 +122,13 @@ jobs:
           files: artifacts/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Sanity-check release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view ${{ github.ref_name }} --json assets \
+            --jq '.assets[].name' | tee assets.txt
+          for must in latest.yml latest-mac.yml latest-linux.yml; do
+            grep -q "$must" assets.txt || { echo "::error::Missing $must"; exit 1; }
+          done
+          echo "✓ All updater manifests attached"
