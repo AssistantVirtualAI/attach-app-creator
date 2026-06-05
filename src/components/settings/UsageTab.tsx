@@ -128,13 +128,13 @@ export function UsageTab() {
     };
 
     // Generate CSV content
-    let csvContent = `${language === 'fr' ? 'Rapport d\'utilisation' : 'Usage Report'} - ${reportData.period}\n\n`;
-    csvContent += `${language === 'fr' ? 'Métrique,Utilisé,Limite,Pourcentage' : 'Metric,Used,Limit,Percentage'}\n`;
+    let csvContent = `Usage Report - ${reportData.period}\n\n`;
+    csvContent += `Metric,Used,Limit,Percentage\n`;
     csvContent += `${t('pages.usage.conversations')},${reportData.conversations.used},${reportData.conversations.limit},${reportData.conversations.percentage}%\n`;
     csvContent += `${t('pages.usage.aiCredits')},${reportData.aiCredits.used},${reportData.aiCredits.limit},${reportData.aiCredits.percentage}%\n`;
     csvContent += `${t('pages.usage.clients')},${reportData.clients.used},${reportData.clients.limit},${reportData.clients.percentage}%\n`;
-    csvContent += `\n${language === 'fr' ? 'Détail journalier des conversations' : 'Daily conversation breakdown'}\n`;
-    csvContent += `${language === 'fr' ? 'Jour,Conversations' : 'Day,Conversations'}\n`;
+    csvContent += `\nDaily conversation breakdown\n`;
+    csvContent += `Day,Conversations\n`;
     reportData.dailyBreakdown.forEach((day: any) => {
       csvContent += `${day.day},${day.conversations}\n`;
     });
@@ -144,7 +144,7 @@ export function UsageTab() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${language === 'fr' ? 'rapport-usage' : 'usage-report'}-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `usage-report-${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

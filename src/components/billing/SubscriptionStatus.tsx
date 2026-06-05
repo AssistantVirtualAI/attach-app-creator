@@ -40,14 +40,14 @@ export const SubscriptionStatus = ({
               <CreditCard className="w-6 h-6 text-white" />
             </div>
             <div>
-              <CardTitle>Votre abonnement</CardTitle>
-              <CardDescription>Gérez votre plan et vos crédits</CardDescription>
+              <CardTitle>Your subscription</CardTitle>
+              <CardDescription>Manage your plan and credits</CardDescription>
             </div>
           </div>
           <Badge className={statusColors[billingConfig?.subscription_status || 'active']}>
-            {billingConfig?.subscription_status === 'active' ? 'Actif' : 
-             billingConfig?.subscription_status === 'canceled' ? 'Annulé' :
-             billingConfig?.subscription_status === 'past_due' ? 'Impayé' : 'Actif'}
+            {billingConfig?.subscription_status === 'active' ? 'Active' : 
+             billingConfig?.subscription_status === 'canceled' ? 'Canceled' :
+             billingConfig?.subscription_status === 'past_due' ? 'Unpaid' : 'Active'}
           </Badge>
         </div>
       </CardHeader>
@@ -56,7 +56,7 @@ export const SubscriptionStatus = ({
           <div className="p-4 rounded-lg bg-muted/30">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Zap className="w-4 h-4" />
-              <span className="text-sm">Plan actuel</span>
+              <span className="text-sm">Current plan</span>
             </div>
             <p className="text-2xl font-bold">{currentPlanName}</p>
           </div>
@@ -64,7 +64,7 @@ export const SubscriptionStatus = ({
           <div className="p-4 rounded-lg bg-muted/30">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Calendar className="w-4 h-4" />
-              <span className="text-sm">Prochaine facturation</span>
+              <span className="text-sm">Next billing</span>
             </div>
             <p className="text-2xl font-bold">
               {billingConfig?.subscription_ends_at 
@@ -84,7 +84,7 @@ export const SubscriptionStatus = ({
 
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
-            <span>Utilisation des crédits</span>
+            <span>Credit usage</span>
             <span>{creditsUsed} / {creditsLimit}</span>
           </div>
           <Progress value={creditsPercentage} className="h-2" />
