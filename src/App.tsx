@@ -84,6 +84,14 @@ import LemtelSettings from "./pages/lemtel/LemtelSettings";
 import LemtelMessages from "./pages/lemtel/LemtelMessages";
 import LemtelPortalCalls from "./pages/lemtel/LemtelPortalCalls";
 import LemtelStub from "./pages/lemtel/LemtelStub";
+import LemtelCustomers from "./pages/lemtel/LemtelCustomers";
+import LemtelExtensions from "./pages/lemtel/LemtelExtensions";
+import LemtelDIDs from "./pages/lemtel/LemtelDIDs";
+import LemtelQueues from "./pages/lemtel/LemtelQueues";
+import LemtelIVR from "./pages/lemtel/LemtelIVR";
+import LemtelVoiceAgents from "./pages/lemtel/LemtelVoiceAgents";
+import LemtelSoftphoneUsers from "./pages/lemtel/LemtelSoftphoneUsers";
+import LemtelAnalytics from "./pages/lemtel/LemtelAnalytics";
 
 // Portal pages
 import PortalLogin from "./pages/PortalLogin";
