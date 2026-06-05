@@ -3,7 +3,7 @@ import {
   Bot, Sparkles, FileQuestion, Users, UserPlus, Calendar,
   Phone, MessageCircle, GitBranch, Sliders, Webhook,
   CreditCard, Settings, Tag, Headphones, LayoutDashboard, Radio, Globe,
-  Shield, Building2, PhoneCall, Voicemail, Smartphone
+  Shield, Building2, PhoneCall, Voicemail, Smartphone, Disc, Bell, Brain, Router
 } from 'lucide-react';
 
 export interface NavItem {
@@ -20,6 +20,7 @@ export interface NavGroup {
   adminOnly?: boolean;
   superAdminOnly?: boolean;
   lemtelOnly?: boolean;
+  lemtelCustomerOnly?: boolean;
 }
 
 export const sidebarGroups: NavGroup[] = [
@@ -113,21 +114,36 @@ export const sidebarGroups: NavGroup[] = [
     ]
   },
   {
-    id: 'lemtel',
-    labelKey: '📞 Lemtel',
+    id: 'phone-system',
+    labelKey: '📞 Phone System',
+    icon: PhoneCall,
+    lemtelOnly: true,
+    items: [
+      { nameKey: 'Dashboard', href: '/org/lemtel/telephony/dashboard', icon: LayoutDashboard },
+      { nameKey: 'Phone Numbers', href: '/org/lemtel/telephony/numbers', icon: Phone },
+      { nameKey: 'Extensions', href: '/org/lemtel/telephony/extensions', icon: Smartphone },
+      { nameKey: 'Devices', href: '/org/lemtel/telephony/devices', icon: Router },
+      { nameKey: 'Call History', href: '/org/lemtel/telephony/calls', icon: PhoneCall },
+      { nameKey: 'Recordings', href: '/org/lemtel/telephony/recordings', icon: Disc },
+      { nameKey: 'Auto-Attendant', href: '/org/lemtel/telephony/ivr', icon: Voicemail },
+      { nameKey: 'Call Queues', href: '/org/lemtel/telephony/queues', icon: Headphones },
+      { nameKey: 'Ring Groups', href: '/org/lemtel/telephony/ring-groups', icon: Bell },
+      { nameKey: 'SMS / Messages', href: '/org/lemtel/telephony/messages', icon: MessageSquare },
+      { nameKey: 'Voice Agents', href: '/org/lemtel/telephony/agents', icon: Bot },
+      { nameKey: 'AI Intelligence', href: '/org/lemtel/telephony/ai', icon: Brain },
+      { nameKey: 'Softphone', href: '/org/lemtel/telephony/webphone', icon: Phone },
+      { nameKey: 'PBX Settings', href: '/org/lemtel/telephony/settings', icon: Settings },
+    ]
+  },
+  {
+    id: 'lemtel-legacy',
+    labelKey: '📞 Lemtel (Legacy)',
     icon: PhoneCall,
     lemtelOnly: true,
     items: [
       { nameKey: 'Dashboard', href: '/lemtel/dashboard', icon: LayoutDashboard },
       { nameKey: 'Customers', href: '/lemtel/customers', icon: Users },
-      { nameKey: 'Phone Numbers', href: '/lemtel/dids', icon: Phone },
-      { nameKey: 'Extensions', href: '/lemtel/extensions', icon: Smartphone },
-      { nameKey: 'Devices', href: '/lemtel/devices', icon: Smartphone },
-      { nameKey: 'Call Queues', href: '/lemtel/queues', icon: Headphones },
-      { nameKey: 'Auto-Attendant', href: '/lemtel/ivr', icon: Voicemail },
-      { nameKey: 'Voice Agents', href: '/lemtel/voice-agents', icon: Bot },
       { nameKey: 'Call Analytics', href: '/lemtel/analytics', icon: BarChart3 },
-      { nameKey: 'Messages (SMS)', href: '/lemtel/messages', icon: MessageSquare },
       { nameKey: 'Softphone Users', href: '/lemtel/softphone-users', icon: Smartphone },
       { nameKey: 'Lemtel Settings', href: '/lemtel/settings', icon: Settings },
     ]
