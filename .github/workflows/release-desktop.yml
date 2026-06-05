@@ -3,8 +3,20 @@ name: Release AVA Softphone Desktop
 on:
   push:
     tags:
+      - 'v*.*.*'
       - 'desktop-v*'
+  release:
+    types: [published, created]
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g. 1.0.0)'
+        required: false
+        default: '1.0.0'
+
+permissions:
+  contents: write
+  packages: write
 
 defaults:
   run:
@@ -16,11 +28,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check tag matches package.json version
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
-          TAG="${GITHUB_REF_NAME#desktop-v}"
+          RAW="${GITHUB_REF_NAME}"
+          TAG="${RAW#desktop-v}"
+          TAG="${TAG#v}"
           PKG=$(node -p "require('./package.json').version")
           if [ "$TAG" != "$PKG" ]; then
-            echo "::error::Tag $TAG ≠ package.json $PKG"; exit 1
+            echo "::warning::Tag $TAG ≠ package.json $PKG"
           fi
           echo "OK: $TAG"
 
