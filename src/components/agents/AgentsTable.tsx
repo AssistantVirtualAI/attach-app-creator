@@ -42,6 +42,7 @@ export function AgentsTable({ agents, onRefetch }: AgentsTableProps) {
   const handleDelete = async (agentId: string) => {
     try {
       const agent = agents.find((item) => item.id === agentId);
+      if (!agent?.organization_id) throw new Error('No organization selected');
       const { error } = await supabase
         .from('agents')
         .delete()
