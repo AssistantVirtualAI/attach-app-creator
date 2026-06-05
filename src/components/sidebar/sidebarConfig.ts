@@ -3,7 +3,7 @@ import {
   Bot, Sparkles, FileQuestion, Users, UserPlus, Calendar,
   Phone, MessageCircle, GitBranch, Sliders, Webhook,
   CreditCard, Settings, Tag, Headphones, LayoutDashboard, Radio, Globe,
-  Shield, Building2, PhoneCall, Voicemail, Smartphone, Disc, Bell, Brain, Router
+  Shield, Building2, PhoneCall, Voicemail, Smartphone, Disc, Bell, Brain, Router, Activity
 } from 'lucide-react';
 
 export interface NavItem {
@@ -132,7 +132,9 @@ export const sidebarGroups: NavGroup[] = [
       { nameKey: 'Voice Agents', href: '/org/lemtel/telephony/agents', icon: Bot },
       { nameKey: 'AI Intelligence', href: '/org/lemtel/telephony/ai', icon: Brain },
       { nameKey: 'Softphone', href: '/org/lemtel/telephony/webphone', icon: Phone },
+      { nameKey: 'Voicemail', href: '/org/lemtel/telephony/voicemail', icon: Voicemail },
       { nameKey: 'PBX Settings', href: '/org/lemtel/telephony/settings', icon: Settings },
+      { nameKey: 'Diagnostics', href: '/org/lemtel/telephony/diagnostics', icon: Activity },
     ]
   },
   {

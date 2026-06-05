@@ -1,3 +1,5 @@
+// Send SMS / MMS via Telnyx; persists to pbx_sms_threads/messages and
+// broadcasts the new message on the org's realtime channel.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -5,58 +7,151 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const LEMTEL_ORG_ID = "71755d33-ed64-4ad5-a828-61c9d2029eb7";
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    if (!authHeader) return json({ error: "Unauthorized" }, 401);
 
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    if (!user) return json({ error: "Unauthorized" }, 401);
 
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    // Verify the user belongs to the Lemtel org
     const { data: member } = await admin
-      .from("organization_members").select("organization_id")
-      .eq("user_id", user.id).eq("organization_id", "71755d33-ed64-4ad5-a828-61c9d2029eb7").maybeSingle();
-    if (!member) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", user.id)
+      .eq("organization_id", LEMTEL_ORG_ID)
+      .maybeSingle();
+    if (!member) return json({ error: "Forbidden" }, 403);
 
-    const { data: cfg } = await admin.from("lemtel_config").select("key, value").in("key", ["TELNYX_API_KEY", "TELNYX_MESSAGING_PROFILE_ID"]);
-    const config = Object.fromEntries((cfg || []).map((r: any) => [r.key, r.value]));
+    const { from, to, text, media_urls } = await req.json();
+    if (!from || !to || !text) return json({ error: "from, to, text required" }, 400);
 
-    if (req.method === "POST") {
-      const { from, to, text, media_urls } = await req.json();
-      if (!from || !to || !text) throw new Error("from, to, text required");
+    // Get Telnyx config from integration row (mock-mode aware)
+    const { data: integ } = await admin
+      .from("pbx_integrations")
+      .select("config")
+      .eq("organization_id", LEMTEL_ORG_ID)
+      .eq("provider", "telnyx")
+      .maybeSingle();
+    const cfg = (integ?.config || {}) as Record<string, any>;
+    const mock = cfg.mock_mode === true;
+    const apiKey = Deno.env.get("TELNYX_API_KEY") || cfg.api_key;
+    const profileId = cfg.messaging_profile_id;
 
+    let providerResult: any = { mock: true };
+    if (!mock) {
+      if (!apiKey) return json({ error: "TELNYX_API_KEY missing" }, 500);
       const res = await fetch("https://api.telnyx.com/v2/messages", {
         method: "POST",
-        headers: { Authorization: `Bearer ${config.TELNYX_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to, text, media_urls, messaging_profile_id: config.TELNYX_MESSAGING_PROFILE_ID }),
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to, text, media_urls, messaging_profile_id: profileId }),
       });
-      const result = await res.json();
-
-      // Append to thread
-      const message = { direction: "outbound", text, media_urls, ts: new Date().toISOString(), id: result.data?.id };
-      const { data: existing } = await admin.from("lemtel_sms_threads")
-        .select("id, messages").eq("did_number", from).eq("contact_number", to).maybeSingle();
-      if (existing) {
-        await admin.from("lemtel_sms_threads").update({
-          messages: [...(existing.messages || []), message], last_message_at: new Date().toISOString(),
-        }).eq("id", existing.id);
-      } else {
-        await admin.from("lemtel_sms_threads").insert({
-          did_number: from, contact_number: to, messages: [message], last_message_at: new Date().toISOString(),
-        });
+      providerResult = await res.json();
+      if (!res.ok) {
+        const code = providerResult?.errors?.[0]?.code || res.status;
+        const detail = providerResult?.errors?.[0]?.detail || providerResult?.errors?.[0]?.title || "Telnyx error";
+        return json({ error: `Telnyx ${code}: ${detail}`, provider: providerResult }, 502);
       }
-
-      return new Response(JSON.stringify(result), { status: res.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: corsHeaders });
+    // Find or create thread
+    let { data: thread } = await admin
+      .from("pbx_sms_threads")
+      .select("id")
+      .eq("organization_id", LEMTEL_ORG_ID)
+      .eq("did_number", from)
+      .eq("contact_phone", to)
+      .maybeSingle();
+
+    if (!thread) {
+      const { data: newThread, error: threadErr } = await admin
+        .from("pbx_sms_threads")
+        .insert({
+          organization_id: LEMTEL_ORG_ID,
+          did_number: from,
+          contact_phone: to,
+          last_message_at: new Date().toISOString(),
+          status: "open",
+          unread_count: 0,
+        })
+        .select("id")
+        .single();
+      if (threadErr) return json({ error: threadErr.message }, 500);
+      thread = newThread;
+    } else {
+      await admin
+        .from("pbx_sms_threads")
+        .update({ last_message_at: new Date().toISOString() })
+        .eq("id", thread.id);
+    }
+
+    const { data: message, error: msgErr } = await admin
+      .from("pbx_sms_messages")
+      .insert({
+        organization_id: LEMTEL_ORG_ID,
+        thread_id: thread!.id,
+        direction: "outbound",
+        from_number: from,
+        to_number: to,
+        body: text,
+        media_urls: media_urls || null,
+        provider_message_id: providerResult?.data?.id || null,
+        status: mock ? "mock" : "sent",
+        sent_at: new Date().toISOString(),
+        raw_data: providerResult,
+      })
+      .select()
+      .single();
+    if (msgErr) return json({ error: msgErr.message }, 500);
+
+    // Broadcast on realtime channel
+    try {
+      const channel = admin.channel(`pbx-sms-${LEMTEL_ORG_ID}`);
+      await channel.send({
+        type: "broadcast",
+        event: "new_message",
+        payload: { thread_id: thread!.id, message },
+      });
+    } catch (e) {
+      console.warn("broadcast failed", e);
+    }
+
+    // Audit log
+    await admin.from("audit_logs").insert({
+      organization_id: LEMTEL_ORG_ID,
+      user_id: user.id,
+      action: "sms_send",
+      resource_type: "pbx_sms_messages",
+      resource_id: message.id,
+      metadata: { from, to, mock },
+    }).then(() => {}, () => {});
+
+    return json({ ok: true, message, provider: providerResult });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
+    console.error("telnyx-sms error", e);
+    return json({ error: e.message || String(e) }, 500);
   }
 });
