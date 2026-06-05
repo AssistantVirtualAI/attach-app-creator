@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/context/OrganizationContext';
 
 export interface ElevenLabsConversation {
   conversation_id: string;
@@ -56,11 +57,18 @@ export const useAllAgentsConversations = (
   limit: number = 20,
   filters: ConversationFilters = {}
 ) => {
+  const { selectedOrgId } = useOrganization();
+
   return useQuery({
-    queryKey: ['all-agents-conversations', page, limit, filters],
+    queryKey: ['all-agents-conversations', selectedOrgId, page, limit, filters],
     queryFn: async (): Promise<AllAgentsConversationsResponse> => {
+      if (!selectedOrgId) {
+        return { conversations: [], agents: [], total: 0, page, limit, totalPages: 0, hasMore: false };
+      }
+
       const { data, error } = await supabase.functions.invoke('elevenlabs-all-agents-conversations', {
         body: { 
+          organizationId: selectedOrgId,
           page, 
           limit, 
           filters,
@@ -81,6 +89,7 @@ export const useAllAgentsConversations = (
       return data as AllAgentsConversationsResponse;
     },
     refetchInterval: 60000, // Refetch every minute
+    enabled: !!selectedOrgId,
     retry: (failureCount, error) => {
       // Don't retry on auth errors
       const errorMsg = (error as any)?.message || String(error);
@@ -96,16 +105,18 @@ export const useConversationDetails = (
   conversationId: string | null,
   options?: { platformAgentId?: string | null }
 ) => {
+  const { selectedOrgId } = useOrganization();
   const platformAgentId = options?.platformAgentId ?? null;
 
   return useQuery({
-    queryKey: ['conversation-details', conversationId, platformAgentId],
+    queryKey: ['conversation-details', selectedOrgId, conversationId, platformAgentId],
     queryFn: async () => {
       if (!conversationId) return null;
 
       const { data, error } = await supabase.functions.invoke('elevenlabs-all-agents-conversations', {
         body: {
           action: 'details',
+          organizationId: selectedOrgId,
           conversationId,
           platformAgentId,
         },
@@ -121,7 +132,7 @@ export const useConversationDetails = (
 
       return data;
     },
-    enabled: !!conversationId,
+    enabled: !!selectedOrgId && !!conversationId,
   });
 };
 
@@ -130,16 +141,18 @@ export const useConversationAudio = (
   format: string = 'mp3',
   options?: { platformAgentId?: string | null }
 ) => {
+  const { selectedOrgId } = useOrganization();
   const platformAgentId = options?.platformAgentId ?? null;
 
   return useQuery({
-    queryKey: ['conversation-audio', conversationId, format, platformAgentId],
+    queryKey: ['conversation-audio', selectedOrgId, conversationId, format, platformAgentId],
     queryFn: async () => {
       if (!conversationId) return null;
 
       const { data, error } = await supabase.functions.invoke('elevenlabs-all-agents-conversations', {
         body: {
           action: 'audio',
+          organizationId: selectedOrgId,
           conversationId,
           format,
           platformAgentId,
@@ -162,6 +175,6 @@ export const useConversationAudio = (
 
       return data;
     },
-    enabled: !!conversationId,
+    enabled: !!selectedOrgId && !!conversationId,
   });
 };
