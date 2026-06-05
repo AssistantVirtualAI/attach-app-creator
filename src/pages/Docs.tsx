@@ -213,16 +213,16 @@ const Docs = () => {
 
   const clientPortalSlides: Slide[] = [
     {
-      title: "Créer un Client",
-      description: "Ajoutez un nouveau client avec ses informations de contact et préférences.",
+      title: "Create a Client",
+      description: "Add a new client with contact information and preferences.",
       icon: <UserPlus className="w-8 h-8" />,
-      highlights: ["Informations de base", "Email de contact", "Langue préférée"]
+      highlights: ["Basic information", "Contact email", "Preferred language"]
     },
     {
-      title: "Assigner des Agents",
-      description: "Associez un ou plusieurs agents au client pour leur utilisation.",
+      title: "Assign Agents",
+      description: "Associate one or more agents with the client for use.",
       icon: <Bot className="w-8 h-8" />,
-      highlights: ["Multi-agents", "Permissions granulaires", "Limites d'usage"]
+      highlights: ["Multiple agents", "Granular permissions", "Usage limits"]
     },
     {
       title: "Personnaliser le Branding",
@@ -391,26 +391,26 @@ const Docs = () => {
   const quickStartSteps = [
     {
       step: 1,
-      title: "Connecter ElevenLabs",
-      description: "Ajoutez votre clé API ElevenLabs dans les paramètres d'intégration",
+      title: "Connect ElevenLabs",
+      description: "Add your ElevenLabs API key in integration settings",
       completed: false
     },
     {
       step: 2,
-      title: "Créer un Agent",
-      description: "Utilisez l'Agent Builder pour configurer votre premier agent vocal",
+      title: "Create an Agent",
+      description: "Use the Agent Builder to configure your first voice agent",
       completed: false
     },
     {
       step: 3,
-      title: "Ajouter un Client",
-      description: "Créez un client et assignez-lui un agent",
+      title: "Add a Client",
+      description: "Create a client and assign an agent to them",
       completed: false
     },
     {
       step: 4,
-      title: "Tester le Widget",
-      description: "Testez le widget vocal sur la page de prototype",
+      title: "Test the Widget",
+      description: "Test the voice widget on the prototype page",
       completed: false
     }
   ];
@@ -422,7 +422,7 @@ const Docs = () => {
         <div className="mb-6">
           <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-4 w-4" />
-            Retour à l'accueil
+            Back to home
           </Link>
         </div>
 
@@ -430,10 +430,10 @@ const Docs = () => {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
             <BookOpen className="h-10 w-10 text-primary" />
-            <h1 className="text-4xl font-bold">Centre d'Aide AVA Statistics</h1>
+            <h1 className="text-4xl font-bold">AVA Statistics Help Center</h1>
           </div>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Guides, tutoriels et documentation complète pour maîtriser la plateforme
+            Guides, tutorials, and complete documentation to master the platform
           </p>
           <Badge variant="secondary" className="mt-4">v1.0.0</Badge>
         </div>
@@ -444,7 +444,7 @@ const Docs = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Rechercher dans la documentation..."
+              placeholder="Search the documentation..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 pr-10"
@@ -463,8 +463,8 @@ const Docs = () => {
           {searchQuery && (
             <p className="text-sm text-muted-foreground mt-2 text-center">
               {hasResults 
-                ? `${matchedSections.length} section(s) trouvée(s)` 
-                : "Aucun résultat trouvé"}
+                ? `${matchedSections.length} section(s) found` 
+                : "No results found"}
             </p>
           )}
         </div>
