@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Eye, EyeOff, Loader2, FlaskConical, Activity, CheckCircle2, XCircle, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { usePbxIntegration, usePbxMockModeToggle, LEMTEL_ORG } from '@/hooks/usePbxData';
+import { usePbxIntegration, usePbxMockModeToggle, usePbxPing, usePbxSync, LEMTEL_ORG } from '@/hooks/usePbxData';
 import { useTelephonyStatus, type ServiceStatus } from '@/hooks/useTelephonyStatus';
 
 const FIELDS = [
