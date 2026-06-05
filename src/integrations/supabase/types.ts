@@ -1829,6 +1829,459 @@ export type Database = {
           },
         ]
       }
+      lemtel_cdrs_cache: {
+        Row: {
+          ai_processing: boolean
+          analyzed: boolean
+          answer_stamp: string | null
+          billsec: number
+          call_uuid: string
+          caller_destination: string | null
+          caller_id_name: string | null
+          caller_id_number: string | null
+          created_at: string
+          customer_id: string | null
+          direction: string | null
+          duration: number
+          end_stamp: string | null
+          id: string
+          missed_call: boolean
+          record_name: string | null
+          record_path: string | null
+          start_stamp: string | null
+          transcribed: boolean
+          voicemail_message: boolean
+        }
+        Insert: {
+          ai_processing?: boolean
+          analyzed?: boolean
+          answer_stamp?: string | null
+          billsec?: number
+          call_uuid: string
+          caller_destination?: string | null
+          caller_id_name?: string | null
+          caller_id_number?: string | null
+          created_at?: string
+          customer_id?: string | null
+          direction?: string | null
+          duration?: number
+          end_stamp?: string | null
+          id?: string
+          missed_call?: boolean
+          record_name?: string | null
+          record_path?: string | null
+          start_stamp?: string | null
+          transcribed?: boolean
+          voicemail_message?: boolean
+        }
+        Update: {
+          ai_processing?: boolean
+          analyzed?: boolean
+          answer_stamp?: string | null
+          billsec?: number
+          call_uuid?: string
+          caller_destination?: string | null
+          caller_id_name?: string | null
+          caller_id_number?: string | null
+          created_at?: string
+          customer_id?: string | null
+          direction?: string | null
+          duration?: number
+          end_stamp?: string | null
+          id?: string
+          missed_call?: boolean
+          record_name?: string | null
+          record_path?: string | null
+          start_stamp?: string | null
+          transcribed?: boolean
+          voicemail_message?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lemtel_cdrs_cache_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "lemtel_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lemtel_config: {
+        Row: {
+          created_at: string
+          id: string
+          is_secret: boolean
+          key: string
+          updated_at: string
+          value: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_secret?: boolean
+          key: string
+          updated_at?: string
+          value?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_secret?: boolean
+          key?: string
+          updated_at?: string
+          value?: string | null
+        }
+        Relationships: []
+      }
+      lemtel_customers: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          plan: string
+          portal_enabled: boolean
+          portal_user_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          plan?: string
+          portal_enabled?: boolean
+          portal_user_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          plan?: string
+          portal_enabled?: boolean
+          portal_user_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      lemtel_dids: {
+        Row: {
+          assigned_id: string | null
+          assigned_type: string
+          created_at: string
+          customer_id: string | null
+          id: string
+          number: string
+          sms_enabled: boolean
+          status: string
+          telnyx_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          assigned_id?: string | null
+          assigned_type?: string
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          number: string
+          sms_enabled?: boolean
+          status?: string
+          telnyx_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          assigned_id?: string | null
+          assigned_type?: string
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          number?: string
+          sms_enabled?: boolean
+          status?: string
+          telnyx_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lemtel_dids_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "lemtel_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lemtel_ivr_audio: {
+        Row: {
+          audio_url: string | null
+          created_at: string
+          customer_id: string | null
+          elevenlabs_voice_id: string | null
+          id: string
+          ivr_menu_id: string | null
+          script_text: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string
+          customer_id?: string | null
+          elevenlabs_voice_id?: string | null
+          id?: string
+          ivr_menu_id?: string | null
+          script_text?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string
+          customer_id?: string | null
+          elevenlabs_voice_id?: string | null
+          id?: string
+          ivr_menu_id?: string | null
+          script_text?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lemtel_ivr_audio_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "lemtel_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lemtel_sms_threads: {
+        Row: {
+          contact_name: string | null
+          contact_number: string
+          created_at: string
+          customer_id: string | null
+          did_number: string
+          id: string
+          last_message_at: string
+          messages: Json
+          unread_count: number
+          updated_at: string
+        }
+        Insert: {
+          contact_name?: string | null
+          contact_number: string
+          created_at?: string
+          customer_id?: string | null
+          did_number: string
+          id?: string
+          last_message_at?: string
+          messages?: Json
+          unread_count?: number
+          updated_at?: string
+        }
+        Update: {
+          contact_name?: string | null
+          contact_number?: string
+          created_at?: string
+          customer_id?: string | null
+          did_number?: string
+          id?: string
+          last_message_at?: string
+          messages?: Json
+          unread_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lemtel_sms_threads_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "lemtel_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lemtel_softphone_users: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          device_type: string
+          display_name: string | null
+          extension: string
+          id: string
+          last_seen: string | null
+          portal_user_id: string | null
+          sip_domain: string | null
+          sip_password: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          device_type?: string
+          display_name?: string | null
+          extension: string
+          id?: string
+          last_seen?: string | null
+          portal_user_id?: string | null
+          sip_domain?: string | null
+          sip_password?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          device_type?: string
+          display_name?: string | null
+          extension?: string
+          id?: string
+          last_seen?: string | null
+          portal_user_id?: string | null
+          sip_domain?: string | null
+          sip_password?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lemtel_softphone_users_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "lemtel_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lemtel_transcriptions: {
+        Row: {
+          action_items: string[] | null
+          ai_model: string
+          call_uuid: string
+          created_at: string
+          escalation_needed: boolean
+          id: string
+          key_phrases: string[] | null
+          satisfaction_score: number | null
+          sentiment: string | null
+          summary: string | null
+          topics: string[] | null
+          transcript_text: string | null
+        }
+        Insert: {
+          action_items?: string[] | null
+          ai_model?: string
+          call_uuid: string
+          created_at?: string
+          escalation_needed?: boolean
+          id?: string
+          key_phrases?: string[] | null
+          satisfaction_score?: number | null
+          sentiment?: string | null
+          summary?: string | null
+          topics?: string[] | null
+          transcript_text?: string | null
+        }
+        Update: {
+          action_items?: string[] | null
+          ai_model?: string
+          call_uuid?: string
+          created_at?: string
+          escalation_needed?: boolean
+          id?: string
+          key_phrases?: string[] | null
+          satisfaction_score?: number | null
+          sentiment?: string | null
+          summary?: string | null
+          topics?: string[] | null
+          transcript_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lemtel_transcriptions_call_uuid_fkey"
+            columns: ["call_uuid"]
+            isOneToOne: false
+            referencedRelation: "lemtel_cdrs_cache"
+            referencedColumns: ["call_uuid"]
+          },
+        ]
+      }
+      lemtel_voice_agents: {
+        Row: {
+          avg_duration: number
+          created_at: string
+          customer_id: string | null
+          description: string | null
+          did_id: string | null
+          elevenlabs_agent_id: string
+          escalation_rate: number
+          extension: string | null
+          id: string
+          name: string
+          status: string
+          total_calls: number
+          updated_at: string
+        }
+        Insert: {
+          avg_duration?: number
+          created_at?: string
+          customer_id?: string | null
+          description?: string | null
+          did_id?: string | null
+          elevenlabs_agent_id: string
+          escalation_rate?: number
+          extension?: string | null
+          id?: string
+          name: string
+          status?: string
+          total_calls?: number
+          updated_at?: string
+        }
+        Update: {
+          avg_duration?: number
+          created_at?: string
+          customer_id?: string | null
+          description?: string | null
+          did_id?: string | null
+          elevenlabs_agent_id?: string
+          escalation_rate?: number
+          extension?: string | null
+          id?: string
+          name?: string
+          status?: string
+          total_calls?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lemtel_voice_agents_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "lemtel_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lemtel_voice_agents_did_id_fkey"
+            columns: ["did_id"]
+            isOneToOne: false
+            referencedRelation: "lemtel_dids"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_exports: {
         Row: {
           content: string
@@ -3222,6 +3675,30 @@ export type Database = {
           },
         ]
       }
+      lemtel_config_safe: {
+        Row: {
+          id: string | null
+          is_secret: boolean | null
+          key: string | null
+          updated_at: string | null
+          value: string | null
+        }
+        Insert: {
+          id?: string | null
+          is_secret?: boolean | null
+          key?: string | null
+          updated_at?: string | null
+          value?: never
+        }
+        Update: {
+          id?: string | null
+          is_secret?: boolean | null
+          key?: string | null
+          updated_at?: string | null
+          value?: never
+        }
+        Relationships: []
+      }
       organization_integrations_safe: {
         Row: {
           additional_config: Json | null
@@ -3300,6 +3777,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_lemtel_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_lemtel_member: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       log_agent_access: {
         Args: { _action: string; _metadata?: Json; _org_id: string }
