@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/context/OrganizationContext';
 
 export interface AgentWithPlatform {
   id: string;
@@ -12,20 +13,12 @@ export interface AgentWithPlatform {
 }
 
 export const useAllAgents = () => {
+  const { selectedOrgId } = useOrganization();
+
   return useQuery({
-    queryKey: ['all-agents'],
+    queryKey: ['all-agents', selectedOrgId],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      // Get user's organization
-      const { data: orgMember } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!orgMember) {
+      if (!selectedOrgId) {
         return { agents: [], fallbackApiKey: null };
       }
 
@@ -33,7 +26,7 @@ export const useAllAgents = () => {
       const { data: agents, error } = await supabase
         .from('agents_safe')
         .select('id, name, platform, platform_agent_id, description, config, organization_id')
-        .eq('organization_id', orgMember.organization_id)
+        .eq('organization_id', selectedOrgId)
         .not('platform_agent_id', 'is', null);
 
       if (error) throw error;
@@ -42,6 +35,7 @@ export const useAllAgents = () => {
         agents: (agents || []) as AgentWithPlatform[],
       };
     },
+    enabled: !!selectedOrgId,
   });
 };
 

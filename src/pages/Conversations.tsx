@@ -32,10 +32,12 @@ import { useLanguage } from '@/context/LanguageContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useOrganization } from '@/context/OrganizationContext';
 
 const Conversations = () => {
   const { t } = useTranslation();
   const { language } = useLanguage();
+  const { selectedOrgId } = useOrganization();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -127,6 +129,7 @@ const Conversations = () => {
       const { error } = await supabase
         .from('conversations')
         .delete()
+        .eq('organization_id', selectedOrgId)
         .in('external_id', Array.from(selectedIds));
       if (error) throw error;
       toast.success(t('conversations.bulkDelete.success')?.replace('{count}', String(selectedIds.size)) || `${selectedIds.size} conversations supprimées`);

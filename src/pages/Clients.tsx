@@ -169,6 +169,7 @@ export default function Clients() {
       const { error } = await supabase
         .from('clients')
         .delete()
+        .eq('organization_id', selectedOrgId)
         .eq('id', clientId);
       if (error) throw error;
     },
@@ -186,6 +187,7 @@ export default function Clients() {
       const { error } = await supabase
         .from('clients')
         .update({ status: newStatus })
+        .eq('organization_id', selectedOrgId)
         .eq('id', clientId);
       if (error) throw error;
     },

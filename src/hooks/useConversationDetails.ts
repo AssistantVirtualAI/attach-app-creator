@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useOrganization } from '@/context/OrganizationContext';
 
 export interface ConversationDetails {
   id: string;
@@ -20,12 +21,15 @@ export interface ConversationDetails {
 }
 
 export const useConversationDetails = (conversationId: string) => {
+  const { selectedOrgId } = useOrganization();
+
   return useQuery({
-    queryKey: ['conversation-details', conversationId],
+    queryKey: ['conversation-details', selectedOrgId, conversationId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('conversations')
         .select('*')
+        .eq('organization_id', selectedOrgId)
         .eq('id', conversationId)
         .single();
 
@@ -33,6 +37,6 @@ export const useConversationDetails = (conversationId: string) => {
       
       return data as ConversationDetails;
     },
-    enabled: !!conversationId,
+    enabled: !!selectedOrgId && !!conversationId,
   });
 };

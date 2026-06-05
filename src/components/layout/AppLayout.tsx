@@ -82,7 +82,7 @@ interface AppLayoutProps {
 
 export const AppLayout = ({ children }: AppLayoutProps) => {
   const { role, isSuperAdmin } = usePermissions();
-  const { selectedOrg, selectedOrgId, isLoading, userRole } = useOrganization();
+  const { selectedOrg, selectedOrgId, organizationMemberships, isLoading, userRole } = useOrganization();
   useApplyBranding(selectedOrgId, 'admin');
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage } = useLanguage();
@@ -233,6 +233,24 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                     <Moon className="w-4 h-4 text-primary" />
                   )}
                 </Button>
+              </div>
+            </div>
+            <div className="rounded-md border border-sidebar-border bg-sidebar-accent/30 p-2 text-[11px] leading-relaxed">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-sidebar-foreground truncate">{selectedOrg?.name || 'No org selected'}</span>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
+                  {userRole?.role || (isSuperAdmin ? 'super_admin' : 'member')}
+                </Badge>
+              </div>
+              <div className="mt-1 space-y-1 text-sidebar-foreground/70">
+                {organizationMemberships.map((membership) => (
+                  <div key={membership.organization.id} className="flex items-center justify-between gap-2">
+                    <span className="truncate">
+                      {membership.isSelected ? '● ' : ''}{membership.organization.name}
+                    </span>
+                    <span className="shrink-0 text-[10px]">{membership.role || 'member'}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

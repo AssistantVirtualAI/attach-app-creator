@@ -132,13 +132,13 @@ export const useDashboardMetrics = (dateRange?: DateRange) => {
         agentsRes,
       ] = await Promise.all([
         supabase.functions.invoke('elevenlabs-all-agents-analytics', {
-          body: { timeframe, includeCharts: true, startDate, endDate }
+          body: { organizationId: selectedOrgId, timeframe, includeCharts: true, startDate, endDate }
         }).catch(() => ({ data: null, error: 'Failed' })),
         supabase.functions.invoke('elevenlabs-all-agents-conversations', {
-          body: { page: 1, limit: 100, action: 'list', startDate, endDate }
+          body: { organizationId: selectedOrgId, page: 1, limit: 100, action: 'list', startDate, endDate }
         }).catch(() => ({ data: null, error: 'Failed' })),
         supabase.functions.invoke('dashboard-insights', {
-          body: { startDate, endDate }
+          body: { organizationId: selectedOrgId, startDate, endDate }
         }).catch(() => ({ data: null, error: 'Failed' })),
         supabase
           .from('clients')

@@ -69,7 +69,7 @@ export const useDashboardAgents = () => {
       // Get conversation counts per agent from ElevenLabs
       const { data: conversationsData } = await supabase.functions.invoke(
         'elevenlabs-all-agents-conversations',
-        { body: { page: 1, limit: 200, action: 'list' } }
+        { body: { organizationId: selectedOrgId, page: 1, limit: 200, action: 'list' } }
       ).catch(() => ({ data: null }));
 
       const conversations = conversationsData?.conversations || [];
@@ -85,7 +85,7 @@ export const useDashboardAgents = () => {
 
       return (agents || []).map(agent => ({
         ...agent,
-        conversations: agentConversationCounts[agent.platform_agent_id] || 0
+        conversations: agentConversationCounts[agent.id] || 0
       }));
     },
     enabled: !!selectedOrgId,
@@ -119,6 +119,7 @@ export const useAgentDashboardMetrics = (agentId: string | null, dateRange?: Dat
         .from('agents_safe')
         .select('platform_agent_id, name')
         .eq('id', agentId)
+        .eq('organization_id', selectedOrgId)
         .single();
 
       if (!agent?.platform_agent_id) return defaultMetrics;

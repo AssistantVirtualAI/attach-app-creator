@@ -19,6 +19,7 @@ serve(async (req) => {
       analyzeConversations = true,
       mode = 'recent',
       language = 'fr',
+      organizationId,
       cursor: startCursor,
     } = await req.json();
 
@@ -53,13 +54,33 @@ serve(async (req) => {
       });
     }
 
-    const { data: orgMember } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .single();
+    const requestedOrgId = typeof organizationId === 'string' && organizationId.length > 0 ? organizationId : null;
+    let orgId = requestedOrgId;
 
-    if (!orgMember) {
+    if (requestedOrgId) {
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .eq('organization_id', requestedOrgId)
+        .maybeSingle();
+
+      if (!membership) {
+        return new Response(JSON.stringify({ error: 'Forbidden for selected organization' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    } else {
+      const { data: memberships } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1);
+      orgId = memberships?.[0]?.organization_id ?? null;
+    }
+
+    if (!orgId) {
       return new Response(JSON.stringify({ error: 'No organization found' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -70,7 +91,7 @@ serve(async (req) => {
     const { data: orgIntegration } = await supabaseAdmin
       .from('organization_integrations')
       .select('api_key')
-      .eq('organization_id', orgMember.organization_id)
+      .eq('organization_id', orgId)
       .eq('platform', 'elevenlabs')
       .eq('is_active', true)
       .maybeSingle();
@@ -81,7 +102,7 @@ serve(async (req) => {
     let agentsQuery = supabase
       .from('agents')
       .select('id, name, platform_agent_id, platform_api_key')
-      .eq('organization_id', orgMember.organization_id)
+      .eq('organization_id', orgId)
       .eq('platform', 'elevenlabs');
     
     if (agentId) {
@@ -203,6 +224,7 @@ serve(async (req) => {
             .from('conversations')
             .select('id, external_id, satisfaction_score, sentiment')
             .eq('external_id', conv.conversation_id)
+            .eq('organization_id', orgId)
             .single();
 
           // Fetch detailed conversation data for transcript
@@ -264,7 +286,7 @@ serve(async (req) => {
             external_id: conv.conversation_id,
             title: `Conversation ${conv.conversation_id.substring(0, 8)}`,
             agent_id: agent.id,
-            organization_id: orgMember.organization_id,
+            organization_id: orgId,
             user_id: user.id,
             platform: 'elevenlabs',
             status: normalizeConversationStatus(conv.status),
@@ -338,7 +360,7 @@ serve(async (req) => {
                       conversationId: inserted.id,
                       transcript: transcriptText,
                       agentId: agent.id,
-                      organizationId: orgMember.organization_id,
+                      organizationId: orgId,
                       language,
                     }),
                   });
