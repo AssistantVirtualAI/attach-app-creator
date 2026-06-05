@@ -17,6 +17,7 @@ export default function TelephonyDashboard() {
   const { data: sms = [] } = usePbxSmsThreads();
   const { data: agents = [] } = usePbxAgents();
   const { data: integration } = usePbxIntegration();
+  const { data: registrations = [] } = usePbxRegistrations(30000);
   const sync = usePbxSync();
 
   const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
