@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, Mail, Globe, Calendar } from 'lucide-react';
+import { Shield, Mail, Globe, Calendar, Phone, Mic, MessageSquare, User, Clock, Download, Trash2 } from 'lucide-react';
 import { Navbar } from '@/components/landing/Navbar';
 import { FooterSection } from '@/components/landing/FooterSection';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -9,154 +9,160 @@ const PrivacyPolicy = () => {
 
   const content = language === 'fr' ? {
     title: 'Politique de Confidentialité',
-    lastUpdated: 'Dernière mise à jour',
+    subtitle: 'Lemtel Telecom – Application Téléphonique IA',
+    lastUpdated: 'Dernière mise à jour : juin 2026',
     sections: [
       {
-        title: '1. Collecte des données',
-        body: 'Nous collectons les informations que vous nous fournissez directement, notamment :',
+        title: '1. Données collectées',
+        body: 'Lemtel Telecom collecte les catégories de données suivantes pour fournir ses services de téléphonie intelligente :',
         items: [
-          'Informations de compte (nom, email, mot de passe)',
-          'Informations de profil (avatar, préférences)',
-          'Données de conversation avec les agents IA',
-          'Informations de paiement (via notre prestataire Stripe)',
-          "Données d'utilisation et logs techniques",
+          'Informations de compte : nom, adresse courriel, numéro de téléphone professionnel',
+          'Communications vocales : métadonnées des appels (durée, numéros, horodatage)',
+          'SMS : contenu des messages texte envoyés et reçus via la plateforme',
+          'Enregistrements d\'appels : conversations téléphoniques enregistrées avec consentement',
+          'Transcriptions IA : textes générés automatiquement à partir des appels',
+          'Contacts téléphoniques : liste de contacts synchronisée (avec autorisation explicite)',
+          'Données techniques : identifiant d\'appareil, journaux de connexion, statut de présence',
         ],
       },
       {
         title: '2. Utilisation des données',
-        body: 'Vos données sont utilisées pour :',
+        body: 'Vos données sont utilisées exclusivement dans les finalités suivantes :',
         items: [
-          'Fournir et améliorer nos services',
-          'Personnaliser votre expérience',
-          'Traiter vos paiements et gérer votre abonnement',
-          'Vous envoyer des communications importantes',
-          "Analyser l'utilisation de nos services (si vous y consentez)",
-          'Respecter nos obligations légales',
+          'Fournir les services de téléphonie VoIP et de messagerie SMS',
+          'Permettre l\'analyse IA des conversations (sentiment, sujets, qualité)',
+          'Générer des rapports d\'appels et des statistiques pour votre organisation',
+          'Activer le routage intelligent des appels et la messagerie vocale',
+          'Assurer la conformité réglementaire (enregistrements légaux, conservation)',
+          'Envoyer des notifications push pour les appels entrants et messages',
         ],
       },
       {
-        title: '3. Partage des données',
-        body: 'Nous ne vendons jamais vos données personnelles. Nous pouvons les partager avec :',
+        title: '3. Conservation des données',
+        body: 'Lemtel Telecom applique une politique de rétention stricte :',
         items: [
-          'Nos prestataires de services (hébergement, paiement, analytics)',
-          'En cas d\'obligation légale ou judiciaire',
-          'Avec votre consentement explicite',
+          'Enregistrements d\'appels : conservés 90 jours, sauf obligation légale contraire',
+          'Transcriptions IA : conservées 90 jours, puis pseudonymisées ou supprimées',
+          'Métadonnées d\'appels (CDR) : conservées 12 mois pour facturation et conformité',
+          'Messages SMS : conservés 24 mois, sauf suppression anticipée par l\'utilisateur',
+          'Messages vocaux : conservés jusqu\'à suppression manuelle ou expiration de 30 jours',
+          'Données de compte : conservées tant que le compte est actif, puis 30 jours après résiliation',
         ],
       },
       {
-        title: '4. Vos droits (RGPD)',
-        body: 'Conformément au RGPD, vous disposez des droits suivants :',
+        title: '4. Vos droits',
+        body: 'Conformément au RGPD et aux lois applicables, vous disposez des droits suivants :',
         items: [
-          'Droit d\'accès : Obtenir une copie de vos données',
-          'Droit de rectification : Corriger vos données inexactes',
-          'Droit à l\'effacement : Demander la suppression de vos données',
-          'Droit à la portabilité : Recevoir vos données dans un format structuré',
-          'Droit d\'opposition : Vous opposer au traitement de vos données',
-          'Droit de limitation : Limiter le traitement de vos données',
+          'Droit d\'accès : consulter l\'ensemble des données vous concernant',
+          'Droit de rectification : corriger vos informations inexactes',
+          'Droit à l\'effacement : demander la suppression de votre compte et de vos données',
+          'Droit à la portabilité : exporter vos données (CDR, contacts, enregistrements)',
+          'Droit d\'opposition : refuser l\'analyse IA de vos conversations',
+          'Droit de limitation : restreindre temporairement le traitement de vos données',
         ],
-        footer: 'Pour exercer ces droits, rendez-vous dans Paramètres > Confidentialité ou contactez-nous.',
+        footer: 'Pour exercer vos droits, envoyez une demande à privacy@lemtel.ca ou utilisez les paramètres de l\'application.',
       },
       {
         title: '5. Sécurité',
-        body: 'Nous mettons en œuvre des mesures de sécurité appropriées :',
+        body: 'Nous mettons en œuvre des mesures de sécurité rigoureuses :',
         items: [
+          'Chiffrement des appels et des données en transit (TLS 1.3 / SRTP)',
           'Chiffrement des données au repos (AES-256)',
-          'Chiffrement des communications (TLS 1.3)',
-          'Authentification sécurisée avec 2FA disponible',
-          'Journaux d\'audit pour les comptes HIPAA',
-          'Sauvegardes régulières et géographiquement distribuées',
+          'Authentification sécurisée avec JWT et 2FA disponible',
+          'Journaux d\'audit complets pour traçabilité',
+          'Hébergement dans des centres de données certifiés ISO 27001',
         ],
       },
       {
-        title: '6. Cookies',
-        body: 'Nous utilisons différents types de cookies :',
-        items: [
-          'Essentiels : Nécessaires au fonctionnement du site',
-          'Analytiques : Pour comprendre l\'utilisation (avec consentement)',
-          'Marketing : Pour personnaliser les publicités (avec consentement)',
-        ],
-        footer: 'Vous pouvez gérer vos préférences de cookies à tout moment.',
-      },
-      {
-        title: '7. Contact',
-        body: 'Pour toute question concernant cette politique ou vos données :',
+        title: '6. Contact',
+        body: 'Pour toute question relative à cette politique ou à vos données personnelles :',
       },
     ],
   } : {
     title: 'Privacy Policy',
-    lastUpdated: 'Last updated',
+    subtitle: 'Lemtel Telecom – AI Phone Application',
+    lastUpdated: 'Last updated: June 2026',
     sections: [
       {
-        title: '1. Data Collection',
-        body: 'We collect information you provide directly, including:',
+        title: '1. Data Collected',
+        body: 'Lemtel Telecom collects the following categories of data to provide its intelligent telephony services:',
         items: [
-          'Account information (name, email, password)',
-          'Profile information (avatar, preferences)',
-          'Conversation data with AI agents',
-          'Payment information (via our provider Stripe)',
-          'Usage data and technical logs',
+          'Account information: name, email address, business phone number',
+          'Voice communications: call metadata (duration, numbers, timestamps)',
+          'SMS: content of text messages sent and received via the platform',
+          'Call recordings: telephone conversations recorded with consent',
+          'AI transcripts: text automatically generated from calls',
+          'Phone contacts: synchronized contact list (with explicit permission)',
+          'Technical data: device identifier, connection logs, presence status',
         ],
       },
       {
-        title: '2. Data Usage',
-        body: 'Your data is used to:',
+        title: '2. How Data Is Used',
+        body: 'Your data is used exclusively for the following purposes:',
         items: [
-          'Provide and improve our services',
-          'Personalize your experience',
-          'Process payments and manage your subscription',
-          'Send you important communications',
-          'Analyze service usage (with your consent)',
-          'Comply with legal obligations',
+          'Provide VoIP telephony and SMS messaging services',
+          'Enable AI analysis of conversations (sentiment, topics, quality)',
+          'Generate call reports and statistics for your organization',
+          'Enable intelligent call routing and voicemail',
+          'Ensure regulatory compliance (legal recordings, retention)',
+          'Send push notifications for incoming calls and messages',
         ],
       },
       {
-        title: '3. Data Sharing',
-        body: 'We never sell your personal data. We may share it with:',
+        title: '3. Data Retention',
+        body: 'Lemtel Telecom applies a strict retention policy:',
         items: [
-          'Service providers (hosting, payment, analytics)',
-          'In case of legal or judicial obligation',
-          'With your explicit consent',
+          'Call recordings: retained for 90 days, unless a longer legal obligation applies',
+          'AI transcripts: retained for 90 days, then pseudonymized or deleted',
+          'Call detail records (CDR): retained for 12 months for billing and compliance',
+          'SMS messages: retained for 24 months, unless earlier deleted by the user',
+          'Voicemail messages: retained until manual deletion or 30-day expiration',
+          'Account data: retained while the account is active, then 30 days after termination',
         ],
       },
       {
-        title: '4. Your Rights (GDPR)',
-        body: 'Under GDPR, you have the following rights:',
+        title: '4. User Rights',
+        body: 'In accordance with GDPR and applicable laws, you have the following rights:',
         items: [
-          'Right of access: Obtain a copy of your data',
-          'Right to rectification: Correct inaccurate data',
-          'Right to erasure: Request deletion of your data',
-          'Right to portability: Receive your data in a structured format',
-          'Right to object: Object to the processing of your data',
-          'Right to restriction: Limit the processing of your data',
+          'Right of access: view all data concerning you',
+          'Right to rectification: correct your inaccurate information',
+          'Right to erasure: request deletion of your account and data',
+          'Right to portability: export your data (CDR, contacts, recordings)',
+          'Right to object: refuse AI analysis of your conversations',
+          'Right to restriction: temporarily restrict processing of your data',
         ],
-        footer: 'To exercise these rights, go to Settings > Privacy or contact us.',
+        footer: 'To exercise your rights, send a request to privacy@lemtel.ca or use the application settings.',
       },
       {
         title: '5. Security',
-        body: 'We implement appropriate security measures:',
+        body: 'We implement rigorous security measures:',
         items: [
-          'Encryption at rest (AES-256)',
-          'Communication encryption (TLS 1.3)',
-          'Secure authentication with 2FA available',
-          'Audit logs for HIPAA accounts',
-          'Regular and geographically distributed backups',
+          'Encryption of calls and data in transit (TLS 1.3 / SRTP)',
+          'Encryption of data at rest (AES-256)',
+          'Secure authentication with JWT and 2FA available',
+          'Complete audit logs for traceability',
+          'Hosting in ISO 27001 certified data centers',
         ],
       },
       {
-        title: '6. Cookies',
-        body: 'We use different types of cookies:',
-        items: [
-          'Essential: Required for the site to function',
-          'Analytics: To understand usage (with consent)',
-          'Marketing: To personalize ads (with consent)',
-        ],
-        footer: 'You can manage your cookie preferences at any time.',
-      },
-      {
-        title: '7. Contact',
-        body: 'For any questions about this policy or your data:',
+        title: '6. Contact',
+        body: 'For any questions regarding this policy or your personal data:',
       },
     ],
+  };
+
+  const iconMap: Record<string, React.ReactNode> = {
+    '1. Données collectées': <Phone className="w-6 h-6 text-primary" />,
+    '1. Data Collected': <Phone className="w-6 h-6 text-primary" />,
+    '2. Utilisation des données': <Mic className="w-6 h-6 text-primary" />,
+    '2. How Data Is Used': <Mic className="w-6 h-6 text-primary" />,
+    '3. Conservation des données': <Clock className="w-6 h-6 text-primary" />,
+    '3. Data Retention': <Clock className="w-6 h-6 text-primary" />,
+    '4. Vos droits': <User className="w-6 h-6 text-primary" />,
+    '4. User Rights': <User className="w-6 h-6 text-primary" />,
+    '5. Sécurité': <Shield className="w-6 h-6 text-primary" />,
+    '5. Security': <Shield className="w-6 h-6 text-primary" />,
+    '6. Contact': <Mail className="w-6 h-6 text-primary" />,
   };
 
   return (
@@ -169,16 +175,20 @@ const PrivacyPolicy = () => {
               <Shield className="w-8 h-8 text-primary" />
             </div>
             <h1 className="text-4xl font-bold mb-2">{content.title}</h1>
+            <p className="text-muted-foreground text-lg mb-2">{content.subtitle}</p>
             <p className="text-muted-foreground flex items-center justify-center gap-2">
               <Calendar className="w-4 h-4" />
-              {content.lastUpdated} : {new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US')}
+              {content.lastUpdated}
             </p>
           </div>
 
           {content.sections.map((section, idx) => (
             <Card key={idx}>
               <CardHeader>
-                <CardTitle>{section.title}</CardTitle>
+                <div className="flex items-center gap-3">
+                  {iconMap[section.title] || <Shield className="w-6 h-6 text-primary" />}
+                  <CardTitle>{section.title}</CardTitle>
+                </div>
               </CardHeader>
               <CardContent className="prose prose-sm dark:prose-invert max-w-none">
                 <p>{section.body}</p>
@@ -191,14 +201,14 @@ const PrivacyPolicy = () => {
                 )}
                 {'footer' in section && section.footer && <p>{section.footer}</p>}
                 {idx === content.sections.length - 1 && (
-                  <div className="flex flex-col gap-2 mt-4">
-                    <a href="mailto:privacy@avastatistics.com" className="flex items-center gap-2 text-primary hover:underline">
+                  <div className="flex flex-col gap-3 mt-4">
+                    <a href="mailto:privacy@lemtel.ca" className="flex items-center gap-2 text-primary hover:underline">
                       <Mail className="w-4 h-4" />
-                      privacy@avastatistics.com
+                      privacy@lemtel.ca
                     </a>
-                    <a href="https://avastatistics.com" className="flex items-center gap-2 text-primary hover:underline">
+                    <a href="https://lemtel.ca" className="flex items-center gap-2 text-primary hover:underline">
                       <Globe className="w-4 h-4" />
-                      www.avastatistics.com
+                      www.lemtel.ca
                     </a>
                   </div>
                 )}

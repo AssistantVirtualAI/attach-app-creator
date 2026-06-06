@@ -55,6 +55,7 @@ import WidgetIframe from "./pages/WidgetIframe";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import BAAgreement from "./pages/BAAgreement";
 import Legal from "./pages/Legal";
+import Support from "./pages/Support";
 import Docs from "./pages/Docs";
 import Topics from "./pages/Topics";
 import Campaigns from "./pages/Campaigns";
@@ -450,6 +451,7 @@ const App = () => (
                   }
                 />
                 <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/support" element={<Support />} />
                 <Route path="/legal" element={<Legal />} />
                 <Route path="/docs" element={<Docs />} />
                 <Route
