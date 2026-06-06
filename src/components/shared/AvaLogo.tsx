@@ -75,7 +75,7 @@ export function AvaLogo({ size = 'md', animated = true, showText = true, classNa
               'font-black tracking-tight text-[#8B5CF6]'
             )}
           >
-            AVA
+            LEMTEL
           </motion.span>
           <motion.span
             initial={{ opacity: 0, x: -10 }}
@@ -86,7 +86,7 @@ export function AvaLogo({ size = 'md', animated = true, showText = true, classNa
               'font-medium tracking-widest uppercase -mt-1 text-[#8B5CF6]'
             )}
           >
-            Statistics
+            Communications
           </motion.span>
         </div>
       )}
