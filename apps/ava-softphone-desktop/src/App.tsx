@@ -6,6 +6,7 @@ import SoftphonePane from './components/SoftphonePane';
 import ConsoleLayout from './components/console/ConsoleLayout';
 import BrightnessOverlay from './components/BrightnessOverlay';
 import { useTheme } from './lib/theme';
+import { useContrast } from './hooks/useContrast';
 
 type Creds = {
   portalUrl: string;
@@ -21,6 +22,7 @@ type Creds = {
 
 export default function App() {
   const { t } = useTheme();
+  useContrast(); // applies low/med/high contrast preset on mount
   const [creds, setCreds] = useState<Creds>(null);
   const [loading, setLoading] = useState(true);
   const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 980);

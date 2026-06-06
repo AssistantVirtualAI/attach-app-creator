@@ -62,8 +62,16 @@ export default function ConsoleLayout({
         setPaletteOpen((v) => !v);
       }
     };
+    const onNav = (e: Event) => {
+      const v = (e as CustomEvent).detail as ConsoleView;
+      if (v) setView(v);
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('lemtel:nav', onNav as EventListener);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('lemtel:nav', onNav as EventListener);
+    };
   }, []);
 
   // Dev helper: trigger a simulated incoming call so the toast + dock can be
