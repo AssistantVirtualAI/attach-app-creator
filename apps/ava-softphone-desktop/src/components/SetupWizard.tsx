@@ -89,10 +89,11 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
         alignItems: 'center', justifyContent: 'center',
         padding: '40px 24px', position: 'relative', zIndex: 1,
       }}>
-        {/* Brand wordmark */}
-        <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <LemtelLogo size="lg" glow />
-          <BrandTagline size="lg" />
+        {/* Brand wordmark — square Lemtel mark */}
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <LemtelLogo size="lg" glow shape="square" />
+          <div style={{ marginTop: 14, fontSize: 22, fontWeight: 800, color: colors.textIce, letterSpacing: 0.2 }}>Lemtel</div>
+          <BrandTagline size="sm" />
         </div>
 
         {/* Card */}
