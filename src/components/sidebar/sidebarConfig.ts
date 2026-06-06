@@ -142,19 +142,6 @@ export const sidebarGroups: NavGroup[] = [
       { nameKey: '✅ Go-Live Checklist', href: '/org/lemtel/telephony/checklist', icon: CheckSquare },
     ]
   },
-  {
-    id: 'lemtel-legacy',
-    labelKey: '📞 Lemtel (Legacy)',
-    icon: PhoneCall,
-    lemtelOnly: true,
-    items: [
-      { nameKey: 'Dashboard', href: '/lemtel/dashboard', icon: LayoutDashboard },
-      { nameKey: 'Customers', href: '/lemtel/customers', icon: Users },
-      { nameKey: 'Call Analytics', href: '/lemtel/analytics', icon: BarChart3 },
-      { nameKey: 'Softphone Users', href: '/lemtel/softphone-users', icon: Smartphone },
-      { nameKey: 'Lemtel Settings', href: '/lemtel/settings', icon: Settings },
-    ]
-  },
 ];
 
 export const settingsLink: NavItem = {
