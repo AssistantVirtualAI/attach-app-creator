@@ -1,0 +1,4 @@
+electron-compiled/
+dist/
+dist-electron/
+node_modules/
