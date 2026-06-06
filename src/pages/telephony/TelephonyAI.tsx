@@ -32,8 +32,8 @@ const sentimentIcon = (s?: string | null) =>
   : <Meh className="h-4 w-4 text-muted-foreground" />;
 
 export default function TelephonyAI() {
-  const { currentOrganization } = useOrganization();
-  const orgId = currentOrganization?.id;
+  const { selectedOrg } = useOrganization();
+  const orgId = selectedOrg?.id;
   const qc = useQueryClient();
   const [period, setPeriod] = useState<Period>(7);
 
