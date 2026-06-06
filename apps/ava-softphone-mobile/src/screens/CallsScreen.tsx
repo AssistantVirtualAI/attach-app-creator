@@ -116,21 +116,24 @@ function SegmentedControl({ value, onChange }: { value: SubTab; onChange: (v: Su
   );
 }
 
-function NumberDisplay({ value, onClear }: { value: string; onClear: () => void }) {
+function NumberDisplay({ value, onClear, onBackspace }: { value: string; onClear: () => void; onBackspace: () => void }) {
   return (
     <div style={{
       margin: '12px 0 16px', padding: '20px 16px',
       borderRadius: radius.xl,
       background: gradients.card,
       border: `1px solid ${colors.border}`,
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
       minHeight: 64,
     }}>
-      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: value.length > 10 ? 22 : 28, color: colors.textIce, fontWeight: 600, letterSpacing: 0.5 }}>
+      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: value.length > 10 ? 22 : 28, color: colors.textIce, fontWeight: 600, letterSpacing: 0.5, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {value || <span style={{ color: colors.mutedSilver, fontWeight: 400 }}>Enter number</span>}
       </span>
       {value && (
-        <button onClick={onClear} style={{ background: 'transparent', border: 'none', color: colors.mutedSilver, fontSize: 14, cursor: 'pointer' }}>Clear</button>
+        <>
+          <button onClick={onBackspace} style={{ background: 'transparent', border: 'none', color: colors.mutedSilver, fontSize: 22, cursor: 'pointer', padding: 4 }}>⌫</button>
+          <button onClick={onClear} style={{ background: 'transparent', border: 'none', color: colors.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Clear</button>
+        </>
       )}
     </div>
   );
