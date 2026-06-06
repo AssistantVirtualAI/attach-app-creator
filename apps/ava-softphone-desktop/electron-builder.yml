@@ -48,7 +48,6 @@ jobs:
           $c += '  base: ''./'',' + $nl
           $c += '})' + $nl
           Set-Content -Path "vite.config.ts" -Value $c -Encoding UTF8
-          Get-Content "vite.config.ts"
 
       - name: Delete root postcss + clear cache
         shell: pwsh
@@ -72,7 +71,7 @@ jobs:
           npx tsc main.ts preload.ts tray.ts notifications.ts updater.ts `
             --target ES2020 --module commonjs --moduleResolution node `
             --esModuleInterop --skipLibCheck --outDir .
-          if ($LASTEXITCODE -ne 0) { Write-Host "tsc warnings ignored" }
+          if ($LASTEXITCODE -ne 0) { Write-Host "tsc warnings - continuing" }
           Get-ChildItem *.js -ErrorAction SilentlyContinue | Select-Object Name
 
       - name: Package Windows
@@ -120,7 +119,6 @@ jobs:
           ]
           open('vite.config.ts', 'w').write('\n'.join(lines) + '\n')
           "
-          cat vite.config.ts
 
       - name: Delete root postcss + clear cache
         working-directory: apps/ava-softphone-desktop
@@ -128,7 +126,6 @@ jobs:
           rm -f ../../postcss.config.js ../../postcss.config.cjs ../../postcss.config.mjs
           find . -name "vite.config.ts.timestamp*" -delete 2>/dev/null || true
           rm -rf node_modules/.vite 2>/dev/null || true
-          ls -la ../../postcss* 2>/dev/null || echo "No postcss at root"
 
       - name: Build Vite
         working-directory: apps/ava-softphone-desktop
@@ -139,8 +136,8 @@ jobs:
         run: |
           npx tsc main.ts preload.ts tray.ts notifications.ts updater.ts \
             --target ES2020 --module commonjs --moduleResolution node \
-            --esModuleInterop --skipLibCheck --outDir . || true
-          ls -la *.js 2>/dev/null || echo "No JS files"
+            --esModuleInterop --skipLibCheck --outDir . 2>&1 || true
+          ls -la *.js 2>/dev/null || echo "No JS compiled"
 
       - name: Package Mac
         working-directory: apps/ava-softphone-desktop
@@ -196,7 +193,6 @@ jobs:
           ]
           open('vite.config.ts', 'w').write('\n'.join(lines) + '\n')
           "
-          cat vite.config.ts
 
       - name: Delete root postcss + clear cache
         working-directory: apps/ava-softphone-desktop
@@ -204,7 +200,6 @@ jobs:
           rm -f ../../postcss.config.js ../../postcss.config.cjs ../../postcss.config.mjs
           find . -name "vite.config.ts.timestamp*" -delete 2>/dev/null || true
           rm -rf node_modules/.vite 2>/dev/null || true
-          ls -la ../../postcss* 2>/dev/null || echo "No postcss at root"
 
       - name: Build Vite
         working-directory: apps/ava-softphone-desktop
@@ -215,8 +210,8 @@ jobs:
         run: |
           npx tsc main.ts preload.ts tray.ts notifications.ts updater.ts \
             --target ES2020 --module commonjs --moduleResolution node \
-            --esModuleInterop --skipLibCheck --outDir . || true
-          ls -la *.js 2>/dev/null || echo "No JS files"
+            --esModuleInterop --skipLibCheck --outDir . 2>&1 || true
+          ls -la *.js 2>/dev/null || echo "No JS compiled"
 
       - name: Package Linux
         working-directory: apps/ava-softphone-desktop
