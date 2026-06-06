@@ -4,6 +4,7 @@ import type { Creds } from '../lib/creds';
 import { mobileApi, MeResponse } from '../lib/mobileApi';
 import { Card, Chip, SectionTitle, SettingsRow, StatusDot, GhostButton, AIPanel } from '../components/ui/Primitives';
 import { LemtelMark, AvaBadge } from '../components/Brand';
+import { checkAllPermissions, openAppSettings, type AllPermissions, type PermissionStatus } from '../lib/permissions';
 
 export default function SettingsScreen({
   creds, sp, onSignOut,
