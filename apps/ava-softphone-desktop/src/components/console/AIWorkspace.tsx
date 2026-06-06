@@ -48,9 +48,9 @@ export default function AIWorkspace() {
         {active === 'intelligence' && <Intelligence />}
         {active === 'transcripts' && <Transcripts />}
         {active === 'greetings' && <Greetings />}
-        {active === 'queues' && <PlaceholderModule title="Queue Optimizer" hint="AVA will analyze last 30 days of queue data and recommend strategy and overflow adjustments." />}
-        {active === 'agents' && <PlaceholderModule title="Voice Agent Manager" hint="Assign AVA/ElevenLabs voice agents to phone numbers, IVR branches, and after-hours flows." />}
-        {active === 'coaching' && <PlaceholderModule title="Coaching Insights" hint="Surface missed opportunities, repeated objections, and escalation patterns per agent." />}
+        {active === 'queues' && <QueueOptimizer />}
+        {active === 'agents' && <VoiceAgentManager />}
+        {active === 'coaching' && <CoachingInsights />}
       </div>
     </div>
   );
