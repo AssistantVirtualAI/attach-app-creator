@@ -95,6 +95,7 @@ function SegmentedControl({ value, onChange }: { value: SubTab; onChange: (v: Su
   const items: { id: SubTab; label: string }[] = [
     { id: 'recents', label: 'Recents' },
     { id: 'dial', label: 'Keypad' },
+    { id: 'voicemail', label: 'Voicemail' },
   ];
   return (
     <div style={{
