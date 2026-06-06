@@ -24,7 +24,7 @@ export default function SetupWizard({
     try {
       const configRes = await fetch(`${portalUrl}/api/supabase-config`);
       if (!configRes.ok) {
-        throw new Error('Portal not configured. Reinstall the app.');
+        throw new Error(`Portal config unavailable (${configRes.status}). Reinstall the app.`);
       }
       const { supabase_url, supabase_anon_key } = await configRes.json();
       if (!supabase_url || !supabase_anon_key) {
