@@ -117,12 +117,13 @@ export default function RecordingsView() {
   return (
     <div style={{ display: 'flex', height: '100%' }}>
       <div style={{ flex: 1, minWidth: 0, padding: '24px 28px', overflowY: 'auto' }}>
-        <header style={{ marginBottom: 14 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: c.textIce, margin: '0 0 4px' }}>Recordings</h1>
-          <p style={{ fontSize: 12, color: c.mutedSilver, margin: 0 }}>
-            Searchable archive with AVA quality, sentiment, date range, and bulk export.
-          </p>
-        </header>
+        <PageHeader
+          eyebrow="Archive"
+          title="Recordings"
+          subtitle="Searchable archive with AVA quality, sentiment, date range, and bulk export."
+          accent={c.avaCyan}
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>}
+        />
 
         <input
           value={search}
