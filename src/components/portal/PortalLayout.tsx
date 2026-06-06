@@ -31,6 +31,7 @@ import {
 import { useTheme } from '@/context/ThemeContext';
 import { motion } from 'framer-motion';
 import { AvaLogo } from '@/components/shared/AvaLogo';
+import { AvaFooter } from '@/components/shared/AvaFooter';
 import { GlowBadge } from '@/components/portal/GlowBadge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLanguage } from '@/context/LanguageContext';
@@ -295,15 +296,16 @@ const PortalLayoutContent = () => {
       </motion.aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto relative z-10">
+      <main className="flex-1 overflow-auto relative z-10 flex flex-col">
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="container mx-auto p-6 max-w-7xl"
+          className="container mx-auto p-6 max-w-7xl flex-1"
         >
           <Outlet />
         </motion.div>
+        <AvaFooter />
       </main>
     </div>
   );

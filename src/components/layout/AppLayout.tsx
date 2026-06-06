@@ -2,6 +2,7 @@ import { ReactNode, useState, useCallback, useMemo, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Moon, Sun, Globe, GripVertical } from 'lucide-react';
 import { AvaLogo } from '@/components/shared/AvaLogo';
+import { AvaFooter } from '@/components/shared/AvaFooter';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useOrganization } from '@/context/OrganizationContext';
@@ -275,10 +276,11 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       </aside>
 
       {/* Main content */}
-      <main className="pt-14 md:pt-0 md:ml-[18rem] lg:ml-80 min-h-screen">
-        <div className="p-4 lg:p-6">
+      <main className="pt-14 md:pt-0 md:ml-[18rem] lg:ml-80 min-h-screen flex flex-col">
+        <div className="p-4 lg:p-6 flex-1">
           {children}
         </div>
+        <AvaFooter />
       </main>
 
       {/* Cookie Consent Banner */}
