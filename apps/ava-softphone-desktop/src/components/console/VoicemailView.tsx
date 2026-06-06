@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { theme } from '../../lib/theme';
-import { ava, VoicemailItem } from '../../lib/avaApi';
+import { ava, VoicemailItem, Feedback } from '../../lib/avaApi';
 
 const { colors: c } = theme;
 
-type Filter = 'all' | 'new' | 'high' | 'negative';
+type Filter = 'all' | 'new' | 'high' | 'negative' | 'handled' | 'open';
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
@@ -13,32 +13,102 @@ function fmtDate(iso: string) {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 function fmtDur(s: number) {
-  const m = Math.floor(s / 60), sec = s % 60;
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, '0')}`;
 }
+
+const SPEEDS = [1, 1.25, 1.5, 2] as const;
 
 export default function VoicemailView() {
   const [items, setItems] = useState<VoicemailItem[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [sel, setSel] = useState<VoicemailItem | null>(null);
+  const [regenLoading, setRegenLoading] = useState(false);
+
+  // Playback
+  const [playing, setPlaying] = useState(false);
+  const [pos, setPos] = useState(0);
+  const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => { ava.voicemails().then(setItems); }, []);
+
+  // Reset playback when selection changes
+  useEffect(() => {
+    setPlaying(false); setPos(0);
+    if (tickRef.current) clearInterval(tickRef.current);
+  }, [sel?.id]);
+
+  // Tick
+  useEffect(() => {
+    if (tickRef.current) clearInterval(tickRef.current);
+    if (playing && sel) {
+      tickRef.current = setInterval(() => {
+        setPos((p) => {
+          const next = p + 0.2 * speed;
+          if (next >= sel.durationSec) { setPlaying(false); return sel.durationSec; }
+          return next;
+        });
+      }, 200);
+    }
+    return () => { if (tickRef.current) clearInterval(tickRef.current); };
+  }, [playing, speed, sel]);
 
   const filtered = useMemo(() => items.filter((v) =>
     filter === 'all' ? true :
     filter === 'new' ? v.isNew :
     filter === 'high' ? v.priority === 'high' :
-    v.sentiment === 'negative'
+    filter === 'negative' ? v.sentiment === 'negative' :
+    filter === 'handled' ? !!v.handled :
+    filter === 'open' ? !v.handled : true
   ), [items, filter]);
+
+  const updateItem = (id: string, patch: Partial<VoicemailItem>) => {
+    setItems((all) => all.map((x) => x.id === id ? { ...x, ...patch } : x));
+    if (sel?.id === id) setSel({ ...sel, ...patch });
+  };
 
   const markRead = (v: VoicemailItem) => {
     if (!v.isNew) return;
     ava.markVoicemailRead(v.id);
-    setItems((all) => all.map((x) => x.id === v.id ? { ...x, isNew: false } : x));
+    updateItem(v.id, { isNew: false });
+  };
+
+  const cyclePriority = () => {
+    if (!sel) return;
+    const order: VoicemailItem['priority'][] = ['low', 'normal', 'high'];
+    const next = order[(order.indexOf(sel.priority) + 1) % order.length];
+    ava.setVoicemailPriority(sel.id, next);
+    updateItem(sel.id, { priority: next });
+  };
+
+  const toggleHandled = () => {
+    if (!sel) return;
+    const next = !sel.handled;
+    ava.markVoicemailHandled(sel.id, next);
+    updateItem(sel.id, { handled: next });
+  };
+
+  const regen = async () => {
+    if (!sel) return;
+    setRegenLoading(true);
+    try {
+      const { summary } = await ava.regenerateSummary('voicemail', sel.id, sel.transcript);
+      updateItem(sel.id, { summary, feedback: null });
+    } finally { setRegenLoading(false); }
+  };
+
+  const feedback = (f: Feedback) => {
+    if (!sel) return;
+    const next: Feedback = sel.feedback === f ? null : f;
+    ava.submitSummaryFeedback('voicemail', sel.id, next);
+    updateItem(sel.id, { feedback: next });
   };
 
   const sentimentColor = (s: VoicemailItem['sentiment']) =>
     s === 'positive' ? c.success : s === 'negative' ? c.danger : c.mutedSilver;
+  const priColor = (p: VoicemailItem['priority']) =>
+    p === 'high' ? c.danger : p === 'normal' ? c.warning : c.mutedSilver;
 
   return (
     <div style={{ display: 'flex', height: '100%' }}>
@@ -46,12 +116,12 @@ export default function VoicemailView() {
         <header style={{ marginBottom: 18 }}>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: c.textIce, margin: '0 0 4px' }}>Voicemail</h1>
           <p style={{ fontSize: 12, color: c.mutedSilver, margin: 0 }}>
-            Playback, AVA transcription, priority detection, and callback shortcuts.
+            Playback, AVA transcription, priority, and one-click handled state.
           </p>
         </header>
 
-        <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-          {(['all', 'new', 'high', 'negative'] as Filter[]).map((f) => (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+          {(['all', 'new', 'open', 'handled', 'high', 'negative'] as Filter[]).map((f) => (
             <button key={f} onClick={() => setFilter(f)} style={chip(filter === f)}>
               {f.toUpperCase()}
             </button>
@@ -61,12 +131,13 @@ export default function VoicemailView() {
         <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
           {filtered.map((v) => (
             <button key={v.id} onClick={() => { setSel(v); markRead(v); }} style={{
-              display: 'grid', gridTemplateColumns: '10px 1fr 60px 80px 70px',
+              display: 'grid', gridTemplateColumns: '10px 1fr 60px 80px 90px',
               alignItems: 'center', gap: 12, width: '100%',
               padding: '12px 14px',
               background: sel?.id === v.id ? 'rgba(255,230,0,0.06)' : 'transparent',
               border: 'none', borderBottom: `1px solid ${c.border}`,
               color: c.textIce, cursor: 'pointer', textAlign: 'left',
+              opacity: v.handled ? 0.55 : 1,
             }}>
               <span style={{
                 width: 8, height: 8, borderRadius: '50%',
@@ -76,6 +147,7 @@ export default function VoicemailView() {
               <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 <span style={{ fontSize: 13, fontWeight: v.isNew ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {v.customer || v.from}
+                  {v.handled && <span style={{ marginLeft: 6, color: c.success, fontSize: 10 }}>✓ handled</span>}
                 </span>
                 <span style={{ fontSize: 10.5, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {v.summary}
@@ -84,8 +156,8 @@ export default function VoicemailView() {
               <span style={{ fontSize: 11, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(v.durationSec)}</span>
               <span style={{ fontSize: 11, color: c.mutedSilver }}>{fmtDate(v.receivedAt)}</span>
               <span style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                {v.priority === 'high' && <span style={tag(c.danger)}>HIGH</span>}
-                <span style={{ ...dot(sentimentColor(v.sentiment)) }}>●</span>
+                {v.priority !== 'low' && <span style={tag(priColor(v.priority))}>{v.priority.toUpperCase()}</span>}
+                <span style={dot(sentimentColor(v.sentiment))}>●</span>
               </span>
             </button>
           ))}
@@ -95,45 +167,89 @@ export default function VoicemailView() {
         </div>
       </div>
 
-      <aside style={{ width: 360, flexShrink: 0, borderLeft: `1px solid ${c.border}`, background: c.deepPanel, padding: '24px 22px', overflowY: 'auto' }}>
+      <aside style={{ width: 380, flexShrink: 0, borderLeft: `1px solid ${c.border}`, background: c.deepPanel, padding: '24px 22px', overflowY: 'auto' }}>
         {!sel && (
           <div style={{ color: c.mutedSilver, fontSize: 12, paddingTop: 80, textAlign: 'center' }}>
-            Select a voicemail to view transcript, AVA summary, and callback actions.
+            Select a voicemail to view transcript, AVA summary, and playback controls.
           </div>
         )}
         {sel && (
           <>
             <div style={{ fontSize: 11, color: c.signalGold, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>Voicemail</div>
             <h2 style={{ fontSize: 18, color: c.textIce, margin: '0 0 4px' }}>{sel.customer || sel.from}</h2>
-            <div style={{ fontSize: 11, color: c.mutedSilver, marginBottom: 18 }}>
+            <div style={{ fontSize: 11, color: c.mutedSilver, marginBottom: 14 }}>
               {sel.from} · {fmtDur(sel.durationSec)} · {new Date(sel.receivedAt).toLocaleString()}
             </div>
 
+            {/* Playback */}
             <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12, marginBottom: 14 }}>
-              <div style={{ display: 'flex', gap: 2, alignItems: 'center', height: 28 }}>
-                {Array.from({ length: 40 }).map((_, i) => (
-                  <span key={i} style={{
-                    flex: 1, height: `${20 + Math.abs(Math.sin(i * 0.9)) * 70}%`,
-                    background: c.avaCyan, opacity: 0.55, borderRadius: 1,
-                  }} />
-                ))}
+              <div style={{ display: 'flex', gap: 2, alignItems: 'center', height: 30, marginBottom: 8 }}>
+                {Array.from({ length: 40 }).map((_, i) => {
+                  const active = (i / 40) <= (pos / Math.max(sel.durationSec, 1));
+                  return (
+                    <span key={i} style={{
+                      flex: 1, height: `${20 + Math.abs(Math.sin(i * 0.9)) * 70}%`,
+                      background: active ? c.signalGold : c.avaCyan,
+                      opacity: active ? 0.9 : 0.35, borderRadius: 1,
+                    }} />
+                  );
+                })}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>
-                <span>0:00</span><span>▶ Play</span><span>{fmtDur(sel.durationSec)}</span>
+              <input
+                type="range" min={0} max={sel.durationSec} step={0.1} value={pos}
+                onChange={(e) => setPos(Number(e.target.value))}
+                style={{ width: '100%', accentColor: c.signalGold }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                <span style={{ fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(pos)}</span>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <button onClick={() => setPos((p) => Math.max(0, p - 5))} style={iconBtn}>«5s</button>
+                  <button onClick={() => setPlaying((p) => !p)} style={{ ...iconBtn, background: c.signalGold, color: c.midnight, fontWeight: 700, padding: '6px 14px' }}>
+                    {playing ? '⏸ Pause' : '▶ Play'}
+                  </button>
+                  <button onClick={() => setPos((p) => Math.min(sel.durationSec, p + 5))} style={iconBtn}>5s»</button>
+                  <button onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])} style={iconBtn}>{speed}x</button>
+                </div>
+                <span style={{ fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(sel.durationSec)}</span>
               </div>
             </div>
 
-            <Panel title="AVA Summary" accent={c.avaViolet}>
+            {/* Lifecycle */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              <button onClick={cyclePriority} style={{ ...iconBtn, flex: 1, color: priColor(sel.priority), borderColor: priColor(sel.priority) + '55' }}>
+                Priority · {sel.priority.toUpperCase()}
+              </button>
+              <button onClick={toggleHandled} style={{
+                ...iconBtn, flex: 1,
+                background: sel.handled ? c.success : 'transparent',
+                color: sel.handled ? c.midnight : c.success,
+                borderColor: c.success + '55', fontWeight: 700,
+              }}>
+                {sel.handled ? '✓ Handled' : 'Mark handled'}
+              </button>
+            </div>
+
+            <Panel
+              title="AVA Summary"
+              accent={c.avaViolet}
+              right={
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={regen} disabled={regenLoading} style={miniBtn}>{regenLoading ? '…' : '↻ Regenerate'}</button>
+                  <button onClick={() => feedback('up')} style={{ ...miniBtn, color: sel.feedback === 'up' ? c.success : c.mutedSilver }}>👍</button>
+                  <button onClick={() => feedback('down')} style={{ ...miniBtn, color: sel.feedback === 'down' ? c.danger : c.mutedSilver }}>👎</button>
+                </div>
+              }
+            >
               <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0 }}>{sel.summary}</p>
+              {sel.feedback && (
+                <div style={{ fontSize: 10, color: c.mutedSilver, marginTop: 6 }}>
+                  Feedback recorded — AVA will adapt future summaries.
+                </div>
+              )}
             </Panel>
+
             <Panel title="Transcript" accent={c.avaCyan}>
               <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0, whiteSpace: 'pre-wrap' }}>{sel.transcript}</p>
-            </Panel>
-            <Panel title="Signals" accent={c.signalGold}>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <span style={tag(sentimentColor(sel.sentiment))}>{sel.sentiment.toUpperCase()}</span>
-                <span style={tag(sel.priority === 'high' ? c.danger : c.mutedSilver)}>PRIORITY · {sel.priority.toUpperCase()}</span>
-              </div>
             </Panel>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
@@ -160,6 +276,16 @@ const tag = (col: string): React.CSSProperties => ({
   background: 'rgba(255,255,255,0.04)', color: col,
   border: `1px solid ${col}33`, fontWeight: 700, letterSpacing: 0.6,
 });
+const iconBtn: React.CSSProperties = {
+  padding: '6px 10px', borderRadius: 8,
+  background: 'transparent', color: c.textIce,
+  border: `1px solid ${c.border}`, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+};
+const miniBtn: React.CSSProperties = {
+  padding: '3px 7px', borderRadius: 6,
+  background: 'transparent', border: `1px solid ${c.border}`,
+  color: c.mutedSilver, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+};
 const btnPrimary: React.CSSProperties = {
   flex: 1, padding: '10px 12px', borderRadius: 10,
   background: c.signalGold, color: c.midnight, border: 'none',
@@ -171,10 +297,13 @@ const btnGhost: React.CSSProperties = {
   border: `1px solid ${c.border}`, fontSize: 12, fontWeight: 600, cursor: 'pointer',
 };
 
-function Panel({ title, accent, children }: { title: string; accent: string; children: React.ReactNode }) {
+function Panel({ title, accent, children, right }: { title: string; accent: string; children: React.ReactNode; right?: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.5, color: accent, textTransform: 'uppercase', marginBottom: 6 }}>{title}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.5, color: accent, textTransform: 'uppercase' }}>{title}</div>
+        {right}
+      </div>
       <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, padding: '10px 12px' }}>{children}</div>
     </div>
   );
