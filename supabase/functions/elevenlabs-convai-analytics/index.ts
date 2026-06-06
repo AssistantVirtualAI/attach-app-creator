@@ -24,9 +24,34 @@ serve(async (req) => {
     const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
     
     console.log(`[analytics] agentId: ${agentId}, organizationId: ${organizationId}, timeframe: ${timeframe}, hasApiKey: ${!!apiKey}`);
-    
+
+    // SECURITY: require valid user JWT before any service-role lookup.
+    const authHeaderTop = req.headers.get('Authorization') || '';
+    if (!authHeaderTop.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const { data: { user: authUser } } = await supabaseService.auth.getUser(authHeaderTop.replace('Bearer ', ''));
+    if (!authUser) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    if (organizationId) {
+      const { data: isSuper } = await supabaseService.rpc('is_super_admin', { _user_id: authUser.id });
+      if (!isSuper) {
+        const { data: membership } = await supabaseService
+          .from('organization_members')
+          .select('id')
+          .eq('user_id', authUser.id)
+          .eq('organization_id', organizationId)
+          .maybeSingle();
+        if (!membership) {
+          return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      }
+    }
+
     // If no API key provided directly, try multiple fallback strategies
     if (!apiKey) {
+
       // Strategy 1: Try organizationId if provided (for portal usage)
       if (organizationId) {
         console.log(`[analytics] Looking up API key via organizationId: ${organizationId}`);
