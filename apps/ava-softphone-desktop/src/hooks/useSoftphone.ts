@@ -40,11 +40,15 @@ async function fetchSoftphoneCredentials(accessToken: string): Promise<FetchedCr
   }
 }
 
+export type ManualStatus = 'auto' | 'available' | 'dnd' | 'away';
+
 export function useSoftphone(args: UseSoftphoneArgs) {
   const [snap, setSnap] = useState<SoftphoneSnapshot>(() => sipProvider.getSnapshot());
   const [config, setConfig] = useState<SoftphoneConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [credError, setCredError] = useState<string | null>(null);
+  const [manualStatus, setManualStatus] = useState<ManualStatus>('auto');
+  const [recording, setRecording] = useState(false);
 
   useEffect(() => {
     const unsub = sipProvider.subscribe(setSnap);
@@ -107,14 +111,14 @@ export function useSoftphone(args: UseSoftphoneArgs) {
     }
   }, [snap.callState, snap.remoteIdentity, snap.remoteNumber]);
 
-  // Tray status reflects SIP state
+  // Tray status reflects SIP state (or manual override)
   useEffect(() => {
-    const trayState =
+    const autoState =
       snap.callState === 'active' || snap.callState === 'held' ? 'oncall' :
       snap.status === 'registered' ? 'available' : 'offline';
+    const trayState = manualStatus === 'auto' ? autoState : manualStatus;
     window.electronAPI?.updateTrayStatus?.(trayState);
 
-    // Publish presence for BLF on other clients
     (async () => {
       try {
         await supabase
@@ -123,7 +127,11 @@ export function useSoftphone(args: UseSoftphoneArgs) {
           .eq('extension', args.extension);
       } catch { /* noop */ }
     })();
-  }, [snap.status, snap.callState, args.extension]);
+  }, [snap.status, snap.callState, args.extension, manualStatus]);
+
+  useEffect(() => {
+    if (snap.callState !== 'active' && snap.callState !== 'held') setRecording(false);
+  }, [snap.callState]);
 
   return {
     snap,
@@ -145,5 +153,12 @@ export function useSoftphone(args: UseSoftphoneArgs) {
     hasConsult: useCallback(() => sipProvider.hasConsult(), []),
     setAudioEl: useCallback((el: HTMLAudioElement | null) => { sipProvider.audioEl = el; }, []),
     setOutputDevice: useCallback((id: string | null) => { sipProvider.outputDeviceId = id; }, []),
+    manualStatus,
+    setManualStatus,
+    recording,
+    toggleRecording: useCallback(() => {
+      sipProvider.sendDTMF('*2');
+      setRecording((r) => !r);
+    }, []),
   };
 }
