@@ -1,6 +1,6 @@
 appId: com.lemtel.softphone
 productName: Lemtel Telecom
-copyright: "Copyright © 2026 Lemtel Communications. Powered by AVA Télécom."
+copyright: "Copyright 2026 Lemtel Communications. Powered by AVA Telecom."
 directories:
   output: dist-electron
 files:
