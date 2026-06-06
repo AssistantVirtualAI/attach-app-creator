@@ -218,9 +218,12 @@ export default function RecordingsView() {
 
       <aside style={{ width: 380, flexShrink: 0, borderLeft: `1px solid ${c.border}`, background: c.deepPanel, padding: '24px 22px', overflowY: 'auto' }}>
         {!sel && (
-          <div style={{ color: c.mutedSilver, fontSize: 12, paddingTop: 80, textAlign: 'center' }}>
-            Select a recording to view waveform, AVA summary, and topics.
-          </div>
+          <EmptyState
+            icon="◉"
+            title="Pick a recording"
+            hint="Select a recording to view waveform, AVA summary, and topics."
+            accent={c.avaCyan}
+          />
         )}
         {sel && (
           <>
