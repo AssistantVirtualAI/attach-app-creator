@@ -22,14 +22,15 @@ export default function SetupWizard({
     setError(null);
     setLoading(true);
     try {
-      // In production these come from a config endpoint at portalUrl.
-      // For now read from injected env (renderer build).
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
-      if (!supabaseUrl || !supabaseKey) {
+      const configRes = await fetch(`${portalUrl}/api/supabase-config`);
+      if (!configRes.ok) {
         throw new Error('Portal not configured. Reinstall the app.');
       }
-      const supabase = createClient(supabaseUrl, supabaseKey);
+      const { supabase_url, supabase_anon_key } = await configRes.json();
+      if (!supabase_url || !supabase_anon_key) {
+        throw new Error('Portal not configured. Reinstall the app.');
+      }
+      const supabase = createClient(supabase_url, supabase_anon_key);
       const { data, error: signErr } = await supabase.auth.signInWithPassword({
         email,
         password,
