@@ -95,8 +95,8 @@ export default function ConsoleLayout({
       <main style={{ flex: 1, minWidth: 0, overflow: 'auto', position: 'relative' }}>
         {view === 'home' && <HomeDashboard displayName={creds.displayName || creds.email} extension={creds.extension} onQuickDial={() => setView('dialer')} />}
         {view === 'dialer' && (
-          <div style={{ maxWidth: 420, margin: '0 auto', height: '100%' }}>
-            <SoftphonePane creds={creds} onOpenSettings={() => setView('settings')} />
+          <div style={{ maxWidth: 460, margin: '0 auto', height: '100%' }}>
+            <SoftphonePane creds={creds} onOpenSettings={() => setView('settings')} hideTabs />
           </div>
         )}
         {view === 'calls' && <CallsView />}
