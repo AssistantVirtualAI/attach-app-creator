@@ -5,8 +5,9 @@ import { mobileApi, CallRecord } from '../lib/mobileApi';
 import { Card, Chip, SectionTitle, Skeleton, EmptyState, PrimaryButton, GhostButton } from '../components/ui/Primitives';
 import CallDetailScreen from './CallDetailScreen';
 import Dialpad from '../components/Dialpad';
+import VoicemailScreen from './VoicemailScreen';
 
-type SubTab = 'recents' | 'dial';
+type SubTab = 'recents' | 'dial' | 'voicemail';
 
 export default function CallsScreen({ sp, haptic }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void> }) {
   const [sub, setSub] = useState<SubTab>('recents');
@@ -83,6 +84,8 @@ export default function CallsScreen({ sp, haptic }: { sp: any; haptic: (s?: Impa
         </>
       )}
 
+      {sub === 'voicemail' && <div style={{ marginTop: 12 }}><VoicemailScreen haptic={haptic} /></div>}
+
       <div style={{ height: 80 }} />
     </div>
   );
@@ -92,6 +95,7 @@ function SegmentedControl({ value, onChange }: { value: SubTab; onChange: (v: Su
   const items: { id: SubTab; label: string }[] = [
     { id: 'recents', label: 'Recents' },
     { id: 'dial', label: 'Keypad' },
+    { id: 'voicemail', label: 'Voicemail' },
   ];
   return (
     <div style={{
