@@ -1,10 +1,11 @@
 export const WHITELABEL = {
   clientName: 'Lemtel Communications',
   appName: 'Lemtel Telecom',
-  tagline: 'AI-Powered Business Communications',
+  tagline: 'Powered by AVA AI',
   primaryColor: '#003DA6',
   accentColor: '#FFD700',
   backgroundColor: '#0a0a1a',
+  logoPath: '/assets/lemtel-logo.svg',
   logoType: 'lemtel' as 'lemtel' | 'ava' | 'custom',
   portalUrl: 'https://avastatistic.ca',
   providerName: 'AVA AI',

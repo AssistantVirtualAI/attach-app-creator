@@ -10,14 +10,16 @@ import Store from 'electron-store';
 import path from 'path';
 import { setupTray, updateTrayStatus } from './tray';
 
+const APP_NAME = 'Lemtel Telecom';
 const store = new Store();
 let mainWindow: BrowserWindow | null = null;
 let isQuitting = false;
 
-app.setName('AVA Softphone');
+app.setName(APP_NAME);
 
 function createWindow() {
   mainWindow = new BrowserWindow({
+    title: APP_NAME,
     width: 380,
     height: 680,
     minWidth: 340,
