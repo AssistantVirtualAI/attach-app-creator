@@ -58,8 +58,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      // Fetch both org integrations and personal integrations (where organization_id is null)
-      // If no organization is selected, fall back to personal integrations only.
+      // Strict tenant isolation: only use integrations owned by the selected organization.
       const baseQuery = supabase
         .from('organization_integrations')
         .select('*')
@@ -67,9 +66,7 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
         .eq('is_active', true);
 
       const { data, error } = selectedOrgId
-        ? await baseQuery.or(
-            `organization_id.eq.${selectedOrgId},and(organization_id.is.null,user_id.eq.${user.id})`
-          )
+        ? await baseQuery.eq('organization_id', selectedOrgId)
         : await baseQuery.is('organization_id', null).eq('user_id', user.id);
 
       if (error) throw error;
