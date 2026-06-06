@@ -213,4 +213,4 @@ export function usePbxPing() {
   });
 }
 
-export { LEMTEL_ORG };
+
