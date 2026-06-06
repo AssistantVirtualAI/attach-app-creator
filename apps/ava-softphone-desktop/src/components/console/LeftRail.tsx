@@ -29,14 +29,17 @@ const LABEL: Record<ConsoleView, string> = {
 
 const ITEMS: ConsoleView[] = ['home', 'dialer', 'calls', 'messages', 'voicemail', 'recordings', 'ai', 'contacts', 'admin'];
 
-export default function LeftRail({
-  view, onChange, onOpenSettings, onOpenSearch,
-}: {
+interface Props {
   view: ConsoleView;
   onChange: (v: ConsoleView) => void;
   onOpenSettings: () => void;
   onOpenSearch: () => void;
-}) {
+  compact?: boolean;
+}
+
+export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch, compact }: Props) {
+  if (compact) return <CompactRail view={view} onChange={onChange} onOpenSettings={onOpenSettings} />;
+
   return (
     <aside style={{
       width: 236, flexShrink: 0, height: '100%',
@@ -72,7 +75,10 @@ export default function LeftRail({
           fontSize: 11.5, textAlign: 'left', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           WebkitAppRegion: 'no-drag' as any,
+          transition: 'border-color .18s ease, background .18s ease',
         }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = c.borderGold; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = c.border; }}
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -82,37 +88,7 @@ export default function LeftRail({
       </button>
 
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, WebkitAppRegion: 'no-drag' as any, overflowY: 'auto' }}>
-        {ITEMS.map((v) => {
-          const active = view === v;
-          const isAI = v === 'ai';
-          const accent = isAI ? c.avaViolet : c.signalGold;
-          return (
-            <button
-              key={v}
-              onClick={() => onChange(v)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 11,
-                padding: '9px 11px', borderRadius: 9,
-                background: active
-                  ? `linear-gradient(90deg, ${isAI ? 'rgba(122,76,255,0.22)' : 'rgba(0,82,204,0.22)'}, transparent)`
-                  : 'transparent',
-                border: '1px solid transparent',
-                borderLeft: active ? `2px solid ${accent}` : '2px solid transparent',
-                color: active ? c.textIce : c.mutedSilver,
-                fontSize: 12.5, fontWeight: active ? 600 : 500,
-                cursor: 'pointer', textAlign: 'left',
-                transition: 'all 160ms ease',
-              }}
-              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(140,180,255,0.06)'; }}
-              onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? accent : 'currentColor'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <path d={ICON[v]} />
-              </svg>
-              {LABEL[v]}
-            </button>
-          );
-        })}
+        {ITEMS.map((v) => <RailItem key={v} v={v} active={view === v} onClick={() => onChange(v)} />)}
       </nav>
 
       <button
@@ -124,7 +100,10 @@ export default function LeftRail({
           color: c.mutedSilver, fontSize: 12.5, fontWeight: 500,
           cursor: 'pointer', textAlign: 'left',
           WebkitAppRegion: 'no-drag' as any,
+          transition: 'color .15s ease, background .15s ease',
         }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(140,180,255,0.06)'; e.currentTarget.style.color = c.textIce; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = c.mutedSilver; }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d={ICON.settings}/></svg>
         Settings
@@ -153,6 +132,93 @@ export default function LeftRail({
             AVA AI
           </span>
         </div>
+      </div>
+    </aside>
+  );
+}
+
+function RailItem({ v, active, onClick }: { v: ConsoleView; active: boolean; onClick: () => void }) {
+  const isAI = v === 'ai';
+  const accent = isAI ? c.avaViolet : c.signalGold;
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 11,
+        padding: '9px 11px', borderRadius: 9,
+        background: active
+          ? `linear-gradient(90deg, ${isAI ? 'rgba(122,76,255,0.22)' : 'rgba(0,82,204,0.22)'}, transparent)`
+          : 'transparent',
+        border: '1px solid transparent',
+        borderLeft: active ? `2px solid ${accent}` : '2px solid transparent',
+        color: active ? c.textIce : c.mutedSilver,
+        fontSize: 12.5, fontWeight: active ? 600 : 500,
+        cursor: 'pointer', textAlign: 'left',
+        transition: 'all 180ms cubic-bezier(.2,.7,.2,1)',
+        transform: 'translateX(0)',
+        position: 'relative',
+      }}
+      onMouseEnter={(e) => {
+        if (!active) {
+          e.currentTarget.style.background = 'rgba(140,180,255,0.08)';
+          e.currentTarget.style.color = c.textIce;
+          e.currentTarget.style.transform = 'translateX(2px)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active) {
+          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.color = c.mutedSilver;
+          e.currentTarget.style.transform = 'translateX(0)';
+        }
+      }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? accent : 'currentColor'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d={ICON[v]} />
+      </svg>
+      {LABEL[v]}
+    </button>
+  );
+}
+
+/* ─── Compact bottom rail for narrow / minimized windows ─── */
+function CompactRail({ view, onChange, onOpenSettings }: { view: ConsoleView; onChange: (v: ConsoleView) => void; onOpenSettings: () => void }) {
+  const all: ConsoleView[] = [...ITEMS, 'settings'];
+  return (
+    <aside style={{
+      position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30,
+      background: `linear-gradient(180deg, ${c.deepPanel}f2, ${c.midnight}f7)`,
+      borderTop: `1px solid ${c.border}`,
+      backdropFilter: 'blur(14px)',
+      WebkitBackdropFilter: 'blur(14px)',
+      boxShadow: '0 -12px 32px -16px rgba(0,0,0,0.5)',
+    }}>
+      <div className="lemtel-rail-h">
+        {all.map((v) => {
+          const active = view === v;
+          const isAI = v === 'ai';
+          const accent = isAI ? c.avaViolet : c.signalGold;
+          return (
+            <button
+              key={v}
+              onClick={() => v === 'settings' ? onOpenSettings() : onChange(v)}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                minWidth: 64, padding: '8px 10px', borderRadius: 12,
+                background: active ? `linear-gradient(180deg, ${accent}22, transparent)` : 'transparent',
+                border: active ? `1px solid ${accent}55` : '1px solid transparent',
+                color: active ? c.textIce : c.mutedSilver,
+                fontSize: 10, fontWeight: active ? 700 : 500,
+                cursor: 'pointer', transition: 'all .18s ease',
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={active ? accent : 'currentColor'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d={ICON[v]} />
+              </svg>
+              <span style={{ letterSpacing: 0.3 }}>{LABEL[v]}</span>
+            </button>
+          );
+        })}
       </div>
     </aside>
   );
