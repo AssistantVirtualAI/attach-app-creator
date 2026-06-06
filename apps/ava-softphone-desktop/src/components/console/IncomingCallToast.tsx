@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useCallBus } from '../../hooks/useCallBus';
 import { theme } from '../../lib/theme';
 
@@ -6,15 +6,6 @@ const { colors: c } = theme;
 
 export default function IncomingCallToast() {
   const { call, answer, hangup } = useCallBus();
-
-  useEffect(() => {
-    if (call?.status === 'incoming') {
-      window.electronAPI?.showNotification?.(
-        'Incoming call',
-        `${call.displayName || call.number}`,
-      );
-    }
-  }, [call?.status, call?.id]);
 
   if (!call || call.status !== 'incoming') return null;
 

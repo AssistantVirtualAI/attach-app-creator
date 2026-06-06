@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, SmsThread } from '../../lib/avaApi';
-import { loadTemplates, saveTemplates, interpolate, MsgTemplate } from '../../lib/messageTemplates';
+import {
+  loadTemplates, saveTemplates, interpolate, filterTemplates,
+  getDefaultTemplateId, setDefaultTemplate,
+  MsgTemplate, TemplateCategory, CATEGORIES,
+} from '../../lib/messageTemplates';
 
 const { colors: c } = theme;
 
@@ -28,6 +32,8 @@ export default function MessagesView() {
   const [aiBusy, setAiBusy] = useState(false);
   const [templates, setTemplates] = useState<MsgTemplate[]>(() => loadTemplates());
   const [tplOpen, setTplOpen] = useState(false);
+  const [tplQuery, setTplQuery] = useState('');
+  const [tplCategory, setTplCategory] = useState<TemplateCategory | 'All'>('All');
 
   useEffect(() => {
     ava.threads().then((t) => { setThreads(t); if (t[0]) setActiveId(t[0].id); });
@@ -35,6 +41,9 @@ export default function MessagesView() {
   useEffect(() => { if (activeId) setMsgs(MOCK_MSGS[activeId] || []); }, [activeId]);
 
   const active = threads.find((t) => t.id === activeId);
+  const contactKey = active?.id || '';
+  const defaultTplId = contactKey ? getDefaultTemplateId(contactKey) : null;
+  const visibleTemplates = filterTemplates(templates, tplQuery, tplCategory);
 
   const send = async () => {
     if (!draft.trim() || !activeId) return;
@@ -56,13 +65,16 @@ export default function MessagesView() {
     const vars = { name: active?.contact.split(' ')[0] || 'there', me: 'AVA' };
     setDraft(interpolate(tpl.body, vars));
     setTplOpen(false);
+    setTplQuery('');
   };
 
   const saveCurrentAsTemplate = () => {
     if (!draft.trim()) return;
     const label = prompt('Template name?');
     if (!label) return;
-    const next = [...templates, { id: 't' + Date.now(), label, body: draft }];
+    const category = (prompt('Category? (Greeting, Follow-up, Scheduling, Closing, Custom)', 'Custom') || 'Custom') as TemplateCategory;
+    const safeCat = CATEGORIES.includes(category) ? category : 'Custom';
+    const next = [...templates, { id: 't' + Date.now(), label, body: draft, category: safeCat }];
     setTemplates(next);
     saveTemplates(next);
   };
@@ -71,6 +83,12 @@ export default function MessagesView() {
     const next = templates.filter((t) => t.id !== id);
     setTemplates(next);
     saveTemplates(next);
+  };
+
+  const toggleDefault = (id: string) => {
+    if (!contactKey) return;
+    setDefaultTemplate(contactKey, defaultTplId === id ? null : id);
+    setTemplates([...templates]); // re-render to refresh star state
   };
 
 
@@ -135,35 +153,79 @@ export default function MessagesView() {
           <div style={{ padding: 16, borderTop: `1px solid ${c.border}`, background: c.deepPanel }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <div style={{ position: 'relative' }}>
-                <button onClick={() => setTplOpen((v) => !v)} style={aiBtn(c.avaCyan)}>📋 Templates</button>
+                <button onClick={() => setTplOpen((v) => !v)} style={aiBtn(c.avaCyan)}>📋 Templates{defaultTplId ? ' ★' : ''}</button>
                 {tplOpen && (
                   <div style={{
                     position: 'absolute', bottom: '110%', left: 0, zIndex: 50,
-                    width: 280, padding: 8, borderRadius: 12,
+                    width: 340, padding: 10, borderRadius: 12,
                     background: c.midnight, border: `1px solid ${c.border}`,
                     boxShadow: '0 18px 40px -10px rgba(0,0,0,0.7)',
                   }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: c.mutedSilver, letterSpacing: 1.5, padding: '4px 8px 6px', textTransform: 'uppercase' }}>Quick replies</div>
-                    {templates.map((tpl) => (
-                      <div key={tpl.id} style={{ display: 'flex', gap: 4 }}>
-                        <button onClick={() => applyTemplate(tpl)} style={{
-                          flex: 1, textAlign: 'left', padding: '7px 9px', borderRadius: 7,
-                          background: 'transparent', border: 'none', color: c.textIce,
-                          fontSize: 12, cursor: 'pointer',
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
-                          <div style={{ fontWeight: 700 }}>{tpl.label}</div>
-                          <div style={{ fontSize: 10.5, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpl.body}</div>
-                        </button>
-                        <button onClick={() => deleteTemplate(tpl.id)} title="Delete" style={{ background: 'transparent', border: 'none', color: c.mutedSilver, cursor: 'pointer', padding: '0 6px' }}>×</button>
-                      </div>
-                    ))}
+                    <input
+                      autoFocus
+                      value={tplQuery}
+                      onChange={(e) => setTplQuery(e.target.value)}
+                      placeholder="Search templates…"
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        padding: '7px 9px', borderRadius: 7, marginBottom: 8,
+                        background: c.bgCard, border: `1px solid ${c.border}`,
+                        color: c.textIce, fontSize: 12, outline: 'none',
+                      }}
+                    />
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                      {(['All', ...CATEGORIES] as const).map((cat) => {
+                        const on = tplCategory === cat;
+                        return (
+                          <button key={cat} onClick={() => setTplCategory(cat)} style={{
+                            padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700,
+                            background: on ? c.avaCyan + '22' : 'transparent',
+                            border: `1px solid ${on ? c.avaCyan + '80' : c.border}`,
+                            color: on ? c.avaCyan : c.mutedSilver, cursor: 'pointer',
+                          }}>{cat}</button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+                      {visibleTemplates.length === 0 && (
+                        <div style={{ padding: 12, fontSize: 11, color: c.mutedSilver, textAlign: 'center' }}>No matches</div>
+                      )}
+                      {visibleTemplates.map((tpl) => {
+                        const isDefault = defaultTplId === tpl.id;
+                        return (
+                          <div key={tpl.id} style={{ display: 'flex', gap: 2, alignItems: 'stretch' }}>
+                            <button
+                              onClick={() => toggleDefault(tpl.id)}
+                              title={isDefault ? 'Unset default for this contact' : 'Set as default for this contact'}
+                              style={{
+                                background: 'transparent', border: 'none', cursor: 'pointer',
+                                color: isDefault ? c.signalGold : c.mutedSilver,
+                                fontSize: 13, padding: '0 4px',
+                              }}
+                            >{isDefault ? '★' : '☆'}</button>
+                            <button onClick={() => applyTemplate(tpl)} style={{
+                              flex: 1, textAlign: 'left', padding: '7px 9px', borderRadius: 7,
+                              background: 'transparent', border: 'none', color: c.textIce,
+                              fontSize: 12, cursor: 'pointer',
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                                <span style={{ fontWeight: 700 }}>{tpl.label}</span>
+                                <span style={{ fontSize: 9, color: c.mutedSilver, letterSpacing: 1 }}>{tpl.category.toUpperCase()}</span>
+                              </div>
+                              <div style={{ fontSize: 10.5, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpl.body}</div>
+                            </button>
+                            <button onClick={() => deleteTemplate(tpl.id)} title="Delete" style={{ background: 'transparent', border: 'none', color: c.mutedSilver, cursor: 'pointer', padding: '0 6px' }}>×</button>
+                          </div>
+                        );
+                      })}
+                    </div>
                     <button onClick={saveCurrentAsTemplate} disabled={!draft.trim()} style={{
-                      width: '100%', marginTop: 6, padding: '7px 9px', borderRadius: 7,
+                      width: '100%', marginTop: 8, padding: '7px 9px', borderRadius: 7,
                       background: 'transparent', border: `1px dashed ${c.border}`, color: c.signalGold,
                       fontSize: 11, fontWeight: 700, cursor: draft.trim() ? 'pointer' : 'not-allowed',
-                    }}>+ Save current draft</button>
+                    }}>+ Save current draft as template</button>
                   </div>
                 )}
               </div>
