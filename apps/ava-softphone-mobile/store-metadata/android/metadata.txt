@@ -1,21 +1,34 @@
-Title: Lemtel Telecom
-Short Description: Business VoIP softphone by Lemtel
-Package Name: com.lemtel.softphone
-Category: Business
-Content Rating: Everyone
+App Title
+Lemtel AI Phone
 
-Full Description:
-Professional VoIP softphone for Lemtel Communications customers.
-Make and receive calls, manage extensions, view call history, and send SMS — all from your Android phone.
+Short Description (80 chars)
+Calls, SMS, voicemail, recordings, transcripts, and AVA AI insights.
 
-Features:
-• HD voice over Wi-Fi & cellular
-• Push notifications via Firebase Cloud Messaging
-• Contacts and recents sync
-• Visual voicemail
-• SMS to your business number
-• Secure SIP/TLS connection
-• Powered by AVA Statistic
+Full Description
+Lemtel AI Phone brings your business communications into one elegant mobile app. Make and receive calls, manage SMS conversations, listen to voicemail, review call recordings, read transcripts, and use AVA AI to summarize calls, create follow-up actions, generate auto-attendant greetings, and connect voice agents.
 
-Website: https://assistantvirtualai.com
-Privacy Policy: https://avastatistic.ca/privacy
+Key features:
+• Premium dialer with HD calling on Wi-Fi and mobile data.
+• SMS & MMS inbox with templates and AVA reply assist (rewrite, shorten, translate, professional).
+• Voicemail with transcription, sentiment, priority and one-tap callback.
+• Call recordings with waveform, transcripts, AI summaries, action items, and quality scoring.
+• AVA AI workspace: call intelligence, action center, greeting studio (ElevenLabs), queue builder, and voice-agent management.
+• Admin tools for IVRs, queues, ring groups, devices, and number assignment.
+• Push notifications for incoming calls, SMS and voicemail.
+
+Access is controlled by your organization's permissions. All sensitive telephony operations are handled securely through AVA backend services — no PBX or SIP secrets are stored on the device.
+
+Category
+Business
+
+Tags
+business phone, softphone, SMS, voicemail, call recording, transcription, AI, AVA, telecom, Lemtel, IVR
+
+Contact
+support@lemtel.tel
+
+Website
+https://lemtel.tel
+
+Privacy Policy
+https://lemtel.tel/privacy

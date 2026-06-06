@@ -1,23 +1,39 @@
-App Name: Lemtel Telecom
-Subtitle: AI Business Phone System
-Bundle ID: com.lemtel.softphone
-Category: Business
-Age Rating: 4+
-Keywords: voip, softphone, business phone, lemtel, sip
+App Name
+Lemtel AI Phone
 
-Description:
-Professional VoIP softphone for Lemtel Communications customers.
-Make and receive calls, manage extensions, view call history, and send SMS — all from your iPhone.
+Subtitle
+Business calling, messaging, and AI insights.
 
-Features:
-• HD voice over Wi-Fi & cellular
-• Push notifications for incoming calls
-• Contacts and recents sync
-• Visual voicemail
-• SMS to your business number
-• Secure SIP/TLS connection
-• Powered by AVA Statistic
+Primary Category
+Business
 
-Support URL: https://assistantvirtualai.com
-Marketing URL: https://avastatistic.ca
-Privacy Policy URL: https://avastatistic.ca/privacy
+Keywords
+business phone, softphone, SMS, voicemail, call recording, transcription, AI, AVA, telecom, Lemtel, IVR
+
+Short Description
+Secure Lemtel softphone with SMS, voicemail, recordings, transcriptions, and AVA-powered call intelligence.
+
+Promotional Text
+Run your business communications from one elegant mobile app — calls, SMS, voicemail, recordings, transcripts, and AVA AI insights.
+
+Description
+Lemtel AI Phone brings your business communications into one elegant mobile app. Make and receive calls, manage SMS conversations, listen to voicemail, review call recordings, read transcripts, and use AVA AI to summarize calls, create follow-up actions, generate auto-attendant greetings, and connect voice agents.
+
+Highlights:
+• Premium dialer with HD calling on Wi-Fi and mobile data.
+• SMS & MMS inbox with templates and AVA reply assist.
+• Voicemail with transcription, sentiment, and priority.
+• Call recordings with waveform, transcripts, and AI summaries.
+• AVA AI workspace: summaries, action items, greeting studio, voice agents.
+• Admin tools for IVRs, queues, ring groups, and number assignment.
+
+Access is controlled by your organization's permissions. All sensitive telephony operations are handled securely through AVA backend services — no PBX or SIP secrets are stored on the device.
+
+Support URL
+https://lemtel.tel/support
+
+Marketing URL
+https://lemtel.tel
+
+Privacy Policy URL
+https://lemtel.tel/privacy

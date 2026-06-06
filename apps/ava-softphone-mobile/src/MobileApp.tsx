@@ -4,45 +4,36 @@ import { Capacitor } from '@capacitor/core';
 // Re-use battle-tested SIP hook from the desktop app
 import { useSoftphone } from '@desktop/hooks/useSoftphone';
 import AuthScreen from './screens/AuthScreen';
-import DialerScreen from './screens/DialerScreen';
-import RecentsScreen from './screens/RecentsScreen';
-import ContactsScreen from './screens/ContactsScreen';
-import VoicemailScreen from './screens/VoicemailScreen';
+import HomeScreen from './screens/HomeScreen';
+import CallsScreen from './screens/CallsScreen';
+import MessagesScreen from './screens/MessagesScreen';
+import AIScreen from './screens/AIScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import BottomTabs, { Tab } from './components/BottomTabs';
 import ActiveCallSheet from './components/ActiveCallSheet';
 import { useStoredCreds, Creds } from './lib/creds';
+import { gradients, colors } from './lib/theme';
 
 export default function MobileApp() {
   const { creds, setCreds, clearCreds, loading } = useStoredCreds();
-  const [tab, setTab] = useState<Tab>('dial');
+  const [tab, setTab] = useState<Tab>('home');
 
   if (loading) {
     return (
-      <div style={loadingStyle}>
-        <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>Loading…</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: colors.midnight }}>
+        <div style={{ fontSize: 14, color: colors.mutedSilver }}>Loading Lemtel AI Phone…</div>
       </div>
     );
   }
 
-  if (!creds) {
-    return <AuthScreen onAuthenticated={setCreds} />;
-  }
+  if (!creds) return <AuthScreen onAuthenticated={setCreds} />;
 
   return <AuthenticatedShell creds={creds} tab={tab} setTab={setTab} onSignOut={clearCreds} />;
 }
 
 function AuthenticatedShell({
-  creds,
-  tab,
-  setTab,
-  onSignOut,
-}: {
-  creds: Creds;
-  tab: Tab;
-  setTab: (t: Tab) => void;
-  onSignOut: () => void;
-}) {
+  creds, tab, setTab, onSignOut,
+}: { creds: Creds; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void }) {
   const sp = useSoftphone({
     extension: creds.extension,
     displayName: creds.displayName,
@@ -68,14 +59,20 @@ function AuthenticatedShell({
   };
 
   return (
-    <div style={shellStyle}>
+    <div style={{
+      display: 'flex', flexDirection: 'column', height: '100vh',
+      background: gradients.app,
+      paddingTop: 'var(--safe-top)',
+      paddingBottom: 'var(--safe-bottom)',
+      color: colors.textIce,
+    }}>
       <audio ref={audioRef} autoPlay playsInline />
 
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        {tab === 'dial' && <DialerScreen sp={sp} haptic={haptic} />}
-        {tab === 'recents' && <RecentsScreen sp={sp} />}
-        {tab === 'contacts' && <ContactsScreen sp={sp} />}
-        {tab === 'voicemail' && <VoicemailScreen />}
+      <div key={tab} className="lemtel-page-enter" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {tab === 'home'     && <HomeScreen onNavigate={setTab} haptic={haptic} />}
+        {tab === 'calls'    && <CallsScreen sp={sp} haptic={haptic} />}
+        {tab === 'messages' && <MessagesScreen haptic={haptic} />}
+        {tab === 'ai'       && <AIScreen />}
         {tab === 'settings' && <SettingsScreen creds={creds} sp={sp} onSignOut={onSignOut} />}
       </div>
 
@@ -85,20 +82,3 @@ function AuthenticatedShell({
     </div>
   );
 }
-
-const shellStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  height: '100vh',
-  background: 'linear-gradient(180deg, #07091a 0%, #0f1330 40%, #161b3f 100%)',
-  paddingTop: 'var(--safe-top)',
-  paddingBottom: 'var(--safe-bottom)',
-};
-
-const loadingStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  height: '100vh',
-  background: 'var(--bg-0)',
-};
