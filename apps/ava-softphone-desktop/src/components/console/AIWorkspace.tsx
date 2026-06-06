@@ -20,13 +20,13 @@ export default function AIWorkspace() {
   const [active, setActive] = useState<Module>('intelligence');
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto', animation: 'fadeIn .3s ease-out' }}>
-      <header style={{ marginBottom: 22 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, color: c.avaViolet, textTransform: 'uppercase' }}>
-          Powered by AVA AI
-        </div>
-        <h1 style={{ fontSize: 28, fontWeight: 700, color: c.textIce, margin: '6px 0 4px' }}>AI Workspace</h1>
-        <p style={{ fontSize: 13, color: c.mutedSilver, margin: 0 }}>Intelligence, automation, and voice-agent control for your communications.</p>
-      </header>
+      <PageHeader
+        eyebrow="Powered by AVA AI"
+        title="AI Workspace"
+        subtitle="Intelligence, automation, and voice-agent control for your communications."
+        accent={c.avaViolet}
+        icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="M12 2l1.8 4.5L18 8l-4.2 1.5L12 14l-1.8-4.5L6 8l4.2-1.5L12 2z"/><path d="M18 14l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z"/></svg>}
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 22 }}>
         {MODULES.map((m) => (
