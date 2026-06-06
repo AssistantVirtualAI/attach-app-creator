@@ -11,21 +11,27 @@ import AIScreen from './screens/AIScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import BottomTabs, { Tab } from './components/BottomTabs';
 import ActiveCallSheet from './components/ActiveCallSheet';
+import SplashAva from './components/SplashAva';
 import { useStoredCreds, Creds } from './lib/creds';
 import { gradients, colors } from './lib/theme';
+import { requestAllPermissions } from './lib/permissions';
+import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
+import { syncDeviceContacts } from './lib/contacts';
+import { bootNative, onAppStateChange } from './lib/nativeBoot';
 
 export default function MobileApp() {
   const { creds, setCreds, clearCreds, loading } = useStoredCreds();
   const [tab, setTab] = useState<Tab>('home');
+  const [booting, setBooting] = useState(true);
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: colors.midnight }}>
-        <div style={{ fontSize: 14, color: colors.mutedSilver }}>Loading Lemtel AI Phone…</div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    bootNative().finally(() => {
+      // Keep the AVA splash visible briefly for brand polish.
+      setTimeout(() => setBooting(false), 700);
+    });
+  }, []);
 
+  if (loading || booting) return <SplashAva />;
   if (!creds) return <AuthScreen onAuthenticated={setCreds} />;
 
   return <AuthenticatedShell creds={creds} tab={tab} setTab={setTab} onSignOut={clearCreds} />;
@@ -45,6 +51,45 @@ function AuthenticatedShell({
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
+
+  // Request mic / speaker / contacts / notifications once the user is in.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const perms = await requestAllPermissions();
+      if (cancelled) return;
+
+      // Push notifications — register token with backend.
+      registerPush({
+        onToken: async (token, platform) => {
+          await sendPushTokenToBackend({
+            token, platform,
+            portalUrl: (creds as any).portalUrl || 'https://avastatistic.ca',
+            accessToken: creds.accessToken || '',
+            extension: creds.extension,
+          });
+        },
+        onAction: (p) => {
+          // Deep-link: tap a push to open the right tab.
+          const kind = p.data?.kind;
+          if (kind === 'sms') setTab('messages');
+          else if (kind === 'voicemail' || kind === 'missed') setTab('calls');
+        },
+      });
+
+      // Contacts sync — for dialer autocomplete.
+      if (perms.contacts === 'granted') {
+        syncDeviceContacts().catch(() => {});
+      }
+    })();
+
+    // Re-register SIP when app comes back to foreground.
+    let unsub: () => void = () => {};
+    onAppStateChange((active) => { if (active) sp.reconnect?.(); }).then((u) => { unsub = u; });
+
+    return () => { cancelled = true; unsub(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [creds.extension]);
 
   const inCall =
     sp.snap.callState === 'active' ||
