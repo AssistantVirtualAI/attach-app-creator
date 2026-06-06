@@ -300,8 +300,8 @@ All colors MUST be HSL.
   @keyframes aiPing {
     0% { transform: scale(1); opacity: .6; }
     80%,100% { transform: scale(2.2); opacity: 0; }
-    box-shadow: 0 10px 40px -10px hsl(var(--primary) / 0.2);
   }
+
 
   /* Marquee animations for TrustedBy section */
   @keyframes marquee {
