@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { AvaLogo } from '@/components/shared/AvaLogo';
+import { AvaStatisticsLogo as AvaLogo } from '@/components/shared/AvaStatisticsLogo';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, Globe, MoreHorizontal } from 'lucide-react';
 import { useState } from 'react';

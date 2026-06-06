@@ -10,7 +10,7 @@ import { usePortal, PortalProvider } from '@/hooks/usePortalAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, AlertTriangle, Globe, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { AvaLogo } from '@/components/shared/AvaLogo';
+import { AvaStatisticsLogo as AvaLogo } from '@/components/shared/AvaStatisticsLogo';
 import { AnimatedFeatures } from '@/components/auth/AnimatedFeatures';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLanguage } from '@/context/LanguageContext';
