@@ -6,6 +6,7 @@ import ContactsList from './ContactsList';
 import VoicemailList from './VoicemailList';
 import SmsThreads from './SmsThreads';
 import CallForwarding from './CallForwarding';
+import lemtelLogo from '../assets/lemtel-logo.png';
 
 interface Creds {
   extension: string;
@@ -302,8 +303,31 @@ export default function SoftphonePane({
         </div>
       )}
 
-      <div style={{ padding: '8px 16px', borderTop: '1px solid rgba(255,255,255,0.08)', textAlign: 'center', fontSize: 10, opacity: 0.5 }}>
-        Powered by AVA AI · assistantvirtualai.com
+      <div
+        style={{
+          padding: '10px 16px 12px',
+          borderTop: '1px solid rgba(255,215,0,0.12)',
+          background:
+            'linear-gradient(180deg, rgba(0,90,255,0.05) 0%, rgba(0,0,0,0.4) 100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 4,
+        }}
+      >
+        <img
+          src={lemtelLogo}
+          alt="Lemtel"
+          style={{
+            height: 22,
+            width: 'auto',
+            opacity: 0.95,
+            filter: 'drop-shadow(0 0 10px rgba(255,215,0,0.35))',
+          }}
+        />
+        <div style={{ fontSize: 9, letterSpacing: 1.5, color: 'rgba(125,211,252,0.7)', textTransform: 'uppercase' }}>
+          Powered by AVA AI · assistantvirtualai.com
+        </div>
       </div>
     </div>
   );

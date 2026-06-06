@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import lemtelLogo from '../assets/lemtel-logo.png';
 
 const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -249,16 +250,39 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
 
 export function LemtelLogo() {
   return (
-    <svg width="180" height="90" viewBox="0 0 180 90" xmlns="http://www.w3.org/2000/svg">
-      <ellipse cx="90" cy="45" rx="88" ry="43" fill="#FFD700" />
-      <ellipse cx="90" cy="45" rx="78" ry="35" fill="#003DA6" />
-      <text x="90" y="40" textAnchor="middle" fill="white" fontSize="22" fontWeight="bold" fontFamily="Arial, sans-serif">
-        LEMTEL
-      </text>
-      <text x="90" y="58" textAnchor="middle" fill="white" fontSize="9" letterSpacing="2" fontFamily="Arial, sans-serif">
-        COMMUNICATIONS
-      </text>
-    </svg>
+    <div
+      style={{
+        position: 'relative',
+        padding: 14,
+        borderRadius: 24,
+        background:
+          'radial-gradient(circle at 50% 50%, rgba(0,90,255,0.25), rgba(255,215,0,0.08) 60%, transparent 80%)',
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: 24,
+          background:
+            'conic-gradient(from 0deg, rgba(255,215,0,0.4), rgba(0,140,255,0.4), rgba(255,215,0,0.4))',
+          filter: 'blur(18px)',
+          opacity: 0.4,
+          zIndex: 0,
+        }}
+      />
+      <img
+        src={lemtelLogo}
+        alt="Lemtel Communications"
+        style={{
+          position: 'relative',
+          height: 90,
+          width: 'auto',
+          zIndex: 1,
+          filter: 'drop-shadow(0 4px 24px rgba(255,215,0,0.45))',
+        }}
+      />
+    </div>
   );
 }
 
