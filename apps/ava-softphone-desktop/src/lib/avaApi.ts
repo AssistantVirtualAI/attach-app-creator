@@ -68,6 +68,25 @@ export interface Ivr { id: string; name: string; greeting: string; options: numb
 export interface CallQueue { id: string; name: string; strategy: string; agents: number; waiting: number; }
 export interface RingGroup { id: string; name: string; members: number; strategy: string; }
 
+export interface VoicemailItem {
+  id: string; from: string; customer?: string; receivedAt: string;
+  durationSec: number; isNew: boolean; transcript: string;
+  summary: string; sentiment: 'positive' | 'neutral' | 'negative';
+  priority: 'low' | 'normal' | 'high';
+}
+export interface RecordingItem {
+  id: string; callId: string; from: string; to: string; customer?: string;
+  recordedAt: string; durationSec: number; sizeKb: number;
+  qualityScore: number; sentiment: 'positive' | 'neutral' | 'negative';
+  summary: string; topics: string[]; tags: string[];
+}
+export interface ContactItem {
+  id: string; name: string; company?: string; phone: string; email?: string;
+  lastInteraction: string; totalCalls: number; totalMessages: number;
+  sentiment: 'positive' | 'neutral' | 'negative';
+  aiNote: string; tags: string[]; favorite: boolean;
+}
+
 /* ---------- Mock data ---------- */
 const MOCK_ME: Me = {
   userId: 'u_1', email: 'demo@lemtel.tel', displayName: 'Demo User',
