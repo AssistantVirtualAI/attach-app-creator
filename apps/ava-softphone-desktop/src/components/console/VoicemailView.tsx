@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, VoicemailItem, Feedback } from '../../lib/avaApi';
+import PageHeader, { EmptyState } from './PageHeader';
 
 const { colors: c } = theme;
 
@@ -113,12 +114,13 @@ export default function VoicemailView() {
   return (
     <div style={{ display: 'flex', height: '100%' }}>
       <div style={{ flex: 1, minWidth: 0, padding: '24px 28px', overflowY: 'auto' }}>
-        <header style={{ marginBottom: 18 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: c.textIce, margin: '0 0 4px' }}>Voicemail</h1>
-          <p style={{ fontSize: 12, color: c.mutedSilver, margin: 0 }}>
-            Playback, AVA transcription, priority, and one-click handled state.
-          </p>
-        </header>
+        <PageHeader
+          eyebrow="Inbox"
+          title="Voicemail"
+          subtitle="Playback, AVA transcription, priority, and one-click handled state."
+          accent={c.signalGold}
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="5.5" cy="12.5" r="4.5"/><circle cx="18.5" cy="12.5" r="4.5"/><line x1="5.5" y1="17" x2="18.5" y2="17"/></svg>}
+        />
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
           {(['all', 'new', 'open', 'handled', 'high', 'negative'] as Filter[]).map((f) => (
@@ -169,9 +171,12 @@ export default function VoicemailView() {
 
       <aside style={{ width: 380, flexShrink: 0, borderLeft: `1px solid ${c.border}`, background: c.deepPanel, padding: '24px 22px', overflowY: 'auto' }}>
         {!sel && (
-          <div style={{ color: c.mutedSilver, fontSize: 12, paddingTop: 80, textAlign: 'center' }}>
-            Select a voicemail to view transcript, AVA summary, and playback controls.
-          </div>
+          <EmptyState
+            icon="✉"
+            title="Pick a voicemail"
+            hint="Select a message to view transcript, AVA summary, and playback controls."
+            accent={c.signalGold}
+          />
         )}
         {sel && (
           <>
