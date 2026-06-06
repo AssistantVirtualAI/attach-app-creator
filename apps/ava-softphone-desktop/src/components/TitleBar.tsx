@@ -1,6 +1,5 @@
 import React from 'react';
 import { WHITELABEL } from '../whitelabel.config';
-import { LemtelLogo } from './SetupWizard';
 
 const dragStyle: React.CSSProperties = {
   // @ts-expect-error electron CSS
