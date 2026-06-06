@@ -53,7 +53,8 @@ export default function CallsView() {
           ))}
         </div>
 
-        <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
+        {loading && <ListSkeleton rows={8} />}
+        {!loading && <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
           {filtered.map((cr) => (
             <button key={cr.id} onClick={() => setSel(cr)} style={{
               display: 'grid', gridTemplateColumns: '24px 1fr 80px 90px 70px',
