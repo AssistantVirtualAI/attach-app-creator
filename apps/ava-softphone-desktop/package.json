@@ -1,6 +1,6 @@
 {
   "name": "lemtel-softphone",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Lemtel Telecom — AI-Powered Business Communications",
   "main": "electron-compiled/main.js",
   "author": "Lemtel Communications / AVA Télécom",
