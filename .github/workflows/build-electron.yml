@@ -32,66 +32,30 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Overwrite vite.config.ts
-        shell: pwsh
-        run: |
-          $config = @'
-import { defineConfig } from "vite"
-import react from "@vitejs/plugin-react"
-import path from "path"
-export default defineConfig({
-  plugins: [react()],
-  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
-  build: { outDir: "dist", emptyOutDir: true, rollupOptions: { external: ["electron"] } },
-  base: "./",
-})
-'@
-          Set-Content -Path "vite.config.ts" -Value $config -Encoding UTF8
-        working-directory: apps/ava-softphone-desktop
-
-      - name: Overwrite package.json
-        shell: pwsh
-        run: |
-          $pkg = @'
-{
-  "name": "ava-softphone",
-  "version": "1.0.0",
-  "description": "AVA Softphone",
-  "main": "electron/main.js",
-  "scripts": {
-    "build:win": "vite build && tsc -p electron/tsconfig.json && electron-builder --win"
-  },
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "jssip": "^3.10.0",
-    "@supabase/supabase-js": "^2.39.0",
-    "electron-updater": "^6.1.7",
-    "electron-store": "^8.1.0"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "concurrently": "^9.1.2",
-    "electron": "^33.0.0",
-    "electron-builder": "^25.1.8",
-    "typescript": "^5.6.3",
-    "vite": "^5.4.21"
-  },
-  "build": { "extends": "./electron-builder.yml" }
-}
-'@
-          Set-Content -Path "package.json" -Value $pkg -Encoding UTF8
-        working-directory: apps/ava-softphone-desktop
-
       - name: Install dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
 
+      - name: Overwrite vite.config.ts AFTER install
+        shell: pwsh
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          $c = 'import { defineConfig } from "vite"' + "`n"
+          $c += 'import react from "@vitejs/plugin-react"' + "`n"
+          $c += 'import path from "path"' + "`n"
+          $c += 'export default defineConfig({' + "`n"
+          $c += '  plugins: [react()],' + "`n"
+          $c += '  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },' + "`n"
+          $c += '  build: { outDir: "dist", emptyOutDir: true, rollupOptions: { external: ["electron"] } },' + "`n"
+          $c += '  base: "./",' + "`n"
+          $c += '})' + "`n"
+          Set-Content -Path "vite.config.ts" -Value $c -Encoding UTF8
+          Write-Host "vite.config.ts overwritten"
+          Get-Content "vite.config.ts"
+
       - name: Build Windows
         shell: pwsh
-        run: npm run build:win
+        run: npx vite build && npx tsc -p electron/tsconfig.json && npx electron-builder --win
         working-directory: apps/ava-softphone-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -113,9 +77,14 @@ export default defineConfig({
         with:
           node-version: '24'
 
-      - name: Overwrite vite.config.ts + package.json
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+        working-directory: apps/ava-softphone-desktop
+
+      - name: Overwrite vite.config.ts AFTER install
+        working-directory: apps/ava-softphone-desktop
         run: |
-          cat > vite.config.ts << 'EOF'
+          cat > vite.config.ts << 'VITEEOF'
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import path from "path"
@@ -125,37 +94,12 @@ export default defineConfig({
   build: { outDir: "dist", emptyOutDir: true, rollupOptions: { external: ["electron"] } },
   base: "./",
 })
-EOF
-          cat > package.json << 'EOF'
-{
-  "name": "ava-softphone",
-  "version": "1.0.0",
-  "main": "electron/main.js",
-  "scripts": {
-    "build:mac": "vite build && tsc -p electron/tsconfig.json && electron-builder --mac --x64 --arm64"
-  },
-  "dependencies": {
-    "react": "^18.2.0", "react-dom": "^18.2.0",
-    "jssip": "^3.10.0", "@supabase/supabase-js": "^2.39.0",
-    "electron-updater": "^6.1.7", "electron-store": "^8.1.0"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.0", "@types/react-dom": "^18.2.0",
-    "@vitejs/plugin-react": "^4.3.4", "concurrently": "^9.1.2",
-    "electron": "^33.0.0", "electron-builder": "^25.1.8",
-    "typescript": "^5.6.3", "vite": "^5.4.21"
-  },
-  "build": { "extends": "./electron-builder.yml" }
-}
-EOF
-        working-directory: apps/ava-softphone-desktop
-
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
-        working-directory: apps/ava-softphone-desktop
+VITEEOF
+          echo "vite.config.ts overwritten:"
+          cat vite.config.ts
 
       - name: Build Mac
-        run: npm run build:mac
+        run: npx vite build && npx tsc -p electron/tsconfig.json && npx electron-builder --mac --x64 --arm64
         working-directory: apps/ava-softphone-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -185,9 +129,14 @@ EOF
             libx11-xcb1 libxcb-dri3-0 libdrm2 libgbm1 libnss3 \
             libatk-bridge2.0-0
 
-      - name: Overwrite vite.config.ts + package.json
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+        working-directory: apps/ava-softphone-desktop
+
+      - name: Overwrite vite.config.ts AFTER install
+        working-directory: apps/ava-softphone-desktop
         run: |
-          cat > vite.config.ts << 'EOF'
+          cat > vite.config.ts << 'VITEEOF'
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import path from "path"
@@ -197,37 +146,12 @@ export default defineConfig({
   build: { outDir: "dist", emptyOutDir: true, rollupOptions: { external: ["electron"] } },
   base: "./",
 })
-EOF
-          cat > package.json << 'EOF'
-{
-  "name": "ava-softphone",
-  "version": "1.0.0",
-  "main": "electron/main.js",
-  "scripts": {
-    "build:linux": "vite build && tsc -p electron/tsconfig.json && electron-builder --linux"
-  },
-  "dependencies": {
-    "react": "^18.2.0", "react-dom": "^18.2.0",
-    "jssip": "^3.10.0", "@supabase/supabase-js": "^2.39.0",
-    "electron-updater": "^6.1.7", "electron-store": "^8.1.0"
-  },
-  "devDependencies": {
-    "@types/react": "^18.2.0", "@types/react-dom": "^18.2.0",
-    "@vitejs/plugin-react": "^4.3.4", "concurrently": "^9.1.2",
-    "electron": "^33.0.0", "electron-builder": "^25.1.8",
-    "typescript": "^5.6.3", "vite": "^5.4.21"
-  },
-  "build": { "extends": "./electron-builder.yml" }
-}
-EOF
-        working-directory: apps/ava-softphone-desktop
-
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
-        working-directory: apps/ava-softphone-desktop
+VITEEOF
+          echo "vite.config.ts overwritten:"
+          cat vite.config.ts
 
       - name: Build Linux
-        run: npm run build:linux
+        run: npx vite build && npx tsc -p electron/tsconfig.json && npx electron-builder --linux
         working-directory: apps/ava-softphone-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
