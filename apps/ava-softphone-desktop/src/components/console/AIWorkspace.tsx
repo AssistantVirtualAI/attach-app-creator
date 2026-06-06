@@ -48,9 +48,9 @@ export default function AIWorkspace() {
         {active === 'intelligence' && <Intelligence />}
         {active === 'transcripts' && <Transcripts />}
         {active === 'greetings' && <Greetings />}
-        {active === 'queues' && <PlaceholderModule title="Queue Optimizer" hint="AVA will analyze last 30 days of queue data and recommend strategy and overflow adjustments." />}
-        {active === 'agents' && <PlaceholderModule title="Voice Agent Manager" hint="Assign AVA/ElevenLabs voice agents to phone numbers, IVR branches, and after-hours flows." />}
-        {active === 'coaching' && <PlaceholderModule title="Coaching Insights" hint="Surface missed opportunities, repeated objections, and escalation patterns per agent." />}
+        {active === 'queues' && <QueueOptimizer />}
+        {active === 'agents' && <VoiceAgentManager />}
+        {active === 'coaching' && <CoachingInsights />}
       </div>
     </div>
   );
@@ -126,6 +126,77 @@ function Greetings() {
           </div>
         </div>
       )}
+    </>
+  );
+}
+
+function QueueOptimizer() {
+  const rows = [
+    { q: 'Sales', wait: '42s', sla: 88, rec: 'Add 1 agent 13:00–15:00 — abandonment +12%' },
+    { q: 'Support', wait: '1m 18s', sla: 71, rec: 'Switch to longest-idle routing — reduces wait ~22%' },
+    { q: 'After-hours', wait: '—', sla: 0, rec: 'Enable AVA voice agent for callback capture' },
+  ];
+  return (
+    <>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#28E6A5', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>Last 30 days</div>
+      {rows.map((r, i) => (
+        <div key={i} style={{ padding: '12px 0', borderBottom: `1px solid ${c.border}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: c.textIce }}>{r.q}</div>
+            <div style={{ fontSize: 11, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>avg wait {r.wait} · SLA {r.sla}%</div>
+          </div>
+          <div style={{ fontSize: 12, color: '#28E6A5', marginTop: 4 }}>↳ {r.rec}</div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function VoiceAgentManager() {
+  const agents = [
+    { name: 'AVA Reception', voice: 'ElevenLabs · Rachel', assigned: ['+1 514 555 0100', 'IVR → Press 0'] },
+    { name: 'After-hours fallback', voice: 'ElevenLabs · Adam', assigned: ['Queue overflow > 60s'] },
+    { name: 'Spanish line', voice: 'ElevenLabs · Mateo', assigned: ['+1 514 555 0144'] },
+  ];
+  return (
+    <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#FF4D67', letterSpacing: 1.5, textTransform: 'uppercase' }}>Active voice agents</div>
+        <button style={{ padding: '6px 12px', borderRadius: 8, background: 'transparent', border: `1px solid #FF4D6770`, color: '#FF4D67', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>+ New agent</button>
+      </div>
+      {agents.map((a, i) => (
+        <div key={i} style={{ padding: 12, marginBottom: 8, borderRadius: 10, background: c.midnight, border: `1px solid ${c.border}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: c.textIce }}>{a.name}</div>
+            <div style={{ fontSize: 10.5, color: c.mutedSilver }}>{a.voice}</div>
+          </div>
+          <div style={{ fontSize: 11, color: c.avaCyan, marginTop: 6, fontFamily: 'JetBrains Mono, monospace' }}>
+            {a.assigned.join(' · ')}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function CoachingInsights() {
+  const items = [
+    { agent: 'Sarah L.', kind: 'Opportunity', detail: '3 missed upsell cues on renewal calls this week.', tone: '#FFCC33' },
+    { agent: 'Mohamed K.', kind: 'Escalation', detail: 'Hold time avg 1m 48s vs team 38s — review call #4821.', tone: '#FF4D67' },
+    { agent: 'Team', kind: 'Objection', detail: '"Price too high" raised in 27% of demos — playbook missing.', tone: '#23D6FF' },
+  ];
+  return (
+    <>
+      <div style={{ fontSize: 11, fontWeight: 700, color: '#FFCC33', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>This week</div>
+      {items.map((r, i) => (
+        <div key={i} style={{ padding: '12px 0', borderBottom: `1px solid ${c.border}`, display: 'flex', gap: 14 }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: r.tone, letterSpacing: 1.5, minWidth: 90, paddingTop: 2 }}>{r.kind.toUpperCase()}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12.5, color: c.textIce }}>{r.agent}</div>
+            <div style={{ fontSize: 12, color: c.mutedSilver, marginTop: 2 }}>{r.detail}</div>
+          </div>
+        </div>
+      ))}
     </>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, SmsThread } from '../../lib/avaApi';
+import { loadTemplates, saveTemplates, interpolate, MsgTemplate } from '../../lib/messageTemplates';
 
 const { colors: c } = theme;
 
@@ -25,6 +26,8 @@ export default function MessagesView() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [draft, setDraft] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
+  const [templates, setTemplates] = useState<MsgTemplate[]>(() => loadTemplates());
+  const [tplOpen, setTplOpen] = useState(false);
 
   useEffect(() => {
     ava.threads().then((t) => { setThreads(t); if (t[0]) setActiveId(t[0].id); });
@@ -48,6 +51,28 @@ export default function MessagesView() {
     setDraft(r.text);
     setAiBusy(false);
   };
+
+  const applyTemplate = (tpl: MsgTemplate) => {
+    const vars = { name: active?.contact.split(' ')[0] || 'there', me: 'AVA' };
+    setDraft(interpolate(tpl.body, vars));
+    setTplOpen(false);
+  };
+
+  const saveCurrentAsTemplate = () => {
+    if (!draft.trim()) return;
+    const label = prompt('Template name?');
+    if (!label) return;
+    const next = [...templates, { id: 't' + Date.now(), label, body: draft }];
+    setTemplates(next);
+    saveTemplates(next);
+  };
+
+  const deleteTemplate = (id: string) => {
+    const next = templates.filter((t) => t.id !== id);
+    setTemplates(next);
+    saveTemplates(next);
+  };
+
 
   return (
     <div style={{ display: 'flex', height: '100%' }}>
@@ -108,7 +133,40 @@ export default function MessagesView() {
 
         {active && (
           <div style={{ padding: 16, borderTop: `1px solid ${c.border}`, background: c.deepPanel }}>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => setTplOpen((v) => !v)} style={aiBtn(c.avaCyan)}>📋 Templates</button>
+                {tplOpen && (
+                  <div style={{
+                    position: 'absolute', bottom: '110%', left: 0, zIndex: 50,
+                    width: 280, padding: 8, borderRadius: 12,
+                    background: c.midnight, border: `1px solid ${c.border}`,
+                    boxShadow: '0 18px 40px -10px rgba(0,0,0,0.7)',
+                  }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: c.mutedSilver, letterSpacing: 1.5, padding: '4px 8px 6px', textTransform: 'uppercase' }}>Quick replies</div>
+                    {templates.map((tpl) => (
+                      <div key={tpl.id} style={{ display: 'flex', gap: 4 }}>
+                        <button onClick={() => applyTemplate(tpl)} style={{
+                          flex: 1, textAlign: 'left', padding: '7px 9px', borderRadius: 7,
+                          background: 'transparent', border: 'none', color: c.textIce,
+                          fontSize: 12, cursor: 'pointer',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+                          <div style={{ fontWeight: 700 }}>{tpl.label}</div>
+                          <div style={{ fontSize: 10.5, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tpl.body}</div>
+                        </button>
+                        <button onClick={() => deleteTemplate(tpl.id)} title="Delete" style={{ background: 'transparent', border: 'none', color: c.mutedSilver, cursor: 'pointer', padding: '0 6px' }}>×</button>
+                      </div>
+                    ))}
+                    <button onClick={saveCurrentAsTemplate} disabled={!draft.trim()} style={{
+                      width: '100%', marginTop: 6, padding: '7px 9px', borderRadius: 7,
+                      background: 'transparent', border: `1px dashed ${c.border}`, color: c.signalGold,
+                      fontSize: 11, fontWeight: 700, cursor: draft.trim() ? 'pointer' : 'not-allowed',
+                    }}>+ Save current draft</button>
+                  </div>
+                )}
+              </div>
               <button onClick={() => aiAction('rewrite')} disabled={aiBusy} style={aiBtn(c.avaViolet)}>✨ Rewrite with AVA</button>
               <button onClick={() => aiAction('professional')} disabled={aiBusy} style={aiBtn(c.avaCyan)}>Make professional</button>
               <button onClick={() => aiAction('shorten')} disabled={aiBusy} style={aiBtn(c.signalGold)}>Shorten</button>

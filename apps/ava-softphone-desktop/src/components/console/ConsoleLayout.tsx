@@ -11,6 +11,11 @@ import ContactsView from './ContactsView';
 import AIWorkspace from './AIWorkspace';
 import AdminView from './AdminView';
 import SoftphonePane from '../SoftphonePane';
+import SettingsPage from '../SettingsPage';
+import IncomingCallToast from './IncomingCallToast';
+import ActiveCallDock from './ActiveCallDock';
+import { useCallShortcuts } from '../../hooks/useShortcuts';
+import { callBus } from '../../hooks/useCallBus';
 import { theme } from '../../lib/theme';
 
 const { colors: c } = theme;
@@ -48,11 +53,26 @@ export default function ConsoleLayout({
   const [aiOpen, setAiOpen] = useState(true);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
+  useCallShortcuts();
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Dev helper: trigger a simulated incoming call so the toast + dock can be
+  // exercised before SIP is fully wired. Press ⌘⇧I.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'i') {
+        e.preventDefault();
+        callBus.simulateIncoming('+1 514 555 0123', 'Marie Tremblay');
       }
     };
     window.addEventListener('keydown', onKey);
@@ -68,7 +88,7 @@ export default function ConsoleLayout({
       <LeftRail
         view={view}
         onChange={setView}
-        onOpenSettings={onOpenSettings}
+        onOpenSettings={() => setView('settings')}
         onOpenSearch={() => setPaletteOpen(true)}
       />
 
@@ -76,7 +96,7 @@ export default function ConsoleLayout({
         {view === 'home' && <HomeDashboard displayName={creds.displayName || creds.email} extension={creds.extension} onQuickDial={() => setView('dialer')} />}
         {view === 'dialer' && (
           <div style={{ maxWidth: 420, margin: '0 auto', height: '100%' }}>
-            <SoftphonePane creds={creds} onOpenSettings={onOpenSettings} />
+            <SoftphonePane creds={creds} onOpenSettings={() => setView('settings')} />
           </div>
         )}
         {view === 'calls' && <CallsView />}
@@ -86,11 +106,24 @@ export default function ConsoleLayout({
         {view === 'ai' && <AIWorkspace />}
         {view === 'contacts' && <ContactsView />}
         {view === 'admin' && <AdminView />}
+        {view === 'settings' && (
+          <SettingsPage
+            creds={creds}
+            onSignOut={async () => {
+              await window.electronAPI?.clearCredentials?.();
+              window.location.reload();
+            }}
+            onBack={() => setView('home')}
+          />
+        )}
       </main>
 
       <AIPanel open={aiOpen} onToggle={() => setAiOpen((v) => !v)} />
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onNavigate={setView} />
+
+      <IncomingCallToast />
+      <ActiveCallDock />
     </div>
   );
 }

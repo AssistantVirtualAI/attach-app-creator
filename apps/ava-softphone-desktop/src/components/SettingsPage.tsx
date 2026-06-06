@@ -198,7 +198,7 @@ export default function SettingsPage({
             boxShadow: t.accentGlow, marginBottom: 6,
           }}>A</div>
           <div style={{ fontSize: 17, fontWeight: 700 }}>{WHITELABEL.appName}</div>
-          <div style={{ fontSize: 12, color: t.textMuted }}>Version 1.0.0</div>
+          <div style={{ fontSize: 12, color: t.textMuted }}>Version 1.4.0</div>
           <button
             style={{
               marginTop: 12, padding: '11px 18px',
