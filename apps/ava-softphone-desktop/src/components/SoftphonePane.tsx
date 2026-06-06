@@ -3,6 +3,8 @@ import { useSoftphone } from '@/hooks/useSoftphone';
 import { supabase } from '@/lib/supabaseClient';
 import RecentsList from './RecentsList';
 import ContactsList from './ContactsList';
+import VoicemailList from './VoicemailList';
+import SmsThreads from './SmsThreads';
 
 interface Creds {
   extension: string;
@@ -14,7 +16,7 @@ interface Creds {
   refreshToken?: string;
 }
 
-type Tab = 'dial' | 'recents' | 'contacts';
+type Tab = 'dial' | 'recents' | 'contacts' | 'voicemail' | 'sms';
 
 export default function SoftphonePane({
   creds,
@@ -120,24 +122,24 @@ export default function SoftphonePane({
       {/* Tabs (hidden during ringing/active so the call view takes full space) */}
       {!inCall && !ringing && (
         <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          {(['dial', 'recents', 'contacts'] as Tab[]).map((t) => (
+          {(['dial', 'recents', 'contacts', 'voicemail', 'sms'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               style={{
                 flex: 1,
-                padding: 10,
+                padding: '10px 4px',
                 background: 'none',
                 border: 'none',
                 borderBottom: tab === t ? '2px solid #FFD700' : '2px solid transparent',
                 color: tab === t ? '#FFD700' : 'rgba(255,255,255,0.5)',
-                fontSize: 12,
+                fontSize: 11,
                 cursor: 'pointer',
-                textTransform: 'capitalize',
                 fontWeight: tab === t ? 600 : 400,
               }}
+              title={t}
             >
-              {t === 'dial' ? '📞 Dial' : t === 'recents' ? '📋 Recents' : '👤 Contacts'}
+              {t === 'dial' ? '📞' : t === 'recents' ? '📋' : t === 'contacts' ? '👤' : t === 'voicemail' ? '✉' : '💬'}
             </button>
           ))}
         </div>
