@@ -7,6 +7,9 @@ import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useLemtelAccess } from '@/hooks/useLemtelAccess';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ShieldAlert } from 'lucide-react';
 
 const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 
@@ -17,14 +20,27 @@ export function ProvisionExtensionModal({ open, onOpenChange }: { open: boolean;
   const [voicemailPin, setVoicemailPin] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const qc = useQueryClient();
+  const { isAdmin } = useLemtelAccess();
 
   const reset = () => {
     setExtension(''); setDisplayName(''); setPassword(''); setVoicemailPin('');
   };
 
   const submit = async () => {
+    if (!isAdmin) {
+      toast.error('You need Lemtel admin access to provision extensions.');
+      return;
+    }
     if (!extension || !password) {
       toast.error('Extension number and SIP password are required');
+      return;
+    }
+    if (!/^\d{3,11}$/.test(extension)) {
+      toast.error('Extension must be 3–11 digits');
+      return;
+    }
+    if (password.length < 8) {
+      toast.error('SIP password must be at least 8 characters');
       return;
     }
     setSubmitting(true);
@@ -43,13 +59,23 @@ export function ProvisionExtensionModal({ open, onOpenChange }: { open: boolean;
           },
         },
       });
-      if (error) throw error;
+      if (error) throw new Error(error.message || 'Edge function call failed');
       if ((data as any)?.error) throw new Error((data as any).message || (data as any).error);
-      toast.success(`Extension ${extension} provisioned`);
+      toast.success(`Extension ${extension} provisioned on FusionPBX`);
       qc.invalidateQueries({ queryKey: ['pbx'] });
       reset();
       onOpenChange(false);
     } catch (e: any) {
+      const msg = e?.message || 'Failed to provision extension';
+      if (/permission|forbidden|403|unauthor/i.test(msg)) {
+        toast.error('Permission denied: your role cannot provision extensions on FusionPBX.');
+      } else if (/duplicate|already exists|unique/i.test(msg)) {
+        toast.error(`Extension ${extension} already exists on FusionPBX.`);
+      } else if (/network|fetch|timeout|ECONN/i.test(msg)) {
+        toast.error('Cannot reach FusionPBX. Check the PBX integration credentials.');
+      } else {
+        toast.error(msg);
+      }
       toast.error(e?.message || 'Failed to provision extension');
     } finally {
       setSubmitting(false);
