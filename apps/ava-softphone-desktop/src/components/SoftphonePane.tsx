@@ -6,6 +6,7 @@ import VoicemailList from './VoicemailList';
 import SmsThreads from './SmsThreads';
 import CallForwarding from './CallForwarding';
 import LemtelLogo from './LemtelLogo';
+import BrandTagline from './BrandTagline';
 import RecordingsList from './RecordingsList';
 import AIInsights from './AIInsights';
 import { theme } from '../lib/theme';
@@ -371,15 +372,18 @@ export default function SoftphonePane({
       {/* Footer */}
       <div style={{
         position: 'relative', zIndex: 1, flexShrink: 0,
-        padding: '14px 14px 16px',
+        padding: '12px 14px 14px',
         textAlign: 'center',
         borderTop: `1px solid ${c.border}`,
         background: c.bg,
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
       }}>
-        <LemtelLogo size="xs" glow />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <LemtelLogo size="xs" glow />
+          <BrandTagline size="sm" showPoweredBy={false} style={{ marginTop: 0 }} />
+        </div>
         <div style={{ fontSize: 10, color: c.textDim, letterSpacing: 0.5 }}>
-          v1.0.5 · Powered by{' '}
+          v1.0.6 · Powered by{' '}
           <a
             onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal?.('https://assistantvirtualai.com'); }}
             href="#"

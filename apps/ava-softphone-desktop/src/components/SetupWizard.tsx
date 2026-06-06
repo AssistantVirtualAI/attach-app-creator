@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { theme } from '../lib/theme';
 import LemtelLogo from './LemtelLogo';
+import BrandTagline from './BrandTagline';
 
 const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -91,28 +92,7 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
         {/* Brand wordmark */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <LemtelLogo size="lg" glow />
-          <div style={{
-            marginTop: 14, fontSize: 14, fontWeight: 600,
-            color: colors.text, letterSpacing: 0.3,
-          }}>
-            Lemtel Communications — your AI companion
-            <span style={{
-              display: 'inline-block', marginLeft: 8,
-              padding: '2px 8px', borderRadius: 999,
-              fontSize: 9, fontWeight: 800, letterSpacing: 1.2,
-              background: 'linear-gradient(135deg, rgba(201,168,76,0.25), rgba(240,215,140,0.15))',
-              border: '1px solid rgba(201,168,76,0.4)',
-              color: colors.gold, textTransform: 'uppercase',
-              verticalAlign: 'middle',
-            }}>AI</span>
-          </div>
-          <div style={{
-            marginTop: 6, fontSize: 10, fontWeight: 700,
-            letterSpacing: 3, color: colors.textDim,
-            textTransform: 'uppercase',
-          }}>
-            Powered by AVA AI
-          </div>
+          <BrandTagline size="lg" />
         </div>
 
         {/* Card */}
