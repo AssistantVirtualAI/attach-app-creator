@@ -135,7 +135,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
     >
       {/* TOP */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 48 }}>
-        <LemtelLogo />
+        <LemtelLogo size="lg" halo />
         <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 700, margin: '24px 0 4px' }}>
           Lemtel Telecom
         </h1>
