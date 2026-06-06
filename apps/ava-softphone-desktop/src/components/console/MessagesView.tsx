@@ -96,9 +96,30 @@ export default function MessagesView() {
     <div style={{ display: 'flex', height: '100%' }}>
       {/* Thread list */}
       <div style={{ width: 280, flexShrink: 0, borderRight: `1px solid ${c.border}`, background: c.deepPanel, display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '18px 18px 12px' }}>
-          <h2 style={{ fontSize: 16, color: c.textIce, margin: 0 }}>Messages</h2>
-          <div style={{ fontSize: 10.5, color: c.mutedSilver, marginTop: 3 }}>{threads.length} threads</div>
+        <div style={{
+          padding: '18px 18px 14px',
+          borderBottom: `1px solid ${c.border}`,
+          background: `linear-gradient(135deg, rgba(0,82,204,0.12), transparent 70%)`,
+          position: 'relative',
+        }}>
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+            background: `linear-gradient(90deg, ${c.signalGold}, ${c.lemtelBlue} 60%, transparent)`,
+          }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 10, display: 'grid', placeItems: 'center',
+              background: `linear-gradient(135deg, ${c.signalGold}22, ${c.lemtelBlue}1c)`,
+              border: `1px solid ${c.borderGold}`, color: c.signalGold,
+            }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            </div>
+            <div>
+              <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 2, color: c.signalGold, textTransform: 'uppercase' }}>Inbox</div>
+              <h2 style={{ fontSize: 16, color: c.textIce, margin: '2px 0 0', letterSpacing: -0.2 }}>Messages</h2>
+              <div style={{ fontSize: 10.5, color: c.mutedSilver, marginTop: 3 }}>{threads.length} threads</div>
+            </div>
+          </div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {threads.map((t) => (
