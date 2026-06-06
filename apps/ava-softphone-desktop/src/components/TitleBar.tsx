@@ -1,4 +1,7 @@
 import React from 'react';
+import lemtelLogo from '../assets/lemtel-logo.png';
+
+
 
 const dragStyle: React.CSSProperties = {
   // @ts-expect-error electron CSS
@@ -15,30 +18,30 @@ export default function TitleBar() {
   return (
     <div
       style={{
-        height: 38,
-        background: '#001a3d',
-        borderBottom: '1px solid rgba(255,215,0,0.15)',
+        height: 42,
+        background: 'linear-gradient(180deg, #001a3d 0%, #000814 100%)',
+        borderBottom: '1px solid rgba(255,215,0,0.25)',
+        boxShadow: '0 1px 0 rgba(0,200,255,0.08), 0 8px 24px -12px rgba(0,90,255,0.5)',
         color: '#fff',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 12px',
+        padding: '0 14px',
         ...dragStyle,
       }}
     >
       {/* Left: Lemtel logo + name */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <svg width="30" height="16" viewBox="0 0 180 90" xmlns="http://www.w3.org/2000/svg">
-          <ellipse cx="90" cy="45" rx="88" ry="43" fill="#FFD700" />
-          <ellipse cx="90" cy="45" rx="78" ry="35" fill="#003DA6" />
-          <text x="90" y="40" textAnchor="middle" fill="white" fontSize="22" fontWeight="bold" fontFamily="Arial, sans-serif">
-            LEMTEL
-          </text>
-          <text x="90" y="58" textAnchor="middle" fill="white" fontSize="9" letterSpacing="2" fontFamily="Arial, sans-serif">
-            COMMUNICATIONS
-          </text>
-        </svg>
-        <span style={{ fontSize: 13, fontWeight: 700 }}>Lemtel Telecom</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <img
+          src={lemtelLogo}
+          alt="Lemtel"
+          style={{
+            height: 24,
+            width: 'auto',
+            filter: 'drop-shadow(0 0 8px rgba(255,215,0,0.35))',
+          }}
+        />
+        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.5, background: 'linear-gradient(90deg,#fff,#7dd3fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Lemtel Telecom</span>
       </div>
 
       {/* Right: Window controls */}
