@@ -101,6 +101,13 @@ export default function SoftphonePane({
     sp.call(dial);
   };
 
+  // Global "dial now" shortcut (⌘/Ctrl + Enter) wires in from useShortcuts.
+  useEffect(() => {
+    const onDial = () => handleCall();
+    window.addEventListener('lemtel:dial-now', onDial);
+    return () => window.removeEventListener('lemtel:dial-now', onDial);
+  }, [dial, sp.snap.status]);
+
   const handleXferSubmit = () => {
     if (!xferTarget) return;
     if (xferMode === 'blind') sp.blindTransfer(xferTarget);
