@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import LemtelLogo from './LemtelLogo';
-import { useTheme } from '../lib/theme';
+import { theme } from '../lib/theme';
 
 const dragStyle: React.CSSProperties = {
   // @ts-expect-error electron CSS
@@ -11,114 +11,102 @@ const noDrag: React.CSSProperties = {
   WebkitAppRegion: 'no-drag',
 };
 
-export default function TitleBar() {
+interface Props {
+  sipStatus?: string;
+}
+
+export default function TitleBar({ sipStatus: sipStatusProp }: Props) {
   const api = window.electronAPI;
-  const { t, mode, toggle } = useTheme();
+  const { colors } = theme;
+  const [sipStatus, setSipStatus] = useState<string>(sipStatusProp || 'connecting');
+
+  useEffect(() => {
+    const onStatus = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (typeof detail === 'string') setSipStatus(detail);
+    };
+    window.addEventListener('lemtel:sip-status', onStatus as EventListener);
+    return () => window.removeEventListener('lemtel:sip-status', onStatus as EventListener);
+  }, []);
+  useEffect(() => { if (sipStatusProp) setSipStatus(sipStatusProp); }, [sipStatusProp]);
+
+  const statusMeta =
+    sipStatus === 'registered'
+      ? { color: colors.green, label: 'Registered', anim: 'statusPulse 2s ease-in-out infinite' }
+      : sipStatus === 'error'
+        ? { color: colors.red, label: 'Error', anim: 'none' }
+        : { color: colors.yellow, label: 'Connecting', anim: 'statusPulse 1.4s ease-in-out infinite' };
 
   return (
     <div
       style={{
-        height: 44,
+        height: 38,
         background:
-          mode === 'dark'
-            ? 'linear-gradient(180deg, rgba(20,23,34,0.95) 0%, rgba(10,11,18,0.92) 100%)'
-            : 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(244,246,251,0.92) 100%)',
+          'linear-gradient(180deg, rgba(8,12,30,0.95) 0%, rgba(5,5,16,0.92) 100%)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: `1px solid ${t.border}`,
-        color: t.text,
+        borderBottom: `1px solid ${colors.borderGold}`,
+        color: colors.text,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 12px',
+        position: 'relative',
         ...dragStyle,
       }}
     >
-      {/* Left: logo + name */}
+      {/* Subtle gold glow line under titlebar */}
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: -1, height: 1,
+        background: 'linear-gradient(90deg, transparent, rgba(255,215,0,0.5), transparent)',
+        pointerEvents: 'none',
+      }} />
+
+      {/* Left: brand */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, ...noDrag }}>
-        <div
-          style={{
-            width: 22,
-            height: 22,
-            borderRadius: 7,
-            background: t.accentGradient,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            fontWeight: 800,
-            fontSize: 11,
-            letterSpacing: 0.5,
-            boxShadow: t.accentGlow,
-          }}
-        >
-          A
-        </div>
-        <span
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            letterSpacing: 0.2,
-            color: t.text,
-          }}
-        >
-          AVA Softphone
+        <LemtelLogo size="xs" glow />
+        <span style={{
+          fontSize: 12, fontWeight: 700, letterSpacing: 0.6,
+          color: colors.text,
+        }}>
+          Lemtel <span style={{ color: colors.gold }}>Telecom</span>
         </span>
       </div>
 
-      {/* Right: theme toggle + window controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, ...noDrag }}>
-        <button
-          onClick={toggle}
-          title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          style={{
-            background: t.surfaceHover,
-            border: `1px solid ${t.border}`,
-            color: t.text,
-            cursor: 'pointer',
-            width: 28,
-            height: 24,
-            borderRadius: 8,
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 12,
-            transition: 'all 160ms ease',
-          }}
-        >
-          {mode === 'dark' ? '☀️' : '🌙'}
-        </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 4 }}>
-          <button
-            onClick={() => api?.minimize()}
-            aria-label="Minimize"
-            style={dot('#fbbf24')}
-          />
-          <button
-            onClick={() => api?.maximize()}
-            aria-label="Maximize"
-            style={dot('#34d399')}
-          />
-          <button
-            onClick={() => api?.close()}
-            aria-label="Close"
-            style={dot('#f87171')}
-          />
+      {/* Center: status pill */}
+      <div style={{ ...noDrag, position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '4px 10px', borderRadius: 12,
+          background: 'rgba(255,255,255,0.04)',
+          border: `1px solid ${colors.border}`,
+          fontSize: 10, letterSpacing: 0.5, textTransform: 'uppercase',
+          color: colors.textSub,
+        }}>
+          <span style={{
+            width: 7, height: 7, borderRadius: '50%',
+            background: statusMeta.color, color: statusMeta.color,
+            animation: statusMeta.anim,
+          }} />
+          {statusMeta.label}
         </div>
+      </div>
+
+      {/* Right: macOS traffic-light style */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, ...noDrag }}>
+        <button onClick={() => api?.minimize()} aria-label="Minimize" style={dot('#fbbf24')} />
+        <button onClick={() => api?.maximize()} aria-label="Maximize" style={dot('#34d399')} />
+        <button onClick={() => api?.close()} aria-label="Close" style={dot('#f87171')} />
       </div>
     </div>
   );
 }
 
 const dot = (bg: string): React.CSSProperties => ({
-  width: 12,
-  height: 12,
-  borderRadius: '50%',
-  background: bg,
-  border: 'none',
-  cursor: 'pointer',
-  transition: 'transform 120ms ease',
+  width: 12, height: 12, borderRadius: '50%',
+  background: bg, border: 'none', cursor: 'pointer',
+  transition: 'transform 120ms ease, box-shadow 120ms ease',
+  boxShadow: `0 0 8px ${bg}55`,
 });
 
-// Keep old export to avoid breaking imports
 export { LemtelLogo };
