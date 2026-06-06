@@ -22,6 +22,7 @@ const SPEEDS = [1, 1.25, 1.5, 2] as const;
 
 export default function VoicemailView() {
   const [items, setItems] = useState<VoicemailItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
   const [sel, setSel] = useState<VoicemailItem | null>(null);
   const [regenLoading, setRegenLoading] = useState(false);
@@ -32,7 +33,7 @@ export default function VoicemailView() {
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => { ava.voicemails().then(setItems); }, []);
+  useEffect(() => { ava.voicemails().then((d) => { setItems(d); setLoading(false); }); }, []);
 
   // Reset playback when selection changes
   useEffect(() => {
