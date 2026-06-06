@@ -22,6 +22,7 @@ export default function SettingsPage({
   onBack: () => void;
 }) {
   const { t, mode, setMode } = useTheme();
+  const { brightness, setBrightness } = useBrightness();
   const [tab, setTab] = useState<Tab>('account');
   const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
   const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
