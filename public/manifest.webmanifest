@@ -1,7 +1,7 @@
 {
-  "name": "Lemtel Telecom",
+  "name": "Lemtel",
   "short_name": "Lemtel",
-  "description": "Lemtel Telecom softphone and communications portal powered by AVA AI.",
+  "description": "Lemtel softphone and communications portal powered by AVA AI.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a1a",
@@ -9,9 +9,14 @@
   "icons": [
     {
       "src": "/lemtel-icon.png",
-      "sizes": "512x512",
+      "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
     }
   ]
 }

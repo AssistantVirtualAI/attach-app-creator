@@ -10,7 +10,7 @@ import Store from 'electron-store';
 import path from 'path';
 import { setupTray, updateTrayStatus } from './tray';
 
-const APP_NAME = 'Lemtel Telecom';
+const APP_NAME = 'Lemtel';
 const store = new Store();
 let mainWindow: BrowserWindow | null = null;
 let isQuitting = false;
