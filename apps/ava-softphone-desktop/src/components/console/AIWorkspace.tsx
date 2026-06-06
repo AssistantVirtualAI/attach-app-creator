@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava } from '../../lib/avaApi';
+import PageHeader from './PageHeader';
 
 const { colors: c } = theme;
 
