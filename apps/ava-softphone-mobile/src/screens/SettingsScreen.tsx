@@ -12,8 +12,10 @@ export default function SettingsScreen({
   const [me, setMe] = useState<MeResponse | null>(null);
   const [dnd, setDnd] = useState(false);
   const [forwarding, setForwarding] = useState<string | null>(null);
+  const [perms, setPerms] = useState<AllPermissions | null>(null);
 
   useEffect(() => { mobileApi.me().then(setMe); }, []);
+  useEffect(() => { checkAllPermissions().then(setPerms); }, []);
 
   const toggleDnd = async () => { const next = !dnd; setDnd(next); try { await mobileApi.setDnd(next); } catch {} };
   const toggleFwd = async () => {
