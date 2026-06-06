@@ -32,56 +32,40 @@ export default function TitleBar({ sipStatus: sipStatusProp }: Props) {
 
   const statusMeta =
     sipStatus === 'registered'
-      ? { color: colors.green, label: 'Registered', anim: 'statusPulse 2s ease-in-out infinite' }
+      ? { color: colors.gold, label: 'Registered', anim: 'statusPulse 2s ease-in-out infinite' }
       : sipStatus === 'error'
         ? { color: colors.red, label: 'Error', anim: 'none' }
-        : { color: colors.yellow, label: 'Connecting', anim: 'statusPulse 1.4s ease-in-out infinite' };
+        : { color: colors.textSub, label: 'Connecting', anim: 'statusPulse 1.4s ease-in-out infinite' };
 
   return (
     <div
       style={{
-        height: 38,
-        background:
-          'linear-gradient(180deg, rgba(8,12,30,0.95) 0%, rgba(5,5,16,0.92) 100%)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: `1px solid ${colors.borderGold}`,
+        height: 44,
+        background: colors.bg,
+        borderBottom: `1px solid ${colors.border}`,
         color: colors.text,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 12px',
+        padding: '0 14px',
         position: 'relative',
         ...dragStyle,
       }}
     >
-      {/* Subtle gold glow line under titlebar */}
-      <div style={{
-        position: 'absolute', left: 0, right: 0, bottom: -1, height: 1,
-        background: 'linear-gradient(90deg, transparent, rgba(255,215,0,0.5), transparent)',
-        pointerEvents: 'none',
-      }} />
-
-      {/* Left: brand */}
+      {/* Left: brand wordmark */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, ...noDrag }}>
         <LemtelLogo size="xs" glow />
-        <span style={{
-          fontSize: 12, fontWeight: 700, letterSpacing: 0.6,
-          color: colors.text,
-        }}>
-          Lemtel <span style={{ color: colors.gold }}>Telecom</span>
-        </span>
       </div>
 
       {/* Center: status pill */}
       <div style={{ ...noDrag, position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
         <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '4px 10px', borderRadius: 12,
-          background: 'rgba(255,255,255,0.04)',
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '5px 12px', borderRadius: 999,
+          background: colors.bgElev,
           border: `1px solid ${colors.border}`,
-          fontSize: 10, letterSpacing: 0.5, textTransform: 'uppercase',
-          color: colors.textSub,
+          fontSize: 11, letterSpacing: 0.8, textTransform: 'uppercase',
+          color: colors.textSub, fontWeight: 600,
         }}>
           <span style={{
             width: 7, height: 7, borderRadius: '50%',
@@ -92,7 +76,7 @@ export default function TitleBar({ sipStatus: sipStatusProp }: Props) {
         </div>
       </div>
 
-      {/* Right: macOS traffic-light style */}
+      {/* Right: window controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, ...noDrag }}>
         <button onClick={() => api?.minimize()} aria-label="Minimize" style={dot('#fbbf24')} />
         <button onClick={() => api?.maximize()} aria-label="Maximize" style={dot('#34d399')} />

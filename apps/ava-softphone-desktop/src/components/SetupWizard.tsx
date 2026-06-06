@@ -21,7 +21,7 @@ type Creds = {
 };
 
 export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds) => void }) {
-  const { colors, glow } = theme;
+  const { colors } = theme;
   const [portalUrl, setPortalUrl] = useState('https://avastatistic.ca');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -68,68 +68,57 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
   return (
     <div style={{
       minHeight: '100%',
-      background: 'radial-gradient(circle at 30% 20%, #0a0520 0%, #050510 60%)',
+      background: colors.bg,
       display: 'flex', flexDirection: 'column', color: colors.text,
       position: 'relative', overflow: 'hidden',
     }}>
-      {/* Floating orbs */}
-      <div className="lemtel-orb" style={{
-        width: 320, height: 320, top: '-80px', left: '-60px',
-        background: 'rgba(0,61,166,0.35)', animation: 'float1 12s ease-in-out infinite',
-      }} />
-      <div className="lemtel-orb" style={{
-        width: 260, height: 260, bottom: '-60px', right: '-40px',
-        background: 'rgba(124,58,237,0.25)', animation: 'float2 10s ease-in-out infinite',
-      }} />
-      <div className="lemtel-orb" style={{
-        width: 200, height: 200, top: '40%', right: '20%',
-        background: 'rgba(255,215,0,0.10)', animation: 'float3 14s ease-in-out infinite',
+      {/* Single soft gold radial behind the wordmark */}
+      <div style={{
+        position: 'absolute',
+        top: '14%', left: '50%', transform: 'translateX(-50%)',
+        width: 520, height: 520, borderRadius: '50%',
+        background: 'radial-gradient(circle, rgba(255,215,0,0.18) 0%, rgba(255,215,0,0.04) 40%, transparent 70%)',
+        filter: 'blur(40px)',
+        animation: 'authGlow 6s ease-in-out infinite',
+        pointerEvents: 'none',
       }} />
 
       <div style={{
         flex: 1, display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
-        padding: '32px 24px', position: 'relative', zIndex: 1,
+        padding: '40px 24px', position: 'relative', zIndex: 1,
       }}>
-        {/* Brand */}
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <LemtelLogo size="lg" glow halo />
+        {/* Brand wordmark */}
+        <div style={{ textAlign: 'center', marginBottom: 36 }}>
+          <LemtelLogo size="lg" glow />
           <div style={{
-            marginTop: 16, fontSize: 11, fontWeight: 800,
-            letterSpacing: 6, color: colors.gold,
-            textShadow: `0 0 18px ${colors.goldDim}`,
+            marginTop: 10, fontSize: 11, fontWeight: 700,
+            letterSpacing: 5, color: colors.textSub,
+            textTransform: 'uppercase',
           }}>
-            LEMTEL TELECOM
-          </div>
-          <div style={{
-            marginTop: 6, fontSize: 12, color: colors.aiLight,
-            letterSpacing: 0.4,
-          }}>
-            AI-Powered Business Communications
+            Business Phone System
           </div>
         </div>
 
         {/* Card */}
         <div style={{
-          width: '100%', maxWidth: 360,
-          background: 'rgba(255,255,255,0.03)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,215,0,0.15)',
-          borderRadius: 20,
-          padding: 24,
-          boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+          width: '100%', maxWidth: 420,
+          background: colors.bgCard,
+          border: `1px solid ${colors.border}`,
+          borderRadius: 24,
+          padding: 32,
+          boxShadow: '0 25px 60px rgba(0,0,0,0.55)',
           animation: 'fadeIn .4s ease-out',
         }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <Field label="Portal URL" value={portalUrl} onChange={setPortalUrl} type="url" />
             <Field label="Email" value={email} onChange={setEmail} type="email" placeholder="you@company.com" autoFocus />
             <Field label="Password" value={password} onChange={setPassword} type="password" placeholder="••••••••" onEnter={handleConnect} />
 
             {error && (
               <div style={{
-                fontSize: 11, color: colors.red,
-                padding: '8px 12px', borderRadius: 8,
+                fontSize: 12, color: colors.red,
+                padding: '10px 14px', borderRadius: 10,
                 background: 'rgba(239,68,68,0.08)',
                 border: '1px solid rgba(239,68,68,0.2)',
               }}>
@@ -142,12 +131,11 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
               onClick={handleConnect}
               disabled={loading || !email || !password}
               style={{
-                marginTop: 6, height: 46, borderRadius: 12,
-                color: '#fff', fontSize: 14, fontWeight: 600,
-                cursor: 'pointer', letterSpacing: 0.3,
+                marginTop: 8, height: 50, borderRadius: 14,
+                fontSize: 14, cursor: 'pointer',
               }}
             >
-              {loading ? 'Connecting…' : '→ Connect'}
+              {loading ? 'Connecting…' : 'Sign in'}
             </button>
           </div>
         </div>
@@ -155,8 +143,8 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
 
       {/* Footer */}
       <div style={{
-        padding: '14px 16px 18px', textAlign: 'center',
-        fontSize: 10, color: colors.textDim, letterSpacing: 0.4,
+        padding: '18px 16px 22px', textAlign: 'center',
+        fontSize: 11, color: colors.textDim, letterSpacing: 0.4,
         position: 'relative', zIndex: 1,
       }}>
         Built by{' '}
@@ -166,9 +154,9 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
             e.preventDefault();
             window.electronAPI?.openExternal?.('https://assistantvirtualai.com');
           }}
-          style={{ color: colors.gold, textDecoration: 'none', cursor: 'pointer' }}
+          style={{ color: colors.gold, textDecoration: 'none', cursor: 'pointer', fontWeight: 600 }}
         >
-          AVA AI · assistantvirtualai.com
+          AVA Statistic · assistantvirtualai.com
         </a>
       </div>
     </div>
@@ -182,10 +170,10 @@ function Field({
   type?: string; placeholder?: string; autoFocus?: boolean; onEnter?: () => void;
 }) {
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <span style={{
         fontSize: 10, color: theme.colors.textSub,
-        textTransform: 'uppercase', letterSpacing: 1.4, fontWeight: 600,
+        textTransform: 'uppercase', letterSpacing: 1.6, fontWeight: 700,
       }}>{label}</span>
       <input
         className="lemtel-input"
