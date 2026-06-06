@@ -183,6 +183,38 @@ export default function SettingsPage({
               })}
             </div>
           </div>
+
+          <div>
+            <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 8, fontWeight: 600, letterSpacing: 0.3, textTransform: 'uppercase' }}>
+              Brightness · keeps blue/yellow palette
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['dim', 'medium', 'bright'] as Brightness[]).map((b) => {
+                const active = brightness === b;
+                const label = b === 'dim' ? 'Dim' : b === 'medium' ? 'Medium' : 'Bright';
+                const icon = b === 'dim' ? '◐' : b === 'medium' ? '◑' : '◓';
+                return (
+                  <button
+                    key={b}
+                    onClick={() => setBrightness(b)}
+                    style={{
+                      flex: 1, padding: '12px 10px',
+                      background: active ? 'rgba(255,215,0,0.12)' : 'transparent',
+                      border: `1px solid ${active ? 'rgba(255,215,0,0.45)' : t.border}`,
+                      color: active ? '#FFD700' : t.text,
+                      borderRadius: 12, cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                      fontWeight: active ? 700 : 500, fontSize: 12,
+                      transition: 'all 160ms ease',
+                    }}
+                  >
+                    <span style={{ fontSize: 18 }}>{icon}</span>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <SelectField tokens={t} label="Language" selectStyle={selectStyle}>
             <option>English</option>
             <option>Français</option>
