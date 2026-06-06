@@ -39,29 +39,37 @@ export default function LeftRail({
 }) {
   return (
     <aside style={{
-      width: 220, flexShrink: 0, height: '100%',
+      width: 236, flexShrink: 0, height: '100%',
       background: `linear-gradient(180deg, ${c.deepPanel} 0%, ${c.midnight} 100%)`,
       borderRight: `1px solid ${c.border}`,
       display: 'flex', flexDirection: 'column',
-      padding: '14px 10px',
+      padding: '16px 12px 14px',
       WebkitAppRegion: 'drag' as any,
+      position: 'relative',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px 14px', WebkitAppRegion: 'no-drag' as any }}>
-        <LemtelLogo size="xs" glow />
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span style={{ fontSize: 13, fontWeight: 800, color: c.textIce, letterSpacing: 0.4 }}>Lemtel</span>
-          <span style={{ fontSize: 9, fontWeight: 700, color: c.signalGold, letterSpacing: 1.5, textTransform: 'uppercase' }}>AI Phone</span>
+      {/* Brand block */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '6px 8px 16px',
+        WebkitAppRegion: 'no-drag' as any,
+      }}>
+        <LemtelLogo size="sm" glow />
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+          <span style={{ fontSize: 15, fontWeight: 800, color: c.textIce, letterSpacing: 0.3 }}>Lemtel</span>
+          <span style={{ fontSize: 9, fontWeight: 700, color: c.signalGold, letterSpacing: 1.6, textTransform: 'uppercase', marginTop: 3 }}>
+            Telecom · AI Phone
+          </span>
         </div>
       </div>
 
       <button
         onClick={onOpenSearch}
         style={{
-          margin: '4px 4px 12px', padding: '8px 10px',
-          background: 'rgba(255,255,255,0.04)',
+          margin: '4px 4px 12px', padding: '9px 11px',
+          background: 'rgba(140,180,255,0.06)',
           border: `1px solid ${c.border}`,
           borderRadius: 10, color: c.mutedSilver,
-          fontSize: 11, textAlign: 'left', cursor: 'pointer',
+          fontSize: 11.5, textAlign: 'left', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           WebkitAppRegion: 'no-drag' as any,
         }}
@@ -73,7 +81,7 @@ export default function LeftRail({
         <kbd style={{ fontSize: 9, padding: '2px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: c.textSub, fontFamily: 'inherit' }}>⌘K</kbd>
       </button>
 
-      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, WebkitAppRegion: 'no-drag' as any }}>
+      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, WebkitAppRegion: 'no-drag' as any, overflowY: 'auto' }}>
         {ITEMS.map((v) => {
           const active = view === v;
           const isAI = v === 'ai';
@@ -85,7 +93,9 @@ export default function LeftRail({
               style={{
                 display: 'flex', alignItems: 'center', gap: 11,
                 padding: '9px 11px', borderRadius: 9,
-                background: active ? `linear-gradient(90deg, ${isAI ? 'rgba(122,76,255,0.18)' : 'rgba(255,230,0,0.10)'}, transparent)` : 'transparent',
+                background: active
+                  ? `linear-gradient(90deg, ${isAI ? 'rgba(122,76,255,0.22)' : 'rgba(0,82,204,0.22)'}, transparent)`
+                  : 'transparent',
                 border: '1px solid transparent',
                 borderLeft: active ? `2px solid ${accent}` : '2px solid transparent',
                 color: active ? c.textIce : c.mutedSilver,
@@ -93,7 +103,7 @@ export default function LeftRail({
                 cursor: 'pointer', textAlign: 'left',
                 transition: 'all 160ms ease',
               }}
-              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(140,180,255,0.06)'; }}
               onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? accent : 'currentColor'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -119,6 +129,31 @@ export default function LeftRail({
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d={ICON.settings}/></svg>
         Settings
       </button>
+
+      {/* AVA footer chip */}
+      <div style={{
+        marginTop: 10, padding: '10px 12px',
+        borderRadius: 12,
+        background: 'linear-gradient(135deg, rgba(122,76,255,0.18), rgba(35,214,255,0.08))',
+        border: `1px solid ${c.borderAI}`,
+        display: 'flex', alignItems: 'center', gap: 10,
+        WebkitAppRegion: 'no-drag' as any,
+      }}>
+        <div style={{
+          width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+          background: `linear-gradient(135deg, ${c.avaViolet}, ${c.avaCyan})`,
+          display: 'grid', placeItems: 'center',
+          color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: 0.5,
+        }}>AI</div>
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: c.avaCyan, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+            Powered by
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: c.textIce, letterSpacing: 0.3 }}>
+            AVA AI
+          </span>
+        </div>
+      </div>
     </aside>
   );
 }
