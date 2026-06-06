@@ -27,7 +27,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify package.json
-        run: cat apps/ava-softphone-desktop/package.json | grep '"version"'
+        run: |
+          cat apps/ava-softphone-desktop/package.json | grep '"version"'
 
   build-windows:
     needs: verify-version
@@ -40,34 +41,18 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Remove root PostCSS config
+      - name: Install root PostCSS deps
         shell: pwsh
-        run: |
-          $files = @(
-            "postcss.config.js",
-            "postcss.config.cjs",
-            "postcss.config.mjs"
-          )
-          foreach ($f in $files) {
-            if (Test-Path $f) {
-              Remove-Item $f -Force
-              Write-Host "Deleted: $f"
-            } else {
-              Write-Host "Not found: $f"
-            }
-          }
+        run: npm install tailwindcss autoprefixer postcss --no-save
+        working-directory: ${{ github.workspace }}
 
-      - name: Install dependencies
+      - name: Install app dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
 
       - name: Build Windows
         shell: pwsh
         run: |
-          Remove-Item -Path "..\..\postcss.config.js" `
-            -Force -ErrorAction SilentlyContinue
-          Remove-Item -Path "..\..\postcss.config.cjs" `
-            -Force -ErrorAction SilentlyContinue
           npx vite build --config vite.config.ts
           npx tsc -p electron/tsconfig.json
           npx electron-builder --win
@@ -100,29 +85,16 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Remove root PostCSS config
-        shell: bash
-        run: |
-          for f in postcss.config.js postcss.config.cjs \
-                   postcss.config.mjs; do
-            if [ -f "$f" ]; then
-              rm -f "$f"
-              echo "Deleted: $f"
-            else
-              echo "Not found: $f"
-            fi
-          done
+      - name: Install root PostCSS deps
+        run: npm install tailwindcss autoprefixer postcss --no-save
+        working-directory: ${{ github.workspace }}
 
-      - name: Install dependencies
+      - name: Install app dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
 
       - name: Build Mac
-        shell: bash
         run: |
-          rm -f ../../postcss.config.js \
-                ../../postcss.config.cjs \
-                ../../postcss.config.mjs || true
           npx vite build --config vite.config.ts
           npx tsc -p electron/tsconfig.json
           npx electron-builder --mac --x64 --arm64
@@ -166,29 +138,16 @@ jobs:
             libx11-xcb1 libxcb-dri3-0 libdrm2 \
             libgbm1 libnss3 libatk-bridge2.0-0
 
-      - name: Remove root PostCSS config
-        shell: bash
-        run: |
-          for f in postcss.config.js postcss.config.cjs \
-                   postcss.config.mjs; do
-            if [ -f "$f" ]; then
-              rm -f "$f"
-              echo "Deleted: $f"
-            else
-              echo "Not found: $f"
-            fi
-          done
+      - name: Install root PostCSS deps
+        run: npm install tailwindcss autoprefixer postcss --no-save
+        working-directory: ${{ github.workspace }}
 
-      - name: Install dependencies
+      - name: Install app dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
 
       - name: Build Linux
-        shell: bash
         run: |
-          rm -f ../../postcss.config.js \
-                ../../postcss.config.cjs \
-                ../../postcss.config.mjs || true
           npx vite build --config vite.config.ts
           npx tsc -p electron/tsconfig.json
           npx electron-builder --linux
