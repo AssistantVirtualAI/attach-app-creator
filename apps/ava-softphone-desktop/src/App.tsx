@@ -56,9 +56,10 @@ export default function App() {
 
   if (!creds) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: t.bg }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: t.bg, position: 'relative' }}>
+        <BrightnessOverlay />
         <TitleBar />
-        <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+        <div style={{ flex: 1, overflow: 'auto', position: 'relative', zIndex: 1 }}>
           <SetupWizard onComplete={(c: any) => setCreds(c)} />
         </div>
       </div>
@@ -66,9 +67,10 @@ export default function App() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: t.bg }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: t.bg, position: 'relative' }}>
+      <BrightnessOverlay />
       <TitleBar />
-      <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+      <div style={{ flex: 1, overflow: 'hidden', position: 'relative', zIndex: 1 }}>
         {wide ? (
           <ConsoleLayout creds={creds} onOpenSettings={openSettingsMobile} />
         ) : (
