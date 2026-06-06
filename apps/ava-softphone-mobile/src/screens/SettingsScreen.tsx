@@ -73,12 +73,30 @@ export default function SettingsScreen({
         </>
       )}
 
+      <SectionTitle eyebrow="Privacy" title="Permissions" />
+      <Card padded={false}>
+        {PERMISSION_ITEMS.map((item) => (
+          <SettingsRow
+            key={item.key}
+            label={item.label}
+            icon={item.icon}
+            value={item.sublabel}
+            right={<PermBadge status={perms?.[item.key as keyof AllPermissions] ?? 'prompt'} />}
+            onPress={() => {
+              const s = perms?.[item.key as keyof AllPermissions];
+              if (s === 'denied') openAppSettings();
+            }}
+          />
+        ))}
+        <SettingsRow label="Open device settings" icon="⚙" onPress={() => openAppSettings()} />
+      </Card>
+
       <SectionTitle eyebrow="Privacy" title="Security & data" />
       <Card padded={false}>
-        <SettingsRow label="Permissions" icon="🛡" onPress={() => {}} />
         <SettingsRow label="Diagnostics" icon="📊" onPress={() => {}} />
         <SettingsRow label="About" icon="ⓘ" value="v1.0.0" onPress={() => {}} />
       </Card>
+
 
       <AIPanel title="AVA powers this app" accent={colors.avaCyan}>
         <p style={{ fontSize: font.sm, color: colors.textIce, margin: 0, lineHeight: 1.55 }}>
