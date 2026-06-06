@@ -65,6 +65,7 @@ export default function MessagesView() {
     const vars = { name: active?.contact.split(' ')[0] || 'there', me: 'AVA' };
     setDraft(interpolate(tpl.body, vars));
     setTplOpen(false);
+    setTplQuery('');
   };
 
   const saveCurrentAsTemplate = () => {
