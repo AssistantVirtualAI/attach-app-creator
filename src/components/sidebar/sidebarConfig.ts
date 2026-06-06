@@ -10,6 +10,7 @@ export interface NavItem {
   nameKey: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  hideForLemtel?: boolean;
 }
 
 export interface NavGroup {
@@ -21,6 +22,7 @@ export interface NavGroup {
   superAdminOnly?: boolean;
   lemtelOnly?: boolean;
   lemtelCustomerOnly?: boolean;
+  hideForLemtel?: boolean;
 }
 
 export const sidebarGroups: NavGroup[] = [
