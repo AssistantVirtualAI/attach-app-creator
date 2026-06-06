@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "AVA Softphone — Professional Communication App",
   "main": "electron/main.js",
+  "type": "module",
   "author": "AVA Télécom",
   "scripts": {
     "dev": "concurrently \"vite --config vite.config.ts\" \"electron .\"",
