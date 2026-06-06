@@ -18,6 +18,7 @@ import { requestAllPermissions } from './lib/permissions';
 import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
 import { syncDeviceContacts } from './lib/contacts';
 import { bootNative, onAppStateChange } from './lib/nativeBoot';
+import { configureMobileApi } from './lib/mobileApi';
 
 export default function MobileApp() {
   const { creds, setCreds, clearCreds, loading } = useStoredCreds();
@@ -51,6 +52,14 @@ function AuthenticatedShell({
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
+
+  // Configure the mobile API client with the signed-in portal + access token.
+  useEffect(() => {
+    configureMobileApi({
+      portalUrl: (creds as any).portalUrl || 'https://avastatistic.ca',
+      accessToken: creds.accessToken || null,
+    });
+  }, [creds]);
 
   // Request mic / speaker / contacts / notifications once the user is in.
   useEffect(() => {
