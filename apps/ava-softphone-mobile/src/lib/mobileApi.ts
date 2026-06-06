@@ -178,6 +178,10 @@ export const mobileApi = {
   ),
 
   voicemails: () => call<VoicemailEntry[]>('/mobile-voicemails', undefined, voicemailMock),
+  voicemailAudio: (id: string) => call<{ url: string; expiresInSec: number }>(
+    `/mobile-voicemail-audio?id=${encodeURIComponent(id)}`, undefined,
+    { url: '', expiresInSec: 0 },
+  ),
 
   analyzeCall: (callId: string) => call<{ jobId: string }>(
     '/ai-analyze-call', { method: 'POST', body: JSON.stringify({ callId }) },
