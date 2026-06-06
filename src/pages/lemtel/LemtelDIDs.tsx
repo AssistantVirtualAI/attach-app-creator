@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Phone, Plus, MessageSquare, Loader2 } from 'lucide-react';
 import { usePbxPhoneNumbers, usePbxPhoneNumberAssignments, usePbxClients } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
+import { SyncEverythingButton } from '@/components/lemtel/SyncEverythingButton';
 import { OrderDIDModal } from '@/components/lemtel/OrderDIDModal';
 
 export default function LemtelDIDs() {
@@ -26,6 +27,7 @@ export default function LemtelDIDs() {
         </div>
         <div className="flex gap-2">
           <PbxRefreshButton kind="config" />
+          <SyncEverythingButton />
           <Button onClick={() => setOrderOpen(true)}><Plus className="w-4 h-4 mr-2" /> Order DID</Button>
         </div>
       </div>
