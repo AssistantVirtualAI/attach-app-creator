@@ -26,6 +26,8 @@ export default function MessagesView() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [draft, setDraft] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
+  const [templates, setTemplates] = useState<MsgTemplate[]>(() => loadTemplates());
+  const [tplOpen, setTplOpen] = useState(false);
 
   useEffect(() => {
     ava.threads().then((t) => { setThreads(t); if (t[0]) setActiveId(t[0].id); });
