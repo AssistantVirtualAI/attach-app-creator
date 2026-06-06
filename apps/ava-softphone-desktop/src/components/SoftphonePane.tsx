@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useSoftphone } from '@/hooks/useSoftphone';
+import { useSoftphone, ManualStatus } from '@/hooks/useSoftphone';
 import { supabase } from '@/lib/supabaseClient';
 import RecentsList from './RecentsList';
 import ContactsList from './ContactsList';
 import VoicemailList from './VoicemailList';
 import SmsThreads from './SmsThreads';
+import CallForwarding from './CallForwarding';
 
 interface Creds {
   extension: string;
@@ -102,13 +103,18 @@ export default function SoftphonePane({
           <div style={{ fontSize: 11, opacity: 0.6 }}>Ext. {creds.extension}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <select
+            value={sp.manualStatus}
+            onChange={(e) => sp.setManualStatus(e.target.value as ManualStatus)}
+            style={statusSelect}
+            title="Presence"
+          >
+            <option value="auto">🟢 Auto</option>
+            <option value="available">🟢 Available</option>
+            <option value="dnd">⛔ DND</option>
+            <option value="away">🌙 Away</option>
+          </select>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor }} />
-          <span style={{ fontSize: 11, opacity: 0.7 }}>
-            {sp.loading ? 'Loading…' :
-              sp.credError ? 'No SIP' :
-              sp.snap.status === 'registered' ? 'Registered' :
-              sp.snap.status === 'error' ? 'Error' : 'Connecting…'}
-          </span>
           <button onClick={onOpenSettings} style={iconBtn} aria-label="Settings">⚙️</button>
         </div>
       </div>
@@ -196,6 +202,7 @@ export default function SoftphonePane({
               <button onClick={() => setShowDTMF((v) => !v)} style={pillBtn(showDTMF)}>🔢 Keypad</button>
               <button onClick={() => { setXferMode('blind'); setShowXfer(true); }} style={pillBtn(false)}>↪ Blind</button>
               <button onClick={() => { setXferMode('attended'); setShowXfer(true); }} style={pillBtn(sp.hasConsult())} disabled={sp.hasConsult()}>↗ Attended</button>
+              <button onClick={sp.toggleRecording} style={pillBtn(sp.recording)}>{sp.recording ? '⏺ Stop rec' : '⏺ Record'}</button>
               {sp.hasConsult() ? (
                 <button onClick={sp.completeAttendedTransfer} style={pillBtn(true)}>✓ Complete</button>
               ) : (
@@ -218,6 +225,7 @@ export default function SoftphonePane({
         {/* Idle: dial / recents / contacts */}
         {!inCall && !ringing && tab === 'dial' && (
           <>
+            <CallForwarding extension={creds.extension} />
             <div style={{ textAlign: 'center', fontSize: 24, fontWeight: 500, minHeight: 36, marginBottom: 16, opacity: dial ? 1 : 0.3 }}>
               {dial || 'Enter number'}
             </div>
@@ -308,6 +316,10 @@ const hdr: React.CSSProperties = {
 };
 const iconBtn: React.CSSProperties = { background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 16 };
 const iconBtnLg: React.CSSProperties = { background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', fontSize: 20, cursor: 'pointer', padding: 8 };
+const statusSelect: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)',
+  borderRadius: 6, fontSize: 11, padding: '4px 6px', cursor: 'pointer',
+};
 const circleBtn = (bg: string, size = 56): React.CSSProperties => ({
   width: size, height: size, borderRadius: '50%', background: bg, border: 'none',
   color: '#fff', fontSize: size > 50 ? 22 : 18, cursor: 'pointer',
