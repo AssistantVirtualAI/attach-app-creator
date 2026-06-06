@@ -171,9 +171,12 @@ export default function VoicemailView() {
 
       <aside style={{ width: 380, flexShrink: 0, borderLeft: `1px solid ${c.border}`, background: c.deepPanel, padding: '24px 22px', overflowY: 'auto' }}>
         {!sel && (
-          <div style={{ color: c.mutedSilver, fontSize: 12, paddingTop: 80, textAlign: 'center' }}>
-            Select a voicemail to view transcript, AVA summary, and playback controls.
-          </div>
+          <EmptyState
+            icon="✉"
+            title="Pick a voicemail"
+            hint="Select a message to view transcript, AVA summary, and playback controls."
+            accent={c.signalGold}
+          />
         )}
         {sel && (
           <>
