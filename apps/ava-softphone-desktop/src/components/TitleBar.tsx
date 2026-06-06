@@ -1,5 +1,6 @@
 import React from 'react';
-import lemtelLogo from '../assets/lemtel-logo.png';
+import LemtelLogo from './LemtelLogo';
+
 
 
 
@@ -31,16 +32,8 @@ export default function TitleBar() {
       }}
     >
       {/* Left: Lemtel logo + name */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <img
-          src={lemtelLogo}
-          alt="Lemtel"
-          style={{
-            height: 24,
-            width: 'auto',
-            filter: 'drop-shadow(0 0 8px rgba(255,215,0,0.35))',
-          }}
-        />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, ...noDrag }}>
+        <LemtelLogo size="sm" />
         <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.5, background: 'linear-gradient(90deg,#fff,#7dd3fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Lemtel Telecom</span>
       </div>
 

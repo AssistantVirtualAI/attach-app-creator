@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import lemtelLogo from '../assets/lemtel-logo.png';
+import LemtelLogo from './LemtelLogo';
 
 const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -135,7 +135,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
     >
       {/* TOP */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 48 }}>
-        <LemtelLogo />
+        <LemtelLogo size="lg" halo />
         <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 700, margin: '24px 0 4px' }}>
           Lemtel Telecom
         </h1>
@@ -248,43 +248,8 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
   );
 }
 
-export function LemtelLogo() {
-  return (
-    <div
-      style={{
-        position: 'relative',
-        padding: 14,
-        borderRadius: 24,
-        background:
-          'radial-gradient(circle at 50% 50%, rgba(0,90,255,0.25), rgba(255,215,0,0.08) 60%, transparent 80%)',
-      }}
-    >
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          borderRadius: 24,
-          background:
-            'conic-gradient(from 0deg, rgba(255,215,0,0.4), rgba(0,140,255,0.4), rgba(255,215,0,0.4))',
-          filter: 'blur(18px)',
-          opacity: 0.4,
-          zIndex: 0,
-        }}
-      />
-      <img
-        src={lemtelLogo}
-        alt="Lemtel Communications"
-        style={{
-          position: 'relative',
-          height: 90,
-          width: 'auto',
-          zIndex: 1,
-          filter: 'drop-shadow(0 4px 24px rgba(255,215,0,0.45))',
-        }}
-      />
-    </div>
-  );
-}
+// Re-export the shared component for any external imports.
+export { default as LemtelLogo } from './LemtelLogo';
 
 function AvaLogo() {
   return (
