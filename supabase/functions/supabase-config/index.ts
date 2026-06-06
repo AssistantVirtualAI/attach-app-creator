@@ -27,6 +27,8 @@ const handler = async (req: Request): Promise<Response> => {
     JSON.stringify({
       supabase_url: supabaseUrl,
       supabase_anon_key: supabaseAnonKey,
+      supabaseUrl,
+      supabaseAnonKey,
     }),
     {
       status: 200,
