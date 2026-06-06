@@ -38,17 +38,16 @@ jobs:
         working-directory: apps/ava-softphone-desktop
         run: |
           $nl = [Environment]::NewLine
-          $content = 'import { defineConfig } from ''vite''' + $nl
-          $content += 'import react from ''@vitejs/plugin-react''' + $nl
-          $content += 'import path from ''path''' + $nl
-          $content += 'export default defineConfig({' + $nl
-          $content += '  plugins: [react()],' + $nl
-          $content += '  resolve: { alias: { ''@'': path.resolve(__dirname, ''./src'') } },' + $nl
-          $content += '  build: { outDir: ''dist'', emptyOutDir: true, rollupOptions: { external: [''electron''] } },' + $nl
-          $content += '  base: ''./'',' + $nl
-          $content += '})' + $nl
-          Set-Content -Path "vite.config.ts" -Value $content -Encoding UTF8
-          Write-Host "=== vite.config.ts ==="
+          $c = 'import { defineConfig } from ''vite''' + $nl
+          $c += 'import react from ''@vitejs/plugin-react''' + $nl
+          $c += 'import path from ''path''' + $nl
+          $c += 'export default defineConfig({' + $nl
+          $c += '  plugins: [react()],' + $nl
+          $c += '  resolve: { alias: { ''@'': path.resolve(__dirname, ''./src'') } },' + $nl
+          $c += '  build: { outDir: ''dist'', emptyOutDir: true, rollupOptions: { external: [''electron''] } },' + $nl
+          $c += '  base: ''./'',' + $nl
+          $c += '})' + $nl
+          Set-Content -Path "vite.config.ts" -Value $c -Encoding UTF8
           Get-Content "vite.config.ts"
 
       - name: Clear Vite cache
@@ -92,18 +91,21 @@ jobs:
       - name: Overwrite vite.config.ts
         working-directory: apps/ava-softphone-desktop
         run: |
-          cat > vite.config.ts << 'EOF'
-import { defineConfig } from "vite"
-import react from "@vitejs/plugin-react"
-import path from "path"
-export default defineConfig({
-  plugins: [react()],
-  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
-  build: { outDir: "dist", emptyOutDir: true, rollupOptions: { external: ["electron"] } },
-  base: "./",
-})
-EOF
-          echo "=== vite.config.ts ==="
+          python3 -c "
+          lines = [
+            'import { defineConfig } from \"vite\"',
+            'import react from \"@vitejs/plugin-react\"',
+            'import path from \"path\"',
+            'export default defineConfig({',
+            '  plugins: [react()],',
+            '  resolve: { alias: { \"@\": path.resolve(__dirname, \"./src\") } },',
+            '  build: { outDir: \"dist\", emptyOutDir: true, rollupOptions: { external: [\"electron\"] } },',
+            '  base: \"./\",',
+            '})',
+          ]
+          open('vite.config.ts', 'w').write('\n'.join(lines) + '\n')
+          print('vite.config.ts written')
+          "
           cat vite.config.ts
 
       - name: Clear Vite cache
@@ -153,18 +155,21 @@ EOF
       - name: Overwrite vite.config.ts
         working-directory: apps/ava-softphone-desktop
         run: |
-          cat > vite.config.ts << 'EOF'
-import { defineConfig } from "vite"
-import react from "@vitejs/plugin-react"
-import path from "path"
-export default defineConfig({
-  plugins: [react()],
-  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
-  build: { outDir: "dist", emptyOutDir: true, rollupOptions: { external: ["electron"] } },
-  base: "./",
-})
-EOF
-          echo "=== vite.config.ts ==="
+          python3 -c "
+          lines = [
+            'import { defineConfig } from \"vite\"',
+            'import react from \"@vitejs/plugin-react\"',
+            'import path from \"path\"',
+            'export default defineConfig({',
+            '  plugins: [react()],',
+            '  resolve: { alias: { \"@\": path.resolve(__dirname, \"./src\") } },',
+            '  build: { outDir: \"dist\", emptyOutDir: true, rollupOptions: { external: [\"electron\"] } },',
+            '  base: \"./\",',
+            '})',
+          ]
+          open('vite.config.ts', 'w').write('\n'.join(lines) + '\n')
+          print('vite.config.ts written')
+          "
           cat vite.config.ts
 
       - name: Clear Vite cache
