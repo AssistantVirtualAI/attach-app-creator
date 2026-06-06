@@ -66,6 +66,7 @@ export const sidebarGroups: NavGroup[] = [
     labelKey: 'sidebar.groups.crm',
     icon: Users,
     adminOnly: true,
+    hideForLemtel: true,
     items: [
       { nameKey: 'sidebar.leads', href: '/leads', icon: UserPlus },
       { nameKey: 'sidebar.appointments', href: '/appointments', icon: Calendar },
