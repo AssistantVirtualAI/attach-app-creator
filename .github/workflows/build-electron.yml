@@ -50,13 +50,20 @@ jobs:
           $c += '  base: "./",' + "`n"
           $c += '})' + "`n"
           Set-Content -Path "vite.config.ts" -Value $c -Encoding UTF8
-          Write-Host "vite.config.ts overwritten"
+          Write-Host "=== vite.config.ts content ==="
           Get-Content "vite.config.ts"
 
       - name: Build Windows
         shell: pwsh
-        run: npx vite build && npx tsc -p electron/tsconfig.json && npx electron-builder --win
         working-directory: apps/ava-softphone-desktop
+        run: |
+          Get-ChildItem -Path "node_modules\.vite" -Filter "*.mjs" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
+          Get-ChildItem -Path "." -Filter "vite.config.ts.timestamp*" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
+          Write-Host "=== vite.config.ts at build time ==="
+          Get-Content "vite.config.ts"
+          npx vite build
+          npx tsc -p electron/tsconfig.json
+          npx electron-builder --win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -65,7 +72,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: apps/ava-softphone-desktop/dist-electron/*.exe
+          path: |
+            apps/ava-softphone-desktop/dist-electron/*.exe
+            apps/ava-softphone-desktop/dist-electron/*.msi
+            apps/ava-softphone-desktop/dist-electron/*.yml
+            apps/ava-softphone-desktop/dist-electron/*.blockmap
           if-no-files-found: warn
 
   build-mac:
@@ -95,21 +106,35 @@ export default defineConfig({
   base: "./",
 })
 VITEEOF
-          echo "vite.config.ts overwritten:"
+          echo "=== vite.config.ts content ==="
           cat vite.config.ts
 
       - name: Build Mac
-        run: npx vite build && npx tsc -p electron/tsconfig.json && npx electron-builder --mac --x64 --arm64
         working-directory: apps/ava-softphone-desktop
+        run: |
+          find node_modules/.vite -name "*.mjs" -delete 2>/dev/null || true
+          find . -name "vite.config.ts.timestamp*" -delete 2>/dev/null || true
+          echo "=== vite.config.ts at build time ==="
+          cat vite.config.ts
+          npx vite build
+          npx tsc -p electron/tsconfig.json
+          npx electron-builder --mac --x64 --arm64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CSC_LINK: ''
+          APPLE_ID: ''
+          APPLE_APP_SPECIFIC_PASSWORD: ''
+          APPLE_TEAM_ID: ''
 
       - uses: actions/upload-artifact@v4
         with:
           name: mac-build
-          path: apps/ava-softphone-desktop/dist-electron/*.dmg
+          path: |
+            apps/ava-softphone-desktop/dist-electron/*.dmg
+            apps/ava-softphone-desktop/dist-electron/*.zip
+            apps/ava-softphone-desktop/dist-electron/*.yml
+            apps/ava-softphone-desktop/dist-electron/*.blockmap
           if-no-files-found: warn
 
   build-linux:
@@ -147,12 +172,19 @@ export default defineConfig({
   base: "./",
 })
 VITEEOF
-          echo "vite.config.ts overwritten:"
+          echo "=== vite.config.ts content ==="
           cat vite.config.ts
 
       - name: Build Linux
-        run: npx vite build && npx tsc -p electron/tsconfig.json && npx electron-builder --linux
         working-directory: apps/ava-softphone-desktop
+        run: |
+          find node_modules/.vite -name "*.mjs" -delete 2>/dev/null || true
+          find . -name "vite.config.ts.timestamp*" -delete 2>/dev/null || true
+          echo "=== vite.config.ts at build time ==="
+          cat vite.config.ts
+          npx vite build
+          npx tsc -p electron/tsconfig.json
+          npx electron-builder --linux
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -163,6 +195,7 @@ VITEEOF
           path: |
             apps/ava-softphone-desktop/dist-electron/*.AppImage
             apps/ava-softphone-desktop/dist-electron/*.deb
+            apps/ava-softphone-desktop/dist-electron/*.yml
           if-no-files-found: warn
 
   create-release:
