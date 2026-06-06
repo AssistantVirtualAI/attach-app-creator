@@ -29,6 +29,7 @@ import {
 import { Link, useLocation, useNavigate, Outlet, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AvaLogo } from '@/components/shared/AvaLogo';
+import { AvaFooter } from '@/components/shared/AvaFooter';
 import { GlowBadge } from '@/components/portal/GlowBadge';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLanguage } from '@/context/LanguageContext';
