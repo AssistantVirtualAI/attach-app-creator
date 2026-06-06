@@ -215,7 +215,39 @@ export default function SettingsPage({
                   </button>
                 );
               })}
+          </div>
+
+          <div>
+            <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 8, fontWeight: 600, letterSpacing: 0.3, textTransform: 'uppercase' }}>
+              Contrast · quick readability presets
             </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['low', 'med', 'high'] as Contrast[]).map((cc) => {
+                const active = contrast === cc;
+                const label = cc === 'low' ? 'Low' : cc === 'med' ? 'Medium' : 'High';
+                return (
+                  <button
+                    key={cc}
+                    onClick={() => setContrast(cc)}
+                    style={{
+                      flex: 1, padding: '12px 10px',
+                      background: active ? 'rgba(0,82,204,0.18)' : 'transparent',
+                      border: `1px solid ${active ? 'rgba(0,82,204,0.55)' : t.border}`,
+                      color: active ? '#7FB0FF' : t.text,
+                      borderRadius: 12, cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                      fontWeight: active ? 700 : 500, fontSize: 12,
+                      transition: 'all 160ms ease',
+                    }}
+                  >
+                    <span style={{ fontSize: 16, letterSpacing: 1, fontWeight: 800 }}>Aa</span>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           </div>
           <SelectField tokens={t} label="Language" selectStyle={selectStyle}>
             <option>English</option>
