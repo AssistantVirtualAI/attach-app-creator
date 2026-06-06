@@ -1,0 +1,21 @@
+Title: Lemtel Telecom
+Short Description: Business VoIP softphone by Lemtel
+Package Name: com.lemtel.softphone
+Category: Business
+Content Rating: Everyone
+
+Full Description:
+Professional VoIP softphone for Lemtel Communications customers.
+Make and receive calls, manage extensions, view call history, and send SMS — all from your Android phone.
+
+Features:
+• HD voice over Wi-Fi & cellular
+• Push notifications via Firebase Cloud Messaging
+• Contacts and recents sync
+• Visual voicemail
+• SMS to your business number
+• Secure SIP/TLS connection
+• Powered by AVA Statistic
+
+Website: https://assistantvirtualai.com
+Privacy Policy: https://avastatistic.ca/privacy
