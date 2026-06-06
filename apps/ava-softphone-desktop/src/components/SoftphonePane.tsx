@@ -258,6 +258,12 @@ export default function SoftphonePane({
         {!inCall && !ringing && tab === 'contacts' && (
           <ContactsList selfExtension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
         )}
+        {!inCall && !ringing && tab === 'voicemail' && (
+          <VoicemailList extension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
+        )}
+        {!inCall && !ringing && tab === 'sms' && (
+          <SmsThreads />
+        )}
       </div>
 
       {/* Transfer modal */}
