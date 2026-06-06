@@ -1,0 +1,140 @@
+import React, { useState } from 'react';
+import { theme } from '../../lib/theme';
+import { ava } from '../../lib/avaApi';
+
+const { colors: c } = theme;
+
+type Module = 'intelligence' | 'transcripts' | 'greetings' | 'queues' | 'agents' | 'coaching';
+
+const MODULES: { id: Module; label: string; desc: string; accent: string }[] = [
+  { id: 'intelligence', label: 'Call Intelligence', desc: 'Summaries, sentiment, topics, action items, risks, opportunities.', accent: '#7A4CFF' },
+  { id: 'transcripts',  label: 'Transcript Search', desc: 'Search across calls and messages by intent, topic, or keyword.', accent: '#23D6FF' },
+  { id: 'greetings',    label: 'Greeting Studio', desc: 'Generate IVR / voicemail / queue greetings through AVA + ElevenLabs.', accent: '#FFE600' },
+  { id: 'queues',       label: 'Queue Optimizer', desc: 'Recommendations for strategy, overflow, staffing, hold messaging.', accent: '#28E6A5' },
+  { id: 'agents',       label: 'Voice Agent Manager', desc: 'Assign AVA voice agents to numbers, IVRs, queues, after-hours.', accent: '#FF4D67' },
+  { id: 'coaching',     label: 'Coaching Insights', desc: 'Missed opportunities, escalations, objections, quality issues.', accent: '#FFCC33' },
+];
+
+export default function AIWorkspace() {
+  const [active, setActive] = useState<Module>('intelligence');
+  return (
+    <div style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto', animation: 'fadeIn .3s ease-out' }}>
+      <header style={{ marginBottom: 22 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, color: c.avaViolet, textTransform: 'uppercase' }}>
+          Powered by AVA AI
+        </div>
+        <h1 style={{ fontSize: 28, fontWeight: 700, color: c.textIce, margin: '6px 0 4px' }}>AI Workspace</h1>
+        <p style={{ fontSize: 13, color: c.mutedSilver, margin: 0 }}>Intelligence, automation, and voice-agent control for your communications.</p>
+      </header>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginBottom: 22 }}>
+        {MODULES.map((m) => (
+          <button key={m.id} onClick={() => setActive(m.id)} style={{
+            textAlign: 'left', padding: 16, borderRadius: 14,
+            background: active === m.id ? `linear-gradient(135deg, ${m.accent}1c, transparent)` : c.bgCard,
+            border: `1px solid ${active === m.id ? m.accent + '60' : c.border}`,
+            cursor: 'pointer', color: c.textIce, transition: 'all 160ms ease',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.accent, boxShadow: `0 0 10px ${m.accent}` }} />
+              <span style={{ fontSize: 13.5, fontWeight: 700 }}>{m.label}</span>
+            </div>
+            <p style={{ fontSize: 11.5, color: c.mutedSilver, margin: 0, lineHeight: 1.5 }}>{m.desc}</p>
+          </button>
+        ))}
+      </div>
+
+      <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 14, padding: 22 }}>
+        {active === 'intelligence' && <Intelligence />}
+        {active === 'transcripts' && <Transcripts />}
+        {active === 'greetings' && <Greetings />}
+        {active === 'queues' && <PlaceholderModule title="Queue Optimizer" hint="AVA will analyze last 30 days of queue data and recommend strategy and overflow adjustments." />}
+        {active === 'agents' && <PlaceholderModule title="Voice Agent Manager" hint="Assign AVA/ElevenLabs voice agents to phone numbers, IVR branches, and after-hours flows." />}
+        {active === 'coaching' && <PlaceholderModule title="Coaching Insights" hint="Surface missed opportunities, repeated objections, and escalation patterns per agent." />}
+      </div>
+    </div>
+  );
+}
+
+function Intelligence() {
+  return (
+    <>
+      <div style={{ fontSize: 11, fontWeight: 700, color: c.avaViolet, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>Latest Calls Analyzed</div>
+      {[
+        { who: 'Marie Tremblay', score: 87, sent: 'Positive', topic: 'Renewal' },
+        { who: 'Acme Corp', score: 64, sent: 'Neutral', topic: 'Reschedule' },
+        { who: 'Unknown caller', score: 41, sent: 'Negative', topic: 'Complaint' },
+      ].map((r, i) => (
+        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${c.border}` }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: c.textIce }}>{r.who}</div>
+            <div style={{ fontSize: 10.5, color: c.mutedSilver }}>{r.topic} · sentiment {r.sent}</div>
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: r.score > 70 ? c.success : r.score > 50 ? c.warning : c.danger, fontFamily: 'JetBrains Mono, monospace' }}>{r.score}</div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function Transcripts() {
+  const [q, setQ] = useState('');
+  return (
+    <>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search transcripts by intent, topic, customer…" style={{
+        width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10,
+        background: c.midnight, border: `1px solid ${c.borderAI}`, color: c.textIce, fontSize: 13, outline: 'none', marginBottom: 14,
+      }} />
+      {q.trim() ? (
+        <div style={{ fontSize: 12, color: c.mutedSilver }}>3 matches for "{q}" — connect AVA backend to enable semantic search.</div>
+      ) : (
+        <div style={{ fontSize: 12, color: c.mutedSilver }}>Type a query to search across all call transcripts and messages.</div>
+      )}
+    </>
+  );
+}
+
+function Greetings() {
+  const [prompt, setPrompt] = useState('Friendly after-hours greeting for our sales line');
+  const [out, setOut] = useState('');
+  const [busy, setBusy] = useState(false);
+  const gen = async () => {
+    setBusy(true);
+    const r = await ava.generateGreeting(prompt);
+    setOut(r.text);
+    setBusy(false);
+  };
+  return (
+    <>
+      <label style={{ fontSize: 11, color: c.mutedSilver, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Describe the greeting</label>
+      <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} style={{
+        width: '100%', boxSizing: 'border-box', padding: 12, borderRadius: 10, marginTop: 6,
+        background: c.midnight, border: `1px solid ${c.border}`, color: c.textIce, fontSize: 13, resize: 'vertical', fontFamily: 'inherit', outline: 'none',
+      }} />
+      <button onClick={gen} disabled={busy} style={{
+        marginTop: 10, padding: '10px 18px', borderRadius: 10,
+        background: `linear-gradient(135deg, ${c.avaViolet}, ${c.avaCyan})`,
+        border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+      }}>{busy ? 'Generating…' : '✨ Generate with AVA'}</button>
+      {out && (
+        <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: c.midnight, border: `1px solid ${c.borderAI}` }}>
+          <div style={{ fontSize: 10, color: c.avaCyan, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>Generated Script</div>
+          <p style={{ fontSize: 13, color: c.textIce, lineHeight: 1.6, margin: 0 }}>{out}</p>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button style={{ padding: '6px 12px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.signalGold}`, color: c.signalGold, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>🎙 Synthesize voice</button>
+            <button style={{ padding: '6px 12px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 11, cursor: 'pointer' }}>Save as IVR greeting</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function PlaceholderModule({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div style={{ padding: '20px 4px', textAlign: 'center' }}>
+      <h3 style={{ fontSize: 16, color: c.textIce, margin: '0 0 6px' }}>{title}</h3>
+      <p style={{ fontSize: 12, color: c.mutedSilver, margin: 0 }}>{hint}</p>
+    </div>
+  );
+}
