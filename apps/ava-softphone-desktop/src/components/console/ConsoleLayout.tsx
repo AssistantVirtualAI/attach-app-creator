@@ -5,6 +5,9 @@ import AIPanel from './AIPanel';
 import CommandPalette from './CommandPalette';
 import CallsView from './CallsView';
 import MessagesView from './MessagesView';
+import VoicemailView from './VoicemailView';
+import RecordingsView from './RecordingsView';
+import ContactsView from './ContactsView';
 import AIWorkspace from './AIWorkspace';
 import AdminView from './AdminView';
 import SoftphonePane from '../SoftphonePane';
@@ -78,10 +81,10 @@ export default function ConsoleLayout({
         )}
         {view === 'calls' && <CallsView />}
         {view === 'messages' && <MessagesView />}
-        {view === 'voicemail' && <Placeholder title="Voicemail" hint="Playback, transcription, callback, assign, and follow-up generator." />}
-        {view === 'recordings' && <Placeholder title="Recordings" hint="Searchable library of call recordings with waveform playback and AVA analysis." />}
+        {view === 'voicemail' && <VoicemailView />}
+        {view === 'recordings' && <RecordingsView />}
         {view === 'ai' && <AIWorkspace />}
-        {view === 'contacts' && <Placeholder title="Contacts" hint="Unified directory with call history, transcripts, and customer notes per contact." />}
+        {view === 'contacts' && <ContactsView />}
         {view === 'admin' && <AdminView />}
       </main>
 

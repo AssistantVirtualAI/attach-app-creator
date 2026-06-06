@@ -68,6 +68,25 @@ export interface Ivr { id: string; name: string; greeting: string; options: numb
 export interface CallQueue { id: string; name: string; strategy: string; agents: number; waiting: number; }
 export interface RingGroup { id: string; name: string; members: number; strategy: string; }
 
+export interface VoicemailItem {
+  id: string; from: string; customer?: string; receivedAt: string;
+  durationSec: number; isNew: boolean; transcript: string;
+  summary: string; sentiment: 'positive' | 'neutral' | 'negative';
+  priority: 'low' | 'normal' | 'high';
+}
+export interface RecordingItem {
+  id: string; callId: string; from: string; to: string; customer?: string;
+  recordedAt: string; durationSec: number; sizeKb: number;
+  qualityScore: number; sentiment: 'positive' | 'neutral' | 'negative';
+  summary: string; topics: string[]; tags: string[];
+}
+export interface ContactItem {
+  id: string; name: string; company?: string; phone: string; email?: string;
+  lastInteraction: string; totalCalls: number; totalMessages: number;
+  sentiment: 'positive' | 'neutral' | 'negative';
+  aiNote: string; tags: string[]; favorite: boolean;
+}
+
 /* ---------- Mock data ---------- */
 const MOCK_ME: Me = {
   userId: 'u_1', email: 'demo@lemtel.tel', displayName: 'Demo User',
@@ -115,6 +134,27 @@ const MOCK_RG: RingGroup[] = [
   { id: 'r1', name: 'Management', members: 3, strategy: 'simultaneous' },
 ];
 
+const MOCK_VM: VoicemailItem[] = [
+  { id: 'v1', from: '+15145550101', customer: 'Marie Tremblay', receivedAt: new Date(Date.now()-1800e3).toISOString(), durationSec: 42, isNew: true, transcript: 'Hi, this is Marie. Just calling to confirm our meeting on Thursday at 2pm. Please call me back to confirm. Thanks!', summary: 'Marie confirms Thursday 2pm meeting and asks for callback confirmation.', sentiment: 'positive', priority: 'high' },
+  { id: 'v2', from: '+14385550199', customer: 'Acme Corp', receivedAt: new Date(Date.now()-7200e3).toISOString(), durationSec: 28, isNew: true, transcript: 'Hello, we need an update on the proposal. Can you call us back today?', summary: 'Acme Corp requesting proposal update, urgent callback today.', sentiment: 'neutral', priority: 'high' },
+  { id: 'v3', from: '+15145550141', receivedAt: new Date(Date.now()-86400e3).toISOString(), durationSec: 15, isNew: false, transcript: 'Sorry, wrong number.', summary: 'Wrong number — no action needed.', sentiment: 'neutral', priority: 'low' },
+  { id: 'v4', from: '+15145550182', customer: 'Jean-Luc Roy', receivedAt: new Date(Date.now()-172800e3).toISOString(), durationSec: 67, isNew: false, transcript: 'Bonjour, I was disappointed by the last support call. Please contact me to discuss.', summary: 'Customer complaint regarding recent support interaction.', sentiment: 'negative', priority: 'high' },
+];
+
+const MOCK_RECORDINGS: RecordingItem[] = [
+  { id: 'rec1', callId: 'c1', from: '+15145550182', to: '301', customer: 'Marie Tremblay', recordedAt: new Date(Date.now()-3600e3).toISOString(), durationSec: 245, sizeKb: 980, qualityScore: 92, sentiment: 'positive', summary: 'Customer confirmed renewal pricing and requested quote by Friday.', topics: ['renewal', 'pricing', 'quote'], tags: ['sales', 'follow-up'] },
+  { id: 'rec2', callId: 'c3', from: '301', to: '+15145550141', recordedAt: new Date(Date.now()-10800e3).toISOString(), durationSec: 612, sizeKb: 2450, qualityScore: 78, sentiment: 'neutral', summary: 'Discovery call covering technical requirements for integration.', topics: ['integration', 'API', 'requirements'], tags: ['discovery'] },
+  { id: 'rec3', callId: 'c4', from: '+15145550101', to: '301', customer: 'Jean-Luc Roy', recordedAt: new Date(Date.now()-14400e3).toISOString(), durationSec: 38, sizeKb: 150, qualityScore: 41, sentiment: 'negative', summary: 'Customer expressed frustration about support response time.', topics: ['support', 'complaint'], tags: ['escalation'] },
+  { id: 'rec4', callId: 'c5', from: '+14385550120', to: '302', customer: 'Sophie Beaulieu', recordedAt: new Date(Date.now()-432000e3).toISOString(), durationSec: 184, sizeKb: 730, qualityScore: 88, sentiment: 'positive', summary: 'Onboarding session completed successfully.', topics: ['onboarding', 'training'], tags: ['success'] },
+];
+
+const MOCK_CONTACTS: ContactItem[] = [
+  { id: 'k1', name: 'Marie Tremblay', company: 'Tremblay & Co', phone: '+15145550182', email: 'marie@tremblay.co', lastInteraction: new Date(Date.now()-3600e3).toISOString(), totalCalls: 14, totalMessages: 23, sentiment: 'positive', aiNote: 'High-value account, renewal due in 30 days. Prefers email follow-ups.', tags: ['vip', 'renewal'], favorite: true },
+  { id: 'k2', name: 'Acme Corp', company: 'Acme Corp', phone: '+14385550199', email: 'ops@acme.com', lastInteraction: new Date(Date.now()-7200e3).toISOString(), totalCalls: 8, totalMessages: 11, sentiment: 'neutral', aiNote: 'Proposal pending. Decision maker is responsive between 9am-11am.', tags: ['prospect'], favorite: false },
+  { id: 'k3', name: 'Jean-Luc Roy', phone: '+15145550101', lastInteraction: new Date(Date.now()-14400e3).toISOString(), totalCalls: 3, totalMessages: 2, sentiment: 'negative', aiNote: 'Recent complaint about support — recommend manager outreach.', tags: ['at-risk'], favorite: false },
+  { id: 'k4', name: 'Sophie Beaulieu', company: 'Beaulieu Studio', phone: '+14385550120', email: 'sophie@beaulieu.studio', lastInteraction: new Date(Date.now()-432000e3).toISOString(), totalCalls: 6, totalMessages: 9, sentiment: 'positive', aiNote: 'Recently onboarded, opportunity to upsell premium plan in Q3.', tags: ['onboarded', 'upsell'], favorite: true },
+];
+
 /* ---------- API surface ---------- */
 export const ava = {
   me: () => call<Me>('/desktop/me', {}, MOCK_ME),
@@ -151,6 +191,11 @@ export const ava = {
   ivrs: () => call<Ivr[]>('/desktop/admin/ivrs', {}, MOCK_IVR),
   queues: () => call<CallQueue[]>('/desktop/admin/queues', {}, MOCK_QUEUES),
   ringGroups: () => call<RingGroup[]>('/desktop/admin/ring-groups', {}, MOCK_RG),
+  /* Phase 3 */
+  voicemails: () => call<VoicemailItem[]>('/desktop/voicemails', {}, MOCK_VM),
+  markVoicemailRead: (id: string) => call<{ ok: true }>(`/desktop/voicemails/${id}/read`, { method: 'POST' }, { ok: true }),
+  recordings: () => call<RecordingItem[]>('/desktop/recordings', {}, MOCK_RECORDINGS),
+  contacts: () => call<ContactItem[]>('/desktop/contacts', {}, MOCK_CONTACTS),
   syncStatus: () => call<{ lastSync: string; status: 'ok' | 'error'; jobs: { kind: string; finishedAt: string; ok: boolean }[] }>('/desktop/admin/sync', {}, {
     lastSync: new Date(Date.now() - 600e3).toISOString(),
     status: 'ok',
