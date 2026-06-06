@@ -76,7 +76,6 @@ export function ProvisionExtensionModal({ open, onOpenChange }: { open: boolean;
       } else {
         toast.error(msg);
       }
-      toast.error(e?.message || 'Failed to provision extension');
     } finally {
       setSubmitting(false);
     }
