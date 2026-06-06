@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+export const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 
 function usePbxTable<T = any>(table: string, opts?: { order?: string; ascending?: boolean; limit?: number }) {
   return useQuery({
@@ -213,4 +213,4 @@ export function usePbxPing() {
   });
 }
 
-export { LEMTEL_ORG };
+

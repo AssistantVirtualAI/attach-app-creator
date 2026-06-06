@@ -4,19 +4,36 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
+import { useLemtelAccess } from '@/hooks/useLemtelAccess';
 
 export function OrderDIDModal({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const [areaCode, setAreaCode] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [notes, setNotes] = useState('');
+  const { isAdmin } = useLemtelAccess();
 
   const submit = () => {
-    const subject = encodeURIComponent(`DID Order — Area code ${areaCode || 'any'} (${quantity})`);
+    if (!isAdmin) {
+      toast.error('You need Lemtel admin access to order DIDs.');
+      return;
+    }
+    const qty = parseInt(quantity, 10);
+    if (!qty || qty < 1 || qty > 50) {
+      toast.error('Quantity must be between 1 and 50');
+      return;
+    }
+    if (areaCode && !/^\d{3}$/.test(areaCode)) {
+      toast.error('Area code must be exactly 3 digits (e.g. 514)');
+      return;
+    }
+    const subject = encodeURIComponent(`DID Order — Area code ${areaCode || 'any'} (${qty})`);
     const body = encodeURIComponent(
-      `Hello,\n\nPlease provision ${quantity} new DID(s) in area code ${areaCode || 'any'}.\n\nNotes:\n${notes || '(none)'}\n\nThanks.`
+      `Hello,\n\nPlease provision ${qty} new DID(s) in area code ${areaCode || 'any'}.\n\nNotes:\n${notes || '(none)'}\n\nThanks.`
     );
-    window.open(`mailto:support@avastatistic.ca?subject=${subject}&body=${body}`, '_blank');
+    window.open(`mailto:support@assistantvirtualai.com?subject=${subject}&body=${body}`, '_blank');
     toast.success('Order request opened in your email client');
     onOpenChange(false);
   };
@@ -28,6 +45,14 @@ export function OrderDIDModal({ open, onOpenChange }: { open: boolean; onOpenCha
           <DialogTitle>Order a new DID</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          {!isAdmin && (
+            <Alert variant="destructive">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertDescription>
+                You don't have permission to order DIDs. Lemtel admin or super-admin role required.
+              </AlertDescription>
+            </Alert>
+          )}
           <p className="text-sm text-muted-foreground">
             DID provisioning is performed by our telecom team. Submit your request and we'll provision it on FusionPBX within 1 business day.
           </p>
@@ -37,7 +62,7 @@ export function OrderDIDModal({ open, onOpenChange }: { open: boolean; onOpenCha
           </div>
           <div className="space-y-2">
             <Label htmlFor="qty">Quantity</Label>
-            <Input id="qty" type="number" min={1} value={quantity} onChange={e => setQuantity(e.target.value)} />
+            <Input id="qty" type="number" min={1} max={50} value={quantity} onChange={e => setQuantity(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
@@ -46,7 +71,7 @@ export function OrderDIDModal({ open, onOpenChange }: { open: boolean; onOpenCha
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit}>Send Order Request</Button>
+          <Button onClick={submit} disabled={!isAdmin}>Send Order Request</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

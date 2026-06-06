@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Disc, Loader2, Play, Pause, ChevronDown, Sparkles } from 'lucide-react';
 import { usePbxCallRecords, LEMTEL_ORG } from '@/hooks/usePbxData';
+import { SyncEverythingButton } from '@/components/lemtel/SyncEverythingButton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -46,9 +47,12 @@ export default function TelephonyRecordings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2"><Disc className="w-7 h-7" /> Recordings</h1>
-        <p className="text-muted-foreground">Call recordings with AI transcription and analysis</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2"><Disc className="w-7 h-7" /> Recordings</h1>
+          <p className="text-muted-foreground">Call recordings with AI transcription and analysis</p>
+        </div>
+        <SyncEverythingButton />
       </div>
 
       {recordings.length === 0 ? (

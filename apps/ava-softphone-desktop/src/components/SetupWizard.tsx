@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useTheme } from '../lib/theme';
+import LemtelLogo from './LemtelLogo';
 
 const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
 const SUPABASE_ANON_KEY =
@@ -128,24 +129,8 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 20px' }}>
         {/* Logo / brand */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 28 }}>
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 18,
-              background: t.accentGradient,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontWeight: 800,
-              fontSize: 28,
-              letterSpacing: 1,
-              boxShadow: t.accentGlow,
-              marginBottom: 16,
-            }}
-          >
-            A
+          <div style={{ marginBottom: 16 }}>
+            <LemtelLogo size="lg" halo />
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: -0.3 }}>
             Welcome to AVA Softphone
@@ -270,11 +255,11 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
           href="https://avastatistic.ca"
           onClick={(e) => {
             e.preventDefault();
-            window.electronAPI?.openExternal?.('https://avastatistic.ca');
+            window.electronAPI?.openExternal?.('https://assistantvirtualai.com');
           }}
           style={{ color: t.accent, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}
         >
-          AVA Statistics · avastatistic.ca
+          AVA Statistics · assistantvirtualai.com
         </a>
       </div>
     </div>
