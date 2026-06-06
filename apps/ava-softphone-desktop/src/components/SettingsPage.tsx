@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { WHITELABEL } from '../whitelabel.config';
+
+const lemtelLogoUrl = new URL('../assets/lemtel-logo.svg', import.meta.url).href;
 
 type Tab = 'account' | 'audio' | 'notifications' | 'general' | 'about';
 const TABS: Tab[] = ['account', 'audio', 'notifications', 'general', 'about'];
@@ -85,6 +88,8 @@ export default function SettingsPage({
 
       {tab === 'about' && (
         <section style={section}>
+          <img src={lemtelLogoUrl} alt={`${WHITELABEL.appName} logo`} style={{ width: 48, height: 48, borderRadius: 12, marginBottom: 10 }} />
+          <Row label="Application" value={WHITELABEL.appName} />
           <Row label="Version" value="1.0.0" />
           <button
             style={primary}
@@ -105,7 +110,7 @@ export default function SettingsPage({
             Release Notes ↗
           </a>
           <div style={{ opacity: 0.6, fontSize: 12, marginTop: 10 }}>
-            © 2026 AVA Télécom
+            © 2026 {WHITELABEL.clientName}. Powered by {WHITELABEL.providerName}
           </div>
         </section>
       )}
