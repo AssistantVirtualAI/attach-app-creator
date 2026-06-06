@@ -77,8 +77,8 @@ export default function SetupWizard({
         email: authData.user.email ?? email.trim(),
         extension: String(softphoneUser.extension ?? ''),
         displayName: softphoneUser.display_name,
-        sipDomain: softphoneUser.sip_domain || 'lemtel.lemtel.tel',
-        wssUrl: softphoneUser.wss_url || 'wss://lemtel.lemtel.tel:7443',
+        sipDomain: softphoneUser.sip_domain || 'lemtel.sip.fusionpbx.com',
+        wssUrl: softphoneUser.wss_url || 'wss://lemtel.sip.fusionpbx.com:7443',
         userId: authData.user.id,
         accessToken: authData.session.access_token,
       };
