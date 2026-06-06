@@ -211,15 +211,6 @@ export const ava = {
   markVoicemailRead: (id: string) => call<{ ok: true }>(`/desktop/voicemails/${id}/read`, { method: 'POST' }, { ok: true }),
   recordings: () => call<RecordingItem[]>('/desktop/recordings', {}, MOCK_RECORDINGS),
   contacts: () => call<ContactItem[]>('/desktop/contacts', {}, MOCK_CONTACTS),
-  syncStatus: () => call<{ lastSync: string; status: 'ok' | 'error'; jobs: { kind: string; finishedAt: string; ok: boolean }[] }>('/desktop/admin/sync', {}, {
-    lastSync: new Date(Date.now() - 600e3).toISOString(),
-    status: 'ok',
-    jobs: [
-  /* Phase 3 */
-  voicemails: () => call<VoicemailItem[]>('/desktop/voicemails', {}, MOCK_VM),
-  markVoicemailRead: (id: string) => call<{ ok: true }>(`/desktop/voicemails/${id}/read`, { method: 'POST' }, { ok: true }),
-  recordings: () => call<RecordingItem[]>('/desktop/recordings', {}, MOCK_RECORDINGS),
-  contacts: () => call<ContactItem[]>('/desktop/contacts', {}, MOCK_CONTACTS),
   /* Phase 3.1 — AI feedback + lifecycle */
   regenerateSummary: (kind: 'voicemail' | 'recording', id: string, sourceText?: string) =>
     call<{ summary: string }>(`/desktop/ai/regenerate-summary`, { method: 'POST', body: JSON.stringify({ kind, id, sourceText }) }, {
@@ -239,5 +230,13 @@ export const ava = {
     }),
   updateContact: (id: string, patch: Partial<Pick<ContactItem, 'notes' | 'tags' | 'favorite'>>) =>
     call<{ ok: true }>(`/desktop/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }, { ok: true }),
-],
+  syncStatus: () => call<{ lastSync: string; status: 'ok' | 'error'; jobs: { kind: string; finishedAt: string; ok: boolean }[] }>('/desktop/admin/sync', {}, {
+    lastSync: new Date(Date.now() - 600e3).toISOString(),
+    status: 'ok',
+    jobs: [
+      { kind: 'extensions', finishedAt: new Date(Date.now()-600e3).toISOString(), ok: true },
+      { kind: 'cdr', finishedAt: new Date(Date.now()-900e3).toISOString(), ok: true },
+      { kind: 'devices', finishedAt: new Date(Date.now()-1800e3).toISOString(), ok: true },
+    ],
+  }),
 };
