@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { WHITELABEL } from '../whitelabel.config';
 
+const lemtelLogoUrl = new URL('../assets/lemtel-logo.svg', import.meta.url).href;
+
 type Creds = { portalUrl: string; email: string; extension: string };
 
 export default function SetupWizard({
@@ -122,7 +124,7 @@ export default function SetupWizard({
           Connect Your Account
         </h2>
         <p style={{ color: '#888', fontSize: 13, margin: '6px 0 0' }}>
-          Sign in with your AVA portal credentials
+          Sign in with your {WHITELABEL.providerName} portal credentials
         </p>
 
         <div style={{ height: 24 }} />
@@ -217,8 +219,9 @@ export default function SetupWizard({
               style={{
                 width: 20,
                 height: 20,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #0023e6, #4f46e5)',
+                borderRadius: 6,
+                background: WHITELABEL.primaryColor,
+                border: `1px solid ${WHITELABEL.accentColor}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -264,46 +267,19 @@ function Label({ children }: { children: React.ReactNode }) {
 }
 
 export function LemtelLogo({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
-  const w = size === 'lg' ? 180 : 60;
-  const h = size === 'lg' ? 100 : 32;
+  const w = size === 'lg' ? 116 : 24;
+  const h = size === 'lg' ? 116 : 24;
   return (
-    <div
+    <img
+      src={lemtelLogoUrl}
+      alt={`${WHITELABEL.appName} logo`}
       style={{
         width: w,
         height: h,
-        borderRadius: '50%',
-        background: WHITELABEL.primaryColor,
-        border: `${size === 'lg' ? 4 : 2}px solid ${WHITELABEL.accentColor}`,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
+        borderRadius: size === 'lg' ? 26 : 6,
         boxShadow: size === 'lg' ? '0 8px 32px rgba(0,61,166,0.4)' : 'none',
+        display: 'block',
       }}
-    >
-      <div
-        style={{
-          color: '#fff',
-          fontWeight: 800,
-          fontSize: size === 'lg' ? 24 : 10,
-          letterSpacing: 1,
-          lineHeight: 1,
-        }}
-      >
-        LEMTEL
-      </div>
-      {size === 'lg' && (
-        <div
-          style={{
-            color: '#fff',
-            fontSize: 8,
-            letterSpacing: 3,
-            marginTop: 6,
-          }}
-        >
-          COMMUNICATIONS
-        </div>
-      )}
-    </div>
+    />
   );
 }
