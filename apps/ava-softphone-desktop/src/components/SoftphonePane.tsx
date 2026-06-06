@@ -293,9 +293,10 @@ export default function SoftphonePane({
       {!inCall && !ringing && (
         <div style={{
           position: 'relative', zIndex: 1, flexShrink: 0,
-          display: 'flex', height: 64,
-          background: c.bgCard,
+          display: 'flex', height: 68,
+          background: 'linear-gradient(180deg, rgba(15,15,30,0.6) 0%, rgba(8,8,18,0.95) 100%)',
           borderTop: `1px solid ${c.border}`,
+          backdropFilter: 'blur(14px)',
         }}>
           {(['dial', 'recents', 'contacts', 'voicemail', 'sms', 'recordings', 'ai'] as Tab[]).map((tk) => {
             const active = tab === tk;
@@ -308,17 +309,20 @@ export default function SoftphonePane({
                 onClick={() => setTab(tk)}
                 style={{
                   flex: 1, background: 'none', border: 'none',
-                  borderTop: active ? `1px solid ${activeColor}` : '1px solid transparent',
                   color: active ? activeColor : c.textSub,
                   cursor: 'pointer',
                   display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center', gap: 5,
-                  transition: 'color 160ms ease, border-color 160ms ease',
-                  filter: active ? `drop-shadow(0 0 8px ${isAI ? 'rgba(124,58,237,0.5)' : 'rgba(255,215,0,0.4)'})` : 'none',
+                  alignItems: 'center', justifyContent: 'center', gap: 6,
+                  transition: 'color 180ms ease',
+                  position: 'relative',
+                  paddingTop: 4,
                 }}
+                onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = c.text; }}
+                onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = c.textSub; }}
               >
-                <Icon size={20} color={active ? activeColor : c.textSub} />
-                <span style={{ fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600 }}>
+                {active && <span className={`lemtel-tab-dot${isAI ? ' lemtel-tab-dot--ai' : ''}`} />}
+                <Icon size={20} color={active ? activeColor : 'currentColor'} />
+                <span style={{ fontSize: 9.5, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: active ? 700 : 500 }}>
                   {label}
                 </span>
               </button>
