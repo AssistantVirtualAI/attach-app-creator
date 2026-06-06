@@ -2,6 +2,7 @@ import { Tray, Menu, nativeImage, BrowserWindow, app } from 'electron';
 import path from 'path';
 
 let tray: Tray | null = null;
+const APP_NAME = 'Lemtel Telecom';
 
 export function setupTray(mainWindow: BrowserWindow | null) {
   const icon = nativeImage.createFromPath(
@@ -9,11 +10,11 @@ export function setupTray(mainWindow: BrowserWindow | null) {
   );
 
   tray = new Tray(icon);
-  tray.setToolTip('AVA Softphone');
+  tray.setToolTip(APP_NAME);
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Open AVA Softphone',
+      label: `Open ${APP_NAME}`,
       click: () => {
         mainWindow?.show();
         mainWindow?.focus();
@@ -44,7 +45,7 @@ export function setupTray(mainWindow: BrowserWindow | null) {
     },
     { type: 'separator' },
     {
-      label: 'Quit AVA Softphone',
+      label: `Quit ${APP_NAME}`,
       click: () => app.quit(),
     },
   ]);
@@ -65,7 +66,7 @@ export function updateTrayStatus(status: string) {
   );
   tray?.setToolTip(
     status === 'active-call'
-      ? 'AVA Softphone — On a call'
-      : 'AVA Softphone'
+      ? `${APP_NAME} — On a call`
+      : APP_NAME
   );
 }
