@@ -9,6 +9,10 @@ import LemtelLogo from './LemtelLogo';
 import RecordingsList from './RecordingsList';
 import AIInsights from './AIInsights';
 import { theme } from '../lib/theme';
+import {
+  PhoneIcon, ClockIcon, UsersIcon, VoicemailIcon,
+  MessageIcon, DiscIcon, SparkleIcon,
+} from './TabIcons';
 
 interface Creds {
   extension: string;
@@ -22,17 +26,18 @@ interface Creds {
 
 type Tab = 'dial' | 'recents' | 'contacts' | 'voicemail' | 'sms' | 'recordings' | 'ai';
 
-const TAB_META: Record<Tab, { icon: string; label: string }> = {
-  dial:       { icon: '⌨', label: 'Phone' },
-  recents:    { icon: '⟲', label: 'History' },
-  contacts:   { icon: '☻', label: 'Contacts' },
-  voicemail:  { icon: '✉', label: 'Voicemail' },
-  sms:        { icon: '✦', label: 'SMS' },
-  recordings: { icon: '●', label: 'Rec' },
-  ai:         { icon: '✨', label: 'AI' },
+const TAB_META: Record<Tab, { Icon: React.FC<{ size?: number; color?: string }>; label: string }> = {
+  dial:       { Icon: PhoneIcon,     label: 'Phone' },
+  recents:    { Icon: ClockIcon,     label: 'History' },
+  contacts:   { Icon: UsersIcon,     label: 'Contacts' },
+  voicemail:  { Icon: VoicemailIcon, label: 'Voicemail' },
+  sms:        { Icon: MessageIcon,   label: 'SMS' },
+  recordings: { Icon: DiscIcon,      label: 'Recordings' },
+  ai:         { Icon: SparkleIcon,   label: 'AI' },
 };
 
 const { colors: c, glow } = theme;
+
 
 export default function SoftphonePane({
   creds,
@@ -271,37 +276,40 @@ export default function SoftphonePane({
       {!inCall && !ringing && (
         <div style={{
           position: 'relative', zIndex: 1, flexShrink: 0,
-          display: 'flex', height: 56,
-          background: 'rgba(0,0,0,0.45)',
-          backdropFilter: 'blur(16px)',
+          display: 'flex', height: 64,
+          background: c.bgCard,
           borderTop: `1px solid ${c.border}`,
         }}>
           {(['dial', 'recents', 'contacts', 'voicemail', 'sms', 'recordings', 'ai'] as Tab[]).map((tk) => {
             const active = tab === tk;
+            const { Icon, label } = TAB_META[tk];
+            const isAI = tk === 'ai';
+            const activeColor = isAI ? c.aiLight : c.gold;
             return (
               <button
                 key={tk}
                 onClick={() => setTab(tk)}
                 style={{
                   flex: 1, background: 'none', border: 'none',
-                  borderTop: active ? `2px solid ${c.gold}` : '2px solid transparent',
-                  color: active ? c.gold : c.textSub,
+                  borderTop: active ? `1px solid ${activeColor}` : '1px solid transparent',
+                  color: active ? activeColor : c.textSub,
                   cursor: 'pointer',
                   display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center', gap: 3,
+                  alignItems: 'center', justifyContent: 'center', gap: 5,
                   transition: 'color 160ms ease, border-color 160ms ease',
-                  filter: active ? `drop-shadow(0 0 6px ${c.goldDim})` : 'none',
+                  filter: active ? `drop-shadow(0 0 8px ${isAI ? 'rgba(124,58,237,0.5)' : 'rgba(255,215,0,0.4)'})` : 'none',
                 }}
               >
-                <span style={{ fontSize: 18 }}>{TAB_META[tk].icon}</span>
-                <span style={{ fontSize: 9, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600 }}>
-                  {TAB_META[tk].label}
+                <Icon size={20} color={active ? activeColor : c.textSub} />
+                <span style={{ fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600 }}>
+                  {label}
                 </span>
               </button>
             );
           })}
         </div>
       )}
+
 
       {/* Transfer modal */}
       {showXfer && (
@@ -342,23 +350,28 @@ export default function SoftphonePane({
       {/* Footer */}
       <div style={{
         position: 'relative', zIndex: 1, flexShrink: 0,
-        padding: '8px 14px', fontSize: 9, color: c.textDim,
-        textAlign: 'center', letterSpacing: 0.4,
+        padding: '14px 14px 16px',
+        textAlign: 'center',
         borderTop: `1px solid ${c.border}`,
-        background: 'rgba(0,0,0,0.3)',
+        background: c.bg,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
       }}>
-        Lemtel Telecom v1.0.4 · Powered by{' '}
-        <a
-          onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal?.('https://assistantvirtualai.com'); }}
-          href="#"
-          style={{ color: c.gold, textDecoration: 'none', cursor: 'pointer' }}
-        >
-          AVA AI
-        </a>
+        <LemtelLogo size="xs" glow />
+        <div style={{ fontSize: 10, color: c.textDim, letterSpacing: 0.5 }}>
+          v1.0.5 · Powered by{' '}
+          <a
+            onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal?.('https://assistantvirtualai.com'); }}
+            href="#"
+            style={{ color: c.gold, textDecoration: 'none', cursor: 'pointer', fontWeight: 600 }}
+          >
+            AVA Statistic · assistantvirtualai.com
+          </a>
+        </div>
       </div>
     </div>
   );
 }
+
 
 /* ============================================================
    Sub-components

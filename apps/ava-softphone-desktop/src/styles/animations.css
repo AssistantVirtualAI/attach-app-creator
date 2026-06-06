@@ -1,20 +1,4 @@
-/* Lemtel Telecom — Global animations & utilities (v1.0.4) */
-
-@keyframes float1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -30px) scale(1.05); }
-  66% { transform: translate(-20px, 20px) scale(0.95); }
-}
-
-@keyframes float2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-40px, -20px) scale(1.1); }
-}
-
-@keyframes float3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(25px, 35px) scale(1.08); }
-}
+/* Lemtel Telecom — Global animations & utilities (v1.0.5) */
 
 @keyframes statusPulse {
   0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 6px currentColor; }
@@ -22,30 +6,13 @@
 }
 
 @keyframes ripple {
-  0% { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(2.5); opacity: 0; }
-}
-
-@keyframes buttonPress {
-  0% { transform: scale(1); }
-  50% { transform: scale(0.94); }
-  100% { transform: scale(1); }
-}
-
-@keyframes aiGlow {
-  0%, 100% { box-shadow: 0 0 15px rgba(124,58,237,0.3); }
-  50% { box-shadow: 0 0 30px rgba(124,58,237,0.6); }
+  0% { transform: scale(1); opacity: 0.55; }
+  100% { transform: scale(2.4); opacity: 0; }
 }
 
 @keyframes slideDown {
-  from { transform: translateY(-100%); opacity: 0; }
+  from { transform: translateY(-12px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
-}
-
-@keyframes gradientShift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
 }
 
 @keyframes wave {
@@ -58,6 +25,11 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes authGlow {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.06); }
+}
+
 /* Hidden scrollbars across tab content */
 .lemtel-scroll {
   scrollbar-width: none;
@@ -66,62 +38,51 @@
 }
 .lemtel-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
-/* Floating orbs (auth screen) */
-.lemtel-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  pointer-events: none;
-  will-change: transform;
-}
-
-/* AI gradient button helper */
-.lemtel-btn-ai {
-  background: linear-gradient(135deg, #7C3AED 0%, #9D6FF0 100%);
-  border: 1px solid rgba(124,58,237,0.5);
-  box-shadow: 0 4px 15px rgba(124,58,237,0.3);
-}
-
-/* Primary gradient (blue → purple) */
+/* Primary gold button */
 .lemtel-btn-primary {
-  background: linear-gradient(135deg, #003DA6 0%, #7C3AED 100%);
-  background-size: 200% 100%;
-  border: 1px solid rgba(255,215,0,0.3);
-  box-shadow: 0 4px 20px rgba(0,61,166,0.4);
-  transition: transform .25s ease, box-shadow .25s ease, background-position .8s ease;
+  background: linear-gradient(135deg, #FFD700 0%, #F0C75A 100%);
+  color: #050510;
+  border: 1px solid rgba(255,215,0,0.6);
+  box-shadow: 0 6px 24px rgba(255,215,0,0.25);
+  transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
+  font-weight: 700;
+  letter-spacing: 0.3px;
 }
 .lemtel-btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 8px 30px rgba(0,61,166,0.6);
-  background-position: 100% 50%;
+  box-shadow: 0 10px 32px rgba(255,215,0,0.4);
+  filter: brightness(1.05);
 }
-.lemtel-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.lemtel-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Glass key (dialpad) */
 .lemtel-key {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: 14px;
+  background: #16162B;
+  border: 1px solid rgba(255,215,0,0.06);
+  border-radius: 16px;
   transition: all .15s ease;
   cursor: pointer;
-  color: #fff;
+  color: #F5F5F7;
 }
-.lemtel-key:hover { background: rgba(255,215,0,0.08); border-color: rgba(255,215,0,0.2); }
+.lemtel-key:hover {
+  background: #1F1F38;
+  border-color: rgba(255,215,0,0.22);
+}
 .lemtel-key:active {
-  background: rgba(255,215,0,0.18);
-  border-color: rgba(255,215,0,0.45);
-  transform: scale(0.95);
-  box-shadow: 0 0 14px rgba(255,215,0,0.25);
+  background: rgba(255,215,0,0.14);
+  border-color: rgba(255,215,0,0.55);
+  transform: scale(0.96);
+  box-shadow: 0 0 18px rgba(255,215,0,0.3);
 }
 
 /* Glass input */
 .lemtel-input {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 10px;
-  color: #fff;
-  padding: 12px 14px;
-  font-size: 13px;
+  background: #16162B;
+  border: 1px solid rgba(255,215,0,0.08);
+  border-radius: 12px;
+  color: #F5F5F7;
+  padding: 14px 16px;
+  font-size: 14px;
   outline: none;
   width: 100%;
   box-sizing: border-box;
@@ -130,6 +91,6 @@
 .lemtel-input:focus {
   border-color: #FFD700;
   box-shadow: 0 0 0 3px rgba(255,215,0,0.12);
-  background: rgba(255,255,255,0.08);
+  background: #1A1A30;
 }
-.lemtel-input::placeholder { color: rgba(255,255,255,0.3); }
+.lemtel-input::placeholder { color: rgba(245,245,247,0.3); }
