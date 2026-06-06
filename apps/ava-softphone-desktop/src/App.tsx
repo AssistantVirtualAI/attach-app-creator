@@ -22,6 +22,7 @@ type Creds = {
 
 export default function App() {
   const { t } = useTheme();
+  useContrast(); // applies low/med/high contrast preset on mount
   const [creds, setCreds] = useState<Creds>(null);
   const [loading, setLoading] = useState(true);
   const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 980);
