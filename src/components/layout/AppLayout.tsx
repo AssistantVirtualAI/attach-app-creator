@@ -185,81 +185,63 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed left-0 top-0 h-screen w-72 bg-sidebar backdrop-blur-xl border-r border-sidebar-border z-50 transition-transform duration-300 ease-in-out ${
+      <aside className={`fixed left-0 top-0 h-screen w-[18rem] lg:w-80 bg-sidebar backdrop-blur-xl border-r border-sidebar-border z-50 transition-transform duration-300 ease-in-out ${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } md:translate-x-0`}>
         <div className="flex flex-col h-full">
-          {/* Logo - AVA Statistics */}
-          <div className="p-6 border-b border-sidebar-border flex items-center justify-between">
-            <Link to="/" onClick={() => setIsSidebarOpen(false)}>
-              <AvaLogo size="lg" animated={true} showText={false} className="[&_div:first-child]:w-16 [&_div:first-child]:h-16 [&_img]:w-16 [&_img]:h-16" />
+          {/* Header: Logo + Org name */}
+          <div className="px-4 py-4 border-b border-sidebar-border flex items-center gap-3">
+            <Link to="/" onClick={() => setIsSidebarOpen(false)} className="shrink-0">
+              <AvaLogo size="md" animated={true} showText={false} className="[&_div:first-child]:w-11 [&_div:first-child]:h-11 [&_img]:w-11 [&_img]:h-11" />
             </Link>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-sidebar-foreground truncate leading-tight">
+                {selectedOrg?.name || 'AVA Statistics'}
+              </div>
+              <div className="text-[11px] text-sidebar-foreground/60 truncate">
+                {userRole?.role || (isSuperAdmin ? 'super_admin' : 'member')}
+              </div>
+            </div>
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="p-2 rounded-lg hover:bg-muted transition-colors md:hidden"
+              className="p-1.5 rounded-md hover:bg-muted transition-colors md:hidden"
             >
-              <X className="w-5 h-5 text-foreground" />
+              <X className="w-4 h-4 text-foreground" />
             </button>
           </div>
 
-          {/* Org Switcher + Toolbar */}
-          <div className="px-4 py-3 border-b border-sidebar-border space-y-2">
-            <OrgSwitcher />
-            <div className="flex items-center justify-between gap-2">
-              {role && (
-                <Badge variant="outline" className="text-[10px] px-2 py-0.5 border-primary/40 bg-primary/10 text-foreground font-medium whitespace-nowrap truncate max-w-[120px]">
-                  {getRoleBadge()}
-                </Badge>
-              )}
-              <div className="flex items-center gap-0.5 ml-auto">
-                <NotificationsBell />
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted">
-                      <Globe className="w-4 h-4 text-muted-foreground" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setLanguage('en')} className={language === 'en' ? 'bg-primary/10' : ''}>
-                      🇬🇧 English
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setLanguage('fr')} className={language === 'fr' ? 'bg-primary/10' : ''}>
-                      🇫🇷 Français
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8 hover:bg-muted">
-                  {theme === 'dark' ? (
-                    <Sun className="w-4 h-4 text-warning" />
-                  ) : (
-                    <Moon className="w-4 h-4 text-primary" />
-                  )}
+          {/* Compact toolbar: org switcher + actions */}
+          <div className="px-3 py-2 border-b border-sidebar-border flex items-center gap-1.5">
+            <div className="flex-1 min-w-0">
+              <OrgSwitcher />
+            </div>
+            <NotificationsBell />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted shrink-0">
+                  <Globe className="w-4 h-4 text-muted-foreground" />
                 </Button>
-              </div>
-            </div>
-            <div className="rounded-md border border-sidebar-border bg-sidebar-accent/30 p-2 text-[11px] leading-relaxed">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-medium text-sidebar-foreground truncate">{selectedOrg?.name || 'No org selected'}</span>
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
-                  {userRole?.role || (isSuperAdmin ? 'super_admin' : 'member')}
-                </Badge>
-              </div>
-              <div className="mt-1 space-y-1 text-sidebar-foreground/70">
-                {organizationMemberships.map((membership) => (
-                  <div key={membership.organization.id} className="flex items-center justify-between gap-2">
-                    <span className="truncate">
-                      {membership.isSelected ? '● ' : ''}{membership.organization.name}
-                    </span>
-                    <span className="shrink-0 text-[10px]">{membership.role || 'member'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setLanguage('en')} className={language === 'en' ? 'bg-primary/10' : ''}>
+                  🇬🇧 English
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLanguage('fr')} className={language === 'fr' ? 'bg-primary/10' : ''}>
+                  🇫🇷 Français
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8 hover:bg-muted shrink-0">
+              {theme === 'dark' ? (
+                <Sun className="w-4 h-4 text-warning" />
+              ) : (
+                <Moon className="w-4 h-4 text-primary" />
+              )}
+            </Button>
           </div>
 
-
           {/* Navigation */}
-          <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={groupOrder} strategy={verticalListSortingStrategy}>
                 {sortedGroups.map((group) => (
@@ -271,18 +253,18 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                 ))}
               </SortableContext>
             </DndContext>
-            
+
             {/* Settings link - always visible */}
             <Link
               to={settingsLink.href}
               onClick={() => setIsSidebarOpen(false)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 mt-4 ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 mt-3 ${
                 isSettingsActive
-                  ? 'bg-primary/15 text-foreground shadow-md border border-primary/30'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted hover:translate-x-1'
+                  ? 'bg-primary/15 text-foreground border border-primary/30'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               }`}
             >
-              <SettingsIcon className="w-5 h-5" />
+              <SettingsIcon className="w-4 h-4" />
               <span className="font-medium text-sm">{t(settingsLink.nameKey)}</span>
             </Link>
           </nav>
@@ -293,7 +275,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       </aside>
 
       {/* Main content */}
-      <main className="pt-14 md:pt-0 md:ml-72 min-h-screen">
+      <main className="pt-14 md:pt-0 md:ml-[18rem] lg:ml-80 min-h-screen">
         <div className="p-4 lg:p-6">
           {children}
         </div>
