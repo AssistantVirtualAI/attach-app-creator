@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import logoImage from '@/assets/ava-statistics-logo.png';
+import logoAsset from '@/assets/ava-statistics-logo.png.asset.json';
+const logoImage = logoAsset.url;
 
 interface AvaStatisticsLogoProps {
   size?: 'sm' | 'md' | 'lg';

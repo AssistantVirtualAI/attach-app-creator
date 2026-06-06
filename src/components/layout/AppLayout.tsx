@@ -1,7 +1,7 @@
 import { ReactNode, useState, useCallback, useMemo, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Moon, Sun, Globe, GripVertical } from 'lucide-react';
-import { AvaLogo } from '@/components/shared/AvaLogo';
+import { AvaStatisticsLogo as AvaLogo } from '@/components/shared/AvaStatisticsLogo';
 import { AvaFooter } from '@/components/shared/AvaFooter';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

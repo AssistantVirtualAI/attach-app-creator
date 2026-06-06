@@ -18,6 +18,7 @@ const PortalLoginContent = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [agentInfo, setAgentInfo] = useState<{ name: string; avatar_url?: string } | null>(null);
+  const [orgBranding, setOrgBranding] = useState<{ logo_url?: string | null; name?: string | null } | null>(null);
   const [loadingAgent, setLoadingAgent] = useState(true);
   const [checkingSuperAdmin, setCheckingSuperAdmin] = useState(true);
   const { login, isLoading, isAuthenticated, session, isSuperAdmin, isSuperAdminChecked, loginAsSuperAdmin, loginAsOrgAdmin, supabaseUser } = usePortal();
@@ -105,7 +106,7 @@ const PortalLoginContent = () => {
       
        const { data, error } = await supabase
          .from('agents_safe')
-         .select('name, avatar_url')
+         .select('name, avatar_url, organization_id')
          .eq('slug', agentSlug)
          .maybeSingle();
 
@@ -116,6 +117,19 @@ const PortalLoginContent = () => {
         setError('Agent non trouvé');
       } else {
         setAgentInfo(data);
+        if (data.organization_id) {
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('name, client_portal_logo_url, logo_login_url, logo_url')
+            .eq('id', data.organization_id)
+            .maybeSingle();
+          if (org) {
+            setOrgBranding({
+              name: org.name,
+              logo_url: org.client_portal_logo_url || org.logo_login_url || org.logo_url || null,
+            });
+          }
+        }
       }
       setLoadingAgent(false);
     };
@@ -290,12 +304,20 @@ const PortalLoginContent = () => {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="max-w-lg space-y-8"
         >
-          {/* Logo */}
+          {/* Logo - white-labeled per organization */}
           <div className="flex items-center gap-4 mb-10">
-            {agentSlug === 'lemtel' ? <AvaLogo size="lg" animated /> : <AvaStatisticsLogo size="lg" animated />}
+            {orgBranding?.logo_url ? (
+              <img
+                src={orgBranding.logo_url}
+                alt={orgBranding.name || 'Organization'}
+                className="w-16 h-16 rounded-2xl object-cover ring-2 ring-primary/20"
+              />
+            ) : (
+              <AvaStatisticsLogo size="lg" animated showText={false} />
+            )}
             <div>
               <h2 className="text-4xl font-black bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                {agentSlug === 'lemtel' ? 'Lemtel Communications' : 'AVA Statistics'}
+                {orgBranding?.name || 'AVA Statistics'}
               </h2>
               <p className="text-muted-foreground mt-1">Votre portail d'analytics intelligent</p>
             </div>
