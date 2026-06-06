@@ -1,6 +1,5 @@
 import React from 'react';
 import { WHITELABEL } from '../whitelabel.config';
-import { LemtelLogo } from './SetupWizard';
 
 const dragStyle: React.CSSProperties = {
   // @ts-expect-error electron CSS
@@ -72,7 +71,37 @@ export default function TitleBar() {
           justifyContent: isMac ? 'center' : 'flex-start',
         }}
       >
-        <LemtelLogo size="sm" />
+        <svg
+          width="30"
+          height="16"
+          viewBox="0 0 180 90"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <ellipse cx="90" cy="45" rx="88" ry="43" fill="#FFD700" />
+          <ellipse cx="90" cy="45" rx="78" ry="35" fill="#003DA6" />
+          <text
+            x="90"
+            y="40"
+            textAnchor="middle"
+            fill="white"
+            fontSize="22"
+            fontWeight="bold"
+            fontFamily="Arial, sans-serif"
+          >
+            LEMTEL
+          </text>
+          <text
+            x="90"
+            y="58"
+            textAnchor="middle"
+            fill="white"
+            fontSize="9"
+            letterSpacing="2"
+            fontFamily="Arial, sans-serif"
+          >
+            COMMUNICATIONS
+          </text>
+        </svg>
         <span style={{ fontSize: 13, fontWeight: 700 }}>{WHITELABEL.appName}</span>
       </div>
       {!isMac && Controls}
