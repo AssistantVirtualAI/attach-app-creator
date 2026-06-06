@@ -28,11 +28,11 @@ Deno.serve(async (req) => {
   const apiKeyHeader = req.headers.get("apikey") || "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-  // pg_cron calls send only `apikey` header (anon or service) — treat as trusted server-side call
+  // Only the service-role key constitutes a trusted server-side call.
+  // The anon key is public (shipped to the client) and must NOT bypass auth.
   const isServiceCall =
     authHeader === `Bearer ${serviceKey}` ||
-    apiKeyHeader === serviceKey ||
-    apiKeyHeader === anonKey;
+    apiKeyHeader === serviceKey;
 
   if (!isServiceCall) {
     if (!authHeader) return json({ error: "Unauthorized" }, 401);
