@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { useTheme } from '../lib/theme';
+import { theme } from '../lib/theme';
 import LemtelLogo from './LemtelLogo';
 
 const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
@@ -20,12 +20,8 @@ type Creds = {
   refreshToken?: string;
 };
 
-interface SetupWizardProps {
-  onComplete: (creds: Creds) => void;
-}
-
-export default function SetupWizard({ onComplete }: SetupWizardProps) {
-  const { t, mode, toggle } = useTheme();
+export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds) => void }) {
+  const { colors, glow } = theme;
   const [portalUrl, setPortalUrl] = useState('https://avastatistic.ca');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,19 +35,16 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
       const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       const { data: authData, error: authError } =
         await supabase.auth.signInWithPassword({ email: email.trim(), password });
-
       if (authError || !authData.user) {
-        setError(`Login failed: ${authError?.message ?? 'unknown error'}`);
+        setError(authError?.message ?? 'Login failed');
         setLoading(false);
         return;
       }
-
       const { data: softphoneUser } = await supabase
         .from('pbx_softphone_users')
         .select('*')
         .eq('portal_user_id', authData.user.id)
         .maybeSingle();
-
       const credentials: Creds = {
         portalUrl: (portalUrl || 'https://avastatistic.ca').replace(/\/+$/, ''),
         email: authData.user.email || email,
@@ -63,7 +56,6 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
         accessToken: authData.session?.access_token,
         refreshToken: authData.session?.refresh_token,
       };
-
       await window.electronAPI?.saveCredentials?.(credentials);
       onComplete(credentials);
     } catch (err: any) {
@@ -73,207 +65,139 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
     }
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    background: mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(15,18,28,0.03)',
-    border: `1px solid ${t.border}`,
-    borderRadius: 10,
-    color: t.text,
-    padding: '12px 14px',
-    fontSize: 13,
-    outline: 'none',
-    boxSizing: 'border-box',
-    transition: 'border 160ms ease, box-shadow 160ms ease',
-  };
-
-  const onFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.currentTarget.style.borderColor = t.accent;
-    e.currentTarget.style.boxShadow = t.ringGlow;
-  };
-  const onBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.currentTarget.style.borderColor = t.border;
-    e.currentTarget.style.boxShadow = 'none';
-  };
-
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: t.bgGradient,
-        display: 'flex',
-        flexDirection: 'column',
-        color: t.text,
-      }}
-    >
-      {/* Theme toggle floating */}
-      <button
-        onClick={toggle}
-        title="Toggle theme"
-        style={{
-          position: 'absolute',
-          top: 56,
-          right: 20,
-          background: t.surface,
-          border: `1px solid ${t.border}`,
-          color: t.text,
-          width: 32,
-          height: 32,
-          borderRadius: 10,
-          cursor: 'pointer',
-          backdropFilter: 'blur(12px)',
-        }}
-      >
-        {mode === 'dark' ? '☀️' : '🌙'}
-      </button>
+    <div style={{
+      minHeight: '100%',
+      background: 'radial-gradient(circle at 30% 20%, #0a0520 0%, #050510 60%)',
+      display: 'flex', flexDirection: 'column', color: colors.text,
+      position: 'relative', overflow: 'hidden',
+    }}>
+      {/* Floating orbs */}
+      <div className="lemtel-orb" style={{
+        width: 320, height: 320, top: '-80px', left: '-60px',
+        background: 'rgba(0,61,166,0.35)', animation: 'float1 12s ease-in-out infinite',
+      }} />
+      <div className="lemtel-orb" style={{
+        width: 260, height: 260, bottom: '-60px', right: '-40px',
+        background: 'rgba(124,58,237,0.25)', animation: 'float2 10s ease-in-out infinite',
+      }} />
+      <div className="lemtel-orb" style={{
+        width: 200, height: 200, top: '40%', right: '20%',
+        background: 'rgba(255,215,0,0.10)', animation: 'float3 14s ease-in-out infinite',
+      }} />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 20px' }}>
-        {/* Logo / brand */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 28 }}>
-          <div style={{ marginBottom: 16 }}>
-            <LemtelLogo size="lg" halo />
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '32px 24px', position: 'relative', zIndex: 1,
+      }}>
+        {/* Brand */}
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <LemtelLogo size="lg" glow halo />
+          <div style={{
+            marginTop: 16, fontSize: 11, fontWeight: 800,
+            letterSpacing: 6, color: colors.gold,
+            textShadow: `0 0 18px ${colors.goldDim}`,
+          }}>
+            LEMTEL TELECOM
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: -0.3 }}>
-            Welcome to AVA Softphone
-          </h1>
-          <p style={{ color: t.textMuted, fontSize: 13, margin: '6px 0 0' }}>
-            Sign in to your AVA workspace
-          </p>
+          <div style={{
+            marginTop: 6, fontSize: 12, color: colors.aiLight,
+            letterSpacing: 0.4,
+          }}>
+            AI-Powered Business Communications
+          </div>
         </div>
 
-        {/* Form card */}
-        <div
-          style={{
-            width: '100%',
-            maxWidth: 380,
-            background: t.surface,
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: `1px solid ${t.glassBorder}`,
-            borderRadius: 16,
-            padding: 24,
-            boxShadow: t.shadow,
-          }}
-        >
-          <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle(t.textMuted)}>Portal URL</label>
-            <input
-              style={inputStyle}
-              value={portalUrl}
-              onChange={(e) => setPortalUrl(e.target.value)}
-              onFocus={onFocus}
-              onBlur={onBlur}
-            />
-          </div>
+        {/* Card */}
+        <div style={{
+          width: '100%', maxWidth: 360,
+          background: 'rgba(255,255,255,0.03)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255,215,0,0.15)',
+          borderRadius: 20,
+          padding: 24,
+          boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+          animation: 'fadeIn .4s ease-out',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <Field label="Portal URL" value={portalUrl} onChange={setPortalUrl} type="url" />
+            <Field label="Email" value={email} onChange={setEmail} type="email" placeholder="you@company.com" autoFocus />
+            <Field label="Password" value={password} onChange={setPassword} type="password" placeholder="••••••••" onEnter={handleConnect} />
 
-          <div style={{ marginBottom: 14 }}>
-            <label style={labelStyle(t.textMuted)}>Email</label>
-            <input
-              style={inputStyle}
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onFocus={onFocus}
-              onBlur={onBlur}
-              placeholder="you@company.com"
-            />
-          </div>
+            {error && (
+              <div style={{
+                fontSize: 11, color: colors.red,
+                padding: '8px 12px', borderRadius: 8,
+                background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.2)',
+              }}>
+                {error}
+              </div>
+            )}
 
-          <div style={{ marginBottom: 6 }}>
-            <label style={labelStyle(t.textMuted)}>Password</label>
-            <input
-              style={inputStyle}
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onFocus={onFocus}
-              onBlur={onBlur}
-              placeholder="••••••••"
-              onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
-            />
-          </div>
-
-          {error && (
-            <div
+            <button
+              className="lemtel-btn-primary"
+              onClick={handleConnect}
+              disabled={loading || !email || !password}
               style={{
-                background: 'rgba(239,68,68,0.10)',
-                border: '1px solid rgba(239,68,68,0.28)',
-                borderRadius: 10,
-                color: t.danger,
-                padding: '10px 12px',
-                fontSize: 12,
-                marginTop: 14,
+                marginTop: 6, height: 46, borderRadius: 12,
+                color: '#fff', fontSize: 14, fontWeight: 600,
+                cursor: 'pointer', letterSpacing: 0.3,
               }}
             >
-              {error}
-            </div>
-          )}
-
-          <button
-            onClick={handleConnect}
-            disabled={loading}
-            style={{
-              marginTop: 18,
-              width: '100%',
-              padding: '13px 14px',
-              background: t.accentGradient,
-              color: '#fff',
-              border: 'none',
-              borderRadius: 12,
-              fontWeight: 700,
-              fontSize: 14,
-              letterSpacing: 0.2,
-              cursor: loading ? 'wait' : 'pointer',
-              boxShadow: t.accentGlow,
-              transition: 'transform 120ms ease, opacity 160ms ease',
-              opacity: loading ? 0.7 : 1,
-            }}
-          >
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
+              {loading ? 'Connecting…' : '→ Connect'}
+            </button>
+          </div>
         </div>
-
-        <p style={{ color: t.textSubtle, fontSize: 11, marginTop: 18, textAlign: 'center', maxWidth: 320 }}>
-          Secured by AVA · Your credentials are encrypted end-to-end
-        </p>
       </div>
 
       {/* Footer */}
-      <div
-        style={{
-          padding: '14px 20px 18px',
-          borderTop: `1px solid ${t.border}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          color: t.textMuted,
-          fontSize: 11,
-        }}
-      >
-        <span style={{ opacity: 0.7 }}>App built by</span>
+      <div style={{
+        padding: '14px 16px 18px', textAlign: 'center',
+        fontSize: 10, color: colors.textDim, letterSpacing: 0.4,
+        position: 'relative', zIndex: 1,
+      }}>
+        Built by{' '}
         <a
-          href="https://avastatistic.ca"
+          href="https://assistantvirtualai.com"
           onClick={(e) => {
             e.preventDefault();
             window.electronAPI?.openExternal?.('https://assistantvirtualai.com');
           }}
-          style={{ color: t.accent, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}
+          style={{ color: colors.gold, textDecoration: 'none', cursor: 'pointer' }}
         >
-          AVA Statistics · assistantvirtualai.com
+          AVA AI · assistantvirtualai.com
         </a>
       </div>
     </div>
   );
 }
 
-const labelStyle = (c: string): React.CSSProperties => ({
-  display: 'block',
-  color: c,
-  fontSize: 11,
-  marginBottom: 6,
-  fontWeight: 600,
-  letterSpacing: 0.3,
-  textTransform: 'uppercase',
-});
-
-export { default as LemtelLogo } from './LemtelLogo';
+function Field({
+  label, value, onChange, type = 'text', placeholder, autoFocus, onEnter,
+}: {
+  label: string; value: string; onChange: (v: string) => void;
+  type?: string; placeholder?: string; autoFocus?: boolean; onEnter?: () => void;
+}) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={{
+        fontSize: 10, color: theme.colors.textSub,
+        textTransform: 'uppercase', letterSpacing: 1.4, fontWeight: 600,
+      }}>{label}</span>
+      <input
+        className="lemtel-input"
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        autoCapitalize="none"
+        autoCorrect="off"
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter' && onEnter) onEnter(); }}
+      />
+    </label>
+  );
+}
