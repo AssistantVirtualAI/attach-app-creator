@@ -1,8 +1,8 @@
-/* Lemtel Telecom — Global animations & utilities (v1.0.5) */
+/* Lemtel Telecom — Global animations & utilities (v1.0.6) */
 
 @keyframes statusPulse {
   0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 6px currentColor; }
-  50% { opacity: 0.65; transform: scale(0.92); box-shadow: 0 0 14px currentColor; }
+  50% { opacity: 0.6; transform: scale(0.9); box-shadow: 0 0 16px currentColor; }
 }
 
 @keyframes ripple {
@@ -28,6 +28,11 @@
 @keyframes authGlow {
   0%, 100% { opacity: 0.55; transform: scale(1); }
   50% { opacity: 0.85; transform: scale(1.06); }
+}
+
+@keyframes tabDotIn {
+  from { opacity: 0; transform: translateX(-50%) scale(0.4); }
+  to { opacity: 1; transform: translateX(-50%) scale(1); }
 }
 
 /* Hidden scrollbars across tab content */
@@ -57,22 +62,24 @@
 
 /* Glass key (dialpad) */
 .lemtel-key {
-  background: #16162B;
-  border: 1px solid rgba(255,215,0,0.06);
-  border-radius: 16px;
+  background: linear-gradient(155deg, #18182E 0%, #121224 100%);
+  border: 1px solid rgba(255,215,0,0.08);
+  border-radius: 18px;
   transition: all .15s ease;
   cursor: pointer;
   color: #F5F5F7;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 2px 6px rgba(0,0,0,0.3);
 }
 .lemtel-key:hover {
-  background: #1F1F38;
-  border-color: rgba(255,215,0,0.22);
+  background: linear-gradient(155deg, #20203A 0%, #18182E 100%);
+  border-color: rgba(255,215,0,0.28);
+  transform: translateY(-1px);
 }
 .lemtel-key:active {
   background: rgba(255,215,0,0.14);
-  border-color: rgba(255,215,0,0.55);
+  border-color: rgba(255,215,0,0.6);
   transform: scale(0.96);
-  box-shadow: 0 0 18px rgba(255,215,0,0.3);
+  box-shadow: 0 0 22px rgba(255,215,0,0.35);
 }
 
 /* Glass input */
@@ -94,3 +101,64 @@
   background: #1A1A30;
 }
 .lemtel-input::placeholder { color: rgba(245,245,247,0.3); }
+
+/* Unified list row — used by Recents, Contacts, Voicemail, SMS, Recordings */
+.lemtel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(155deg, rgba(22,22,43,0.7) 0%, rgba(15,15,30,0.7) 100%);
+  border: 1px solid rgba(255,215,0,0.05);
+  border-radius: 14px;
+  padding: 12px 14px;
+  cursor: pointer;
+  color: #F5F5F7;
+  width: 100%;
+  text-align: left;
+  transition: all .18s ease;
+  position: relative;
+  overflow: hidden;
+}
+.lemtel-row::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, #FFD700, #F0C75A);
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+.lemtel-row:hover {
+  background: linear-gradient(155deg, rgba(30,30,55,0.85) 0%, rgba(22,22,43,0.85) 100%);
+  border-color: rgba(255,215,0,0.22);
+  transform: translateX(2px);
+}
+.lemtel-row:hover::before { opacity: 1; }
+
+.lemtel-avatar {
+  width: 38px; height: 38px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #003DA6 0%, #7C3AED 100%);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0,61,166,0.35);
+}
+
+/* Tab active dot */
+.lemtel-tab-dot {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: #FFD700;
+  box-shadow: 0 0 8px rgba(255,215,0,0.9);
+  animation: tabDotIn .25s ease-out forwards;
+}
+.lemtel-tab-dot--ai {
+  background: #9D6FF0;
+  box-shadow: 0 0 8px rgba(157,111,240,0.9);
+}

@@ -204,7 +204,7 @@ export default function SoftphonePane({
             <div style={{ color: c.red, fontSize: 12, fontWeight: 700, letterSpacing: 0.3, marginBottom: 2 }}>
               SIP not registered — calls disabled
             </div>
-            <div style={{ color: c.text.secondary, fontSize: 11, lineHeight: 1.5 }}>
+            <div style={{ color: c.textSub, fontSize: 11, lineHeight: 1.5 }}>
               {sp.credError}
             </div>
           </div>
@@ -293,9 +293,10 @@ export default function SoftphonePane({
       {!inCall && !ringing && (
         <div style={{
           position: 'relative', zIndex: 1, flexShrink: 0,
-          display: 'flex', height: 64,
-          background: c.bgCard,
+          display: 'flex', height: 68,
+          background: 'linear-gradient(180deg, rgba(15,15,30,0.6) 0%, rgba(8,8,18,0.95) 100%)',
           borderTop: `1px solid ${c.border}`,
+          backdropFilter: 'blur(14px)',
         }}>
           {(['dial', 'recents', 'contacts', 'voicemail', 'sms', 'recordings', 'ai'] as Tab[]).map((tk) => {
             const active = tab === tk;
@@ -308,17 +309,20 @@ export default function SoftphonePane({
                 onClick={() => setTab(tk)}
                 style={{
                   flex: 1, background: 'none', border: 'none',
-                  borderTop: active ? `1px solid ${activeColor}` : '1px solid transparent',
                   color: active ? activeColor : c.textSub,
                   cursor: 'pointer',
                   display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center', gap: 5,
-                  transition: 'color 160ms ease, border-color 160ms ease',
-                  filter: active ? `drop-shadow(0 0 8px ${isAI ? 'rgba(124,58,237,0.5)' : 'rgba(255,215,0,0.4)'})` : 'none',
+                  alignItems: 'center', justifyContent: 'center', gap: 6,
+                  transition: 'color 180ms ease',
+                  position: 'relative',
+                  paddingTop: 4,
                 }}
+                onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = c.text; }}
+                onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = c.textSub; }}
               >
-                <Icon size={20} color={active ? activeColor : c.textSub} />
-                <span style={{ fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600 }}>
+                {active && <span className={`lemtel-tab-dot${isAI ? ' lemtel-tab-dot--ai' : ''}`} />}
+                <Icon size={20} color={active ? activeColor : 'currentColor'} />
+                <span style={{ fontSize: 9.5, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: active ? 700 : 500 }}>
                   {label}
                 </span>
               </button>
@@ -406,41 +410,44 @@ function Dialer({
 
       {/* Number display */}
       <div style={{
-        textAlign: 'center', minHeight: 56, marginBottom: 14,
+        textAlign: 'center', minHeight: 64, marginBottom: 18,
         fontFamily: 'JetBrains Mono, Menlo, monospace',
-        fontSize: 28, letterSpacing: 4, fontWeight: 500,
+        fontSize: 32, letterSpacing: 4, fontWeight: 400,
         color: dial ? c.text : c.textDim,
-        textShadow: dial ? `0 0 18px ${c.goldDim}` : 'none',
+        textShadow: dial ? '0 0 24px rgba(255,215,0,0.35)' : 'none',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {dial || '·  ·  ·  ·'}
       </div>
 
       {/* Dialpad */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10,
-        maxWidth: 260, margin: '0 auto 18px',
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
+        maxWidth: 272, margin: '0 auto 22px',
       }}>
         {dialKeys.map(([key, sub]) => (
           <button
             key={key}
             className="lemtel-key"
             onClick={() => setDial((p) => p + key)}
-            style={{ height: 64, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}
+            style={{ height: 66, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}
           >
-            <span style={{ fontSize: 22, fontWeight: 600 }}>{key}</span>
-            {sub && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', letterSpacing: 2 }}>{sub}</span>}
+            <span style={{ fontSize: 22, fontWeight: 500 }}>{key}</span>
+            {sub && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', letterSpacing: 2 }}>{sub}</span>}
           </button>
         ))}
       </div>
 
       {/* Action row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 28 }}>
         <button
           onClick={() => setDial('')}
           disabled={!dial}
           style={{
-            background: 'none', border: 'none', color: dial ? c.textSub : 'transparent',
-            fontSize: 14, cursor: dial ? 'pointer' : 'default', padding: 8, width: 56,
+            background: 'none', border: 'none',
+            color: dial ? c.textSub : 'transparent',
+            fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase',
+            cursor: dial ? 'pointer' : 'default', padding: 8, width: 56,
           }}
           title="Clear"
         >Clear</button>
@@ -449,17 +456,27 @@ function Dialer({
           onClick={onCall}
           disabled={!canCall}
           style={{
-            width: 64, height: 64, borderRadius: '50%',
+            width: 72, height: 72, borderRadius: '50%',
             background: canCall
-              ? 'linear-gradient(135deg, #059669 0%, #10B981 100%)'
-              : 'rgba(16,185,129,0.2)',
-            border: 'none', color: '#fff', fontSize: 26, cursor: canCall ? 'pointer' : 'not-allowed',
-            boxShadow: canCall ? `0 4px 20px ${c.aiGlow}, ${glow.green}` : 'none',
+              ? 'radial-gradient(circle at 30% 30%, #34D399 0%, #10B981 55%, #047857 100%)'
+              : 'rgba(16,185,129,0.15)',
+            border: canCall ? '1px solid rgba(255,255,255,0.18)' : '1px solid rgba(16,185,129,0.2)',
+            color: '#fff', fontSize: 28,
+            cursor: canCall ? 'pointer' : 'not-allowed',
+            boxShadow: canCall
+              ? '0 8px 28px rgba(16,185,129,0.55), inset 0 1px 0 rgba(255,255,255,0.25)'
+              : 'none',
             transition: 'transform .15s ease, box-shadow .15s ease',
+            display: 'grid', placeItems: 'center',
           }}
-          onMouseEnter={(e) => { if (canCall) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.06)'; }}
+          onMouseEnter={(e) => { if (canCall) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.07)'; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
-        >☏</button>
+          aria-label="Call"
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.9.36 1.78.7 2.6a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.82.34 1.7.57 2.6.7A2 2 0 0 1 22 16.92z" />
+          </svg>
+        </button>
 
         <button
           onClick={() => setDial((p) => p.slice(0, -1))}
@@ -468,6 +485,7 @@ function Dialer({
             background: 'none', border: 'none', color: dial ? c.textSub : 'transparent',
             fontSize: 20, cursor: dial ? 'pointer' : 'default', padding: 8, width: 56,
           }}
+          aria-label="Backspace"
         >⌫</button>
       </div>
     </div>
