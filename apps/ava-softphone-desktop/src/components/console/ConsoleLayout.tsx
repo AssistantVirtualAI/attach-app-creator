@@ -11,6 +11,11 @@ import ContactsView from './ContactsView';
 import AIWorkspace from './AIWorkspace';
 import AdminView from './AdminView';
 import SoftphonePane from '../SoftphonePane';
+import SettingsPage from '../SettingsPage';
+import IncomingCallToast from './IncomingCallToast';
+import ActiveCallDock from './ActiveCallDock';
+import { useCallShortcuts } from '../../hooks/useShortcuts';
+import { callBus } from '../../hooks/useCallBus';
 import { theme } from '../../lib/theme';
 
 const { colors: c } = theme;
