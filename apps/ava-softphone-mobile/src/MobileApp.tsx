@@ -42,6 +42,25 @@ export default function MobileApp() {
 function AuthenticatedShell({
   creds, tab, setTab, onSignOut,
 }: { creds: Creds; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void }) {
+  const [permsGateDone, setPermsGateDone] = useState<boolean | null>(null);
+
+  // Decide whether to show the onboarding permission gate.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const seen = localStorage.getItem('lemtel-permissions-onboarded') === '1';
+        const current = await checkAllPermissions();
+        if (cancelled) return;
+        if (seen || current.microphone === 'granted') setPermsGateDone(true);
+        else setPermsGateDone(false);
+      } catch {
+        if (!cancelled) setPermsGateDone(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const sp = useSoftphone({
     extension: creds.extension,
     displayName: creds.displayName,
