@@ -5,7 +5,8 @@ import ContactsList from './ContactsList';
 import VoicemailList from './VoicemailList';
 import SmsThreads from './SmsThreads';
 import CallForwarding from './CallForwarding';
-import { useTheme } from '../lib/theme';
+import LemtelLogo from './LemtelLogo';
+import { theme } from '../lib/theme';
 
 interface Creds {
   extension: string;
@@ -20,12 +21,14 @@ interface Creds {
 type Tab = 'dial' | 'recents' | 'contacts' | 'voicemail' | 'sms';
 
 const TAB_META: Record<Tab, { icon: string; label: string }> = {
-  dial: { icon: '⌨', label: 'Dial' },
-  recents: { icon: '⟲', label: 'Recents' },
-  contacts: { icon: '☻', label: 'Contacts' },
+  dial:      { icon: '⌨', label: 'Phone' },
+  recents:   { icon: '⟲', label: 'History' },
+  contacts:  { icon: '☻', label: 'Contacts' },
   voicemail: { icon: '✉', label: 'Voicemail' },
-  sms: { icon: '✦', label: 'SMS' },
+  sms:       { icon: '✦', label: 'SMS' },
 };
+
+const { colors: c, glow } = theme;
 
 export default function SoftphonePane({
   creds,
@@ -34,7 +37,6 @@ export default function SoftphonePane({
   creds: Creds;
   onOpenSettings: () => void;
 }) {
-  const { t, mode } = useTheme();
   const sp = useSoftphone({
     extension: creds.extension,
     displayName: creds.displayName,
@@ -55,6 +57,11 @@ export default function SoftphonePane({
 
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
 
+  // Broadcast SIP status to TitleBar
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('lemtel:sip-status', { detail: sp.snap.status }));
+  }, [sp.snap.status]);
+
   useEffect(() => {
     if (sp.snap.callState !== 'active' && sp.snap.callState !== 'held') { setTimer(0); return; }
     if (!sp.snap.startedAt) return;
@@ -65,8 +72,8 @@ export default function SoftphonePane({
   }, [sp.snap.callState, sp.snap.startedAt]);
 
   const dotColor =
-    sp.snap.status === 'registered' ? t.success :
-    sp.snap.status === 'error' ? t.danger : t.warning;
+    sp.snap.status === 'registered' ? c.green :
+    sp.snap.status === 'error' ? c.red : c.yellow;
 
   const inCall = sp.snap.callState === 'active' || sp.snap.callState === 'held';
   const ringing = sp.snap.callState === 'ringing-in' || sp.snap.callState === 'ringing-out';
@@ -97,98 +104,80 @@ export default function SoftphonePane({
     ['*', ''], ['0', '+'], ['#', ''],
   ];
 
-  const circleBtn = (bg: string, size = 56, glow?: string): React.CSSProperties => ({
-    width: size, height: size, borderRadius: '50%', background: bg, border: 'none',
-    color: '#fff', fontSize: size > 50 ? 22 : 18, cursor: 'pointer',
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    boxShadow: glow || `0 8px 24px -8px ${bg}`,
-    transition: 'transform 120ms ease',
-  });
-
-  const pillBtn = (active: boolean, danger = false): React.CSSProperties => ({
-    background: danger
-      ? 'rgba(239,68,68,0.12)'
-      : active
-        ? t.accentSoft
-        : mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(15,18,28,0.04)',
-    color: danger ? t.danger : active ? t.accent : t.text,
-    border: `1px solid ${danger ? 'rgba(239,68,68,0.28)' : active ? 'rgba(99,102,241,0.35)' : t.border}`,
-    borderRadius: 10, padding: '10px 8px', fontSize: 11, fontWeight: 600,
-    cursor: 'pointer', transition: 'all 140ms ease',
-  });
-
-  const dtmfBtn: React.CSSProperties = {
-    background: mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(15,18,28,0.04)',
-    border: `1px solid ${t.border}`,
-    borderRadius: 10, color: t.text, padding: '10px 0', cursor: 'pointer', fontSize: 16,
-    transition: 'all 140ms ease',
-  };
-
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', height: '100%',
-      background: t.bgGradient, color: t.text,
+      background: c.bg, color: c.text, position: 'relative', overflow: 'hidden',
     }}>
+      {/* Ambient background glow */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: c.bgGradient,
+        pointerEvents: 'none', zIndex: 0,
+      }} />
+
       <audio ref={audioRef} autoPlay />
 
-      {/* Header */}
+      {/* HEADER */}
       <div style={{
+        position: 'relative', zIndex: 1,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 16px', borderBottom: `1px solid ${t.border}`,
-        background: t.surface, backdropFilter: 'blur(12px)',
+        padding: '10px 14px', height: 52, boxSizing: 'border-box',
+        background: 'rgba(0,0,0,0.3)',
+        borderBottom: `1px solid ${c.border}`,
+        backdropFilter: 'blur(12px)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: t.accentGradient,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontWeight: 700, fontSize: 14,
-            boxShadow: t.accentGlow,
-          }}>
-            {(creds.displayName || creds.email).charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{creds.displayName || creds.email}</div>
-            <div style={{ fontSize: 11, color: t.textMuted, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, boxShadow: `0 0 8px ${dotColor}` }} />
-              Ext. {creds.extension}
-            </div>
-          </div>
+        {/* Extension badge */}
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '4px 10px', borderRadius: 999,
+          background: c.goldDim, border: `1px solid ${c.borderGold}`,
+          color: c.gold, fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+          boxShadow: glow.gold,
+        }}>
+          Ext {creds.extension}
         </div>
+
+        <div style={{ fontSize: 12, fontWeight: 500, color: c.text, opacity: 0.85 }}>
+          {creds.displayName || creds.email}
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: dotColor, color: dotColor,
+            animation: sp.snap.status === 'registered' ? 'statusPulse 2s ease-in-out infinite' : 'none',
+          }} />
           <select
             value={sp.manualStatus}
             onChange={(e) => sp.setManualStatus(e.target.value as ManualStatus)}
             style={{
-              background: mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(15,18,28,0.04)',
-              color: t.text, border: `1px solid ${t.border}`,
-              borderRadius: 8, fontSize: 11, padding: '6px 8px', cursor: 'pointer',
+              background: 'rgba(255,255,255,0.05)', color: c.text,
+              border: `1px solid ${c.border}`, borderRadius: 8,
+              fontSize: 10, padding: '4px 6px', cursor: 'pointer',
             }}
-            title="Presence"
           >
             <option value="auto">Auto</option>
             <option value="available">Available</option>
-            <option value="dnd">Do Not Disturb</option>
+            <option value="dnd">DND</option>
             <option value="away">Away</option>
           </select>
           <button
             onClick={onOpenSettings}
             style={{
-              background: mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(15,18,28,0.04)',
-              border: `1px solid ${t.border}`,
-              color: t.text, cursor: 'pointer',
-              width: 30, height: 30, borderRadius: 8, fontSize: 14,
+              background: 'rgba(255,255,255,0.05)', border: `1px solid ${c.border}`,
+              color: c.text, cursor: 'pointer',
+              width: 30, height: 28, borderRadius: 8, fontSize: 14,
             }}
             aria-label="Settings"
-          >
-            ⚙
-          </button>
+          >⚙</button>
         </div>
       </div>
 
       {sp.credError && (
         <div style={{
-          background: 'rgba(239,68,68,0.10)', color: t.danger,
+          position: 'relative', zIndex: 1,
+          background: 'rgba(239,68,68,0.10)', color: c.red,
           padding: '8px 14px', fontSize: 11,
           borderBottom: '1px solid rgba(239,68,68,0.2)',
         }}>
@@ -196,9 +185,83 @@ export default function SoftphonePane({
         </div>
       )}
 
-      {/* Tabs */}
+      {/* CONTENT */}
+      <div className="lemtel-scroll" style={{
+        flex: 1, overflowY: 'auto', position: 'relative', zIndex: 1,
+        padding: ringing || inCall ? 0 : '20px 16px 12px',
+      }}>
+        {/* Incoming */}
+        {sp.snap.callState === 'ringing-in' && (
+          <IncomingCall
+            who={sp.snap.remoteIdentity || sp.snap.remoteNumber || 'Unknown'}
+            number={sp.snap.remoteNumber}
+            onAnswer={sp.answer}
+            onDecline={sp.hangup}
+          />
+        )}
+
+        {/* Outgoing */}
+        {sp.snap.callState === 'ringing-out' && (
+          <CallingState
+            who={sp.snap.remoteNumber || dial}
+            onHangup={sp.hangup}
+          />
+        )}
+
+        {/* Active / Held */}
+        {inCall && (
+          <ActiveCall
+            sp={sp}
+            timer={fmt(timer)}
+            showDTMF={showDTMF}
+            toggleDTMF={() => setShowDTMF((v) => !v)}
+            dialKeys={dialKeys}
+            onTransfer={(m) => { setXferMode(m); setShowXfer(true); }}
+          />
+        )}
+
+        {/* Idle — Dialer */}
+        {!inCall && !ringing && tab === 'dial' && (
+          <Dialer
+            dial={dial} setDial={setDial}
+            dialKeys={dialKeys}
+            onCall={handleCall}
+            canCall={!!dial && sp.snap.status === 'registered'}
+            extension={creds.extension}
+          />
+        )}
+
+        {!inCall && !ringing && tab === 'recents' && (
+          <div style={{ animation: 'fadeIn .25s ease-out' }}>
+            <RecentsList extension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
+          </div>
+        )}
+        {!inCall && !ringing && tab === 'contacts' && (
+          <div style={{ animation: 'fadeIn .25s ease-out' }}>
+            <ContactsList selfExtension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
+          </div>
+        )}
+        {!inCall && !ringing && tab === 'voicemail' && (
+          <div style={{ animation: 'fadeIn .25s ease-out' }}>
+            <VoicemailList extension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
+          </div>
+        )}
+        {!inCall && !ringing && tab === 'sms' && (
+          <div style={{ animation: 'fadeIn .25s ease-out' }}>
+            <SmsThreads />
+          </div>
+        )}
+      </div>
+
+      {/* BOTTOM TABS */}
       {!inCall && !ringing && (
-        <div style={{ display: 'flex', borderBottom: `1px solid ${t.border}`, padding: '0 8px' }}>
+        <div style={{
+          position: 'relative', zIndex: 1, flexShrink: 0,
+          display: 'flex', height: 56,
+          background: 'rgba(0,0,0,0.45)',
+          backdropFilter: 'blur(16px)',
+          borderTop: `1px solid ${c.border}`,
+        }}>
           {(['dial', 'recents', 'contacts', 'voicemail', 'sms'] as Tab[]).map((tk) => {
             const active = tab === tk;
             return (
@@ -206,256 +269,377 @@ export default function SoftphonePane({
                 key={tk}
                 onClick={() => setTab(tk)}
                 style={{
-                  flex: 1, padding: '12px 4px', background: 'none', border: 'none',
-                  borderBottom: active ? `2px solid ${t.accent}` : '2px solid transparent',
-                  color: active ? t.accent : t.textMuted,
-                  fontSize: 11, cursor: 'pointer',
-                  fontWeight: active ? 700 : 500,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                  transition: 'color 140ms ease',
+                  flex: 1, background: 'none', border: 'none',
+                  borderTop: active ? `2px solid ${c.gold}` : '2px solid transparent',
+                  color: active ? c.gold : c.textSub,
+                  cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', gap: 3,
+                  transition: 'color 160ms ease, border-color 160ms ease',
+                  filter: active ? `drop-shadow(0 0 6px ${c.goldDim})` : 'none',
                 }}
-                title={TAB_META[tk].label}
               >
-                <span style={{ fontSize: 16 }}>{TAB_META[tk].icon}</span>
-                <span style={{ fontSize: 9, letterSpacing: 0.5, textTransform: 'uppercase' }}>{TAB_META[tk].label}</span>
+                <span style={{ fontSize: 18 }}>{TAB_META[tk].icon}</span>
+                <span style={{ fontSize: 9, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 600 }}>
+                  {TAB_META[tk].label}
+                </span>
               </button>
             );
           })}
         </div>
       )}
 
-      {/* Content */}
-      <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
-        {/* Incoming */}
-        {sp.snap.callState === 'ringing-in' && (
-          <div style={{ textAlign: 'center', padding: 28 }}>
-            <div style={{
-              width: 90, height: 90, margin: '0 auto 18px', borderRadius: '50%',
-              background: t.accentGradient,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 38, color: '#fff', boxShadow: t.accentGlow,
-              animation: 'pulse 1.6s ease-in-out infinite',
-            }}>📞</div>
-            <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 4, letterSpacing: 0.8, textTransform: 'uppercase' }}>Incoming call</div>
-            <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>{sp.snap.remoteIdentity}</div>
-            <div style={{ fontSize: 13, color: t.textMuted, marginBottom: 28 }}>{sp.snap.remoteNumber}</div>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 24 }}>
-              <button onClick={sp.hangup} style={circleBtn(t.danger, 60)}>📵</button>
-              <button onClick={sp.answer} style={circleBtn(t.success, 60)}>📞</button>
-            </div>
-          </div>
-        )}
-
-        {/* Outgoing */}
-        {sp.snap.callState === 'ringing-out' && (
-          <div style={{ textAlign: 'center', padding: 28 }}>
-            <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 4, letterSpacing: 0.8, textTransform: 'uppercase' }}>Calling…</div>
-            <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 28 }}>{sp.snap.remoteNumber || dial}</div>
-            <button onClick={sp.hangup} style={circleBtn(t.danger, 60)}>📵</button>
-          </div>
-        )}
-
-        {/* Active / Held */}
-        {inCall && (
-          <div style={{ textAlign: 'center', padding: '8px 4px' }}>
-            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{sp.snap.remoteIdentity || sp.snap.remoteNumber}</div>
-            <div style={{
-              fontSize: 32, fontFamily: 'JetBrains Mono, monospace', fontWeight: 500,
-              color: sp.snap.onHold ? t.warning : t.success,
-              marginBottom: 6, letterSpacing: 1,
-            }}>
-              {fmt(timer)}
-            </div>
-            <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 18, letterSpacing: 0.5, textTransform: 'uppercase' }}>
-              {sp.snap.onHold ? 'On hold' : 'Active call'}
-              {sp.hasConsult() && ' · consult ongoing'}
-            </div>
-
-            {showDTMF && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 14 }}>
-                {dialKeys.map(([k]) => (
-                  <button key={k} onClick={() => sp.sendDTMF(k)} style={dtmfBtn}>{k}</button>
-                ))}
-              </div>
-            )}
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 12 }}>
-              <button onClick={sp.snap.muted ? sp.unmute : sp.mute} style={pillBtn(sp.snap.muted)}>{sp.snap.muted ? '🔇 Unmute' : '🎤 Mute'}</button>
-              <button onClick={sp.snap.onHold ? sp.unhold : sp.hold} style={pillBtn(sp.snap.onHold)}>{sp.snap.onHold ? '▶ Resume' : '⏸ Hold'}</button>
-              <button onClick={() => setShowDTMF((v) => !v)} style={pillBtn(showDTMF)}>🔢 Keypad</button>
-              <button onClick={() => { setXferMode('blind'); setShowXfer(true); }} style={pillBtn(false)}>↪ Blind</button>
-              <button onClick={() => { setXferMode('attended'); setShowXfer(true); }} style={pillBtn(sp.hasConsult())} disabled={sp.hasConsult()}>↗ Attended</button>
-              <button onClick={sp.toggleRecording} style={pillBtn(sp.recording)}>{sp.recording ? '⏺ Stop' : '⏺ Record'}</button>
-            </div>
-
-            {sp.hasConsult() ? (
-              <>
-                <button onClick={sp.completeAttendedTransfer} style={{ ...pillBtn(true), width: '100%', marginBottom: 8, padding: '12px' }}>✓ Complete transfer</button>
-                <button onClick={sp.cancelAttendedConsult} style={{ ...pillBtn(false, true), width: '100%' }}>✕ Cancel consult</button>
-              </>
-            ) : (
-              <button onClick={sp.hangup} style={{ ...circleBtn(t.danger, 60), marginTop: 8 }}>📵</button>
-            )}
-          </div>
-        )}
-
-        {/* Idle */}
-        {!inCall && !ringing && tab === 'dial' && (
-          <>
-            <CallForwarding extension={creds.extension} />
-            <div style={{
-              textAlign: 'center', fontSize: 28, fontWeight: 600,
-              minHeight: 44, marginBottom: 18, opacity: dial ? 1 : 0.35,
-              fontFamily: 'JetBrains Mono, monospace', letterSpacing: 2,
-              color: t.text,
-            }}>
-              {dial || 'Enter number'}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 18 }}>
-              {dialKeys.map(([key, sub]) => (
-                <button
-                  key={key}
-                  onClick={() => setDial((p) => p + key)}
-                  style={{
-                    background: mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(15,18,28,0.03)',
-                    border: `1px solid ${t.border}`,
-                    borderRadius: 12, color: t.text,
-                    padding: '16px 8px', cursor: 'pointer',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                    transition: 'all 140ms ease',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = t.accentSoft; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(15,18,28,0.03)'; e.currentTarget.style.borderColor = t.border; }}
-                >
-                  <span style={{ fontSize: 22, fontWeight: 500 }}>{key}</span>
-                  <span style={{ fontSize: 9, color: t.textSubtle }}>{sub}</span>
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18 }}>
-              <button
-                onClick={() => setDial((p) => p.slice(0, -1))}
-                style={{
-                  background: 'none', border: 'none', color: t.textMuted,
-                  fontSize: 20, cursor: 'pointer', padding: 8,
-                }}
-              >⌫</button>
-              <button
-                onClick={handleCall}
-                disabled={!dial || sp.snap.status !== 'registered'}
-                style={{
-                  ...circleBtn(t.success, 60, '0 8px 24px -8px ' + t.success),
-                  opacity: (!dial || sp.snap.status !== 'registered') ? 0.4 : 1,
-                  cursor: (!dial || sp.snap.status !== 'registered') ? 'not-allowed' : 'pointer',
-                }}
-              >📞</button>
-              <div style={{ width: 36 }} />
-            </div>
-          </>
-        )}
-
-        {!inCall && !ringing && tab === 'recents' && (
-          <RecentsList extension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
-        )}
-        {!inCall && !ringing && tab === 'contacts' && (
-          <ContactsList selfExtension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
-        )}
-        {!inCall && !ringing && tab === 'voicemail' && (
-          <VoicemailList extension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
-        )}
-        {!inCall && !ringing && tab === 'sms' && (
-          <SmsThreads />
-        )}
-      </div>
-
       {/* Transfer modal */}
       {showXfer && (
         <div style={{
-          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)',
+          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
           backdropFilter: 'blur(8px)',
         }} onClick={() => setShowXfer(false)}>
           <div
             style={{
-              background: t.surfaceElev, border: `1px solid ${t.borderStrong}`,
-              borderRadius: 16, padding: 20, width: 300, boxShadow: t.shadow,
+              background: 'rgba(15,15,30,0.95)', border: `1px solid ${c.borderGold}`,
+              borderRadius: 16, padding: 20, width: 300,
+              boxShadow: '0 25px 50px rgba(0,0,0,0.6)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-              {xferMode === 'blind' ? 'Blind transfer' : 'Attended transfer'}
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: c.gold }}>
+              {xferMode === 'blind' ? '↪ Blind transfer' : '↗ Attended transfer'}
             </div>
             <input
               autoFocus
+              className="lemtel-input"
               value={xferTarget}
               onChange={(e) => setXferTarget(e.target.value)}
               placeholder="Extension or number"
-              style={{
-                width: '100%',
-                background: mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(15,18,28,0.03)',
-                border: `1px solid ${t.border}`,
-                borderRadius: 10, color: t.text,
-                padding: '11px 12px', fontSize: 14, outline: 'none', boxSizing: 'border-box',
-              }}
               onKeyDown={(e) => e.key === 'Enter' && handleXferSubmit()}
             />
             <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-              <button onClick={() => setShowXfer(false)} style={{ ...pillBtn(false), flex: 1, padding: '11px' }}>Cancel</button>
-              <button onClick={handleXferSubmit} style={{ ...pillBtn(true), flex: 1, padding: '11px' }}>
+              <button onClick={() => setShowXfer(false)} style={ghostBtn}>Cancel</button>
+              <button onClick={handleXferSubmit} className="lemtel-btn-primary" style={{ ...ghostBtn, color: '#fff', border: 'none' }}>
                 {xferMode === 'blind' ? 'Transfer' : 'Start consult'}
               </button>
             </div>
-            {xferMode === 'attended' && (
-              <div style={{ fontSize: 10, color: t.textSubtle, marginTop: 10 }}>
-                Speak with the new party, then press ✓ Complete to connect them with the caller.
-              </div>
-            )}
           </div>
         </div>
       )}
 
-      {/* AVA footer */}
-      <div
-        data-testid="ava-footer"
-        style={{
-          flexShrink: 0,
-          padding: '10px 16px 12px',
-          borderTop: `1px solid ${t.border}`,
-          background: t.surface,
-          backdropFilter: 'blur(12px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 6,
-          fontSize: 10,
-          color: t.textMuted,
-          letterSpacing: 0.4,
-        }}
-      >
-        <div style={{
-          width: 14, height: 14, borderRadius: 4, background: t.accentGradient,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: 8, fontWeight: 800,
-        }}>A</div>
-        <span>App built by</span>
+      {/* Footer */}
+      <div style={{
+        position: 'relative', zIndex: 1, flexShrink: 0,
+        padding: '8px 14px', fontSize: 9, color: c.textDim,
+        textAlign: 'center', letterSpacing: 0.4,
+        borderTop: `1px solid ${c.border}`,
+        background: 'rgba(0,0,0,0.3)',
+      }}>
+        Lemtel Telecom v1.0.4 · Powered by{' '}
         <a
-          href="https://avastatistic.ca"
-          onClick={(e) => {
-            e.preventDefault();
-            window.electronAPI?.openExternal?.('https://assistantvirtualai.com');
-          }}
-          style={{ color: t.accent, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}
+          onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal?.('https://assistantvirtualai.com'); }}
+          href="#"
+          style={{ color: c.gold, textDecoration: 'none', cursor: 'pointer' }}
         >
-          AVA Statistics · assistantvirtualai.com
+          AVA AI
         </a>
       </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.06); }
-        }
-      `}</style>
     </div>
   );
 }
+
+/* ============================================================
+   Sub-components
+   ============================================================ */
+
+function Dialer({
+  dial, setDial, dialKeys, onCall, canCall, extension,
+}: {
+  dial: string; setDial: (s: string | ((p: string) => string)) => void;
+  dialKeys: [string, string][]; onCall: () => void; canCall: boolean; extension: string;
+}) {
+  return (
+    <div style={{ animation: 'fadeIn .25s ease-out' }}>
+      <CallForwarding extension={extension} />
+
+      {/* Number display */}
+      <div style={{
+        textAlign: 'center', minHeight: 56, marginBottom: 14,
+        fontFamily: 'JetBrains Mono, Menlo, monospace',
+        fontSize: 28, letterSpacing: 4, fontWeight: 500,
+        color: dial ? c.text : c.textDim,
+        textShadow: dial ? `0 0 18px ${c.goldDim}` : 'none',
+      }}>
+        {dial || '·  ·  ·  ·'}
+      </div>
+
+      {/* Dialpad */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10,
+        maxWidth: 260, margin: '0 auto 18px',
+      }}>
+        {dialKeys.map(([key, sub]) => (
+          <button
+            key={key}
+            className="lemtel-key"
+            onClick={() => setDial((p) => p + key)}
+            style={{ height: 64, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}
+          >
+            <span style={{ fontSize: 22, fontWeight: 600 }}>{key}</span>
+            {sub && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', letterSpacing: 2 }}>{sub}</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* Action row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24 }}>
+        <button
+          onClick={() => setDial('')}
+          disabled={!dial}
+          style={{
+            background: 'none', border: 'none', color: dial ? c.textSub : 'transparent',
+            fontSize: 14, cursor: dial ? 'pointer' : 'default', padding: 8, width: 56,
+          }}
+          title="Clear"
+        >Clear</button>
+
+        <button
+          onClick={onCall}
+          disabled={!canCall}
+          style={{
+            width: 64, height: 64, borderRadius: '50%',
+            background: canCall
+              ? 'linear-gradient(135deg, #059669 0%, #10B981 100%)'
+              : 'rgba(16,185,129,0.2)',
+            border: 'none', color: '#fff', fontSize: 26, cursor: canCall ? 'pointer' : 'not-allowed',
+            boxShadow: canCall ? `0 4px 20px ${c.aiGlow}, ${glow.green}` : 'none',
+            transition: 'transform .15s ease, box-shadow .15s ease',
+          }}
+          onMouseEnter={(e) => { if (canCall) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.06)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
+        >☏</button>
+
+        <button
+          onClick={() => setDial((p) => p.slice(0, -1))}
+          disabled={!dial}
+          style={{
+            background: 'none', border: 'none', color: dial ? c.textSub : 'transparent',
+            fontSize: 20, cursor: dial ? 'pointer' : 'default', padding: 8, width: 56,
+          }}
+        >⌫</button>
+      </div>
+    </div>
+  );
+}
+
+function CallingState({ who, onHangup }: { who: string; onHangup: () => void }) {
+  return (
+    <div style={callViewStyle}>
+      <div style={{ position: 'relative', marginBottom: 22 }}>
+        {[0, 1, 2].map((i) => (
+          <div key={i} style={{
+            position: 'absolute', inset: 0, borderRadius: '50%',
+            border: `2px solid ${c.gold}`,
+            animation: `ripple 1.8s ${i * 0.6}s ease-out infinite`,
+          }} />
+        ))}
+        <div style={{
+          width: 110, height: 110, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #003DA6, #7C3AED)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 42, color: '#fff', boxShadow: glow.blue,
+          position: 'relative', zIndex: 1,
+        }}>☏</div>
+      </div>
+      <div style={{ fontSize: 11, color: c.aiLight, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 6 }}>Calling…</div>
+      <div style={{ fontSize: 24, fontWeight: 600, marginBottom: 32, color: c.text }}>{who}</div>
+      <button onClick={onHangup} style={hangupBtn}>📵</button>
+    </div>
+  );
+}
+
+function IncomingCall({ who, number, onAnswer, onDecline }: { who: string; number?: string; onAnswer: () => void; onDecline: () => void }) {
+  return (
+    <div style={{ ...callViewStyle, animation: 'slideDown .35s ease-out' }}>
+      <div style={{ position: 'relative', marginBottom: 22 }}>
+        {[0, 1, 2].map((i) => (
+          <div key={i} style={{
+            position: 'absolute', inset: 0, borderRadius: '50%',
+            border: `2px solid ${c.gold}`,
+            animation: `ripple 1.6s ${i * 0.5}s ease-out infinite`,
+          }} />
+        ))}
+        <div style={{
+          width: 110, height: 110, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #003DA6, #7C3AED)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 44, color: '#fff', boxShadow: glow.ai,
+          position: 'relative', zIndex: 1, fontWeight: 700,
+        }}>{String(who).charAt(0).toUpperCase()}</div>
+      </div>
+      <div style={{ fontSize: 11, color: c.gold, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 6 }}>Incoming Call</div>
+      <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 4, color: c.text }}>{who}</div>
+      {number && number !== who && <div style={{ fontSize: 13, color: c.textSub, marginBottom: 32 }}>{number}</div>}
+      <div style={{ display: 'flex', gap: 28, marginTop: 24 }}>
+        <button onClick={onDecline} style={{
+          ...hangupBtn, background: 'linear-gradient(135deg, #DC2626, #EF4444)', boxShadow: glow.red,
+        }}>✕</button>
+        <button onClick={onAnswer} style={{
+          ...hangupBtn, background: 'linear-gradient(135deg, #059669, #10B981)', boxShadow: glow.green,
+        }}>✓</button>
+      </div>
+    </div>
+  );
+}
+
+function ActiveCall({
+  sp, timer, showDTMF, toggleDTMF, dialKeys, onTransfer,
+}: {
+  sp: any; timer: string; showDTMF: boolean; toggleDTMF: () => void;
+  dialKeys: [string, string][]; onTransfer: (m: 'blind' | 'attended') => void;
+}) {
+  const remote = sp.snap.remoteIdentity || sp.snap.remoteNumber || 'Unknown';
+
+  return (
+    <div style={{
+      ...callViewStyle,
+      background: 'linear-gradient(180deg, #050510 0%, #0a0015 100%)',
+    }}>
+      <div style={{
+        width: 92, height: 92, borderRadius: '50%',
+        background: 'linear-gradient(135deg, #003DA6, #7C3AED)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 36, fontWeight: 700, color: '#fff', boxShadow: glow.blue,
+        marginBottom: 14,
+      }}>
+        {String(remote).charAt(0).toUpperCase()}
+      </div>
+
+      <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 4, color: c.text }}>{remote}</div>
+      <div style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '3px 10px', borderRadius: 999,
+        background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.35)',
+        color: c.green, fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase',
+        boxShadow: glow.green, marginBottom: 10,
+      }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.green }} />
+        {sp.snap.onHold ? 'On Hold' : 'Active Call'}
+      </div>
+      <div style={{
+        fontFamily: 'JetBrains Mono, Menlo, monospace', fontSize: 22, fontWeight: 500,
+        color: c.gold, letterSpacing: 2, marginBottom: 18,
+      }}>{timer}</div>
+
+      {/* Visualizer */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 32, marginBottom: 22 }}>
+        {[0.6, 0.9, 0.4, 1, 0.7, 0.5, 0.85].map((h, i) => (
+          <div key={i} style={{
+            width: 4, height: `${h * 100}%`, borderRadius: 2,
+            background: 'linear-gradient(180deg, #003DA6, #7C3AED)',
+            animation: `wave ${0.7 + i * 0.1}s ease-in-out infinite`,
+            transformOrigin: 'bottom',
+          }} />
+        ))}
+      </div>
+
+      {showDTMF && (
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
+          marginBottom: 14, width: '100%', maxWidth: 240,
+        }}>
+          {dialKeys.map(([k]) => (
+            <button key={k} className="lemtel-key" onClick={() => sp.sendDTMF(k)} style={{ padding: '10px 0', fontSize: 16 }}>{k}</button>
+          ))}
+        </div>
+      )}
+
+      {/* Controls grid */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8,
+        width: '100%', maxWidth: 280, marginBottom: 12,
+      }}>
+        <ControlBtn icon="🎤" label={sp.snap.muted ? 'Unmute' : 'Mute'} active={sp.snap.muted} danger onClick={sp.snap.muted ? sp.unmute : sp.mute} />
+        <ControlBtn icon="⏸" label={sp.snap.onHold ? 'Resume' : 'Hold'} active={sp.snap.onHold} warning onClick={sp.snap.onHold ? sp.unhold : sp.hold} />
+        <ControlBtn icon="#" label="Keypad" active={showDTMF} onClick={toggleDTMF} />
+        <ControlBtn icon="⏺" label={sp.recording ? 'Stop' : 'Record'} active={sp.recording} onClick={sp.toggleRecording} />
+        <ControlBtn icon="↪" label="Blind Xfer" onClick={() => onTransfer('blind')} />
+        <ControlBtn icon="↗" label="Attended" onClick={() => onTransfer('attended')} disabled={sp.hasConsult()} active={sp.hasConsult()} />
+      </div>
+
+      {sp.hasConsult() ? (
+        <div style={{ width: '100%', maxWidth: 280, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button onClick={sp.completeAttendedTransfer} className="lemtel-btn-primary" style={{
+            height: 44, borderRadius: 12, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          }}>✓ Complete Transfer</button>
+          <button onClick={sp.cancelAttendedConsult} style={endCallBtn}>✕ Cancel Consult</button>
+        </div>
+      ) : (
+        <button onClick={sp.hangup} style={endCallBtn}>📵 End Call</button>
+      )}
+    </div>
+  );
+}
+
+function ControlBtn({
+  icon, label, onClick, active, danger, warning, disabled,
+}: {
+  icon: string; label: string; onClick: () => void;
+  active?: boolean; danger?: boolean; warning?: boolean; disabled?: boolean;
+}) {
+  const bg = active
+    ? danger ? 'rgba(239,68,68,0.18)' : warning ? 'rgba(245,158,11,0.18)' : 'rgba(255,215,0,0.15)'
+    : 'rgba(255,255,255,0.05)';
+  const bd = active
+    ? danger ? 'rgba(239,68,68,0.5)' : warning ? 'rgba(245,158,11,0.5)' : c.borderGold
+    : c.border;
+  const col = active
+    ? danger ? c.red : warning ? c.yellow : c.gold
+    : c.text;
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        height: 44, borderRadius: 12,
+        background: bg, border: `1px solid ${bd}`, color: col,
+        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        fontSize: 11, fontWeight: 600, letterSpacing: 0.3,
+        transition: 'all .15s ease',
+        boxShadow: active ? `0 0 12px ${col}33` : 'none',
+      }}
+    >
+      <span style={{ fontSize: 14 }}>{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+/* ===== shared styles ===== */
+
+const callViewStyle: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', alignItems: 'center',
+  justifyContent: 'center', minHeight: 'calc(100vh - 130px)',
+  padding: '28px 20px', textAlign: 'center',
+  animation: 'fadeIn .3s ease-out',
+};
+
+const hangupBtn: React.CSSProperties = {
+  width: 64, height: 64, borderRadius: '50%',
+  background: 'linear-gradient(135deg, #DC2626, #EF4444)',
+  border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer',
+  boxShadow: '0 4px 20px rgba(239,68,68,0.5)',
+};
+
+const endCallBtn: React.CSSProperties = {
+  width: '100%', maxWidth: 280, height: 52, borderRadius: 14,
+  background: 'linear-gradient(135deg, #DC2626, #EF4444)',
+  border: 'none', color: '#fff', fontSize: 14, fontWeight: 700, letterSpacing: 0.5,
+  cursor: 'pointer', boxShadow: '0 4px 20px rgba(239,68,68,0.5)',
+  marginTop: 4,
+};
+
+const ghostBtn: React.CSSProperties = {
+  flex: 1, height: 40, borderRadius: 10,
+  background: 'rgba(255,255,255,0.05)', border: `1px solid ${c.border}`,
+  color: c.text, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+};
