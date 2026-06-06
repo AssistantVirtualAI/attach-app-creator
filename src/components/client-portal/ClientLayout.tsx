@@ -364,15 +364,16 @@ export const ClientLayout = () => {
       </motion.aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto relative z-10">
+      <main className="flex-1 overflow-auto relative z-10 flex flex-col">
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="container mx-auto p-6 max-w-7xl"
+          className="container mx-auto p-6 max-w-7xl flex-1"
         >
           <Outlet />
         </motion.div>
+        <AvaFooter />
       </main>
     </div>
   );
