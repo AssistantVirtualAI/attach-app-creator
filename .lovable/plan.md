@@ -1,95 +1,66 @@
-# Plan — Visual Refresh + AI Analysis Page
+## Redesign desktop softphone — Noir & Or premium
 
-## 1. Visual refresh (modern, AI-flavored)
+### 1. Logo — full Lemtel wordmark
+- Generate a new wordmark image: "LEMTEL" in elegant uppercase letterforms, refined gold (#FFD700 → #F0C75A gradient) on transparent background, optional thin "COMMUNICATIONS" tracking-wide subtitle below. Save to `apps/ava-softphone-desktop/src/assets/lemtel-wordmark.png` (transparent PNG, premium quality).
+- Update `LemtelLogo.tsx` to use the new wordmark with proper heights: `xs` 22px, `sm` 32px, `md` 56px, `lg` 110px. Remove halo conic-blob (too noisy); replace with subtle gold drop-shadow only.
+- **AuthScreen (SetupWizard)**: full wordmark `size="lg"`, centered, no halo background — just clean spotlight.
+- **TitleBar**: wordmark `size="xs"` on the left, replaces current cropped logo.
+- **Softphone footer**: keep AVA Statistic + assistantvirtualai.com link, add a small Lemtel wordmark above it.
 
-Goal: cohesive cyberpunk / glass-morphism AI aesthetic across web app + desktop softphone, without changing business logic.
+### 2. Palette lock — Noir & Or premium
+Update `lib/theme.tsx` design tokens to:
+```
+bg.base        #050510  (near-black blue-tinted)
+bg.surface     #0F0F1E  (cards)
+bg.elev        #16162B  (raised)
+border.subtle  rgba(255,215,0,0.08)
+border.gold    rgba(255,215,0,0.25)
+text.primary   #F5F5F7
+text.muted     #8A8A99
+gold           #FFD700
+gold.soft      #F0C75A
+blue           #003DA6  (kept as secondary accent for SIP status / links)
+glow.gold      0 0 24px rgba(255,215,0,0.35)
+```
+Remove the purple AI color from primary surfaces (kept only as small AI-tab accent). No more rgba(0,90,255) radial blobs on auth.
 
-### 1.1 Design tokens (`src/index.css`, `tailwind.config.ts`)
-- New semantic tokens (HSL only):
-  - `--surface-glass`, `--surface-elevated`, `--border-glow`
-  - `--gradient-ai`: indigo → cyan → gold sweep
-  - `--gradient-mesh`: animated radial mesh for hero backgrounds
-  - `--shadow-glow-primary`, `--shadow-glow-accent`
-  - `--ring-ai` (focus ring)
-- Utility classes: `.glass-card`, `.ai-border`, `.ai-glow`, `.ai-grid-bg` (subtle dotted/grid overlay), `.ai-text-gradient`.
-- Keep Inter / Fira Code; add display weight 800 for hero numerals.
+### 3. Bottom tabs — Lucide outline raffinés
+Standardize to **stroke 1.5, size 20**, label 11px tracking-wider underneath. Active state = gold icon + gold label + 1px gold top-border + soft gold underglow. Inactive = `text.muted`.
 
-### 1.2 Shared visual primitives (`src/components/ui/ai/`)
-- `GlassCard.tsx` – frosted panel with animated gradient border.
-- `AIBadge.tsx` – small "AI" pill with pulsing dot.
-- `MeshBackground.tsx` – animated SVG/CSS mesh (no heavy deps).
-- `StatTile.tsx` – KPI tile w/ sparkline + glow.
-- `SectionHeader.tsx` – icon + gradient title + subtitle.
+Map per tab:
+- Phone → `Phone`
+- History → `Clock3`
+- Contacts → `Users`
+- Voicemail → `Voicemail`
+- SMS → `MessageSquare`
+- Recordings → `Disc3`
+- AI → `Sparkles` (only tab keeping a hint of purple accent on active)
 
-### 1.3 Layout polish
-- AppShell sidebar: condensed icons, active item with neon underline + glow.
-- Topbar: glass blur, status dot, AI quick-action button (opens AI Analysis).
-- Cards across Dashboard / Conversations / Leads / Telephony switch to `GlassCard`.
-- Charts: unify Recharts theme (HSL tokens, gradient fills, rounded bars, soft grid).
-- Empty states: illustrated with `MeshBackground` + AI badge.
+Bar: 64px tall, `bg.surface` + 1px top `border.subtle`, equal-flex items, no pill background per tab.
 
-### 1.4 Desktop softphone (`apps/ava-softphone-desktop`)
-- Reuse `LemtelLogo` (already shared).
-- Apply gradient borders + glow to keypad buttons, status select, call control pills.
-- Footer keeps logo; add subtle moving gradient line above border.
+### 4. Spacious & aéré layout
+- Increase global padding: panes get 28px horizontal / 24px vertical (was ~16).
+- Dialer display: 36px monospace, letter-spacing 2px, 32px vertical breathing room.
+- Dialpad keys: 64×64 (was 56), gap 16px, subtle inner gradient + 1px gold border on press.
+- Call button: 72px circle, green→emerald gradient kept, larger glow.
+- Lists (Recents/Contacts/Recordings/etc.): 64px row height, 16px gap between avatar/icon and text, divider = 1px `border.subtle`.
+- Remove the animated background orbs everywhere except auth — keep auth with ONE single soft gold radial behind the wordmark, nothing more.
 
-### 1.5 Auth + Portal landing
-- Auth page: mesh background, glass form card, gradient CTA, logo halo.
-- Lemtel portal dashboard: replace flat cards with `GlassCard` + `StatTile`.
+### 5. TitleBar polish
+- 44px height, full-bleed `bg.base`, 1px gold under-glow line replaced by a subtle 1px `border.subtle`.
+- Center status pill: smaller (12px text), pill bg `bg.elev`, dot uses gold when connected, muted when offline.
 
-## 2. AI Analysis page
+### 6. SetupWizard (Auth) polish
+- Single centered card 420px wide, 32px padding, `bg.surface` with 1px `border.subtle`, 24px radius, soft gold glow on focus only.
+- Full Lemtel wordmark above title, then thin uppercase tracking-wide caption "BUSINESS PHONE SYSTEM".
+- Inputs: 48px tall, `bg.elev`, gold focus ring (1px), no purple.
+- Submit button: gold gradient, black text, bold.
 
-Goal: a single page that ingests existing app data (calls, recordings, conversations, leads) and produces AI summaries + insights via Lovable AI Gateway.
+### 7. Files to change
+- Create: `apps/ava-softphone-desktop/src/assets/lemtel-wordmark.png` (via imagegen premium, transparent)
+- Edit: `LemtelLogo.tsx`, `TitleBar.tsx`, `SetupWizard.tsx`, `SoftphonePane.tsx` (tabs + dialer spacing + remove orbs + footer), `lib/theme.tsx` (tokens), `styles/animations.css` (remove orb keyframes, keep status pulse + ripple)
+- Light pass on list components (`RecentsList`, `ContactsList`, `VoicemailList`, `RecordingsList`, `AIInsights`, `SmsThreads`) only to apply new spacing/typography tokens — no logic changes.
+- Bump `package.json` to `1.0.5`.
 
-### 2.1 Route + nav
-- New route: `/ai-insights` (admin) and `/org/lemtel/portal/ai-insights` (portal).
-- Sidebar entry "AI Insights" with `AIBadge`.
-
-### 2.2 Page sections (`src/pages/AIInsights.tsx`)
-1. **Overview strip** — period selector (24h / 7d / 30d), 4 `StatTile`s: total calls, avg duration, sentiment score, top topic.
-2. **Call summaries feed** — paginated list of recent calls with: caller, duration, AI summary (2–3 lines), sentiment chip, action items, "View transcript" drawer.
-3. **Recording analysis** — when a recording URL exists (`pbx_call_recordings` / `lemtel-recordings` bucket), transcribe (ElevenLabs STT already integrated) then summarize.
-4. **Topic clusters** — bar/treemap of detected topics across the period.
-5. **Lead intelligence** — AI scoring of leads (intent, urgency, next best action).
-6. **Ask AI** — free-form chat box scoped to the org's data (RAG-lite: send aggregated context, not raw rows).
-
-### 2.3 Data sources (already in DB)
-- `pbx_calls`, `pbx_call_recordings`, `pbx_sms_messages`
-- `conversations`, `conversation_analysis`
-- `leads`
-- Storage bucket `lemtel-recordings` (signed URLs only, server-side).
-
-### 2.4 Edge functions (new, all `verify_jwt = false` + in-code JWT + org membership check)
-- `ai-summarize-call` — input: `{ callId }`. Loads call + transcript (or transcribes via ElevenLabs if only audio), returns `{ summary, sentiment, topics, actionItems }` via `google/gemini-3-flash-preview` with tool-calling schema.
-- `ai-period-insights` — input: `{ organizationId, from, to }`. Aggregates counts/topics, asks Gemini for narrative + recommendations.
-- `ai-score-leads` — input: `{ organizationId, leadIds? }`. Returns score + reasoning per lead.
-- `ai-ask` — streaming chat endpoint (SSE) scoped to org context bundle.
-- All call Lovable AI Gateway (`https://ai.gateway.lovable.dev/v1/chat/completions`) with `LOVABLE_API_KEY`; surface 429/402 to client toasts.
-
-### 2.5 Caching
-- New table `ai_call_summaries` (call_id PK, organization_id, summary jsonb, model, created_at) with RLS scoped to org members; GRANT to authenticated + service_role.
-- Reuse summary if `created_at` newer than recording's `updated_at`.
-
-### 2.6 Frontend hooks
-- `useCallSummary(callId)` – fetches cached or triggers edge function.
-- `usePeriodInsights(range)` – memoized, cached 10 min.
-- `useAskAI()` – SSE stream with token-by-token rendering and markdown via `react-markdown`.
-
-### 2.7 Security
-- All edge functions validate JWT + verify `organization_members` membership before reading rows or signing recording URLs.
-- Frontend reads only from `_safe` views; raw recordings accessed exclusively via signed URLs from edge functions.
-
-## 3. Rollout order
-1. Design tokens + shared `ui/ai/*` primitives.
-2. Apply primitives to Dashboard, Conversations, Lemtel portal dashboard (visible wins first).
-3. Migration: `ai_call_summaries` table + RLS + grants.
-4. Edge functions: `ai-summarize-call`, `ai-period-insights`, `ai-score-leads`, `ai-ask`.
-5. Build `/ai-insights` page wired to those functions.
-6. Add sidebar entry + portal mirror route.
-7. Polish softphone + Auth visuals.
-8. Manual QA across desktop / tablet / mobile + hard refresh.
-
-## 4. Out of scope
-- No new auth providers, billing changes, or schema beyond `ai_call_summaries`.
-- No replacement of existing Recharts library — only theming.
-- No real-time transcription pipeline changes beyond reusing current ElevenLabs STT.
+### Out of scope
+No changes to business logic, edge function calls, SIP layer, or sidebar config. Mobile app (`apps/ava-softphone-mobile/`) untouched.
