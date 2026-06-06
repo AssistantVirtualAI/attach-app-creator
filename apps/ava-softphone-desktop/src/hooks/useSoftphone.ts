@@ -113,7 +113,17 @@ export function useSoftphone(args: UseSoftphoneArgs) {
       snap.callState === 'active' || snap.callState === 'held' ? 'oncall' :
       snap.status === 'registered' ? 'available' : 'offline';
     window.electronAPI?.updateTrayStatus?.(trayState);
-  }, [snap.status, snap.callState]);
+
+    // Publish presence for BLF on other clients
+    (async () => {
+      try {
+        await supabase
+          .from('pbx_softphone_users')
+          .update({ status: trayState, last_seen_at: new Date().toISOString() })
+          .eq('extension', args.extension);
+      } catch { /* noop */ }
+    })();
+  }, [snap.status, snap.callState, args.extension]);
 
   return {
     snap,
