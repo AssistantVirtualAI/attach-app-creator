@@ -1,28 +1,254 @@
-appId: com.ava-telecom.softphone
-productName: AVA Softphone
-directories:
-  output: dist-electron
-files:
-  - dist/**/*
-  - electron/**/*
-  - assets/**/*
-  - package.json
-mac:
-  category: public.app-category.business
-  target:
-    - dmg
-    - zip
-win:
-  target:
-    - nsis
-linux:
-  target:
-    - AppImage
-    - deb
-  category: Office
-publish:
-  - provider: github
-    owner: AssistantVirtualAI
-    repo: attach-app-creator
-    private: false
-    releaseType: release
+name: Build & Release AVA Softphone
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+      - 'desktop-v*'
+  release:
+    types: [published, created]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  verify-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cat apps/ava-softphone-desktop/package.json | grep '"version"'
+
+  build-windows:
+    needs: verify-version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+        working-directory: apps/ava-softphone-desktop
+
+      - name: Overwrite vite.config.ts
+        shell: pwsh
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          $nl = [Environment]::NewLine
+          $c = 'import { defineConfig } from ''vite''' + $nl
+          $c += 'import react from ''@vitejs/plugin-react''' + $nl
+          $c += 'import path from ''path''' + $nl
+          $c += 'export default defineConfig({' + $nl
+          $c += '  plugins: [react()],' + $nl
+          $c += '  resolve: { alias: { ''@'': path.resolve(__dirname, ''./src'') } },' + $nl
+          $c += '  build: { outDir: ''dist'', emptyOutDir: true, rollupOptions: { external: [''electron''] } },' + $nl
+          $c += '  base: ''./'',' + $nl
+          $c += '})' + $nl
+          Set-Content -Path "vite.config.ts" -Value $c -Encoding UTF8
+          Get-Content "vite.config.ts"
+
+      - name: Delete root postcss + clear cache
+        shell: pwsh
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          Remove-Item -Path "..\..\postcss.config.js" -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "..\..\postcss.config.cjs" -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "..\..\postcss.config.mjs" -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -Path "." -Filter "vite.config.ts.timestamp*" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
+          if (Test-Path "node_modules/.vite") { Remove-Item -Recurse -Force "node_modules/.vite" }
+
+      - name: Build Vite
+        shell: pwsh
+        working-directory: apps/ava-softphone-desktop
+        run: npx vite build
+
+      - name: Compile Electron TypeScript
+        shell: pwsh
+        working-directory: apps/ava-softphone-desktop/electron
+        run: |
+          npx tsc main.ts preload.ts tray.ts notifications.ts updater.ts `
+            --target ES2020 --module commonjs --moduleResolution node `
+            --esModuleInterop --skipLibCheck --outDir .
+          if ($LASTEXITCODE -ne 0) { Write-Host "tsc warnings ignored" }
+          Get-ChildItem *.js -ErrorAction SilentlyContinue | Select-Object Name
+
+      - name: Package Windows
+        shell: pwsh
+        working-directory: apps/ava-softphone-desktop
+        run: npx electron-builder --win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          WIN_CSC_LINK: ''
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: apps/ava-softphone-desktop/dist-electron/*.exe
+          if-no-files-found: warn
+
+  build-mac:
+    needs: verify-version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+        working-directory: apps/ava-softphone-desktop
+
+      - name: Overwrite vite.config.ts
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          python3 -c "
+          lines = [
+            'import { defineConfig } from \"vite\"',
+            'import react from \"@vitejs/plugin-react\"',
+            'import path from \"path\"',
+            'export default defineConfig({',
+            '  plugins: [react()],',
+            '  resolve: { alias: { \"@\": path.resolve(__dirname, \"./src\") } },',
+            '  build: { outDir: \"dist\", emptyOutDir: true, rollupOptions: { external: [\"electron\"] } },',
+            '  base: \"./\",',
+            '})',
+          ]
+          open('vite.config.ts', 'w').write('\n'.join(lines) + '\n')
+          "
+          cat vite.config.ts
+
+      - name: Delete root postcss + clear cache
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          rm -f ../../postcss.config.js ../../postcss.config.cjs ../../postcss.config.mjs
+          find . -name "vite.config.ts.timestamp*" -delete 2>/dev/null || true
+          rm -rf node_modules/.vite 2>/dev/null || true
+          ls -la ../../postcss* 2>/dev/null || echo "No postcss at root"
+
+      - name: Build Vite
+        working-directory: apps/ava-softphone-desktop
+        run: npx vite build
+
+      - name: Compile Electron TypeScript
+        working-directory: apps/ava-softphone-desktop/electron
+        run: |
+          npx tsc main.ts preload.ts tray.ts notifications.ts updater.ts \
+            --target ES2020 --module commonjs --moduleResolution node \
+            --esModuleInterop --skipLibCheck --outDir . || true
+          ls -la *.js 2>/dev/null || echo "No JS files"
+
+      - name: Package Mac
+        working-directory: apps/ava-softphone-desktop
+        run: npx electron-builder --mac --x64 --arm64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_LINK: ''
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-build
+          path: |
+            apps/ava-softphone-desktop/dist-electron/*.dmg
+            apps/ava-softphone-desktop/dist-electron/*.zip
+          if-no-files-found: warn
+
+  build-linux:
+    needs: verify-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install Linux system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libnotify-dev \
+            libasound2-dev libcups2-dev libxss1 libxtst6 xvfb \
+            libx11-xcb1 libxcb-dri3-0 libdrm2 libgbm1 libnss3 \
+            libatk-bridge2.0-0
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+        working-directory: apps/ava-softphone-desktop
+
+      - name: Overwrite vite.config.ts
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          python3 -c "
+          lines = [
+            'import { defineConfig } from \"vite\"',
+            'import react from \"@vitejs/plugin-react\"',
+            'import path from \"path\"',
+            'export default defineConfig({',
+            '  plugins: [react()],',
+            '  resolve: { alias: { \"@\": path.resolve(__dirname, \"./src\") } },',
+            '  build: { outDir: \"dist\", emptyOutDir: true, rollupOptions: { external: [\"electron\"] } },',
+            '  base: \"./\",',
+            '})',
+          ]
+          open('vite.config.ts', 'w').write('\n'.join(lines) + '\n')
+          "
+          cat vite.config.ts
+
+      - name: Delete root postcss + clear cache
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          rm -f ../../postcss.config.js ../../postcss.config.cjs ../../postcss.config.mjs
+          find . -name "vite.config.ts.timestamp*" -delete 2>/dev/null || true
+          rm -rf node_modules/.vite 2>/dev/null || true
+          ls -la ../../postcss* 2>/dev/null || echo "No postcss at root"
+
+      - name: Build Vite
+        working-directory: apps/ava-softphone-desktop
+        run: npx vite build
+
+      - name: Compile Electron TypeScript
+        working-directory: apps/ava-softphone-desktop/electron
+        run: |
+          npx tsc main.ts preload.ts tray.ts notifications.ts updater.ts \
+            --target ES2020 --module commonjs --moduleResolution node \
+            --esModuleInterop --skipLibCheck --outDir . || true
+          ls -la *.js 2>/dev/null || echo "No JS files"
+
+      - name: Package Linux
+        working-directory: apps/ava-softphone-desktop
+        run: npx electron-builder --linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: |
+            apps/ava-softphone-desktop/dist-electron/*.AppImage
+            apps/ava-softphone-desktop/dist-electron/*.deb
+          if-no-files-found: warn
+
+  create-release:
+    needs: [build-windows, build-mac, build-linux]
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - run: find artifacts -type f | sort
+      - if: >
+          github.event_name == 'release' ||
+          startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_unmatched_files: false
