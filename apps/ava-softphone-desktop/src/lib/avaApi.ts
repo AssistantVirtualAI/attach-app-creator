@@ -215,9 +215,29 @@ export const ava = {
     lastSync: new Date(Date.now() - 600e3).toISOString(),
     status: 'ok',
     jobs: [
-      { kind: 'extensions', finishedAt: new Date(Date.now()-600e3).toISOString(), ok: true },
-      { kind: 'cdr', finishedAt: new Date(Date.now()-900e3).toISOString(), ok: true },
-      { kind: 'devices', finishedAt: new Date(Date.now()-1800e3).toISOString(), ok: true },
-    ],
-  }),
+  /* Phase 3 */
+  voicemails: () => call<VoicemailItem[]>('/desktop/voicemails', {}, MOCK_VM),
+  markVoicemailRead: (id: string) => call<{ ok: true }>(`/desktop/voicemails/${id}/read`, { method: 'POST' }, { ok: true }),
+  recordings: () => call<RecordingItem[]>('/desktop/recordings', {}, MOCK_RECORDINGS),
+  contacts: () => call<ContactItem[]>('/desktop/contacts', {}, MOCK_CONTACTS),
+  /* Phase 3.1 — AI feedback + lifecycle */
+  regenerateSummary: (kind: 'voicemail' | 'recording', id: string, sourceText?: string) =>
+    call<{ summary: string }>(`/desktop/ai/regenerate-summary`, { method: 'POST', body: JSON.stringify({ kind, id, sourceText }) }, {
+      summary: sourceText
+        ? `AVA v2 · ${sourceText.split(/[.!?]/)[0].trim()}. Key points refined and prioritized for action.`
+        : `AVA regenerated this summary with the latest model and tone refinements.`,
+    }),
+  submitSummaryFeedback: (kind: 'voicemail' | 'recording', id: string, feedback: Feedback) =>
+    call<{ ok: true }>(`/desktop/ai/summary-feedback`, { method: 'POST', body: JSON.stringify({ kind, id, feedback }) }, { ok: true }),
+  setVoicemailPriority: (id: string, priority: VoicemailItem['priority']) =>
+    call<{ ok: true }>(`/desktop/voicemails/${id}/priority`, { method: 'POST', body: JSON.stringify({ priority }) }, { ok: true }),
+  markVoicemailHandled: (id: string, handled: boolean) =>
+    call<{ ok: true }>(`/desktop/voicemails/${id}/handled`, { method: 'POST', body: JSON.stringify({ handled }) }, { ok: true }),
+  exportRecordings: (ids: string[]) =>
+    call<{ ok: true; count: number; url: string }>(`/desktop/recordings/export`, { method: 'POST', body: JSON.stringify({ ids }) }, {
+      ok: true, count: ids.length, url: `https://ava.local/exports/recordings-${Date.now()}.zip`,
+    }),
+  updateContact: (id: string, patch: Partial<Pick<ContactItem, 'notes' | 'tags' | 'favorite'>>) =>
+    call<{ ok: true }>(`/desktop/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }, { ok: true }),
+],
 };
