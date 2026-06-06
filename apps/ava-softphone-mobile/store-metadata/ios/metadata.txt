@@ -1,0 +1,23 @@
+App Name: Lemtel Telecom
+Subtitle: AI Business Phone System
+Bundle ID: com.lemtel.softphone
+Category: Business
+Age Rating: 4+
+Keywords: voip, softphone, business phone, lemtel, sip
+
+Description:
+Professional VoIP softphone for Lemtel Communications customers.
+Make and receive calls, manage extensions, view call history, and send SMS — all from your iPhone.
+
+Features:
+• HD voice over Wi-Fi & cellular
+• Push notifications for incoming calls
+• Contacts and recents sync
+• Visual voicemail
+• SMS to your business number
+• Secure SIP/TLS connection
+• Powered by AVA Statistic
+
+Support URL: https://assistantvirtualai.com
+Marketing URL: https://avastatistic.ca
+Privacy Policy URL: https://avastatistic.ca/privacy
