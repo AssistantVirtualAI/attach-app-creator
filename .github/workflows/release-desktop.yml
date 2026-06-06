@@ -41,19 +41,25 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Install root PostCSS deps
-        shell: pwsh
-        run: npm install tailwindcss autoprefixer postcss --no-save
-        working-directory: ${{ github.workspace }}
-
       - name: Install app dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
 
+      - name: Delete root postcss + clear cache
+        shell: pwsh
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          Remove-Item -Path "..\..\postcss.config.js" -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "..\..\postcss.config.cjs" -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "..\..\postcss.config.mjs" -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -Path "." -Filter "vite.config.ts.timestamp*" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
+          if (Test-Path "node_modules/.vite") { Remove-Item -Recurse -Force "node_modules/.vite" }
+          Write-Host "Root postcss deleted, cache cleared"
+
       - name: Build Windows
         shell: pwsh
         run: |
-          npx vite build --config vite.config.ts
+          npx vite build
           npx tsc -p electron/tsconfig.json
           npx electron-builder --win
         working-directory: apps/ava-softphone-desktop
@@ -85,17 +91,22 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Install root PostCSS deps
-        run: npm install tailwindcss autoprefixer postcss --no-save
-        working-directory: ${{ github.workspace }}
-
       - name: Install app dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
 
+      - name: Delete root postcss + clear cache
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          rm -f ../../postcss.config.js ../../postcss.config.cjs ../../postcss.config.mjs
+          find . -name "vite.config.ts.timestamp*" -delete 2>/dev/null || true
+          rm -rf node_modules/.vite 2>/dev/null || true
+          echo "Root postcss deleted, cache cleared"
+          ls -la ../../postcss* 2>/dev/null || echo "No postcss files at root"
+
       - name: Build Mac
         run: |
-          npx vite build --config vite.config.ts
+          npx vite build
           npx tsc -p electron/tsconfig.json
           npx electron-builder --mac --x64 --arm64
         working-directory: apps/ava-softphone-desktop
@@ -138,17 +149,22 @@ jobs:
             libx11-xcb1 libxcb-dri3-0 libdrm2 \
             libgbm1 libnss3 libatk-bridge2.0-0
 
-      - name: Install root PostCSS deps
-        run: npm install tailwindcss autoprefixer postcss --no-save
-        working-directory: ${{ github.workspace }}
-
       - name: Install app dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
 
+      - name: Delete root postcss + clear cache
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          rm -f ../../postcss.config.js ../../postcss.config.cjs ../../postcss.config.mjs
+          find . -name "vite.config.ts.timestamp*" -delete 2>/dev/null || true
+          rm -rf node_modules/.vite 2>/dev/null || true
+          echo "Root postcss deleted, cache cleared"
+          ls -la ../../postcss* 2>/dev/null || echo "No postcss files at root"
+
       - name: Build Linux
         run: |
-          npx vite build --config vite.config.ts
+          npx vite build
           npx tsc -p electron/tsconfig.json
           npx electron-builder --linux
         working-directory: apps/ava-softphone-desktop
