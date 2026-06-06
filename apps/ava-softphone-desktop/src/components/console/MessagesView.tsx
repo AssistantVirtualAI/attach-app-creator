@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, SmsThread } from '../../lib/avaApi';
+import { loadTemplates, saveTemplates, interpolate, MsgTemplate } from '../../lib/messageTemplates';
 
 const { colors: c } = theme;
 
