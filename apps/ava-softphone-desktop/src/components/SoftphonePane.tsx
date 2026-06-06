@@ -293,7 +293,7 @@ export default function SoftphonePane({
       </div>
 
       {/* BOTTOM TABS */}
-      {!inCall && !ringing && (
+      {!inCall && !ringing && !hideTabs && (
         <div style={{
           position: 'relative', zIndex: 1, flexShrink: 0,
           display: 'flex', height: 68,
