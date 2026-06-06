@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import LemtelLogo from './LemtelLogo';
 import { theme } from '../lib/theme';
 
@@ -12,12 +12,23 @@ const noDrag: React.CSSProperties = {
 };
 
 interface Props {
-  sipStatus?: 'registered' | 'connecting' | 'error' | 'unregistered' | string;
+  sipStatus?: string;
 }
 
-export default function TitleBar({ sipStatus = 'connecting' }: Props) {
+export default function TitleBar({ sipStatus: sipStatusProp }: Props) {
   const api = window.electronAPI;
   const { colors } = theme;
+  const [sipStatus, setSipStatus] = useState<string>(sipStatusProp || 'connecting');
+
+  useEffect(() => {
+    const onStatus = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (typeof detail === 'string') setSipStatus(detail);
+    };
+    window.addEventListener('lemtel:sip-status', onStatus as EventListener);
+    return () => window.removeEventListener('lemtel:sip-status', onStatus as EventListener);
+  }, []);
+  useEffect(() => { if (sipStatusProp) setSipStatus(sipStatusProp); }, [sipStatusProp]);
 
   const statusMeta =
     sipStatus === 'registered'
