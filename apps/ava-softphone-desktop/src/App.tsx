@@ -23,7 +23,6 @@ export default function App() {
   const { t } = useTheme();
   const [creds, setCreds] = useState<Creds>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'phone' | 'settings'>('phone');
   const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 980);
 
   useEffect(() => {
@@ -38,6 +37,11 @@ export default function App() {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  const openSettingsMobile = () => {
+    // On narrow viewports the console layout is hidden; just reload after clearing.
+    // The SoftphonePane keeps its own simpler settings affordance.
+  };
 
   if (loading) {
     return (
@@ -65,19 +69,10 @@ export default function App() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: t.bg }}>
       <TitleBar />
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-        {view === 'settings' ? (
-          <SettingsPage
-            creds={creds}
-            onSignOut={async () => {
-              await window.electronAPI.clearCredentials();
-              setCreds(null);
-            }}
-            onBack={() => setView('phone')}
-          />
-        ) : wide ? (
-          <ConsoleLayout creds={creds} onOpenSettings={() => setView('settings')} />
+        {wide ? (
+          <ConsoleLayout creds={creds} onOpenSettings={openSettingsMobile} />
         ) : (
-          <SoftphonePane creds={creds} onOpenSettings={() => setView('settings')} />
+          <SoftphonePane creds={creds} onOpenSettings={openSettingsMobile} />
         )}
       </div>
       <UpdateBanner />
