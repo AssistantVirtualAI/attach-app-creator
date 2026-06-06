@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Bot, AlertTriangle, MessageSquare, BarChart3, BookOpen, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AvaLogo } from '@/components/shared/AvaLogo';
+import { AvaStatisticsLogo } from '@/components/shared/AvaStatisticsLogo';
 
 const PortalLoginContent = () => {
   const { agentSlug } = useParams<{ agentSlug: string }>();
@@ -291,10 +292,10 @@ const PortalLoginContent = () => {
         >
           {/* Logo */}
           <div className="flex items-center gap-4 mb-10">
-            <AvaLogo size="lg" animated />
+            {agentSlug === 'lemtel' ? <AvaLogo size="lg" animated /> : <AvaStatisticsLogo size="lg" animated />}
             <div>
               <h2 className="text-4xl font-black bg-gradient-to-r from-primary via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                AVA Statistics
+                {agentSlug === 'lemtel' ? 'Lemtel Communications' : 'AVA Statistics'}
               </h2>
               <p className="text-muted-foreground mt-1">Votre portail d'analytics intelligent</p>
             </div>

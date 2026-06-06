@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Mail } from "lucide-react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { AvaLogo } from "@/components/shared/AvaLogo";
+import { AvaStatisticsLogo as AvaLogo } from "@/components/shared/AvaStatisticsLogo";
 import { useTranslation } from "@/hooks/useTranslation";
 
 export const FooterSection = () => {
