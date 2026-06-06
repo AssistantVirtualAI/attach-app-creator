@@ -255,11 +255,11 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
           href="https://avastatistic.ca"
           onClick={(e) => {
             e.preventDefault();
-            window.electronAPI?.openExternal?.('https://avastatistic.ca');
+            window.electronAPI?.openExternal?.('https://assistantvirtualai.com');
           }}
           style={{ color: t.accent, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}
         >
-          AVA Statistics · avastatistic.ca
+          AVA Statistics · assistantvirtualai.com
         </a>
       </div>
     </div>
