@@ -85,9 +85,9 @@ export default function CallsView() {
             </button>
           ))}
           {filtered.length === 0 && (
-            <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>No calls match this filter.</div>
+            <EmptyState icon="📞" title="No calls match this filter" hint="Adjust the filter chips above or place a new call to start your log." accent={c.signalGold} />
           )}
-        </div>
+        </div>}
       </div>
 
       {/* Detail */}
