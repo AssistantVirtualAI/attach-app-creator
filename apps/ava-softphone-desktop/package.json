@@ -1,6 +1,6 @@
 {
   "name": "lemtel",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Lemtel — AI-Powered Business Communications",
   "main": "electron-compiled/main.js",
   "author": "Lemtel Communications / AVA Télécom",
