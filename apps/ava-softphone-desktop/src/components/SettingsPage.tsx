@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { WHITELABEL } from '../whitelabel.config';
 import { useTheme } from '../lib/theme';
 import { useBrightness, Brightness } from '../hooks/useBrightness';
+import { useContrast, Contrast } from '../hooks/useContrast';
 
 type Tab = 'account' | 'audio' | 'notifications' | 'general' | 'about';
 const TABS: { id: Tab; icon: string; label: string }[] = [
