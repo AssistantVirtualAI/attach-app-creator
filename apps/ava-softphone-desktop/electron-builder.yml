@@ -1,6 +1,6 @@
 appId: com.lemtel.softphone
-productName: Lemtel
-copyright: "Copyright 2026 Lemtel Communications. Powered by AVA Telecom."
+productName: Lemtel Telecom
+copyright: "Copyright 2026 Lemtel Communications. Powered by AVA AI."
 directories:
   output: dist-electron
 files:
@@ -10,13 +10,26 @@ files:
   - package.json
 mac:
   category: public.app-category.business
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
   target:
-    - dmg
-    - zip
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
 win:
   target:
-    - nsis
+    - target: nsis
+      arch: [x64]
   publisherName: "Lemtel Communications"
+  signingHashAlgorithms: []
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "Lemtel Telecom"
 linux:
   target:
     - AppImage
