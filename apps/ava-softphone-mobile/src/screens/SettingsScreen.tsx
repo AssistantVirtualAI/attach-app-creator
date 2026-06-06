@@ -4,6 +4,7 @@ import type { Creds } from '../lib/creds';
 import { mobileApi, MeResponse } from '../lib/mobileApi';
 import { Card, Chip, SectionTitle, SettingsRow, StatusDot, GhostButton, AIPanel } from '../components/ui/Primitives';
 import { LemtelMark, AvaBadge } from '../components/Brand';
+import { checkAllPermissions, openAppSettings, type AllPermissions, type PermissionStatus } from '../lib/permissions';
 
 export default function SettingsScreen({
   creds, sp, onSignOut,
@@ -11,8 +12,10 @@ export default function SettingsScreen({
   const [me, setMe] = useState<MeResponse | null>(null);
   const [dnd, setDnd] = useState(false);
   const [forwarding, setForwarding] = useState<string | null>(null);
+  const [perms, setPerms] = useState<AllPermissions | null>(null);
 
   useEffect(() => { mobileApi.me().then(setMe); }, []);
+  useEffect(() => { checkAllPermissions().then(setPerms); }, []);
 
   const toggleDnd = async () => { const next = !dnd; setDnd(next); try { await mobileApi.setDnd(next); } catch {} };
   const toggleFwd = async () => {
@@ -70,12 +73,30 @@ export default function SettingsScreen({
         </>
       )}
 
+      <SectionTitle eyebrow="Privacy" title="Permissions" />
+      <Card padded={false}>
+        {PERMISSION_ITEMS.map((item) => (
+          <SettingsRow
+            key={item.key}
+            label={item.label}
+            icon={item.icon}
+            value={item.sublabel}
+            right={<PermBadge status={perms?.[item.key as keyof AllPermissions] ?? 'prompt'} />}
+            onPress={() => {
+              const s = perms?.[item.key as keyof AllPermissions];
+              if (s === 'denied') openAppSettings();
+            }}
+          />
+        ))}
+        <SettingsRow label="Open device settings" icon="⚙" onPress={() => openAppSettings()} />
+      </Card>
+
       <SectionTitle eyebrow="Privacy" title="Security & data" />
       <Card padded={false}>
-        <SettingsRow label="Permissions" icon="🛡" onPress={() => {}} />
         <SettingsRow label="Diagnostics" icon="📊" onPress={() => {}} />
         <SettingsRow label="About" icon="ⓘ" value="v1.0.0" onPress={() => {}} />
       </Card>
+
 
       <AIPanel title="AVA powers this app" accent={colors.avaCyan}>
         <p style={{ fontSize: font.sm, color: colors.textIce, margin: 0, lineHeight: 1.55 }}>
@@ -114,6 +135,30 @@ function Switch({ on }: { on: boolean }) {
         background: '#fff', transition: 'left .2s ease',
         boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
       }} />
+    </span>
+  );
+}
+
+const PERMISSION_ITEMS = [
+  { key: 'microphone',    icon: '🎤', label: 'Microphone',    sublabel: 'Required for calls' },
+  { key: 'speaker',       icon: '🔊', label: 'Speaker',       sublabel: 'For call audio' },
+  { key: 'contacts',      icon: '👥', label: 'Contacts',      sublabel: 'For caller ID' },
+  { key: 'notifications', icon: '🔔', label: 'Notifications', sublabel: 'For incoming calls' },
+] as const;
+
+function PermBadge({ status }: { status: PermissionStatus }) {
+  const cfg =
+    status === 'granted' ? { dot: '#10B981', label: 'Granted' } :
+    status === 'denied'  ? { dot: colors.danger, label: 'Denied' } :
+    status === 'unsupported' ? { dot: colors.mutedSilver, label: 'N/A' } :
+                           { dot: colors.mutedSilver, label: 'Ask' };
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      fontSize: 11, color: colors.textIce, fontWeight: 600,
+    }}>
+      <span style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot }} />
+      {cfg.label}
     </span>
   );
 }

@@ -12,9 +12,10 @@ import SettingsScreen from './screens/SettingsScreen';
 import BottomTabs, { Tab } from './components/BottomTabs';
 import ActiveCallSheet from './components/ActiveCallSheet';
 import SplashAva from './components/SplashAva';
+import PermissionGate from './components/PermissionGate';
 import { useStoredCreds, Creds } from './lib/creds';
 import { gradients, colors } from './lib/theme';
-import { requestAllPermissions } from './lib/permissions';
+import { requestAllPermissions, checkAllPermissions } from './lib/permissions';
 import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
 import { syncDeviceContacts } from './lib/contacts';
 import { bootNative, onAppStateChange } from './lib/nativeBoot';
@@ -41,6 +42,25 @@ export default function MobileApp() {
 function AuthenticatedShell({
   creds, tab, setTab, onSignOut,
 }: { creds: Creds; tab: Tab; setTab: (t: Tab) => void; onSignOut: () => void }) {
+  const [permsGateDone, setPermsGateDone] = useState<boolean | null>(null);
+
+  // Decide whether to show the onboarding permission gate.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const seen = localStorage.getItem('lemtel-permissions-onboarded') === '1';
+        const current = await checkAllPermissions();
+        if (cancelled) return;
+        if (seen || current.microphone === 'granted') setPermsGateDone(true);
+        else setPermsGateDone(false);
+      } catch {
+        if (!cancelled) setPermsGateDone(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const sp = useSoftphone({
     extension: creds.extension,
     displayName: creds.displayName,
@@ -61,8 +81,9 @@ function AuthenticatedShell({
     });
   }, [creds]);
 
-  // Request mic / speaker / contacts / notifications once the user is in.
+  // Once the permission gate is dismissed, finalize permissions + push.
   useEffect(() => {
+    if (!permsGateDone) return;
     let cancelled = false;
     (async () => {
       const perms = await requestAllPermissions();
@@ -98,7 +119,8 @@ function AuthenticatedShell({
 
     return () => { cancelled = true; unsub(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creds.extension]);
+  }, [creds.extension, permsGateDone]);
+
 
   const inCall =
     sp.snap.callState === 'active' ||
@@ -111,6 +133,16 @@ function AuthenticatedShell({
       try { await Haptics.impact({ style }); } catch {}
     }
   };
+  if (permsGateDone === null) return <SplashAva />;
+  if (permsGateDone === false) {
+    return (
+      <PermissionGate onComplete={() => {
+        try { localStorage.setItem('lemtel-permissions-onboarded', '1'); } catch {}
+        setPermsGateDone(true);
+      }} />
+    );
+  }
+
 
   return (
     <div style={{
