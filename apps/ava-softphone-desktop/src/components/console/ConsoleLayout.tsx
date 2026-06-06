@@ -3,6 +3,10 @@ import LeftRail, { ConsoleView } from './LeftRail';
 import HomeDashboard from './HomeDashboard';
 import AIPanel from './AIPanel';
 import CommandPalette from './CommandPalette';
+import CallsView from './CallsView';
+import MessagesView from './MessagesView';
+import AIWorkspace from './AIWorkspace';
+import AdminView from './AdminView';
 import SoftphonePane from '../SoftphonePane';
 import { theme } from '../../lib/theme';
 
