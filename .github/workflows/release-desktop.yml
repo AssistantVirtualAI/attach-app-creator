@@ -34,33 +34,50 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+
       - name: Remove root PostCSS config
         shell: pwsh
         run: |
-          $target = "postcss.config.js"
-          if (Test-Path $target) {
-            Remove-Item $target -Force
-            Write-Host "✅ Deleted $target"
-          } else {
-            Write-Host "ℹ️ $target not found at root"
+          $files = @(
+            "postcss.config.js",
+            "postcss.config.cjs",
+            "postcss.config.mjs"
+          )
+          foreach ($f in $files) {
+            if (Test-Path $f) {
+              Remove-Item $f -Force
+              Write-Host "Deleted: $f"
+            } else {
+              Write-Host "Not found: $f"
+            }
           }
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
+
       - name: Build Windows
-        run: npm run build:win
+        shell: pwsh
+        run: |
+          Remove-Item -Path "..\..\postcss.config.js" `
+            -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "..\..\postcss.config.cjs" `
+            -Force -ErrorAction SilentlyContinue
+          npx vite build --config vite.config.ts
+          npx tsc -p electron/tsconfig.json
+          npx electron-builder --win
         working-directory: apps/ava-softphone-desktop
         env:
-          VITE_CONFIG_FILE: ./apps/ava-softphone-desktop/vite.config.ts
-          VITE_ROOT: ./apps/ava-softphone-desktop
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           WIN_CSC_LINK: ''
           WIN_CSC_KEY_PASSWORD: ''
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -77,34 +94,47 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+
       - name: Remove root PostCSS config
         shell: bash
         run: |
-          if [ -f "postcss.config.js" ]; then
-            rm -f postcss.config.js
-            echo "✅ Deleted postcss.config.js"
-          else
-            echo "ℹ️ postcss.config.js not found at root"
-          fi
+          for f in postcss.config.js postcss.config.cjs \
+                   postcss.config.mjs; do
+            if [ -f "$f" ]; then
+              rm -f "$f"
+              echo "Deleted: $f"
+            else
+              echo "Not found: $f"
+            fi
+          done
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
+
       - name: Build Mac
-        run: npm run build:mac
+        shell: bash
+        run: |
+          rm -f ../../postcss.config.js \
+                ../../postcss.config.cjs \
+                ../../postcss.config.mjs || true
+          npx vite build --config vite.config.ts
+          npx tsc -p electron/tsconfig.json
+          npx electron-builder --mac --x64 --arm64
         working-directory: apps/ava-softphone-desktop
         env:
-          VITE_CONFIG_FILE: ./apps/ava-softphone-desktop/vite.config.ts
-          VITE_ROOT: ./apps/ava-softphone-desktop
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CSC_LINK: ''
           APPLE_ID: ''
           APPLE_APP_SPECIFIC_PASSWORD: ''
           APPLE_TEAM_ID: ''
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -121,11 +151,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Install Linux dependencies
+
+      - name: Install Linux system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -133,26 +165,38 @@ jobs:
             libcups2-dev libxss1 libxtst6 xvfb \
             libx11-xcb1 libxcb-dri3-0 libdrm2 \
             libgbm1 libnss3 libatk-bridge2.0-0
+
       - name: Remove root PostCSS config
         shell: bash
         run: |
-          if [ -f "postcss.config.js" ]; then
-            rm -f postcss.config.js
-            echo "✅ Deleted postcss.config.js"
-          else
-            echo "ℹ️ postcss.config.js not found at root"
-          fi
+          for f in postcss.config.js postcss.config.cjs \
+                   postcss.config.mjs; do
+            if [ -f "$f" ]; then
+              rm -f "$f"
+              echo "Deleted: $f"
+            else
+              echo "Not found: $f"
+            fi
+          done
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
+
       - name: Build Linux
-        run: npm run build:linux
+        shell: bash
+        run: |
+          rm -f ../../postcss.config.js \
+                ../../postcss.config.cjs \
+                ../../postcss.config.mjs || true
+          npx vite build --config vite.config.ts
+          npx tsc -p electron/tsconfig.json
+          npx electron-builder --linux
         working-directory: apps/ava-softphone-desktop
         env:
-          VITE_CONFIG_FILE: ./apps/ava-softphone-desktop/vite.config.ts
-          VITE_ROOT: ./apps/ava-softphone-desktop
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -174,10 +218,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
       - name: List artifacts
         run: find artifacts -type f | sort
+
       - name: Update GitHub Release
-        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
+        if: >
+          github.event_name == 'release' ||
+          startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
