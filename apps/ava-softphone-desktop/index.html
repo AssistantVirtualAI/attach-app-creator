@@ -3,11 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lemtel</title>
+    <title>AVA Softphone</title>
     <link rel="icon" type="image/png" href="/assets/icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/jssip@3.10.0/dist/jssip.min.js"></script>
     <style>
-      html, body, #root { height: 100%; margin: 0; background: #0a0a0f; color: #fff; font-family: Inter, system-ui, sans-serif; }
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body, #root {
+        height: 100%;
+        margin: 0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-feature-settings: 'cv11', 'ss01';
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background: #0a0b12;
+        color: #f5f7fb;
+        transition: background 240ms ease, color 240ms ease;
+      }
+      button { font-family: inherit; }
+      input, select { font-family: inherit; }
+      /* Custom scrollbar */
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(127,127,127,0.25); border-radius: 8px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(127,127,127,0.45); }
     </style>
   </head>
   <body>

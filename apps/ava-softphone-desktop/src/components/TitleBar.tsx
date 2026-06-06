@@ -1,8 +1,6 @@
 import React from 'react';
 import LemtelLogo from './LemtelLogo';
-
-
-
+import { useTheme } from '../lib/theme';
 
 const dragStyle: React.CSSProperties = {
   // @ts-expect-error electron CSS
@@ -15,46 +13,112 @@ const noDrag: React.CSSProperties = {
 
 export default function TitleBar() {
   const api = window.electronAPI;
+  const { t, mode, toggle } = useTheme();
 
   return (
     <div
       style={{
-        height: 42,
-        background: 'linear-gradient(180deg, #001a3d 0%, #000814 100%)',
-        borderBottom: '1px solid rgba(255,215,0,0.25)',
-        boxShadow: '0 1px 0 rgba(0,200,255,0.08), 0 8px 24px -12px rgba(0,90,255,0.5)',
-        color: '#fff',
+        height: 44,
+        background:
+          mode === 'dark'
+            ? 'linear-gradient(180deg, rgba(20,23,34,0.95) 0%, rgba(10,11,18,0.92) 100%)'
+            : 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(244,246,251,0.92) 100%)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: `1px solid ${t.border}`,
+        color: t.text,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 14px',
+        padding: '0 12px',
         ...dragStyle,
       }}
     >
-      {/* Left: Lemtel logo + name */}
+      {/* Left: logo + name */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, ...noDrag }}>
-        <LemtelLogo size="sm" />
-        <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: 0.5, background: 'linear-gradient(90deg,#fff,#7dd3fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Lemtel Telecom</span>
+        <div
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: 7,
+            background: t.accentGradient,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            fontWeight: 800,
+            fontSize: 11,
+            letterSpacing: 0.5,
+            boxShadow: t.accentGlow,
+          }}
+        >
+          A
+        </div>
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            letterSpacing: 0.2,
+            color: t.text,
+          }}
+        >
+          AVA Softphone
+        </span>
       </div>
 
-      {/* Right: Window controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, ...noDrag }}>
+      {/* Right: theme toggle + window controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, ...noDrag }}>
         <button
-          onClick={() => api?.minimize()}
-          aria-label="Minimize"
-          style={{ width: 12, height: 12, borderRadius: '50%', background: '#ffbd2e', border: 'none', cursor: 'pointer' }}
-        />
-        <button
-          onClick={() => api?.maximize()}
-          aria-label="Maximize"
-          style={{ width: 12, height: 12, borderRadius: '50%', background: '#28ca41', border: 'none', cursor: 'pointer' }}
-        />
-        <button
-          onClick={() => api?.close()}
-          aria-label="Close"
-          style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff5f56', border: 'none', cursor: 'pointer' }}
-        />
+          onClick={toggle}
+          title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          style={{
+            background: t.surfaceHover,
+            border: `1px solid ${t.border}`,
+            color: t.text,
+            cursor: 'pointer',
+            width: 28,
+            height: 24,
+            borderRadius: 8,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 12,
+            transition: 'all 160ms ease',
+          }}
+        >
+          {mode === 'dark' ? '☀️' : '🌙'}
+        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 4 }}>
+          <button
+            onClick={() => api?.minimize()}
+            aria-label="Minimize"
+            style={dot('#fbbf24')}
+          />
+          <button
+            onClick={() => api?.maximize()}
+            aria-label="Maximize"
+            style={dot('#34d399')}
+          />
+          <button
+            onClick={() => api?.close()}
+            aria-label="Close"
+            style={dot('#f87171')}
+          />
+        </div>
       </div>
     </div>
   );
 }
+
+const dot = (bg: string): React.CSSProperties => ({
+  width: 12,
+  height: 12,
+  borderRadius: '50%',
+  background: bg,
+  border: 'none',
+  cursor: 'pointer',
+  transition: 'transform 120ms ease',
+});
+
+// Keep old export to avoid breaking imports
+export { LemtelLogo };

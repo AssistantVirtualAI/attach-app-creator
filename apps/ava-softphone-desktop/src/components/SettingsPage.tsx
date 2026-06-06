@@ -1,10 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { WHITELABEL } from '../whitelabel.config';
-
-const lemtelLogoUrl = new URL('../assets/lemtel-logo.svg', import.meta.url).href;
+import { useTheme } from '../lib/theme';
 
 type Tab = 'account' | 'audio' | 'notifications' | 'general' | 'about';
-const TABS: Tab[] = ['account', 'audio', 'notifications', 'general', 'about'];
+const TABS: { id: Tab; icon: string; label: string }[] = [
+  { id: 'account', icon: '👤', label: 'Account' },
+  { id: 'audio', icon: '🎧', label: 'Audio' },
+  { id: 'notifications', icon: '🔔', label: 'Notifications' },
+  { id: 'general', icon: '⚙', label: 'General' },
+  { id: 'about', icon: 'ⓘ', label: 'About' },
+];
 
 export default function SettingsPage({
   creds,
@@ -15,6 +20,7 @@ export default function SettingsPage({
   onSignOut: () => void;
   onBack: () => void;
 }) {
+  const { t, mode, setMode } = useTheme();
   const [tab, setTab] = useState<Tab>('account');
   const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
   const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
@@ -26,29 +32,87 @@ export default function SettingsPage({
     });
   }, []);
 
+  const selectStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '9px 12px',
+    background: mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(15,18,28,0.03)',
+    border: `1px solid ${t.border}`,
+    borderRadius: 10,
+    color: t.text,
+    fontSize: 13,
+    outline: 'none',
+  };
+
+  const section: React.CSSProperties = {
+    background: t.surface,
+    border: `1px solid ${t.glassBorder}`,
+    backdropFilter: 'blur(12px)',
+    borderRadius: 14,
+    padding: 18,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  };
+
   return (
-    <div style={{ padding: 16 }}>
-      <button onClick={onBack} style={back}>
+    <div style={{ background: t.bgGradient, minHeight: '100%', padding: 18 }}>
+      <button
+        onClick={onBack}
+        style={{
+          background: 'none', border: 'none', color: t.textMuted,
+          cursor: 'pointer', fontSize: 12, padding: '4px 0', marginBottom: 14,
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+        }}
+      >
         ← Back
       </button>
-      <div style={tabsRow}>
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{ ...tabBtn, ...(tab === t ? tabActive : {}) }}
-          >
-            {t}
-          </button>
-        ))}
+
+      <div style={{
+        display: 'flex', gap: 4, marginBottom: 16,
+        background: t.surface, border: `1px solid ${t.border}`,
+        padding: 4, borderRadius: 12, overflowX: 'auto',
+      }}>
+        {TABS.map((tt) => {
+          const active = tab === tt.id;
+          return (
+            <button
+              key={tt.id}
+              onClick={() => setTab(tt.id)}
+              style={{
+                background: active ? t.accentSoft : 'transparent',
+                color: active ? t.accent : t.textMuted,
+                border: 'none',
+                padding: '8px 12px',
+                fontSize: 12,
+                fontWeight: active ? 700 : 500,
+                cursor: 'pointer',
+                borderRadius: 8,
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                transition: 'all 140ms ease',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span>{tt.icon}</span> {tt.label}
+            </button>
+          );
+        })}
       </div>
 
       {tab === 'account' && (
         <section style={section}>
-          <Row label="Email" value={creds.email} />
-          <Row label="Extension" value={creds.extension} />
-          <Row label="Status" value="🟢 Registered" />
-          <button style={danger} onClick={onSignOut}>
+          <Row tokens={t} label="Email" value={creds.email} />
+          <Row tokens={t} label="Extension" value={creds.extension} />
+          <Row tokens={t} label="Status" value="● Registered" valueColor={t.success} />
+          <button
+            style={{
+              marginTop: 6, padding: '11px 14px',
+              background: 'rgba(239,68,68,0.10)',
+              color: t.danger,
+              border: '1px solid rgba(239,68,68,0.28)',
+              borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: 13,
+            }}
+            onClick={onSignOut}
+          >
             Sign Out
           </button>
         </section>
@@ -56,49 +120,99 @@ export default function SettingsPage({
 
       {tab === 'audio' && (
         <section style={section}>
-          <Select label="Microphone" options={mics} />
-          <Select label="Speaker" options={speakers} />
-          <Select label="Ring device" options={speakers} />
-          <Toggle label="Echo cancellation" defaultChecked />
-          <Toggle label="Noise suppression" defaultChecked />
+          <SelectField tokens={t} label="Microphone" selectStyle={selectStyle}>
+            {mics.map((o) => (<option key={o.deviceId} value={o.deviceId}>{o.label || o.deviceId}</option>))}
+          </SelectField>
+          <SelectField tokens={t} label="Speaker" selectStyle={selectStyle}>
+            {speakers.map((o) => (<option key={o.deviceId} value={o.deviceId}>{o.label || o.deviceId}</option>))}
+          </SelectField>
+          <SelectField tokens={t} label="Ring device" selectStyle={selectStyle}>
+            {speakers.map((o) => (<option key={o.deviceId} value={o.deviceId}>{o.label || o.deviceId}</option>))}
+          </SelectField>
+          <Toggle tokens={t} label="Echo cancellation" defaultChecked />
+          <Toggle tokens={t} label="Noise suppression" defaultChecked />
         </section>
       )}
 
       {tab === 'notifications' && (
         <section style={section}>
-          <Toggle label="Incoming call notifications" defaultChecked />
-          <Toggle label="Missed call notifications" defaultChecked />
-          <Toggle label="New SMS notifications" defaultChecked />
-          <Toggle label="Notification sound" defaultChecked />
+          <Toggle tokens={t} label="Incoming call notifications" defaultChecked />
+          <Toggle tokens={t} label="Missed call notifications" defaultChecked />
+          <Toggle tokens={t} label="New SMS notifications" defaultChecked />
+          <Toggle tokens={t} label="Notification sound" defaultChecked />
         </section>
       )}
 
       {tab === 'general' && (
         <section style={section}>
           <Toggle
+            tokens={t}
             label="Launch on startup"
             defaultChecked
             onChange={(v) => window.electronAPI.setLaunchOnStartup(v)}
           />
-          <Toggle label="Minimize to tray on close" defaultChecked />
-          <SelectStatic label="Theme" options={['Dark', 'Light', 'System']} />
-          <SelectStatic label="Language" options={['FR', 'EN']} />
+          <Toggle tokens={t} label="Minimize to tray on close" defaultChecked />
+          <div>
+            <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 8, fontWeight: 600, letterSpacing: 0.3, textTransform: 'uppercase' }}>
+              Appearance
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['dark', 'light'] as const).map((m) => {
+                const active = mode === m;
+                return (
+                  <button
+                    key={m}
+                    onClick={() => setMode(m)}
+                    style={{
+                      flex: 1, padding: '14px 12px',
+                      background: active ? t.accentSoft : 'transparent',
+                      border: `1px solid ${active ? 'rgba(99,102,241,0.4)' : t.border}`,
+                      color: active ? t.accent : t.text,
+                      borderRadius: 12, cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                      fontWeight: active ? 700 : 500, fontSize: 12,
+                      transition: 'all 160ms ease',
+                    }}
+                  >
+                    <span style={{ fontSize: 22 }}>{m === 'dark' ? '🌙' : '☀️'}</span>
+                    {m === 'dark' ? 'Dark' : 'Light'}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <SelectField tokens={t} label="Language" selectStyle={selectStyle}>
+            <option>English</option>
+            <option>Français</option>
+          </SelectField>
         </section>
       )}
 
       {tab === 'about' && (
-        <section style={section}>
-          <img src={lemtelLogoUrl} alt={`${WHITELABEL.appName} logo`} style={{ width: 48, height: 48, borderRadius: 12, marginBottom: 10 }} />
-          <Row label="Application" value={WHITELABEL.appName} />
-          <Row label="Version" value="1.0.0" />
+        <section style={{ ...section, alignItems: 'center', textAlign: 'center' }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: 18,
+            background: t.accentGradient,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontWeight: 800, fontSize: 28,
+            boxShadow: t.accentGlow, marginBottom: 6,
+          }}>A</div>
+          <div style={{ fontSize: 17, fontWeight: 700 }}>{WHITELABEL.appName}</div>
+          <div style={{ fontSize: 12, color: t.textMuted }}>Version 1.0.0</div>
           <button
-            style={primary}
+            style={{
+              marginTop: 12, padding: '11px 18px',
+              background: t.accentGradient,
+              border: 'none', borderRadius: 10, color: '#fff',
+              cursor: 'pointer', fontWeight: 700, fontSize: 13,
+              boxShadow: t.accentGlow,
+            }}
             onClick={() => window.electronAPI.checkForUpdates()}
           >
             Check for Updates
           </button>
           <a
-            style={link}
+            style={{ color: t.accent, fontSize: 12, cursor: 'pointer', textDecoration: 'none', fontWeight: 600 }}
             onClick={(e) => {
               e.preventDefault();
               window.electronAPI.openExternal(
@@ -107,10 +221,10 @@ export default function SettingsPage({
             }}
             href="#"
           >
-            Release Notes ↗
+            Release notes ↗
           </a>
-          <div style={{ opacity: 0.6, fontSize: 12, marginTop: 10 }}>
-            © 2026 {WHITELABEL.clientName}. Powered by {WHITELABEL.providerName}
+          <div style={{ color: t.textSubtle, fontSize: 11, marginTop: 8 }}>
+            © 2026 {WHITELABEL.clientName} · Built by AVA Statistics
           </div>
         </section>
       )}
@@ -118,117 +232,56 @@ export default function SettingsPage({
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ tokens, label, value, valueColor }: { tokens: any; label: string; value: string; valueColor?: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
-      <span style={{ opacity: 0.7 }}>{label}</span>
-      <span>{value}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
+      <span style={{ color: tokens.textMuted, fontSize: 12 }}>{label}</span>
+      <span style={{ color: valueColor || tokens.text, fontSize: 13, fontWeight: 600 }}>{value}</span>
     </div>
   );
 }
+
 function Toggle({
+  tokens,
   label,
   defaultChecked,
   onChange,
 }: {
+  tokens: any;
   label: string;
   defaultChecked?: boolean;
   onChange?: (v: boolean) => void;
 }) {
   const [v, setV] = useState(!!defaultChecked);
   return (
-    <label style={{ display: 'flex', gap: 8, padding: '6px 0', alignItems: 'center' }}>
-      <input
-        type="checkbox"
-        checked={v}
-        onChange={(e) => {
-          setV(e.target.checked);
-          onChange?.(e.target.checked);
+    <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '4px 0' }}>
+      <span style={{ fontSize: 13, color: tokens.text }}>{label}</span>
+      <button
+        type="button"
+        onClick={() => { const nv = !v; setV(nv); onChange?.(nv); }}
+        style={{
+          width: 38, height: 22, borderRadius: 999,
+          background: v ? tokens.accent : 'rgba(127,127,127,0.3)',
+          border: 'none', position: 'relative', cursor: 'pointer',
+          transition: 'background 160ms ease',
         }}
-      />
-      {label}
-    </label>
-  );
-}
-function Select({ label, options }: { label: string; options: MediaDeviceInfo[] }) {
-  return (
-    <label style={{ display: 'block', padding: '6px 0' }}>
-      <div style={{ fontSize: 12, opacity: 0.7 }}>{label}</div>
-      <select style={selectStyle}>
-        {options.map((o) => (
-          <option key={o.deviceId} value={o.deviceId}>
-            {o.label || o.deviceId}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-function SelectStatic({ label, options }: { label: string; options: string[] }) {
-  return (
-    <label style={{ display: 'block', padding: '6px 0' }}>
-      <div style={{ fontSize: 12, opacity: 0.7 }}>{label}</div>
-      <select style={selectStyle}>
-        {options.map((o) => (
-          <option key={o}>{o}</option>
-        ))}
-      </select>
+      >
+        <span style={{
+          position: 'absolute', top: 2, left: v ? 18 : 2,
+          width: 18, height: 18, borderRadius: '50%', background: '#fff',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+          transition: 'left 180ms ease',
+        }} />
+      </button>
     </label>
   );
 }
 
-const back: React.CSSProperties = {
-  background: 'transparent',
-  border: 0,
-  color: '#9aa',
-  cursor: 'pointer',
-  fontSize: 12,
-};
-const tabsRow: React.CSSProperties = { display: 'flex', gap: 4, margin: '8px 0 12px' };
-const tabBtn: React.CSSProperties = {
-  background: 'transparent',
-  color: '#aaa',
-  border: 0,
-  padding: '6px 10px',
-  fontSize: 12,
-  cursor: 'pointer',
-  textTransform: 'capitalize',
-  borderBottom: '2px solid transparent',
-};
-const tabActive: React.CSSProperties = { color: '#fff', borderColor: '#0023e6' };
-const section: React.CSSProperties = {
-  background: '#13131c',
-  borderRadius: 8,
-  padding: 12,
-};
-const danger: React.CSSProperties = {
-  marginTop: 12,
-  padding: '8px 12px',
-  background: '#3a0d0d',
-  color: '#ff8a8a',
-  border: '1px solid #5a1313',
-  borderRadius: 6,
-  cursor: 'pointer',
-};
-const primary: React.CSSProperties = {
-  padding: '8px 12px',
-  background: '#0023e6',
-  border: 0,
-  borderRadius: 6,
-  color: '#fff',
-  cursor: 'pointer',
-};
-const link: React.CSSProperties = {
-  display: 'block',
-  marginTop: 10,
-  color: '#7aa2ff',
-  fontSize: 13,
-};
-const selectStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '6px 8px',
-  background: '#15151f',
-  border: '1px solid #2a2a3a',
-  borderRadius: 6,
-  color: '#fff',
-};
+function SelectField({ tokens, label, selectStyle, children }: { tokens: any; label: string; selectStyle: React.CSSProperties; children: React.ReactNode }) {
+  return (
+    <label style={{ display: 'block' }}>
+      <div style={{ fontSize: 11, color: tokens.textMuted, marginBottom: 6, fontWeight: 600, letterSpacing: 0.3, textTransform: 'uppercase' }}>{label}</div>
+      <select style={selectStyle}>{children}</select>
+    </label>
+  );
+}
