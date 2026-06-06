@@ -4048,6 +4048,8 @@ export type Database = {
           display_name: string | null
           extension: string
           extension_id: string | null
+          forward_enabled: boolean
+          forward_to: string | null
           id: string
           last_seen_at: string | null
           organization_id: string
@@ -4062,6 +4064,8 @@ export type Database = {
           display_name?: string | null
           extension: string
           extension_id?: string | null
+          forward_enabled?: boolean
+          forward_to?: string | null
           id?: string
           last_seen_at?: string | null
           organization_id: string
@@ -4076,6 +4080,8 @@ export type Database = {
           display_name?: string | null
           extension?: string
           extension_id?: string | null
+          forward_enabled?: boolean
+          forward_to?: string | null
           id?: string
           last_seen_at?: string | null
           organization_id?: string
