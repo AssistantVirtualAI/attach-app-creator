@@ -260,12 +260,13 @@ serve(async (req) => {
       throw new Error('Error fetching agents');
     }
 
-    // Get all integrations (for fallback API keys)
+    // Get integrations only for the selected organization.
+    // Do not fall back to user-owned integrations: org data must stay fully isolated.
     const { data: integrations } = await supabase
       .from('organization_integrations')
       .select('id, agent_id, api_key, platform, additional_config')
       .eq('is_active', true)
-      .or(`organization_id.eq.${orgId},user_id.eq.${user.id}`);
+      .eq('organization_id', orgId);
 
     // Build integration API keys map by platform
     const integrationApiKeys: Record<string, Record<string, string>> = {
