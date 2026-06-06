@@ -10,6 +10,7 @@ export interface NavItem {
   nameKey: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  hideForLemtel?: boolean;
 }
 
 export interface NavGroup {
@@ -21,6 +22,7 @@ export interface NavGroup {
   superAdminOnly?: boolean;
   lemtelOnly?: boolean;
   lemtelCustomerOnly?: boolean;
+  hideForLemtel?: boolean;
 }
 
 export const sidebarGroups: NavGroup[] = [
@@ -64,6 +66,7 @@ export const sidebarGroups: NavGroup[] = [
     labelKey: 'sidebar.groups.crm',
     icon: Users,
     adminOnly: true,
+    hideForLemtel: true,
     items: [
       { nameKey: 'sidebar.leads', href: '/leads', icon: UserPlus },
       { nameKey: 'sidebar.appointments', href: '/appointments', icon: Calendar },
@@ -88,7 +91,7 @@ export const sidebarGroups: NavGroup[] = [
     items: [
       { nameKey: 'sidebar.workflows', href: '/workflows', icon: GitBranch },
       { nameKey: 'sidebar.integrations', href: '/integrations', icon: Sliders },
-      { nameKey: 'sidebar.twilioManagement', href: '/twilio-management', icon: Phone },
+      { nameKey: 'sidebar.twilioManagement', href: '/twilio-management', icon: Phone, hideForLemtel: true },
       { nameKey: 'sidebar.webhookLogs', href: '/webhook-logs', icon: Webhook },
       { nameKey: 'Audit Logs', href: '/audit-logs', icon: Shield },
       { nameKey: 'sidebar.apiExplorer', href: '/api-explorer', icon: Globe },
@@ -99,6 +102,7 @@ export const sidebarGroups: NavGroup[] = [
     labelKey: 'sidebar.groups.billing',
     icon: CreditCard,
     adminOnly: true,
+    hideForLemtel: true,
     items: [
       { nameKey: 'sidebar.stripeBilling', href: '/stripe-billing', icon: CreditCard },
       { nameKey: 'sidebar.saasConfig', href: '/saas-config', icon: Settings },
@@ -136,19 +140,6 @@ export const sidebarGroups: NavGroup[] = [
       { nameKey: 'PBX Settings', href: '/org/lemtel/telephony/settings', icon: Settings },
       { nameKey: 'Diagnostics', href: '/org/lemtel/telephony/diagnostics', icon: Activity },
       { nameKey: '✅ Go-Live Checklist', href: '/org/lemtel/telephony/checklist', icon: CheckSquare },
-    ]
-  },
-  {
-    id: 'lemtel-legacy',
-    labelKey: '📞 Lemtel (Legacy)',
-    icon: PhoneCall,
-    lemtelOnly: true,
-    items: [
-      { nameKey: 'Dashboard', href: '/lemtel/dashboard', icon: LayoutDashboard },
-      { nameKey: 'Customers', href: '/lemtel/customers', icon: Users },
-      { nameKey: 'Call Analytics', href: '/lemtel/analytics', icon: BarChart3 },
-      { nameKey: 'Softphone Users', href: '/lemtel/softphone-users', icon: Smartphone },
-      { nameKey: 'Lemtel Settings', href: '/lemtel/settings', icon: Settings },
     ]
   },
 ];

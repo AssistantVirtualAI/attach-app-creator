@@ -97,7 +97,11 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
   // Filter groups based on role and Lemtel org membership
   const isLemtelMember = isSuperAdmin || organizationMemberships.some(m => m.organization.id === '71755d33-ed64-4ad5-a828-61c9d2029eb7');
-  const visibleGroups = useMemo(() => sidebarGroups.filter(g => !g.lemtelOnly || isLemtelMember), [isLemtelMember]);
+  const visibleGroups = useMemo(() => sidebarGroups.filter(g => {
+    if (g.lemtelOnly && !isLemtelMember) return false;
+    if (g.hideForLemtel && isLemtelMember) return false;
+    return true;
+  }), [isLemtelMember]);
 
   // Sidebar group ordering with drag & drop
   const sensors = useSensors(

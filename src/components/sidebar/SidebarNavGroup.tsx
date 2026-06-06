@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { NavGroup } from './sidebarConfig';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useOrganization } from '@/context/OrganizationContext';
 
 interface SidebarNavGroupProps {
   group: NavGroup;
@@ -29,7 +30,10 @@ const setCollapsedGroups = (groups: string[]) => {
 export const SidebarNavGroup = ({ group, onNavigate }: SidebarNavGroupProps) => {
   const location = useLocation();
   const { t } = useTranslation();
-  const isActiveGroup = group.items.some(item => location.pathname === item.href);
+  const { isSuperAdmin, organizationMemberships } = useOrganization();
+  const isLemtelMember = isSuperAdmin || organizationMemberships.some(m => m.organization.id === '71755d33-ed64-4ad5-a828-61c9d2029eb7');
+  const visibleItems = useMemo(() => group.items.filter(item => !(item.hideForLemtel && isLemtelMember)), [group.items, isLemtelMember]);
+  const isActiveGroup = visibleItems.some(item => location.pathname === item.href);
   
   const [isOpen, setIsOpen] = useState(() => {
     if (isActiveGroup) return true;
@@ -83,7 +87,7 @@ export const SidebarNavGroup = ({ group, onNavigate }: SidebarNavGroupProps) => 
       <AnimatePresence>
         {isOpen && (
           <CollapsibleContent className="pl-4 mt-1 space-y-1 overflow-hidden">
-            {group.items.map((item, index) => {
+            {visibleItems.map((item, index) => {
               const ItemIcon = item.icon;
               const isActive = location.pathname === item.href;
               
