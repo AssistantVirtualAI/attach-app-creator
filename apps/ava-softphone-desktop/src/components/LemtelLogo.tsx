@@ -13,6 +13,7 @@ interface Props {
   size?: LemtelLogoSize;
   glow?: boolean;
   halo?: boolean;
+  shape?: 'circle' | 'square';
   className?: string;
   style?: React.CSSProperties;
 }
@@ -24,6 +25,7 @@ interface Props {
 export default function LemtelLogo({
   size = 'sm',
   glow = true,
+  shape = 'circle',
   className,
   style,
 }: Props) {
@@ -45,8 +47,18 @@ export default function LemtelLogo({
         xmlns="http://www.w3.org/2000/svg"
         style={{ display: 'block' }}
       >
-        {/* Background circle */}
-        <circle cx="60" cy="60" r="56" fill="#050510" stroke="rgba(255,215,0,0.15)" strokeWidth="1.5" />
+        {shape === 'square' ? (
+          <rect x="6" y="6" width="108" height="108" rx="22" ry="22"
+            fill="url(#lemtelSquareFill)" stroke="rgba(255,215,0,0.32)" strokeWidth="1.5" />
+        ) : (
+          <circle cx="60" cy="60" r="56" fill="#0A1530" stroke="rgba(255,215,0,0.18)" strokeWidth="1.5" />
+        )}
+        <defs>
+          <linearGradient id="lemtelSquareFill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#0052CC" />
+            <stop offset="100%" stopColor="#0A1530" />
+          </linearGradient>
+        </defs>
 
         {/* L shape — blue */}
         <path
