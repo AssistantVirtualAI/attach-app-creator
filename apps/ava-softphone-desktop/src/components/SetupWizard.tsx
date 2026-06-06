@@ -15,6 +15,7 @@ type Creds = {
   wssUrl?: string;
   userId?: string;
   accessToken?: string;
+  refreshToken?: string;
 };
 
 interface SetupWizardProps {
@@ -89,6 +90,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
         wssUrl: softphoneUser?.wss_url || 'wss://lemtel.lemtel.tel:7443',
         userId: authData.user.id,
         accessToken: authData.session?.access_token,
+        refreshToken: authData.session?.refresh_token,
       };
 
       await window.electronAPI?.saveCredentials?.(credentials);
