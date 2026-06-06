@@ -4,6 +4,34 @@ import { WHITELABEL } from '../whitelabel.config';
 
 const lemtelLogoUrl = new URL('../assets/lemtel-logo.svg', import.meta.url).href;
 
+type SupabaseConfig = { supabase_url: string; supabase_anon_key: string };
+
+async function loadSupabaseConfig(portalUrl: string): Promise<SupabaseConfig> {
+  if (WHITELABEL.supabaseUrl && WHITELABEL.supabaseAnonKey) {
+    return { supabase_url: WHITELABEL.supabaseUrl, supabase_anon_key: WHITELABEL.supabaseAnonKey };
+  }
+
+  const portal = portalUrl.replace(/\/+$/, '');
+  const endpoints = [
+    `${portal}/api/supabase-config`,
+    `${portal}/api/supabase-config.json`,
+    'https://gejxisrqtvxavbrfcoxz.supabase.co/functions/v1/supabase-config',
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint);
+      if (!res.ok) continue;
+      const config = await res.json();
+      if (config?.supabase_url && config?.supabase_anon_key) return config;
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error('Portal configuration unavailable. Please update the app.');
+}
+
 type Creds = { portalUrl: string; email: string; extension: string };
 
 export default function SetupWizard({
@@ -23,7 +51,9 @@ export default function SetupWizard({
     setError(null);
     setLoading(true);
     try {
-      const supabase = createClient(WHITELABEL.supabaseUrl, WHITELABEL.supabaseAnonKey);
+      const normalizedPortalUrl = (portalUrl.trim() || WHITELABEL.portalUrl).replace(/\/+$/, '');
+      const config = await loadSupabaseConfig(normalizedPortalUrl);
+      const supabase = createClient(config.supabase_url, config.supabase_anon_key);
       const { data, error: signErr } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -41,11 +71,11 @@ export default function SetupWizard({
       }
 
       await window.electronAPI.saveCredentials({
-        portalUrl,
+        portalUrl: normalizedPortalUrl,
         email,
         extension: String(row.extension),
       });
-      onComplete({ portalUrl, email, extension: String(row.extension) });
+      onComplete({ portalUrl: normalizedPortalUrl, email, extension: String(row.extension) });
     } catch (e: any) {
       setError(e?.message ?? 'Connection failed');
     } finally {
