@@ -81,8 +81,9 @@ function AuthenticatedShell({
     });
   }, [creds]);
 
-  // Request mic / speaker / contacts / notifications once the user is in.
+  // Once the permission gate is dismissed, finalize permissions + push.
   useEffect(() => {
+    if (!permsGateDone) return;
     let cancelled = false;
     (async () => {
       const perms = await requestAllPermissions();
@@ -118,7 +119,8 @@ function AuthenticatedShell({
 
     return () => { cancelled = true; unsub(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creds.extension]);
+  }, [creds.extension, permsGateDone]);
+
 
   const inCall =
     sp.snap.callState === 'active' ||
