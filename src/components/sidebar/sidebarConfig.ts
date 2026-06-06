@@ -102,6 +102,7 @@ export const sidebarGroups: NavGroup[] = [
     labelKey: 'sidebar.groups.billing',
     icon: CreditCard,
     adminOnly: true,
+    hideForLemtel: true,
     items: [
       { nameKey: 'sidebar.stripeBilling', href: '/stripe-billing', icon: CreditCard },
       { nameKey: 'sidebar.saasConfig', href: '/saas-config', icon: Settings },
