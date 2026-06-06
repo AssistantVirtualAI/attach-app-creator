@@ -125,3 +125,79 @@ export function loadCachedPermissions(): AllPermissions | null {
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
+
+/**
+ * Non-prompting check of current permission state. Uses the Permissions API
+ * where available, falls back to enumerateDevices() for microphone heuristics.
+ */
+export async function checkAllPermissions(): Promise<AllPermissions> {
+  const perms: AllPermissions = {
+    microphone: 'prompt',
+    speaker: 'granted', // playback never gated
+    contacts: 'prompt',
+    notifications: 'prompt',
+    camera: 'prompt',
+  };
+
+  // Microphone — try Permissions API, then enumerateDevices heuristic.
+  try {
+    const anyPerm: any = (navigator as any).permissions;
+    if (anyPerm?.query) {
+      try {
+        const st = await anyPerm.query({ name: 'microphone' as PermissionName });
+        if (st?.state === 'granted' || st?.state === 'denied' || st?.state === 'prompt') {
+          perms.microphone = st.state as PermissionStatus;
+        }
+      } catch { /* not supported */ }
+    }
+    if (perms.microphone === 'prompt' && navigator.mediaDevices?.enumerateDevices) {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const mic = devices.find((d) => d.kind === 'audioinput');
+      if (mic && mic.label) perms.microphone = 'granted';
+    }
+  } catch { /* ignore */ }
+
+  // Notifications (web only; native uses real check via plugin).
+  if (!Capacitor.isNativePlatform() && typeof Notification !== 'undefined') {
+    perms.notifications =
+      Notification.permission === 'granted' ? 'granted'
+        : Notification.permission === 'denied' ? 'denied' : 'prompt';
+  } else if (Capacitor.isNativePlatform()) {
+    try {
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      const res = await PushNotifications.checkPermissions();
+      perms.notifications = res.receive === 'granted' ? 'granted'
+        : res.receive === 'denied' ? 'denied' : 'prompt';
+    } catch { /* ignore */ }
+  }
+
+  // Contacts (native only).
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { Contacts } = await import('@capacitor-community/contacts');
+      const res = await Contacts.checkPermissions();
+      perms.contacts = res?.contacts === 'granted' ? 'granted'
+        : res?.contacts === 'denied' ? 'denied' : 'prompt';
+    } catch { /* ignore */ }
+  }
+
+  return perms;
+}
+
+/** Open the OS-level app settings page so the user can flip a denied permission. */
+export async function openAppSettings(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    const { App } = await import('@capacitor/app');
+    // Capacitor App plugin doesn't directly expose settings on all versions;
+    // fall back to platform-specific deep link via window.open.
+    const platform = Capacitor.getPlatform();
+    if (platform === 'ios') {
+      window.open('app-settings:', '_system');
+    } else if (platform === 'android') {
+      window.open('package:com.lemtel.softphone', '_system');
+    }
+    // Touch App import to avoid unused warning.
+    void App;
+  } catch { /* ignore */ }
+}
