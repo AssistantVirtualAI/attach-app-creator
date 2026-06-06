@@ -94,18 +94,41 @@ ipcMain.handle('clear-credentials', () => {
   return true;
 });
 
-ipcMain.handle('show-notification', (_e, { title, body }) => {
+// Tagged notifications so we can dismiss them on answer/hangup.
+const activeNotifications = new Map<string, Notification>();
+
+ipcMain.handle('show-notification', (_e, { title, body, tag, urgent }: { title: string; body: string; tag?: string; urgent?: boolean }) => {
+  // Replace existing notification with the same tag.
+  if (tag && activeNotifications.has(tag)) {
+    try { activeNotifications.get(tag)?.close(); } catch { /* noop */ }
+    activeNotifications.delete(tag);
+  }
   const notification = new Notification({
     title,
     body,
     icon: path.join(__dirname, '../assets/icon.png'),
-    urgency: 'critical',
+    urgency: urgent ? 'critical' : 'normal',
   });
   notification.show();
   notification.on('click', () => {
     mainWindow?.show();
     mainWindow?.focus();
+    if (tag) {
+      mainWindow?.webContents.send('notification-clicked', { tag });
+    }
   });
+  notification.on('close', () => {
+    if (tag) activeNotifications.delete(tag);
+  });
+  if (tag) activeNotifications.set(tag, notification);
+});
+
+ipcMain.handle('clear-notification', (_e, { tag }: { tag: string }) => {
+  const n = activeNotifications.get(tag);
+  if (n) {
+    try { n.close(); } catch { /* noop */ }
+    activeNotifications.delete(tag);
+  }
 });
 
 ipcMain.handle('window-minimize', () => mainWindow?.minimize());
