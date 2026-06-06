@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, SmsThread } from '../../lib/avaApi';
-import { loadTemplates, saveTemplates, interpolate, MsgTemplate } from '../../lib/messageTemplates';
+import {
+  loadTemplates, saveTemplates, interpolate, filterTemplates,
+  getDefaultTemplateId, setDefaultTemplate,
+  MsgTemplate, TemplateCategory, CATEGORIES,
+} from '../../lib/messageTemplates';
 
 const { colors: c } = theme;
 
@@ -28,6 +32,8 @@ export default function MessagesView() {
   const [aiBusy, setAiBusy] = useState(false);
   const [templates, setTemplates] = useState<MsgTemplate[]>(() => loadTemplates());
   const [tplOpen, setTplOpen] = useState(false);
+  const [tplQuery, setTplQuery] = useState('');
+  const [tplCategory, setTplCategory] = useState<TemplateCategory | 'All'>('All');
 
   useEffect(() => {
     ava.threads().then((t) => { setThreads(t); if (t[0]) setActiveId(t[0].id); });
@@ -35,6 +41,9 @@ export default function MessagesView() {
   useEffect(() => { if (activeId) setMsgs(MOCK_MSGS[activeId] || []); }, [activeId]);
 
   const active = threads.find((t) => t.id === activeId);
+  const contactKey = active?.id || '';
+  const defaultTplId = contactKey ? getDefaultTemplateId(contactKey) : null;
+  const visibleTemplates = filterTemplates(templates, tplQuery, tplCategory);
 
   const send = async () => {
     if (!draft.trim() || !activeId) return;
@@ -62,7 +71,9 @@ export default function MessagesView() {
     if (!draft.trim()) return;
     const label = prompt('Template name?');
     if (!label) return;
-    const next = [...templates, { id: 't' + Date.now(), label, body: draft }];
+    const category = (prompt('Category? (Greeting, Follow-up, Scheduling, Closing, Custom)', 'Custom') || 'Custom') as TemplateCategory;
+    const safeCat = CATEGORIES.includes(category) ? category : 'Custom';
+    const next = [...templates, { id: 't' + Date.now(), label, body: draft, category: safeCat }];
     setTemplates(next);
     saveTemplates(next);
   };
@@ -71,6 +82,12 @@ export default function MessagesView() {
     const next = templates.filter((t) => t.id !== id);
     setTemplates(next);
     saveTemplates(next);
+  };
+
+  const toggleDefault = (id: string) => {
+    if (!contactKey) return;
+    setDefaultTemplate(contactKey, defaultTplId === id ? null : id);
+    setTemplates([...templates]); // re-render to refresh star state
   };
 
 
