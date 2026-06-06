@@ -43,9 +43,11 @@ const { colors: c, glow } = theme;
 export default function SoftphonePane({
   creds,
   onOpenSettings,
+  hideTabs = false,
 }: {
   creds: Creds;
   onOpenSettings: () => void;
+  hideTabs?: boolean;
 }) {
   const sp = useSoftphone({
     extension: creds.extension,
