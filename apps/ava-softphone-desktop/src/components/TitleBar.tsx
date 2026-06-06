@@ -1,4 +1,6 @@
 import React from 'react';
+import { WHITELABEL } from '../whitelabel.config';
+import { LemtelLogo } from './SetupWizard';
 
 const dragStyle: React.CSSProperties = {
   // @ts-expect-error electron CSS
@@ -13,30 +15,45 @@ export default function TitleBar() {
   const isMac = window.electronAPI?.platform === 'darwin';
   const api = window.electronAPI;
 
+  const dot = (color: string, onClick: () => void, label: string, glyph: string) => (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      style={{
+        width: 14,
+        height: 14,
+        borderRadius: '50%',
+        background: color,
+        border: 0,
+        margin: '0 4px',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'rgba(0,0,0,0.5)',
+        fontSize: 9,
+        lineHeight: 1,
+        padding: 0,
+      }}
+    >
+      <span style={{ opacity: 0 }}>{glyph}</span>
+    </button>
+  );
+
   const Controls = (
-    <div style={{ display: 'flex', ...noDrag }}>
-      <button style={ctrl} onClick={() => api?.minimize()} aria-label="Minimize">
-        −
-      </button>
-      <button style={ctrl} onClick={() => api?.maximize()} aria-label="Maximize">
-        □
-      </button>
-      <button
-        style={{ ...ctrl, color: '#ff6b6b' }}
-        onClick={() => api?.close()}
-        aria-label="Close to tray"
-      >
-        ✕
-      </button>
+    <div style={{ display: 'flex', alignItems: 'center', padding: '0 12px', ...noDrag }}>
+      {dot('#888', () => api?.minimize(), 'Minimize', '−')}
+      {dot('#888', () => api?.maximize(), 'Maximize', '□')}
+      {dot('#ff5f57', () => api?.close(), 'Close', '✕')}
     </div>
   );
 
   return (
     <div
       style={{
-        height: 32,
-        background: '#0a0a0f',
-        borderBottom: '1px solid #1f1f2c',
+        height: 38,
+        background: '#001a3d',
+        borderBottom: '1px solid rgba(255,215,0,0.15)',
         color: '#fff',
         display: 'flex',
         alignItems: 'center',
@@ -45,20 +62,20 @@ export default function TitleBar() {
       }}
     >
       {isMac && Controls}
-      <div style={{ padding: '0 12px', fontSize: 12, fontWeight: 600 }}>
-        AVA Softphone
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '0 12px',
+          flex: 1,
+          justifyContent: isMac ? 'center' : 'flex-start',
+        }}
+      >
+        <LemtelLogo size="sm" />
+        <span style={{ fontSize: 13, fontWeight: 700 }}>{WHITELABEL.appName}</span>
       </div>
       {!isMac && Controls}
     </div>
   );
 }
-
-const ctrl: React.CSSProperties = {
-  width: 44,
-  height: 32,
-  background: 'transparent',
-  border: 0,
-  color: '#fff',
-  cursor: 'pointer',
-  fontSize: 14,
-};

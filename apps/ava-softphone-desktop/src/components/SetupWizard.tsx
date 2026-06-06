@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { WHITELABEL } from '../whitelabel.config';
 
-type Step = 1 | 2 | 3;
 type Creds = { portalUrl: string; email: string; extension: string };
 
 export default function SetupWizard({
@@ -9,28 +9,19 @@ export default function SetupWizard({
 }: {
   onComplete: (c: Creds) => void;
 }) {
-  const [step, setStep] = useState<Step>(1);
-  const [portalUrl, setPortalUrl] = useState('https://avastatistic.ca');
+  const [portalUrl, setPortalUrl] = useState(WHITELABEL.portalUrl);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [extension, setExtension] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [launchOnStartup, setLaunchOnStartup] = useState(true);
+  const [focused, setFocused] = useState<string | null>(null);
+  const [hoverBtn, setHoverBtn] = useState(false);
 
   async function connect() {
     setError(null);
     setLoading(true);
     try {
-      const configRes = await fetch(`${portalUrl}/api/supabase-config`);
-      if (!configRes.ok) {
-        throw new Error(`Portal config unavailable (${configRes.status}). Reinstall the app.`);
-      }
-      const { supabase_url, supabase_anon_key } = await configRes.json();
-      if (!supabase_url || !supabase_anon_key) {
-        throw new Error('Portal not configured. Reinstall the app.');
-      }
-      const supabase = createClient(supabase_url, supabase_anon_key);
+      const supabase = createClient(WHITELABEL.supabaseUrl, WHITELABEL.supabaseAnonKey);
       const { data, error: signErr } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -43,15 +34,16 @@ export default function SetupWizard({
         .eq('portal_user_id', data.user.id)
         .maybeSingle();
       if (rowErr) throw rowErr;
-      if (!row?.extension) throw new Error('No extension assigned to this user.');
+      if (!row?.extension) {
+        throw new Error('No softphone account found. Contact your administrator.');
+      }
 
-      setExtension(String(row.extension));
       await window.electronAPI.saveCredentials({
         portalUrl,
         email,
-        extension: row.extension,
+        extension: String(row.extension),
       });
-      setStep(3);
+      onComplete({ portalUrl, email, extension: String(row.extension) });
     } catch (e: any) {
       setError(e?.message ?? 'Connection failed');
     } finally {
@@ -59,125 +51,259 @@ export default function SetupWizard({
     }
   }
 
+  const inputStyle = (key: string): React.CSSProperties => ({
+    width: '100%',
+    padding: '12px 16px',
+    background: 'rgba(255,255,255,0.08)',
+    border: `1px solid ${focused === key ? WHITELABEL.accentColor : 'rgba(255,255,255,0.15)'}`,
+    borderRadius: 8,
+    color: '#fff',
+    fontSize: 14,
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.15s',
+  });
+
   return (
-    <div style={wrap}>
-      {step === 1 && (
-        <>
-          <div style={logo}>AVA</div>
-          <h1 style={h1}>Welcome to AVA Softphone</h1>
-          <p style={sub}>Your professional communication app</p>
-          <button style={primary} onClick={() => setStep(2)}>
-            Get Started →
-          </button>
-        </>
-      )}
+    <div
+      style={{
+        minHeight: '100vh',
+        background: WHITELABEL.backgroundColor,
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      }}
+    >
+      {/* TOP */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          paddingTop: 60,
+        }}
+      >
+        <LemtelLogo />
+        <div style={{ height: 32 }} />
+        <h1 style={{ color: '#fff', fontSize: 28, fontWeight: 700, margin: 0 }}>
+          {WHITELABEL.appName}
+        </h1>
+        <div
+          style={{
+            color: WHITELABEL.accentColor,
+            fontSize: 13,
+            letterSpacing: 1,
+            marginTop: 6,
+          }}
+        >
+          {WHITELABEL.tagline.toUpperCase()}
+        </div>
+        <div style={{ height: 8 }} />
+        <div
+          style={{
+            width: 40,
+            height: 2,
+            background: WHITELABEL.accentColor,
+          }}
+        />
+      </div>
 
-      {step === 2 && (
-        <>
-          <h2 style={h2}>Connect Your Account</h2>
-          <label style={lbl}>AVA Portal URL</label>
-          <input
-            style={input}
-            value={portalUrl}
-            onChange={(e) => setPortalUrl(e.target.value)}
-          />
-          <label style={lbl}>Email</label>
-          <input
-            style={input}
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <label style={lbl}>Password</label>
-          <input
-            style={input}
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          {error && <div style={err}>{error}</div>}
-          <button style={primary} disabled={loading} onClick={connect}>
-            {loading ? 'Connecting…' : 'Connect & Sign In'}
-          </button>
-        </>
-      )}
+      {/* MIDDLE */}
+      <div
+        style={{
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,215,0,0.2)',
+          borderRadius: 16,
+          padding: 32,
+          margin: '32px 24px',
+        }}
+      >
+        <h2 style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: 0 }}>
+          Connect Your Account
+        </h2>
+        <p style={{ color: '#888', fontSize: 13, margin: '6px 0 0' }}>
+          Sign in with your AVA portal credentials
+        </p>
 
-      {step === 3 && (
-        <>
-          <h2 style={h2}>You're all set</h2>
-          <div style={ok}>✅ Connected to AVA Portal</div>
-          <div style={ok}>✅ Extension: {extension} registered</div>
-          <div style={ok}>✅ SIP: Connected to portal.lemtel.tel</div>
-          <p style={sub}>Your softphone is ready.</p>
+        <div style={{ height: 24 }} />
 
-          <label style={{ ...lbl, display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input
-              type="checkbox"
-              checked={launchOnStartup}
-              onChange={(e) => setLaunchOnStartup(e.target.checked)}
-            />
-            Launch AVA Softphone on startup
-          </label>
+        <Label>AVA Portal URL</Label>
+        <input
+          style={inputStyle('url')}
+          value={portalUrl}
+          onChange={(e) => setPortalUrl(e.target.value)}
+          onFocus={() => setFocused('url')}
+          onBlur={() => setFocused(null)}
+        />
 
-          <button
-            style={primary}
-            onClick={async () => {
-              await window.electronAPI.setLaunchOnStartup(launchOnStartup);
-              onComplete({ portalUrl, email, extension });
+        <div style={{ height: 12 }} />
+        <Label>Email</Label>
+        <input
+          style={inputStyle('email')}
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onFocus={() => setFocused('email')}
+          onBlur={() => setFocused(null)}
+        />
+
+        <div style={{ height: 12 }} />
+        <Label>Password</Label>
+        <input
+          style={inputStyle('pw')}
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onFocus={() => setFocused('pw')}
+          onBlur={() => setFocused(null)}
+        />
+
+        {error && (
+          <div
+            style={{
+              marginTop: 16,
+              background: 'rgba(255,0,0,0.1)',
+              border: '1px solid rgba(255,0,0,0.3)',
+              borderRadius: 8,
+              color: '#ff6b6b',
+              padding: 12,
+              fontSize: 13,
             }}
           >
-            Launch App →
-          </button>
-        </>
-      )}
+            {error}
+          </div>
+        )}
+
+        <div style={{ height: 24 }} />
+
+        <button
+          onClick={connect}
+          disabled={loading}
+          onMouseEnter={() => setHoverBtn(true)}
+          onMouseLeave={() => setHoverBtn(false)}
+          style={{
+            width: '100%',
+            padding: 14,
+            background: hoverBtn
+              ? WHITELABEL.accentColor
+              : `linear-gradient(135deg, ${WHITELABEL.primaryColor}, #0052CC)`,
+            color: hoverBtn ? WHITELABEL.primaryColor : '#fff',
+            border: `1px solid ${WHITELABEL.accentColor}`,
+            borderRadius: 10,
+            fontWeight: 700,
+            fontSize: 14,
+            cursor: loading ? 'wait' : 'pointer',
+            transition: 'all 0.2s',
+          }}
+        >
+          {loading ? '⏳ Connecting...' : 'Connect & Sign In →'}
+        </button>
+      </div>
+
+      {/* BOTTOM */}
+      <div style={{ marginTop: 'auto', padding: 20 }}>
+        <div style={{ height: 1, background: '#333', marginBottom: 16 }} />
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 4,
+            fontSize: 11,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#666' }}>
+            <div
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #0023e6, #4f46e5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                fontSize: 9,
+                fontWeight: 800,
+              }}
+            >
+              A
+            </div>
+            <span>Built by {WHITELABEL.providerName}</span>
+          </div>
+          <a
+            href={WHITELABEL.providerUrl}
+            onClick={(e) => {
+              e.preventDefault();
+              window.electronAPI?.openExternal?.(WHITELABEL.providerUrl);
+            }}
+            style={{ color: WHITELABEL.accentColor, textDecoration: 'none', cursor: 'pointer' }}
+          >
+            {WHITELABEL.providerUrl.replace(/^https?:\/\//, '')}
+          </a>
+        </div>
+      </div>
     </div>
   );
 }
 
-const wrap: React.CSSProperties = {
-  padding: 24,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 10,
-  minHeight: 'calc(100vh - 32px)',
-  justifyContent: 'center',
-};
-const logo: React.CSSProperties = {
-  fontSize: 48,
-  fontWeight: 800,
-  letterSpacing: 4,
-  textAlign: 'center',
-  color: '#0023e6',
-};
-const h1: React.CSSProperties = { fontSize: 22, margin: 0, textAlign: 'center' };
-const h2: React.CSSProperties = { fontSize: 18, margin: '0 0 12px' };
-const sub: React.CSSProperties = {
-  opacity: 0.7,
-  fontSize: 13,
-  textAlign: 'center',
-  margin: 0,
-};
-const lbl: React.CSSProperties = { fontSize: 12, opacity: 0.8, marginTop: 8 };
-const input: React.CSSProperties = {
-  padding: '8px 10px',
-  background: '#15151f',
-  border: '1px solid #2a2a3a',
-  borderRadius: 6,
-  color: '#fff',
-};
-const primary: React.CSSProperties = {
-  marginTop: 16,
-  padding: '10px 14px',
-  background: '#0023e6',
-  border: 0,
-  borderRadius: 6,
-  color: '#fff',
-  fontWeight: 600,
-  cursor: 'pointer',
-};
-const err: React.CSSProperties = {
-  color: '#ff6b6b',
-  fontSize: 12,
-  marginTop: 6,
-};
-const ok: React.CSSProperties = { fontSize: 14, margin: '4px 0' };
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <label
+      style={{
+        display: 'block',
+        color: '#ccc',
+        fontSize: 12,
+        marginBottom: 6,
+        fontWeight: 500,
+      }}
+    >
+      {children}
+    </label>
+  );
+}
+
+export function LemtelLogo({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
+  const w = size === 'lg' ? 180 : 60;
+  const h = size === 'lg' ? 100 : 32;
+  return (
+    <div
+      style={{
+        width: w,
+        height: h,
+        borderRadius: '50%',
+        background: WHITELABEL.primaryColor,
+        border: `${size === 'lg' ? 4 : 2}px solid ${WHITELABEL.accentColor}`,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: size === 'lg' ? '0 8px 32px rgba(0,61,166,0.4)' : 'none',
+      }}
+    >
+      <div
+        style={{
+          color: '#fff',
+          fontWeight: 800,
+          fontSize: size === 'lg' ? 24 : 10,
+          letterSpacing: 1,
+          lineHeight: 1,
+        }}
+      >
+        LEMTEL
+      </div>
+      {size === 'lg' && (
+        <div
+          style={{
+            color: '#fff',
+            fontSize: 8,
+            letterSpacing: 3,
+            marginTop: 6,
+          }}
+        >
+          COMMUNICATIONS
+        </div>
+      )}
+    </div>
+  );
+}

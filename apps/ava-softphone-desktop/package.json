@@ -1,9 +1,9 @@
 {
-  "name": "ava-softphone",
+  "name": "lemtel-softphone",
   "version": "1.0.0",
-  "description": "AVA Softphone — Professional Communication App",
+  "description": "Lemtel Telecom — AI-Powered Business Communications",
   "main": "electron-compiled/main.js",
-  "author": "AVA Télécom",
+  "author": "Lemtel Communications / AVA Télécom",
   "scripts": {
     "dev": "concurrently \"vite\" \"electron .\"",
     "build": "vite build && tsc -p electron/tsconfig.json",
