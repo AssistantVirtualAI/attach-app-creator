@@ -8,11 +8,6 @@ on:
   release:
     types: [published, created]
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version (e.g. 1.0.0)'
-        required: false
-        default: '1.0.0'
 
 permissions:
   contents: write
@@ -26,51 +21,87 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify package.json
-        run: cat apps/ava-softphone-desktop/package.json | grep '"version"'
+      - run: cat apps/ava-softphone-desktop/package.json | grep '"version"'
 
   build-windows:
     needs: verify-version
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '24'
 
-      - name: Install root PostCSS deps
+      - name: Overwrite vite.config.ts
         shell: pwsh
-        run: npm install tailwindcss autoprefixer postcss --no-save
-        working-directory: ${{ github.workspace }}
+        run: |
+          $config = @'
+import { defineConfig } from "vite"
+import react from "@vitejs/plugin-react"
+import path from "path"
+export default defineConfig({
+  plugins: [react()],
+  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  build: { outDir: "dist", emptyOutDir: true, rollupOptions: { external: ["electron"] } },
+  base: "./",
+})
+'@
+          Set-Content -Path "vite.config.ts" -Value $config -Encoding UTF8
+        working-directory: apps/ava-softphone-desktop
 
-      - name: Install app dependencies
+      - name: Overwrite package.json
+        shell: pwsh
+        run: |
+          $pkg = @'
+{
+  "name": "ava-softphone",
+  "version": "1.0.0",
+  "description": "AVA Softphone",
+  "main": "electron/main.js",
+  "scripts": {
+    "build:win": "vite build && tsc -p electron/tsconfig.json && electron-builder --win"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "jssip": "^3.10.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "electron-updater": "^6.1.7",
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.21"
+  },
+  "build": { "extends": "./electron-builder.yml" }
+}
+'@
+          Set-Content -Path "package.json" -Value $pkg -Encoding UTF8
+        working-directory: apps/ava-softphone-desktop
+
+      - name: Install dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
 
       - name: Build Windows
         shell: pwsh
-        run: |
-          npx vite build --config vite.config.ts
-          npx tsc -p electron/tsconfig.json
-          npx electron-builder --win
+        run: npm run build:win
         working-directory: apps/ava-softphone-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           WIN_CSC_LINK: ''
-          WIN_CSC_KEY_PASSWORD: ''
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: |
-            apps/ava-softphone-desktop/dist-electron/*.exe
-            apps/ava-softphone-desktop/dist-electron/*.msi
-            apps/ava-softphone-desktop/dist-electron/*.yml
-            apps/ava-softphone-desktop/dist-electron/*.blockmap
+          path: apps/ava-softphone-desktop/dist-electron/*.exe
           if-no-files-found: warn
 
   build-mac:
@@ -78,43 +109,63 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '24'
 
-      - name: Install root PostCSS deps
-        run: npm install tailwindcss autoprefixer postcss --no-save
-        working-directory: ${{ github.workspace }}
+      - name: Overwrite vite.config.ts + package.json
+        run: |
+          cat > vite.config.ts << 'EOF'
+import { defineConfig } from "vite"
+import react from "@vitejs/plugin-react"
+import path from "path"
+export default defineConfig({
+  plugins: [react()],
+  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  build: { outDir: "dist", emptyOutDir: true, rollupOptions: { external: ["electron"] } },
+  base: "./",
+})
+EOF
+          cat > package.json << 'EOF'
+{
+  "name": "ava-softphone",
+  "version": "1.0.0",
+  "main": "electron/main.js",
+  "scripts": {
+    "build:mac": "vite build && tsc -p electron/tsconfig.json && electron-builder --mac --x64 --arm64"
+  },
+  "dependencies": {
+    "react": "^18.2.0", "react-dom": "^18.2.0",
+    "jssip": "^3.10.0", "@supabase/supabase-js": "^2.39.0",
+    "electron-updater": "^6.1.7", "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0", "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.3.4", "concurrently": "^9.1.2",
+    "electron": "^33.0.0", "electron-builder": "^25.1.8",
+    "typescript": "^5.6.3", "vite": "^5.4.21"
+  },
+  "build": { "extends": "./electron-builder.yml" }
+}
+EOF
+        working-directory: apps/ava-softphone-desktop
 
-      - name: Install app dependencies
+      - name: Install dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
 
       - name: Build Mac
-        run: |
-          npx vite build --config vite.config.ts
-          npx tsc -p electron/tsconfig.json
-          npx electron-builder --mac --x64 --arm64
+        run: npm run build:mac
         working-directory: apps/ava-softphone-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CSC_LINK: ''
-          APPLE_ID: ''
-          APPLE_APP_SPECIFIC_PASSWORD: ''
-          APPLE_TEAM_ID: ''
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: mac-build
-          path: |
-            apps/ava-softphone-desktop/dist-electron/*.dmg
-            apps/ava-softphone-desktop/dist-electron/*.zip
-            apps/ava-softphone-desktop/dist-electron/*.yml
-            apps/ava-softphone-desktop/dist-electron/*.blockmap
+          path: apps/ava-softphone-desktop/dist-electron/*.dmg
           if-no-files-found: warn
 
   build-linux:
@@ -122,47 +173,72 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '24'
 
-      - name: Install Linux system dependencies
+      - name: Install Linux system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-3-dev libnotify-dev libasound2-dev \
-            libcups2-dev libxss1 libxtst6 xvfb \
-            libx11-xcb1 libxcb-dri3-0 libdrm2 \
-            libgbm1 libnss3 libatk-bridge2.0-0
+          sudo apt-get install -y libgtk-3-dev libnotify-dev \
+            libasound2-dev libcups2-dev libxss1 libxtst6 xvfb \
+            libx11-xcb1 libxcb-dri3-0 libdrm2 libgbm1 libnss3 \
+            libatk-bridge2.0-0
 
-      - name: Install root PostCSS deps
-        run: npm install tailwindcss autoprefixer postcss --no-save
-        working-directory: ${{ github.workspace }}
+      - name: Overwrite vite.config.ts + package.json
+        run: |
+          cat > vite.config.ts << 'EOF'
+import { defineConfig } from "vite"
+import react from "@vitejs/plugin-react"
+import path from "path"
+export default defineConfig({
+  plugins: [react()],
+  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  build: { outDir: "dist", emptyOutDir: true, rollupOptions: { external: ["electron"] } },
+  base: "./",
+})
+EOF
+          cat > package.json << 'EOF'
+{
+  "name": "ava-softphone",
+  "version": "1.0.0",
+  "main": "electron/main.js",
+  "scripts": {
+    "build:linux": "vite build && tsc -p electron/tsconfig.json && electron-builder --linux"
+  },
+  "dependencies": {
+    "react": "^18.2.0", "react-dom": "^18.2.0",
+    "jssip": "^3.10.0", "@supabase/supabase-js": "^2.39.0",
+    "electron-updater": "^6.1.7", "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0", "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.3.4", "concurrently": "^9.1.2",
+    "electron": "^33.0.0", "electron-builder": "^25.1.8",
+    "typescript": "^5.6.3", "vite": "^5.4.21"
+  },
+  "build": { "extends": "./electron-builder.yml" }
+}
+EOF
+        working-directory: apps/ava-softphone-desktop
 
-      - name: Install app dependencies
+      - name: Install dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
 
       - name: Build Linux
-        run: |
-          npx vite build --config vite.config.ts
-          npx tsc -p electron/tsconfig.json
-          npx electron-builder --linux
+        run: npm run build:linux
         working-directory: apps/ava-softphone-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: linux-build
           path: |
             apps/ava-softphone-desktop/dist-electron/*.AppImage
             apps/ava-softphone-desktop/dist-electron/*.deb
-            apps/ava-softphone-desktop/dist-electron/*.yml
           if-no-files-found: warn
 
   create-release:
@@ -172,16 +248,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
-
-      - name: List artifacts
-        run: find artifacts -type f | sort
-
-      - name: Update GitHub Release
-        if: >
+      - run: find artifacts -type f | sort
+      - if: >
           github.event_name == 'release' ||
           startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
