@@ -80,6 +80,7 @@ import AuditLogs from "./pages/AuditLogs";
 // Lemtel module
 import { LemtelGuard } from "./pages/lemtel/LemtelGuard";
 import LemtelDashboard from "./pages/lemtel/LemtelDashboard";
+import PortalDiagnostic from "./pages/lemtel/PortalDiagnostic";
 import LemtelSettings from "./pages/lemtel/LemtelSettings";
 import LemtelMessages from "./pages/lemtel/LemtelMessages";
 import LemtelPortalCalls from "./pages/lemtel/LemtelPortalCalls";
