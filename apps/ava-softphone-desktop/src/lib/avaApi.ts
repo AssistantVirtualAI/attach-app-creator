@@ -209,15 +209,20 @@ const MOCK_CONTACTS: ContactItem[] = [
   { id: 'k4', name: 'Sophie Beaulieu', company: 'Beaulieu Studio', phone: '+14385550120', email: 'sophie@beaulieu.studio', lastInteraction: new Date(Date.now()-432000e3).toISOString(), totalCalls: 6, totalMessages: 9, sentiment: 'positive', aiNote: 'Recently onboarded, opportunity to upsell premium plan in Q3.', tags: ['onboarded', 'upsell'], favorite: true, interactions: mkInteractions(4) },
 ];
 
-/* ---------- API surface ---------- */
+/* ---------- API surface ----------
+ * Live routes map to Supabase:
+ *   /db/<table>?...        → PostgREST SELECT/PATCH on a table.
+ *   /fn/<edge-function>    → Supabase Edge Function (POST JSON).
+ * Mocks short-circuit when MOCK=true.
+ */
 export const ava = {
-  me: () => call<Me>('/desktop/me', {}, MOCK_ME),
-  dashboard: () => call<DashboardBrief>('/desktop/dashboard', {}, {
+  me: () => call<Me>(`/db/${TABLES.softphoneUsers}?select=*&limit=1`, {}, MOCK_ME),
+  dashboard: () => call<DashboardBrief>(`/fn/${FN.aiAnalyzeCall}?view=dashboard`, { method: 'POST', body: JSON.stringify({ view: 'dashboard' }) }, {
     missed: 3, answered: 12, unreadSms: 5, voicemail: 2, aiActions: 4, pbxHealth: 'ok',
     brief: 'You have 3 missed calls and 2 unread voicemails requiring callbacks. One conversation flagged a renewal opportunity.',
   }),
-  calls: (limit = 50) => call<CallRecord[]>(`/desktop/calls?limit=${limit}`, {}, MOCK_CALLS),
-  callDetail: (id: string) => call<CallInsight>(`/desktop/calls/${id}`, {}, {
+  calls: (limit = 50) => call<CallRecord[]>(`/db/${TABLES.callRecords}?select=*&order=started_at.desc&limit=${limit}`, {}, MOCK_CALLS),
+  callDetail: (id: string) => call<CallInsight>(`/db/${TABLES.aiInsights}?call_id=eq.${id}&select=*`, {}, {
     callId: id,
     summary: 'Customer asked about Q4 invoicing. Agent confirmed updated pricing and committed to sending a revised quote by Friday.',
     sentiment: 'positive', topics: ['invoicing', 'pricing', 'renewal'],
@@ -225,51 +230,54 @@ export const ava = {
     risks: [], opportunities: ['Annual renewal mentioned'],
     qualityScore: 87,
   }),
-  startCall: (to: string) => call<{ callId: string }>('/desktop/calls/start', { method: 'POST', body: JSON.stringify({ to }) }, { callId: 'mock' }),
-  threads: () => call<SmsThread[]>('/desktop/messages/threads', {}, MOCK_THREADS),
-  sendMessage: (threadId: string, body: string) => call<{ ok: true }>('/desktop/messages/send', { method: 'POST', body: JSON.stringify({ threadId, body }) }, { ok: true }),
+  startCall: (to: string) => call<{ callId: string }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'start_call', to }) }, { callId: 'mock' }),
+  threads: () => call<SmsThread[]>(`/db/${TABLES.smsThreads}?select=*&order=last_message_at.desc`, {}, MOCK_THREADS),
+  sendMessage: (threadId: string, body: string) =>
+    call<{ ok: true }>(`/fn/${FN.telnyxSms}`, { method: 'POST', body: JSON.stringify({ op: 'send', threadId, body }) }, { ok: true }),
   aiRewrite: (text: string, action: 'professional' | 'shorten' | 'translate' | 'rewrite') =>
-    call<{ text: string }>('/desktop/ai/rewrite', { method: 'POST', body: JSON.stringify({ text, action }) }, {
+    call<{ text: string }>(`/fn/${FN.aiAnalyzeCall}`, { method: 'POST', body: JSON.stringify({ op: 'rewrite', text, action }) }, {
       text: action === 'shorten' ? text.split('.')[0] + '.' :
             action === 'professional' ? `Hi,\n\n${text}\n\nBest regards,` :
             action === 'translate' ? `[FR] ${text}` :
             `${text} — refined by AVA.`,
     }),
-  generateGreeting: (prompt: string) => call<{ text: string; audioUrl?: string }>('/desktop/ai/generate-greeting', { method: 'POST', body: JSON.stringify({ prompt }) }, {
-    text: `Thank you for calling Lemtel Communications. ${prompt}. Please hold while we connect you to the right team.`,
-  }),
+  generateGreeting: (prompt: string) =>
+    call<{ text: string; audioUrl?: string }>(`/fn/${FN.elevenlabsGreeting}`, { method: 'POST', body: JSON.stringify({ prompt }) }, {
+      text: `Thank you for calling Lemtel Communications. ${prompt}. Please hold while we connect you to the right team.`,
+    }),
   /* Admin */
-  extensions: () => call<Extension[]>('/desktop/admin/extensions', {}, MOCK_EXT),
-  devices: () => call<Device[]>('/desktop/admin/devices', {}, MOCK_DEV),
-  phoneNumbers: () => call<PhoneNumber[]>('/desktop/admin/phone-numbers', {}, MOCK_NUM),
-  ivrs: () => call<Ivr[]>('/desktop/admin/ivrs', {}, MOCK_IVR),
-  queues: () => call<CallQueue[]>('/desktop/admin/queues', {}, MOCK_QUEUES),
-  ringGroups: () => call<RingGroup[]>('/desktop/admin/ring-groups', {}, MOCK_RG),
+  extensions: () => call<Extension[]>(`/db/${TABLES.extensions}?select=*&order=extension.asc`, {}, MOCK_EXT),
+  devices: () => call<Device[]>(`/fn/${FN.fusionpbxProxy}?op=list_devices`, { method: 'POST', body: JSON.stringify({ op: 'list_devices' }) }, MOCK_DEV),
+  phoneNumbers: () => call<PhoneNumber[]>(`/fn/${FN.fusionpbxProxy}?op=list_numbers`, { method: 'POST', body: JSON.stringify({ op: 'list_numbers' }) }, MOCK_NUM),
+  ivrs: () => call<Ivr[]>(`/fn/${FN.fusionpbxProxy}?op=list_ivrs`, { method: 'POST', body: JSON.stringify({ op: 'list_ivrs' }) }, MOCK_IVR),
+  queues: () => call<CallQueue[]>(`/fn/${FN.fusionpbxProxy}?op=list_queues`, { method: 'POST', body: JSON.stringify({ op: 'list_queues' }) }, MOCK_QUEUES),
+  ringGroups: () => call<RingGroup[]>(`/fn/${FN.fusionpbxProxy}?op=list_ring_groups`, { method: 'POST', body: JSON.stringify({ op: 'list_ring_groups' }) }, MOCK_RG),
   /* Phase 3 */
-  voicemails: () => call<VoicemailItem[]>('/desktop/voicemails', {}, MOCK_VM),
-  markVoicemailRead: (id: string) => call<{ ok: true }>(`/desktop/voicemails/${id}/read`, { method: 'POST' }, { ok: true }),
-  recordings: () => call<RecordingItem[]>('/desktop/recordings', {}, MOCK_RECORDINGS),
-  contacts: () => call<ContactItem[]>('/desktop/contacts', {}, MOCK_CONTACTS),
+  voicemails: () => call<VoicemailItem[]>(`/fn/${FN.fusionpbxProxy}?op=list_voicemails`, { method: 'POST', body: JSON.stringify({ op: 'list_voicemails' }) }, MOCK_VM),
+  markVoicemailRead: (id: string) =>
+    call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'voicemail_read', id }) }, { ok: true }),
+  recordings: () => call<RecordingItem[]>(`/fn/${FN.fusionpbxProxy}?op=list_recordings`, { method: 'POST', body: JSON.stringify({ op: 'list_recordings' }) }, MOCK_RECORDINGS),
+  contacts: () => call<ContactItem[]>(`/db/${TABLES.softphoneUsers}?select=*&order=last_interaction.desc`, {}, MOCK_CONTACTS),
   /* Phase 3.1 — AI feedback + lifecycle */
   regenerateSummary: (kind: 'voicemail' | 'recording', id: string, sourceText?: string) =>
-    call<{ summary: string }>(`/desktop/ai/regenerate-summary`, { method: 'POST', body: JSON.stringify({ kind, id, sourceText }) }, {
+    call<{ summary: string }>(`/fn/${FN.aiAnalyzeCall}`, { method: 'POST', body: JSON.stringify({ op: 'regenerate_summary', kind, id, sourceText }) }, {
       summary: sourceText
         ? `AVA v2 · ${sourceText.split(/[.!?]/)[0].trim()}. Key points refined and prioritized for action.`
         : `AVA regenerated this summary with the latest model and tone refinements.`,
     }),
   submitSummaryFeedback: (kind: 'voicemail' | 'recording', id: string, feedback: Feedback) =>
-    call<{ ok: true }>(`/desktop/ai/summary-feedback`, { method: 'POST', body: JSON.stringify({ kind, id, feedback }) }, { ok: true }),
+    call<{ ok: true }>(`/fn/${FN.aiAnalyzeCall}`, { method: 'POST', body: JSON.stringify({ op: 'summary_feedback', kind, id, feedback }) }, { ok: true }),
   setVoicemailPriority: (id: string, priority: VoicemailItem['priority']) =>
-    call<{ ok: true }>(`/desktop/voicemails/${id}/priority`, { method: 'POST', body: JSON.stringify({ priority }) }, { ok: true }),
+    call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'voicemail_priority', id, priority }) }, { ok: true }),
   markVoicemailHandled: (id: string, handled: boolean) =>
-    call<{ ok: true }>(`/desktop/voicemails/${id}/handled`, { method: 'POST', body: JSON.stringify({ handled }) }, { ok: true }),
+    call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'voicemail_handled', id, handled }) }, { ok: true }),
   exportRecordings: (ids: string[]) =>
-    call<{ ok: true; count: number; url: string }>(`/desktop/recordings/export`, { method: 'POST', body: JSON.stringify({ ids }) }, {
+    call<{ ok: true; count: number; url: string }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'export_recordings', ids }) }, {
       ok: true, count: ids.length, url: `https://ava.local/exports/recordings-${Date.now()}.zip`,
     }),
   updateContact: (id: string, patch: Partial<Pick<ContactItem, 'notes' | 'tags' | 'favorite'>>) =>
-    call<{ ok: true }>(`/desktop/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }, { ok: true }),
-  syncStatus: () => call<{ lastSync: string; status: 'ok' | 'error'; jobs: { kind: string; finishedAt: string; ok: boolean }[] }>('/desktop/admin/sync', {}, {
+    call<{ ok: true }>(`/db/${TABLES.softphoneUsers}?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } }, { ok: true }),
+  syncStatus: () => call<{ lastSync: string; status: 'ok' | 'error'; jobs: { kind: string; finishedAt: string; ok: boolean }[] }>(`/fn/${FN.fusionpbxProxy}?op=sync_status`, { method: 'POST', body: JSON.stringify({ op: 'sync_status' }) }, {
     lastSync: new Date(Date.now() - 600e3).toISOString(),
     status: 'ok',
     jobs: [
