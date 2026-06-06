@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
-import { ava, RecordingItem } from '../../lib/avaApi';
+import { ava, RecordingItem, Feedback } from '../../lib/avaApi';
 
 const { colors: c } = theme;
 
 type Quality = 'all' | 'high' | 'medium' | 'low';
 type Sent = 'all' | 'positive' | 'neutral' | 'negative';
+type Sort = 'recent' | 'oldest' | 'longest' | 'quality_desc' | 'quality_asc';
+type Range = 'all' | '24h' | '7d' | '30d' | '90d';
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
@@ -17,33 +19,99 @@ function fmtDur(s: number) {
 function fmtSize(kb: number) {
   return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
 }
+function rangeCutoff(r: Range): number {
+  const ms = { '24h': 864e5, '7d': 7 * 864e5, '30d': 30 * 864e5, '90d': 90 * 864e5 } as const;
+  return r === 'all' ? 0 : Date.now() - (ms as any)[r];
+}
 
 export default function RecordingsView() {
   const [items, setItems] = useState<RecordingItem[]>([]);
   const [q, setQ] = useState<Quality>('all');
   const [s, setS] = useState<Sent>('all');
+  const [range, setRange] = useState<Range>('all');
+  const [sort, setSort] = useState<Sort>('recent');
   const [search, setSearch] = useState('');
   const [sel, setSel] = useState<RecordingItem | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
+  const [exportNote, setExportNote] = useState<string | null>(null);
+  const [regenLoading, setRegenLoading] = useState(false);
 
   useEffect(() => { ava.recordings().then(setItems); }, []);
 
-  const filtered = useMemo(() => items.filter((r) => {
-    if (q === 'high' && r.qualityScore < 80) return false;
-    if (q === 'medium' && (r.qualityScore < 50 || r.qualityScore >= 80)) return false;
-    if (q === 'low' && r.qualityScore >= 50) return false;
-    if (s !== 'all' && r.sentiment !== s) return false;
-    if (search) {
-      const t = search.toLowerCase();
-      const hay = `${r.customer || ''} ${r.from} ${r.to} ${r.summary} ${r.topics.join(' ')} ${r.tags.join(' ')}`.toLowerCase();
-      if (!hay.includes(t)) return false;
-    }
-    return true;
-  }), [items, q, s, search]);
+  const filtered = useMemo(() => {
+    const cutoff = rangeCutoff(range);
+    const list = items.filter((r) => {
+      if (q === 'high' && r.qualityScore < 80) return false;
+      if (q === 'medium' && (r.qualityScore < 50 || r.qualityScore >= 80)) return false;
+      if (q === 'low' && r.qualityScore >= 50) return false;
+      if (s !== 'all' && r.sentiment !== s) return false;
+      if (cutoff && new Date(r.recordedAt).getTime() < cutoff) return false;
+      if (search) {
+        const t = search.toLowerCase();
+        const hay = `${r.customer || ''} ${r.from} ${r.to} ${r.summary} ${r.topics.join(' ')} ${r.tags.join(' ')}`.toLowerCase();
+        if (!hay.includes(t)) return false;
+      }
+      return true;
+    });
+    list.sort((a, b) => {
+      switch (sort) {
+        case 'oldest': return +new Date(a.recordedAt) - +new Date(b.recordedAt);
+        case 'longest': return b.durationSec - a.durationSec;
+        case 'quality_desc': return b.qualityScore - a.qualityScore;
+        case 'quality_asc': return a.qualityScore - b.qualityScore;
+        default: return +new Date(b.recordedAt) - +new Date(a.recordedAt);
+      }
+    });
+    return list;
+  }, [items, q, s, range, sort, search]);
 
   const qualityColor = (score: number) =>
     score >= 80 ? c.success : score >= 50 ? c.warning : c.danger;
   const sentColor = (x: RecordingItem['sentiment']) =>
     x === 'positive' ? c.success : x === 'negative' ? c.danger : c.mutedSilver;
+
+  const updateItem = (id: string, patch: Partial<RecordingItem>) => {
+    setItems((all) => all.map((x) => x.id === id ? { ...x, ...patch } : x));
+    if (sel?.id === id) setSel({ ...sel, ...patch });
+  };
+
+  const toggleSel = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIds((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  };
+  const toggleAll = () => {
+    const allIds = filtered.map((r) => r.id);
+    const allSelected = allIds.every((id) => selectedIds.has(id));
+    setSelectedIds(allSelected ? new Set() : new Set(allIds));
+  };
+  const exportSelected = async () => {
+    if (selectedIds.size === 0) return;
+    setExporting(true); setExportNote(null);
+    try {
+      const res = await ava.exportRecordings(Array.from(selectedIds));
+      setExportNote(`Exported ${res.count} recording${res.count === 1 ? '' : 's'} · ${res.url}`);
+    } finally { setExporting(false); }
+  };
+
+  const regen = async () => {
+    if (!sel) return;
+    setRegenLoading(true);
+    try {
+      const { summary } = await ava.regenerateSummary('recording', sel.id, sel.summary);
+      updateItem(sel.id, { summary, feedback: null });
+    } finally { setRegenLoading(false); }
+  };
+  const feedback = (f: Feedback) => {
+    if (!sel) return;
+    const next: Feedback = sel.feedback === f ? null : f;
+    ava.submitSummaryFeedback('recording', sel.id, next);
+    updateItem(sel.id, { feedback: next });
+  };
 
   return (
     <div style={{ display: 'flex', height: '100%' }}>
@@ -51,7 +119,7 @@ export default function RecordingsView() {
         <header style={{ marginBottom: 14 }}>
           <h1 style={{ fontSize: 24, fontWeight: 700, color: c.textIce, margin: '0 0 4px' }}>Recordings</h1>
           <p style={{ fontSize: 12, color: c.mutedSilver, margin: 0 }}>
-            Searchable archive of call audio with AVA quality scores, summaries, and topics.
+            Searchable archive with AVA quality, sentiment, date range, and bulk export.
           </p>
         </header>
 
@@ -69,18 +137,61 @@ export default function RecordingsView() {
         <div style={{ display: 'flex', gap: 14, marginBottom: 14, flexWrap: 'wrap' }}>
           <FilterGroup label="Quality" value={q} onChange={(v) => setQ(v as Quality)} options={['all', 'high', 'medium', 'low']} />
           <FilterGroup label="Sentiment" value={s} onChange={(v) => setS(v as Sent)} options={['all', 'positive', 'neutral', 'negative']} />
+          <FilterGroup label="Range" value={range} onChange={(v) => setRange(v as Range)} options={['all', '24h', '7d', '30d', '90d']} />
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 5 }}>Sort</div>
+            <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} style={{
+              padding: '5px 8px', borderRadius: 8, background: c.bgCard,
+              border: `1px solid ${c.border}`, color: c.textIce, fontSize: 11, fontWeight: 600,
+            }}>
+              <option value="recent">Most recent</option>
+              <option value="oldest">Oldest first</option>
+              <option value="longest">Longest first</option>
+              <option value="quality_desc">Quality ↓</option>
+              <option value="quality_asc">Quality ↑</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Bulk bar */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 12px', marginBottom: 10, borderRadius: 10,
+          background: selectedIds.size ? 'rgba(255,230,0,0.07)' : c.bgCard,
+          border: `1px solid ${selectedIds.size ? c.borderGold : c.border}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button onClick={toggleAll} style={miniBtn}>
+              {filtered.length && filtered.every((r) => selectedIds.has(r.id)) ? 'Clear' : 'Select all'}
+            </button>
+            <span style={{ fontSize: 11, color: c.mutedSilver }}>
+              {selectedIds.size} selected · {filtered.length} shown
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {exportNote && <span style={{ fontSize: 10, color: c.success }}>{exportNote}</span>}
+            <button onClick={exportSelected} disabled={!selectedIds.size || exporting} style={{
+              ...miniBtn, background: selectedIds.size ? c.signalGold : 'transparent',
+              color: selectedIds.size ? c.midnight : c.mutedSilver, fontWeight: 700,
+              borderColor: selectedIds.size ? c.signalGold : c.border, opacity: exporting ? 0.6 : 1,
+            }}>{exporting ? 'Exporting…' : '⬇ Export ZIP'}</button>
+          </div>
         </div>
 
         <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
           {filtered.map((r) => (
-            <button key={r.id} onClick={() => setSel(r)} style={{
-              display: 'grid', gridTemplateColumns: '1fr 60px 80px 80px 70px',
+            <div key={r.id} onClick={() => setSel(r)} style={{
+              display: 'grid', gridTemplateColumns: '22px 1fr 60px 80px 80px 70px',
               alignItems: 'center', gap: 12, width: '100%',
               padding: '12px 14px',
               background: sel?.id === r.id ? 'rgba(35,214,255,0.06)' : 'transparent',
-              border: 'none', borderBottom: `1px solid ${c.border}`,
-              color: c.textIce, cursor: 'pointer', textAlign: 'left',
+              borderBottom: `1px solid ${c.border}`, color: c.textIce, cursor: 'pointer',
             }}>
+              <input
+                type="checkbox" checked={selectedIds.has(r.id)}
+                onChange={() => {}} onClick={(e) => toggleSel(r.id, e)}
+                style={{ accentColor: c.signalGold, cursor: 'pointer' }}
+              />
               <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {r.customer || `${r.from} → ${r.to}`}
@@ -95,7 +206,7 @@ export default function RecordingsView() {
               <span style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                 <span style={dot(sentColor(r.sentiment))}>●</span>
               </span>
-            </button>
+            </div>
           ))}
           {filtered.length === 0 && (
             <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>No recordings match these filters.</div>
@@ -103,7 +214,7 @@ export default function RecordingsView() {
         </div>
       </div>
 
-      <aside style={{ width: 360, flexShrink: 0, borderLeft: `1px solid ${c.border}`, background: c.deepPanel, padding: '24px 22px', overflowY: 'auto' }}>
+      <aside style={{ width: 380, flexShrink: 0, borderLeft: `1px solid ${c.border}`, background: c.deepPanel, padding: '24px 22px', overflowY: 'auto' }}>
         {!sel && (
           <div style={{ color: c.mutedSilver, fontSize: 12, paddingTop: 80, textAlign: 'center' }}>
             Select a recording to view waveform, AVA summary, and topics.
@@ -137,9 +248,26 @@ export default function RecordingsView() {
                 <span style={{ fontSize: 11, color: c.mutedSilver }}>/100</span>
               </div>
             </Panel>
-            <Panel title="AVA Summary" accent={c.avaViolet}>
+
+            <Panel
+              title="AVA Summary"
+              accent={c.avaViolet}
+              right={
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={regen} disabled={regenLoading} style={miniBtn}>{regenLoading ? '…' : '↻ Regenerate'}</button>
+                  <button onClick={() => feedback('up')} style={{ ...miniBtn, color: sel.feedback === 'up' ? c.success : c.mutedSilver }}>👍</button>
+                  <button onClick={() => feedback('down')} style={{ ...miniBtn, color: sel.feedback === 'down' ? c.danger : c.mutedSilver }}>👎</button>
+                </div>
+              }
+            >
               <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0 }}>{sel.summary}</p>
+              {sel.feedback && (
+                <div style={{ fontSize: 10, color: c.mutedSilver, marginTop: 6 }}>
+                  Feedback recorded — AVA will adapt future summaries.
+                </div>
+              )}
             </Panel>
+
             <Panel title="Topics" accent={c.avaCyan}>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {sel.topics.map((t) => <span key={t} style={tag(c.avaCyan)}>{t}</span>)}
@@ -188,6 +316,11 @@ const tag = (col: string): React.CSSProperties => ({
   background: 'rgba(255,255,255,0.04)', color: col,
   border: `1px solid ${col}33`, fontWeight: 600,
 });
+const miniBtn: React.CSSProperties = {
+  padding: '5px 10px', borderRadius: 8,
+  background: 'transparent', border: `1px solid ${c.border}`,
+  color: c.textIce, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+};
 const btnPrimary: React.CSSProperties = {
   flex: 1, padding: '10px 12px', borderRadius: 10,
   background: c.signalGold, color: c.midnight, border: 'none',
@@ -199,10 +332,13 @@ const btnGhost: React.CSSProperties = {
   border: `1px solid ${c.border}`, fontSize: 12, fontWeight: 600, cursor: 'pointer',
 };
 
-function Panel({ title, accent, children }: { title: string; accent: string; children: React.ReactNode }) {
+function Panel({ title, accent, children, right }: { title: string; accent: string; children: React.ReactNode; right?: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.5, color: accent, textTransform: 'uppercase', marginBottom: 6 }}>{title}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.5, color: accent, textTransform: 'uppercase' }}>{title}</div>
+        {right}
+      </div>
       <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, padding: '10px 12px' }}>{children}</div>
     </div>
   );

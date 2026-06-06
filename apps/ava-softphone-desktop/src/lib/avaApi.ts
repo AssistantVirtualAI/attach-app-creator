@@ -68,23 +68,31 @@ export interface Ivr { id: string; name: string; greeting: string; options: numb
 export interface CallQueue { id: string; name: string; strategy: string; agents: number; waiting: number; }
 export interface RingGroup { id: string; name: string; members: number; strategy: string; }
 
+export type Feedback = 'up' | 'down' | null;
+
 export interface VoicemailItem {
   id: string; from: string; customer?: string; receivedAt: string;
   durationSec: number; isNew: boolean; transcript: string;
   summary: string; sentiment: 'positive' | 'neutral' | 'negative';
   priority: 'low' | 'normal' | 'high';
+  handled?: boolean; feedback?: Feedback;
 }
 export interface RecordingItem {
   id: string; callId: string; from: string; to: string; customer?: string;
   recordedAt: string; durationSec: number; sizeKb: number;
   qualityScore: number; sentiment: 'positive' | 'neutral' | 'negative';
-  summary: string; topics: string[]; tags: string[];
+  summary: string; topics: string[]; tags: string[]; feedback?: Feedback;
+}
+export interface ContactInteraction {
+  id: string; kind: 'call' | 'sms' | 'voicemail';
+  direction: 'in' | 'out'; at: string; preview: string; durationSec?: number;
 }
 export interface ContactItem {
   id: string; name: string; company?: string; phone: string; email?: string;
   lastInteraction: string; totalCalls: number; totalMessages: number;
   sentiment: 'positive' | 'neutral' | 'negative';
-  aiNote: string; tags: string[]; favorite: boolean;
+  aiNote: string; notes?: string; tags: string[]; favorite: boolean;
+  interactions?: ContactInteraction[];
 }
 
 /* ---------- Mock data ---------- */
@@ -148,11 +156,18 @@ const MOCK_RECORDINGS: RecordingItem[] = [
   { id: 'rec4', callId: 'c5', from: '+14385550120', to: '302', customer: 'Sophie Beaulieu', recordedAt: new Date(Date.now()-432000e3).toISOString(), durationSec: 184, sizeKb: 730, qualityScore: 88, sentiment: 'positive', summary: 'Onboarding session completed successfully.', topics: ['onboarding', 'training'], tags: ['success'] },
 ];
 
+const mkInteractions = (seed: number): ContactInteraction[] => [
+  { id: `${seed}-i1`, kind: 'call', direction: 'in', at: new Date(Date.now()-3600e3).toISOString(), preview: 'Discussed renewal terms and timing.', durationSec: 245 },
+  { id: `${seed}-i2`, kind: 'sms', direction: 'out', at: new Date(Date.now()-7200e3).toISOString(), preview: 'Sent updated quote PDF.' },
+  { id: `${seed}-i3`, kind: 'voicemail', direction: 'in', at: new Date(Date.now()-86400e3).toISOString(), preview: 'Left a voicemail about Thursday meeting.', durationSec: 42 },
+  { id: `${seed}-i4`, kind: 'call', direction: 'out', at: new Date(Date.now()-172800e3).toISOString(), preview: 'Follow-up call, no answer.', durationSec: 0 },
+];
+
 const MOCK_CONTACTS: ContactItem[] = [
-  { id: 'k1', name: 'Marie Tremblay', company: 'Tremblay & Co', phone: '+15145550182', email: 'marie@tremblay.co', lastInteraction: new Date(Date.now()-3600e3).toISOString(), totalCalls: 14, totalMessages: 23, sentiment: 'positive', aiNote: 'High-value account, renewal due in 30 days. Prefers email follow-ups.', tags: ['vip', 'renewal'], favorite: true },
-  { id: 'k2', name: 'Acme Corp', company: 'Acme Corp', phone: '+14385550199', email: 'ops@acme.com', lastInteraction: new Date(Date.now()-7200e3).toISOString(), totalCalls: 8, totalMessages: 11, sentiment: 'neutral', aiNote: 'Proposal pending. Decision maker is responsive between 9am-11am.', tags: ['prospect'], favorite: false },
-  { id: 'k3', name: 'Jean-Luc Roy', phone: '+15145550101', lastInteraction: new Date(Date.now()-14400e3).toISOString(), totalCalls: 3, totalMessages: 2, sentiment: 'negative', aiNote: 'Recent complaint about support — recommend manager outreach.', tags: ['at-risk'], favorite: false },
-  { id: 'k4', name: 'Sophie Beaulieu', company: 'Beaulieu Studio', phone: '+14385550120', email: 'sophie@beaulieu.studio', lastInteraction: new Date(Date.now()-432000e3).toISOString(), totalCalls: 6, totalMessages: 9, sentiment: 'positive', aiNote: 'Recently onboarded, opportunity to upsell premium plan in Q3.', tags: ['onboarded', 'upsell'], favorite: true },
+  { id: 'k1', name: 'Marie Tremblay', company: 'Tremblay & Co', phone: '+15145550182', email: 'marie@tremblay.co', lastInteraction: new Date(Date.now()-3600e3).toISOString(), totalCalls: 14, totalMessages: 23, sentiment: 'positive', aiNote: 'High-value account, renewal due in 30 days. Prefers email follow-ups.', tags: ['vip', 'renewal'], favorite: true, interactions: mkInteractions(1) },
+  { id: 'k2', name: 'Acme Corp', company: 'Acme Corp', phone: '+14385550199', email: 'ops@acme.com', lastInteraction: new Date(Date.now()-7200e3).toISOString(), totalCalls: 8, totalMessages: 11, sentiment: 'neutral', aiNote: 'Proposal pending. Decision maker is responsive between 9am-11am.', tags: ['prospect'], favorite: false, interactions: mkInteractions(2) },
+  { id: 'k3', name: 'Jean-Luc Roy', phone: '+15145550101', lastInteraction: new Date(Date.now()-14400e3).toISOString(), totalCalls: 3, totalMessages: 2, sentiment: 'negative', aiNote: 'Recent complaint about support — recommend manager outreach.', tags: ['at-risk'], favorite: false, interactions: mkInteractions(3) },
+  { id: 'k4', name: 'Sophie Beaulieu', company: 'Beaulieu Studio', phone: '+14385550120', email: 'sophie@beaulieu.studio', lastInteraction: new Date(Date.now()-432000e3).toISOString(), totalCalls: 6, totalMessages: 9, sentiment: 'positive', aiNote: 'Recently onboarded, opportunity to upsell premium plan in Q3.', tags: ['onboarded', 'upsell'], favorite: true, interactions: mkInteractions(4) },
 ];
 
 /* ---------- API surface ---------- */
@@ -196,6 +211,25 @@ export const ava = {
   markVoicemailRead: (id: string) => call<{ ok: true }>(`/desktop/voicemails/${id}/read`, { method: 'POST' }, { ok: true }),
   recordings: () => call<RecordingItem[]>('/desktop/recordings', {}, MOCK_RECORDINGS),
   contacts: () => call<ContactItem[]>('/desktop/contacts', {}, MOCK_CONTACTS),
+  /* Phase 3.1 — AI feedback + lifecycle */
+  regenerateSummary: (kind: 'voicemail' | 'recording', id: string, sourceText?: string) =>
+    call<{ summary: string }>(`/desktop/ai/regenerate-summary`, { method: 'POST', body: JSON.stringify({ kind, id, sourceText }) }, {
+      summary: sourceText
+        ? `AVA v2 · ${sourceText.split(/[.!?]/)[0].trim()}. Key points refined and prioritized for action.`
+        : `AVA regenerated this summary with the latest model and tone refinements.`,
+    }),
+  submitSummaryFeedback: (kind: 'voicemail' | 'recording', id: string, feedback: Feedback) =>
+    call<{ ok: true }>(`/desktop/ai/summary-feedback`, { method: 'POST', body: JSON.stringify({ kind, id, feedback }) }, { ok: true }),
+  setVoicemailPriority: (id: string, priority: VoicemailItem['priority']) =>
+    call<{ ok: true }>(`/desktop/voicemails/${id}/priority`, { method: 'POST', body: JSON.stringify({ priority }) }, { ok: true }),
+  markVoicemailHandled: (id: string, handled: boolean) =>
+    call<{ ok: true }>(`/desktop/voicemails/${id}/handled`, { method: 'POST', body: JSON.stringify({ handled }) }, { ok: true }),
+  exportRecordings: (ids: string[]) =>
+    call<{ ok: true; count: number; url: string }>(`/desktop/recordings/export`, { method: 'POST', body: JSON.stringify({ ids }) }, {
+      ok: true, count: ids.length, url: `https://ava.local/exports/recordings-${Date.now()}.zip`,
+    }),
+  updateContact: (id: string, patch: Partial<Pick<ContactItem, 'notes' | 'tags' | 'favorite'>>) =>
+    call<{ ok: true }>(`/desktop/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }, { ok: true }),
   syncStatus: () => call<{ lastSync: string; status: 'ok' | 'error'; jobs: { kind: string; finishedAt: string; ok: boolean }[] }>('/desktop/admin/sync', {}, {
     lastSync: new Date(Date.now() - 600e3).toISOString(),
     status: 'ok',
