@@ -19,11 +19,12 @@ function fmtDur(s: number) {
 
 export default function CallsView() {
   const [calls, setCalls] = useState<CallRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'missed' | 'in' | 'out' | 'recorded'>('all');
   const [sel, setSel] = useState<CallRecord | null>(null);
   const [insight, setInsight] = useState<any>(null);
 
-  useEffect(() => { ava.calls().then(setCalls); }, []);
+  useEffect(() => { ava.calls().then((d) => { setCalls(d); setLoading(false); }); }, []);
   useEffect(() => {
     if (sel) { setInsight(null); ava.callDetail(sel.id).then(setInsight); }
   }, [sel]);
