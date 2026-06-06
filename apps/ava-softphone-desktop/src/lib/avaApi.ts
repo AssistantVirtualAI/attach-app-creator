@@ -1,25 +1,64 @@
 /**
- * AVA Desktop API Client — Phase 2
- * Production-shaped, mock-backed. Swap `MOCK` to false and set AVA_API_BASE_URL
- * to route through the AVA backend (which proxies FusionPBX, ElevenLabs, etc.).
- * No PBX/SIP/SMS secrets ever live in the desktop app.
+ * AVA Desktop API Client.
+ *
+ * Backend: Supabase project gejxisrqtvxavbrfcoxz.supabase.co
+ *   Auth      — Supabase Auth (JWT in Authorization header).
+ *   Tables    — pbx_call_records, pbx_extensions, pbx_ai_insights,
+ *               pbx_sms_threads, pbx_softphone_users.
+ *   Functions — fusionpbx-proxy, ai-analyze-call, telnyx-sms,
+ *               elevenlabs-generate-greeting, softphone-credentials.
+ *
+ * Set MOCK=false (and provide a Supabase session token via `setAuthToken`)
+ * to route through the live backend. PBX/SIP/SMS secrets NEVER live in the
+ * desktop app — they are held by the Edge Functions above.
  */
+import { BACKEND, TABLES, FN, fnUrl } from './config';
 
 export const MOCK = true;
-const BASE = (import.meta as any).env?.VITE_AVA_API_BASE_URL || '';
+
+let authToken: string | null = null;
+export function setAuthToken(token: string | null) { authToken = token; }
+
+function authHeaders(): Record<string, string> {
+  const h: Record<string, string> = {
+    'Content-Type': 'application/json',
+    apikey: BACKEND.anonKey,
+  };
+  if (authToken) h.Authorization = `Bearer ${authToken}`;
+  return h;
+}
+
+/**
+ * Path routing convention for live mode:
+ *   `/fn/<function-name>`   → POST  ${BACKEND.url}/functions/v1/<name>
+ *   `/db/<table>?<query>`   → GET   ${BACKEND.url}/rest/v1/<table>?<query>
+ * Everything else is treated as a relative REST path under PostgREST.
+ */
+function resolveUrl(path: string): string {
+  if (path.startsWith('/fn/')) return fnUrl(path.slice(4).split('?')[0]);
+  if (path.startsWith('/db/')) return `${BACKEND.url}/rest/v1/${path.slice(4)}`;
+  return `${BACKEND.url}${path}`;
+}
 
 async function call<T>(path: string, init: RequestInit = {}, mockData?: T): Promise<T> {
   if (MOCK && mockData !== undefined) {
     await new Promise((r) => setTimeout(r, 180));
     return mockData;
   }
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(resolveUrl(path), {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+    headers: { ...authHeaders(), ...(init.headers || {}) },
   });
   if (!res.ok) throw new Error(`AVA ${path} ${res.status}`);
   return res.json() as Promise<T>;
 }
+
+/** Concrete backend wiring exposed for components that need it directly. */
+export const BACKEND_WIRING = {
+  url: BACKEND.url,
+  tables: TABLES,
+  functions: FN,
+} as const;
 
 /* ---------- Types ---------- */
 export interface Me {
