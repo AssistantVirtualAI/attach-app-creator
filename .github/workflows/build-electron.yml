@@ -13,9 +13,6 @@ permissions:
   contents: write
   packages: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   verify-version:
     runs-on: ubuntu-latest
@@ -36,31 +33,36 @@ jobs:
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
 
-      - name: Overwrite vite.config.ts AFTER install
+      - name: Overwrite vite.config.ts
         shell: pwsh
         working-directory: apps/ava-softphone-desktop
         run: |
-          $c = 'import { defineConfig } from "vite"' + "`n"
-          $c += 'import react from "@vitejs/plugin-react"' + "`n"
-          $c += 'import path from "path"' + "`n"
-          $c += 'export default defineConfig({' + "`n"
-          $c += '  plugins: [react()],' + "`n"
-          $c += '  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },' + "`n"
-          $c += '  build: { outDir: "dist", emptyOutDir: true, rollupOptions: { external: ["electron"] } },' + "`n"
-          $c += '  base: "./",' + "`n"
-          $c += '})' + "`n"
+          $c = @"
+import { defineConfig } from "vite"
+import react from "@vitejs/plugin-react"
+import path from "path"
+export default defineConfig({
+  plugins: [react()],
+  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
+  build: { outDir: "dist", emptyOutDir: true, rollupOptions: { external: ["electron"] } },
+  base: "./",
+})
+"@
           Set-Content -Path "vite.config.ts" -Value $c -Encoding UTF8
-          Write-Host "=== vite.config.ts content ==="
+          Write-Host "=== vite.config.ts ==="
           Get-Content "vite.config.ts"
+
+      - name: Clear Vite cache
+        shell: pwsh
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          Get-ChildItem -Path "." -Filter "vite.config.ts.timestamp*" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
+          if (Test-Path "node_modules/.vite") { Remove-Item -Recurse -Force "node_modules/.vite" }
 
       - name: Build Windows
         shell: pwsh
         working-directory: apps/ava-softphone-desktop
         run: |
-          Get-ChildItem -Path "node_modules\.vite" -Filter "*.mjs" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
-          Get-ChildItem -Path "." -Filter "vite.config.ts.timestamp*" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
-          Write-Host "=== vite.config.ts at build time ==="
-          Get-Content "vite.config.ts"
           npx vite build
           npx tsc -p electron/tsconfig.json
           npx electron-builder --win
@@ -72,11 +74,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: |
-            apps/ava-softphone-desktop/dist-electron/*.exe
-            apps/ava-softphone-desktop/dist-electron/*.msi
-            apps/ava-softphone-desktop/dist-electron/*.yml
-            apps/ava-softphone-desktop/dist-electron/*.blockmap
+          path: apps/ava-softphone-desktop/dist-electron/*.exe
           if-no-files-found: warn
 
   build-mac:
@@ -92,10 +90,10 @@ jobs:
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
 
-      - name: Overwrite vite.config.ts AFTER install
+      - name: Overwrite vite.config.ts
         working-directory: apps/ava-softphone-desktop
         run: |
-          cat > vite.config.ts << 'VITEEOF'
+          cat > vite.config.ts << 'EOF'
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import path from "path"
@@ -105,17 +103,19 @@ export default defineConfig({
   build: { outDir: "dist", emptyOutDir: true, rollupOptions: { external: ["electron"] } },
   base: "./",
 })
-VITEEOF
-          echo "=== vite.config.ts content ==="
+EOF
+          echo "=== vite.config.ts ==="
           cat vite.config.ts
+
+      - name: Clear Vite cache
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          find . -name "vite.config.ts.timestamp*" -delete 2>/dev/null || true
+          rm -rf node_modules/.vite 2>/dev/null || true
 
       - name: Build Mac
         working-directory: apps/ava-softphone-desktop
         run: |
-          find node_modules/.vite -name "*.mjs" -delete 2>/dev/null || true
-          find . -name "vite.config.ts.timestamp*" -delete 2>/dev/null || true
-          echo "=== vite.config.ts at build time ==="
-          cat vite.config.ts
           npx vite build
           npx tsc -p electron/tsconfig.json
           npx electron-builder --mac --x64 --arm64
@@ -123,18 +123,11 @@ VITEEOF
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CSC_LINK: ''
-          APPLE_ID: ''
-          APPLE_APP_SPECIFIC_PASSWORD: ''
-          APPLE_TEAM_ID: ''
 
       - uses: actions/upload-artifact@v4
         with:
           name: mac-build
-          path: |
-            apps/ava-softphone-desktop/dist-electron/*.dmg
-            apps/ava-softphone-desktop/dist-electron/*.zip
-            apps/ava-softphone-desktop/dist-electron/*.yml
-            apps/ava-softphone-desktop/dist-electron/*.blockmap
+          path: apps/ava-softphone-desktop/dist-electron/*.dmg
           if-no-files-found: warn
 
   build-linux:
@@ -158,10 +151,10 @@ VITEEOF
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
 
-      - name: Overwrite vite.config.ts AFTER install
+      - name: Overwrite vite.config.ts
         working-directory: apps/ava-softphone-desktop
         run: |
-          cat > vite.config.ts << 'VITEEOF'
+          cat > vite.config.ts << 'EOF'
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import path from "path"
@@ -171,17 +164,19 @@ export default defineConfig({
   build: { outDir: "dist", emptyOutDir: true, rollupOptions: { external: ["electron"] } },
   base: "./",
 })
-VITEEOF
-          echo "=== vite.config.ts content ==="
+EOF
+          echo "=== vite.config.ts ==="
           cat vite.config.ts
+
+      - name: Clear Vite cache
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          find . -name "vite.config.ts.timestamp*" -delete 2>/dev/null || true
+          rm -rf node_modules/.vite 2>/dev/null || true
 
       - name: Build Linux
         working-directory: apps/ava-softphone-desktop
         run: |
-          find node_modules/.vite -name "*.mjs" -delete 2>/dev/null || true
-          find . -name "vite.config.ts.timestamp*" -delete 2>/dev/null || true
-          echo "=== vite.config.ts at build time ==="
-          cat vite.config.ts
           npx vite build
           npx tsc -p electron/tsconfig.json
           npx electron-builder --linux
@@ -195,7 +190,6 @@ VITEEOF
           path: |
             apps/ava-softphone-desktop/dist-electron/*.AppImage
             apps/ava-softphone-desktop/dist-electron/*.deb
-            apps/ava-softphone-desktop/dist-electron/*.yml
           if-no-files-found: warn
 
   create-release:
