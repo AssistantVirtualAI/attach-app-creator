@@ -25,6 +25,44 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes lemtelPageEnter {
+  from { opacity: 0; transform: translateY(6px); filter: blur(2px); }
+  to   { opacity: 1; transform: translateY(0);   filter: blur(0); }
+}
+.lemtel-page-enter {
+  animation: lemtelPageEnter .26s cubic-bezier(.2,.7,.2,1) both;
+  will-change: transform, opacity, filter;
+}
+
+@keyframes lemtelShimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.lemtel-skeleton {
+  position: relative;
+  background: linear-gradient(
+    90deg,
+    rgba(140,180,255,0.05) 0%,
+    rgba(140,180,255,0.14) 40%,
+    rgba(255,215,0,0.10) 55%,
+    rgba(140,180,255,0.05) 100%
+  );
+  background-size: 800px 100%;
+  animation: lemtelShimmer 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* Horizontal scrollable rail when window is compact */
+.lemtel-rail-h {
+  display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: thin; scrollbar-color: rgba(255,215,0,0.35) transparent;
+  scroll-snap-type: x proximity;
+  padding: 8px 12px 10px;
+}
+.lemtel-rail-h::-webkit-scrollbar { height: 6px; }
+.lemtel-rail-h::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.35); border-radius: 99px; }
+.lemtel-rail-h > * { scroll-snap-align: start; flex-shrink: 0; }
+
 @keyframes authGlow {
   0%, 100% { opacity: 0.55; transform: scale(1); }
   50% { opacity: 0.85; transform: scale(1.06); }
