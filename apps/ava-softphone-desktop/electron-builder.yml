@@ -1,5 +1,6 @@
-appId: com.ava-telecom.softphone
-productName: AVA Softphone
+appId: com.lemtel.softphone
+productName: Lemtel Telecom
+copyright: "Copyright © 2026 Lemtel Communications. Powered by AVA Télécom."
 directories:
   output: dist-electron
 files:
@@ -15,6 +16,7 @@ mac:
 win:
   target:
     - nsis
+  publisherName: "Lemtel Communications"
 linux:
   target:
     - AppImage
