@@ -20,9 +20,9 @@ app.setName(APP_NAME);
 function createWindow() {
   mainWindow = new BrowserWindow({
     title: APP_NAME,
-    width: 380,
-    height: 680,
-    minWidth: 340,
+    width: 1280,
+    height: 820,
+    minWidth: 360,
     minHeight: 580,
     resizable: true,
     frame: false,
