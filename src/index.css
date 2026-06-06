@@ -1,4 +1,7 @@
-@tailwind base;
+/* Prevent any uncontained SVG (notably Recharts) from blowing up the
+   layout before its parent has a measured width. */
+svg { max-width: 100%; max-height: 100%; }
+
 @tailwind components;
 @tailwind utilities;
 
