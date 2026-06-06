@@ -81,12 +81,13 @@ serve(async (req) => {
       .select('id, name, platform_agent_id, platform_api_key, platform, config')
       .eq('organization_id', orgId);
 
-    // Get all integrations for all platforms (by org_id OR user_id)
+    // Get integrations only for the selected organization.
+    // Do not fall back to user-owned integrations: org data must stay fully isolated.
     const { data: integrations } = await supabase
       .from('organization_integrations')
       .select('id, agent_id, api_key, platform, additional_config')
       .eq('is_active', true)
-      .or(`organization_id.eq.${orgId},user_id.eq.${user.id}`);
+      .eq('organization_id', orgId);
 
     // Build a map of platform -> api_key from integrations
     const platformApiKeys: Record<string, string> = {};
