@@ -4046,6 +4046,7 @@ export type Database = {
           client_id: string | null
           created_at: string | null
           display_name: string | null
+          dnd_enabled: boolean
           extension: string
           extension_id: string | null
           forward_enabled: boolean
@@ -4062,6 +4063,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string | null
           display_name?: string | null
+          dnd_enabled?: boolean
           extension: string
           extension_id?: string | null
           forward_enabled?: boolean
@@ -4078,6 +4080,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string | null
           display_name?: string | null
+          dnd_enabled?: boolean
           extension?: string
           extension_id?: string | null
           forward_enabled?: boolean
