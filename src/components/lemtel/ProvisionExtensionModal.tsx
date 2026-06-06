@@ -88,6 +88,14 @@ export function ProvisionExtensionModal({ open, onOpenChange }: { open: boolean;
           <DialogTitle>Provision New Extension</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          {!isAdmin && (
+            <Alert variant="destructive">
+              <ShieldAlert className="h-4 w-4" />
+              <AlertDescription>
+                You don't have permission to provision extensions. Lemtel admin or super-admin role required.
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-2">
             <Label htmlFor="ext">Extension number *</Label>
             <Input id="ext" placeholder="e.g. 230" value={extension} onChange={e => setExtension(e.target.value)} />
@@ -107,7 +115,7 @@ export function ProvisionExtensionModal({ open, onOpenChange }: { open: boolean;
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
-          <Button onClick={submit} disabled={submitting}>
+          <Button onClick={submit} disabled={submitting || !isAdmin}>
             {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Create on FusionPBX
           </Button>
