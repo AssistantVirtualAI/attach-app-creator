@@ -5,8 +5,9 @@ import { mobileApi, CallRecord } from '../lib/mobileApi';
 import { Card, Chip, SectionTitle, Skeleton, EmptyState, PrimaryButton, GhostButton } from '../components/ui/Primitives';
 import CallDetailScreen from './CallDetailScreen';
 import Dialpad from '../components/Dialpad';
+import VoicemailScreen from './VoicemailScreen';
 
-type SubTab = 'recents' | 'dial';
+type SubTab = 'recents' | 'dial' | 'voicemail';
 
 export default function CallsScreen({ sp, haptic }: { sp: any; haptic: (s?: ImpactStyle) => Promise<void> }) {
   const [sub, setSub] = useState<SubTab>('recents');
