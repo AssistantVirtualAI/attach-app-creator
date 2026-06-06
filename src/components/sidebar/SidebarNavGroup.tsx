@@ -87,7 +87,7 @@ export const SidebarNavGroup = ({ group, onNavigate }: SidebarNavGroupProps) => 
       <AnimatePresence>
         {isOpen && (
           <CollapsibleContent className="pl-4 mt-1 space-y-1 overflow-hidden">
-            {group.items.map((item, index) => {
+            {visibleItems.map((item, index) => {
               const ItemIcon = item.icon;
               const isActive = location.pathname === item.href;
               
