@@ -8,8 +8,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clearCredentials: () => ipcRenderer.invoke('clear-credentials'),
 
   // Notifications
-  showNotification: (title: string, body: string) =>
-    ipcRenderer.invoke('show-notification', { title, body }),
+  showNotification: (title: string, body: string, opts?: { tag?: string; urgent?: boolean }) =>
+    ipcRenderer.invoke('show-notification', { title, body, tag: opts?.tag, urgent: opts?.urgent }),
+  clearNotification: (tag: string) =>
+    ipcRenderer.invoke('clear-notification', { tag }),
+  onNotificationClicked: (cb: (info: { tag: string }) => void) =>
+    ipcRenderer.on('notification-clicked', (_e, i) => cb(i)),
 
   // Window controls
   minimize: () => ipcRenderer.invoke('window-minimize'),
