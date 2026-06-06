@@ -2,10 +2,6 @@ import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { WHITELABEL } from '../whitelabel.config';
 
-const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
-const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
-
 type Creds = {
   portalUrl: string;
   email: string;
@@ -35,7 +31,7 @@ export default function SetupWizard({
     setError(null);
 
     try {
-      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const supabase = createClient(WHITELABEL.supabaseUrl, WHITELABEL.supabaseAnonKey);
 
       const { data: authData, error: authError } =
         await supabase.auth.signInWithPassword({
@@ -164,7 +160,7 @@ export default function SetupWizard({
         }}
       >
         <h2 style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: 0 }}>
-          Connect Your Account
+          Connect your Lemtel account
         </h2>
         <p style={{ color: '#888', fontSize: 13, margin: '6px 0 0' }}>
           Sign in with your {WHITELABEL.providerName} portal credentials
@@ -172,7 +168,7 @@ export default function SetupWizard({
 
         <div style={{ height: 24 }} />
 
-        <Label>AVA Portal URL</Label>
+        <Label>Lemtel portal URL</Label>
         <input
           style={inputStyle('url')}
           value={portalUrl}
@@ -241,7 +237,7 @@ export default function SetupWizard({
             transition: 'all 0.2s',
           }}
         >
-          {loading ? '⏳ Connecting...' : 'Connect & Sign In →'}
+          {loading ? '⏳ Connecting...' : 'Connect to Lemtel →'}
         </button>
       </div>
 
