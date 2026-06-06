@@ -52,6 +52,28 @@ export default function MessagesView() {
     setAiBusy(false);
   };
 
+  const applyTemplate = (tpl: MsgTemplate) => {
+    const vars = { name: active?.contact.split(' ')[0] || 'there', me: 'AVA' };
+    setDraft(interpolate(tpl.body, vars));
+    setTplOpen(false);
+  };
+
+  const saveCurrentAsTemplate = () => {
+    if (!draft.trim()) return;
+    const label = prompt('Template name?');
+    if (!label) return;
+    const next = [...templates, { id: 't' + Date.now(), label, body: draft }];
+    setTemplates(next);
+    saveTemplates(next);
+  };
+
+  const deleteTemplate = (id: string) => {
+    const next = templates.filter((t) => t.id !== id);
+    setTemplates(next);
+    saveTemplates(next);
+  };
+
+
   return (
     <div style={{ display: 'flex', height: '100%' }}>
       {/* Thread list */}
