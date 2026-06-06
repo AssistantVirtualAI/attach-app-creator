@@ -52,8 +52,15 @@ export default function ConsoleLayout({
   const [view, setView] = useState<ConsoleView>('home');
   const [aiOpen, setAiOpen] = useState(true);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
 
   useCallShortcuts();
+
+  useEffect(() => {
+    const onResize = () => setCompact(window.innerWidth < 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -74,8 +81,6 @@ export default function ConsoleLayout({
     };
   }, []);
 
-  // Dev helper: trigger a simulated incoming call so the toast + dock can be
-  // exercised before SIP is fully wired. Press ⌘⇧I.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'i') {
@@ -93,40 +98,57 @@ export default function ConsoleLayout({
       background: c.bgGradient,
       color: c.textIce, position: 'relative', overflow: 'hidden',
     }}>
-      <LeftRail
-        view={view}
-        onChange={setView}
-        onOpenSettings={() => setView('settings')}
-        onOpenSearch={() => setPaletteOpen(true)}
-      />
+      {!compact && (
+        <LeftRail
+          view={view}
+          onChange={setView}
+          onOpenSettings={() => setView('settings')}
+          onOpenSearch={() => setPaletteOpen(true)}
+        />
+      )}
 
-      <main style={{ flex: 1, minWidth: 0, overflow: 'auto', position: 'relative' }}>
-        {view === 'home' && <HomeDashboard displayName={creds.displayName || creds.email} extension={creds.extension} onQuickDial={() => setView('dialer')} />}
-        {view === 'dialer' && (
-          <div style={{ maxWidth: 460, margin: '0 auto', height: '100%' }}>
-            <SoftphonePane creds={creds} onOpenSettings={() => setView('settings')} hideTabs />
-          </div>
-        )}
-        {view === 'calls' && <CallsView />}
-        {view === 'messages' && <MessagesView />}
-        {view === 'voicemail' && <VoicemailView />}
-        {view === 'recordings' && <RecordingsView />}
-        {view === 'ai' && <AIWorkspace />}
-        {view === 'contacts' && <ContactsView />}
-        {view === 'admin' && <AdminView />}
-        {view === 'settings' && (
-          <SettingsPage
-            creds={creds}
-            onSignOut={async () => {
-              await window.electronAPI?.clearCredentials?.();
-              window.location.reload();
-            }}
-            onBack={() => setView('home')}
-          />
-        )}
+      <main style={{
+        flex: 1, minWidth: 0, overflow: 'auto', position: 'relative',
+        paddingBottom: compact ? 78 : 0,
+      }}>
+        <div key={view} className="lemtel-page-enter" style={{ height: '100%' }}>
+          {view === 'home' && <HomeDashboard displayName={creds.displayName || creds.email} extension={creds.extension} onQuickDial={() => setView('dialer')} />}
+          {view === 'dialer' && (
+            <div style={{ maxWidth: 460, margin: '0 auto', height: '100%' }}>
+              <SoftphonePane creds={creds} onOpenSettings={() => setView('settings')} hideTabs />
+            </div>
+          )}
+          {view === 'calls' && <CallsView />}
+          {view === 'messages' && <MessagesView />}
+          {view === 'voicemail' && <VoicemailView />}
+          {view === 'recordings' && <RecordingsView />}
+          {view === 'ai' && <AIWorkspace />}
+          {view === 'contacts' && <ContactsView />}
+          {view === 'admin' && <AdminView />}
+          {view === 'settings' && (
+            <SettingsPage
+              creds={creds}
+              onSignOut={async () => {
+                await window.electronAPI?.clearCredentials?.();
+                window.location.reload();
+              }}
+              onBack={() => setView('home')}
+            />
+          )}
+        </div>
       </main>
 
-      <AIPanel open={aiOpen} onToggle={() => setAiOpen((v) => !v)} />
+      {!compact && <AIPanel open={aiOpen} onToggle={() => setAiOpen((v) => !v)} />}
+
+      {compact && (
+        <LeftRail
+          compact
+          view={view}
+          onChange={setView}
+          onOpenSettings={() => setView('settings')}
+          onOpenSearch={() => setPaletteOpen(true)}
+        />
+      )}
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onNavigate={setView} />
 
