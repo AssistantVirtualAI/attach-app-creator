@@ -204,7 +204,7 @@ export default function SoftphonePane({
             <div style={{ color: c.red, fontSize: 12, fontWeight: 700, letterSpacing: 0.3, marginBottom: 2 }}>
               SIP not registered — calls disabled
             </div>
-            <div style={{ color: c.text.secondary, fontSize: 11, lineHeight: 1.5 }}>
+            <div style={{ color: c.textSub, fontSize: 11, lineHeight: 1.5 }}>
               {sp.credError}
             </div>
           </div>
