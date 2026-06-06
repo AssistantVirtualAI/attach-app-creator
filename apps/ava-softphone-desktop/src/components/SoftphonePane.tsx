@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSoftphone } from '@/hooks/useSoftphone';
+import { supabase } from '@/lib/supabaseClient';
+import RecentsList from './RecentsList';
+import ContactsList from './ContactsList';
 
 interface Creds {
   extension: string;
@@ -248,16 +251,10 @@ export default function SoftphonePane({
         )}
 
         {!inCall && !ringing && tab === 'recents' && (
-          <div style={emptyState}>
-            <div style={{ fontSize: 36, marginBottom: 8 }}>📋</div>
-            <div style={{ fontSize: 13 }}>Recents come in Phase 2</div>
-          </div>
+          <RecentsList extension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
         )}
         {!inCall && !ringing && tab === 'contacts' && (
-          <div style={emptyState}>
-            <div style={{ fontSize: 36, marginBottom: 8 }}>👤</div>
-            <div style={{ fontSize: 13 }}>Contacts come in Phase 2</div>
-          </div>
+          <ContactsList selfExtension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
         )}
       </div>
 
