@@ -68,23 +68,31 @@ export interface Ivr { id: string; name: string; greeting: string; options: numb
 export interface CallQueue { id: string; name: string; strategy: string; agents: number; waiting: number; }
 export interface RingGroup { id: string; name: string; members: number; strategy: string; }
 
+export type Feedback = 'up' | 'down' | null;
+
 export interface VoicemailItem {
   id: string; from: string; customer?: string; receivedAt: string;
   durationSec: number; isNew: boolean; transcript: string;
   summary: string; sentiment: 'positive' | 'neutral' | 'negative';
   priority: 'low' | 'normal' | 'high';
+  handled?: boolean; feedback?: Feedback;
 }
 export interface RecordingItem {
   id: string; callId: string; from: string; to: string; customer?: string;
   recordedAt: string; durationSec: number; sizeKb: number;
   qualityScore: number; sentiment: 'positive' | 'neutral' | 'negative';
-  summary: string; topics: string[]; tags: string[];
+  summary: string; topics: string[]; tags: string[]; feedback?: Feedback;
+}
+export interface ContactInteraction {
+  id: string; kind: 'call' | 'sms' | 'voicemail';
+  direction: 'in' | 'out'; at: string; preview: string; durationSec?: number;
 }
 export interface ContactItem {
   id: string; name: string; company?: string; phone: string; email?: string;
   lastInteraction: string; totalCalls: number; totalMessages: number;
   sentiment: 'positive' | 'neutral' | 'negative';
-  aiNote: string; tags: string[]; favorite: boolean;
+  aiNote: string; notes?: string; tags: string[]; favorite: boolean;
+  interactions?: ContactInteraction[];
 }
 
 /* ---------- Mock data ---------- */
