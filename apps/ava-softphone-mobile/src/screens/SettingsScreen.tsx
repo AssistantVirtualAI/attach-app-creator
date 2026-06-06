@@ -138,3 +138,27 @@ function Switch({ on }: { on: boolean }) {
     </span>
   );
 }
+
+const PERMISSION_ITEMS = [
+  { key: 'microphone',    icon: '🎤', label: 'Microphone',    sublabel: 'Required for calls' },
+  { key: 'speaker',       icon: '🔊', label: 'Speaker',       sublabel: 'For call audio' },
+  { key: 'contacts',      icon: '👥', label: 'Contacts',      sublabel: 'For caller ID' },
+  { key: 'notifications', icon: '🔔', label: 'Notifications', sublabel: 'For incoming calls' },
+] as const;
+
+function PermBadge({ status }: { status: PermissionStatus }) {
+  const cfg =
+    status === 'granted' ? { dot: '#10B981', label: 'Granted' } :
+    status === 'denied'  ? { dot: colors.danger, label: 'Denied' } :
+    status === 'unsupported' ? { dot: colors.mutedSilver, label: 'N/A' } :
+                           { dot: colors.mutedSilver, label: 'Ask' };
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      fontSize: 11, color: colors.textIce, fontWeight: 600,
+    }}>
+      <span style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.dot }} />
+      {cfg.label}
+    </span>
+  );
+}
