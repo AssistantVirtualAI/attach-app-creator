@@ -80,6 +80,10 @@ Deno.serve(async (req) => {
       );
     }
 
+    const escapeXml = (s: string) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+    const fromSafe = escapeXml(from);
+    const platformAgentIdSafe = encodeURIComponent(platformAgentId);
+
     // Generate TwiML based on platform
     let twiml = '';
 
