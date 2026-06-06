@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "react-router-dom";
-import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, MessageSquare, Voicemail, Smartphone, Settings, Activity } from "lucide-react";
+import { Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, MessageSquare, Smartphone, Settings, Activity } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -19,39 +20,59 @@ interface Mapping {
 export default function PortalDashboard() {
   const { user } = useAuth();
   const [me, setMe] = useState<Mapping | null>(null);
+  const [meLoading, setMeLoading] = useState(true);
   const [calls, setCalls] = useState<any[]>([]);
+  const [callsLoading, setCallsLoading] = useState(true);
   const [sms, setSms] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [smsLoading, setSmsLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
     (async () => {
-      setLoading(true);
+      setMeLoading(true);
       const { data: sp } = await supabase
         .from("pbx_softphone_users")
         .select("extension, display_name, status, forward_enabled, forward_to")
         .eq("portal_user_id", user.id)
         .maybeSingle();
+      if (cancelled) return;
       setMe(sp as any);
+      setMeLoading(false);
 
-      if (sp?.extension) {
-        const { data: cdrs } = await supabase
-          .from("pbx_call_records")
-          .select("id, direction, caller_id_number, destination_number, duration_seconds, start_stamp, missed_call")
-          .or(`caller_id_number.eq.${sp.extension},destination_number.eq.${sp.extension}`)
-          .order("start_stamp", { ascending: false })
-          .limit(20);
-        setCalls(cdrs || []);
-
-        const { data: threads } = await supabase
-          .from("pbx_sms_threads")
-          .select("id, contact_name, contact_phone, unread_count, last_message_at")
-          .order("last_message_at", { ascending: false })
-          .limit(10);
-        setSms(threads || []);
+      if (!sp?.extension) {
+        setCallsLoading(false);
+        setSmsLoading(false);
+        return;
       }
-      setLoading(false);
+
+      // Fire in parallel so each list renders as soon as it's ready
+      supabase
+        .from("pbx_call_records")
+        .select("id, direction, caller_id_number, destination_number, duration_seconds, start_stamp, missed_call")
+        .or(`caller_id_number.eq.${sp.extension},destination_number.eq.${sp.extension}`)
+        .order("start_stamp", { ascending: false })
+        .limit(20)
+        .then(({ data }) => {
+          if (!cancelled) {
+            setCalls(data || []);
+            setCallsLoading(false);
+          }
+        });
+
+      supabase
+        .from("pbx_sms_threads")
+        .select("id, contact_name, contact_phone, unread_count, last_message_at")
+        .order("last_message_at", { ascending: false })
+        .limit(10)
+        .then(({ data }) => {
+          if (!cancelled) {
+            setSms(data || []);
+            setSmsLoading(false);
+          }
+        });
     })();
+    return () => { cancelled = true; };
   }, [user?.id]);
 
   const todayCalls = calls.filter((c) => c.start_stamp && new Date(c.start_stamp).toDateString() === new Date().toDateString());
@@ -60,11 +81,7 @@ export default function PortalDashboard() {
   const outbound = todayCalls.filter((c) => c.direction === "outbound").length;
   const unread = sms.reduce((s, t: any) => s + (t.unread_count || 0), 0);
 
-  if (loading) {
-    return <div className="p-8 text-center text-sm text-muted-foreground">Loading your portal…</div>;
-  }
-
-  if (!me) {
+  if (!meLoading && !me) {
     return (
       <div className="max-w-md mx-auto mt-12">
         <Card>
@@ -84,25 +101,34 @@ export default function PortalDashboard() {
   }
 
   const dot =
-    me.status === "available" ? "bg-emerald-500" :
-    me.status === "oncall" ? "bg-amber-500" :
-    me.status === "dnd" ? "bg-rose-500" :
+    me?.status === "available" ? "bg-emerald-500" :
+    me?.status === "oncall" ? "bg-amber-500" :
+    me?.status === "dnd" ? "bg-rose-500" :
     "bg-muted-foreground";
 
   return (
-    <div className="space-y-6 p-2">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Welcome, {me.display_name || `Ext ${me.extension}`}</h1>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-            <span className={`w-2 h-2 rounded-full ${dot}`} />
-            Extension {me.extension} · {me.status || "offline"}
-            {me.forward_enabled && me.forward_to && (
-              <Badge variant="outline" className="ml-2">↪ forwarding to {me.forward_to}</Badge>
-            )}
-          </div>
+    <div className="space-y-6 p-2 min-w-0">
+      <div className="flex items-center justify-between flex-wrap gap-3 min-w-0">
+        <div className="min-w-0">
+          {meLoading ? (
+            <>
+              <Skeleton className="h-7 w-56 mb-2" />
+              <Skeleton className="h-4 w-40" />
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold truncate">Welcome, {me!.display_name || `Ext ${me!.extension}`}</h1>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1 flex-wrap">
+                <span className={`w-2 h-2 rounded-full ${dot}`} />
+                Extension {me!.extension} · {me!.status || "offline"}
+                {me!.forward_enabled && me!.forward_to && (
+                  <Badge variant="outline" className="ml-2">↪ forwarding to {me!.forward_to}</Badge>
+                )}
+              </div>
+            </>
+          )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button asChild variant="outline" size="sm">
             <Link to="/org/lemtel/portal/softphone"><Phone className="w-4 h-4 mr-2" /> Open Softphone</Link>
           </Button>
@@ -113,30 +139,32 @@ export default function PortalDashboard() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Kpi label="Calls today" value={todayCalls.length} Icon={Activity} color="text-blue-500" />
-        <Kpi label="Inbound" value={inbound} Icon={PhoneIncoming} color="text-emerald-500" />
-        <Kpi label="Outbound" value={outbound} Icon={PhoneOutgoing} color="text-indigo-500" />
-        <Kpi label="Missed" value={missed} Icon={PhoneMissed} color="text-rose-500" />
+        <Kpi label="Calls today" value={todayCalls.length} Icon={Activity} color="text-blue-500" loading={callsLoading} />
+        <Kpi label="Inbound" value={inbound} Icon={PhoneIncoming} color="text-emerald-500" loading={callsLoading} />
+        <Kpi label="Outbound" value={outbound} Icon={PhoneOutgoing} color="text-indigo-500" loading={callsLoading} />
+        <Kpi label="Missed" value={missed} Icon={PhoneMissed} color="text-rose-500" loading={callsLoading} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-w-0">
+        <Card className="min-w-0">
           <CardHeader className="pb-3"><CardTitle className="text-base">Recent calls</CardTitle></CardHeader>
           <CardContent className="p-0">
-            {calls.length === 0 ? (
+            {callsLoading ? (
+              <ListSkeleton rows={6} />
+            ) : calls.length === 0 ? (
               <div className="px-4 py-6 text-sm text-muted-foreground text-center">No calls yet</div>
             ) : (
               <ul className="divide-y">
                 {calls.slice(0, 8).map((c) => (
-                  <li key={c.id} className="flex items-center gap-3 px-4 py-2 text-sm">
-                    {c.missed_call ? <PhoneMissed className="w-4 h-4 text-rose-500" /> :
-                      c.direction === "inbound" ? <PhoneIncoming className="w-4 h-4 text-emerald-500" /> :
-                      <PhoneOutgoing className="w-4 h-4 text-indigo-500" />}
-                    <span className="font-mono text-xs flex-1 truncate">
+                  <li key={c.id} className="flex items-center gap-3 px-4 py-2 text-sm min-w-0">
+                    {c.missed_call ? <PhoneMissed className="w-4 h-4 text-rose-500 shrink-0" /> :
+                      c.direction === "inbound" ? <PhoneIncoming className="w-4 h-4 text-emerald-500 shrink-0" /> :
+                      <PhoneOutgoing className="w-4 h-4 text-indigo-500 shrink-0" />}
+                    <span className="font-mono text-xs flex-1 truncate min-w-0">
                       {c.direction === "inbound" ? c.caller_id_number : c.destination_number}
                     </span>
-                    <span className="text-xs text-muted-foreground">{c.duration_seconds || 0}s</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground shrink-0">{c.duration_seconds || 0}s</span>
+                    <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline">
                       {c.start_stamp ? formatDistanceToNow(new Date(c.start_stamp), { addSuffix: true }) : ""}
                     </span>
                   </li>
@@ -146,21 +174,23 @@ export default function PortalDashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="min-w-0">
           <CardHeader className="pb-3 flex flex-row items-center justify-between">
             <CardTitle className="text-base">SMS inbox</CardTitle>
             {unread > 0 && <Badge>{unread} unread</Badge>}
           </CardHeader>
           <CardContent className="p-0">
-            {sms.length === 0 ? (
+            {smsLoading ? (
+              <ListSkeleton rows={5} />
+            ) : sms.length === 0 ? (
               <div className="px-4 py-6 text-sm text-muted-foreground text-center">No messages</div>
             ) : (
               <ul className="divide-y">
                 {sms.slice(0, 8).map((t: any) => (
-                  <li key={t.id} className="flex items-center gap-3 px-4 py-2 text-sm">
-                    <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                    <span className="flex-1 truncate">{t.contact_name || t.contact_phone}</span>
-                    {t.unread_count > 0 && <Badge variant="secondary">{t.unread_count}</Badge>}
+                  <li key={t.id} className="flex items-center gap-3 px-4 py-2 text-sm min-w-0">
+                    <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="flex-1 truncate min-w-0">{t.contact_name || t.contact_phone}</span>
+                    {t.unread_count > 0 && <Badge variant="secondary" className="shrink-0">{t.unread_count}</Badge>}
                   </li>
                 ))}
               </ul>
@@ -179,7 +209,7 @@ export default function PortalDashboard() {
   );
 }
 
-function Kpi({ label, value, Icon, color }: { label: string; value: number; Icon: any; color: string }) {
+function Kpi({ label, value, Icon, color, loading }: { label: string; value: number; Icon: any; color: string; loading?: boolean }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -187,9 +217,23 @@ function Kpi({ label, value, Icon, color }: { label: string; value: number; Icon
         <Icon className={`w-4 h-4 ${color}`} />
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        {loading ? <Skeleton className="h-7 w-12" /> : <div className="text-2xl font-bold">{value}</div>}
       </CardContent>
     </Card>
+  );
+}
+
+function ListSkeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <ul className="divide-y">
+      {Array.from({ length: rows }).map((_, i) => (
+        <li key={i} className="flex items-center gap-3 px-4 py-3">
+          <Skeleton className="w-4 h-4 rounded-full" />
+          <Skeleton className="h-3 flex-1" />
+          <Skeleton className="h-3 w-10" />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -199,7 +243,7 @@ function QuickLink({ to, Icon, label }: { to: string; Icon: any; label: string }
       <Card className="hover:bg-muted/40 transition cursor-pointer">
         <CardContent className="flex items-center gap-3 py-3">
           <Icon className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium">{label}</span>
+          <span className="text-sm font-medium truncate">{label}</span>
         </CardContent>
       </Card>
     </Link>
