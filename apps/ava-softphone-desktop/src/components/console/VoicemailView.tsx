@@ -131,7 +131,8 @@ export default function VoicemailView() {
           ))}
         </div>
 
-        <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
+        {loading && <ListSkeleton rows={6} />}
+        {!loading && <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
           {filtered.map((v) => (
             <button key={v.id} onClick={() => { setSel(v); markRead(v); }} style={{
               display: 'grid', gridTemplateColumns: '10px 1fr 60px 80px 90px',
@@ -165,9 +166,15 @@ export default function VoicemailView() {
             </button>
           ))}
           {filtered.length === 0 && (
-            <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>No voicemails match this filter.</div>
+            <EmptyState
+              icon="✉"
+              title="Inbox is clear"
+              hint="No voicemails match this filter. Switch filter or wait for new messages — AVA will transcribe instantly."
+              accent={c.signalGold}
+              cta={{ label: 'View all', onClick: () => setFilter('all') }}
+            />
           )}
-        </div>
+        </div>}
       </div>
 
       <aside style={{ width: 380, flexShrink: 0, borderLeft: `1px solid ${c.border}`, background: c.deepPanel, padding: '24px 22px', overflowY: 'auto' }}>
