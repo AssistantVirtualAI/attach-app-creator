@@ -9,6 +9,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // PostCSS disabled — Tailwind is not used in this desktop app and a stray
+  // postcss config in a parent dir breaks the Electron build. Mandatory.
+  css: { postcss: false as unknown as any },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
