@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import TitleBar from './components/TitleBar';
 import SetupWizard from './components/SetupWizard';
-import SettingsPage from './components/SettingsPage';
 import UpdateBanner from './components/UpdateBanner';
 import SoftphonePane from './components/SoftphonePane';
 import ConsoleLayout from './components/console/ConsoleLayout';
+import BrightnessOverlay from './components/BrightnessOverlay';
 import { useTheme } from './lib/theme';
 
 type Creds = {
