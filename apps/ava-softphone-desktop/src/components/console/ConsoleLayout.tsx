@@ -82,7 +82,7 @@ export default function ConsoleLayout({
   return (
     <div style={{
       display: 'flex', height: '100%',
-      background: `linear-gradient(180deg, ${c.midnight}, ${c.deepPanel})`,
+      background: c.bgGradient,
       color: c.textIce, position: 'relative', overflow: 'hidden',
     }}>
       <LeftRail
