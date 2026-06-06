@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent any uncontained SVG (notably Recharts) from blowing up the
+   layout before its parent has a measured width. */
+svg { max-width: 100%; max-height: 100%; }
+
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
@@ -276,4 +281,19 @@ All colors MUST be HSL.
   .animate-marquee-reverse:hover {
     animation-play-state: paused;
   }
+}
+
+/* Recharts: clamp SVGs so a 0-width parent on first paint doesn't make
+   the chart overflow the page. */
+.recharts-responsive-container,
+.recharts-wrapper {
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+.recharts-surface {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
 }
