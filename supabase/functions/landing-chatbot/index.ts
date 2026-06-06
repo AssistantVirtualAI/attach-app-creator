@@ -125,7 +125,13 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, language = "en", sendSummary = false } = await req.json();
+    const { messages: rawMessages, language = "en", sendSummary = false } = await req.json();
+    const messages = Array.isArray(rawMessages)
+      ? rawMessages
+          .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant'))
+          .slice(-20)
+          .map((m: any) => ({ role: m.role, content: String(m.content ?? '').slice(0, 4000) }))
+      : [];
 
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");

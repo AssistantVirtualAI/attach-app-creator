@@ -124,9 +124,34 @@ serve(async (req) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
     
     const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
-    
+
+    // SECURITY: require valid user JWT before any service-role lookup.
+    const authHeaderTop = req.headers.get('Authorization') || '';
+    if (!authHeaderTop.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const { data: { user: authUser } } = await supabaseService.auth.getUser(authHeaderTop.replace('Bearer ', ''));
+    if (!authUser) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    if (organizationId) {
+      const { data: isSuper } = await supabaseService.rpc('is_super_admin', { _user_id: authUser.id });
+      if (!isSuper) {
+        const { data: membership } = await supabaseService
+          .from('organization_members')
+          .select('id')
+          .eq('user_id', authUser.id)
+          .eq('organization_id', organizationId)
+          .maybeSingle();
+        if (!membership) {
+          return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      }
+    }
+
     // If no API key provided directly, try multiple fallback strategies
     if (!apiKey) {
+
       // Strategy 1: Try organizationId if provided (for portal usage)
       if (organizationId) {
         console.log(`[elevenlabs-agent-config] Looking up API key via organizationId: ${organizationId}`);

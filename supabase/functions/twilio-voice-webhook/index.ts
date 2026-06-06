@@ -80,49 +80,49 @@ Deno.serve(async (req) => {
       );
     }
 
+    const escapeXml = (s: string) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+    const fromSafe = escapeXml(from);
+    const platformAgentIdSafe = encodeURIComponent(platformAgentId);
+
     // Generate TwiML based on platform
     let twiml = '';
 
     switch (agent.platform) {
       case 'elevenlabs':
-        // ElevenLabs uses WebSocket streaming
-        const elevenLabsWsUrl = `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${platformAgentId}`;
+        const elevenLabsWsUrl = `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${platformAgentIdSafe}`;
         twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="${elevenLabsWsUrl}">
-      <Parameter name="caller" value="${from}" />
+    <Stream url="${escapeXml(elevenLabsWsUrl)}">
+      <Parameter name="caller" value="${fromSafe}" />
     </Stream>
   </Connect>
 </Response>`;
         break;
 
       case 'vapi':
-        // Vapi uses their own phone system - redirect or use their API
-        // For now, use a Connect verb to their service
-        const vapiPhoneUrl = `https://api.vapi.ai/call/phone`;
         twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="wss://api.vapi.ai/ws/${platformAgentId}">
-      <Parameter name="caller" value="${from}" />
+    <Stream url="${escapeXml(`wss://api.vapi.ai/ws/${platformAgentIdSafe}`)}">
+      <Parameter name="caller" value="${fromSafe}" />
     </Stream>
   </Connect>
 </Response>`;
         break;
 
       case 'retell':
-        // Retell uses WebSocket
-        const retellWsUrl = `wss://api.retellai.com/audio-websocket/${platformAgentId}`;
+        const retellWsUrl = `wss://api.retellai.com/audio-websocket/${platformAgentIdSafe}`;
         twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Connect>
-    <Stream url="${retellWsUrl}">
-      <Parameter name="caller" value="${from}" />
+    <Stream url="${escapeXml(retellWsUrl)}">
+      <Parameter name="caller" value="${fromSafe}" />
     </Stream>
   </Connect>
 </Response>`;
         break;
+
 
       default:
         console.error('Unsupported platform:', agent.platform);
