@@ -191,6 +191,11 @@ export const ava = {
   ivrs: () => call<Ivr[]>('/desktop/admin/ivrs', {}, MOCK_IVR),
   queues: () => call<CallQueue[]>('/desktop/admin/queues', {}, MOCK_QUEUES),
   ringGroups: () => call<RingGroup[]>('/desktop/admin/ring-groups', {}, MOCK_RG),
+  /* Phase 3 */
+  voicemails: () => call<VoicemailItem[]>('/desktop/voicemails', {}, MOCK_VM),
+  markVoicemailRead: (id: string) => call<{ ok: true }>(`/desktop/voicemails/${id}/read`, { method: 'POST' }, { ok: true }),
+  recordings: () => call<RecordingItem[]>('/desktop/recordings', {}, MOCK_RECORDINGS),
+  contacts: () => call<ContactItem[]>('/desktop/contacts', {}, MOCK_CONTACTS),
   syncStatus: () => call<{ lastSync: string; status: 'ok' | 'error'; jobs: { kind: string; finishedAt: string; ok: boolean }[] }>('/desktop/admin/sync', {}, {
     lastSync: new Date(Date.now() - 600e3).toISOString(),
     status: 'ok',
