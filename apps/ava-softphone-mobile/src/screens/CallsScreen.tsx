@@ -84,6 +84,8 @@ export default function CallsScreen({ sp, haptic }: { sp: any; haptic: (s?: Impa
         </>
       )}
 
+      {sub === 'voicemail' && <div style={{ marginTop: 12 }}><VoicemailScreen haptic={haptic} /></div>}
+
       <div style={{ height: 80 }} />
     </div>
   );
