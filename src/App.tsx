@@ -81,6 +81,7 @@ import AuditLogs from "./pages/AuditLogs";
 import { LemtelGuard } from "./pages/lemtel/LemtelGuard";
 import LemtelDashboard from "./pages/lemtel/LemtelDashboard";
 import PortalDiagnostic from "./pages/lemtel/PortalDiagnostic";
+import PortalDashboard from "./pages/lemtel/PortalDashboard";
 import LemtelSettings from "./pages/lemtel/LemtelSettings";
 import LemtelMessages from "./pages/lemtel/LemtelMessages";
 import LemtelPortalCalls from "./pages/lemtel/LemtelPortalCalls";
@@ -537,7 +538,7 @@ const App = () => (
                 {/* /org/lemtel/portal/* customer routes (PortalGuard enforces customer scope) */}
                 <Route path="/org/lemtel/portal" element={<Navigate to="/org/lemtel/portal/dashboard" replace />} />
                 <Route path="/org/lemtel/portal/diagnostic" element={<ProtectedRoute><PortalDiagnostic /></ProtectedRoute>} />
-                <Route path="/org/lemtel/portal/dashboard" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><TelephonyDashboard /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/portal/dashboard" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><PortalDashboard /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/portal/extensions" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><LemtelExtensions /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/portal/calls" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><LemtelPortalCalls /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/portal/recordings" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><TelephonyRecordings /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
