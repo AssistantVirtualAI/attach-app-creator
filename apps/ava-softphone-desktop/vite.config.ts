@@ -1,19 +1,17 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+import tailwindcss from 'tailwindcss'
+import autoprefixer from 'autoprefixer'
+import tailwindConfig from './tailwind.config.js'
 
 export default defineConfig({
   plugins: [react()],
   css: {
     postcss: {
       plugins: [
-        // Use require with full absolute path from __dirname.
-        // This guarantees we use the app's own node_modules
-        // and never trigger postcss.config.js file search.
-        require(path.join(__dirname, 'node_modules', 'tailwindcss'))({
-          config: path.join(__dirname, 'tailwind.config.js'),
-        }),
-        require(path.join(__dirname, 'node_modules', 'autoprefixer'))(),
+        tailwindcss(tailwindConfig),
+        autoprefixer(),
       ],
     },
   },
@@ -27,12 +25,12 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       external: ['electron'],
-      output: {
-        format: 'cjs',
-      },
     },
   },
   base: './',
   root: path.resolve(__dirname),
-  envDir: path.resolve(__dirname),
-});
+  server: {
+    port: 5173,
+    strictPort: true,
+  },
+})
