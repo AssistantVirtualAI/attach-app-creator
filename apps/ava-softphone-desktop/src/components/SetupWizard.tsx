@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { WHITELABEL } from '../whitelabel.config';
+
+const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
+const SUPABASE_ANON_KEY =
+  (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
 
 type Creds = {
   portalUrl: string;
@@ -13,25 +17,50 @@ type Creds = {
   accessToken?: string;
 };
 
-export default function SetupWizard({
-  onComplete,
-}: {
-  onComplete: (c: Creds) => void;
-}) {
-  const [portalUrl, setPortalUrl] = useState(WHITELABEL.portalUrl);
+interface SetupWizardProps {
+  onComplete: (creds: Creds) => void;
+}
+
+export default function SetupWizard({ onComplete }: SetupWizardProps) {
+  const [portalUrl, setPortalUrl] = useState('https://avastatistic.ca');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [focused, setFocused] = useState<string | null>(null);
-  const [hoverBtn, setHoverBtn] = useState(false);
+  const [error, setError] = useState('');
 
   const handleConnect = async () => {
     setLoading(true);
-    setError(null);
+    setError('');
 
     try {
-      const supabase = createClient(WHITELABEL.supabaseUrl, WHITELABEL.supabaseAnonKey);
+      let anonKey = SUPABASE_ANON_KEY;
+
+      if (!anonKey) {
+        try {
+          const configRes = await fetch(
+            'https://gejxisrqtvxavbrfcoxz.supabase.co/functions/v1/supabase-config',
+            { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+          );
+          if (configRes.ok) {
+            const config = await configRes.json();
+            anonKey =
+              config.supabaseAnonKey ||
+              config.supabase_anon_key ||
+              config.anon_key ||
+              '';
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (!anonKey) {
+        setError('Cannot connect to AVA Portal. Check your internet connection.');
+        setLoading(false);
+        return;
+      }
+
+      const supabase = createClient(SUPABASE_URL, anonKey);
 
       const { data: authData, error: authError } =
         await supabase.auth.signInWithPassword({
@@ -39,48 +68,27 @@ export default function SetupWizard({
           password,
         });
 
-      if (authError) {
-        setError(`Login failed: ${authError.message}`);
+      if (authError || !authData.user) {
+        setError(`Login failed: ${authError?.message ?? 'unknown error'}`);
         setLoading(false);
         return;
       }
 
-      if (!authData.user || !authData.session) {
-        setError('Login failed: no session returned');
-        setLoading(false);
-        return;
-      }
-
-      const { data: softphoneUser, error: spError } = await supabase
+      const { data: softphoneUser } = await supabase
         .from('pbx_softphone_users')
         .select('*')
         .eq('portal_user_id', authData.user.id)
         .maybeSingle();
 
-      const normalizedPortalUrl = (portalUrl.trim() || WHITELABEL.portalUrl).replace(/\/+$/, '');
-
-      if (spError || !softphoneUser) {
-        const credentials: Creds = {
-          portalUrl: normalizedPortalUrl,
-          email: authData.user.email ?? email.trim(),
-          extension: 'N/A',
-          userId: authData.user.id,
-          accessToken: authData.session.access_token,
-        };
-        await window.electronAPI?.saveCredentials?.(credentials);
-        onComplete(credentials);
-        return;
-      }
-
       const credentials: Creds = {
-        portalUrl: normalizedPortalUrl,
-        email: authData.user.email ?? email.trim(),
-        extension: String(softphoneUser.extension ?? ''),
-        displayName: softphoneUser.display_name,
-        sipDomain: softphoneUser.sip_domain || 'lemtel.sip.fusionpbx.com',
-        wssUrl: softphoneUser.wss_url || 'wss://lemtel.sip.fusionpbx.com:7443',
+        portalUrl: (portalUrl || 'https://avastatistic.ca').replace(/\/+$/, ''),
+        email: authData.user.email || email,
+        extension: String(softphoneUser?.extension ?? 'N/A'),
+        displayName: softphoneUser?.display_name || email.split('@')[0],
+        sipDomain: softphoneUser?.sip_domain || 'lemtel.lemtel.tel',
+        wssUrl: softphoneUser?.wss_url || 'wss://lemtel.lemtel.tel:7443',
         userId: authData.user.id,
-        accessToken: authData.session.access_token,
+        accessToken: authData.session?.access_token,
       };
 
       await window.electronAPI?.saveCredentials?.(credentials);
@@ -92,233 +100,160 @@ export default function SetupWizard({
     }
   };
 
-  const inputStyle = (key: string): React.CSSProperties => ({
+  const inputStyle: React.CSSProperties = {
     width: '100%',
-    padding: '12px 16px',
     background: 'rgba(255,255,255,0.08)',
-    border: `1px solid ${focused === key ? WHITELABEL.accentColor : 'rgba(255,255,255,0.15)'}`,
+    border: '1px solid rgba(255,255,255,0.15)',
     borderRadius: 8,
-    color: '#fff',
-    fontSize: 14,
+    color: 'white',
+    padding: '10px 14px',
+    fontSize: 13,
     outline: 'none',
     boxSizing: 'border-box',
-    transition: 'border-color 0.15s',
-  });
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    color: '#ccc',
+    fontSize: 12,
+    marginBottom: 6,
+    fontWeight: 500,
+  };
 
   return (
     <div
       style={{
         minHeight: '100vh',
-        background: WHITELABEL.backgroundColor,
+        background: '#0a0a1a',
         display: 'flex',
         flexDirection: 'column',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       }}
     >
       {/* TOP */}
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          paddingTop: 60,
-        }}
-      >
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 48 }}>
         <LemtelLogo />
-        <div style={{ height: 32 }} />
-        <h1 style={{ color: '#fff', fontSize: 28, fontWeight: 700, margin: 0 }}>
-          {WHITELABEL.appName}
+        <h1 style={{ color: '#fff', fontSize: 26, fontWeight: 700, margin: '24px 0 4px' }}>
+          Lemtel Telecom
         </h1>
-        <div
-          style={{
-            color: WHITELABEL.accentColor,
-            fontSize: 13,
-            letterSpacing: 1,
-            marginTop: 6,
-          }}
-        >
-          {WHITELABEL.tagline.toUpperCase()}
+        <div style={{ color: '#FFD700', fontSize: 12, letterSpacing: 1.5 }}>
+          AI-POWERED BUSINESS COMMUNICATIONS
         </div>
-        <div style={{ height: 8 }} />
-        <div
-          style={{
-            width: 40,
-            height: 2,
-            background: WHITELABEL.accentColor,
-          }}
-        />
+        <div style={{ width: 40, height: 2, background: '#FFD700', marginTop: 12 }} />
       </div>
 
-      {/* MIDDLE */}
+      {/* FORM */}
       <div
         style={{
           background: 'rgba(255,255,255,0.05)',
           border: '1px solid rgba(255,215,0,0.2)',
           borderRadius: 16,
-          padding: 32,
-          margin: '32px 24px',
+          padding: 28,
+          margin: '28px 24px',
         }}
       >
         <h2 style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: 0 }}>
-          Connect your Lemtel account
+          Connect Your Account
         </h2>
-        <p style={{ color: '#888', fontSize: 13, margin: '6px 0 0' }}>
-          Sign in with your {WHITELABEL.providerName} portal credentials
+        <p style={{ color: '#888', fontSize: 13, margin: '4px 0 20px' }}>
+          Sign in with your AVA portal credentials
         </p>
 
-        <div style={{ height: 24 }} />
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>AVA Portal URL</label>
+          <input style={inputStyle} value={portalUrl} onChange={(e) => setPortalUrl(e.target.value)} />
+        </div>
 
-        <Label>Lemtel portal URL</Label>
-        <input
-          style={inputStyle('url')}
-          value={portalUrl}
-          onChange={(e) => setPortalUrl(e.target.value)}
-          onFocus={() => setFocused('url')}
-          onBlur={() => setFocused(null)}
-        />
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Email</label>
+          <input
+            style={inputStyle}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="your@email.com"
+          />
+        </div>
 
-        <div style={{ height: 12 }} />
-        <Label>Email</Label>
-        <input
-          style={inputStyle('email')}
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onFocus={() => setFocused('email')}
-          onBlur={() => setFocused(null)}
-        />
-
-        <div style={{ height: 12 }} />
-        <Label>Password</Label>
-        <input
-          style={inputStyle('pw')}
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onFocus={() => setFocused('pw')}
-          onBlur={() => setFocused(null)}
-        />
+        <div style={{ marginBottom: 12 }}>
+          <label style={labelStyle}>Password</label>
+          <input
+            style={inputStyle}
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
+          />
+        </div>
 
         {error && (
           <div
             style={{
-              marginTop: 16,
               background: 'rgba(255,0,0,0.1)',
               border: '1px solid rgba(255,0,0,0.3)',
               borderRadius: 8,
               color: '#ff6b6b',
               padding: 12,
               fontSize: 13,
+              marginTop: 12,
             }}
           >
             {error}
           </div>
         )}
 
-        <div style={{ height: 24 }} />
-
         <button
           onClick={handleConnect}
           disabled={loading}
-          onMouseEnter={() => setHoverBtn(true)}
-          onMouseLeave={() => setHoverBtn(false)}
           style={{
+            marginTop: 20,
             width: '100%',
             padding: 14,
-            background: hoverBtn
-              ? WHITELABEL.accentColor
-              : `linear-gradient(135deg, ${WHITELABEL.primaryColor}, #0052CC)`,
-            color: hoverBtn ? WHITELABEL.primaryColor : '#fff',
-            border: `1px solid ${WHITELABEL.accentColor}`,
+            background: 'linear-gradient(135deg, #003DA6, #0052CC)',
+            color: '#fff',
+            border: '1px solid #FFD700',
             borderRadius: 10,
             fontWeight: 700,
             fontSize: 14,
             cursor: loading ? 'wait' : 'pointer',
-            transition: 'all 0.2s',
           }}
         >
-          {loading ? '⏳ Connecting...' : 'Connect to Lemtel →'}
+          {loading ? '⏳ Connecting...' : 'Connect & Sign In →'}
         </button>
       </div>
 
-      {/* BOTTOM */}
-      <div style={{ marginTop: 'auto', padding: 20 }}>
+      {/* FOOTER */}
+      <div style={{ marginTop: 'auto', padding: 20, textAlign: 'center' }}>
         <div style={{ height: 1, background: '#333', marginBottom: 16 }} />
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 4,
-            fontSize: 11,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#666' }}>
-            <AvaLogo />
-            <span>Built by {WHITELABEL.providerName}</span>
-          </div>
-          <a
-            href={WHITELABEL.providerUrl}
-            onClick={(e) => {
-              e.preventDefault();
-              window.electronAPI?.openExternal?.(WHITELABEL.providerUrl);
-            }}
-            style={{ color: WHITELABEL.accentColor, textDecoration: 'none', cursor: 'pointer' }}
-          >
-            {WHITELABEL.providerUrl.replace(/^https?:\/\//, '')}
-          </a>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, color: '#666', fontSize: 11 }}>
+          <AvaLogo />
+          <span>Built by AVA AI</span>
         </div>
+        <a
+          href="https://assistantvirtualai.com"
+          onClick={(e) => {
+            e.preventDefault();
+            window.electronAPI?.openExternal?.('https://assistantvirtualai.com');
+          }}
+          style={{ display: 'inline-block', marginTop: 6, color: '#FFD700', fontSize: 11, textDecoration: 'none', cursor: 'pointer' }}
+        >
+          assistantvirtualai.com
+        </a>
       </div>
     </div>
   );
 }
 
-function Label({ children }: { children: React.ReactNode }) {
-  return (
-    <label
-      style={{
-        display: 'block',
-        color: '#ccc',
-        fontSize: 12,
-        marginBottom: 6,
-        fontWeight: 500,
-      }}
-    >
-      {children}
-    </label>
-  );
-}
-
 export function LemtelLogo() {
   return (
-    <svg
-      width="180"
-      height="90"
-      viewBox="0 0 180 90"
-      xmlns="http://www.w3.org/2000/svg"
-    >
+    <svg width="180" height="90" viewBox="0 0 180 90" xmlns="http://www.w3.org/2000/svg">
       <ellipse cx="90" cy="45" rx="88" ry="43" fill="#FFD700" />
       <ellipse cx="90" cy="45" rx="78" ry="35" fill="#003DA6" />
-      <text
-        x="90"
-        y="40"
-        textAnchor="middle"
-        fill="white"
-        fontSize="22"
-        fontWeight="bold"
-        fontFamily="Arial, sans-serif"
-      >
+      <text x="90" y="40" textAnchor="middle" fill="white" fontSize="22" fontWeight="bold" fontFamily="Arial, sans-serif">
         LEMTEL
       </text>
-      <text
-        x="90"
-        y="58"
-        textAnchor="middle"
-        fill="white"
-        fontSize="9"
-        letterSpacing="2"
-        fontFamily="Arial, sans-serif"
-      >
+      <text x="90" y="58" textAnchor="middle" fill="white" fontSize="9" letterSpacing="2" fontFamily="Arial, sans-serif">
         COMMUNICATIONS
       </text>
     </svg>
@@ -327,22 +262,9 @@ export function LemtelLogo() {
 
 function AvaLogo() {
   return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      xmlns="http://www.w3.org/2000/svg"
-    >
+    <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
       <circle cx="10" cy="10" r="9" fill="#0023e6" />
-      <text
-        x="10"
-        y="14"
-        textAnchor="middle"
-        fill="white"
-        fontSize="9"
-        fontWeight="bold"
-        fontFamily="Arial, sans-serif"
-      >
+      <text x="10" y="14" textAnchor="middle" fill="white" fontSize="9" fontWeight="bold" fontFamily="Arial, sans-serif">
         AVA
       </text>
     </svg>
