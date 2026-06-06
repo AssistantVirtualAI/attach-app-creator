@@ -6,6 +6,8 @@ import VoicemailList from './VoicemailList';
 import SmsThreads from './SmsThreads';
 import CallForwarding from './CallForwarding';
 import LemtelLogo from './LemtelLogo';
+import RecordingsList from './RecordingsList';
+import AIInsights from './AIInsights';
 import { theme } from '../lib/theme';
 
 interface Creds {
@@ -18,14 +20,16 @@ interface Creds {
   refreshToken?: string;
 }
 
-type Tab = 'dial' | 'recents' | 'contacts' | 'voicemail' | 'sms';
+type Tab = 'dial' | 'recents' | 'contacts' | 'voicemail' | 'sms' | 'recordings' | 'ai';
 
 const TAB_META: Record<Tab, { icon: string; label: string }> = {
-  dial:      { icon: '⌨', label: 'Phone' },
-  recents:   { icon: '⟲', label: 'History' },
-  contacts:  { icon: '☻', label: 'Contacts' },
-  voicemail: { icon: '✉', label: 'Voicemail' },
-  sms:       { icon: '✦', label: 'SMS' },
+  dial:       { icon: '⌨', label: 'Phone' },
+  recents:    { icon: '⟲', label: 'History' },
+  contacts:   { icon: '☻', label: 'Contacts' },
+  voicemail:  { icon: '✉', label: 'Voicemail' },
+  sms:        { icon: '✦', label: 'SMS' },
+  recordings: { icon: '●', label: 'Rec' },
+  ai:         { icon: '✨', label: 'AI' },
 };
 
 const { colors: c, glow } = theme;
@@ -251,6 +255,16 @@ export default function SoftphonePane({
             <SmsThreads />
           </div>
         )}
+        {!inCall && !ringing && tab === 'recordings' && (
+          <div style={{ animation: 'fadeIn .25s ease-out' }}>
+            <RecordingsList />
+          </div>
+        )}
+        {!inCall && !ringing && tab === 'ai' && (
+          <div style={{ animation: 'fadeIn .25s ease-out' }}>
+            <AIInsights />
+          </div>
+        )}
       </div>
 
       {/* BOTTOM TABS */}
@@ -262,7 +276,7 @@ export default function SoftphonePane({
           backdropFilter: 'blur(16px)',
           borderTop: `1px solid ${c.border}`,
         }}>
-          {(['dial', 'recents', 'contacts', 'voicemail', 'sms'] as Tab[]).map((tk) => {
+          {(['dial', 'recents', 'contacts', 'voicemail', 'sms', 'recordings', 'ai'] as Tab[]).map((tk) => {
             const active = tab === tk;
             return (
               <button

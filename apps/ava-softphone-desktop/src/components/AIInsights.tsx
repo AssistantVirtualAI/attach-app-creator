@@ -1,0 +1,187 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { theme } from '../lib/theme';
+
+const { colors: c, glow } = theme;
+const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+
+interface CallRec {
+  id: string;
+  caller_number?: string | null;
+  start_at?: string | null;
+  duration_seconds?: number | null;
+  transcribed?: boolean | null;
+  has_recording?: boolean | null;
+  raw_data?: any;
+}
+
+export default function AIInsights() {
+  const [items, setItems] = useState<CallRec[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    const { data, error } = await supabase
+      .from('pbx_call_records' as any)
+      .select('*')
+      .eq('organization_id', LEMTEL_ORG)
+      .order('start_at', { ascending: false })
+      .limit(100);
+    if (error) setError(error.message);
+    else setItems((data || []) as any[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const analyzeAll = async () => {
+    const pending = items.filter(r => (r.has_recording || (r as any).recording_url) && !r.transcribed);
+    if (pending.length === 0) return;
+    setWorking(true); setError(null);
+    try {
+      for (const r of pending.slice(0, 10)) {
+        const t = await supabase.functions.invoke('ai-transcribe-call', {
+          body: { call_record_id: r.id, organization_id: LEMTEL_ORG },
+        });
+        if (t.error) continue;
+        await supabase.functions.invoke('ai-analyze-call', {
+          body: { call_record_id: r.id, organization_id: LEMTEL_ORG },
+        });
+      }
+      await load();
+    } catch (e: any) {
+      setError(e?.message || 'Batch analysis failed');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const analyzed = items.filter(r => r.transcribed && r.raw_data);
+
+  // Aggregate
+  const sentiments = { positive: 0, neutral: 0, negative: 0 };
+  const topicCounts: Record<string, number> = {};
+  const allActions: { id: string; action: string; when?: string }[] = [];
+  for (const r of analyzed) {
+    const s = (r.raw_data?.sentiment || '').toLowerCase();
+    if (s.includes('positive')) sentiments.positive++;
+    else if (s.includes('negative')) sentiments.negative++;
+    else sentiments.neutral++;
+    (r.raw_data?.topics || []).forEach((t: string) => {
+      topicCounts[t] = (topicCounts[t] || 0) + 1;
+    });
+    (r.raw_data?.action_items || []).forEach((a: string) => {
+      allActions.push({ id: r.id, action: a, when: r.start_at || undefined });
+    });
+  }
+  const topTopics = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const total = analyzed.length || 1;
+
+  if (loading) return <div style={{ textAlign: 'center', padding: 40, color: c.textSub }}>Loading insights…</div>;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Header */}
+      <div style={{ ...theme.glass.cardAI, padding: 14, boxShadow: glow.ai }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 11, color: c.aiLight, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>
+              ✨ AI Insights
+            </div>
+            <div style={{ fontSize: 10, color: c.textSub, marginTop: 2 }}>
+              {analyzed.length} analyzed / {items.length} total calls
+            </div>
+          </div>
+          <button
+            onClick={analyzeAll}
+            disabled={working}
+            style={{
+              padding: '6px 12px', borderRadius: 8,
+              background: working ? 'rgba(124,58,237,0.3)' : c.ai,
+              border: 'none', color: '#fff', fontSize: 11, fontWeight: 600,
+              cursor: working ? 'wait' : 'pointer', boxShadow: glow.ai,
+            }}
+          >
+            {working ? 'Analyzing…' : '✨ Analyze pending'}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ padding: 10, background: 'rgba(239,68,68,0.10)', color: c.red, fontSize: 11, borderRadius: 8 }}>
+          {error}
+        </div>
+      )}
+
+      {analyzed.length === 0 ? (
+        <div style={{ ...theme.glass.card, padding: 30, textAlign: 'center', color: c.textSub, fontSize: 12 }}>
+          No analyzed calls yet. Click <strong style={{ color: c.aiLight }}>Analyze pending</strong> above
+          or analyze individual recordings in the Recordings tab.
+        </div>
+      ) : (
+        <>
+          {/* Sentiment */}
+          <div style={{ ...theme.glass.card, padding: 12 }}>
+            <div style={{ fontSize: 10, color: c.textSub, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+              Sentiment breakdown
+            </div>
+            <div style={{ display: 'flex', height: 12, borderRadius: 6, overflow: 'hidden', background: 'rgba(255,255,255,0.05)' }}>
+              <div style={{ width: `${(sentiments.positive / total) * 100}%`, background: c.green }} />
+              <div style={{ width: `${(sentiments.neutral / total) * 100}%`, background: c.yellow }} />
+              <div style={{ width: `${(sentiments.negative / total) * 100}%`, background: c.red }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 10, color: c.textSub }}>
+              <span style={{ color: c.green }}>● {sentiments.positive} positive</span>
+              <span style={{ color: c.yellow }}>● {sentiments.neutral} neutral</span>
+              <span style={{ color: c.red }}>● {sentiments.negative} negative</span>
+            </div>
+          </div>
+
+          {/* Topics */}
+          {topTopics.length > 0 && (
+            <div style={{ ...theme.glass.card, padding: 12 }}>
+              <div style={{ fontSize: 10, color: c.textSub, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                Top topics
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {topTopics.map(([t, n]) => (
+                  <span key={t} style={{
+                    padding: '4px 8px', borderRadius: 999,
+                    background: 'rgba(124,58,237,0.12)', border: `1px solid ${c.borderAI}`,
+                    color: c.aiLight, fontSize: 10, fontWeight: 600,
+                  }}>
+                    {t} <span style={{ opacity: 0.6 }}>×{n}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Action items */}
+          {allActions.length > 0 && (
+            <div style={{ ...theme.glass.card, padding: 12 }}>
+              <div style={{ fontSize: 10, color: c.textSub, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                Action items ({allActions.length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 240, overflowY: 'auto' }}>
+                {allActions.slice(0, 30).map((a, i) => (
+                  <div key={i} style={{
+                    padding: '6px 8px', borderRadius: 8,
+                    background: 'rgba(255,215,0,0.06)', border: `1px solid ${c.borderGold}`,
+                    fontSize: 11, color: c.text,
+                  }}>
+                    <span style={{ color: c.gold, marginRight: 6 }}>◆</span>
+                    {a.action}
+                    {a.when && <div style={{ fontSize: 9, color: c.textDim, marginTop: 2 }}>{new Date(a.when).toLocaleDateString()}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
