@@ -37,18 +37,17 @@ jobs:
         shell: pwsh
         working-directory: apps/ava-softphone-desktop
         run: |
-          $c = @"
-import { defineConfig } from "vite"
-import react from "@vitejs/plugin-react"
-import path from "path"
-export default defineConfig({
-  plugins: [react()],
-  resolve: { alias: { "@": path.resolve(__dirname, "./src") } },
-  build: { outDir: "dist", emptyOutDir: true, rollupOptions: { external: ["electron"] } },
-  base: "./",
-})
-"@
-          Set-Content -Path "vite.config.ts" -Value $c -Encoding UTF8
+          $nl = [Environment]::NewLine
+          $content = 'import { defineConfig } from ''vite''' + $nl
+          $content += 'import react from ''@vitejs/plugin-react''' + $nl
+          $content += 'import path from ''path''' + $nl
+          $content += 'export default defineConfig({' + $nl
+          $content += '  plugins: [react()],' + $nl
+          $content += '  resolve: { alias: { ''@'': path.resolve(__dirname, ''./src'') } },' + $nl
+          $content += '  build: { outDir: ''dist'', emptyOutDir: true, rollupOptions: { external: [''electron''] } },' + $nl
+          $content += '  base: ''./'',' + $nl
+          $content += '})' + $nl
+          Set-Content -Path "vite.config.ts" -Value $content -Encoding UTF8
           Write-Host "=== vite.config.ts ==="
           Get-Content "vite.config.ts"
 
