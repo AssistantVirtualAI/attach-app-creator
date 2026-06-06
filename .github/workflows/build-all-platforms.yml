@@ -1,0 +1,254 @@
+name: Build All Platforms
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ============ DESKTOP ============
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install + Build Mac
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          npm install --legacy-peer-deps
+          python3 -c "
+          lines = [
+            'import { defineConfig } from \"vite\"',
+            'import react from \"@vitejs/plugin-react\"',
+            'import path from \"path\"',
+            'export default defineConfig({',
+            '  plugins: [react()],',
+            '  resolve: { alias: { \"@\": path.resolve(__dirname, \"./src\") } },',
+            '  build: { outDir: \"dist\", emptyOutDir: true, rollupOptions: { external: [\"electron\"] } },',
+            '  base: \"./\",',
+            '})',
+          ]
+          open('vite.config.ts', 'w').write('\n'.join(lines) + '\n')
+          "
+          npx vite build
+          npx tsc -p electron/tsconfig.json || true
+          npx electron-builder --mac --x64 --arm64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-build
+          path: |
+            apps/ava-softphone-desktop/dist-electron/*.dmg
+            apps/ava-softphone-desktop/dist-electron/*.zip
+          if-no-files-found: warn
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install root PostCSS
+        run: npm install tailwindcss autoprefixer postcss --no-save
+      - name: Install + Build Windows
+        shell: pwsh
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          npm install --legacy-peer-deps
+          $nl = [Environment]::NewLine
+          $c = 'import { defineConfig } from ''vite''' + $nl
+          $c += 'import react from ''@vitejs/plugin-react''' + $nl
+          $c += 'import path from ''path''' + $nl
+          $c += 'export default defineConfig({' + $nl
+          $c += '  plugins: [react()],' + $nl
+          $c += '  resolve: { alias: { ''@'': path.resolve(__dirname, ''./src'') } },' + $nl
+          $c += '  build: { outDir: ''dist'', emptyOutDir: true, rollupOptions: { external: [''electron''] } },' + $nl
+          $c += '  base: ''./'',' + $nl
+          $c += '})' + $nl
+          Set-Content -Path "vite.config.ts" -Value $c -Encoding UTF8
+          npx vite build
+          npx tsc -p electron/tsconfig.json
+          npx electron-builder --win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          WIN_CSC_LINK: ''
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: apps/ava-softphone-desktop/dist-electron/*.exe
+          if-no-files-found: warn
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Linux deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libnotify-dev \
+            libasound2-dev libcups2-dev libxss1 libxtst6 xvfb \
+            libx11-xcb1 libxcb-dri3-0 libdrm2 libgbm1 libnss3 \
+            libatk-bridge2.0-0
+      - name: Install + Build Linux
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          npm install --legacy-peer-deps
+          python3 -c "
+          lines = [
+            'import { defineConfig } from \"vite\"',
+            'import react from \"@vitejs/plugin-react\"',
+            'import path from \"path\"',
+            'export default defineConfig({',
+            '  plugins: [react()],',
+            '  resolve: { alias: { \"@\": path.resolve(__dirname, \"./src\") } },',
+            '  build: { outDir: \"dist\", emptyOutDir: true, rollupOptions: { external: [\"electron\"] } },',
+            '  base: \"./\",',
+            '})',
+          ]
+          open('vite.config.ts', 'w').write('\n'.join(lines) + '\n')
+          "
+          npx vite build
+          npx tsc -p electron/tsconfig.json || true
+          npx electron-builder --linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: |
+            apps/ava-softphone-desktop/dist-electron/*.AppImage
+            apps/ava-softphone-desktop/dist-electron/*.deb
+          if-no-files-found: warn
+
+  # ============ MOBILE ============
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install dependencies
+        working-directory: apps/ava-softphone-mobile
+        run: npm install --legacy-peer-deps
+      - name: Build web
+        working-directory: apps/ava-softphone-mobile
+        run: npx vite build
+      - name: Add Android platform
+        working-directory: apps/ava-softphone-mobile
+        run: |
+          if [ ! -d "android" ]; then npx cap add android; fi
+      - name: Sync Capacitor
+        working-directory: apps/ava-softphone-mobile
+        run: npx cap sync android
+      - name: Build Android APK
+        working-directory: apps/ava-softphone-mobile
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ secrets.ANDROID_KEYSTORE_PATH }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-build
+          path: apps/ava-softphone-mobile/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        working-directory: apps/ava-softphone-mobile
+        run: npm install --legacy-peer-deps
+      - name: Build web
+        working-directory: apps/ava-softphone-mobile
+        run: npx vite build
+      - name: Add iOS platform
+        working-directory: apps/ava-softphone-mobile
+        run: |
+          if [ ! -d "ios" ]; then npx cap add ios; fi
+      - name: Sync Capacitor
+        working-directory: apps/ava-softphone-mobile
+        run: npx cap sync ios
+      - name: Build iOS
+        working-directory: apps/ava-softphone-mobile
+        run: |
+          xcodebuild archive \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -archivePath ios/App/App.xcarchive \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }}
+          xcodebuild -exportArchive \
+            -archivePath ios/App/App.xcarchive \
+            -exportPath ios/App/export \
+            -exportOptionsPlist ios/ExportOptions.plist
+        env:
+          APPLE_TEAM_ID: 64XSWWB49N
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: apps/ava-softphone-mobile/ios/App/export/*.ipa
+          if-no-files-found: warn
+
+  # ============ RELEASE ============
+
+  create-release:
+    needs: [build-mac, build-windows, build-linux, build-android, build-ios]
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - run: find artifacts -type f | sort
+      - if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_unmatched_files: false
+          body: |
+            ## Lemtel Telecom — Release ${{ github.ref_name }}
+
+            ### 📥 Downloads
+            | Platform | File |
+            |----------|------|
+            | 🍎 macOS Apple Silicon | Lemtel-*-arm64.dmg |
+            | 🍎 macOS Intel | Lemtel-*-x64.dmg |
+            | 🪟 Windows | Lemtel-*.exe |
+            | 🐧 Linux | Lemtel-*.AppImage |
+            | 🤖 Android | app-release.apk |
+            | 📱 iOS | App.ipa (sideload) |
