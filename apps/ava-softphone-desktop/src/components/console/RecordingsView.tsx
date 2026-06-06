@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, RecordingItem, Feedback } from '../../lib/avaApi';
-import PageHeader, { EmptyState } from './PageHeader';
+import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
 
 const { colors: c } = theme;
 
@@ -27,6 +27,7 @@ function rangeCutoff(r: Range): number {
 
 export default function RecordingsView() {
   const [items, setItems] = useState<RecordingItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [q, setQ] = useState<Quality>('all');
   const [s, setS] = useState<Sent>('all');
   const [range, setRange] = useState<Range>('all');
@@ -38,7 +39,7 @@ export default function RecordingsView() {
   const [exportNote, setExportNote] = useState<string | null>(null);
   const [regenLoading, setRegenLoading] = useState(false);
 
-  useEffect(() => { ava.recordings().then(setItems); }, []);
+  useEffect(() => { ava.recordings().then((d) => { setItems(d); setLoading(false); }); }, []);
 
   const filtered = useMemo(() => {
     const cutoff = rangeCutoff(range);
@@ -180,7 +181,8 @@ export default function RecordingsView() {
           </div>
         </div>
 
-        <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
+        {loading && <ListSkeleton rows={7} />}
+        {!loading && <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
           {filtered.map((r) => (
             <div key={r.id} onClick={() => setSel(r)} style={{
               display: 'grid', gridTemplateColumns: '22px 1fr 60px 80px 80px 70px',
@@ -211,9 +213,15 @@ export default function RecordingsView() {
             </div>
           ))}
           {filtered.length === 0 && (
-            <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>No recordings match these filters.</div>
+            <EmptyState
+              icon="◉"
+              title="No recordings yet"
+              hint="Recordings will appear here automatically. Adjust filters or clear search to widen results."
+              accent={c.avaCyan}
+              cta={{ label: 'Clear filters', onClick: () => { setQ('all'); setS('all'); setRange('all'); setSearch(''); } }}
+            />
           )}
-        </div>
+        </div>}
       </div>
 
       <aside style={{ width: 380, flexShrink: 0, borderLeft: `1px solid ${c.border}`, background: c.deepPanel, padding: '24px 22px', overflowY: 'auto' }}>

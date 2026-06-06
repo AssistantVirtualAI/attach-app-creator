@@ -153,6 +153,27 @@ export default function MessagesView() {
         )}
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {!active && (
+            <div style={{ margin: 'auto', maxWidth: 360 }}>
+              <div style={{
+                position: 'relative', padding: '40px 24px', textAlign: 'center',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+                borderRadius: 18,
+                background: `radial-gradient(circle at 50% 0%, ${c.lemtelBlue}1f, transparent 70%), ${c.bgCard}`,
+                border: `1px solid ${c.lemtelBlue}44`,
+                boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 12px 32px -20px ${c.lemtelBlue}88`,
+              }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: 18, display: 'grid', placeItems: 'center',
+                  background: `linear-gradient(135deg, ${c.lemtelBlue}33, ${c.signalGold}1c)`,
+                  border: `1px solid ${c.lemtelBlue}66`, color: c.lemtelBlue, fontSize: 26,
+                  boxShadow: `0 14px 34px -16px ${c.lemtelBlue}88`,
+                }}>✉</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: c.textIce }}>Pick a conversation</div>
+                <div style={{ fontSize: 12, color: c.mutedSilver, lineHeight: 1.5 }}>Select a thread on the left to view messages, or use AVA templates to start a new one.</div>
+              </div>
+            </div>
+          )}
           {msgs.map((m) => (
             <div key={m.id} style={{
               alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start',

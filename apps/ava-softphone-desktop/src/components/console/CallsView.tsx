@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, CallRecord } from '../../lib/avaApi';
-import PageHeader from './PageHeader';
+import PageHeader, { ListSkeleton, EmptyState } from './PageHeader';
 
 const { colors: c } = theme;
 
@@ -19,11 +19,12 @@ function fmtDur(s: number) {
 
 export default function CallsView() {
   const [calls, setCalls] = useState<CallRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'missed' | 'in' | 'out' | 'recorded'>('all');
   const [sel, setSel] = useState<CallRecord | null>(null);
   const [insight, setInsight] = useState<any>(null);
 
-  useEffect(() => { ava.calls().then(setCalls); }, []);
+  useEffect(() => { ava.calls().then((d) => { setCalls(d); setLoading(false); }); }, []);
   useEffect(() => {
     if (sel) { setInsight(null); ava.callDetail(sel.id).then(setInsight); }
   }, [sel]);
@@ -52,7 +53,8 @@ export default function CallsView() {
           ))}
         </div>
 
-        <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
+        {loading && <ListSkeleton rows={8} />}
+        {!loading && <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
           {filtered.map((cr) => (
             <button key={cr.id} onClick={() => setSel(cr)} style={{
               display: 'grid', gridTemplateColumns: '24px 1fr 80px 90px 70px',
@@ -83,17 +85,20 @@ export default function CallsView() {
             </button>
           ))}
           {filtered.length === 0 && (
-            <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>No calls match this filter.</div>
+            <EmptyState icon="📞" title="No calls match this filter" hint="Adjust the filter chips above or place a new call to start your log." accent={c.signalGold} />
           )}
-        </div>
+        </div>}
       </div>
 
       {/* Detail */}
       <aside style={{ width: 360, flexShrink: 0, borderLeft: `1px solid ${c.border}`, background: c.deepPanel, padding: '24px 22px', overflowY: 'auto' }}>
         {!sel && (
-          <div style={{ color: c.mutedSilver, fontSize: 12, paddingTop: 80, textAlign: 'center' }}>
-            Select a call to view recording, transcript, and AVA insights.
-          </div>
+          <EmptyState
+            icon="◔"
+            title="Pick a call"
+            hint="Select a call to view recording, transcript, and AVA insights."
+            accent={c.avaCyan}
+          />
         )}
         {sel && (
           <>

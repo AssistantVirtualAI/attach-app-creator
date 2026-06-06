@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, VoicemailItem, Feedback } from '../../lib/avaApi';
-import PageHeader, { EmptyState } from './PageHeader';
+import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
 
 const { colors: c } = theme;
 
@@ -22,6 +22,7 @@ const SPEEDS = [1, 1.25, 1.5, 2] as const;
 
 export default function VoicemailView() {
   const [items, setItems] = useState<VoicemailItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
   const [sel, setSel] = useState<VoicemailItem | null>(null);
   const [regenLoading, setRegenLoading] = useState(false);
@@ -32,7 +33,7 @@ export default function VoicemailView() {
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => { ava.voicemails().then(setItems); }, []);
+  useEffect(() => { ava.voicemails().then((d) => { setItems(d); setLoading(false); }); }, []);
 
   // Reset playback when selection changes
   useEffect(() => {
@@ -130,7 +131,8 @@ export default function VoicemailView() {
           ))}
         </div>
 
-        <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
+        {loading && <ListSkeleton rows={6} />}
+        {!loading && <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
           {filtered.map((v) => (
             <button key={v.id} onClick={() => { setSel(v); markRead(v); }} style={{
               display: 'grid', gridTemplateColumns: '10px 1fr 60px 80px 90px',
@@ -164,9 +166,15 @@ export default function VoicemailView() {
             </button>
           ))}
           {filtered.length === 0 && (
-            <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>No voicemails match this filter.</div>
+            <EmptyState
+              icon="✉"
+              title="Inbox is clear"
+              hint="No voicemails match this filter. Switch filter or wait for new messages — AVA will transcribe instantly."
+              accent={c.signalGold}
+              cta={{ label: 'View all', onClick: () => setFilter('all') }}
+            />
           )}
-        </div>
+        </div>}
       </div>
 
       <aside style={{ width: 380, flexShrink: 0, borderLeft: `1px solid ${c.border}`, background: c.deepPanel, padding: '24px 22px', overflowY: 'auto' }}>
