@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { ArrowUpRight, ArrowDownLeft, PhoneMissed, PhoneCall } from './RowIcons';
 
 interface CallRow {
   id: string;
@@ -77,10 +78,12 @@ export default function RecentsList({ extension, onCall }: Props) {
   if (rows.length === 0) return <div style={center}>No recent calls</div>;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <span style={{ fontSize: 11, opacity: 0.6 }}>{rows.length} call{rows.length > 1 ? 's' : ''}</span>
-        <button onClick={load} style={refreshBtn}>↻</button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, padding: '0 2px' }}>
+        <span style={{ fontSize: 10, opacity: 0.5, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 600 }}>
+          {rows.length} call{rows.length > 1 ? 's' : ''}
+        </span>
+        <button onClick={load} style={refreshBtn} title="Refresh">↻</button>
       </div>
       {rows.map((r) => {
         const outbound = r.direction === 'outbound' || r.direction === 'local';
@@ -89,24 +92,38 @@ export default function RecentsList({ extension, onCall }: Props) {
           : (r.caller_number || '?');
         const name = !outbound ? r.caller_name : null;
         const missed = r.missed_call || r.call_status === 'no_answer' || r.call_status === 'missed';
-        const icon = missed ? '✗' : outbound ? '↗' : '↙';
-        const iconColor = missed ? '#ff5f56' : outbound ? '#FFD700' : '#28ca41';
+        const iconColor = missed ? '#EF4444' : outbound ? '#FFD700' : '#10B981';
+        const initial = (name || peer || '?').toString().charAt(0).toUpperCase();
         return (
-          <button
-            key={r.id}
-            onClick={() => onCall(peer)}
-            style={rowBtn}
-          >
-            <span style={{ color: iconColor, fontSize: 16, width: 20 }}>{icon}</span>
-            <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: missed ? '#ff8a8a' : '#fff' }}>
+          <button key={r.id} onClick={() => onCall(peer)} className="lemtel-row">
+            <div className="lemtel-avatar" style={{
+              background: missed
+                ? 'linear-gradient(135deg, #7F1D1D 0%, #DC2626 100%)'
+                : outbound
+                  ? 'linear-gradient(135deg, #C9A84C 0%, #FFD700 100%)'
+                  : 'linear-gradient(135deg, #003DA6 0%, #7C3AED 100%)',
+            }}>
+              {initial}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: 13, fontWeight: 600, overflow: 'hidden',
+                textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                color: missed ? '#FCA5A5' : '#F5F5F7',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <span style={{ color: iconColor, display: 'inline-flex' }}>
+                  {missed ? <PhoneMissed size={13} /> : outbound ? <ArrowUpRight size={13} /> : <ArrowDownLeft size={13} />}
+                </span>
                 {name || peer}
               </div>
-              <div style={{ fontSize: 10, opacity: 0.55 }}>
+              <div style={{ fontSize: 10.5, opacity: 0.5, marginTop: 2, letterSpacing: 0.2 }}>
                 {fmtTime(r.start_at)}{r.duration_seconds ? ` · ${fmtDur(r.duration_seconds)}` : ''}
               </div>
             </div>
-            <span style={{ fontSize: 14, opacity: 0.6 }}>📞</span>
+            <span style={{ color: 'rgba(255,215,0,0.6)', display: 'inline-flex' }}>
+              <PhoneCall size={16} />
+            </span>
           </button>
         );
       })}
@@ -114,13 +131,9 @@ export default function RecentsList({ extension, onCall }: Props) {
   );
 }
 
-const center: React.CSSProperties = { textAlign: 'center', padding: 40, opacity: 0.5, fontSize: 12 };
-const rowBtn: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 10,
-  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
-  borderRadius: 8, padding: '8px 10px', cursor: 'pointer', color: '#fff',
-};
+const center: React.CSSProperties = { textAlign: 'center', padding: 48, opacity: 0.5, fontSize: 12, letterSpacing: 0.5 };
 const refreshBtn: React.CSSProperties = {
-  background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)',
-  cursor: 'pointer', fontSize: 14,
+  background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)',
+  color: '#FFD700', borderRadius: 8, width: 28, height: 28,
+  cursor: 'pointer', fontSize: 13,
 };
