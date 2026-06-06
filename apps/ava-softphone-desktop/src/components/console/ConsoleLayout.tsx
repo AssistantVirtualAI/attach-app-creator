@@ -109,7 +109,10 @@ export default function ConsoleLayout({
         {view === 'settings' && (
           <SettingsPage
             creds={creds}
-            onSignOut={onOpenSettings /* delegate sign-out to host */}
+            onSignOut={async () => {
+              await window.electronAPI?.clearCredentials?.();
+              window.location.reload();
+            }}
             onBack={() => setView('home')}
           />
         )}
