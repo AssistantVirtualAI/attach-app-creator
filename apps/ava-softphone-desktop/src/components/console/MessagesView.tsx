@@ -153,7 +153,7 @@ export default function MessagesView() {
           <div style={{ padding: 16, borderTop: `1px solid ${c.border}`, background: c.deepPanel }}>
             <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <div style={{ position: 'relative' }}>
-                <button onClick={() => setTplOpen((v) => !v)} style={aiBtn(c.avaCyan)}>📋 Templates</button>
+                <button onClick={() => setTplOpen((v) => !v)} style={aiBtn(c.avaCyan)}>📋 Templates{defaultTplId ? ' ★' : ''}</button>
                 {tplOpen && (
                   <div style={{
                     position: 'absolute', bottom: '110%', left: 0, zIndex: 50,
