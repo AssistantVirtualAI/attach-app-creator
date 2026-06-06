@@ -7,7 +7,6 @@ files:
   - electron-compiled/**/*
   - assets/**/*
   - package.json
-main: electron-compiled/main.js
 mac:
   category: public.app-category.business
   target:
