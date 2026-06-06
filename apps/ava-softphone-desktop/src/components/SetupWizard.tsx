@@ -2,37 +2,20 @@ import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { WHITELABEL } from '../whitelabel.config';
 
-const lemtelLogoUrl = new URL('../assets/lemtel-logo.svg', import.meta.url).href;
+const SUPABASE_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
+const SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlanhpc3JxdHZ4YXZicmZjb3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1MDMxNzQsImV4cCI6MjA3NzA3OTE3NH0.kaO-GslE99OCNrZ4_AMnbzGqya2azqz_UMZR34zZvvo';
 
-type SupabaseConfig = { supabase_url: string; supabase_anon_key: string };
-
-async function loadSupabaseConfig(portalUrl: string): Promise<SupabaseConfig> {
-  if (WHITELABEL.supabaseUrl && WHITELABEL.supabaseAnonKey) {
-    return { supabase_url: WHITELABEL.supabaseUrl, supabase_anon_key: WHITELABEL.supabaseAnonKey };
-  }
-
-  const portal = portalUrl.replace(/\/+$/, '');
-  const endpoints = [
-    `${portal}/api/supabase-config`,
-    `${portal}/api/supabase-config.json`,
-    'https://gejxisrqtvxavbrfcoxz.supabase.co/functions/v1/supabase-config',
-  ];
-
-  for (const endpoint of endpoints) {
-    try {
-      const res = await fetch(endpoint);
-      if (!res.ok) continue;
-      const config = await res.json();
-      if (config?.supabase_url && config?.supabase_anon_key) return config;
-    } catch {
-      continue;
-    }
-  }
-
-  throw new Error('Portal configuration unavailable. Please update the app.');
-}
-
-type Creds = { portalUrl: string; email: string; extension: string };
+type Creds = {
+  portalUrl: string;
+  email: string;
+  extension: string;
+  displayName?: string;
+  sipDomain?: string;
+  wssUrl?: string;
+  userId?: string;
+  accessToken?: string;
+};
 
 export default function SetupWizard({
   onComplete,
@@ -47,41 +30,71 @@ export default function SetupWizard({
   const [focused, setFocused] = useState<string | null>(null);
   const [hoverBtn, setHoverBtn] = useState(false);
 
-  async function connect() {
-    setError(null);
+  const handleConnect = async () => {
     setLoading(true);
-    try {
-      const normalizedPortalUrl = (portalUrl.trim() || WHITELABEL.portalUrl).replace(/\/+$/, '');
-      const config = await loadSupabaseConfig(normalizedPortalUrl);
-      const supabase = createClient(config.supabase_url, config.supabase_anon_key);
-      const { data, error: signErr } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (signErr || !data.user) throw signErr ?? new Error('Sign-in failed');
+    setError(null);
 
-      const { data: row, error: rowErr } = await supabase
-        .from('pbx_softphone_users')
-        .select('extension')
-        .eq('portal_user_id', data.user.id)
-        .maybeSingle();
-      if (rowErr) throw rowErr;
-      if (!row?.extension) {
-        throw new Error('No softphone account found. Contact your administrator.');
+    try {
+      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+
+      if (authError) {
+        setError(`Login failed: ${authError.message}`);
+        setLoading(false);
+        return;
       }
 
-      await window.electronAPI.saveCredentials({
+      if (!authData.user || !authData.session) {
+        setError('Login failed: no session returned');
+        setLoading(false);
+        return;
+      }
+
+      const { data: softphoneUser, error: spError } = await supabase
+        .from('pbx_softphone_users')
+        .select('*')
+        .eq('portal_user_id', authData.user.id)
+        .maybeSingle();
+
+      const normalizedPortalUrl = (portalUrl.trim() || WHITELABEL.portalUrl).replace(/\/+$/, '');
+
+      if (spError || !softphoneUser) {
+        const credentials: Creds = {
+          portalUrl: normalizedPortalUrl,
+          email: authData.user.email ?? email.trim(),
+          extension: 'N/A',
+          userId: authData.user.id,
+          accessToken: authData.session.access_token,
+        };
+        await window.electronAPI?.saveCredentials?.(credentials);
+        onComplete(credentials);
+        return;
+      }
+
+      const credentials: Creds = {
         portalUrl: normalizedPortalUrl,
-        email,
-        extension: String(row.extension),
-      });
-      onComplete({ portalUrl: normalizedPortalUrl, email, extension: String(row.extension) });
-    } catch (e: any) {
-      setError(e?.message ?? 'Connection failed');
+        email: authData.user.email ?? email.trim(),
+        extension: String(softphoneUser.extension ?? ''),
+        displayName: softphoneUser.display_name,
+        sipDomain: softphoneUser.sip_domain || 'lemtel.lemtel.tel',
+        wssUrl: softphoneUser.wss_url || 'wss://lemtel.lemtel.tel:7443',
+        userId: authData.user.id,
+        accessToken: authData.session.access_token,
+      };
+
+      await window.electronAPI?.saveCredentials?.(credentials);
+      onComplete(credentials);
+    } catch (err: any) {
+      setError(`Connection error: ${err.message}`);
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   const inputStyle = (key: string): React.CSSProperties => ({
     width: '100%',
@@ -209,7 +222,7 @@ export default function SetupWizard({
         <div style={{ height: 24 }} />
 
         <button
-          onClick={connect}
+          onClick={handleConnect}
           disabled={loading}
           onMouseEnter={() => setHoverBtn(true)}
           onMouseLeave={() => setHoverBtn(false)}
@@ -245,23 +258,7 @@ export default function SetupWizard({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#666' }}>
-            <div
-              style={{
-                width: 20,
-                height: 20,
-                borderRadius: 6,
-                background: WHITELABEL.primaryColor,
-                border: `1px solid ${WHITELABEL.accentColor}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                fontSize: 9,
-                fontWeight: 800,
-              }}
-            >
-              A
-            </div>
+            <AvaLogo />
             <span>Built by {WHITELABEL.providerName}</span>
           </div>
           <a
@@ -296,20 +293,62 @@ function Label({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function LemtelLogo({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
-  const w = size === 'lg' ? 116 : 24;
-  const h = size === 'lg' ? 116 : 24;
+export function LemtelLogo() {
   return (
-    <img
-      src={lemtelLogoUrl}
-      alt={`${WHITELABEL.appName} logo`}
-      style={{
-        width: w,
-        height: h,
-        borderRadius: size === 'lg' ? 26 : 6,
-        boxShadow: size === 'lg' ? '0 8px 32px rgba(0,61,166,0.4)' : 'none',
-        display: 'block',
-      }}
-    />
+    <svg
+      width="180"
+      height="90"
+      viewBox="0 0 180 90"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <ellipse cx="90" cy="45" rx="88" ry="43" fill="#FFD700" />
+      <ellipse cx="90" cy="45" rx="78" ry="35" fill="#003DA6" />
+      <text
+        x="90"
+        y="40"
+        textAnchor="middle"
+        fill="white"
+        fontSize="22"
+        fontWeight="bold"
+        fontFamily="Arial, sans-serif"
+      >
+        LEMTEL
+      </text>
+      <text
+        x="90"
+        y="58"
+        textAnchor="middle"
+        fill="white"
+        fontSize="9"
+        letterSpacing="2"
+        fontFamily="Arial, sans-serif"
+      >
+        COMMUNICATIONS
+      </text>
+    </svg>
+  );
+}
+
+function AvaLogo() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <circle cx="10" cy="10" r="9" fill="#0023e6" />
+      <text
+        x="10"
+        y="14"
+        textAnchor="middle"
+        fill="white"
+        fontSize="9"
+        fontWeight="bold"
+        fontFamily="Arial, sans-serif"
+      >
+        AVA
+      </text>
+    </svg>
   );
 }
