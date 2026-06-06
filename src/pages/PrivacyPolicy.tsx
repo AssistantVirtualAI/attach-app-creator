@@ -163,7 +163,6 @@ const PrivacyPolicy = () => {
     '5. Sécurité': <Shield className="w-6 h-6 text-primary" />,
     '5. Security': <Shield className="w-6 h-6 text-primary" />,
     '6. Contact': <Mail className="w-6 h-6 text-primary" />,
-    '6. Contact': <Mail className="w-6 h-6 text-primary" />,
   };
 
   return (
