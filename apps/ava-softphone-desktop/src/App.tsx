@@ -6,6 +6,7 @@ import SoftphonePane from './components/SoftphonePane';
 import ConsoleLayout from './components/console/ConsoleLayout';
 import BrightnessOverlay from './components/BrightnessOverlay';
 import { useTheme } from './lib/theme';
+import { useContrast } from './hooks/useContrast';
 
 type Creds = {
   portalUrl: string;
