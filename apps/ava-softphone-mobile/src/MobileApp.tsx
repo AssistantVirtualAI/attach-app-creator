@@ -133,6 +133,16 @@ function AuthenticatedShell({
       try { await Haptics.impact({ style }); } catch {}
     }
   };
+  if (permsGateDone === null) return <SplashAva />;
+  if (permsGateDone === false) {
+    return (
+      <PermissionGate onComplete={() => {
+        try { localStorage.setItem('lemtel-permissions-onboarded', '1'); } catch {}
+        setPermsGateDone(true);
+      }} />
+    );
+  }
+
 
   return (
     <div style={{
