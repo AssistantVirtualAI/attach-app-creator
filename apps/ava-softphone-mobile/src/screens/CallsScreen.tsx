@@ -36,11 +36,10 @@ export default function CallsScreen({ sp, haptic }: { sp: any; haptic: (s?: Impa
 
       {sub === 'dial' && (
         <div style={{ marginTop: 6 }}>
-          <NumberDisplay value={number} onClear={() => setNumber('')} />
+          <NumberDisplay value={number} onBackspace={() => { haptic(); setNumber((n) => n.slice(0, -1)); }} onClear={() => setNumber('')} />
           <Dialpad
-            onKey={(k) => { haptic(ImpactStyle.Light); setNumber((n) => n + k); }}
-            onLongZero={() => { haptic(ImpactStyle.Medium); setNumber((n) => n + '+'); }}
-            onBackspace={() => { haptic(); setNumber((n) => n.slice(0, -1)); }}
+            onPress={(k) => { haptic(ImpactStyle.Light); setNumber((n) => n + k); }}
+            onLongPressZero={() => { haptic(ImpactStyle.Medium); setNumber((n) => n + '+'); }}
           />
           <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
             <PrimaryButton onClick={() => startCall(number)} disabled={!number} style={{ flex: 1 }}>
