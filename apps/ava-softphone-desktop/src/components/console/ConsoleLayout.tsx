@@ -76,13 +76,13 @@ export default function ConsoleLayout({
             <SoftphonePane creds={creds} onOpenSettings={onOpenSettings} />
           </div>
         )}
-        {view === 'calls' && <Placeholder title="Calls & Recordings" hint="Full filterable call history with audio, transcript, AI summary, sentiment, and customer context." />}
-        {view === 'messages' && <Placeholder title="Messages" hint="SMS/MMS inbox with AI reply assist, templates, and multi-number support." />}
+        {view === 'calls' && <CallsView />}
+        {view === 'messages' && <MessagesView />}
         {view === 'voicemail' && <Placeholder title="Voicemail" hint="Playback, transcription, callback, assign, and follow-up generator." />}
         {view === 'recordings' && <Placeholder title="Recordings" hint="Searchable library of call recordings with waveform playback and AVA analysis." />}
-        {view === 'ai' && <Placeholder title="AVA AI Workspace" hint="Call intelligence, transcript search, greeting studio, queue optimizer, voice agent manager, and coaching insights." />}
+        {view === 'ai' && <AIWorkspace />}
         {view === 'contacts' && <Placeholder title="Contacts" hint="Unified directory with call history, transcripts, and customer notes per contact." />}
-        {view === 'admin' && <Placeholder title="Admin" hint="Extensions, devices, phone numbers, IVRs, queues, ring groups, and sync diagnostics." />}
+        {view === 'admin' && <AdminView />}
       </main>
 
       <AIPanel open={aiOpen} onToggle={() => setAiOpen((v) => !v)} />
