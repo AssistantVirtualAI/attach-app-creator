@@ -43,9 +43,11 @@ const { colors: c, glow } = theme;
 export default function SoftphonePane({
   creds,
   onOpenSettings,
+  hideTabs = false,
 }: {
   creds: Creds;
   onOpenSettings: () => void;
+  hideTabs?: boolean;
 }) {
   const sp = useSoftphone({
     extension: creds.extension,
@@ -291,7 +293,7 @@ export default function SoftphonePane({
       </div>
 
       {/* BOTTOM TABS */}
-      {!inCall && !ringing && (
+      {!inCall && !ringing && !hideTabs && (
         <div style={{
           position: 'relative', zIndex: 1, flexShrink: 0,
           display: 'flex', height: 68,
