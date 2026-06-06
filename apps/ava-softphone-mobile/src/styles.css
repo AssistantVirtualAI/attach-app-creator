@@ -1,16 +1,18 @@
 :root {
-  --bg-0: #07091a;
-  --bg-1: #0f1330;
-  --bg-2: #161b3f;
-  --brand-blue: #003DA6;
-  --brand-blue-2: #0057d9;
-  --brand-yellow: #FFC72C;
-  --text: #ffffff;
-  --text-muted: rgba(255, 255, 255, 0.65);
-  --border: rgba(255, 255, 255, 0.08);
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
+  --bg-0: #050816;
+  --bg-1: #0A0F23;
+  --bg-2: #101727;
+  --brand-blue: #0716A8;
+  --brand-blue-2: #2D55E5;
+  --brand-yellow: #FFE600;
+  --ava-cyan: #23D6FF;
+  --ava-violet: #7A4CFF;
+  --text: #F6F8FF;
+  --text-muted: #A9B4C7;
+  --border: rgba(140,180,255,0.10);
+  --success: #28E6A5;
+  --warning: #FFCC33;
+  --danger: #FF4D67;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -18,14 +20,47 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body, #root { height: 100%; margin: 0; padding: 0; overscroll-behavior: none; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
   background: var(--bg-0);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   user-select: none;
 }
 
-button { font-family: inherit; }
+button, input, textarea { font-family: inherit; }
+textarea, input { user-select: text; }
+
+/* Premium page transition between tabs */
+@keyframes lemtelPageEnter {
+  from { opacity: 0; transform: translateY(6px); filter: blur(2px); }
+  to   { opacity: 1; transform: translateY(0);   filter: blur(0); }
+}
+.lemtel-page-enter {
+  animation: lemtelPageEnter .28s cubic-bezier(.2,.7,.2,1) both;
+  will-change: transform, opacity, filter;
+}
+
+/* Shimmer skeleton */
+@keyframes lemtelShimmer {
+  0%   { background-position: -420px 0; }
+  100% { background-position: 420px 0; }
+}
+.lemtel-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(140,180,255,0.06) 0%,
+    rgba(140,180,255,0.16) 45%,
+    rgba(255,230,0,0.10) 55%,
+    rgba(140,180,255,0.06) 100%
+  );
+  background-size: 800px 100%;
+  animation: lemtelShimmer 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* Hide scrollbars on horizontal scrollers */
+.lemtel-hscroll::-webkit-scrollbar { display: none; }
+.lemtel-hscroll { scrollbar-width: none; }
 
 @keyframes pulse-ring {
   0% { transform: scale(1); opacity: 0.6; }
