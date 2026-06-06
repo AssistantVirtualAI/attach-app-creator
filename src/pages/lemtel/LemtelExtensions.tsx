@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Smartphone, Plus, Circle, Loader2, X, BellOff, PhoneForwarded, AlertCircle } from 'lucide-react';
 import { usePbxExtensions } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
+import { ProvisionExtensionModal } from '@/components/lemtel/ProvisionExtensionModal';
 import { formatDistanceToNow } from 'date-fns';
 
 type ExtType = { label: string; cls: string };
@@ -30,6 +31,7 @@ const NOTABLE_AI_EXT = '5143122929';
 export default function LemtelExtensions() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [provisionOpen, setProvisionOpen] = useState(false);
   const { data: extensions = [], isLoading } = usePbxExtensions();
   const all = extensions as any[];
 
@@ -66,9 +68,10 @@ export default function LemtelExtensions() {
         </div>
         <div className="flex gap-2">
           <PbxRefreshButton kind="config" />
-          <Button><Plus className="w-4 h-4 mr-2" /> Provision Extension</Button>
+          <Button onClick={() => setProvisionOpen(true)}><Plus className="w-4 h-4 mr-2" /> Provision Extension</Button>
         </div>
       </div>
+      <ProvisionExtensionModal open={provisionOpen} onOpenChange={setProvisionOpen} />
 
       <div className="flex flex-wrap gap-2 items-center">
         {Object.entries(stats).map(([k, v]) => {

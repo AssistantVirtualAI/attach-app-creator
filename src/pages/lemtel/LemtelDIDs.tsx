@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -5,8 +6,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Phone, Plus, MessageSquare, Loader2 } from 'lucide-react';
 import { usePbxPhoneNumbers, usePbxPhoneNumberAssignments, usePbxClients } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
+import { OrderDIDModal } from '@/components/lemtel/OrderDIDModal';
 
 export default function LemtelDIDs() {
+  const [orderOpen, setOrderOpen] = useState(false);
   const { data: numbers = [], isLoading } = usePbxPhoneNumbers();
   const { data: assignments = [] } = usePbxPhoneNumberAssignments();
   const { data: clients = [] } = usePbxClients();
@@ -23,9 +26,10 @@ export default function LemtelDIDs() {
         </div>
         <div className="flex gap-2">
           <PbxRefreshButton kind="config" />
-          <Button><Plus className="w-4 h-4 mr-2" /> Order DID</Button>
+          <Button onClick={() => setOrderOpen(true)}><Plus className="w-4 h-4 mr-2" /> Order DID</Button>
         </div>
       </div>
+      <OrderDIDModal open={orderOpen} onOpenChange={setOrderOpen} />
       <Card>
         <CardHeader><CardTitle>{numbers.length} numbers</CardTitle></CardHeader>
         <CardContent>
