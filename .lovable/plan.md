@@ -1,72 +1,58 @@
+# Lemtel Desktop — Full FusionPBX Integration Plan
 
-# Lemtel Telecom Module — Integration Plan
+Ajouter toutes les fonctionnalités téléphoniques FusionPBX dans l'app desktop, par phases livrables et testables.
 
-Adds a new module to the existing AVA Statistic portal without rebuilding anything. All routes, sidebar entries, tables, and edge functions are scoped to the Lemtel organization only.
+## Phase 1 — Core call control (immédiat)
+- Récupération du mot de passe SIP via l'edge function `softphone-credentials` au démarrage de l'app (au lieu de `password: ''` actuel).
+- Transferts : **blind** et **attended** (REFER via JsSIP).
+- **Hold / Unhold** (déjà câblé, vérification).
+- **DTMF** durant un appel (clavier in-call).
+- **Mute / Unmute** (déjà câblé).
+- **Conférence 3-way** locale (mix via WebRTC + 2e session).
+- Sonneries entrantes (audio + notification système Electron).
 
-## Scoping rule (applies everywhere)
-- A single org gate: `useLemtelAccess()` hook checks `selectedOrg.slug === 'lemtel'` (or matches a `LEMTEL_ORG_ID` constant resolved at runtime from `organizations` table).
-- Sidebar group, routes, and edge function calls all short-circuit if the user is not in the Lemtel org (or `super_admin`).
-- All Lemtel tables include `organization_id` defaulting to the Lemtel org id, with RLS policies that require membership in that org.
+## Phase 2 — Historique, contacts, présence
+- **Recents** : onglet alimenté par `pbx_cdr_safe` (50 derniers, scope extension de l'user), bouton rappel 1-clic.
+- **Contacts** : onglet listant les extensions internes de l'org (`pbx_extensions_safe`), recherche, appel direct.
+- **BLF / Presence** : statut des collègues via SIP SUBSCRIBE/NOTIFY (vert = libre, rouge = en appel, gris = offline).
+- **Caller ID lookup** : enrichir l'appel entrant avec nom du contact si l'extension est connue.
 
-## Phase 1 — Foundation (this build)
+## Phase 3 — Messagerie & SMS
+- **Voicemail visuel** : onglet listant les messages (`pbx_voicemail_messages`), lecture inline, suppression, marquer lu/non-lu.
+- **MWI** (Message Waiting Indicator) : badge sur l'onglet voicemail via NOTIFY SIP.
+- **SMS/MMS** : onglet threads alimenté par `pbx_sms_threads` + `pbx_sms_messages`, envoi via edge function Telnyx existante.
 
-### 1. Database migration
-Create tables (all with `organization_id uuid NOT NULL` + RLS scoped to Lemtel org members via `has_role`/`organization_members`):
-- `lemtel_config` (key/value, admin-only write)
-- `lemtel_customers`
-- `lemtel_dids`
-- `lemtel_cdrs_cache`
-- `lemtel_transcriptions`
-- `lemtel_voice_agents`
-- `lemtel_sms_threads`
-- `lemtel_softphone_users` (sip_password stored encrypted via pgsodium / never read client-side)
-- `lemtel_ivr_audio`
+## Phase 4 — Settings, queues, recording
+- **Audio devices** : sélecteur micro/HP/sonnerie (enumerateDevices), persisté dans electron-store.
+- **DND** (Do Not Disturb) : toggle local + push vers `pbx_softphone_users.status`.
+- **Call forwarding** : always / busy / no-answer, écrit dans FusionPBX via edge function `pbx-extension-update`.
+- **Codecs preferences** : OPUS / G.722 / PCMU/A (par défaut OPUS).
+- **Ring groups / Queues** : login/logout agent, pause/unpause (edge function `pbx-queue-agent`).
+- **Call parking** & **pickup** (codes FusionPBX *3xxx, *4xxx configurables).
+- **Enregistrement** : start/stop on-demand, accès aux recordings (`pbx_recordings` + bucket `lemtel-recordings`).
+- **Launch on startup**, **minimize to tray** (déjà câblé, vérification).
 
-Each: GRANTs for `authenticated` + `service_role`, RLS enabled, policies restricted to Lemtel org members. Sensitive columns (`sip_password`, all `lemtel_config.value` for keys, recording URLs) readable only by `service_role` via `_safe` views for client.
+## Technical section
 
-Storage buckets (private): `lemtel-ivr-audio`, `lemtel-recordings`.
+### Backend (edge functions à créer)
+- `pbx-recent-calls` — proxy lecture `pbx_cdr` filtré par extension.
+- `pbx-contacts` — liste extensions de l'org depuis `pbx_extensions_safe`.
+- `pbx-voicemail` — list/get/delete via FusionPBX API.
+- `pbx-extension-update` — update forwarding, DND, codecs, ring strategy.
+- `pbx-queue-agent` — login/logout/pause agent dans une queue.
+- `pbx-recording-toggle` — start/stop d'un enregistrement actif.
 
-Enable Realtime on `lemtel_sms_threads`, `lemtel_cdrs_cache`, `lemtel_softphone_users`.
+### Frontend (apps/ava-softphone-desktop/src)
+- Refactor de `App.tsx` : extraire la logique SIP dans `hooks/useSoftphone.ts` (parité avec l'app web).
+- Nouveau `lib/sip.ts` : provider JsSIP avec transfer, conference, DTMF, hold.
+- Nouveaux composants : `components/CallView.tsx`, `Dialpad.tsx`, `RecentsList.tsx`, `ContactsList.tsx`, `VoicemailList.tsx`, `SmsThreads.tsx`, `AudioDevicesPicker.tsx`, `SettingsPage.tsx` (étendue).
+- Realtime Supabase channel pour MWI, SMS, présence BLF cross-device.
+- Version bumpée par phase (1.1.0 → 1.4.0).
 
-### 2. Secrets
-Add via secrets tool: `FUSIONPBX_URL`, `FUSIONPBX_USERNAME`, `FUSIONPBX_API_KEY`, `FUSIONPBX_WSS_URL`, `FUSIONPBX_DOMAIN`, `TELNYX_API_KEY`, `TELNYX_MESSAGING_PROFILE_ID`, `TELNYX_WEBHOOK_PUBLIC_KEY`, `ANTHROPIC_API_KEY`. ElevenLabs key already present.
+### Sécurité
+- Aucun mot de passe SIP côté client persistant : refetch via edge function à chaque démarrage.
+- Toutes les écritures FusionPBX passent par edge functions avec validation Zod + RLS check.
+- Les recordings restent dans le bucket privé, URLs signées 1h max.
 
-### 3. Edge functions (stubs that work with mock mode)
-- `fusionpbx-proxy` — JWT-verified, validates Lemtel membership, forwards `{endpoint, method, body}` to FusionPBX with API key as query params.
-- `telnyx-sms` — POST send / GET history; logs to `lemtel_sms_threads`.
-- `telnyx-webhook` (public, signature-verified) — upserts inbound SMS, broadcasts `lemtel-sms-inbox`.
-- `ai-call-analysis` — Claude `claude-sonnet-4-20250514` transcript + JSON analysis → `lemtel_transcriptions`.
-- `ivr-script-generator` — Claude script → ElevenLabs TTS → upload to `lemtel-ivr-audio` bucket.
-
-### 4. Frontend skeleton
-- New sidebar group `lemtel` added to `src/components/sidebar/sidebarConfig.ts`, conditionally rendered (new `lemtelOnly: true` flag handled in `AppLayout.tsx`).
-- Admin items vs portal items split by role (`org_admin`/`super_admin` vs Lemtel customer portal user).
-- Routes added to `App.tsx` under `/lemtel/*` and `/lemtel/portal/*` with a `<LemtelGuard>` wrapper.
-- All admin and portal pages created as routed shells with titles + loading/empty states.
-
-### 5. Phase 1 functional pages
-- `/lemtel/settings` — full credential editor, test buttons per service, Mock Data toggle (stored in `lemtel_config`).
-- `/lemtel/dashboard` — status banner, 4 stat cards, recent calls + SMS preview, agent perf chart (mock-first).
-- `/lemtel/portal/calls` — CDR table with audio player, "Analyze" action calling `ai-call-analysis`.
-- `/lemtel/messages` — 3-panel SMS UI wired to `telnyx-sms` + Realtime.
-- Softphone widget v1: minimized button + DIAL tab, JsSIP registration to WSS, status dot.
-
-### 6. Mock Data mode
-Single `useMockMode()` hook reading `lemtel_config.mock_mode`. All hooks (`useLemtelCustomers`, `useLemtelCdrs`, etc.) return canned datasets when ON.
-
-## Phase 2 (after Phase 1 sign-off)
-Full softphone (all 4 tabs, hold/transfer/conference/DTMF), all customer portal pages, IVR visual builder + AI generation UI, voice agent analytics, BLF presence polling, PDF export, FR/EN i18n strings for the new module.
-
-## Technical notes
-- JsSIP loaded via CDN in `index.html`, typed via ambient `declare global` shim.
-- Audio playback via `<audio>` + `setSinkId`; ringtone as base64 data URI.
-- Telnyx webhook signature verified with Ed25519 public key.
-- Claude calls use Anthropic REST API directly from edge functions (no SDK needed).
-- Recharts already present for dashboard chart.
-- Wavesurfer.js added via `bun add wavesurfer.js` in Phase 2 recordings page.
-
-## Out of scope
-- No changes to existing non-Lemtel pages, hooks, or org logic.
-- No multi-org rollout of this module — Lemtel-only.
-
-Reply "go" (or pick a Phase 1 subset to start with) and I'll implement.
+## Livraison
+Je commence **immédiatement par la Phase 1**, livre, puis enchaîne sur 2 → 3 → 4 en messages séparés pour que tu puisses tester chaque étape.
