@@ -6,7 +6,7 @@ export function showIncomingCallNotification(
   caller: string
 ) {
   const n = new Notification({
-    title: 'Incoming Call — AVA Softphone',
+    title: 'Incoming Call — Lemtel Telecom',
     body: caller,
     icon: path.join(__dirname, '../assets/icon.png'),
     urgency: 'critical',
