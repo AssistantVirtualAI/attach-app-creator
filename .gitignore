@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Block root postcss config (breaks Electron desktop build)
+postcss.config.js
+postcss.config.cjs
+postcss.config.mjs
