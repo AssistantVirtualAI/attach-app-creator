@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { WHITELABEL } from '../whitelabel.config';
 import { useTheme } from '../lib/theme';
+import { useBrightness, Brightness } from '../hooks/useBrightness';
 
 type Tab = 'account' | 'audio' | 'notifications' | 'general' | 'about';
 const TABS: { id: Tab; icon: string; label: string }[] = [
@@ -21,6 +22,7 @@ export default function SettingsPage({
   onBack: () => void;
 }) {
   const { t, mode, setMode } = useTheme();
+  const { brightness, setBrightness } = useBrightness();
   const [tab, setTab] = useState<Tab>('account');
   const [mics, setMics] = useState<MediaDeviceInfo[]>([]);
   const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
@@ -176,6 +178,38 @@ export default function SettingsPage({
                   >
                     <span style={{ fontSize: 22 }}>{m === 'dark' ? '🌙' : '☀️'}</span>
                     {m === 'dark' ? 'Dark' : 'Light'}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 8, fontWeight: 600, letterSpacing: 0.3, textTransform: 'uppercase' }}>
+              Brightness · keeps blue/yellow palette
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['dim', 'medium', 'bright'] as Brightness[]).map((b) => {
+                const active = brightness === b;
+                const label = b === 'dim' ? 'Dim' : b === 'medium' ? 'Medium' : 'Bright';
+                const icon = b === 'dim' ? '◐' : b === 'medium' ? '◑' : '◓';
+                return (
+                  <button
+                    key={b}
+                    onClick={() => setBrightness(b)}
+                    style={{
+                      flex: 1, padding: '12px 10px',
+                      background: active ? 'rgba(255,215,0,0.12)' : 'transparent',
+                      border: `1px solid ${active ? 'rgba(255,215,0,0.45)' : t.border}`,
+                      color: active ? '#FFD700' : t.text,
+                      borderRadius: 12, cursor: 'pointer',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                      fontWeight: active ? 700 : 500, fontSize: 12,
+                      transition: 'all 160ms ease',
+                    }}
+                  >
+                    <span style={{ fontSize: 18 }}>{icon}</span>
+                    {label}
                   </button>
                 );
               })}

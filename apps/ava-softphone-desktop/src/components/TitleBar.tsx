@@ -40,32 +40,28 @@ export default function TitleBar({ sipStatus: sipStatusProp }: Props) {
   return (
     <div
       style={{
-        height: 44,
-        background: colors.bg,
+        height: 38,
+        background: 'rgba(10,21,48,0.85)',
         borderBottom: `1px solid ${colors.border}`,
         color: colors.text,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        justifyContent: 'center',
         padding: '0 14px',
         position: 'relative',
+        backdropFilter: 'blur(14px)',
         ...dragStyle,
       }}
     >
-      {/* Left: brand wordmark */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, ...noDrag }}>
-        <LemtelLogo size="xs" glow />
-      </div>
-
-      {/* Center: status pill */}
-      <div style={{ ...noDrag, position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+      {/* Center: status pill (window controls handled by OS on left) */}
+      <div style={{ ...noDrag }}>
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '5px 12px', borderRadius: 999,
-          background: colors.bgElev,
+          padding: '4px 12px', borderRadius: 999,
+          background: 'rgba(0,82,204,0.18)',
           border: `1px solid ${colors.border}`,
-          fontSize: 11, letterSpacing: 0.8, textTransform: 'uppercase',
-          color: colors.textSub, fontWeight: 600,
+          fontSize: 10.5, letterSpacing: 1, textTransform: 'uppercase',
+          color: colors.textSub, fontWeight: 700,
         }}>
           <span style={{
             width: 7, height: 7, borderRadius: '50%',
@@ -75,22 +71,8 @@ export default function TitleBar({ sipStatus: sipStatusProp }: Props) {
           {statusMeta.label}
         </div>
       </div>
-
-      {/* Right: window controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, ...noDrag }}>
-        <button onClick={() => api?.minimize()} aria-label="Minimize" style={dot('#fbbf24')} />
-        <button onClick={() => api?.maximize()} aria-label="Maximize" style={dot('#34d399')} />
-        <button onClick={() => api?.close()} aria-label="Close" style={dot('#f87171')} />
-      </div>
     </div>
   );
 }
-
-const dot = (bg: string): React.CSSProperties => ({
-  width: 12, height: 12, borderRadius: '50%',
-  background: bg, border: 'none', cursor: 'pointer',
-  transition: 'transform 120ms ease, box-shadow 120ms ease',
-  boxShadow: `0 0 8px ${bg}55`,
-});
 
 export { LemtelLogo };

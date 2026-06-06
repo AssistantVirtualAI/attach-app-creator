@@ -411,49 +411,76 @@ function Dialer({
   dialKeys: [string, string][]; onCall: () => void; canCall: boolean; extension: string;
 }) {
   return (
-    <div style={{ animation: 'fadeIn .25s ease-out' }}>
+    <div style={{ animation: 'fadeIn .25s ease-out', padding: '4px 4px 8px' }}>
       <CallForwarding extension={extension} />
 
-      {/* Number display */}
+      {/* Number display — premium glass tile */}
       <div style={{
-        textAlign: 'center', minHeight: 64, marginBottom: 18,
-        fontFamily: 'JetBrains Mono, Menlo, monospace',
-        fontSize: 32, letterSpacing: 4, fontWeight: 400,
-        color: dial ? c.text : c.textDim,
-        textShadow: dial ? '0 0 24px rgba(255,215,0,0.35)' : 'none',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        margin: '4px auto 22px', maxWidth: 320,
+        padding: '18px 20px', borderRadius: 18,
+        background: 'linear-gradient(180deg, rgba(0,82,204,0.10), rgba(10,21,48,0.40))',
+        border: `1px solid ${c.border}`,
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 28px -16px rgba(0,82,204,0.5)',
+        textAlign: 'center', minHeight: 64,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
       }}>
-        {dial || '·  ·  ·  ·'}
+        <div style={{
+          fontFamily: 'JetBrains Mono, Menlo, monospace',
+          fontSize: 30, letterSpacing: 3, fontWeight: 500,
+          color: dial ? c.textIce : c.textDim,
+          textShadow: dial ? '0 0 22px rgba(255,215,0,0.35)' : 'none',
+          minHeight: 36,
+        }}>
+          {dial || 'Enter a number'}
+        </div>
+        {dial && (
+          <div style={{ fontSize: 10, color: c.signalGold, letterSpacing: 1.6, textTransform: 'uppercase', fontWeight: 700 }}>
+            Ready to dial · ext {extension}
+          </div>
+        )}
       </div>
 
       {/* Dialpad */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
-        maxWidth: 272, margin: '0 auto 22px',
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14,
+        maxWidth: 296, margin: '0 auto 26px',
       }}>
         {dialKeys.map(([key, sub]) => (
           <button
             key={key}
             className="lemtel-key"
             onClick={() => setDial((p) => p + key)}
-            style={{ height: 66, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1 }}
+            style={{
+              height: 72, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', gap: 2,
+              borderRadius: 16,
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
+              border: `1px solid ${c.border}`,
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+              transition: 'transform 120ms ease, background 120ms ease, border-color 120ms ease',
+              cursor: 'pointer', color: c.textIce,
+            }}
+            onMouseDown={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.96)'; }}
+            onMouseUp={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
           >
-            <span style={{ fontSize: 22, fontWeight: 500 }}>{key}</span>
-            {sub && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', letterSpacing: 2 }}>{sub}</span>}
+            <span style={{ fontSize: 24, fontWeight: 500, letterSpacing: 0.5 }}>{key}</span>
+            {sub && <span style={{ fontSize: 9, color: 'rgba(159,179,214,0.55)', letterSpacing: 2, fontWeight: 700 }}>{sub}</span>}
           </button>
         ))}
       </div>
 
       {/* Action row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 28 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32 }}>
         <button
           onClick={() => setDial('')}
           disabled={!dial}
           style={{
             background: 'none', border: 'none',
             color: dial ? c.textSub : 'transparent',
-            fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase',
+            fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase',
             cursor: dial ? 'pointer' : 'default', padding: 8, width: 56,
+            transition: 'color 120ms ease',
           }}
           title="Clear"
         >Clear</button>
@@ -462,24 +489,24 @@ function Dialer({
           onClick={onCall}
           disabled={!canCall}
           style={{
-            width: 72, height: 72, borderRadius: '50%',
+            width: 78, height: 78, borderRadius: '50%',
             background: canCall
-              ? 'radial-gradient(circle at 30% 30%, #34D399 0%, #10B981 55%, #047857 100%)'
-              : 'rgba(16,185,129,0.15)',
-            border: canCall ? '1px solid rgba(255,255,255,0.18)' : '1px solid rgba(16,185,129,0.2)',
+              ? 'radial-gradient(circle at 30% 28%, #6EE7B7 0%, #10B981 55%, #047857 100%)'
+              : 'rgba(16,185,129,0.12)',
+            border: canCall ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(16,185,129,0.18)',
             color: '#fff', fontSize: 28,
             cursor: canCall ? 'pointer' : 'not-allowed',
             boxShadow: canCall
-              ? '0 8px 28px rgba(16,185,129,0.55), inset 0 1px 0 rgba(255,255,255,0.25)'
+              ? '0 12px 36px rgba(16,185,129,0.55), 0 0 0 6px rgba(16,185,129,0.10), inset 0 1px 0 rgba(255,255,255,0.32)'
               : 'none',
-            transition: 'transform .15s ease, box-shadow .15s ease',
+            transition: 'transform .18s ease, box-shadow .18s ease',
             display: 'grid', placeItems: 'center',
           }}
-          onMouseEnter={(e) => { if (canCall) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.07)'; }}
+          onMouseEnter={(e) => { if (canCall) (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.08)'; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
           aria-label="Call"
         >
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.9.36 1.78.7 2.6a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.82.34 1.7.57 2.6.7A2 2 0 0 1 22 16.92z" />
           </svg>
         </button>
@@ -489,7 +516,7 @@ function Dialer({
           disabled={!dial}
           style={{
             background: 'none', border: 'none', color: dial ? c.textSub : 'transparent',
-            fontSize: 20, cursor: dial ? 'pointer' : 'default', padding: 8, width: 56,
+            fontSize: 22, cursor: dial ? 'pointer' : 'default', padding: 8, width: 56,
           }}
           aria-label="Backspace"
         >⌫</button>
