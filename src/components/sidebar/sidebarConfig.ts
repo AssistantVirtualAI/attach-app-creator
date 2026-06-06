@@ -91,7 +91,7 @@ export const sidebarGroups: NavGroup[] = [
     items: [
       { nameKey: 'sidebar.workflows', href: '/workflows', icon: GitBranch },
       { nameKey: 'sidebar.integrations', href: '/integrations', icon: Sliders },
-      { nameKey: 'sidebar.twilioManagement', href: '/twilio-management', icon: Phone },
+      { nameKey: 'sidebar.twilioManagement', href: '/twilio-management', icon: Phone, hideForLemtel: true },
       { nameKey: 'sidebar.webhookLogs', href: '/webhook-logs', icon: Webhook },
       { nameKey: 'Audit Logs', href: '/audit-logs', icon: Shield },
       { nameKey: 'sidebar.apiExplorer', href: '/api-explorer', icon: Globe },
