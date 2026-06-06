@@ -27,6 +27,7 @@ function rangeCutoff(r: Range): number {
 
 export default function RecordingsView() {
   const [items, setItems] = useState<RecordingItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [q, setQ] = useState<Quality>('all');
   const [s, setS] = useState<Sent>('all');
   const [range, setRange] = useState<Range>('all');
@@ -38,7 +39,7 @@ export default function RecordingsView() {
   const [exportNote, setExportNote] = useState<string | null>(null);
   const [regenLoading, setRegenLoading] = useState(false);
 
-  useEffect(() => { ava.recordings().then(setItems); }, []);
+  useEffect(() => { ava.recordings().then((d) => { setItems(d); setLoading(false); }); }, []);
 
   const filtered = useMemo(() => {
     const cutoff = rangeCutoff(range);
