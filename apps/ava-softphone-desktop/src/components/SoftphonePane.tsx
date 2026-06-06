@@ -186,11 +186,28 @@ export default function SoftphonePane({
       {sp.credError && (
         <div style={{
           position: 'relative', zIndex: 1,
-          background: 'rgba(239,68,68,0.10)', color: c.red,
-          padding: '8px 14px', fontSize: 11,
-          borderBottom: '1px solid rgba(239,68,68,0.2)',
+          margin: '14px 16px 0',
+          padding: '14px 16px',
+          borderRadius: 14,
+          background: 'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(255,215,0,0.04))',
+          border: '1px solid rgba(239,68,68,0.25)',
+          boxShadow: '0 8px 24px -12px rgba(239,68,68,0.35)',
+          display: 'flex', gap: 12, alignItems: 'flex-start',
         }}>
-          {sp.credError}
+          <div style={{
+            width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+            display: 'grid', placeItems: 'center',
+            background: 'rgba(239,68,68,0.15)', color: c.red,
+            fontSize: 16, fontWeight: 700,
+          }}>!</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ color: c.red, fontSize: 12, fontWeight: 700, letterSpacing: 0.3, marginBottom: 2 }}>
+              SIP not registered — calls disabled
+            </div>
+            <div style={{ color: c.text.secondary, fontSize: 11, lineHeight: 1.5 }}>
+              {sp.credError}
+            </div>
+          </div>
         </div>
       )}
 
