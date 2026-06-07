@@ -35,6 +35,7 @@ export interface SoftphoneConfig {
   displayName: string;
   sipDomain: string;
   wssUrl: string;
+  wssUrls?: string[];
   password: string;
   mock: boolean;
 }
@@ -95,14 +96,25 @@ class JsSipProvider {
     }
 
     try {
-      const socket = new window.JsSIP.WebSocketInterface(cfg.wssUrl);
+      const fallbackUrls = Array.from(new Set([
+        cfg.wssUrl,
+        ...(cfg.wssUrls || []),
+        'wss://lemtel.lemtel.tel:7443',
+        'wss://pbxnode.lemtel.tel:7443',
+      ].filter(Boolean)));
+      const sockets = fallbackUrls.map((u) => new window.JsSIP.WebSocketInterface(u));
       const ua = new window.JsSIP.UA({
-        sockets: [socket],
+        sockets,
         uri: `sip:${cfg.extension}@${cfg.sipDomain}`,
         password: cfg.password,
+        authorization_user: cfg.extension,
+        realm: cfg.sipDomain,
+        contact_uri: `sip:${cfg.extension}@${cfg.sipDomain};transport=wss`,
         register: true,
         session_timers: false,
         register_expires: 300,
+        connection_recovery_min_interval: 2,
+        connection_recovery_max_interval: 30,
         user_agent: "AVA Softphone 1.0",
       });
 
