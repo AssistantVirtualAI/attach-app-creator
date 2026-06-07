@@ -87,7 +87,7 @@ export default function OutputDevicePicker({
   }
 
   return (
-    <div style={{ width: '100%', maxWidth: 280, marginBottom: 10 }}>
+    <div style={{ width: '100%', maxWidth: 280, minWidth: 0, marginBottom: 10 }}>
       <label
         htmlFor="lemtel-audio-output"
         style={{
@@ -106,10 +106,11 @@ export default function OutputDevicePicker({
         onChange={(e) => choose(e.target.value)}
         style={{
           width: '100%',
-          background: 'rgba(255,255,255,0.05)', color: c.text,
-          border: `1px solid ${c.border}`, borderRadius: 10,
+          background: 'rgba(255,255,255,0.86)', color: c.text,
+          border: '1px solid rgba(0,61,166,0.18)', borderRadius: 10,
           padding: compact ? '6px 8px' : '8px 10px',
           fontSize: compact ? 11 : 12, cursor: 'pointer',
+          minWidth: 0,
         }}
       >
         <option value="default">System default</option>
@@ -124,6 +125,7 @@ export default function OutputDevicePicker({
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             marginTop: 6, cursor: 'pointer', fontSize: 10, color: c.textSub,
+            minWidth: 0,
           }}
         >
           <input
