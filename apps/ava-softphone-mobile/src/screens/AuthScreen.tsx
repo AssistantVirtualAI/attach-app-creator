@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
 import type { Creds } from '../lib/creds';
+import SipConfigScreen from './SipConfigScreen';
 
 export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: Creds) => void }) {
+  const [mode, setMode] = useState<'login' | 'sip'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [portalUrl, setPortalUrl] = useState('https://avastatistic.ca');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  if (mode === 'sip') {
+    return <SipConfigScreen onSaved={onAuthenticated} onCancel={() => setMode('login')} />;
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
