@@ -62,6 +62,12 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
           }}>
             {busy ? 'Signing in…' : 'Sign In'}
           </button>
+          <button type="button" onClick={() => setMode('sip')} style={{
+            marginTop: 4, height: 40, borderRadius: 20, border: '1px solid var(--border)',
+            background: 'transparent', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer',
+          }}>
+            Manual SIP setup
+          </button>
         </form>
       </div>
 
