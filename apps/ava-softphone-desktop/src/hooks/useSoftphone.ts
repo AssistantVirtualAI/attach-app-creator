@@ -161,9 +161,9 @@ export function useSoftphone(args: UseSoftphoneArgs) {
       sipProvider.sendDTMF('*2');
       setRecording((r) => !r);
     }, []),
-    restart: useCallback(() => {
-      try { sipProvider.stop(); } catch { /* noop */ }
+    restart: useCallback(async () => {
       setCredError(null);
+      await sipProvider.restart();
       setRetryTick((n) => n + 1);
     }, []),
   };
