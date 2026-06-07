@@ -191,7 +191,7 @@ export default function SoftphonePane({
   };
 
   const handleCall = () => {
-    if (!dial || sp.snap.status !== 'registered') return;
+    if (dial.length < 3) return;
     sp.call(dial);
   };
 
@@ -393,7 +393,8 @@ export default function SoftphonePane({
             dial={dial} setDial={setDial}
             dialKeys={dialKeys}
             onCall={handleCall}
-            canCall={!!dial && sp.snap.status === 'registered'}
+            canCall={dial.length >= 3}
+            sipRegistered={sp.snap.status === 'registered'}
             extension={creds.extension}
             compact={compact}
           />
@@ -599,10 +600,11 @@ export default function SoftphonePane({
    ============================================================ */
 
 function Dialer({
-  dial, setDial, dialKeys, onCall, canCall, extension, compact = false,
+  dial, setDial, dialKeys, onCall, canCall, sipRegistered = true, extension, compact = false,
 }: {
   dial: string; setDial: (s: string | ((p: string) => string)) => void;
-  dialKeys: [string, string][]; onCall: () => void; canCall: boolean; extension: string;
+  dialKeys: [string, string][]; onCall: () => void; canCall: boolean;
+  sipRegistered?: boolean; extension: string;
   compact?: boolean;
 }) {
   return (
@@ -683,17 +685,23 @@ function Dialer({
           onClick={onCall}
           disabled={!canCall}
           className={canCall ? 'lemtel-glass' : undefined}
+          title={canCall && !sipRegistered ? 'SIP connecting — call may fail' : undefined}
           style={{
             width: 78, height: 78, borderRadius: '50%',
-            background: canCall
-              ? 'radial-gradient(circle at 30% 28%, #6EE7B7 0%, #10B981 55%, #047857 100%)'
-              : 'rgba(16,185,129,0.12)',
-            border: canCall ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(16,185,129,0.18)',
+            background: !canCall
+              ? 'rgba(120,120,140,0.18)'
+              : sipRegistered
+                ? 'linear-gradient(135deg, #059669, #10B981)'
+                : 'linear-gradient(135deg, #D97706, #F59E0B)',
+            border: canCall ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.08)',
             color: '#fff', fontSize: 28,
             cursor: canCall ? 'pointer' : 'not-allowed',
-            boxShadow: canCall
-              ? '0 12px 36px rgba(16,185,129,0.55), 0 0 0 6px rgba(16,185,129,0.10), inset 0 1px 0 rgba(255,255,255,0.32)'
-              : 'none',
+            opacity: canCall ? 1 : 0.4,
+            boxShadow: !canCall
+              ? 'none'
+              : sipRegistered
+                ? '0 4px 20px rgba(16,185,129,0.5), inset 0 1px 0 rgba(255,255,255,0.28)'
+                : '0 4px 20px rgba(245,158,11,0.4), inset 0 1px 0 rgba(255,255,255,0.28)',
             transition: 'transform .18s ease, box-shadow .18s ease',
             display: 'grid', placeItems: 'center',
           }}
