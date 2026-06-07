@@ -69,10 +69,11 @@ app.on('open-url', (event, url) => {
 function createWindow() {
   mainWindow = new BrowserWindow({
     title: APP_NAME,
-    width: 1280,
-    height: 820,
-    minWidth: 360,
-    minHeight: 580,
+    width: 440,
+    height: 760,
+    minWidth: 380,
+    minHeight: 600,
+    maxWidth: 600,
     resizable: true,
     frame: false,
     transparent: false,
