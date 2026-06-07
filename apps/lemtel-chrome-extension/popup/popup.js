@@ -34,11 +34,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (number.length >= 10) makeCall(number);
   });
 
-  saveSettingsBtn.addEventListener('click', () => {
-    chrome.storage.local.set({ lemtel_portal_url: portalUrlInput.value });
-    saveSettingsBtn.textContent = '✅ Saved!';
-    setTimeout(() => { saveSettingsBtn.textContent = 'Save Settings'; }, 2000);
-  });
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
