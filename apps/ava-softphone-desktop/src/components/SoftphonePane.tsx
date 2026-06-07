@@ -647,10 +647,10 @@ function IncomingCall({ who, number, onAnswer, onDecline }: { who: string; numbe
       <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 4, color: c.text }}>{who}</div>
       {number && number !== who && <div style={{ fontSize: 13, color: c.textSub, marginBottom: 32 }}>{number}</div>}
       <div style={{ display: 'flex', gap: 28, marginTop: 24 }}>
-        <button onClick={onDecline} style={{
+        <button onClick={onDecline} className="lemtel-glass" style={{
           ...hangupBtn, background: 'linear-gradient(135deg, #DC2626, #EF4444)', boxShadow: glow.red,
         }}>✕</button>
-        <button onClick={onAnswer} style={{
+        <button onClick={onAnswer} className="lemtel-glass" style={{
           ...hangupBtn, background: 'linear-gradient(135deg, #059669, #10B981)', boxShadow: glow.green,
         }}>✓</button>
       </div>
@@ -715,7 +715,7 @@ function ActiveCall({
           marginBottom: 14, width: '100%', maxWidth: 240,
         }}>
           {dialKeys.map(([k]) => (
-            <button key={k} className="lemtel-key" onClick={() => sp.sendDTMF(k)} style={{ padding: '10px 0', fontSize: 16 }}>{k}</button>
+            <button key={k} className="lemtel-key lemtel-glass" onClick={() => sp.sendDTMF(k)} style={{ padding: '10px 0', fontSize: 16 }}>{k}</button>
           ))}
         </div>
       )}
@@ -735,13 +735,13 @@ function ActiveCall({
 
       {sp.hasConsult() ? (
         <div style={{ width: '100%', maxWidth: 280, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button onClick={sp.completeAttendedTransfer} className="lemtel-btn-primary" style={{
+          <button onClick={sp.completeAttendedTransfer} className="lemtel-btn-primary lemtel-glass" style={{
             height: 44, borderRadius: 12, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
           }}>✓ Complete Transfer</button>
-          <button onClick={sp.cancelAttendedConsult} style={endCallBtn}>✕ Cancel Consult</button>
+          <button onClick={sp.cancelAttendedConsult} className="lemtel-glass" style={endCallBtn}>✕ Cancel Consult</button>
         </div>
       ) : (
-        <button onClick={sp.hangup} style={endCallBtn}>📵 End Call</button>
+        <button onClick={sp.hangup} className="lemtel-glass" style={endCallBtn}>📵 End Call</button>
       )}
     </div>
   );
@@ -766,6 +766,7 @@ function ControlBtn({
     <button
       onClick={onClick}
       disabled={disabled}
+      className={disabled ? undefined : 'lemtel-glass'}
       style={{
         height: 44, borderRadius: 12,
         background: bg, border: `1px solid ${bd}`, color: col,
