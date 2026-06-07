@@ -112,6 +112,15 @@ const AuthPage = () => {
     }
   };
 
+  const handleAppleLogin = async () => {
+    setLoading(true);
+    try {
+      await signInWithApple();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getTitle = () => {
     switch (mode) {
       case 'login': return t('auth.login');
