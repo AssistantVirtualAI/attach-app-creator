@@ -20,7 +20,7 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "jssip": "^3.10.0",
+    "jssip": "^3.13.8",
     "@supabase/supabase-js": "^2.39.0",
     "electron-updater": "^6.1.7",
     "electron-store": "^8.1.0"
