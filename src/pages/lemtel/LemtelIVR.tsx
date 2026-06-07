@@ -88,14 +88,19 @@ export default function LemtelIVR() {
     queryKey: ['ivr-audio', selectedId],
     enabled: !!selectedId,
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('pbx_ivr_audio')
         .select('*')
         .eq('ivr_id', selectedId!)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      return data;
+      if (error) throw error;
+      if (!data?.storage_path) return data;
+      const { data: signed } = await supabase.storage
+        .from('lemtel-ivr-audio')
+        .createSignedUrl(data.storage_path, 3600);
+      return { ...data, audio_url: signed?.signedUrl || data.audio_url };
     },
   });
 
@@ -132,6 +137,10 @@ export default function LemtelIVR() {
     if (!script.trim()) return toast.error('Tapez un script');
     if (!selectedOrgId) return toast.error('Organisation introuvable');
     if (!selectedId) return toast.error('Sélectionnez un IVR');
+    setLastAction('generate');
+    setGenerateError(null);
+    setSaveError(null);
+    setPreview(null);
     setSynthesizing(true);
     try {
       const { data, error } = await supabase.functions.invoke('elevenlabs-generate-greeting', {
@@ -146,11 +155,21 @@ export default function LemtelIVR() {
       if (error) throw error;
       const url = (data as any)?.audio_url;
       if (!url) throw new Error('No audio URL returned');
-      setAudioUrl(url);
+      setPreview({
+        id: (data as any)?.id,
+        audio_url: url,
+        storage_path: (data as any)?.storage_path,
+        script_text: script,
+        elevenlabs_voice_id: voiceId,
+        language,
+        status: 'ready',
+      });
       queryClient.invalidateQueries({ queryKey: ['ivr-audio', selectedId] });
-      toast.success('Voix générée ✓');
+      toast.success('Voix générée — écoutez l’aperçu avant d’enregistrer');
     } catch (e: any) {
-      toast.error(e?.message || 'Échec synthèse vocale');
+      const message = errorText(e, 'Échec de la génération ElevenLabs');
+      setGenerateError(message);
+      toast.error(message);
     } finally {
       setSynthesizing(false);
     }
@@ -158,17 +177,46 @@ export default function LemtelIVR() {
 
   const saveAsGreeting = async () => {
     if (!selected) return;
+    if (!preview?.audio_url) {
+      const message = 'Générez et écoutez un aperçu audio avant d’insérer le message dans l’IVR.';
+      setSaveError(message);
+      return toast.error(message);
+    }
+    setLastAction('save');
+    setSaveError(null);
     setSaving(true);
     try {
+      const voiceName = VOICES.find((voice) => voice.id === voiceId)?.name || voiceId;
       const { error } = await supabase
         .from('pbx_ivrs')
-        .update({ greet_long: script })
+        .update({
+          greet_long: script,
+          raw_data: {
+            ...(selected.raw_data || {}),
+            elevenlabs_greeting: {
+              audio_id: preview.id,
+              audio_url: preview.audio_url,
+              storage_path: preview.storage_path,
+              script_text: script,
+              elevenlabs_voice_id: voiceId,
+              voice_name: voiceName,
+              language,
+              saved_at: new Date().toISOString(),
+            },
+          },
+        } as any)
         .eq('id', selected.id);
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['pbx-ivrs'] });
+      if (preview.id) {
+        await supabase.from('pbx_ivr_audio').update({ status: 'saved' }).eq('id', preview.id);
+      }
+      queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivrs'] });
+      queryClient.invalidateQueries({ queryKey: ['ivr-audio', selectedId] });
       toast.success('Message d\'accueil mis à jour');
     } catch (e: any) {
-      toast.error(e?.message || 'Échec sauvegarde');
+      const message = errorText(e, 'Échec de l’enregistrement du message d’accueil');
+      setSaveError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
