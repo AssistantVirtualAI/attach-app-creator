@@ -104,6 +104,7 @@ import TelephonyAI from "./pages/telephony/TelephonyAI";
 import TelephonyWebphone from "./pages/telephony/TelephonyWebphone";
 import TelephonyVoicemail from "./pages/telephony/TelephonyVoicemail";
 import TelephonyTeam from "./pages/telephony/TelephonyTeam";
+import TelephonyUserPreferences from "./pages/telephony/TelephonyUserPreferences";
 import TelephonyDiagnostics from "./pages/telephony/TelephonyDiagnostics";
 import TelephonyChecklist from "./pages/telephony/TelephonyChecklist";
 import TelephonyPortalMappings from "./pages/telephony/TelephonyPortalMappings";
@@ -543,6 +544,7 @@ const App = () => (
                 <Route path="/org/lemtel/telephony/settings" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonySettings /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/voicemail" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyVoicemail /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/team" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyTeam /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/telephony/preferences" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyUserPreferences /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/diagnostics" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyDiagnostics /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/checklist" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyChecklist /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/portal-mappings" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyPortalMappings /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />

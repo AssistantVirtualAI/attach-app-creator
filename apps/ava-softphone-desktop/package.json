@@ -1,6 +1,6 @@
 {
   "name": "lemtel-softphone",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "description": "Lemtel Telecom — AI-Powered Business Communications",
   "main": "electron-compiled/main.js",
   "homepage": "https://assistantvirtualai.com",
