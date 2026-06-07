@@ -393,7 +393,8 @@ export default function SoftphonePane({
             dial={dial} setDial={setDial}
             dialKeys={dialKeys}
             onCall={handleCall}
-            canCall={!!dial && sp.snap.status === 'registered'}
+            canCall={dial.length >= 3}
+            sipRegistered={sp.snap.status === 'registered'}
             extension={creds.extension}
             compact={compact}
           />
