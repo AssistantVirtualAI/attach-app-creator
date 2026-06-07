@@ -368,8 +368,7 @@ class JsSipProvider {
       return micErr;
     }
     this.logEvent('info', `Starting call with input="${this.boundInputLabel}" output="${this.boundOutputLabel}"`);
-    const target = `sip:${this.config && number}@${this.config.sipDomain}`.replace('&&', '');
-    const realTarget = `sip:${number}@${this.config.sipDomain}`;
+    const target = `sip:${number}@${this.config.sipDomain}`;
     try {
       const audioConstraints: MediaTrackConstraints = {};
       if (this.inputDeviceId) (audioConstraints as any).deviceId = { exact: this.inputDeviceId };
