@@ -340,34 +340,63 @@ export default function SoftphonePane({
         </div>
       )}
 
-      {!sp.credError && (sp.snap.status === 'error' || sp.snap.status === 'connecting' || sp.snap.status === 'disconnected') && (
+      {!sp.credError && sp.snap.status !== 'registered' && sp.snap.status !== 'idle' && (
         <div style={{
           position: 'relative', zIndex: 1,
           margin: compact ? '8px 12px 0' : '10px 16px 0',
           padding: '10px 12px', borderRadius: 10,
           background: sp.snap.status === 'error'
             ? 'rgba(239,68,68,0.10)'
-            : 'rgba(245,158,11,0.10)',
+            : sp.snap.status === 'disconnected'
+              ? 'rgba(148,163,184,0.10)'
+              : 'rgba(245,158,11,0.10)',
           border: sp.snap.status === 'error'
             ? '1px solid rgba(239,68,68,0.35)'
-            : '1px solid rgba(245,158,11,0.35)',
+            : sp.snap.status === 'disconnected'
+              ? '1px solid rgba(148,163,184,0.35)'
+              : '1px solid rgba(245,158,11,0.35)',
           color: '#fff', fontSize: 12,
         }}>
-          <div style={{ fontWeight: 700, fontSize: 12 }}>
-            {sp.snap.status === 'error' ? '⚠️ SIP Registration Failed' : '🔄 Connecting to SIP...'}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ fontWeight: 700, fontSize: 12 }}>
+              {sp.snap.status === 'error' && '⚠️ SIP Registration Failed'}
+              {sp.snap.status === 'connecting' && '🔄 Connecting to SIP…'}
+              {sp.snap.status === 'connected' && '🔄 Connected — registering…'}
+              {sp.snap.status === 'disconnected' && '⚡ Disconnected — reconnecting…'}
+            </div>
+            <button
+              onClick={() => sp.restart()}
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6,
+                color: '#fff', padding: '3px 8px', fontSize: 10, cursor: 'pointer',
+              }}
+              title="Reinitialize SIP"
+            >↻ Retry</button>
           </div>
           {sp.snap.errorCause && (
             <div style={{ marginTop: 4, opacity: 0.85, fontSize: 11 }}>{sp.snap.errorCause}</div>
           )}
-          {sp.snap.status === 'error' && (
-            <button
-              onClick={() => sp.restart()}
-              style={{
-                marginTop: 8, background: 'rgba(255,255,255,0.1)',
-                border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6,
-                color: '#fff', padding: '4px 10px', fontSize: 11, cursor: 'pointer',
-              }}
-            >🔄 Retry Connection</button>
+          {sp.snap.events && sp.snap.events.length > 0 && (
+            <details style={{ marginTop: 6 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 10, opacity: 0.75 }}>
+                Show last {sp.snap.events.length} SIP events
+              </summary>
+              <div style={{
+                marginTop: 4, maxHeight: 140, overflowY: 'auto',
+                fontFamily: 'JetBrains Mono, Menlo, monospace', fontSize: 10,
+                background: 'rgba(0,0,0,0.35)', borderRadius: 6, padding: 6,
+              }}>
+                {sp.snap.events.slice().reverse().map((ev, i) => (
+                  <div key={i} style={{
+                    color: ev.level === 'error' ? '#fca5a5' : ev.level === 'warn' ? '#fcd34d' : '#a7f3d0',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>
+                    {new Date(ev.at).toLocaleTimeString()} · {ev.message}
+                  </div>
+                ))}
+              </div>
+            </details>
           )}
         </div>
       )}
