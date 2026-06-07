@@ -150,10 +150,10 @@ const recoverStyles = async (reason: string) => {
   sessionStorage.setItem(STYLE_RELOAD_KEY, String(count));
   remember("style-hard-reload", { count });
 
-  if (count <= 6) await hardReload(`style-guard-${reason}`);
+  if (count <= 1) await hardReload(`style-guard-${reason}`);
   else {
     remember("style-reload-loop-stopped", { reason, count });
-    showPortalGuardToast("Réparation automatique bloquée — cliquez Réparer maintenant pour forcer un nouveau chargement.", "error");
+    hideOverlay();
   }
 };
 
