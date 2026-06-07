@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,10 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Smartphone, Plus, Circle, Loader2, X, BellOff, PhoneForwarded, AlertCircle } from 'lucide-react';
-import { usePbxExtensions } from '@/hooks/usePbxData';
+import { usePbxExtensions, usePbxSoftphoneUsers } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
 import { SyncEverythingButton } from '@/components/lemtel/SyncEverythingButton';
 import { ProvisionExtensionModal } from '@/components/lemtel/ProvisionExtensionModal';
+import { EnableSoftphonePopover } from '@/components/lemtel/EnableSoftphonePopover';
 import { formatDistanceToNow } from 'date-fns';
 
 type ExtType = { label: string; cls: string };
@@ -33,8 +35,31 @@ export default function LemtelExtensions() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [provisionOpen, setProvisionOpen] = useState(false);
+  const [prefill, setPrefill] = useState<{ extension?: string; displayName?: string; outboundCid?: string } | undefined>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: extensions = [], isLoading } = usePbxExtensions();
+  const { data: softphones = [] } = usePbxSoftphoneUsers();
+  const softphoneByExt = useMemo(() => {
+    const m = new Map<string, any>();
+    (softphones as any[]).forEach(s => m.set(String(s.extension), s));
+    return m;
+  }, [softphones]);
   const all = extensions as any[];
+
+  useEffect(() => {
+    const create = searchParams.get('create');
+    if (create) {
+      setPrefill({
+        extension: create,
+        displayName: searchParams.get('name') || '',
+        outboundCid: searchParams.get('cid') || undefined,
+      });
+      setProvisionOpen(true);
+      searchParams.delete('create'); searchParams.delete('name'); searchParams.delete('cid');
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const stats = useMemo(() => {
     const s: Record<string, number> = {};
@@ -70,10 +95,10 @@ export default function LemtelExtensions() {
         <div className="flex gap-2">
           <PbxRefreshButton kind="config" />
           <SyncEverythingButton />
-          <Button onClick={() => setProvisionOpen(true)}><Plus className="w-4 h-4 mr-2" /> Provision Extension</Button>
+          <Button onClick={() => setProvisionOpen(true)}><Plus className="w-4 h-4 mr-2" /> New Extension</Button>
         </div>
       </div>
-      <ProvisionExtensionModal open={provisionOpen} onOpenChange={setProvisionOpen} />
+      <ProvisionExtensionModal open={provisionOpen} onOpenChange={(v) => { setProvisionOpen(v); if (!v) setPrefill(undefined); }} prefill={prefill} />
 
       <div className="flex flex-wrap gap-2 items-center">
         {Object.entries(stats).map(([k, v]) => {
@@ -111,6 +136,7 @@ export default function LemtelExtensions() {
                 <TableHead>Caller ID</TableHead>
                 <TableHead>Flags</TableHead>
                 <TableHead>Voicemail</TableHead>
+                <TableHead>Softphone</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -146,6 +172,17 @@ export default function LemtelExtensions() {
                       </div>
                     </TableCell>
                     <TableCell>{e.voicemail_enabled ? <Badge variant="secondary">On</Badge> : <Badge variant="outline">Off</Badge>}</TableCell>
+                    <TableCell>
+                      {softphoneByExt.has(String(e.extension)) ? (
+                        <Badge variant="outline" className="bg-green-500/15 text-green-600 border-green-500/30">✅ Active</Badge>
+                      ) : (
+                        <EnableSoftphonePopover
+                          extensionId={e.id}
+                          extension={String(e.extension)}
+                          defaultDisplayName={e.effective_cid_name || e.description || ''}
+                        />
+                      )}
+                    </TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-1 text-sm">
                         <Circle className={`w-2.5 h-2.5 ${e.enabled ? 'fill-green-500 text-green-500' : 'fill-muted text-muted'}`} />

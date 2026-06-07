@@ -223,6 +223,26 @@ const sections: Section[] = [
           if (!count) return { status: 'warn' as const, detail: 'ℹ️ 0 softphone users configured — create users in Extensions → Enable Softphone' };
           return { status: 'pass' as const, detail: `${count} softphone users` };
         } },
+      { id: '3.5b', name: 'Extension 300 in FusionPBX', description: 'Primary test extension exists',
+        fixHref: '/org/lemtel/telephony/extensions?create=300&name=Mohamad%20Hassoun&cid=15144942888',
+        fixLabel: 'Create Extension 300',
+        run: async () => {
+          const { count } = await (supabase as any).from('pbx_extensions')
+            .select('*', { count: 'exact', head: true })
+            .eq('organization_id', LEMTEL_ORG_ID).eq('extension', '300');
+          if (!count) return { status: 'fail' as const, detail: 'Extension 300 not found — create it first' };
+          return { status: 'pass' as const, detail: 'Extension 300 exists and is enabled' };
+        } },
+      { id: '3.5c', name: 'Softphone user for ext 300', description: 'Softphone account exists for ext 300',
+        fixHref: '/org/lemtel/telephony/extensions',
+        fixLabel: 'Enable Softphone',
+        run: async () => {
+          const { count } = await (supabase as any).from('pbx_softphone_users')
+            .select('*', { count: 'exact', head: true })
+            .eq('organization_id', LEMTEL_ORG_ID).eq('extension', '300');
+          if (!count) return { status: 'fail' as const, detail: 'No softphone user — enable softphone for ext 300' };
+          return { status: 'pass' as const, detail: 'Softphone user configured for ext 300' };
+        } },
       { id: '3.6', name: 'Desktop app build', description: 'Electron app released',
         run: async () => {
           try {
