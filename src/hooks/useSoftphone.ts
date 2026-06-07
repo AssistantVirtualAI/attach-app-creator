@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { sipProvider, SoftphoneSnapshot, SoftphoneConfig } from "@/lib/softphone/jssipProvider";
 import { ringtone } from "@/lib/softphone/ringtonePlayer";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,10 +9,13 @@ export type UserStatus = "available" | "busy" | "dnd" | "away";
 
 export function useSoftphone() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [snap, setSnap] = useState<SoftphoneSnapshot>(() => sipProvider.getSnapshot());
   const [config, setConfig] = useState<SoftphoneConfig | null>(null);
   const [loading, setLoading] = useState(false);
   const [userStatus, setUserStatus] = useState<UserStatus>("available");
+  const callStartRef = useRef<number | null>(null);
+  const callMetaRef = useRef<{ direction: "in" | "out" | null; remote: string }>({ direction: null, remote: "" });
 
   useEffect(() => {
     const unsub = sipProvider.subscribe(setSnap);
