@@ -118,6 +118,7 @@ export default function LemtelExtensions() {
                 <TableHead>Caller ID</TableHead>
                 <TableHead>Flags</TableHead>
                 <TableHead>Voicemail</TableHead>
+                <TableHead>Softphone</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
