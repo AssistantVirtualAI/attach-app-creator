@@ -205,7 +205,13 @@ class JsSipProvider {
       });
       ua.on('newRTCSession', (e: any) => this.attachSession(e.session, e.originator));
 
-      ua.start();
+      try {
+        ua.start();
+        this.logEvent('info', 'UA.start() invoked');
+      } catch (startErr: any) {
+        this.logEvent('error', `UA.start() threw: ${String(startErr?.message || startErr)}`);
+        throw startErr;
+      }
       this.ua = ua;
       this.update({ status: 'connecting' });
     } catch (err: any) {
