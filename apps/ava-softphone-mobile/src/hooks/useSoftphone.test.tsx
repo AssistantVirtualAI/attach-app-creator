@@ -80,11 +80,9 @@ describe('useSoftphone', () => {
     expect(result.current.sipError).toBe('Forbidden');
   });
 
-  it('handles incoming call: ringing -> active -> idle (after ended)', async () => {
-    vi.useFakeTimers();
+  it('handles incoming call: ringing -> active -> ended', async () => {
     const ua = installFakeJsSIP();
     const { result } = renderHook(() => useSoftphone(cfg));
-    await vi.advanceTimersByTimeAsync(0);
     await waitFor(() => expect(ua.start).toHaveBeenCalled());
 
     const session = makeFakeSession('incoming', '5145559999');
@@ -97,9 +95,8 @@ describe('useSoftphone', () => {
 
     act(() => session.emit('ended'));
     expect(result.current.callState).toBe('ended');
-    await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
-    expect(result.current.callState).toBe('idle');
+    // Transition back to idle happens after a 2s setTimeout; assert it eventually clears.
+    await waitFor(() => expect(result.current.callState).toBe('idle'), { timeout: 3000 });
     expect(result.current.activeCallNumber).toBe('');
-    vi.useRealTimers();
   });
 });
