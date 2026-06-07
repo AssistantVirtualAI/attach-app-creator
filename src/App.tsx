@@ -105,6 +105,7 @@ import TelephonyWebphone from "./pages/telephony/TelephonyWebphone";
 import TelephonyVoicemail from "./pages/telephony/TelephonyVoicemail";
 import TelephonyDiagnostics from "./pages/telephony/TelephonyDiagnostics";
 import TelephonyChecklist from "./pages/telephony/TelephonyChecklist";
+import TelephonyPortalMappings from "./pages/telephony/TelephonyPortalMappings";
 import TelephonyUsers from "./pages/telephony/TelephonyUsers";
 import { TelephonyLayout } from "./components/telephony/TelephonyLayout";
 import { PortalGuard } from "./components/telephony/PortalGuard";
@@ -542,6 +543,7 @@ const App = () => (
                 <Route path="/org/lemtel/telephony/voicemail" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyVoicemail /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/diagnostics" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyDiagnostics /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/checklist" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyChecklist /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/telephony/portal-mappings" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyPortalMappings /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
 
                 {/* /org/lemtel/portal/* customer routes (PortalGuard enforces customer scope) */}
                 <Route path="/org/lemtel/portal" element={<Navigate to="/org/lemtel/portal/dashboard" replace />} />
