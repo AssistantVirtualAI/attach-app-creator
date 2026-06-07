@@ -153,19 +153,8 @@ export default function SoftphonePane({
     ['*', ''], ['0', '+'], ['#', ''],
   ];
 
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%',
-      background: c.bg, color: c.text, position: 'relative', overflow: 'hidden',
-    }}>
-      {/* Ambient background glow */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: c.bgGradient,
-        pointerEvents: 'none', zIndex: 0,
-      }} />
 
-      <audio ref={audioRef} autoPlay />
+
 
   return (
     <div ref={rootRef} style={{
