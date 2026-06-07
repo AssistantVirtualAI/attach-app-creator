@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "./lib/devPreviewGuard";
 import App from "./App.tsx";
 import "./index.css";
 import { initSentry } from "./lib/sentry";
