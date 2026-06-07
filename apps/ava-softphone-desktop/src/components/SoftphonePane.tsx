@@ -344,7 +344,8 @@ export default function SoftphonePane({
       {/* CONTENT */}
       <div className="lemtel-scroll" style={{
         flex: 1, overflowY: 'auto', position: 'relative', zIndex: 1,
-        padding: ringing || inCall ? 0 : '20px 16px 12px',
+        padding: ringing || inCall ? 0 : compact ? '12px 10px 10px' : '20px 16px 12px',
+        minWidth: 0,
       }}>
         {/* Incoming */}
         {sp.snap.callState === 'ringing-in' && (
@@ -394,6 +395,7 @@ export default function SoftphonePane({
             onCall={handleCall}
             canCall={!!dial && sp.snap.status === 'registered'}
             extension={creds.extension}
+            compact={compact}
           />
         )}
 
@@ -403,7 +405,7 @@ export default function SoftphonePane({
           </div>
         )}
         {!inCall && !ringing && tab === 'contacts' && (
-          <div style={{ animation: 'fadeIn .25s ease-out' }}>
+          <div style={{ animation: 'fadeIn .25s ease-out', minWidth: 0, width: '100%' }}>
             <ContactsList selfExtension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
           </div>
         )}
