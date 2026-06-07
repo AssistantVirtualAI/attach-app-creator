@@ -77,6 +77,29 @@ export default function SoftphonePane({
   const [autoResetOutput, setAutoResetOutput] = useState<boolean>(() => {
     try { return localStorage.getItem('lemtel.autoResetOutput') === 'true'; } catch { return false; }
   });
+  const [micPermission, setMicPermission] = useState<'unknown' | 'granted' | 'denied' | 'prompt'>('unknown');
+
+  useEffect(() => {
+    const nav: any = navigator;
+    if (!nav?.permissions?.query) return;
+    let permRef: any = null;
+    nav.permissions.query({ name: 'microphone' as PermissionName }).then((res: any) => {
+      permRef = res;
+      setMicPermission(res.state);
+      res.onchange = () => setMicPermission(res.state);
+    }).catch(() => setMicPermission('unknown'));
+    return () => { if (permRef) permRef.onchange = null; };
+  }, []);
+
+  const requestMic = async () => {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      s.getTracks().forEach((t) => t.stop());
+      setMicPermission('granted');
+    } catch {
+      setMicPermission('denied');
+    }
+  };
 
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
 
