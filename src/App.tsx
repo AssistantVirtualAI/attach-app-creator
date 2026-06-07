@@ -172,6 +172,9 @@ const App = () => (
                 
                 {/* Contact Us */}
                 <Route path="/contact" element={<ContactUs />} />
+
+                {/* Public download page */}
+                <Route path="/download" element={<Download />} />
                 
                 {/* Universal login - redirects based on user type */}
                 <Route path="/login" element={<UniversalLogin />} />
