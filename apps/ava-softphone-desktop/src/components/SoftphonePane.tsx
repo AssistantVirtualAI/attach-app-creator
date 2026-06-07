@@ -345,7 +345,8 @@ export default function SoftphonePane({
       {!inCall && !ringing && !hideTabs && (
         <div style={{
           position: 'relative', zIndex: 1, flexShrink: 0,
-          display: 'flex', height: 68,
+          display: 'flex',
+          height: ultraCompact ? 54 : compact ? 60 : 68,
           background: 'linear-gradient(180deg, rgba(15,15,30,0.6) 0%, rgba(8,8,18,0.95) 100%)',
           borderTop: `1px solid ${c.border}`,
           backdropFilter: 'blur(14px)',
@@ -355,33 +356,49 @@ export default function SoftphonePane({
             const { Icon, label } = TAB_META[tk];
             const isAI = tk === 'ai';
             const activeColor = isAI ? c.aiLight : c.gold;
+            const showLabel = !ultraCompact;
             return (
               <button
                 key={tk}
                 onClick={() => setTab(tk)}
+                title={label}
+                aria-label={label}
                 style={{
-                  flex: 1, background: 'none', border: 'none',
+                  flex: 1, minWidth: 0, background: 'none', border: 'none',
                   color: active ? activeColor : c.textSub,
                   cursor: 'pointer',
                   display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center', gap: 6,
+                  alignItems: 'center', justifyContent: 'center',
+                  gap: compact ? 3 : 6,
                   transition: 'color 180ms ease',
                   position: 'relative',
                   paddingTop: 4,
+                  paddingLeft: 2, paddingRight: 2,
+                  overflow: 'hidden',
                 }}
                 onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = c.text; }}
                 onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = c.textSub; }}
               >
                 {active && <span className={`lemtel-tab-dot${isAI ? ' lemtel-tab-dot--ai' : ''}`} />}
-                <Icon size={20} color={active ? activeColor : 'currentColor'} />
-                <span style={{ fontSize: 9.5, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: active ? 700 : 500 }}>
-                  {label}
-                </span>
+                <Icon size={compact ? 18 : 20} color={active ? activeColor : 'currentColor'} />
+                {showLabel && (
+                  <span style={{
+                    fontSize: compact ? 8.5 : 9.5,
+                    letterSpacing: compact ? 0.6 : 1.2,
+                    textTransform: 'uppercase',
+                    fontWeight: active ? 700 : 500,
+                    maxWidth: '100%',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {label}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
       )}
+
 
 
       {/* Transfer modal */}
