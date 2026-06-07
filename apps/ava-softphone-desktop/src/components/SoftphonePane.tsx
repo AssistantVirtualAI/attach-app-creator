@@ -191,7 +191,7 @@ export default function SoftphonePane({
   };
 
   const handleCall = () => {
-    if (!dial || sp.snap.status !== 'registered') return;
+    if (dial.length < 3) return;
     sp.call(dial);
   };
 
