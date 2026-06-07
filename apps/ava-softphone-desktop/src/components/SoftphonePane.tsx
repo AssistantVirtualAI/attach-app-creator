@@ -788,24 +788,32 @@ function ActiveCall({
         </div>
       )}
 
-      {/* Controls grid — scrolls on tight viewports */}
+      {/* Audio output selector */}
+      <OutputDevicePicker audioEl={audioEl} compact={compact} />
+
+      {/* Controls — vertical grid normally, continuous swipe strip when compact
+          so every button stays reachable at very small widths. */}
       <div
         role="toolbar"
         aria-label="Call controls"
-        className="lemtel-scroll"
-        style={{
+        aria-keyshortcuts="M H K T E"
+        className={compact ? 'lemtel-control-strip' : 'lemtel-scroll'}
+        style={compact ? {
+          width: '100%', marginBottom: 12,
+        } : {
           display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8,
           width: '100%', maxWidth: 280, marginBottom: 12,
           maxHeight: '38vh', overflowY: 'auto', paddingRight: 2,
         }}
       >
-        <ControlBtn icon="🎤" label={sp.snap.muted ? 'Unmute' : 'Mute'} ariaLabel={sp.snap.muted ? 'Unmute microphone' : 'Mute microphone'} active={sp.snap.muted} danger onClick={sp.snap.muted ? sp.unmute : sp.mute} />
-        <ControlBtn icon="⏸" label={sp.snap.onHold ? 'Resume' : 'Hold'} ariaLabel={sp.snap.onHold ? 'Resume call' : 'Place call on hold'} active={sp.snap.onHold} warning onClick={sp.snap.onHold ? sp.unhold : sp.hold} />
-        <ControlBtn icon="#" label="Keypad" ariaLabel={showDTMF ? 'Hide DTMF keypad' : 'Show DTMF keypad'} active={showDTMF} onClick={toggleDTMF} />
+        <ControlBtn icon="🎤" label={sp.snap.muted ? 'Unmute' : 'Mute'} ariaLabel={`${sp.snap.muted ? 'Unmute microphone' : 'Mute microphone'} (shortcut M)`} active={sp.snap.muted} danger onClick={sp.snap.muted ? sp.unmute : sp.mute} />
+        <ControlBtn icon="⏸" label={sp.snap.onHold ? 'Resume' : 'Hold'} ariaLabel={`${sp.snap.onHold ? 'Resume call' : 'Place call on hold'} (shortcut H)`} active={sp.snap.onHold} warning onClick={sp.snap.onHold ? sp.unhold : sp.hold} />
+        <ControlBtn icon="#" label="Keypad" ariaLabel={`${showDTMF ? 'Hide DTMF keypad' : 'Show DTMF keypad'} (shortcut K)`} active={showDTMF} onClick={toggleDTMF} />
         <ControlBtn icon="⏺" label={sp.recording ? 'Stop' : 'Record'} ariaLabel={sp.recording ? 'Stop recording call' : 'Start recording call'} active={sp.recording} onClick={sp.toggleRecording} />
-        <ControlBtn icon="↪" label="Blind Xfer" ariaLabel="Blind transfer call" onClick={() => onTransfer('blind')} />
-        <ControlBtn icon="↗" label="Attended" ariaLabel="Attended transfer call" onClick={() => onTransfer('attended')} disabled={sp.hasConsult()} active={sp.hasConsult()} />
+        <ControlBtn icon="↪" label="Blind Xfer" ariaLabel="Blind transfer call (shortcut T)" onClick={() => onTransfer('blind')} />
+        <ControlBtn icon="↗" label="Attended" ariaLabel="Attended transfer call (shortcut Shift+T)" onClick={() => onTransfer('attended')} disabled={sp.hasConsult()} active={sp.hasConsult()} />
       </div>
+
 
       {sp.hasConsult() ? (
         <div style={{ width: '100%', maxWidth: 280, display: 'flex', flexDirection: 'column', gap: 8 }}>
