@@ -2,6 +2,8 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from "fs";
+import tailwindcss from "tailwindcss";
+import autoprefixer from "autoprefixer";
 import { componentTagger } from "lovable-tagger";
 
 const BUILD_ID = Date.now().toString(36);
