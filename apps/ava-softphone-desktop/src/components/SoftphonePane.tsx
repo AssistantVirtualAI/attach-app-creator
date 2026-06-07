@@ -440,27 +440,28 @@ export default function SoftphonePane({
       {/* Footer */}
       <div style={{
         position: 'relative', zIndex: 1, flexShrink: 0,
-        padding: '12px 14px 14px',
+        padding: compact ? '8px 10px 10px' : '12px 14px 14px',
         textAlign: 'center',
         borderTop: `1px solid ${c.border}`,
         background: c.bg,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: compact ? 3 : 6,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <LemtelLogo size="xs" glow />
           <BrandTagline size="sm" showPoweredBy={false} style={{ marginTop: 0 }} />
         </div>
-        <div style={{ fontSize: 10, color: c.textDim, letterSpacing: 0.5 }}>
-          v1.0.6 · Powered by{' '}
+        <div style={{ fontSize: compact ? 9 : 10, color: c.textDim, letterSpacing: 0.5 }}>
+          v1.0.6 {ultraCompact ? '' : '· Powered by '}
           <a
             onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal?.('https://assistantvirtualai.com'); }}
             href="#"
             style={{ color: c.gold, textDecoration: 'none', cursor: 'pointer', fontWeight: 600 }}
           >
-            AVA Statistic · assistantvirtualai.com
+            {ultraCompact ? 'AVA Statistic' : 'AVA Statistic · assistantvirtualai.com'}
           </a>
         </div>
       </div>
+
     </div>
   );
 }
