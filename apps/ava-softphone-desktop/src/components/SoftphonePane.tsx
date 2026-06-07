@@ -720,10 +720,11 @@ function IncomingCall({ who, number, onAnswer, onDecline }: { who: string; numbe
 }
 
 function ActiveCall({
-  sp, timer, showDTMF, toggleDTMF, dialKeys, onTransfer,
+  sp, timer, showDTMF, toggleDTMF, dialKeys, onTransfer, compact = false, audioEl = null,
 }: {
   sp: any; timer: string; showDTMF: boolean; toggleDTMF: () => void;
   dialKeys: [string, string][]; onTransfer: (m: 'blind' | 'attended') => void;
+  compact?: boolean; audioEl?: HTMLAudioElement | null;
 }) {
   const remote = sp.snap.remoteIdentity || sp.snap.remoteNumber || 'Unknown';
 
