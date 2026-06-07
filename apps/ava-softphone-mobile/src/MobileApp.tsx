@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Capacitor } from '@capacitor/core';
 // Re-use battle-tested SIP hook from the desktop app
-import { useSoftphone } from '@desktop/hooks/useSoftphone';
+import { useSoftphone } from './hooks/useSoftphone';
 import AuthScreen from './screens/AuthScreen';
 import HomeScreen from './screens/HomeScreen';
 import CallsScreen from './screens/CallsScreen';

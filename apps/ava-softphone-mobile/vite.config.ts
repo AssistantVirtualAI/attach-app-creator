@@ -7,7 +7,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@desktop': path.resolve(__dirname, '../ava-softphone-desktop/src'),
     },
   },
   build: {
