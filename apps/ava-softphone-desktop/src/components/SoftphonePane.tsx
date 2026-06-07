@@ -766,6 +766,7 @@ function ControlBtn({
     <button
       onClick={onClick}
       disabled={disabled}
+      className={disabled ? undefined : 'lemtel-glass'}
       style={{
         height: 44, borderRadius: 12,
         background: bg, border: `1px solid ${bd}`, color: col,
