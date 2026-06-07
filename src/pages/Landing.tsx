@@ -24,6 +24,7 @@ import { AIForCompaniesSection } from "@/components/landing/AIForCompaniesSectio
 import { CompetitorComparisonSection } from "@/components/landing/CompetitorComparisonSection";
 import { WhatsNewSection } from "@/components/landing/WhatsNewSection";
 import { AppsShowcaseSection } from "@/components/landing/AppsShowcaseSection";
+import { LemtelInteractiveDemo } from "@/components/landing/LemtelInteractiveDemo";
 import { useTranslation } from "@/hooks/useTranslation";
 
 const Landing = () => {
@@ -74,6 +75,9 @@ const Landing = () => {
         </div>
         <div id="apps-showcase">
           <AppsShowcaseSection />
+        </div>
+        <div id="lemtel-demo">
+          <LemtelInteractiveDemo />
         </div>
         <SectionDivider variant="pulse" />
         <div id="live-demo">
