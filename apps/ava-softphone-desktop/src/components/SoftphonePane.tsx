@@ -735,13 +735,13 @@ function ActiveCall({
 
       {sp.hasConsult() ? (
         <div style={{ width: '100%', maxWidth: 280, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button onClick={sp.completeAttendedTransfer} className="lemtel-btn-primary" style={{
+          <button onClick={sp.completeAttendedTransfer} className="lemtel-btn-primary lemtel-glass" style={{
             height: 44, borderRadius: 12, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
           }}>✓ Complete Transfer</button>
-          <button onClick={sp.cancelAttendedConsult} style={endCallBtn}>✕ Cancel Consult</button>
+          <button onClick={sp.cancelAttendedConsult} className="lemtel-glass" style={endCallBtn}>✕ Cancel Consult</button>
         </div>
       ) : (
-        <button onClick={sp.hangup} style={endCallBtn}>📵 End Call</button>
+        <button onClick={sp.hangup} className="lemtel-glass" style={endCallBtn}>📵 End Call</button>
       )}
     </div>
   );
