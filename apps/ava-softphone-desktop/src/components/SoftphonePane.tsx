@@ -14,6 +14,8 @@ import {
   PhoneIcon, ClockIcon, UsersIcon, VoicemailIcon,
   MessageIcon, DiscIcon, SparkleIcon,
 } from './TabIcons';
+import OutputDevicePicker from './OutputDevicePicker';
+import { watchA11y } from '../lib/a11yAudit';
 
 interface Creds {
   extension: string;
