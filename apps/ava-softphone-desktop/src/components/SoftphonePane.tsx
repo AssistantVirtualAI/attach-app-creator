@@ -353,8 +353,11 @@ export default function SoftphonePane({
             toggleDTMF={() => setShowDTMF((v) => !v)}
             dialKeys={dialKeys}
             onTransfer={(m) => { setXferMode(m); setShowXfer(true); }}
+            compact={compact}
+            audioEl={audioRef.current}
           />
         )}
+
 
         {/* Idle — Dialer */}
         {!inCall && !ringing && tab === 'dial' && (
