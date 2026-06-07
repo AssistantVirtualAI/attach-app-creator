@@ -5,8 +5,14 @@ import UpdateBanner from './components/UpdateBanner';
 import SoftphonePane from './components/SoftphonePane';
 import ConsoleLayout from './components/console/ConsoleLayout';
 import BrightnessOverlay from './components/BrightnessOverlay';
+import ResponsiveLab from './components/ResponsiveLab';
 import { useTheme } from './lib/theme';
 import { useContrast } from './hooks/useContrast';
+
+const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+const IS_LAB = qs?.get('lab') === 'responsive';
+const IS_EMBED = qs?.get('embed') === '1';
+
 
 type Creds = {
   portalUrl: string;
