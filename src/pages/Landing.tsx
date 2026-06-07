@@ -51,6 +51,9 @@ const Landing = () => {
         transition={{ duration: 0.5 }}
       >
         <HeroSection />
+        <div id="nouveautes">
+          <WhatsNewSection />
+        </div>
         <TrustedBySection />
         <SectionDivider variant="wave" />
         <div id="portal-preview">
@@ -69,9 +72,6 @@ const Landing = () => {
         </div>
         <div id="features">
           <FeaturesSection />
-        </div>
-        <div id="whats-new">
-          <WhatsNewSection />
         </div>
         <div id="apps-showcase">
           <AppsShowcaseSection />
