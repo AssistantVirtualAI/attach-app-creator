@@ -308,6 +308,21 @@ export default function SoftphonePane({
             background: dotColor, color: dotColor,
             animation: sp.snap.status === 'registered' ? 'statusPulse 2s ease-in-out infinite' : 'none',
           }} />
+          <span
+            title={sp.snap.errorCause || `SIP status: ${sp.snap.status}`}
+            style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase',
+              color: dotColor, maxWidth: compact ? 70 : 110,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}
+          >
+            {sp.snap.status === 'registered' ? 'Registered'
+              : sp.snap.status === 'connecting' ? 'Connecting…'
+              : sp.snap.status === 'connected' ? 'Registering…'
+              : sp.snap.status === 'error' ? 'Error'
+              : sp.snap.status === 'disconnected' ? 'Offline'
+              : 'Idle'}
+          </span>
           <select
             value={sp.manualStatus}
             onChange={(e) => sp.setManualStatus(e.target.value as ManualStatus)}
@@ -334,6 +349,9 @@ export default function SoftphonePane({
           >⚙</button>
         </div>
       </div>
+
+      {/* Diagnostics strip — always available */}
+      <SipDiagnostics sp={sp} compact={compact} c={c} />
 
       {sp.credError && (
         <div style={{
