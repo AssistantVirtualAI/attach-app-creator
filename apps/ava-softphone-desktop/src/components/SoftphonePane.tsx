@@ -167,31 +167,53 @@ export default function SoftphonePane({
 
       <audio ref={audioRef} autoPlay />
 
+  return (
+    <div ref={rootRef} style={{
+      display: 'flex', flexDirection: 'column', height: '100%',
+      background: c.bg, color: c.text, position: 'relative', overflow: 'hidden',
+    }}>
+      {/* Ambient background glow */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: c.bgGradient,
+        pointerEvents: 'none', zIndex: 0,
+      }} />
+
+      <audio ref={audioRef} autoPlay />
+
       {/* HEADER */}
       <div style={{
         position: 'relative', zIndex: 1,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 14px', height: 52, boxSizing: 'border-box',
+        gap: compact ? 6 : 10,
+        padding: compact ? '8px 10px' : '10px 14px',
+        height: compact ? 46 : 52, boxSizing: 'border-box',
         background: 'rgba(0,0,0,0.3)',
         borderBottom: `1px solid ${c.border}`,
         backdropFilter: 'blur(12px)',
       }}>
         {/* Extension badge */}
         <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '4px 10px', borderRadius: 999,
+          display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
+          padding: compact ? '3px 8px' : '4px 10px', borderRadius: 999,
           background: c.goldDim, border: `1px solid ${c.borderGold}`,
-          color: c.gold, fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+          color: c.gold, fontSize: compact ? 10 : 11, fontWeight: 700, letterSpacing: 0.5,
           boxShadow: glow.gold,
         }}>
           Ext {creds.extension}
         </div>
 
-        <div style={{ fontSize: 12, fontWeight: 500, color: c.text, opacity: 0.85 }}>
-          {creds.displayName || creds.email}
-        </div>
+        {!ultraCompact && (
+          <div style={{
+            fontSize: compact ? 11 : 12, fontWeight: 500, color: c.text, opacity: 0.85,
+            flex: 1, minWidth: 0, textAlign: 'center',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {creds.displayName || creds.email}
+          </div>
+        )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 5 : 8, flexShrink: 0 }}>
           <span style={{
             width: 8, height: 8, borderRadius: '50%',
             background: dotColor, color: dotColor,
@@ -203,7 +225,8 @@ export default function SoftphonePane({
             style={{
               background: 'rgba(255,255,255,0.05)', color: c.text,
               border: `1px solid ${c.border}`, borderRadius: 8,
-              fontSize: 10, padding: '4px 6px', cursor: 'pointer',
+              fontSize: 10, padding: compact ? '3px 4px' : '4px 6px', cursor: 'pointer',
+              maxWidth: compact ? 70 : 'none',
             }}
           >
             <option value="auto">Auto</option>
@@ -216,7 +239,7 @@ export default function SoftphonePane({
             style={{
               background: 'rgba(255,255,255,0.05)', border: `1px solid ${c.border}`,
               color: c.text, cursor: 'pointer',
-              width: 30, height: 28, borderRadius: 8, fontSize: 14,
+              width: compact ? 26 : 30, height: compact ? 24 : 28, borderRadius: 8, fontSize: 14,
             }}
             aria-label="Settings"
           >⚙</button>
@@ -226,25 +249,25 @@ export default function SoftphonePane({
       {sp.credError && (
         <div style={{
           position: 'relative', zIndex: 1,
-          margin: '14px 16px 0',
-          padding: '14px 16px',
+          margin: compact ? '10px 12px 0' : '14px 16px 0',
+          padding: compact ? '10px 12px' : '14px 16px',
           borderRadius: 14,
           background: 'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(255,215,0,0.04))',
           border: '1px solid rgba(239,68,68,0.25)',
           boxShadow: '0 8px 24px -12px rgba(239,68,68,0.35)',
-          display: 'flex', gap: 12, alignItems: 'flex-start',
+          display: 'flex', gap: compact ? 10 : 12, alignItems: 'flex-start',
         }}>
           <div style={{
-            width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+            width: compact ? 26 : 32, height: compact ? 26 : 32, borderRadius: 10, flexShrink: 0,
             display: 'grid', placeItems: 'center',
             background: 'rgba(239,68,68,0.15)', color: c.red,
-            fontSize: 16, fontWeight: 700,
+            fontSize: compact ? 14 : 16, fontWeight: 700,
           }}>!</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: c.red, fontSize: 12, fontWeight: 700, letterSpacing: 0.3, marginBottom: 2 }}>
+            <div style={{ color: c.red, fontSize: compact ? 11 : 12, fontWeight: 700, letterSpacing: 0.3, marginBottom: 2 }}>
               SIP not registered — calls disabled
             </div>
-            <div style={{ color: c.textSub, fontSize: 11, lineHeight: 1.5 }}>
+            <div style={{ color: c.textSub, fontSize: compact ? 10 : 11, lineHeight: 1.5 }}>
               {sp.credError}
             </div>
           </div>
