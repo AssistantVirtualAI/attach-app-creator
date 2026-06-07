@@ -164,6 +164,27 @@ export const useAuth = () => {
     }
   };
 
+  const signInWithApple = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo: `${window.location.origin}/`,
+        },
+      });
+
+      if (error) throw error;
+      return { error: null };
+    } catch (error: any) {
+      toast({
+        title: "Erreur de connexion Apple",
+        description: error.message,
+        variant: "destructive",
+      });
+      return { error };
+    }
+  };
+
   const resetPassword = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -238,6 +259,7 @@ export const useAuth = () => {
     signIn,
     signInWithGoogle,
     signInWithMicrosoft,
+    signInWithApple,
     resetPassword,
     updatePassword,
     signOut,

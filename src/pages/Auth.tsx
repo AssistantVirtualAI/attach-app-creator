@@ -33,7 +33,7 @@ const AuthPage = () => {
   const [showForgotDialog, setShowForgotDialog] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   
-  const { signIn, signUp, signInWithGoogle, signInWithMicrosoft, resetPassword, updatePassword, user } = useAuth();
+  const { signIn, signUp, signInWithGoogle, signInWithMicrosoft, signInWithApple, resetPassword, updatePassword, user } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { language, toggleLanguage } = useLanguage();
@@ -107,6 +107,15 @@ const AuthPage = () => {
     setLoading(true);
     try {
       await signInWithMicrosoft();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    setLoading(true);
+    try {
+      await signInWithApple();
     } finally {
       setLoading(false);
     }
@@ -218,6 +227,19 @@ const AuthPage = () => {
                     <rect x="12" y="12" width="10" height="10" fill="#FFB900"/>
                   </svg>
                   Continue with Microsoft
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12 gap-3 bg-card hover:bg-muted border-border"
+                  onClick={handleAppleLogin}
+                  disabled={loading}
+                >
+                  <svg width="20" height="20" viewBox="0 0 170 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.197-2.12-9.973-3.17-14.34-3.17-4.58 0-9.492 1.05-14.746 3.17-5.262 2.13-9.501 3.24-12.742 3.35-4.929.21-9.842-1.96-14.746-6.52-3.13-2.73-7.045-7.41-11.735-14.04-5.032-7.08-9.169-15.29-12.41-24.63-3.471-10.11-5.211-19.9-5.211-29.378 0-10.857 2.346-20.221 7.045-28.1 4.693-7.88 10.987-13.547 18.874-17.003 5.986-2.714 12.517-4.1 19.594-4.17 3.518 0 8.131.994 13.85 2.978 5.736 1.979 9.468 2.979 11.197 2.979 1.324 0 5.738-.925 13.235-2.775 7.09-1.715 13.1-2.468 18.035-2.27 15.694.633 26.907 9.369 33.62 9.369-9.57 5.82-14.337 13.86-14.301 24.102 0 8.208 3.006 15.012 9.024 20.4 2.693 2.55 5.705 4.526 9.043 5.928-2.24 6.538-4.688 12.803-7.333 18.79zm-38.598-110.24c0 8.102-2.968 15.672-8.898 22.692-7.188 9.1-15.893 14.366-25.355 13.518-.12-1.002-.188-2.06-.188-3.177 0-7.77 3.379-16.048 9.393-23.833 3.004-3.476 6.82-6.35 11.45-8.62 4.619-2.243 8.985-3.414 13.095-3.517.13 1.078.169 2.152.169 3.244 0 .59-.01 1.186-.029 1.785l.363-.088z" fill="currentColor"/>
+                  </svg>
+                  Continue with Apple
                 </Button>
 
                 <div className="relative">
