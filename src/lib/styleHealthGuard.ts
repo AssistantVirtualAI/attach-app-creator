@@ -23,6 +23,9 @@ const hasRuntimeStyles = () => {
 
   const probe = document.createElement("div");
   probe.className = "hidden p-4 bg-primary text-primary-foreground rounded-lg";
+  probe.style.position = "absolute";
+  probe.style.pointerEvents = "none";
+  probe.style.visibility = "hidden";
   document.body.appendChild(probe);
 
   const rootStyles = getComputedStyle(document.documentElement);
