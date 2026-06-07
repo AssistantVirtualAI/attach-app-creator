@@ -222,6 +222,12 @@ export default function LemtelIVR() {
     }
   };
 
+  const handleScriptChange = (value: string) => {
+    setScript(value);
+    setPreview(null);
+    setSaveError(null);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -330,7 +336,7 @@ export default function LemtelIVR() {
                     <Textarea
                       rows={5}
                       value={script}
-                      onChange={(e) => setScript(e.target.value)}
+                      onChange={(e) => handleScriptChange(e.target.value)}
                       placeholder="Bonjour, vous avez joint... Pour les ventes, faites le 1. Pour le support, faites le 2…"
                       className="mt-1 font-mono text-sm"
                     />
