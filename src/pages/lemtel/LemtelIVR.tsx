@@ -346,25 +346,47 @@ export default function LemtelIVR() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <Button onClick={synthesize} disabled={synthesizing || !script.trim()} size="sm">
+                    <Button onClick={synthesize} disabled={synthesizing || saving || !script.trim()} size="sm">
                       {synthesizing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
-                      Générer la voix
+                      {synthesizing ? 'Génération ElevenLabs…' : generateError && lastAction === 'generate' ? 'Réessayer la génération' : 'Générer la voix'}
                     </Button>
-                    <Button onClick={saveAsGreeting} disabled={saving || !script.trim()} variant="outline" size="sm">
+                    <Button onClick={saveAsGreeting} disabled={saving || synthesizing || !script.trim() || !preview?.audio_url} variant="outline" size="sm">
                       {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                      Enregistrer comme message d'accueil
+                      {saving ? 'Enregistrement…' : saveError && lastAction === 'save' ? 'Réessayer l’enregistrement' : 'Insérer définitivement dans l’IVR'}
                     </Button>
                   </div>
 
-                  {audioUrl && (
-                    <div className="rounded-md bg-background/60 p-3 border">
-                      <div className="text-xs text-muted-foreground mb-2 flex items-center gap-2">
-                        <Play className="w-3 h-3" /> Aperçu audio
+                  {(generateError || saveError) && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <span>{generateError || saveError}</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={generateError ? synthesize : saveAsGreeting}
+                          disabled={synthesizing || saving}
+                        >
+                          <RotateCcw className="w-3 h-3 mr-2" /> Réessayer
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {preview?.audio_url && (
+                    <div className="rounded-md bg-background/60 p-3 border space-y-3">
+                      <div className="text-xs text-muted-foreground flex items-center gap-2">
+                        <Play className="w-3 h-3" /> Aperçu synchronisé avant insertion
                       </div>
-                      <audio controls src={audioUrl} className="w-full" />
-                      <p className="text-[10px] text-muted-foreground mt-1">
-                        Fichier stocké dans <code>lemtel-ivr-audio</code> · prêt pour l'import FusionPBX.
-                      </p>
+                      <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">{preview.script_text || script}</div>
+                      <audio controls src={preview.audio_url} className="w-full" />
+                      <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                        <Badge variant="outline">{selectedVoiceName}</Badge>
+                        <Badge variant="outline">{language.toUpperCase()}</Badge>
+                        {preview.status === 'saved' && <span className="inline-flex items-center gap-1 text-primary"><CheckCircle2 className="w-3 h-3" /> Sauvegardé</span>}
+                        <span>Script + audio conservés pour relecture.</span>
+                      </div>
                     </div>
                   )}
                 </div>
