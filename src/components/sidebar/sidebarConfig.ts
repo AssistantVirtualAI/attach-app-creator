@@ -126,6 +126,7 @@ export const sidebarGroups: NavGroup[] = [
       { nameKey: 'Dashboard', href: '/org/lemtel/telephony/dashboard', icon: LayoutDashboard },
       { nameKey: 'Phone Numbers', href: '/org/lemtel/telephony/numbers', icon: Phone },
       { nameKey: 'Extensions', href: '/org/lemtel/telephony/extensions', icon: Smartphone },
+      { nameKey: 'Users', href: '/org/lemtel/telephony/users', icon: Users },
       { nameKey: 'Devices', href: '/org/lemtel/telephony/devices', icon: Router },
       { nameKey: 'Call History', href: '/org/lemtel/telephony/calls', icon: PhoneCall },
       { nameKey: 'Recordings', href: '/org/lemtel/telephony/recordings', icon: Disc },
