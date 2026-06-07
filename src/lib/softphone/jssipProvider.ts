@@ -35,6 +35,7 @@ export interface SoftphoneConfig {
   displayName: string;
   sipDomain: string;
   wssUrl: string;
+  wssUrls?: string[];
   password: string;
   mock: boolean;
 }
