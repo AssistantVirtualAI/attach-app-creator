@@ -989,6 +989,213 @@ export type Database = {
           },
         ]
       }
+      cc_agent_activity: {
+        Row: {
+          activity_type: string | null
+          agent_extension: string | null
+          agent_id: string | null
+          agent_name: string | null
+          call_id: string | null
+          caller_number: string | null
+          created_at: string | null
+          disposition: string | null
+          duration_seconds: number | null
+          id: string
+          notes: string | null
+          organization_id: string
+          pause_reason: string | null
+          queue_name: string | null
+        }
+        Insert: {
+          activity_type?: string | null
+          agent_extension?: string | null
+          agent_id?: string | null
+          agent_name?: string | null
+          call_id?: string | null
+          caller_number?: string | null
+          created_at?: string | null
+          disposition?: string | null
+          duration_seconds?: number | null
+          id?: string
+          notes?: string | null
+          organization_id: string
+          pause_reason?: string | null
+          queue_name?: string | null
+        }
+        Update: {
+          activity_type?: string | null
+          agent_extension?: string | null
+          agent_id?: string | null
+          agent_name?: string | null
+          call_id?: string | null
+          caller_number?: string | null
+          created_at?: string | null
+          disposition?: string | null
+          duration_seconds?: number | null
+          id?: string
+          notes?: string | null
+          organization_id?: string
+          pause_reason?: string | null
+          queue_name?: string | null
+        }
+        Relationships: []
+      }
+      cc_monitor_sessions: {
+        Row: {
+          agent_extension: string | null
+          call_id: string | null
+          ended_at: string | null
+          id: string
+          monitor_type: string | null
+          organization_id: string
+          started_at: string | null
+          supervisor_extension: string | null
+          supervisor_id: string | null
+        }
+        Insert: {
+          agent_extension?: string | null
+          call_id?: string | null
+          ended_at?: string | null
+          id?: string
+          monitor_type?: string | null
+          organization_id: string
+          started_at?: string | null
+          supervisor_extension?: string | null
+          supervisor_id?: string | null
+        }
+        Update: {
+          agent_extension?: string | null
+          call_id?: string | null
+          ended_at?: string | null
+          id?: string
+          monitor_type?: string | null
+          organization_id?: string
+          started_at?: string | null
+          supervisor_extension?: string | null
+          supervisor_id?: string | null
+        }
+        Relationships: []
+      }
+      cc_pause_reasons: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          id: string
+          is_productive: boolean | null
+          organization_id: string
+          reason: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          is_productive?: boolean | null
+          organization_id: string
+          reason: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          is_productive?: boolean | null
+          organization_id?: string
+          reason?: string
+        }
+        Relationships: []
+      }
+      cc_queue_stats: {
+        Row: {
+          agents_available: number | null
+          agents_offline: number | null
+          agents_on_call: number | null
+          agents_paused: number | null
+          agents_total: number | null
+          avg_handle_time_seconds: number | null
+          avg_wait_time_seconds: number | null
+          calls_abandoned_today: number | null
+          calls_answered_today: number | null
+          calls_waiting: number | null
+          id: string
+          longest_wait_seconds: number | null
+          organization_id: string
+          queue_extension: string | null
+          queue_name: string
+          service_level_percent: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          agents_available?: number | null
+          agents_offline?: number | null
+          agents_on_call?: number | null
+          agents_paused?: number | null
+          agents_total?: number | null
+          avg_handle_time_seconds?: number | null
+          avg_wait_time_seconds?: number | null
+          calls_abandoned_today?: number | null
+          calls_answered_today?: number | null
+          calls_waiting?: number | null
+          id?: string
+          longest_wait_seconds?: number | null
+          organization_id: string
+          queue_extension?: string | null
+          queue_name: string
+          service_level_percent?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          agents_available?: number | null
+          agents_offline?: number | null
+          agents_on_call?: number | null
+          agents_paused?: number | null
+          agents_total?: number | null
+          avg_handle_time_seconds?: number | null
+          avg_wait_time_seconds?: number | null
+          calls_abandoned_today?: number | null
+          calls_answered_today?: number | null
+          calls_waiting?: number | null
+          id?: string
+          longest_wait_seconds?: number | null
+          organization_id?: string
+          queue_extension?: string | null
+          queue_name?: string
+          service_level_percent?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      cc_report_schedules: {
+        Row: {
+          cadence: string
+          created_at: string | null
+          enabled: boolean | null
+          id: string
+          last_sent_at: string | null
+          organization_id: string
+          recipients: string[]
+          report_type: string
+        }
+        Insert: {
+          cadence: string
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          last_sent_at?: string | null
+          organization_id: string
+          recipients?: string[]
+          report_type: string
+        }
+        Update: {
+          cadence?: string
+          created_at?: string | null
+          enabled?: boolean | null
+          id?: string
+          last_sent_at?: string | null
+          organization_id?: string
+          recipients?: string[]
+          report_type?: string
+        }
+        Relationships: []
+      }
       client_agent_assignments: {
         Row: {
           agent_id: string
@@ -4338,6 +4545,14 @@ export type Database = {
         Row: {
           account_status: string
           active_platforms: string[]
+          cc_avg_handle_time: number | null
+          cc_calls_today: number | null
+          cc_logged_in_at: string | null
+          cc_pause_reason: string | null
+          cc_queues: string[] | null
+          cc_role: string | null
+          cc_skills: string[] | null
+          cc_status: string | null
           client_id: string | null
           created_at: string | null
           custom_status: string | null
@@ -4370,6 +4585,14 @@ export type Database = {
         Insert: {
           account_status?: string
           active_platforms?: string[]
+          cc_avg_handle_time?: number | null
+          cc_calls_today?: number | null
+          cc_logged_in_at?: string | null
+          cc_pause_reason?: string | null
+          cc_queues?: string[] | null
+          cc_role?: string | null
+          cc_skills?: string[] | null
+          cc_status?: string | null
           client_id?: string | null
           created_at?: string | null
           custom_status?: string | null
@@ -4402,6 +4625,14 @@ export type Database = {
         Update: {
           account_status?: string
           active_platforms?: string[]
+          cc_avg_handle_time?: number | null
+          cc_calls_today?: number | null
+          cc_logged_in_at?: string | null
+          cc_pause_reason?: string | null
+          cc_queues?: string[] | null
+          cc_role?: string | null
+          cc_skills?: string[] | null
+          cc_status?: string | null
           client_id?: string | null
           created_at?: string | null
           custom_status?: string | null
@@ -5770,6 +6001,7 @@ export type Database = {
         Returns: boolean
       }
       increment_sms_unread: { Args: { thread_id: string }; Returns: undefined }
+      is_cc_supervisor: { Args: { _user_id: string }; Returns: boolean }
       is_lemtel_admin: { Args: { _user_id: string }; Returns: boolean }
       is_lemtel_member: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
