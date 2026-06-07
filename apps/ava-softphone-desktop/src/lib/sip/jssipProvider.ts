@@ -103,11 +103,7 @@ class JsSipProvider {
       return;
     }
 
-    if (!window.JsSIP) {
-      this.logEvent('error', 'JsSIP library not loaded on window');
-      this.update({ status: 'error', errorCause: 'JsSIP not loaded' });
-      return;
-    }
+    // JsSIP is imported as an npm module — always available
 
     const isElectron = typeof window !== 'undefined' &&
       typeof window.navigator !== 'undefined' &&
@@ -128,11 +124,11 @@ class JsSipProvider {
       this.logEvent('info', `Init sip:${cfg.extension}@${cfg.sipDomain} via ${fallbackUrls.length} WSS endpoint(s)`);
 
       const sockets = fallbackUrls.map(
-        (url) => new window.JsSIP.WebSocketInterface(url),
+        (url) => new JsSIP.WebSocketInterface(url),
       );
       sockets.forEach((s: any) => { try { s.via_transport = 'wss'; } catch { /* noop */ } });
 
-      const ua = new window.JsSIP.UA({
+      const ua = new JsSIP.UA({
         sockets,
         uri: `sip:${cfg.extension}@${cfg.sipDomain}`,
         password: cfg.password,
