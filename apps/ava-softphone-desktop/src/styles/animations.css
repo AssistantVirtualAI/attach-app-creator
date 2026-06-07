@@ -401,3 +401,31 @@
     animation: none !important;
   }
 }
+
+/* ============================================
+   Continuous horizontal swipe strip for call controls
+   (used at very compact widths to guarantee no
+   control is ever hidden behind clipped overflow)
+   ============================================ */
+.lemtel-control-strip {
+  display: flex !important;
+  grid-template-columns: none !important;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  gap: 8px;
+  padding: 2px 12px 6px;
+  max-height: none !important;
+  scroll-behavior: smooth;
+  mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+}
+.lemtel-control-strip::-webkit-scrollbar { display: none; }
+.lemtel-control-strip > button {
+  flex: 0 0 auto;
+  min-width: 92px;
+  scroll-snap-align: center;
+}

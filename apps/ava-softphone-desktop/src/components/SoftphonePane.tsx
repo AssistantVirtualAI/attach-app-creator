@@ -14,6 +14,8 @@ import {
   PhoneIcon, ClockIcon, UsersIcon, VoicemailIcon,
   MessageIcon, DiscIcon, SparkleIcon,
 } from './TabIcons';
+import OutputDevicePicker from './OutputDevicePicker';
+import { watchA11y } from '../lib/a11yAudit';
 
 interface Creds {
   extension: string;
@@ -86,6 +88,62 @@ export default function SoftphonePane({
 
   const compact = paneWidth < 440;
   const ultraCompact = paneWidth < 360;
+
+  // Dev-only a11y audit on every DOM mutation inside the pane.
+  useEffect(() => {
+    if (!rootRef.current) return;
+    return watchA11y(rootRef.current, 'SoftphonePane');
+  }, []);
+
+  // ---- In-call keyboard shortcuts ----------------------------------------
+  // M = mute/unmute · H = hold/resume · K = toggle DTMF · T = blind transfer
+  // Shift+T = attended transfer · E or Esc = end call · 0-9 * # = DTMF tone
+  useEffect(() => {
+    const inActiveCall = sp.snap.callState === 'active' || sp.snap.callState === 'held';
+    if (!inActiveCall && sp.snap.callState !== 'ringing-in') return;
+
+    const onKey = (e: KeyboardEvent) => {
+      // Ignore when typing in inputs/selects/textareas/contenteditable.
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // Incoming ring → Enter answers, Esc declines (already wired globally,
+      // but we keep a local fallback so the pane works in isolation).
+      if (sp.snap.callState === 'ringing-in') {
+        if (e.key === 'Enter') { e.preventDefault(); sp.answer(); }
+        else if (e.key === 'Escape') { e.preventDefault(); sp.hangup(); }
+        return;
+      }
+
+      const k = e.key;
+      if (k === 'm' || k === 'M') {
+        e.preventDefault();
+        sp.snap.muted ? sp.unmute() : sp.mute();
+      } else if (k === 'h' || k === 'H') {
+        e.preventDefault();
+        sp.snap.onHold ? sp.unhold() : sp.hold();
+      } else if (k === 'k' || k === 'K') {
+        e.preventDefault();
+        setShowDTMF((v) => !v);
+      } else if (k === 'e' || k === 'E' || k === 'Escape') {
+        e.preventDefault();
+        sp.hangup();
+      } else if (k === 't') {
+        e.preventDefault();
+        setXferMode('blind'); setShowXfer(true);
+      } else if (k === 'T') {
+        e.preventDefault();
+        setXferMode('attended'); setShowXfer(true);
+      } else if (/^[0-9*#]$/.test(k)) {
+        e.preventDefault();
+        sp.sendDTMF(k);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sp.snap.callState, sp.snap.muted, sp.snap.onHold, sp]);
+
 
   // Broadcast SIP status to TitleBar
   useEffect(() => {
@@ -295,8 +353,11 @@ export default function SoftphonePane({
             toggleDTMF={() => setShowDTMF((v) => !v)}
             dialKeys={dialKeys}
             onTransfer={(m) => { setXferMode(m); setShowXfer(true); }}
+            compact={compact}
+            audioEl={audioRef.current}
           />
         )}
+
 
         {/* Idle — Dialer */}
         {!inCall && !ringing && tab === 'dial' && (
@@ -659,10 +720,11 @@ function IncomingCall({ who, number, onAnswer, onDecline }: { who: string; numbe
 }
 
 function ActiveCall({
-  sp, timer, showDTMF, toggleDTMF, dialKeys, onTransfer,
+  sp, timer, showDTMF, toggleDTMF, dialKeys, onTransfer, compact = false, audioEl = null,
 }: {
   sp: any; timer: string; showDTMF: boolean; toggleDTMF: () => void;
   dialKeys: [string, string][]; onTransfer: (m: 'blind' | 'attended') => void;
+  compact?: boolean; audioEl?: HTMLAudioElement | null;
 }) {
   const remote = sp.snap.remoteIdentity || sp.snap.remoteNumber || 'Unknown';
 
@@ -726,24 +788,32 @@ function ActiveCall({
         </div>
       )}
 
-      {/* Controls grid — scrolls on tight viewports */}
+      {/* Audio output selector */}
+      <OutputDevicePicker audioEl={audioEl} compact={compact} />
+
+      {/* Controls — vertical grid normally, continuous swipe strip when compact
+          so every button stays reachable at very small widths. */}
       <div
         role="toolbar"
         aria-label="Call controls"
-        className="lemtel-scroll"
-        style={{
+        aria-keyshortcuts="M H K T E"
+        className={compact ? 'lemtel-control-strip' : 'lemtel-scroll'}
+        style={compact ? {
+          width: '100%', marginBottom: 12,
+        } : {
           display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8,
           width: '100%', maxWidth: 280, marginBottom: 12,
           maxHeight: '38vh', overflowY: 'auto', paddingRight: 2,
         }}
       >
-        <ControlBtn icon="🎤" label={sp.snap.muted ? 'Unmute' : 'Mute'} ariaLabel={sp.snap.muted ? 'Unmute microphone' : 'Mute microphone'} active={sp.snap.muted} danger onClick={sp.snap.muted ? sp.unmute : sp.mute} />
-        <ControlBtn icon="⏸" label={sp.snap.onHold ? 'Resume' : 'Hold'} ariaLabel={sp.snap.onHold ? 'Resume call' : 'Place call on hold'} active={sp.snap.onHold} warning onClick={sp.snap.onHold ? sp.unhold : sp.hold} />
-        <ControlBtn icon="#" label="Keypad" ariaLabel={showDTMF ? 'Hide DTMF keypad' : 'Show DTMF keypad'} active={showDTMF} onClick={toggleDTMF} />
+        <ControlBtn icon="🎤" label={sp.snap.muted ? 'Unmute' : 'Mute'} ariaLabel={`${sp.snap.muted ? 'Unmute microphone' : 'Mute microphone'} (shortcut M)`} active={sp.snap.muted} danger onClick={sp.snap.muted ? sp.unmute : sp.mute} />
+        <ControlBtn icon="⏸" label={sp.snap.onHold ? 'Resume' : 'Hold'} ariaLabel={`${sp.snap.onHold ? 'Resume call' : 'Place call on hold'} (shortcut H)`} active={sp.snap.onHold} warning onClick={sp.snap.onHold ? sp.unhold : sp.hold} />
+        <ControlBtn icon="#" label="Keypad" ariaLabel={`${showDTMF ? 'Hide DTMF keypad' : 'Show DTMF keypad'} (shortcut K)`} active={showDTMF} onClick={toggleDTMF} />
         <ControlBtn icon="⏺" label={sp.recording ? 'Stop' : 'Record'} ariaLabel={sp.recording ? 'Stop recording call' : 'Start recording call'} active={sp.recording} onClick={sp.toggleRecording} />
-        <ControlBtn icon="↪" label="Blind Xfer" ariaLabel="Blind transfer call" onClick={() => onTransfer('blind')} />
-        <ControlBtn icon="↗" label="Attended" ariaLabel="Attended transfer call" onClick={() => onTransfer('attended')} disabled={sp.hasConsult()} active={sp.hasConsult()} />
+        <ControlBtn icon="↪" label="Blind Xfer" ariaLabel="Blind transfer call (shortcut T)" onClick={() => onTransfer('blind')} />
+        <ControlBtn icon="↗" label="Attended" ariaLabel="Attended transfer call (shortcut Shift+T)" onClick={() => onTransfer('attended')} disabled={sp.hasConsult()} active={sp.hasConsult()} />
       </div>
+
 
       {sp.hasConsult() ? (
         <div style={{ width: '100%', maxWidth: 280, display: 'flex', flexDirection: 'column', gap: 8 }}>
