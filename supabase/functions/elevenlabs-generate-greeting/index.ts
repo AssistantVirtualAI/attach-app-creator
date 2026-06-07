@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     if (!ttsRes.ok) throw new Error(`TTS failed: ${await ttsRes.text()}`);
     const audio = new Uint8Array(await ttsRes.arrayBuffer());
 
-    const path = `${organization_id}/${ivr_id || crypto.randomUUID()}.mp3`;
+    const path = `${organization_id}/${ivr_id || "standalone"}/${crypto.randomUUID()}.mp3`;
     const { error: upErr } = await admin.storage.from("lemtel-ivr-audio").upload(path, audio, { contentType: "audio/mpeg", upsert: true });
     if (upErr) throw upErr;
     const { data: signed } = await admin.storage.from("lemtel-ivr-audio").createSignedUrl(path, 3600);
