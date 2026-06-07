@@ -38,9 +38,11 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
     <div style={wrap}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 28px', gap: 32 }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={logoStyle}>L</div>
-          <h1 style={{ fontSize: 28, fontWeight: 600, margin: '24px 0 4px', letterSpacing: -0.5 }}>Lemtel Telecom</h1>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>AI Business Phone System</p>
+          <div style={logoStyle}>
+            <img src="/lemtel-logo.png?v=4" alt="Lemtel" width={84} height={84} style={{ display: 'block', borderRadius: 22 }} />
+          </div>
+          <h1 style={{ fontSize: 28, fontWeight: 700, margin: '24px 0 4px', letterSpacing: -0.5, color: '#0E1B3D' }}>Lemtel Telecom</h1>
+          <p style={{ fontSize: 13, color: '#42547A', margin: 0 }}>AI Business Phone System</p>
         </div>
 
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
