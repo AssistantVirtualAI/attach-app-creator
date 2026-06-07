@@ -31,7 +31,7 @@
   function createCallButton(number) {
     const btn = document.createElement('a');
     btn.className = 'lemtel-call-btn';
-    btn.href = `lemtel://call/${cleanNumber(number)}`;
+    btn.href = `tel:${cleanNumber(number)}`;
     btn.title = `Call ${formatDisplay(number)} with Lemtel Telecom`;
     btn.innerHTML = `${PHONE_ICON_SVG}<span>${formatDisplay(number)}</span>`;
 
@@ -45,7 +45,9 @@
   }
 
   function dialNumber(number) {
-    window.location.href = `lemtel://call/${number}`;
+    // Hand off to the background worker which triggers the OS / linked mobile
+    // phone app via tel:. Never navigate the current page (that previously
+    // ended up on avastatistic.ca as a fallback).
     try {
       chrome.runtime.sendMessage({ type: 'DIAL', number });
     } catch (e) {}

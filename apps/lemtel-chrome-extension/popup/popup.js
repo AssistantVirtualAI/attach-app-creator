@@ -79,9 +79,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function makeCall(number) {
-    if (tab?.id) {
-      chrome.tabs.update(tab.id, { url: `lemtel://call/${number}` });
-    }
+    // Route through the background worker so we never navigate the active tab
+    // (which previously caused a fallback to avastatistic.ca). The background
+    // hands off to the OS / linked mobile phone app via the tel: protocol.
+    chrome.runtime.sendMessage({ type: 'DIAL', number });
     callBtn.innerHTML = '✅';
     setTimeout(() => { callBtn.innerHTML = PHONE_ICON_LG; }, 2000);
     window.close();
