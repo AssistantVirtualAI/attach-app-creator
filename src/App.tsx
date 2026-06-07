@@ -543,6 +543,7 @@ const App = () => (
                 <Route path="/org/lemtel/telephony/voicemail" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyVoicemail /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/diagnostics" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyDiagnostics /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/checklist" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyChecklist /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/telephony/portal-mappings" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyPortalMappings /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
 
                 {/* /org/lemtel/portal/* customer routes (PortalGuard enforces customer scope) */}
                 <Route path="/org/lemtel/portal" element={<Navigate to="/org/lemtel/portal/dashboard" replace />} />
