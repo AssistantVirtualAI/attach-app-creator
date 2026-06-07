@@ -77,6 +77,29 @@ export default function SoftphonePane({
   const [autoResetOutput, setAutoResetOutput] = useState<boolean>(() => {
     try { return localStorage.getItem('lemtel.autoResetOutput') === 'true'; } catch { return false; }
   });
+  const [micPermission, setMicPermission] = useState<'unknown' | 'granted' | 'denied' | 'prompt'>('unknown');
+
+  useEffect(() => {
+    const nav: any = navigator;
+    if (!nav?.permissions?.query) return;
+    let permRef: any = null;
+    nav.permissions.query({ name: 'microphone' as PermissionName }).then((res: any) => {
+      permRef = res;
+      setMicPermission(res.state);
+      res.onchange = () => setMicPermission(res.state);
+    }).catch(() => setMicPermission('unknown'));
+    return () => { if (permRef) permRef.onchange = null; };
+  }, []);
+
+  const requestMic = async () => {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      s.getTracks().forEach((t) => t.stop());
+      setMicPermission('granted');
+    } catch {
+      setMicPermission('denied');
+    }
+  };
 
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
 
@@ -190,9 +213,10 @@ export default function SoftphonePane({
     return `${m}:${sec}`;
   };
 
-  const handleCall = () => {
+  const handleCall = async () => {
     if (dial.length < 3) return;
-    sp.call(dial);
+    if (micPermission === 'denied') { await requestMic(); return; }
+    await sp.call(dial);
   };
 
   // Global "dial now" shortcut (⌘/Ctrl + Enter) wires in from useShortcuts.
@@ -450,7 +474,30 @@ export default function SoftphonePane({
         )}
 
 
+        {/* Mic permission prompt */}
+        {!inCall && !ringing && micPermission === 'denied' && (
+          <div style={{
+            margin: '12px 16px',
+            padding: '14px 16px',
+            borderRadius: 10,
+            background: 'rgba(220, 38, 38, 0.08)',
+            border: '1px solid rgba(220, 38, 38, 0.35)',
+            display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start',
+          }}>
+            <div style={{ fontSize: 18 }}>🎤 Microphone Access Required</div>
+            <div style={{ fontSize: 12, opacity: 0.8 }}>
+              Allow microphone access to make calls. On macOS, enable Lemtel Telecom in System Preferences → Privacy → Microphone.
+            </div>
+            <button onClick={requestMic} style={{
+              background: 'linear-gradient(135deg, #003DA6, #7C3AED)',
+              border: 'none', borderRadius: 8, color: 'white',
+              padding: '8px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+            }}>Allow Microphone</button>
+          </div>
+        )}
+
         {/* Idle — Dialer */}
+
         {!inCall && !ringing && tab === 'dial' && (
           <Dialer
             dial={dial} setDial={setDial}
