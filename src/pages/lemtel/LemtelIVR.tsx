@@ -6,13 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Voicemail, Plus, Sparkles, Play, Volume2, Loader2, Mic, Save, Wand2 } from 'lucide-react';
+import { Voicemail, Plus, Sparkles, Play, Volume2, Loader2, Mic, Save, Wand2, AlertCircle, RotateCcw, CheckCircle2 } from 'lucide-react';
 import { usePbxIvrs, usePbxIvrOptions } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Curated ElevenLabs voices (multilingual v2 compatible)
 const VOICES = [
@@ -28,6 +29,20 @@ const VOICES = [
   { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam · Young Male' },
   { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie · Casual Male' },
 ];
+
+type IvrAudioPreview = {
+  id?: string;
+  audio_url?: string | null;
+  storage_path?: string | null;
+  script_text?: string | null;
+  elevenlabs_voice_id?: string | null;
+  language?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+};
+
+const errorText = (error: any, fallback: string) =>
+  error?.message || error?.error_description || error?.details || error?.hint || fallback;
 
 export default function LemtelIVR() {
   const { selectedOrgId } = useOrganization();
