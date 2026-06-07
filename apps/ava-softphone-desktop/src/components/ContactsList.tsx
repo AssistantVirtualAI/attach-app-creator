@@ -112,8 +112,8 @@ export default function ContactsList({ selfExtension, onCall }: Props) {
             e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
           }}
           onBlur={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
-            e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+            e.currentTarget.style.borderColor = 'rgba(0,61,166,0.14)';
+            e.currentTarget.style.background = 'rgba(255,255,255,0.72)';
           }}
         />
       </div>
