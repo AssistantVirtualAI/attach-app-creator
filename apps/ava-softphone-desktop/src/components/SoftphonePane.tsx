@@ -62,6 +62,7 @@ export default function SoftphonePane({
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const prevCallStateRef = useRef(false);
   const [tab, setTab] = useState<Tab>('dial');
   const [dial, setDial] = useState('');
   const [timer, setTimer] = useState(0);
@@ -72,6 +73,10 @@ export default function SoftphonePane({
   const [paneWidth, setPaneWidth] = useState<number>(() =>
     typeof window !== 'undefined' ? window.innerWidth : 480
   );
+  const [activeOutputLabel, setActiveOutputLabel] = useState('System default');
+  const [autoResetOutput, setAutoResetOutput] = useState<boolean>(() => {
+    try { return localStorage.getItem('lemtel.autoResetOutput') === 'true'; } catch { return false; }
+  });
 
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
 
