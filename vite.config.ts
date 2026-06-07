@@ -208,6 +208,11 @@ export default defineConfig(({ mode }) => {
     __APP_BUILD_ID__: JSON.stringify(BUILD_ID),
     __APP_BUILD_TIME__: JSON.stringify(BUILD_TIME),
   },
+  css: {
+    postcss: {
+      plugins: [tailwindcss, autoprefixer],
+    },
+  },
   build: {
     rollupOptions: {
       output: {
