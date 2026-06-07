@@ -1,0 +1,158 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  width: 280px;
+  min-height: 400px;
+  background: #050816;
+  color: white;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+}
+
+#app { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.logo { display: block; }
+
+.status-dot { width: 10px; height: 10px; border-radius: 50%; }
+.status-dot.connected {
+  background: #10B981;
+  box-shadow: 0 0 8px rgba(16,185,129,0.6);
+  animation: pulse 2s infinite;
+}
+.status-dot.disconnected { background: rgba(255,255,255,0.2); }
+
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+.ext-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(0,61,166,0.2);
+  border: 1px solid rgba(0,61,166,0.4);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.ext-label { color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+.ext-number { color: #FFD700; font-size: 18px; font-weight: 700; }
+
+.section { display: flex; flex-direction: column; gap: 8px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; }
+.section-label { color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+
+.count-badge {
+  background: rgba(255,215,0,0.15);
+  color: #FFD700;
+  border: 1px solid rgba(255,215,0,0.3);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dial-row { display: flex; gap: 8px; }
+
+.dial-input {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  color: white;
+  padding: 8px 12px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.dial-input:focus { border-color: rgba(255,215,0,0.5); background: rgba(255,255,255,0.08); }
+
+.call-btn {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #059669, #10B981);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(16,185,129,0.4);
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.call-btn:hover:not(:disabled) { transform: scale(1.05); box-shadow: 0 6px 16px rgba(16,185,129,0.6); }
+.call-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+.numbers-list { max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+
+.number-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 8px;
+  padding: 7px 10px;
+  transition: background 0.15s;
+}
+.number-item:hover { background: rgba(255,255,255,0.08); }
+.number-text { color: white; font-size: 13px; }
+
+.number-call-btn {
+  width: 26px;
+  height: 26px;
+  background: linear-gradient(135deg, #003DA6, #7C3AED);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.number-call-btn:hover { transform: scale(1.1); }
+
+.empty-state { color: rgba(255,255,255,0.3); font-size: 12px; text-align: center; padding: 16px 0; }
+
+.url-input {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  color: white;
+  padding: 8px 12px;
+  font-size: 12px;
+  outline: none;
+  width: 100%;
+}
+
+.save-btn {
+  background: rgba(255,215,0,0.1);
+  border: 1px solid rgba(255,215,0,0.3);
+  border-radius: 8px;
+  color: #FFD700;
+  padding: 7px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.save-btn:hover { background: rgba(255,215,0,0.2); }
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: rgba(255,255,255,0.2);
+  font-size: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.hidden { display: none; }
