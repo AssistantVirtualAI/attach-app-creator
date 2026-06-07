@@ -1,66 +1,73 @@
-## Redesign desktop softphone — Noir & Or premium
 
-### 1. Logo — full Lemtel wordmark
-- Generate a new wordmark image: "LEMTEL" in elegant uppercase letterforms, refined gold (#FFD700 → #F0C75A gradient) on transparent background, optional thin "COMMUNICATIONS" tracking-wide subtitle below. Save to `apps/ava-softphone-desktop/src/assets/lemtel-wordmark.png` (transparent PNG, premium quality).
-- Update `LemtelLogo.tsx` to use the new wordmark with proper heights: `xs` 22px, `sm` 32px, `md` 56px, `lg` 110px. Remove halo conic-blob (too noisy); replace with subtle gold drop-shadow only.
-- **AuthScreen (SetupWizard)**: full wordmark `size="lg"`, centered, no halo background — just clean spotlight.
-- **TitleBar**: wordmark `size="xs"` on the left, replaces current cropped logo.
-- **Softphone footer**: keep AVA Statistic + assistantvirtualai.com link, add a small Lemtel wordmark above it.
+## Phase 1 — Logos, favicons, scroll fix, light glass refresh
 
-### 2. Palette lock — Noir & Or premium
-Update `lib/theme.tsx` design tokens to:
-```
-bg.base        #050510  (near-black blue-tinted)
-bg.surface     #0F0F1E  (cards)
-bg.elev        #16162B  (raised)
-border.subtle  rgba(255,215,0,0.08)
-border.gold    rgba(255,215,0,0.25)
-text.primary   #F5F5F7
-text.muted     #8A8A99
-gold           #FFD700
-gold.soft      #F0C75A
-blue           #003DA6  (kept as secondary accent for SIP status / links)
-glow.gold      0 0 24px rgba(255,215,0,0.35)
-```
-Remove the purple AI color from primary surfaces (kept only as small AI-tab accent). No more rgba(0,90,255) radial blobs on auth.
+### 1. Logo asset distribution
 
-### 3. Bottom tabs — Lucide outline raffinés
-Standardize to **stroke 1.5, size 20**, label 11px tracking-wider underneath. Active state = gold icon + gold label + 1px gold top-border + soft gold underglow. Inactive = `text.muted`.
+Source: `user-uploads://lemtel_store_icon_128_clean.png` (blue rounded square + gold wifi "L").
 
-Map per tab:
-- Phone → `Phone`
-- History → `Clock3`
-- Contacts → `Users`
-- Voicemail → `Voicemail`
-- SMS → `MessageSquare`
-- Recordings → `Disc3`
-- AI → `Sparkles` (only tab keeping a hint of purple accent on active)
+Generate sized variants once and copy to every required path:
 
-Bar: 64px tall, `bg.surface` + 1px top `border.subtle`, equal-flex items, no pill background per tab.
+- **Web app (avastatistic.ca)**
+  - `public/favicon.png` (overwrite)
+  - `public/lemtel-icon.png` (overwrite)
+  - `public/desktop-app-icon.png` (overwrite)
+  - `index.html` — confirm `<link rel="icon">` points to `/favicon.png`
+  - Auth page (`src/pages/Auth.tsx`) — replace the generic `Activity` icon block with the Lemtel mark; add a small "AVA × Lemtel" lockup.
 
-### 4. Spacious & aéré layout
-- Increase global padding: panes get 28px horizontal / 24px vertical (was ~16).
-- Dialer display: 36px monospace, letter-spacing 2px, 32px vertical breathing room.
-- Dialpad keys: 64×64 (was 56), gap 16px, subtle inner gradient + 1px gold border on press.
-- Call button: 72px circle, green→emerald gradient kept, larger glow.
-- Lists (Recents/Contacts/Recordings/etc.): 64px row height, 16px gap between avatar/icon and text, divider = 1px `border.subtle`.
-- Remove the animated background orbs everywhere except auth — keep auth with ONE single soft gold radial behind the wordmark, nothing more.
+- **Desktop (Electron) `apps/ava-softphone-desktop/assets/`**
+  - `icon.png` (1024px), `icon.ico` (Windows), `icon.icns` (macOS) — regenerated from the new PNG
+  - `tray-icon.png` + `@2x`, `tray-icon-active.png` + `@2x` — monochrome variant for the tray (small)
+  - `lemtel-logo.png` (overwrite)
 
-### 5. TitleBar polish
-- 44px height, full-bleed `bg.base`, 1px gold under-glow line replaced by a subtle 1px `border.subtle`.
-- Center status pill: smaller (12px text), pill bg `bg.elev`, dot uses gold when connected, muted when offline.
+- **Mobile (Capacitor) `apps/ava-softphone-mobile/assets/`**
+  - Run `generate-icons.js` after dropping the new source PNG so Android `mipmap-*` and iOS `AppIcon.appiconset` are regenerated.
+  - PWA: `apps/ava-softphone-mobile/public/` icons + `manifest.webmanifest` references.
 
-### 6. SetupWizard (Auth) polish
-- Single centered card 420px wide, 32px padding, `bg.surface` with 1px `border.subtle`, 24px radius, soft gold glow on focus only.
-- Full Lemtel wordmark above title, then thin uppercase tracking-wide caption "BUSINESS PHONE SYSTEM".
-- Inputs: 48px tall, `bg.elev`, gold focus ring (1px), no purple.
-- Submit button: gold gradient, black text, bold.
+- **Chrome extension `apps/lemtel-chrome-extension/icons/`**
+  - `icon16.png`, `icon32.png`, `icon48.png`, `icon128.png` — regenerated from source.
+  - `manifest.json` already references them; no JSON change needed.
 
-### 7. Files to change
-- Create: `apps/ava-softphone-desktop/src/assets/lemtel-wordmark.png` (via imagegen premium, transparent)
-- Edit: `LemtelLogo.tsx`, `TitleBar.tsx`, `SetupWizard.tsx`, `SoftphonePane.tsx` (tabs + dialer spacing + remove orbs + footer), `lib/theme.tsx` (tokens), `styles/animations.css` (remove orb keyframes, keep status pulse + ripple)
-- Light pass on list components (`RecentsList`, `ContactsList`, `VoicemailList`, `RecordingsList`, `AIInsights`, `SmsThreads`) only to apply new spacing/typography tokens — no logic changes.
-- Bump `package.json` to `1.0.5`.
+- **App Store / Play Store metadata**
+  - Place a 1024×1024 master at `apps/ava-softphone-mobile/store-metadata/icon-1024.png` for store submission.
 
-### Out of scope
-No changes to business logic, edge function calls, SIP layer, or sidebar config. Mobile app (`apps/ava-softphone-mobile/`) untouched.
+### 2. Auth page branding (web)
+
+`src/pages/Auth.tsx`: replace the gradient + `Activity` lucide icon with the real Lemtel mark image, wordmark "AVA Statistic — powered by Lemtel", lighter background gradient (white → soft blue), keep existing Google/Microsoft/Apple buttons but give them a glass surface with subtle gold hover ring.
+
+### 3. Desktop scroll bug — fix all three
+
+`apps/ava-softphone-desktop/src/`:
+
+- **Top tab bar** (`TabIcons.tsx` / parent in `App.tsx`): the container is `display:flex` with no overflow rule. Add `overflow-x:auto`, `flex-wrap:nowrap`, `min-width:0` on the wrapper, hide scrollbar visually, and ensure each tab has `flex-shrink:0`.
+- **List views** (`RecentsList.tsx`, `ContactsList.tsx`, `VoicemailList.tsx`, `RecordingsList.tsx`, `SmsThreads.tsx`): wrap their root in a flex column with `flex:1; min-height:0; overflow-y:auto`. Root cause: parent panes use flex without `min-height:0`, so children collapse instead of scrolling.
+- **Settings** (`SettingsPage.tsx`): same fix — give the scroll container `flex:1; min-height:0; overflow-y:auto` and ensure the page wrapper is height-bounded.
+
+### 4. Lighter glass visual refresh
+
+**Desktop** (`apps/ava-softphone-desktop/src/lib/theme.tsx` + `styles/animations.css`):
+- Shift base from deep navy to a lighter palette: surface `rgba(255,255,255,0.78)` over a soft `#eaf1fb → #f7faff` gradient, primary `#0052CC`, accent gold `#FFD700`, AI shimmer violet/cyan retained for "Powered by AVA" chips.
+- Buttons get a glass variant: `backdrop-filter: blur(14px) saturate(160%)`, 1px gold inner ring, soft shadow, animated specular highlight on hover.
+- Cards: 16px radius, 1px white border at 40%, frosted background, dim outer shadow.
+- Tabs gain an active "wet glass" pill with subtle gold underline.
+
+**Mobile** (`apps/ava-softphone-mobile/src/lib/theme` + `Brand.tsx`):
+- Same lighter base; keep `HeroGradient` but lift opacity, swap to white-tinted glass cards for Home/Dialer/Calls/Messages/AI/Settings screens.
+- Shiny glass CTA component used for Call / Send / Connect across screens.
+
+**Web auth**: lighter gradient on the right panel, glass buttons matching desktop.
+
+No business-logic changes. All edits stay in presentation files.
+
+### 5. GitHub push
+
+Commit is automatic on Lovable saves and syncs to the connected GitHub repo. After the changes land I'll confirm the sync.
+
+### Out of scope for this turn (next phase if desired)
+- Rebuilding mobile `AppIcon.appiconset` natively (requires `npx cap sync` locally by the user)
+- Codesigned `.icns`/`.ico` regeneration via `iconutil` (will be produced via `sharp` in CI)
+- Per-page visual QA pass on the admin web app beyond Auth — say the word and I'll extend the refresh to Dashboard/Settings/etc.
+
+### Technical notes
+- Icon resizing in the sandbox via `sharp` (Node) — no ImageMagick install needed.
+- `.icns` generation uses `png2icons` (npm) for cross-platform build.
+- Tray icons stay 16/22/32px monochrome to respect macOS template-image rules.
