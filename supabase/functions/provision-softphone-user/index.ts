@@ -26,12 +26,15 @@ function generatePassword(len = 16) {
 
 function welcomeHtml(opts: { displayName: string; extension: string; email: string; magicLink: string | null }) {
   const { displayName, extension, email, magicLink } = opts;
+  const RELEASE = "https://github.com/AssistantVirtualAI/attach-app-creator/releases/latest/download";
   const downloads = [
     { icon: "📱", title: "iPhone & iPad", note: "Download on the App Store", href: "https://apps.apple.com/" },
     { icon: "🤖", title: "Android", note: "Get it on Google Play", href: "https://play.google.com/" },
-    { icon: "🍎", title: "Mac", note: "macOS 11+ (Apple Silicon & Intel)", href: "https://github.com/AssistantVirtualAI/attach-app-creator/releases/latest" },
-    { icon: "🪟", title: "Windows", note: "Windows 10+ (64-bit)", href: "https://github.com/AssistantVirtualAI/attach-app-creator/releases/latest" },
-    { icon: "🐧", title: "Linux", note: "AppImage — all distributions", href: "https://github.com/AssistantVirtualAI/attach-app-creator/releases/latest" },
+    { icon: "🍎", title: "Mac (Apple Silicon)", note: "macOS 11+ · .dmg", href: `${RELEASE}/Lemtel.Telecom-arm64.dmg` },
+    { icon: "🍎", title: "Mac (Intel)", note: "macOS 11+ · .dmg", href: `${RELEASE}/Lemtel.Telecom-x64.dmg` },
+    { icon: "🪟", title: "Windows", note: "Windows 10+ · 64-bit installer", href: `${RELEASE}/Lemtel.Telecom.Setup.exe` },
+    { icon: "🐧", title: "Linux", note: "AppImage — all distributions", href: `${RELEASE}/Lemtel.Telecom.AppImage` },
+    { icon: "🌐", title: "All downloads", note: "avastatistic.ca/download", href: "https://avastatistic.ca/download" },
   ];
   return `<!doctype html><html><body style="margin:0;font-family:Inter,Arial,sans-serif;background:#f6f7fb;color:#0f172a;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7fb;padding:24px 0;">
