@@ -25,12 +25,14 @@ mac:
       arch: [x64, arm64]
     - target: zip
       arch: [x64, arm64]
+  artifactName: "Lemtel.Telecom-${arch}.${ext}"
 win:
   target:
     - target: nsis
       arch: [x64]
   publisherName: "Lemtel Communications"
   signingHashAlgorithms: []
+  artifactName: "Lemtel.Telecom.Setup.${ext}"
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
@@ -42,6 +44,7 @@ linux:
     - AppImage
     - deb
   category: Office
+  artifactName: "Lemtel.Telecom.${ext}"
 publish:
   - provider: github
     owner: AssistantVirtualAI

@@ -1,71 +1,115 @@
 import { useEffect, useState } from "react";
-import { Download, Apple, Monitor, Cpu, CheckCircle2 } from "lucide-react";
+import { Download, CheckCircle2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 const REPO = "AssistantVirtualAI/attach-app-creator";
-const RELEASES = `https://github.com/${REPO}/releases/latest/download`;
+const BASE = `https://github.com/${REPO}/releases/latest/download`;
 const API_LATEST = `https://api.github.com/repos/${REPO}/releases/latest`;
 
-type DownloadItem = {
+export type DownloadItem = {
+  platform: string;
+  icon: string;
   label: string;
-  subtitle: string;
-  href: string;
-  icon: React.ReactNode;
+  sublabel: string;
+  url: string;
+  badge: string;
+  color: string;
 };
 
-export function DesktopDownloadCard() {
-  const [version, setVersion] = useState<string | null>(null);
-  const [publishedAt, setPublishedAt] = useState<string | null>(null);
+export const downloads: DownloadItem[] = [
+  {
+    platform: "Windows",
+    icon: "🪟",
+    label: "Download for Windows",
+    sublabel: "Windows 10+ · 64-bit · Auto-installer",
+    url: `${BASE}/Lemtel.Telecom.Setup.exe`,
+    badge: ".exe",
+    color: "#0078D4",
+  },
+  {
+    platform: "Mac Apple Silicon",
+    icon: "🍎",
+    label: "Download for Mac (M1/M2/M3/M4)",
+    sublabel: "macOS 11+ · Apple Silicon",
+    url: `${BASE}/Lemtel.Telecom-arm64.dmg`,
+    badge: ".dmg",
+    color: "#555555",
+  },
+  {
+    platform: "Mac Intel",
+    icon: "🍎",
+    label: "Download for Mac (Intel)",
+    sublabel: "macOS 11+ · Intel",
+    url: `${BASE}/Lemtel.Telecom-x64.dmg`,
+    badge: ".dmg",
+    color: "#555555",
+  },
+  {
+    platform: "Linux",
+    icon: "🐧",
+    label: "Download for Linux",
+    sublabel: "All distributions · AppImage",
+    url: `${BASE}/Lemtel.Telecom.AppImage`,
+    badge: ".AppImage",
+    color: "#E95420",
+  },
+  {
+    platform: "Linux Debian",
+    icon: "🐧",
+    label: "Download for Linux (Debian/Ubuntu)",
+    sublabel: "Ubuntu 20.04+ · .deb package",
+    url: `${BASE}/Lemtel.Telecom.deb`,
+    badge: ".deb",
+    color: "#A80030",
+  },
+];
 
+type Asset = { name: string; url: string; size: string };
+
+export function useLatestRelease() {
+  const [info, setInfo] = useState<{ version: string; date: string; assets: Asset[] } | null>(null);
   useEffect(() => {
     let cancelled = false;
     fetch(API_LATEST)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data) return;
-        setVersion(data.tag_name?.replace(/^v/, "") || null);
-        setPublishedAt(data.published_at || null);
+        setInfo({
+          version: data.tag_name,
+          date: new Date(data.published_at).toLocaleDateString("fr-CA"),
+          assets:
+            data.assets?.map((a: any) => ({
+              name: a.name,
+              url: a.browser_download_url,
+              size: (a.size / 1024 / 1024).toFixed(1) + " MB",
+            })) || [],
+        });
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
+  return info;
+}
 
-  const downloads: DownloadItem[] = [
-    {
-      label: "Download for Windows",
-      subtitle: "Windows 10 or later · 64-bit",
-      href: `${RELEASES}/AVA-Softphone-Setup.exe`,
-      icon: <Download className="h-4 w-4" />,
-    },
-    {
-      label: "Download for Mac (Intel)",
-      subtitle: "macOS 11 or later",
-      href: `${RELEASES}/AVA-Softphone-x64.dmg`,
-      icon: <Apple className="h-4 w-4" />,
-    },
-    {
-      label: "Download for Mac (Apple Silicon)",
-      subtitle: "M1, M2, M3, M4 Macs",
-      href: `${RELEASES}/AVA-Softphone-arm64.dmg`,
-      icon: <Cpu className="h-4 w-4" />,
-    },
-    {
-      label: "Download for Linux",
-      subtitle: "Ubuntu 20.04+ · AppImage",
-      href: `${RELEASES}/AVA-Softphone.AppImage`,
-      icon: <Monitor className="h-4 w-4" />,
-    },
-  ];
+export function DesktopDownloadCard() {
+  const info = useLatestRelease();
+
+  const sizeFor = (url: string) => {
+    const fileName = url.split("/").pop();
+    return info?.assets.find((a) => a.name === fileName)?.size;
+  };
 
   const requirements = [
     "Windows 10+ (64-bit)",
     "macOS 11+ (Intel or Apple Silicon)",
     "Ubuntu 20.04+ / Debian 11+",
     "Microphone required for calls",
-    "HTTPS internet connection required",
-    "Auto-updates included — always stay current",
+    "Internet connection required",
+    "Auto-updates included",
   ];
 
   return (
@@ -73,38 +117,45 @@ export function DesktopDownloadCard() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-lg font-semibold">Download AVA Softphone</h3>
-            {version ? (
-              <Badge variant="secondary">Latest v{version}</Badge>
+            <h3 className="text-lg font-semibold">Download Lemtel Telecom</h3>
+            {info ? (
+              <Badge variant="secondary">Latest {info.version}</Badge>
             ) : (
               <Badge variant="outline">Latest version</Badge>
             )}
           </div>
           <p className="text-sm text-muted-foreground mt-1">
-            {version && publishedAt
-              ? `Latest version: v${version} — Released ${new Date(publishedAt).toLocaleDateString()}`
+            {info
+              ? `Latest version: ${info.version} — ${info.date}`
               : "Native softphone for Windows, macOS, and Linux. Auto-updates included."}
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-        {downloads.map((d) => (
-          <Button
-            key={d.label}
-            asChild
-            variant="default"
-            className="h-auto py-3 px-4 justify-start gap-3"
-          >
-            <a href={d.href} download>
-              {d.icon}
-              <div className="flex flex-col items-start text-left">
-                <span className="text-sm font-medium">{d.label}</span>
-                <span className="text-xs opacity-80">{d.subtitle}</span>
-              </div>
-            </a>
-          </Button>
-        ))}
+        {downloads.map((d) => {
+          const size = sizeFor(d.url);
+          return (
+            <Button
+              key={d.platform}
+              asChild
+              variant="default"
+              className="h-auto py-3 px-4 justify-start gap-3"
+            >
+              <a href={d.url} download>
+                <span className="text-xl" aria-hidden>{d.icon}</span>
+                <div className="flex flex-col items-start text-left flex-1">
+                  <span className="text-sm font-medium">{d.label}</span>
+                  <span className="text-xs opacity-80">
+                    {d.sublabel}
+                    {size ? ` · ${size}` : ""}
+                  </span>
+                </div>
+                <Download className="h-4 w-4 opacity-70" />
+              </a>
+            </Button>
+          );
+        })}
       </div>
 
       <div className="mt-5 pt-4 border-t border-border">
