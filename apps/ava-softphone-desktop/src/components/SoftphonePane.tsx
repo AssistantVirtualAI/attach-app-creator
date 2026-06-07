@@ -869,11 +869,12 @@ function ActiveCall({
         style={compact ? {
           width: '100%', marginBottom: 12,
         } : {
-          display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8,
-          width: '100%', maxWidth: 280, marginBottom: 12,
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10,
+          width: '100%', maxWidth: 300, marginBottom: 12,
           maxHeight: '38vh', overflowY: 'auto', paddingRight: 2,
         }}
       >
+
         <ControlBtn icon="🎤" label={sp.snap.muted ? 'Unmute' : 'Mute'} ariaLabel={`${sp.snap.muted ? 'Unmute microphone' : 'Mute microphone'} (shortcut M)`} active={sp.snap.muted} danger onClick={sp.snap.muted ? sp.unmute : sp.mute} />
         <ControlBtn icon="⏸" label={sp.snap.onHold ? 'Resume' : 'Hold'} ariaLabel={`${sp.snap.onHold ? 'Resume call' : 'Place call on hold'} (shortcut H)`} active={sp.snap.onHold} warning onClick={sp.snap.onHold ? sp.unhold : sp.hold} />
         <ControlBtn icon="#" label="Keypad" ariaLabel={`${showDTMF ? 'Hide DTMF keypad' : 'Show DTMF keypad'} (shortcut K)`} active={showDTMF} onClick={toggleDTMF} />
