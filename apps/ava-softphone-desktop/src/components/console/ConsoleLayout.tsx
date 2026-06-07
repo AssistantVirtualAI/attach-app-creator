@@ -108,8 +108,8 @@ export default function ConsoleLayout({
       )}
 
       <main style={{
-        flex: 1, minWidth: 0, overflow: 'auto', position: 'relative',
-        paddingBottom: compact ? 78 : 0,
+        flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', position: 'relative',
+        paddingBottom: compact ? 78 : 0, display: 'flex', flexDirection: 'column',
       }}>
         <div key={view} className="lemtel-page-enter" style={{ height: '100%' }}>
           {view === 'home' && <HomeDashboard displayName={creds.displayName || creds.email} extension={creds.extension} onQuickDial={() => setView('dialer')} />}
