@@ -746,10 +746,14 @@ function IncomingCall({ who, number, onAnswer, onDecline }: { who: string; numbe
 
 function ActiveCall({
   sp, timer, showDTMF, toggleDTMF, dialKeys, onTransfer, compact = false, audioEl = null,
+  activeOutputLabel, autoResetOutput, onAutoResetChange, onActiveOutputLabel,
 }: {
   sp: any; timer: string; showDTMF: boolean; toggleDTMF: () => void;
   dialKeys: [string, string][]; onTransfer: (m: 'blind' | 'attended') => void;
   compact?: boolean; audioEl?: HTMLAudioElement | null;
+  activeOutputLabel: string; autoResetOutput: boolean;
+  onAutoResetChange: (v: boolean) => void;
+  onActiveOutputLabel: (label: string) => void;
 }) {
   const remote = sp.snap.remoteIdentity || sp.snap.remoteNumber || 'Unknown';
 
@@ -774,15 +778,22 @@ function ActiveCall({
         padding: '3px 10px', borderRadius: 999,
         background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.35)',
         color: c.green, fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase',
-        boxShadow: glow.green, marginBottom: 10,
+        boxShadow: glow.green, marginBottom: 6,
       }}>
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.green }} />
         {sp.snap.onHold ? 'On Hold' : 'Active Call'}
       </div>
       <div style={{
         fontFamily: 'JetBrains Mono, Menlo, monospace', fontSize: 22, fontWeight: 500,
-        color: c.gold, letterSpacing: 2, marginBottom: 18,
+        color: c.gold, letterSpacing: 2, marginBottom: 4,
       }}>{timer}</div>
+      <div style={{
+        fontSize: 10, color: c.textSub, letterSpacing: 0.6,
+        marginBottom: 18, display: 'flex', alignItems: 'center', gap: 4,
+      }}>
+        <span style={{ fontSize: 10 }}>🔊</span>
+        {activeOutputLabel}
+      </div>
 
       {/* Visualizer */}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 32, marginBottom: 22 }}>
@@ -814,7 +825,13 @@ function ActiveCall({
       )}
 
       {/* Audio output selector */}
-      <OutputDevicePicker audioEl={audioEl} compact={compact} />
+      <OutputDevicePicker
+        audioEl={audioEl}
+        compact={compact}
+        onActiveLabel={onActiveOutputLabel}
+        autoReset={autoResetOutput}
+        onAutoResetChange={onAutoResetChange}
+      />
 
       {/* Controls — vertical grid normally, continuous swipe strip when compact
           so every button stays reachable at very small widths. */}
