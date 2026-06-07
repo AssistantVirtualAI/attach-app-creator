@@ -523,6 +523,7 @@ const App = () => (
                 <Route path="/org/lemtel/telephony/dashboard" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyDashboard /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/numbers" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><LemtelDIDs /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/extensions" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><LemtelExtensions /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/telephony/users" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyUsers /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/devices" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><LemtelDevices /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/calls" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><LemtelPortalCalls /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/recordings" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyRecordings /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
