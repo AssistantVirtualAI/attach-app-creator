@@ -277,6 +277,10 @@ const Dashboard = () => {
         {/* Charts */}
         <ConversationsChart metrics={currentMetrics} />
 
+        {/* Phone System overview (Lemtel members) */}
+        <TelephonyStatsCard />
+
+
         {/* Priority Actions + Alerts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <AIPriorityActions />
