@@ -4,6 +4,7 @@ import {
   ipcMain,
   Notification,
   shell,
+  systemPreferences,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import Store from 'electron-store';
@@ -128,6 +129,13 @@ app.whenReady().then(() => {
     session.setPermissionCheckHandler((_wc, permission) => {
       return ['media', 'audioCapture', 'videoCapture', 'notifications'].includes(permission);
     });
+  }
+
+  // macOS: trigger native OS prompts for microphone & camera (TCC). Speaker
+  // output never requires authorization. On Windows/Linux this is a no-op.
+  if (process.platform === 'darwin' && systemPreferences?.askForMediaAccess) {
+    systemPreferences.askForMediaAccess('microphone').catch(() => { /* noop */ });
+    systemPreferences.askForMediaAccess('camera').catch(() => { /* noop */ });
   }
 
   if (store.get('launchOnStartup', true)) {

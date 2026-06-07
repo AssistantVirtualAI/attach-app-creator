@@ -368,3 +368,36 @@
   .lemtel-glass:hover { animation: none; }
   .lemtel-glass:hover::after { animation: none; }
 }
+
+/* ============================================
+   Keyboard focus ring — applied to call buttons
+   ============================================ */
+.lemtel-focus:focus { outline: none; }
+.lemtel-focus:focus-visible {
+  outline: 2px solid #FFD700;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgba(255,215,0,0.25), 0 0 18px rgba(255,215,0,0.45);
+  border-radius: 12px;
+}
+
+/* ============================================
+   Reduced-motion: soften shimmer & pulse
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  .lemtel-glass:hover,
+  .lemtel-glass:hover::after,
+  .lemtel-glass--ai:hover::after {
+    animation: none !important;
+    transform: none !important;
+  }
+  .lemtel-glass::after { display: none; }
+  .lemtel-glass:hover {
+    box-shadow: 0 0 0 1px rgba(255,215,0,0.55), 0 0 10px rgba(255,215,0,0.20);
+    transition: box-shadow .15s ease;
+  }
+  .lemtel-tab-dot,
+  .lemtel-skeleton,
+  .lemtel-page-enter {
+    animation: none !important;
+  }
+}
