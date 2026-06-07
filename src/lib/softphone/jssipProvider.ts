@@ -327,7 +327,7 @@ class JsSipProvider {
     });
   }
 
-  call(number: string) {
+  async call(number: string) {
     if (!this.config) return;
     this.logCall("info", `Dialing ${number}`);
     if (this.config.mock || !this.ua) {
@@ -349,7 +349,25 @@ class JsSipProvider {
     }
     const target = `sip:${number}@${this.config.sipDomain}`;
     try {
+      // Pre-fetch a real audio stream — JsSIP otherwise generates an SDP
+      // offer with no media line, which the server rejects with
+      // "Bad Media Description".
+      let mediaStream: MediaStream;
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: false,
+        });
+        if (!mediaStream.getAudioTracks().length) throw new Error("no audio track");
+      } catch (micErr: any) {
+        const msg = `Microphone unavailable: ${micErr?.message || micErr}`;
+        this.logCall("error", msg);
+        this.update({ lastCallError: msg, errorCause: msg });
+        return;
+      }
+
       this.ua.call(target, {
+        mediaStream,
         mediaConstraints: { audio: true, video: false },
         rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
         pcConfig: {
