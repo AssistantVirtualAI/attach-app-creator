@@ -337,7 +337,17 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
         <Button variant="outline" size="icon" className="h-11 w-11" onClick={() => setNumber((n) => n.slice(0, -1))}>
           <Delete className="w-4 h-4" />
         </Button>
-        <Button onClick={startCall} disabled={sipStatus !== "registered" && !sp.config?.mock} className="flex-1 h-11 bg-emerald-600 hover:bg-emerald-700">
+        <Button
+          onClick={startCall}
+          disabled={number.length < 3}
+          title={sipStatus !== "registered" && !sp.config?.mock ? `SIP ${sipStatus} — call may fail` : undefined}
+          className={cn(
+            "flex-1 h-11",
+            sipStatus === "registered" || sp.config?.mock
+              ? "bg-emerald-600 hover:bg-emerald-700"
+              : "bg-amber-600 hover:bg-amber-700",
+          )}
+        >
           <Phone className="w-4 h-4 mr-2" /> Call
         </Button>
         <Button variant="outline" size="icon" className="h-11 w-11" onClick={onPaste}>
