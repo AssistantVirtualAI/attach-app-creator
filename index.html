@@ -79,28 +79,58 @@
         const isProd = !location.hostname.includes("lovableproject.com") && location.hostname !== "localhost" && location.port !== "8080";
         if (!isProd) return;
 
+        const log = (...a) => console.info("%c[AVA cache-bust]", "color:#0023e6;font-weight:700", ...a);
+
         // Always nuke SW + caches in production too
-        navigator.serviceWorker?.getRegistrations?.().then((rs) => rs.forEach((r) => r.unregister()));
-        window.caches?.keys?.().then((keys) => keys.forEach((k) => caches.delete(k)));
+        navigator.serviceWorker?.getRegistrations?.().then((rs) => {
+          if (rs.length) log("Unregistering", rs.length, "service worker(s)");
+          rs.forEach((r) => r.unregister());
+        });
+        window.caches?.keys?.().then((keys) => {
+          if (keys.length) log("Clearing", keys.length, "cache(s):", keys);
+          keys.forEach((k) => caches.delete(k));
+        });
 
         const VERSION_KEY = "ava_app_build_id";
+        const FORCE_KEY = "ava_force_reload_count";
+
+        const hardReload = (reason) => {
+          const count = Number(sessionStorage.getItem(FORCE_KEY) || "0") + 1;
+          sessionStorage.setItem(FORCE_KEY, String(count));
+          log("HARD RELOAD #" + count + " (" + reason + ")");
+          if (count > 3) {
+            log("⚠️ Reload loop detected — aborting auto-refresh");
+            return;
+          }
+          const url = new URL(location.href);
+          url.searchParams.set("_r", Date.now().toString(36));
+          location.replace(url.toString());
+        };
+
         const checkVersion = async () => {
           try {
-            const res = await fetch("/index.html", { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
+            const res = await fetch("/index.html?_v=" + Date.now(), {
+              cache: "no-store",
+              headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+            });
             const html = await res.text();
-            // Hash main script tag (Vite injects /assets/index-<hash>.js)
             const m = html.match(/\/assets\/index[^"']+\.js/);
             const current = m ? m[0] : html.length.toString();
             const stored = localStorage.getItem(VERSION_KEY);
+            log("version check → current:", current, "stored:", stored || "(none)");
             if (stored && stored !== current) {
               localStorage.setItem(VERSION_KEY, current);
-              // Hard reload bypassing cache
-              location.replace(location.pathname + "?_r=" + Date.now() + location.hash);
+              hardReload("new build detected");
               return;
             }
             if (!stored) localStorage.setItem(VERSION_KEY, current);
-          } catch {}
+            sessionStorage.removeItem(FORCE_KEY);
+          } catch (e) {
+            log("version check failed", e);
+          }
         };
+        // Expose for manual debugging
+        window.__avaCacheBust = { checkVersion, hardReload, log };
         checkVersion();
         setInterval(checkVersion, 60_000);
         document.addEventListener("visibilitychange", () => { if (!document.hidden) checkVersion(); });

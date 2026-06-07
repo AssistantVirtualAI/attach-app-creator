@@ -42,6 +42,7 @@ import { NotificationsBell } from '@/components/notifications/NotificationsBell'
 import { OrgSwitcher } from '@/components/layout/OrgSwitcher';
 import { useApplyBranding } from '@/hooks/useApplyBranding';
 import { SoftphoneWidget } from '@/components/softphone/SoftphoneWidget';
+import { VersionBadge } from '@/components/shared/VersionBadge';
 
 const SIDEBAR_ORDER_KEY = 'sidebar-group-order';
 
@@ -243,6 +244,11 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
                 <Moon className="w-4 h-4 text-primary" />
               )}
             </Button>
+          </div>
+
+          {/* Version + clear cache */}
+          <div className="px-3 py-1.5 border-b border-sidebar-border flex justify-center">
+            <VersionBadge />
           </div>
 
           {/* Navigation */}
