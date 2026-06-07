@@ -647,10 +647,10 @@ function IncomingCall({ who, number, onAnswer, onDecline }: { who: string; numbe
       <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 4, color: c.text }}>{who}</div>
       {number && number !== who && <div style={{ fontSize: 13, color: c.textSub, marginBottom: 32 }}>{number}</div>}
       <div style={{ display: 'flex', gap: 28, marginTop: 24 }}>
-        <button onClick={onDecline} className="lemtel-glass" style={{
+        <button onClick={onDecline} className="lemtel-glass lemtel-focus" aria-label="Decline incoming call" style={{
           ...hangupBtn, background: 'linear-gradient(135deg, #DC2626, #EF4444)', boxShadow: glow.red,
         }}>✕</button>
-        <button onClick={onAnswer} className="lemtel-glass" style={{
+        <button onClick={onAnswer} className="lemtel-glass lemtel-focus" aria-label="Answer incoming call" style={{
           ...hangupBtn, background: 'linear-gradient(135deg, #059669, #10B981)', boxShadow: glow.green,
         }}>✓</button>
       </div>
