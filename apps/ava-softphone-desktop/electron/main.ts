@@ -17,6 +17,54 @@ let isQuitting = false;
 
 app.setName(APP_NAME);
 
+// Register lemtel:// custom protocol
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('lemtel', process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient('lemtel');
+}
+
+// Ensure single-instance so protocol launches focus the existing window
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+}
+
+function handleProtocolUrl(url: string | undefined) {
+  if (!url || !url.startsWith('lemtel://')) return;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === 'call') {
+      const number = parsed.pathname.replace(/^\//, '');
+      mainWindow?.webContents.send('protocol-call', { number });
+    }
+  } catch {
+    /* ignore malformed protocol urls */
+  }
+}
+
+app.on('second-instance', (_event, commandLine) => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+  const url = commandLine.find((arg) => arg.startsWith('lemtel://'));
+  handleProtocolUrl(url);
+});
+
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+  handleProtocolUrl(url);
+});
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     title: APP_NAME,
