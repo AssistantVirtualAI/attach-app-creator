@@ -108,6 +108,13 @@ class JsSipProvider {
       return;
     }
 
+    const isElectron = typeof window !== 'undefined' &&
+      typeof window.navigator !== 'undefined' &&
+      window.navigator.userAgent.includes('Electron');
+    this.logEvent('info', isElectron
+      ? 'Running in Electron — direct WSS, no CORS/mixed-content'
+      : 'Running in browser — WSS may be blocked by CORS/mixed-content');
+
     try {
       const fallbackUrls = Array.from(new Set([
         cfg.wssUrl,
@@ -136,7 +143,11 @@ class JsSipProvider {
         register_expires: 300,
         connection_recovery_min_interval: 2,
         connection_recovery_max_interval: 30,
-        user_agent: 'Lemtel Telecom 1.0',
+        user_agent: 'Lemtel Telecom 1.1',
+        hack_via_tcp: false,
+        hack_ip_in_contact: false,
+        hack_wss_in_transport: true,
+        use_preloaded_route: false,
       });
 
       ua.on('connecting', () => {
@@ -181,6 +192,7 @@ class JsSipProvider {
       this.update({ status: 'error', errorCause: String(err?.message || err) });
     }
   }
+
 
 
   private attachSession(session: any, originator: string) {
@@ -261,21 +273,60 @@ class JsSipProvider {
     });
   }
 
-  call(number: string) {
-    if (!this.config || !this.ua) return;
-    const target = `sip:${number}@${this.config.sipDomain}`;
-    this.ua.call(target, {
-      mediaConstraints: { audio: true, video: false },
-      pcConfig: {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-        ],
-        iceTransportPolicy: 'all',
-        bundlePolicy: 'balanced',
-      },
-    });
+  /** Ensure mic permission before placing a call. Returns null on success or error message. */
+  async ensureMicPermission(): Promise<string | null> {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false,
+      });
+      stream.getTracks().forEach((t) => t.stop());
+      this.logEvent('info', 'Microphone permission granted');
+      return null;
+    } catch (err: any) {
+      const msg = `Microphone access denied: ${err?.message || err}`;
+      this.logEvent('error', msg);
+      return msg;
+    }
   }
+
+  async call(number: string): Promise<string | null> {
+    if (!this.config || !this.ua) return 'SIP not initialized';
+    const micErr = await this.ensureMicPermission();
+    if (micErr) {
+      this.update({ errorCause: micErr });
+      return micErr;
+    }
+    const target = `sip:${number}@${this.config.sipDomain}`;
+    try {
+      this.ua.call(target, {
+        mediaConstraints: { audio: true, video: false },
+        rtcOfferConstraints: {
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: false,
+        },
+        pcConfig: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+          ],
+          iceTransportPolicy: 'all',
+          bundlePolicy: 'balanced',
+          rtcpMuxPolicy: 'require',
+        },
+        sessionTimersExpires: 120,
+        extraHeaders: ['X-App: Lemtel-Telecom-Desktop'],
+      });
+      this.logEvent('info', `Call initiated → ${number}`);
+      return null;
+    } catch (err: any) {
+      const msg = `Call error: ${err?.message || err}`;
+      this.logEvent('error', msg);
+      this.update({ errorCause: msg });
+      return msg;
+    }
+  }
+
 
   answer() {
     this.session?.answer({ mediaConstraints: { audio: true, video: false } });
