@@ -9,6 +9,7 @@ import { AIInsightsWidget } from '@/components/dashboard/AIInsightsWidget';
 import { QuickStatsBanner } from '@/components/dashboard/QuickStatsBanner';
 import { AIPriorityActions } from '@/components/dashboard/AIPriorityActions';
 import { AlertsSection } from '@/components/dashboard/AlertsSection';
+import { TelephonyStatsCard } from '@/components/dashboard/TelephonyStatsCard';
 import { AgentSelector } from '@/components/dashboard/AgentSelector';
 import { DateRangeSelector } from '@/components/dashboard/DateRangeSelector';
 import { ReportGenerator } from '@/components/reports/ReportGenerator';
