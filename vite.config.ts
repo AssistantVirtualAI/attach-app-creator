@@ -2,6 +2,8 @@ import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from "fs";
+import tailwindcss from "tailwindcss";
+import autoprefixer from "autoprefixer";
 import { componentTagger } from "lovable-tagger";
 
 const BUILD_ID = Date.now().toString(36);
@@ -102,7 +104,7 @@ const avaCacheBustPlugin = (monitoringUrl = "", monitoringKey = ""): Plugin => {
           }
           const count = Number(sessionStorage.getItem(STYLE_RELOAD_KEY) || "0") + 1;
           sessionStorage.setItem(STYLE_RELOAD_KEY, String(count));
-          if (count <= 6) return hardReload("missing-styles-" + reason);
+          if (count <= 1) return hardReload("missing-styles-" + reason);
           remember("style-reload-loop-stopped", { reason, count });
         };
         const hardReload = async (reason) => {
@@ -205,6 +207,11 @@ export default defineConfig(({ mode }) => {
   define: {
     __APP_BUILD_ID__: JSON.stringify(BUILD_ID),
     __APP_BUILD_TIME__: JSON.stringify(BUILD_TIME),
+  },
+  css: {
+    postcss: {
+      plugins: [tailwindcss, autoprefixer],
+    },
   },
   build: {
     rollupOptions: {
