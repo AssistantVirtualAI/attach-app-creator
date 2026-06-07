@@ -15,8 +15,7 @@
     "esModuleInterop": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@desktop/*": ["../ava-softphone-desktop/src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src", "capacitor.config.ts"]
