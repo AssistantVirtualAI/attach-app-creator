@@ -85,6 +85,7 @@ export default function LemtelIVR() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState<'generate' | 'save' | null>(null);
   const selectedVoiceName = VOICES.find((voice) => voice.id === voiceId)?.name || voiceId;
+  const targetOrgId = selected?.organization_id || selectedOrgId;
 
   // Load existing greeting/audio when selecting an IVR
   useEffect(() => {
@@ -148,7 +149,7 @@ export default function LemtelIVR() {
 
   const synthesize = async () => {
     if (!script.trim()) return toast.error('Tapez un script');
-    if (!selectedOrgId) return toast.error('Organisation introuvable');
+    if (!targetOrgId) return toast.error('Organisation introuvable');
     if (!selectedId) return toast.error('Sélectionnez un IVR');
     setLastAction('generate');
     setGenerateError(null);
@@ -162,7 +163,7 @@ export default function LemtelIVR() {
           voice_id: voiceId,
           language,
           ivr_id: selectedId,
-          organization_id: selectedOrgId,
+          organization_id: targetOrgId,
         },
       });
       await throwInvokeError(error, 'Échec de la génération ElevenLabs');
