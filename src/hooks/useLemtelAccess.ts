@@ -13,7 +13,10 @@ export function useLemtelAccess() {
 
   const isAdmin =
     isSuperAdmin ||
-    (selectedOrgId === LEMTEL_ORG_ID && (role === 'org_admin' || role === 'manager'));
+    (selectedOrgId === LEMTEL_ORG_ID && (role === 'super_admin' || role === 'org_admin' || role === 'manager')) ||
+    organizationMemberships.some(
+      (m) => m.organization.id === LEMTEL_ORG_ID && (role === 'super_admin' || role === 'org_admin' || role === 'manager')
+    );
 
   const isLemtelOrgSelected = selectedOrgId === LEMTEL_ORG_ID;
 
