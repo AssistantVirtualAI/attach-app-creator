@@ -390,7 +390,7 @@ class JsSipProvider {
         sessionTimersExpires: 120,
         extraHeaders: ['X-App: Lemtel-Telecom-Desktop'],
       });
-      this.logEvent('info', `Call initiated → ${number} (target=${target})`);
+      this.logEvent('info', `Call initiated → ${target}`);
       this.lastCallError = null;
       return null;
     } catch (err: any) {
