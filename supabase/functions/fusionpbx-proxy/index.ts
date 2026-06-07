@@ -383,9 +383,12 @@ Deno.serve(async (req) => {
       if (extData.voicemail_enabled === "true" || extData.voicemail_enabled === true) {
         const vmStarted = Date.now();
         try {
-          const vmRes = await fetch(`${FUSIONPBX_API_URL}/app/api/7/voicemails`, {
+          const vmUrl = new URL(`${FUSIONPBX_API_URL}/app/api/7/voicemails`);
+          vmUrl.searchParams.set("key", FUSIONPBX_API_KEY);
+          vmUrl.searchParams.set("username", FUSIONPBX_USERNAME);
+          const vmRes = await fetch(vmUrl.toString(), {
             method: "POST",
-            headers: { Authorization: basicHeader, "Content-Type": "application/json", Accept: "application/json" },
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
             body: JSON.stringify({ voicemails: [{
               domain_uuid: extData.domain_uuid || FUSIONPBX_DOMAIN_UUID,
               voicemail_id: String(extData.extension),
