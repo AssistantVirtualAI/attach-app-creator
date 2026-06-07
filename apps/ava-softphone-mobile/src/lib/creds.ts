@@ -16,15 +16,15 @@ export type Creds = {
 const KEY = 'lemtel.creds.v1';
 
 // Lightweight Preferences shim — uses Capacitor when native, localStorage on web preview.
-const Store = {
+export const Store = {
   async get(): Promise<Creds | null> {
     try {
       if ((Preferences as any)?.get) {
         const { value } = await Preferences.get({ key: KEY });
-        return value ? JSON.parse(value) : null;
+        if (value) return JSON.parse(value);
       }
     } catch {}
-    const v = localStorage.getItem(KEY);
+    const v = typeof localStorage !== 'undefined' ? localStorage.getItem(KEY) : null;
     return v ? JSON.parse(v) : null;
   },
   async set(c: Creds) {
@@ -35,7 +35,7 @@ const Store = {
         return;
       }
     } catch {}
-    localStorage.setItem(KEY, v);
+    if (typeof localStorage !== 'undefined') localStorage.setItem(KEY, v);
   },
   async clear() {
     try {
@@ -44,9 +44,13 @@ const Store = {
         return;
       }
     } catch {}
-    localStorage.removeItem(KEY);
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(KEY);
   },
 };
+
+export const saveCredentials = (c: Creds) => Store.set(c);
+export const getCredentials = () => Store.get();
+export const clearCredentials = () => Store.clear();
 
 export function useStoredCreds() {
   const [creds, setCredsState] = useState<Creds | null>(null);
