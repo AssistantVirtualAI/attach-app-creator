@@ -1,15 +1,20 @@
 {
-  "name": "lemtel",
-  "version": "1.4.1",
-  "description": "Lemtel — AI-Powered Business Communications",
+  "name": "lemtel-softphone",
+  "version": "2.0.1",
+  "description": "Lemtel Telecom — AI-Powered Business Communications",
   "main": "electron-compiled/main.js",
-  "author": "Lemtel Communications / AVA Télécom",
+  "homepage": "https://assistantvirtualai.com",
+  "author": {
+    "name": "Lemtel Communications",
+    "email": "support@assistantvirtualai.com",
+    "url": "https://assistantvirtualai.com"
+  },
   "scripts": {
     "dev": "concurrently \"vite\" \"electron .\"",
-    "build": "npx vite build && npx tsc -p electron/tsconfig.json",
-    "build:win": "npx vite build && npx tsc -p electron/tsconfig.json && npx electron-builder --win",
-    "build:mac": "npx vite build && npx tsc -p electron/tsconfig.json && npx electron-builder --mac --x64 --arm64",
-    "build:linux": "npx vite build && npx tsc -p electron/tsconfig.json && npx electron-builder --linux",
+    "build": "vite build && tsc -p electron/tsconfig.json",
+    "build:win": "vite build && tsc -p electron/tsconfig.json && electron-builder --win",
+    "build:mac": "vite build && tsc -p electron/tsconfig.json && electron-builder --mac --x64 --arm64",
+    "build:linux": "vite build && tsc -p electron/tsconfig.json && electron-builder --linux",
     "dist": "npm run build"
   },
   "dependencies": {
