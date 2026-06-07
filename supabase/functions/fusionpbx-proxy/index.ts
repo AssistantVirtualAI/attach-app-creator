@@ -432,21 +432,21 @@ Deno.serve(async (req) => {
     if (action === "delete-extension") {
       const id = params.extension_uuid;
       if (!id) return json({ error: "extension_uuid required" }, 400);
-      return json(await pbxFetch(`extensions/${id}`, { method: "DELETE" }));
+      return json(await pbxWrite(`extensions/${id}`, "DELETE"));
     }
     if (action === "create-device") return json(await writeCollection("devices", "devices", params));
     if (action === "update-device") return json(await writeCollection("devices", "devices", params));
     if (action === "delete-device") {
       const id = params.device_uuid;
       if (!id) return json({ error: "device_uuid required" }, 400);
-      return json(await pbxFetch(`devices/${id}`, { method: "DELETE" }));
+      return json(await pbxWrite(`devices/${id}`, "DELETE"));
     }
     if (action === "create-ivr") return json(await writeCollection("ivr_menus", "ivr_menus", params));
     if (action === "update-ivr") return json(await writeCollection("ivr_menus", "ivr_menus", params));
     if (action === "delete-ivr") {
       const id = params.ivr_menu_uuid;
       if (!id) return json({ error: "ivr_menu_uuid required" }, 400);
-      return json(await pbxFetch(`ivr_menus/${id}`, { method: "DELETE" }));
+      return json(await pbxWrite(`ivr_menus/${id}`, "DELETE"));
     }
     if (action === "create-queue") return json(await writeCollection("call_center_queues", "call_center_queues", params));
     if (action === "update-queue") return json(await writeCollection("call_center_queues", "call_center_queues", params));
