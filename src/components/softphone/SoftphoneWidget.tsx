@@ -315,6 +315,16 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
 
   const dialTab = (
     <div className="flex-1 flex flex-col p-3 gap-3">
+      {sipStatus !== "registered" && !sp.config?.mock && (
+        <div className={cn(
+          "rounded-md px-2.5 py-1.5 text-[11px] border",
+          sipStatus === "error"
+            ? "bg-destructive/10 border-destructive/40 text-destructive-foreground"
+            : "bg-amber-500/10 border-amber-500/40 text-amber-100",
+        )}>
+          SIP: {sipStatus}{sp.snap.errorCause ? ` — ${sp.snap.errorCause}` : ""}
+        </div>
+      )}
       <div className={cn(
         "h-14 rounded-lg bg-muted/40 flex items-center justify-center font-mono text-2xl tabular-nums px-3 truncate",
         shake && "animate-[shake_0.4s]",
