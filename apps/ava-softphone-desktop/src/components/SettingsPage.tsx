@@ -59,7 +59,7 @@ export default function SettingsPage({
   };
 
   return (
-    <div style={{ background: t.bgGradient, minHeight: '100%', padding: 18 }}>
+    <div style={{ background: t.bgGradient, flex: 1, minHeight: 0, overflowY: 'auto', padding: 18 }}>
       <button
         onClick={onBack}
         style={{

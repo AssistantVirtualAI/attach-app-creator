@@ -1,18 +1,18 @@
 :root {
-  --bg-0: #050816;
-  --bg-1: #0A0F23;
-  --bg-2: #101727;
-  --brand-blue: #0716A8;
-  --brand-blue-2: #2D55E5;
-  --brand-yellow: #FFE600;
-  --ava-cyan: #23D6FF;
+  --bg-0: #EEF3FB;
+  --bg-1: #F5F8FD;
+  --bg-2: rgba(255,255,255,0.78);
+  --brand-blue: #0052CC;
+  --brand-blue-2: #2D7BE5;
+  --brand-yellow: #E0A800;
+  --ava-cyan: #0BB5D6;
   --ava-violet: #7A4CFF;
-  --text: #F6F8FF;
-  --text-muted: #A9B4C7;
-  --border: rgba(140,180,255,0.10);
-  --success: #28E6A5;
-  --warning: #FFCC33;
-  --danger: #FF4D67;
+  --text: #0E1B3D;
+  --text-muted: #5A6B8C;
+  --border: rgba(0,61,166,0.10);
+  --success: #0FA471;
+  --warning: #D97706;
+  --danger: #DC2626;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -21,10 +21,44 @@
 html, body, #root { height: 100%; margin: 0; padding: 0; overscroll-behavior: none; }
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
-  background: var(--bg-0);
+  background:
+    radial-gradient(1100px 700px at 12% -10%, rgba(0,82,204,0.16), transparent 60%),
+    radial-gradient(900px 600px at 100% 110%, rgba(255,196,0,0.14), transparent 55%),
+    linear-gradient(180deg, #F7FAFE 0%, #E8F0FA 100%);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   user-select: none;
+}
+
+/* Shiny glass button — reusable across the mobile app */
+.lemtel-shiny-btn {
+  position: relative;
+  background: linear-gradient(135deg, #0052CC 0%, #2D7BE5 55%, #4F9CFF 100%);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.35);
+  box-shadow: 0 18px 40px -16px rgba(0,82,204,0.45), inset 0 1px 0 rgba(255,255,255,0.5);
+  overflow: hidden;
+  isolation: isolate;
+}
+.lemtel-shiny-btn::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: lemtelShine 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes lemtelShine {
+  0%, 60% { transform: translateX(-120%); }
+  80%, 100% { transform: translateX(120%); }
+}
+
+.lemtel-glass {
+  background: linear-gradient(155deg, rgba(255,255,255,0.78) 0%, rgba(255,255,255,0.62) 100%);
+  border: 1px solid rgba(0,61,166,0.10);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  box-shadow: 0 10px 32px -16px rgba(0,61,166,0.22);
+  border-radius: 16px;
 }
 
 button, input, textarea { font-family: inherit; }

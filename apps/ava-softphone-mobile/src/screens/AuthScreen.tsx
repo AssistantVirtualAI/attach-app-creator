@@ -38,9 +38,11 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
     <div style={wrap}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 28px', gap: 32 }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={logoStyle}>L</div>
-          <h1 style={{ fontSize: 28, fontWeight: 600, margin: '24px 0 4px', letterSpacing: -0.5 }}>Lemtel Telecom</h1>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>AI Business Phone System</p>
+          <div style={logoStyle}>
+            <img src="/lemtel-logo.png?v=4" alt="Lemtel" width={84} height={84} style={{ display: 'block', borderRadius: 22 }} />
+          </div>
+          <h1 style={{ fontSize: 28, fontWeight: 700, margin: '24px 0 4px', letterSpacing: -0.5, color: '#0E1B3D' }}>Lemtel Telecom</h1>
+          <p style={{ fontSize: 13, color: '#42547A', margin: 0 }}>AI Business Phone System</p>
         </div>
 
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -54,11 +56,10 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
             </div>
           )}
 
-          <button type="submit" disabled={busy || !email || !password} style={{
-            marginTop: 8, height: 52, borderRadius: 26, border: 'none',
-            background: busy ? 'rgba(0,61,166,0.5)' : 'linear-gradient(135deg, var(--brand-blue), var(--brand-blue-2))',
-            color: 'white', fontSize: 16, fontWeight: 600, cursor: 'pointer',
-            boxShadow: '0 10px 30px rgba(0, 61, 166, 0.4)',
+          <button type="submit" disabled={busy || !email || !password} className="lemtel-shiny-btn" style={{
+            marginTop: 8, height: 52, borderRadius: 26,
+            fontSize: 16, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.2,
+            opacity: busy ? 0.7 : 1,
           }}>
             {busy ? 'Signing in…' : 'Sign In'}
           </button>
@@ -91,8 +92,9 @@ function Field({ label, value, onChange, type = 'text', autoFocus }: any) {
         onChange={(e) => onChange(e.target.value)}
         style={{
           height: 48, padding: '0 16px', borderRadius: 12,
-          background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)',
-          color: 'white', fontSize: 16, outline: 'none',
+          background: 'rgba(255,255,255,0.78)', border: '1px solid var(--border)',
+          color: 'var(--text)', fontSize: 16, outline: 'none',
+          backdropFilter: 'blur(10px)',
         }}
       />
     </label>
@@ -101,15 +103,15 @@ function Field({ label, value, onChange, type = 'text', autoFocus }: any) {
 
 const wrap: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', height: '100vh',
-  background: 'linear-gradient(180deg, #07091a 0%, #001a3d 60%, #003DA6 130%)',
+  background: 'radial-gradient(900px 600px at 50% -10%, rgba(0,82,204,0.18), transparent 60%), linear-gradient(180deg, #F7FAFE 0%, #E8F0FA 100%)',
   paddingTop: 'var(--safe-top)',
 };
 
 const logoStyle: React.CSSProperties = {
-  width: 84, height: 84, borderRadius: 24, margin: '0 auto',
-  background: 'linear-gradient(135deg, var(--brand-yellow), #f59e0b)',
+  width: 92, height: 92, borderRadius: 26, margin: '0 auto',
+  background: 'linear-gradient(135deg, rgba(255,255,255,0.92), rgba(235,243,253,0.7))',
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  fontSize: 44, fontWeight: 700, color: '#001a3d',
-  boxShadow: '0 20px 60px rgba(255, 199, 44, 0.35)',
-  fontFamily: 'Georgia, serif',
+  boxShadow: '0 24px 60px -18px rgba(0,82,204,0.40), inset 0 1px 0 rgba(255,255,255,0.9)',
+  border: '1px solid rgba(0,61,166,0.10)',
+  padding: 4,
 };

@@ -180,13 +180,16 @@ const AuthPage = () => {
             className="text-center"
           >
             <div className="inline-flex items-center gap-3 mb-8">
-              <motion.div 
-                whileHover={{ rotate: 10, scale: 1.1 }}
-                className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/25"
+              <motion.div
+                whileHover={{ rotate: 6, scale: 1.06 }}
+                className="w-14 h-14 rounded-2xl overflow-hidden shadow-xl shadow-primary/30 ring-1 ring-white/20"
               >
-                <Activity className="w-7 h-7 text-white" />
+                <img src="/favicon.png?v=4" alt="Lemtel" className="w-full h-full object-cover" />
               </motion.div>
-              <span className="text-2xl font-bold">AVA Statistics</span>
+              <div className="flex flex-col items-start leading-tight">
+                <span className="text-2xl font-bold">AVA Statistics</span>
+                <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Powered by Lemtel</span>
+              </div>
             </div>
             <h1 className="text-3xl font-bold mb-2">{getTitle()}</h1>
             <p className="text-muted-foreground">{getDescription()}</p>
