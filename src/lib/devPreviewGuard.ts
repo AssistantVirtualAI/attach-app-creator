@@ -26,7 +26,7 @@ const clearRecoveryParam = () => {
 const hardReloadPreview = () => {
   const lastReloadAt = readTimestamp(RELOAD_KEY);
 
-  if (now() - lastReloadAt < 2500) return;
+  if (now() - lastReloadAt < 10000) return;
 
   writeTimestamp(RELOAD_KEY);
 
@@ -107,17 +107,6 @@ const pingDevServer = async () => {
 
 const startRecoveryLoop = () => {
   createOverlay();
-
-  const recover = async () => {
-    if (await pingDevServer()) {
-      hardReloadPreview();
-      return;
-    }
-
-    window.setTimeout(recover, 1000);
-  };
-
-  window.setTimeout(recover, 700);
 };
 
 const isRecoverableDevError = (message: string) =>
@@ -184,7 +173,6 @@ const installStyleHealthCheck = () => {
 
   window.addEventListener("pageshow", run);
   window.addEventListener("focus", run);
-  window.setInterval(recoverFromMissingStyles, 5000);
 };
 
 if (import.meta.env.DEV && isBrowser) {
