@@ -60,9 +60,25 @@ Deno.serve(async (req) => {
     if (!script_text || !organization_id) {
       return new Response(JSON.stringify({ error: "script_text and organization_id required" }), { status: 400, headers: corsHeaders });
     }
+    if (String(script_text).trim().length > 5000) {
+      return new Response(JSON.stringify({ error: "Le script dépasse 5000 caractères. Raccourcissez le message puis réessayez." }), { status: 400, headers: corsHeaders });
+    }
     const { data: member } = await admin.from("organization_members")
       .select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle();
-    if (!member) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
+    const { data: superAdmin } = await admin.rpc("is_super_admin", { _user_id: user.id });
+    if (!member && !superAdmin) return new Response(JSON.stringify({ error: "Vous n’avez pas accès à cette organisation." }), { status: 403, headers: corsHeaders });
+
+    let clientId = null;
+    if (ivr_id) {
+      const { data: ivr, error: ivrErr } = await admin.from("pbx_ivrs")
+        .select("id, organization_id, client_id").eq("id", ivr_id).maybeSingle();
+      if (ivrErr) throw ivrErr;
+      if (!ivr) return new Response(JSON.stringify({ error: "IVR introuvable." }), { status: 404, headers: corsHeaders });
+      if (ivr.organization_id !== organization_id) {
+        return new Response(JSON.stringify({ error: "Cet IVR n’appartient pas à l’organisation sélectionnée." }), { status: 403, headers: corsHeaders });
+      }
+      clientId = ivr.client_id;
+    }
 
     const elevenKey = Deno.env.get("ELEVENLABS_API_KEY");
     const vid = voice_id || "21m00Tcm4TlvDq8ikWAM";
@@ -84,7 +100,7 @@ Deno.serve(async (req) => {
     const { data: signed } = await admin.storage.from("lemtel-ivr-audio").createSignedUrl(path, 3600);
 
     const { data: row } = await admin.from("pbx_ivr_audio").insert({
-      organization_id, ivr_id, script_text, audio_url: signed?.signedUrl,
+      organization_id, client_id: clientId, ivr_id, script_text, audio_url: signed?.signedUrl,
       storage_path: path, elevenlabs_voice_id: vid, language, status: "ready",
     }).select().single();
 
