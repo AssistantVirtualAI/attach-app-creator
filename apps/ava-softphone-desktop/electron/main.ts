@@ -165,8 +165,17 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Grant microphone/media permissions on the default session BEFORE any
+  // window is created — required so getUserMedia() does not reject in Electron.
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+    const allowed = new Set(['media', 'mediaKeySystem', 'microphone', 'audioCapture', 'videoCapture', 'notifications']);
+    callback(allowed.has(permission as string));
+  });
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => {
+    return ['media', 'microphone', 'audioCapture', 'videoCapture', 'notifications'].includes(permission);
+  });
+
   createWindow();
-  setupTray(mainWindow);
 
   // Auto-grant media/notification permissions to our own window so the SIP
   // softphone can access the microphone, speaker output, and notifications
