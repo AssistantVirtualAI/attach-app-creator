@@ -28,10 +28,9 @@ export interface NavGroup {
 export const sidebarGroups: NavGroup[] = [
   {
     id: 'overview',
-    labelKey: 'sidebar.groups.overview',
-    icon: LayoutDashboard,
+    labelKey: 'sidebar.dashboard',
+    icon: TrendingUp,
     items: [
-      { nameKey: 'sidebar.home', href: '/', icon: Home },
       { nameKey: 'sidebar.dashboard', href: '/dashboard', icon: TrendingUp },
     ]
   },
@@ -108,15 +107,8 @@ export const sidebarGroups: NavGroup[] = [
       { nameKey: 'sidebar.saasConfig', href: '/saas-config', icon: Settings },
     ]
   },
-  {
-    id: 'administration',
-    labelKey: 'sidebar.groups.administration',
-    icon: Shield,
-    superAdminOnly: true,
-    items: [
-      { nameKey: 'sidebar.superAdmin', href: '/super-admin', icon: Building2 },
-    ]
-  },
+  // Administration group removed per request
+
   {
     id: 'phone-system',
     labelKey: '📞 Phone System',
