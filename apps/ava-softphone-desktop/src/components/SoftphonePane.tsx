@@ -445,6 +445,9 @@ export default function SoftphonePane({
               const { Icon, label } = TAB_META[tk];
               const isAI = tk === 'ai';
               const activeColor = isAI ? c.aiLight : c.gold;
+              // High-contrast inactive color so tabs are clearly readable on dark glass bar
+              const inactiveColor = 'rgba(235,240,255,0.82)';
+              const hoverColor = '#FFFFFF';
               return (
                 <button
                   key={tk}
@@ -457,29 +460,50 @@ export default function SoftphonePane({
                       ? { flex: '0 0 auto', minWidth: 68, padding: '6px 10px' }
                       : { flex: 1, minWidth: 0, padding: '4px 4px 0' }),
                     background: active
-                      ? 'linear-gradient(180deg, rgba(255,215,0,0.08), rgba(255,215,0,0))'
-                      : 'transparent',
-                    border: 'none',
+                      ? (isAI
+                          ? 'linear-gradient(180deg, rgba(157,111,240,0.18), rgba(157,111,240,0.04))'
+                          : 'linear-gradient(180deg, rgba(255,215,0,0.18), rgba(255,215,0,0.04))')
+                      : 'rgba(255,255,255,0.04)',
+                    border: active
+                      ? `1px solid ${isAI ? 'rgba(157,111,240,0.55)' : 'rgba(255,215,0,0.55)'}`
+                      : '1px solid rgba(255,255,255,0.08)',
                     borderRadius: 12,
-                    margin: compact ? '6px 3px 6px' : 0,
-                    color: active ? activeColor : c.textSub,
+                    margin: compact ? '6px 3px 6px' : '6px 3px',
+                    color: active ? activeColor : inactiveColor,
+                    textShadow: active
+                      ? `0 0 10px ${isAI ? 'rgba(157,111,240,0.55)' : 'rgba(255,215,0,0.55)'}`
+                      : '0 1px 2px rgba(0,0,0,0.5)',
                     cursor: 'pointer',
                     display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'center',
                     gap: compact ? 3 : 6,
-                    transition: 'color 180ms ease, background 180ms ease',
+                    transition: 'color 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease',
                     position: 'relative',
                   }}
-                  onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = c.text; }}
-                  onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = c.textSub; }}
+                  onMouseEnter={(e) => {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    if (!active) {
+                      el.style.color = hoverColor;
+                      el.style.background = 'rgba(255,255,255,0.09)';
+                      el.style.borderColor = 'rgba(255,215,0,0.35)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    const el = e.currentTarget as HTMLButtonElement;
+                    if (!active) {
+                      el.style.color = inactiveColor;
+                      el.style.background = 'rgba(255,255,255,0.04)';
+                      el.style.borderColor = 'rgba(255,255,255,0.08)';
+                    }
+                  }}
                 >
                   {active && <span className={`lemtel-tab-dot${isAI ? ' lemtel-tab-dot--ai' : ''}`} />}
                   <Icon size={compact ? 19 : 20} color={active ? activeColor : 'currentColor'} />
                   <span style={{
-                    fontSize: compact ? 8.5 : 9.5,
-                    letterSpacing: compact ? 0.6 : 1.2,
+                    fontSize: compact ? 9 : 10,
+                    letterSpacing: compact ? 0.7 : 1.2,
                     textTransform: 'uppercase',
-                    fontWeight: active ? 700 : 500,
+                    fontWeight: active ? 800 : 600,
                     maxWidth: '100%',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   }}>
