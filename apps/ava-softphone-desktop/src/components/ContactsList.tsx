@@ -109,7 +109,7 @@ export default function ContactsList({ selfExtension, onCall }: Props) {
           style={search}
           onFocus={(e) => {
             e.currentTarget.style.borderColor = 'rgba(255,215,0,0.4)';
-            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+            e.currentTarget.style.background = 'rgba(255,255,255,0.92)';
           }}
           onBlur={(e) => {
             e.currentTarget.style.borderColor = 'rgba(0,61,166,0.14)';
