@@ -343,45 +343,52 @@ export default function SoftphonePane({
 
       {/* BOTTOM TABS */}
       {!inCall && !ringing && !hideTabs && (
-        <div style={{
+        <div className={compact ? 'lemtel-tabbar-wrap' : undefined} style={{
           position: 'relative', zIndex: 1, flexShrink: 0,
-          display: 'flex',
-          height: ultraCompact ? 54 : compact ? 60 : 68,
           background: 'linear-gradient(180deg, rgba(15,15,30,0.6) 0%, rgba(8,8,18,0.95) 100%)',
           borderTop: `1px solid ${c.border}`,
           backdropFilter: 'blur(14px)',
         }}>
-          {(['dial', 'recents', 'contacts', 'voicemail', 'sms', 'recordings', 'ai'] as Tab[]).map((tk) => {
-            const active = tab === tk;
-            const { Icon, label } = TAB_META[tk];
-            const isAI = tk === 'ai';
-            const activeColor = isAI ? c.aiLight : c.gold;
-            const showLabel = !ultraCompact;
-            return (
-              <button
-                key={tk}
-                onClick={() => setTab(tk)}
-                title={label}
-                aria-label={label}
-                style={{
-                  flex: 1, minWidth: 0, background: 'none', border: 'none',
-                  color: active ? activeColor : c.textSub,
-                  cursor: 'pointer',
-                  display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center',
-                  gap: compact ? 3 : 6,
-                  transition: 'color 180ms ease',
-                  position: 'relative',
-                  paddingTop: 4,
-                  paddingLeft: 2, paddingRight: 2,
-                  overflow: 'hidden',
-                }}
-                onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = c.text; }}
-                onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = c.textSub; }}
-              >
-                {active && <span className={`lemtel-tab-dot${isAI ? ' lemtel-tab-dot--ai' : ''}`} />}
-                <Icon size={compact ? 18 : 20} color={active ? activeColor : 'currentColor'} />
-                {showLabel && (
+          <div className={compact ? 'lemtel-tabbar' : undefined} style={{
+            display: 'flex',
+            height: ultraCompact ? 56 : compact ? 62 : 68,
+            ...(compact ? {} : { width: '100%' }),
+          }}>
+            {(['dial', 'recents', 'contacts', 'voicemail', 'sms', 'recordings', 'ai'] as Tab[]).map((tk) => {
+              const active = tab === tk;
+              const { Icon, label } = TAB_META[tk];
+              const isAI = tk === 'ai';
+              const activeColor = isAI ? c.aiLight : c.gold;
+              return (
+                <button
+                  key={tk}
+                  onClick={() => setTab(tk)}
+                  title={label}
+                  aria-label={label}
+                  className={`lemtel-glass${isAI ? ' lemtel-glass--ai' : ''}`}
+                  style={{
+                    ...(compact
+                      ? { flex: '0 0 auto', minWidth: 68, padding: '6px 10px' }
+                      : { flex: 1, minWidth: 0, padding: '4px 4px 0' }),
+                    background: active
+                      ? 'linear-gradient(180deg, rgba(255,215,0,0.08), rgba(255,215,0,0))'
+                      : 'transparent',
+                    border: 'none',
+                    borderRadius: 12,
+                    margin: compact ? '6px 3px 6px' : 0,
+                    color: active ? activeColor : c.textSub,
+                    cursor: 'pointer',
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                    gap: compact ? 3 : 6,
+                    transition: 'color 180ms ease, background 180ms ease',
+                    position: 'relative',
+                  }}
+                  onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = c.text; }}
+                  onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = c.textSub; }}
+                >
+                  {active && <span className={`lemtel-tab-dot${isAI ? ' lemtel-tab-dot--ai' : ''}`} />}
+                  <Icon size={compact ? 19 : 20} color={active ? activeColor : 'currentColor'} />
                   <span style={{
                     fontSize: compact ? 8.5 : 9.5,
                     letterSpacing: compact ? 0.6 : 1.2,
@@ -392,12 +399,13 @@ export default function SoftphonePane({
                   }}>
                     {label}
                   </span>
-                )}
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
+
 
 
 
@@ -515,7 +523,7 @@ function Dialer({
         {dialKeys.map(([key, sub]) => (
           <button
             key={key}
-            className="lemtel-key"
+            className="lemtel-key lemtel-glass"
             onClick={() => setDial((p) => p + key)}
             style={{
               height: 72, display: 'flex', flexDirection: 'column',
@@ -524,27 +532,8 @@ function Dialer({
               background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
               border: `1px solid ${c.border}`,
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
-              transition: 'transform 120ms cubic-bezier(.2,.8,.2,1), background 160ms ease, border-color 160ms ease, box-shadow 160ms ease',
               cursor: 'pointer', color: c.textIce,
               willChange: 'transform',
-            }}
-            onPointerDown={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.transform = 'scale(0.93)';
-              el.style.background = 'linear-gradient(180deg, rgba(255,215,0,0.12), rgba(0,82,204,0.08))';
-              el.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.10), 0 0 0 4px rgba(255,215,0,0.10)';
-            }}
-            onPointerUp={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.transform = 'scale(1)';
-              el.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))';
-              el.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.06)';
-            }}
-            onPointerLeave={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.transform = 'scale(1)';
-              el.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))';
-              el.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.06)';
             }}
           >
             <span style={{ fontSize: 24, fontWeight: 500, letterSpacing: 0.5 }}>{key}</span>
@@ -571,6 +560,7 @@ function Dialer({
         <button
           onClick={onCall}
           disabled={!canCall}
+          className={canCall ? 'lemtel-glass' : undefined}
           style={{
             width: 78, height: 78, borderRadius: '50%',
             background: canCall

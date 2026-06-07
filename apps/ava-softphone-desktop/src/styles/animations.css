@@ -261,3 +261,110 @@
   .lemtel-ai-badge,
   .lemtel-ai-badge__dot { animation: none; }
 }
+
+/* ============================================
+   Futuristic glass shine on hover
+   ============================================ */
+@keyframes lemtelShine {
+  0%   { transform: translateX(-120%) skewX(-18deg); }
+  100% { transform: translateX(220%)  skewX(-18deg); }
+}
+@keyframes lemtelBorderPulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(255,215,0,0.55), 0 0 18px rgba(255,215,0,0.25), inset 0 0 14px rgba(255,215,0,0.08); }
+  50%      { box-shadow: 0 0 0 1px rgba(255,215,0,0.85), 0 0 28px rgba(255,215,0,0.45), inset 0 0 22px rgba(255,215,0,0.14); }
+}
+
+/* Glass tile — apply to any interactive surface for futuristic shine on hover */
+.lemtel-glass {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform .2s ease, box-shadow .25s ease, border-color .25s ease;
+}
+.lemtel-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(135deg,
+    rgba(255,255,255,0.10) 0%,
+    rgba(255,255,255,0.02) 40%,
+    rgba(255,215,0,0.06) 100%);
+  opacity: 0.6;
+  z-index: 0;
+}
+.lemtel-glass::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 60%;
+  background: linear-gradient(100deg,
+    transparent 0%,
+    rgba(255,255,255,0.22) 45%,
+    rgba(255,215,0,0.35) 50%,
+    rgba(255,255,255,0.22) 55%,
+    transparent 100%);
+  transform: translateX(-120%) skewX(-18deg);
+  pointer-events: none;
+  z-index: 1;
+}
+.lemtel-glass:hover {
+  animation: lemtelBorderPulse 1.8s ease-in-out infinite;
+  transform: translateY(-1px);
+}
+.lemtel-glass:hover::after {
+  animation: lemtelShine 1.1s ease-out;
+}
+.lemtel-glass > * { position: relative; z-index: 2; }
+
+/* Variant for AI/violet accent */
+.lemtel-glass--ai:hover {
+  box-shadow: 0 0 0 1px rgba(157,111,240,0.7), 0 0 26px rgba(157,111,240,0.45), inset 0 0 18px rgba(157,111,240,0.12);
+  animation: none;
+}
+.lemtel-glass--ai:hover::after {
+  background: linear-gradient(100deg,
+    transparent 0%,
+    rgba(255,255,255,0.22) 45%,
+    rgba(157,111,240,0.45) 50%,
+    rgba(255,255,255,0.22) 55%,
+    transparent 100%);
+}
+
+/* Horizontal scroll tab rail (used when window is compact) */
+.lemtel-tabbar {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+}
+.lemtel-tabbar::-webkit-scrollbar { display: none; }
+.lemtel-tabbar > button { scroll-snap-align: center; }
+
+/* Subtle scroll hint shadow on edges */
+.lemtel-tabbar-wrap {
+  position: relative;
+}
+.lemtel-tabbar-wrap::before,
+.lemtel-tabbar-wrap::after {
+  content: '';
+  position: absolute; top: 0; bottom: 0; width: 24px;
+  pointer-events: none; z-index: 3;
+}
+.lemtel-tabbar-wrap::before {
+  left: 0;
+  background: linear-gradient(90deg, rgba(8,8,18,0.95), rgba(8,8,18,0));
+}
+.lemtel-tabbar-wrap::after {
+  right: 0;
+  background: linear-gradient(270deg, rgba(8,8,18,0.95), rgba(8,8,18,0));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lemtel-glass:hover { animation: none; }
+  .lemtel-glass:hover::after { animation: none; }
+}
