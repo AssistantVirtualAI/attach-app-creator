@@ -3,8 +3,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const callBtn = document.getElementById('call-btn');
   const numbersList = document.getElementById('numbers-list');
   const numbersCount = document.getElementById('numbers-count');
-  const portalUrlInput = document.getElementById('portal-url');
-  const saveSettingsBtn = document.getElementById('save-settings');
   const statusDot = document.getElementById('status-indicator');
   const accountInfo = document.getElementById('account-info');
   const extNumber = document.getElementById('ext-number');
@@ -12,8 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const PHONE_ICON = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z" fill="white"/></svg>`;
   const PHONE_ICON_LG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z" fill="white"/></svg>`;
 
-  chrome.storage.local.get(['lemtel_portal_url','lemtel_connected','lemtel_extension'], (result) => {
-    portalUrlInput.value = result.lemtel_portal_url || 'https://avastatistic.ca';
+  chrome.storage.local.get(['lemtel_connected','lemtel_extension'], (result) => {
     if (result.lemtel_connected && result.lemtel_extension) {
       statusDot.className = 'status-dot connected';
       accountInfo.classList.remove('hidden');
