@@ -598,19 +598,21 @@ export default function SoftphonePane({
    ============================================================ */
 
 function Dialer({
-  dial, setDial, dialKeys, onCall, canCall, extension,
+  dial, setDial, dialKeys, onCall, canCall, extension, compact = false,
 }: {
   dial: string; setDial: (s: string | ((p: string) => string)) => void;
   dialKeys: [string, string][]; onCall: () => void; canCall: boolean; extension: string;
+  compact?: boolean;
 }) {
   return (
-    <div style={{ animation: 'fadeIn .25s ease-out', padding: '4px 4px 8px' }}>
+    <div style={{ animation: 'fadeIn .25s ease-out', padding: compact ? '2px 0 8px' : '4px 4px 8px', minWidth: 0 }}>
       <CallForwarding extension={extension} />
 
       {/* Number display — premium glass tile */}
       <div style={{
-        margin: '4px auto 22px', maxWidth: 320,
-        padding: '18px 20px', borderRadius: 18,
+        margin: compact ? '4px auto 16px' : '4px auto 22px', maxWidth: 320,
+        width: '100%', boxSizing: 'border-box',
+        padding: compact ? '14px 12px' : '18px 20px', borderRadius: 18,
         background: 'linear-gradient(180deg, rgba(0,82,204,0.10), rgba(10,21,48,0.40))',
         border: `1px solid ${c.border}`,
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 28px -16px rgba(0,82,204,0.5)',
@@ -619,10 +621,11 @@ function Dialer({
       }}>
         <div style={{
           fontFamily: 'JetBrains Mono, Menlo, monospace',
-          fontSize: 30, letterSpacing: 3, fontWeight: 500,
+          fontSize: compact ? 24 : 30, letterSpacing: compact ? 1.5 : 3, fontWeight: 500,
           color: dial ? c.textIce : c.textDim,
           textShadow: dial ? '0 0 22px rgba(255,215,0,0.35)' : 'none',
           minHeight: 36,
+          maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {dial || 'Enter a number'}
         </div>
@@ -635,8 +638,8 @@ function Dialer({
 
       {/* Dialpad */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14,
-        maxWidth: 296, margin: '0 auto 26px',
+        display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: compact ? 8 : 14,
+        width: 'min(100%, 296px)', margin: compact ? '0 auto 20px' : '0 auto 26px',
       }}>
         {dialKeys.map(([key, sub]) => (
           <button
@@ -644,7 +647,7 @@ function Dialer({
             className="lemtel-key lemtel-glass"
             onClick={() => setDial((p) => p + key)}
             style={{
-              height: 72, display: 'flex', flexDirection: 'column',
+              height: compact ? 58 : 72, display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center', gap: 2,
               borderRadius: 16,
               background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
@@ -654,7 +657,7 @@ function Dialer({
               willChange: 'transform',
             }}
           >
-            <span style={{ fontSize: 24, fontWeight: 500, letterSpacing: 0.5 }}>{key}</span>
+            <span style={{ fontSize: compact ? 22 : 24, fontWeight: 500, letterSpacing: 0.5 }}>{key}</span>
             {sub && <span style={{ fontSize: 9, color: 'rgba(159,179,214,0.55)', letterSpacing: 2, fontWeight: 700 }}>{sub}</span>}
           </button>
         ))}
