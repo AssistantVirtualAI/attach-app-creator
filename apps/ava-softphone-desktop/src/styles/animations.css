@@ -429,3 +429,71 @@
   min-width: 92px;
   scroll-snap-align: center;
 }
+
+/* ============================================
+   Contact row interactions (hover / focus / active / disabled)
+   ============================================ */
+.lemtel-contact-row:hover {
+  background: linear-gradient(180deg, rgba(20,32,64,0.85), rgba(14,22,46,0.9)) !important;
+  border-color: rgba(180,200,255,0.55) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0,40,120,0.35), inset 0 0 0 1px rgba(255,255,255,0.06) !important;
+}
+.lemtel-contact-row:active { transform: translateY(0); }
+.lemtel-contact-row:focus-visible {
+  outline: 2px solid #FFD700;
+  outline-offset: 2px;
+  border-color: rgba(255,215,0,0.7) !important;
+}
+.lemtel-contact-row:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.4);
+}
+.lemtel-contact-row:hover .lemtel-contact-call {
+  transform: scale(1.06);
+  box-shadow: 0 4px 14px rgba(16,185,129,0.65), inset 0 0 0 1px rgba(255,255,255,0.3) !important;
+}
+.lemtel-contact-call { transition: transform 160ms ease, box-shadow 160ms ease; }
+
+/* ============================================
+   Global focus ring for keyboard navigation on every button
+   ============================================ */
+button:focus-visible {
+  outline: 2px solid #FFD700;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(255,215,0,0.18);
+}
+button:disabled,
+button[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: saturate(0.7);
+}
+
+/* ============================================
+   High-Contrast theme — overrides triggered by `.lemtel-hc` on <html>.
+   Boosts text, borders, and button outlines without altering brand hues.
+   ============================================ */
+.lemtel-hc .lemtel-contact-row,
+.lemtel-hc .lemtel-glass,
+.lemtel-hc button {
+  border-color: rgba(255,255,255,0.85) !important;
+}
+.lemtel-hc .lemtel-contact-row {
+  background: #050B1C !important;
+}
+.lemtel-hc .lemtel-contact-row > div > div:first-child { color: #FFFFFF !important; }
+.lemtel-hc .lemtel-contact-row > div > div:last-child { color: #E6ECFF !important; }
+.lemtel-hc button:focus-visible { outline: 3px solid #FFEB3B; outline-offset: 3px; }
+.lemtel-hc .lemtel-contact-call {
+  background: #FFD700 !important;
+  color: #0A0A0A !important;
+  box-shadow: 0 0 0 2px #000, 0 0 0 4px #FFD700 !important;
+}
+.lemtel-hc input,
+.lemtel-hc input::placeholder { color: #fff !important; }
+.lemtel-hc input {
+  background: #04081A !important;
+  border: 1.5px solid #FFFFFF !important;
+}
