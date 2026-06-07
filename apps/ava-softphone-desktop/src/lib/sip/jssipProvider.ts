@@ -360,58 +360,26 @@ class JsSipProvider {
   }
 
   async call(number: string): Promise<string | null> {
-    if (!this.config || !this.ua) return 'SIP not initialized';
-    const micErr = await this.ensureMicPermission();
-    if (micErr) {
-      this.update({ errorCause: micErr });
-      this.lastCallError = micErr;
-      return micErr;
+    if (!this.config || !this.ua) {
+      this.logEvent('error', 'UA not ready — cannot call');
+      return 'SIP not initialized';
     }
-    this.logEvent('info', `Starting call with input="${this.boundInputLabel}" output="${this.boundOutputLabel}"`);
     const target = `sip:${number}@${this.config.sipDomain}`;
+    this.logEvent('info', `Dialing ${number}`);
     try {
-      // Pre-fetch a real audio MediaStream and pass it directly to JsSIP.
-      // Avoids the "Bad Media Description" error that occurs when the SDP
-      // offer is generated before any audio track is attached to the peer.
-      let mediaStream: MediaStream | null = null;
-      try {
-        const constraints: MediaStreamConstraints = {
-          audio: this.inputDeviceId
-            ? { deviceId: { exact: this.inputDeviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-            : { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-          video: false,
-        };
-        mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-        if (!mediaStream.getAudioTracks().length) throw new Error('No audio track in stream');
-      } catch (msErr: any) {
-        // Fallback to plain audio:true if device-pinned constraints failed.
-        this.logEvent('warn', `Specific mic constraint failed (${msErr?.message}); retrying with default mic`);
-        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      }
-
+      // Let JsSIP handle getUserMedia internally. Pre-fetching the stream
+      // causes "Bad Media Description" + unhandled rejections that crash
+      // the Electron renderer (black screen).
       this.ua.call(target, {
-        mediaStream,
         mediaConstraints: { audio: true, video: false },
-        rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
-        pcConfig: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-          ],
-          bundlePolicy: 'balanced',
-          rtcpMuxPolicy: 'require',
-        },
-        sessionTimersExpires: 120,
-        extraHeaders: ['X-App: Lemtel-Telecom-Desktop'],
-      });
-      this.logEvent('info', `Call initiated → ${target}`);
+      } as any);
       this.lastCallError = null;
       return null;
-    } catch (err: any) {
-      const msg = `Call error: ${err?.message || err}`;
+    } catch (e: any) {
+      const msg = `call() threw: ${e?.message || e}`;
       this.logEvent('error', msg);
       this.lastCallError = msg;
-      this.update({ errorCause: msg });
+      this.update({ callState: 'idle', errorCause: e?.message || 'Call failed' });
       return msg;
     }
   }
