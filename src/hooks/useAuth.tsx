@@ -237,6 +237,7 @@ export const useAuth = () => {
     signUp,
     signIn,
     signInWithGoogle,
+    signInWithMicrosoft,
     resetPassword,
     updatePassword,
     signOut,
