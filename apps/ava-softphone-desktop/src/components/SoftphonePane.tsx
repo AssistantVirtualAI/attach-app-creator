@@ -552,6 +552,7 @@ function Dialer({
         <button
           onClick={onCall}
           disabled={!canCall}
+          className={canCall ? 'lemtel-glass' : undefined}
           style={{
             width: 78, height: 78, borderRadius: '50%',
             background: canCall
