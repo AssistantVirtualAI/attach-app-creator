@@ -760,9 +760,9 @@ function ActiveCall({
 }
 
 function ControlBtn({
-  icon, label, onClick, active, danger, warning, disabled,
+  icon, label, ariaLabel, onClick, active, danger, warning, disabled,
 }: {
-  icon: string; label: string; onClick: () => void;
+  icon: string; label: string; ariaLabel?: string; onClick: () => void;
   active?: boolean; danger?: boolean; warning?: boolean; disabled?: boolean;
 }) {
   const bg = active
@@ -778,7 +778,9 @@ function ControlBtn({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={disabled ? undefined : 'lemtel-glass'}
+      aria-label={ariaLabel || label}
+      aria-pressed={active ? true : undefined}
+      className={`lemtel-focus${disabled ? '' : ' lemtel-glass'}`}
       style={{
         height: 44, borderRadius: 12,
         background: bg, border: `1px solid ${bd}`, color: col,
@@ -789,7 +791,7 @@ function ControlBtn({
         boxShadow: active ? `0 0 12px ${col}33` : 'none',
       }}
     >
-      <span style={{ fontSize: 14 }}>{icon}</span>
+      <span aria-hidden="true" style={{ fontSize: 14 }}>{icon}</span>
       {label}
     </button>
   );
