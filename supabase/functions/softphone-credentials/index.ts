@@ -13,42 +13,68 @@ const json = (b: unknown, s = 200) =>
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const reqId = crypto.randomUUID().slice(0, 8);
+  const log = (...args: unknown[]) => console.log(`[softphone-credentials ${reqId}]`, ...args);
   try {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error(`[softphone-credentials ${reqId}] missing env`, {
+        hasUrl: !!SUPABASE_URL,
+        hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY,
+      });
+      return json({
+        error: "MISSING_ENV",
+        message: "Server misconfigured: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.",
+        details: { hasUrl: !!SUPABASE_URL, hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY },
+      }, 500);
+    }
+
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return json({ error: "unauthorized" }, 401);
+    if (!authHeader) {
+      log("missing Authorization header");
+      return json({ error: "unauthorized" }, 401);
+    }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
     // Admin client without auth header for sensitive reads (bypasses RLS).
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
     const user = userData?.user;
-    if (!user) return json({ error: "unauthorized" }, 401);
+    if (userErr) log("auth.getUser error", userErr.message);
+    if (!user) {
+      log("no authenticated user");
+      return json({ error: "unauthorized" }, 401);
+    }
+    log("authenticated user", { id: user.id, email: user.email });
 
-    let { data: sp } = await supabaseAdmin
+    let { data: sp, error: spErr } = await supabaseAdmin
       .from("pbx_softphone_users")
       .select("extension, organization_id, extension_id, display_name, sip_password, wss_url")
       .eq("portal_user_id", user.id)
       .maybeSingle();
+    if (spErr) log("lookup by portal_user_id error", spErr.message);
+    log("lookup by portal_user_id", { found: !!sp, extension: sp?.extension });
 
     // Fallback: lookup by extension '300' if no row is linked to this user
     if (!sp) {
-      const { data: byExt } = await supabaseAdmin
+      const { data: byExt, error: extErr } = await supabaseAdmin
         .from("pbx_softphone_users")
         .select("extension, organization_id, extension_id, display_name, sip_password, wss_url")
         .eq("extension", "300")
         .maybeSingle();
+      if (extErr) log("fallback ext 300 error", extErr.message);
+      log("fallback to extension 300", { found: !!byExt });
       sp = byExt || null;
     }
 
-    if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT", message: "Contact your administrator to enable softphone" }, 404);
+    if (!sp) {
+      log("NO_SOFTPHONE_ACCOUNT");
+      return json({ error: "NO_SOFTPHONE_ACCOUNT", message: "Contact your administrator to enable softphone" }, 404);
+    }
 
     // Fixed Lemtel endpoints — overridable via Vault for other tenants
     const sipDomain = Deno.env.get("FUSIONPBX_SIP_DOMAIN") || "lemtel.lemtel.tel";
