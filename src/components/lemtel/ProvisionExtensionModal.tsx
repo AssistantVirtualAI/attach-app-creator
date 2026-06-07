@@ -152,7 +152,7 @@ export function ProvisionExtensionModal({ open, onOpenChange, prefill }: Props) 
           enabled,
           description: displayName,
           domain_uuid: DOMAIN_UUID,
-          raw_data: result,
+          raw_data: { ...result, password: sipPassword, sip_password: sipPassword },
           synced_at: new Date().toISOString(),
         })
         .select('id')
@@ -163,14 +163,18 @@ export function ProvisionExtensionModal({ open, onOpenChange, prefill }: Props) 
 
       // Softphone user record
       if (enableSoftphone) {
-        await supabase.from('pbx_softphone_users' as any).insert({
+        const { data: { user } } = await supabase.auth.getUser();
+        await supabase.from('pbx_softphone_users' as any).upsert({
           organization_id: LEMTEL_ORG,
           extension_id: (row as any)?.id ?? null,
           extension,
           sip_domain: SIP_DOMAIN,
+          wss_url: WSS_URL,
           display_name: displayName,
+          sip_password: sipPassword,
+          portal_user_id: user?.id ?? null,
           status: 'offline',
-        });
+        }, { onConflict: 'extension' });
       }
 
       toast.success(`✅ Extension ${extension} created successfully`);
