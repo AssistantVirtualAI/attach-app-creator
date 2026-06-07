@@ -13,6 +13,7 @@ mac:
   identity: null
   hardenedRuntime: false
   gatekeeperAssess: false
+  notarize: false
   extendInfo:
     NSMicrophoneUsageDescription: "Lemtel Telecom needs microphone access to make and receive voice calls over your business phone system."
     NSCameraUsageDescription: "Lemtel Telecom uses the camera for video calls."
@@ -42,9 +43,13 @@ nsis:
 linux:
   target:
     - AppImage
-    - deb
   category: Office
+  description: "AI-powered business softphone for Lemtel Communications"
+  maintainer: "Lemtel Communications <support@assistantvirtualai.com>"
+  vendor: "Lemtel Communications"
+  synopsis: "AI Business Phone System"
   artifactName: "Lemtel.Telecom.${ext}"
+
 publish:
   - provider: github
     owner: AssistantVirtualAI

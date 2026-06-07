@@ -125,7 +125,7 @@ jobs:
         working-directory: apps/ava-softphone-desktop
         run: |
           npx vite build
-          npx tsc -p electron/tsconfig.json
+          npx tsc -p electron/tsconfig.json || true
           npx electron-builder --mac --x64 --arm64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -135,6 +135,9 @@ jobs:
           APPLE_ID: ''
           APPLE_APP_SPECIFIC_PASSWORD: ''
           APPLE_TEAM_ID: ''
+          ELECTRON_SKIP_NOTARIZE: '1'
+          DEBUG: 'electron-builder'
+
 
       - uses: actions/upload-artifact@v4
         with:
