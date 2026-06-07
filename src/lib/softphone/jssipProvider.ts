@@ -1,6 +1,6 @@
 // JsSIP UA lifecycle manager + event emitter.
 // Used by useSoftphone hook; do not import directly into components.
-declare global { interface Window { JsSIP: any } }
+import JsSIP from "jssip";
 
 export type SipStatus =
   | "idle"
@@ -18,16 +18,31 @@ export type CallState =
   | "held"
   | "ended";
 
+export type LogLevel = "info" | "warn" | "error" | "debug";
+
+export interface SipEvent {
+  at: number;
+  level: LogLevel;
+  category: "sip" | "call" | "ws" | "config" | "env";
+  message: string;
+  detail?: any;
+}
+
 export interface SoftphoneSnapshot {
   status: SipStatus;
   callState: CallState;
   remoteIdentity: string;
   remoteNumber: string;
   errorCause?: string;
+  lastCallError?: string;
   muted: boolean;
   onHold: boolean;
   direction: "in" | "out" | null;
   startedAt: number | null;
+  events: SipEvent[];
+  callEvents: SipEvent[];
+  wssReachable: boolean | null;
+  wssCheckedUrl?: string;
 }
 
 export interface SoftphoneConfig {
@@ -58,6 +73,9 @@ class JsSipProvider {
     onHold: false,
     direction: null,
     startedAt: null,
+    events: [],
+    callEvents: [],
+    wssReachable: null,
   };
   audioEl: HTMLAudioElement | null = null;
 
@@ -77,21 +95,105 @@ class JsSipProvider {
     this.listeners.forEach((l) => l(this.snap));
   }
 
+  log(level: LogLevel, category: SipEvent["category"], message: string, detail?: any) {
+    const ev: SipEvent = { at: Date.now(), level, category, message, detail };
+    const events = [...this.snap.events, ev].slice(-50);
+    this.update({ events });
+    // Also echo to console for devtools visibility
+    const fn = level === "error" ? "error" : level === "warn" ? "warn" : "log";
+    // eslint-disable-next-line no-console
+    (console as any)[fn](`[softphone:${category}] ${message}`, detail ?? "");
+  }
+
+  private logCall(level: LogLevel, message: string, detail?: any) {
+    const ev: SipEvent = { at: Date.now(), level, category: "call", message, detail };
+    const callEvents = [...this.snap.callEvents, ev].slice(-30);
+    this.update({ callEvents });
+    this.log(level, "call", message, detail);
+  }
+
   getConfig() { return this.config; }
   getSnapshot() { return this.snap; }
+
+  /** Probe a WSS URL with a short timeout; resolves true if socket opens. */
+  async probeWss(url: string, timeoutMs = 5000): Promise<boolean> {
+    return new Promise((resolve) => {
+      let done = false;
+      let ws: WebSocket | null = null;
+      const finish = (ok: boolean, reason?: string) => {
+        if (done) return;
+        done = true;
+        try { ws?.close(); } catch {}
+        this.log(ok ? "info" : "error", "ws", `WSS probe ${ok ? "succeeded" : "failed"}: ${url}`, reason);
+        resolve(ok);
+      };
+      try {
+        ws = new WebSocket(url, "sip");
+        ws.onopen = () => finish(true);
+        ws.onerror = (e) => finish(false, "error event (CORS, mixed-content, or blocked)");
+        ws.onclose = (e) => { if (!done) finish(false, `closed code=${e.code}`); };
+        setTimeout(() => finish(false, "timeout"), timeoutMs);
+      } catch (err: any) {
+        finish(false, String(err?.message || err));
+      }
+    });
+  }
+
+  private checkEnv(cfg: SoftphoneConfig) {
+    if (typeof window === "undefined") return;
+    if (window.location.protocol === "http:" && cfg.wssUrl?.startsWith("wss://")) {
+      // wss from http page is fine; the reverse (ws:// from https) is blocked.
+    }
+    if (window.location.protocol === "https:") {
+      const insecure = [cfg.wssUrl, ...(cfg.wssUrls || [])].filter((u) => u?.startsWith("ws://"));
+      if (insecure.length) this.log("error", "env", "Mixed content: ws:// URLs blocked on https page", insecure);
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.log("error", "env", "navigator.mediaDevices.getUserMedia unavailable (requires HTTPS or localhost)");
+    }
+    if (!("RTCPeerConnection" in window)) {
+      this.log("error", "env", "WebRTC RTCPeerConnection not supported in this browser");
+    }
+  }
+
+  private validateConfig(cfg: SoftphoneConfig): string | null {
+    if (!cfg.extension) return "Missing extension";
+    if (!cfg.sipDomain) return "Missing sipDomain";
+    if (!cfg.password) return "Missing SIP password";
+    if (!cfg.wssUrl && !(cfg.wssUrls && cfg.wssUrls.length)) return "Missing wssUrl";
+    return null;
+  }
+
+  async restart() {
+    this.log("info", "sip", "Manual restart requested");
+    this.stop();
+    if (this.config) await this.init(this.config);
+  }
 
   async init(cfg: SoftphoneConfig) {
     if (this.ua) this.stop();
     this.config = cfg;
+    this.update({ events: [], callEvents: [], wssReachable: null, errorCause: undefined });
+    this.log("info", "config", `Initializing SIP for ext ${cfg.extension}@${cfg.sipDomain}`);
 
     if (cfg.mock || !cfg.password) {
-      // Mock mode — fake "registered" state
+      this.log("info", "sip", "Mock mode (no real registration)");
       this.update({ status: "registered" });
       return;
     }
 
-    if (!window.JsSIP) {
-      this.update({ status: "error", errorCause: "JsSIP not loaded" });
+    const invalid = this.validateConfig(cfg);
+    if (invalid) {
+      this.update({ status: "error", errorCause: invalid });
+      this.log("error", "config", invalid);
+      return;
+    }
+
+    this.checkEnv(cfg);
+
+    if (!JsSIP) {
+      this.update({ status: "error", errorCause: "JsSIP module failed to load" });
+      this.log("error", "sip", "JsSIP module failed to load");
       return;
     }
 
@@ -101,9 +203,15 @@ class JsSipProvider {
         ...(cfg.wssUrls || []),
         'wss://lemtel.lemtel.tel:7443',
         'wss://pbxnode.lemtel.tel:7443',
-      ].filter(Boolean)));
-      const sockets = fallbackUrls.map((u) => new window.JsSIP.WebSocketInterface(u));
-      const ua = new window.JsSIP.UA({
+      ].filter(Boolean))) as string[];
+
+      // Probe first URL for connectivity (non-blocking for UA start)
+      this.probeWss(fallbackUrls[0]).then((ok) => {
+        this.update({ wssReachable: ok, wssCheckedUrl: fallbackUrls[0] });
+      });
+
+      const sockets = fallbackUrls.map((u) => new (JsSIP as any).WebSocketInterface(u));
+      const ua = new (JsSIP as any).UA({
         sockets,
         uri: `sip:${cfg.extension}@${cfg.sipDomain}`,
         password: cfg.password,
@@ -115,18 +223,23 @@ class JsSipProvider {
         register_expires: 300,
         connection_recovery_min_interval: 2,
         connection_recovery_max_interval: 30,
-        user_agent: "AVA Softphone 1.0",
+        user_agent: "AVA Softphone 1.1",
       });
 
-      ua.on("connected", () => this.update({ status: "connected" }));
-      ua.on("disconnected", () => {
+      ua.on("connecting", () => { this.log("info", "sip", "WebSocket connecting"); this.update({ status: "connecting" }); });
+      ua.on("connected", () => { this.log("info", "sip", "WebSocket connected"); this.update({ status: "connected" }); });
+      ua.on("disconnected", (e: any) => {
+        this.log("warn", "sip", "WebSocket disconnected", { code: e?.code, reason: e?.reason });
         this.update({ status: "disconnected" });
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
         this.reconnectTimer = setTimeout(() => { try { ua.start(); } catch {} }, 5000);
       });
-      ua.on("registered", () => this.update({ status: "registered" }));
+      ua.on("registered", () => { this.log("info", "sip", "Registered"); this.update({ status: "registered", errorCause: undefined }); });
+      ua.on("unregistered", (e: any) => this.log("warn", "sip", "Unregistered", { cause: e?.cause }));
       ua.on("registrationFailed", (e: any) => {
-        this.update({ status: "error", errorCause: e?.cause || "registration failed" });
+        const cause = e?.cause || e?.response?.reason_phrase || "registration failed";
+        this.log("error", "sip", `Registration failed: ${cause}`, { status: e?.response?.status_code });
+        this.update({ status: "error", errorCause: cause });
       });
       ua.on("newRTCSession", (e: any) => this.attachSession(e.session, e.originator));
 
@@ -134,7 +247,9 @@ class JsSipProvider {
       this.ua = ua;
       this.update({ status: "connecting" });
     } catch (err: any) {
-      this.update({ status: "error", errorCause: String(err?.message || err) });
+      const msg = String(err?.message || err);
+      this.log("error", "sip", `UA init exception: ${msg}`);
+      this.update({ status: "error", errorCause: msg });
     }
   }
 
@@ -144,6 +259,8 @@ class JsSipProvider {
     const remoteUri = session.remote_identity?.uri?.user || "";
     const remoteName = session.remote_identity?.display_name || remoteUri;
 
+    this.logCall("info", `${incoming ? "Incoming" : "Outgoing"} INVITE: ${remoteName} <${remoteUri}>`);
+
     this.update({
       callState: incoming ? "ringing-in" : "ringing-out",
       remoteIdentity: remoteName,
@@ -151,19 +268,26 @@ class JsSipProvider {
       direction: incoming ? "in" : "out",
       muted: false,
       onHold: false,
+      lastCallError: undefined,
     });
 
     session.on("progress", () => {
+      this.logCall("info", "Ringing (180 progress)");
       if (!incoming) this.update({ callState: "ringing-out" });
     });
+    session.on("accepted", () => this.logCall("info", "Answered (200 OK)"));
     session.on("confirmed", () => {
+      this.logCall("info", "Call confirmed (ACK)");
       this.update({ callState: "active", startedAt: Date.now() });
     });
     session.on("failed", (e: any) => {
-      this.update({ callState: "ended", errorCause: e?.cause });
+      const cause = e?.cause || e?.message || "failed";
+      this.logCall("error", `Call failed: ${cause}`, { status: e?.message?.status_code });
+      this.update({ callState: "ended", errorCause: cause, lastCallError: cause });
       setTimeout(() => this.resetCall(), 2500);
     });
-    session.on("ended", () => {
+    session.on("ended", (e: any) => {
+      this.logCall("info", `Call ended: ${e?.cause || "normal"}`);
       this.update({ callState: "ended" });
       setTimeout(() => this.resetCall(), 2500);
     });
@@ -198,8 +322,8 @@ class JsSipProvider {
 
   call(number: string) {
     if (!this.config) return;
+    this.logCall("info", `Dialing ${number}`);
     if (this.config.mock || !this.ua) {
-      // Simulate a call in mock mode
       this.clearMockTimers();
       this.update({
         callState: "ringing-out",
@@ -209,7 +333,6 @@ class JsSipProvider {
       });
       this.mockTimers.push(
         setTimeout(() => {
-          // Only auto-connect if still ringing (user didn't hang up)
           if (this.snap.callState === "ringing-out") {
             this.update({ callState: "active", startedAt: Date.now() });
           }
@@ -218,7 +341,13 @@ class JsSipProvider {
       return;
     }
     const target = `sip:${number}@${this.config.sipDomain}`;
-    this.ua.call(target, { mediaConstraints: { audio: true, video: false } });
+    try {
+      this.ua.call(target, { mediaConstraints: { audio: true, video: false } });
+    } catch (err: any) {
+      const msg = String(err?.message || err);
+      this.logCall("error", `ua.call() threw: ${msg}`);
+      this.update({ lastCallError: msg });
+    }
   }
 
   answer() {
@@ -256,7 +385,6 @@ class JsSipProvider {
     this.session.refer(`sip:${target}@${this.config.sipDomain}`);
   }
 
-  // Simulate incoming call (used by mock mode / test buttons)
   simulateIncoming(number: string) {
     this.update({
       callState: "ringing-in",
@@ -274,6 +402,37 @@ class JsSipProvider {
     this.ua = null;
     this.session = null;
     this.update({ status: "disconnected", callState: "idle", direction: null, startedAt: null });
+  }
+
+  /** Build a debug report with secrets masked. */
+  buildDebugReport() {
+    const cfg = this.config;
+    const masked = cfg ? {
+      extension: cfg.extension,
+      displayName: cfg.displayName,
+      sipDomain: cfg.sipDomain,
+      wssUrl: cfg.wssUrl,
+      wssUrls: cfg.wssUrls,
+      mock: cfg.mock,
+      password: cfg.password ? `*** (${cfg.password.length} chars)` : "(empty)",
+    } : null;
+    return {
+      generatedAt: new Date().toISOString(),
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+      pageUrl: typeof window !== "undefined" ? window.location.href : "",
+      pageProtocol: typeof window !== "undefined" ? window.location.protocol : "",
+      snapshot: {
+        status: this.snap.status,
+        callState: this.snap.callState,
+        errorCause: this.snap.errorCause,
+        lastCallError: this.snap.lastCallError,
+        wssReachable: this.snap.wssReachable,
+        wssCheckedUrl: this.snap.wssCheckedUrl,
+      },
+      config: masked,
+      events: this.snap.events,
+      callEvents: this.snap.callEvents,
+    };
   }
 }
 

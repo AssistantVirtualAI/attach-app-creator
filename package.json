@@ -61,6 +61,7 @@
     "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
     "jspdf": "^4.0.0",
+    "jssip": "^3.13.8",
     "lucide-react": "^0.462.0",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
