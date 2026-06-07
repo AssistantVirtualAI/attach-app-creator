@@ -451,7 +451,7 @@ export default function SoftphonePane({
               const isAI = tk === 'ai';
               const activeColor = isAI ? c.aiLight : c.gold;
               // High-contrast inactive color so tabs are clearly readable on dark glass bar
-              const inactiveColor = 'rgba(235,240,255,0.82)';
+              const inactiveColor = '#EAF1FF';
               const hoverColor = '#FFFFFF';
               return (
                 <button
@@ -467,12 +467,12 @@ export default function SoftphonePane({
 
                     background: active
                       ? (isAI
-                          ? 'linear-gradient(180deg, rgba(157,111,240,0.18), rgba(157,111,240,0.04))'
-                          : 'linear-gradient(180deg, rgba(255,215,0,0.18), rgba(255,215,0,0.04))')
-                      : 'rgba(255,255,255,0.04)',
+                          ? 'linear-gradient(180deg, rgba(157,111,240,0.34), rgba(58,38,118,0.22))'
+                          : 'linear-gradient(180deg, rgba(255,215,0,0.30), rgba(78,62,18,0.24))')
+                      : 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06))',
                     border: active
-                      ? `1px solid ${isAI ? 'rgba(157,111,240,0.55)' : 'rgba(255,215,0,0.55)'}`
-                      : '1px solid rgba(255,255,255,0.08)',
+                      ? `1px solid ${isAI ? 'rgba(201,178,255,0.72)' : 'rgba(255,215,0,0.78)'}`
+                      : '1px solid rgba(235,240,255,0.20)',
                     borderRadius: 12,
                     margin: compact ? '6px 3px 6px' : '6px 3px',
                     color: active ? activeColor : inactiveColor,
@@ -490,16 +490,16 @@ export default function SoftphonePane({
                     const el = e.currentTarget as HTMLButtonElement;
                     if (!active) {
                       el.style.color = hoverColor;
-                      el.style.background = 'rgba(255,255,255,0.09)';
-                      el.style.borderColor = 'rgba(255,215,0,0.35)';
+                      el.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.10))';
+                      el.style.borderColor = 'rgba(255,215,0,0.48)';
                     }
                   }}
                   onMouseLeave={(e) => {
                     const el = e.currentTarget as HTMLButtonElement;
                     if (!active) {
                       el.style.color = inactiveColor;
-                      el.style.background = 'rgba(255,255,255,0.04)';
-                      el.style.borderColor = 'rgba(255,255,255,0.08)';
+                      el.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06))';
+                      el.style.borderColor = 'rgba(235,240,255,0.20)';
                     }
                   }}
                 >
