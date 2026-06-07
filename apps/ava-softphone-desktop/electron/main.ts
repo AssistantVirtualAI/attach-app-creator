@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   ipcMain,
   Notification,
+  session,
   shell,
   systemPreferences,
 } from 'electron';
