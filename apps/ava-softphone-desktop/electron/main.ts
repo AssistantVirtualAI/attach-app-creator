@@ -4,6 +4,7 @@ import {
   ipcMain,
   Notification,
   shell,
+  systemPreferences,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import Store from 'electron-store';
