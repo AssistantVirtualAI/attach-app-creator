@@ -64,7 +64,12 @@ const showOverlay = () => {
       <button type="button" data-ava-style-repair style="cursor:pointer;border:0;border-radius:8px;padding:11px 14px;background:linear-gradient(135deg,hsl(231 100% 50%),hsl(280 85% 55%));color:white;font:800 13px/1 Inter,system-ui,sans-serif">Réparer maintenant</button>
     </div>
   `;
-  el.querySelector("[data-ava-style-repair]")?.addEventListener("click", () => hardReload("style-guard-user-repair"));
+  (window as any).__avaStyleGuardForceRepair = () => {
+    sessionStorage.removeItem(STYLE_RELOAD_KEY);
+    trackPortalGuardEvent("style-repair-button-clicked", { buildId: BUILD_ID, version: APP_VERSION }, "warning");
+    void hardReload("style-guard-user-repair");
+  };
+  el.querySelector("[data-ava-style-repair]")?.addEventListener("click", () => (window as any).__avaStyleGuardForceRepair());
   document.body.appendChild(el);
 };
 
