@@ -206,7 +206,7 @@ export default function LemtelIVR() {
         .update({
           greet_long: script,
           raw_data: {
-            ...(selected.raw_data || {}),
+            ...(typeof selected.raw_data === 'object' && selected.raw_data ? selected.raw_data : {}),
             elevenlabs_greeting: {
               audio_id: preview.id,
               audio_url: preview.audio_url,
@@ -225,6 +225,7 @@ export default function LemtelIVR() {
         const { error: audioError } = await supabase.from('pbx_ivr_audio').update({ status: 'saved' }).eq('id', preview.id);
         if (audioError) throw audioError;
       }
+      setPreview((current) => current ? { ...current, status: 'saved' } : current);
       queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivrs'] });
       queryClient.invalidateQueries({ queryKey: ['ivr-audio', selectedId] });
       toast.success('Message d\'accueil mis à jour');
