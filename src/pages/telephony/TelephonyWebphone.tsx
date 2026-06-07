@@ -82,11 +82,13 @@ export default function TelephonyWebphone() {
           </CardHeader>
           <ScrollArea className="flex-1">
             <CardContent className="space-y-1 pt-0">
-              {recents.map((r: any) => (
+              {recents.length === 0 ? (
+                <div className="text-xs text-muted-foreground p-2">No recent calls yet.</div>
+              ) : recents.map((r: any) => (
                 <div key={r.id} className="flex items-center justify-between p-2 rounded hover:bg-muted/50">
                   <div>
-                    <div className="text-sm">{r.direction === 'outbound' ? r.destination_number : r.caller_id_number}</div>
-                    <div className="text-xs text-muted-foreground">{new Date(r.start_stamp).toLocaleString()}</div>
+                    <div className="text-sm">{r.direction === 'outbound' ? r.destination_number : r.caller_number}</div>
+                    <div className="text-xs text-muted-foreground">{r.start_at ? new Date(r.start_at).toLocaleString() : ''}</div>
                   </div>
                   <span className="text-xs text-muted-foreground">{r.duration_seconds || 0}s</span>
                 </div>
