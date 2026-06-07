@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:smoke": "vite build && vitest run src/test/build-smoke.test.ts",
     "cap:add:ios": "npx cap add ios",
     "cap:add:android": "npx cap add android",
     "sync:ios": "npx cap sync ios",
