@@ -251,7 +251,13 @@ class JsSipProvider {
       this.update({ callState: 'active', startedAt: Date.now() });
     });
     session.on('failed', (e: any) => {
-      this.update({ callState: 'ended', errorCause: e?.cause });
+      const cause = e?.cause || 'unknown';
+      const reason = e?.message?.reason_phrase || e?.response?.reason_phrase || '';
+      const code = e?.message?.status_code || e?.response?.status_code;
+      const detail = [cause, code, reason].filter(Boolean).join(' ');
+      this.lastCallError = detail;
+      this.logEvent('error', `Call failed: ${detail}`);
+      this.update({ callState: 'ended', errorCause: detail });
       setTimeout(() => this.resetCall(), 2500);
     });
     session.on('ended', () => {
