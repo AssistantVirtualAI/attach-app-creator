@@ -502,16 +502,19 @@ export default function SoftphonePane({
                 >
                   {active && <span className={`lemtel-tab-dot${isAI ? ' lemtel-tab-dot--ai' : ''}`} />}
                   <Icon size={compact ? 19 : 20} color={active ? activeColor : 'currentColor'} />
-                  <span style={{
-                    fontSize: compact ? 9 : 10,
-                    letterSpacing: compact ? 0.7 : 1.2,
-                    textTransform: 'uppercase',
-                    fontWeight: active ? 800 : 600,
-                    maxWidth: '100%',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {label}
-                  </span>
+                  {!ultraCompact && (
+                    <span style={{
+                      fontSize: compact ? 9 : 10,
+                      letterSpacing: compact ? 0.7 : 1.2,
+                      textTransform: 'uppercase',
+                      fontWeight: active ? 800 : 600,
+                      maxWidth: '100%',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {label}
+                    </span>
+                  )}
+
                 </button>
               );
             })}
