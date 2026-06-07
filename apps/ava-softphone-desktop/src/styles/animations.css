@@ -464,8 +464,40 @@
   .lemtel-contact-row [aria-label][title] { width: 7px !important; height: 7px !important; }
   .lemtel-contact-call { width: 34px !important; height: 34px !important; }
   .lemtel-control-strip { padding-left: 8px; padding-right: 8px; }
-  .lemtel-control-strip > button { min-width: 82px; }
+  .lemtel-control-strip > button { min-width: 56px; }
 }
+
+/* ============================================
+   Call control button — explicit hover / focus /
+   disabled states with strong contrast for compact
+   desktop widths where buttons can crowd together.
+   ============================================ */
+.lemtel-ctrlbtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(255,170,0,0.75) !important;
+  box-shadow: 0 10px 22px -10px rgba(255,170,0,0.55),
+              inset 0 0 0 1px rgba(255,255,255,0.75) !important;
+  filter: brightness(1.04);
+}
+.lemtel-ctrlbtn:active:not(:disabled) {
+  transform: translateY(0);
+  filter: brightness(0.97);
+}
+.lemtel-ctrlbtn:focus-visible {
+  outline: 3px solid #FFD700 !important;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgba(255,215,0,0.35),
+              0 0 22px rgba(255,215,0,0.55) !important;
+  z-index: 2;
+}
+.lemtel-ctrlbtn:disabled {
+  background: rgba(232,236,245,0.55) !important;
+  border-color: rgba(0,61,166,0.18) !important;
+  color: rgba(14,27,61,0.55) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.45) !important;
+  filter: grayscale(0.35);
+}
+
 
 /* ============================================
    Global focus ring for keyboard navigation on every button
