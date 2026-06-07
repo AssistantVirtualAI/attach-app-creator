@@ -57,6 +57,7 @@ class JsSipProvider {
     onHold: false,
     direction: null,
     startedAt: null,
+    events: [],
   };
   audioEl: HTMLAudioElement | null = null;
   outputDeviceId: string | null = null;
@@ -72,9 +73,24 @@ class JsSipProvider {
     this.listeners.forEach((l) => l(this.snap));
   }
 
+  private logEvent(level: SipEvent['level'], message: string) {
+    const next = [...this.snap.events, { at: Date.now(), level, message }].slice(-20);
+    // eslint-disable-next-line no-console
+    console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log'](`[SIP] ${message}`);
+    this.update({ events: next });
+  }
+
   getConfig() { return this.config; }
   getSnapshot() { return this.snap; }
   hasActiveCall() { return !!this.session; }
+
+  async restart() {
+    const cfg = this.config;
+    this.logEvent('info', 'Manual restart requested');
+    this.stop();
+    if (cfg) await this.init(cfg);
+  }
+
 
   async init(cfg: SoftphoneConfig) {
     if (this.ua) this.stop();
