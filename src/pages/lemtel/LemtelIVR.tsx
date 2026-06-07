@@ -68,13 +68,18 @@ export default function LemtelIVR() {
   const [language, setLanguage] = useState<'fr' | 'en' | 'es'>('fr');
   const [synthesizing, setSynthesizing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [preview, setPreview] = useState<IvrAudioPreview | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [lastAction, setLastAction] = useState<'generate' | 'save' | null>(null);
 
   // Load existing greeting/audio when selecting an IVR
   useEffect(() => {
     if (selected) {
       setScript(selected.greet_long || selected.greet_short || '');
-      setAudioUrl(null);
+      setPreview(null);
+      setGenerateError(null);
+      setSaveError(null);
     }
   }, [selectedId]);
 
@@ -95,7 +100,10 @@ export default function LemtelIVR() {
   });
 
   useEffect(() => {
-    if (lastAudio?.audio_url && !audioUrl) setAudioUrl(lastAudio.audio_url);
+    if (lastAudio?.audio_url && !preview) {
+      setPreview(lastAudio as IvrAudioPreview);
+      if (lastAudio.script_text) setScript(lastAudio.script_text);
+    }
     if (lastAudio?.elevenlabs_voice_id) setVoiceId(lastAudio.elevenlabs_voice_id);
     if (lastAudio?.language) setLanguage(lastAudio.language as any);
   }, [lastAudio?.id]);
