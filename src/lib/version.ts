@@ -24,6 +24,7 @@ export async function hardReload(reason = "manual") {
     localStorage.removeItem("ava_app_build_id");
     const sw = await navigator.serviceWorker?.getRegistrations?.();
     await Promise.all((sw || []).map((r) => r.unregister()));
+    await navigator.serviceWorker?.register?.(`/sw.js?_ava_kill=${Date.now().toString(36)}`, { scope: "/" }).catch(() => undefined);
     const keys = await window.caches?.keys?.();
     await Promise.all((keys || []).map((k) => caches.delete(k)));
     await flushPortalGuardEvents();

@@ -58,6 +58,7 @@ const avaCacheBustPlugin = (monitoringUrl = "", monitoringKey = ""): Plugin => {
         const clearBrowserCaches = async () => {
           const regs = await navigator.serviceWorker?.getRegistrations?.().catch(() => []) || [];
           await Promise.all(regs.map((reg) => reg.unregister()));
+          await navigator.serviceWorker?.register?.("/sw.js?_ava_kill=" + Date.now().toString(36), { scope: "/" }).catch(() => undefined);
           const keys = await window.caches?.keys?.().catch(() => []) || [];
           await Promise.all(keys.map((key) => caches.delete(key)));
           remember("cache-cleared", { serviceWorkers: regs.length, caches: keys.length });
