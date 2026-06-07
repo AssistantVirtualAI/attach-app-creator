@@ -1,3 +1,4 @@
+import type React from 'react';
 /**
  * Lemtel AI Phone — Mobile design tokens.
  * Light glass UI: airy white surfaces, Lemtel blue + signal gold + AVA cyan/violet AI shimmer.
