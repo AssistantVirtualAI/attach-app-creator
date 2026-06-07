@@ -14,7 +14,8 @@ import { Link } from 'react-router-dom';
 import { useLemtelAccess } from '@/hooks/useLemtelAccess';
 
 export const TelephonyStatsCard = () => {
-  const { hasAccess } = useLemtelAccess();
+  const { isMember, isSuperAdmin } = useLemtelAccess();
+  const hasAccess = isMember || isSuperAdmin;
   const { data: cdrs = [] } = usePbxCallRecords(500);
   const { data: extensions = [] } = usePbxExtensions();
   const { data: ivrs = [] } = usePbxIvrs();
