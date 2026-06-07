@@ -205,10 +205,17 @@ class JsSipProvider {
         'wss://pbxnode.lemtel.tel:7443',
       ].filter(Boolean))) as string[];
 
-      // Probe first URL for connectivity (non-blocking for UA start)
-      this.probeWss(fallbackUrls[0]).then((ok) => {
-        this.update({ wssReachable: ok, wssCheckedUrl: fallbackUrls[0] });
-      });
+      // Defer probe so it doesn't compete with the UA's own WS connection.
+      // Skip entirely if UA registers in time — registration proves reachability.
+      setTimeout(() => {
+        if (this.snap.status === "registered" || this.snap.status === "connected") {
+          this.update({ wssReachable: true, wssCheckedUrl: fallbackUrls[0] });
+          return;
+        }
+        this.probeWss(fallbackUrls[0]).then((ok) => {
+          this.update({ wssReachable: ok, wssCheckedUrl: fallbackUrls[0] });
+        });
+      }, 6000);
 
       const sockets = fallbackUrls.map((u) => new (JsSIP as any).WebSocketInterface(u));
       const ua = new (JsSIP as any).UA({
