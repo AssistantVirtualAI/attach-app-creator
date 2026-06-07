@@ -548,8 +548,8 @@ export default function SoftphonePane({
             dial={dial} setDial={setDial}
             dialKeys={dialKeys}
             onCall={handleCall}
-            canCall={dial.length >= 3}
-            sipRegistered={sp.snap.status === 'registered'}
+            canCall={dial.length >= 3 && sipReady && !callBusy && micPermission !== 'denied'}
+            sipRegistered={sipReady}
             extension={creds.extension}
             compact={compact}
           />
