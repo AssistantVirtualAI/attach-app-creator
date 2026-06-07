@@ -7,6 +7,14 @@ interface AudioOutDevice { deviceId: string; label: string }
 
 const STORAGE_KEY = 'lemtel.audioOutput.v1';
 
+interface Props {
+  audioEl: HTMLAudioElement | null;
+  compact?: boolean;
+  onActiveLabel?: (label: string) => void;
+  autoReset?: boolean;
+  onAutoResetChange?: (v: boolean) => void;
+}
+
 /**
  * Speaker / audio output picker.
  * Uses HTMLMediaElement.setSinkId() to route call audio to the chosen device.
@@ -15,10 +23,10 @@ const STORAGE_KEY = 'lemtel.audioOutput.v1';
 export default function OutputDevicePicker({
   audioEl,
   compact = false,
-}: {
-  audioEl: HTMLAudioElement | null;
-  compact?: boolean;
-}) {
+  onActiveLabel,
+  autoReset,
+  onAutoResetChange,
+}: Props) {
   const [devices, setDevices] = useState<AudioOutDevice[]>([]);
   const [sinkId, setSinkId] = useState<string>(() => {
     try { return localStorage.getItem(STORAGE_KEY) || 'default'; } catch { return 'default'; }
@@ -55,6 +63,15 @@ export default function OutputDevicePicker({
     if (typeof el.setSinkId !== 'function') { setSupported(false); return; }
     el.setSinkId(sinkId).catch((e: Error) => setError(e.message));
   }, [audioEl, sinkId]);
+
+  // Report the human-readable label of the currently chosen device
+  useEffect(() => {
+    if (!onActiveLabel) return;
+    const active = sinkId === 'default'
+      ? 'System default'
+      : devices.find((d) => d.deviceId === sinkId)?.label || 'System default';
+    onActiveLabel(active);
+  }, [sinkId, devices, onActiveLabel]);
 
   const choose = (id: string) => {
     setSinkId(id);
@@ -102,6 +119,23 @@ export default function OutputDevicePicker({
             <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
           ))}
       </select>
+      {onAutoResetChange && (
+        <label
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            marginTop: 6, cursor: 'pointer', fontSize: 10, color: c.textSub,
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={!!autoReset}
+            onChange={(e) => onAutoResetChange(e.target.checked)}
+            style={{ cursor: 'pointer' }}
+            aria-label="Automatically return to the default audio device after the call ends"
+          />
+          Return to default after call
+        </label>
+      )}
       {error && (
         <div style={{ fontSize: 10, color: c.red, marginTop: 4 }} role="alert">{error}</div>
       )}
