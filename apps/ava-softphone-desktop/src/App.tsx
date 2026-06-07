@@ -88,15 +88,15 @@ export default function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: t.bg, position: 'relative' }}>
       <BrightnessOverlay />
-      <TitleBar />
+      {!IS_EMBED && <TitleBar />}
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative', zIndex: 1 }}>
-        {wide ? (
+        {wide && !IS_EMBED ? (
           <ConsoleLayout creds={creds} onOpenSettings={openSettingsMobile} />
         ) : (
           <SoftphonePane creds={creds} onOpenSettings={openSettingsMobile} />
         )}
       </div>
-      <UpdateBanner />
+      {!IS_EMBED && <UpdateBanner />}
     </div>
   );
 }
