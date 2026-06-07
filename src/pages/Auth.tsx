@@ -33,7 +33,7 @@ const AuthPage = () => {
   const [showForgotDialog, setShowForgotDialog] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   
-  const { signIn, signUp, signInWithGoogle, signInWithMicrosoft, resetPassword, updatePassword, user } = useAuth();
+  const { signIn, signUp, signInWithGoogle, signInWithMicrosoft, signInWithApple, resetPassword, updatePassword, user } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { language, toggleLanguage } = useLanguage();
