@@ -306,7 +306,6 @@ Deno.serve(async (req) => {
           accountcode: "lemtel.lemtel.tel",
           limit_max: "5",
           limit_destination: "!USER_BUSY",
-          voicemail_enabled: extData.voicemail_enabled || "true",
         }],
       };
 
@@ -326,15 +325,26 @@ Deno.serve(async (req) => {
       console.log("FusionPBX response status:", res.status);
       console.log("FusionPBX response body:", responseText);
 
-      if (!res.ok) {
-        let errorDetail = responseText;
-        try { errorDetail = JSON.stringify(JSON.parse(responseText)); } catch {}
-        console.error("FusionPBX create-extension failed:", { status: res.status, body: errorDetail });
-        return json({ error: "CREATE_FAILED", status: res.status, details: errorDetail }, 200);
-      }
-
       let responseData: any = {};
       try { responseData = JSON.parse(responseText); } catch { responseData = { raw: responseText }; }
+
+      // FusionPBX often returns HTTP 200 with an embedded error code. Detect both.
+      const embeddedCode = responseData?.code || responseData?.details?.[0]?.code;
+      const failed = !res.ok || (embeddedCode && String(embeddedCode) !== "200");
+      if (failed) {
+        const msg = responseData?.details?.[0]?.message || responseData?.message || responseText;
+        console.error("FusionPBX create-extension failed:", { status: res.status, embeddedCode, msg });
+        if (/voicemail_enabled/i.test(msg)) {
+          // Enable voicemail in a follow-up call only if the extension actually exists.
+        }
+        return json({
+          error: "CREATE_FAILED",
+          message: msg,
+          status: res.status,
+          embeddedCode,
+          details: responseData,
+        }, 200);
+      }
 
       console.log("Extension created successfully:", responseData);
 
@@ -343,6 +353,23 @@ Deno.serve(async (req) => {
         responseData?.extension_uuid ||
         responseData?.[0]?.extension_uuid ||
         null;
+
+      // Best-effort: provision voicemail entry separately (column lives on v_voicemails)
+      if (extensionUuid && (extData.voicemail_enabled === "true" || extData.voicemail_enabled === true)) {
+        try {
+          await fetch(`${FUSIONPBX_API_URL}/app/api/7/voicemails`, {
+            method: "POST",
+            headers: { Authorization: basicHeader, "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify({ voicemails: [{
+              domain_uuid: extData.domain_uuid || FUSIONPBX_DOMAIN_UUID,
+              voicemail_id: String(extData.extension),
+              voicemail_password: String(extData.extension),
+              voicemail_enabled: "true",
+              voicemail_mail_to: "",
+            }]}),
+          });
+        } catch (e) { console.warn("voicemail provision failed", e); }
+      }
 
       return json({
         success: true,
