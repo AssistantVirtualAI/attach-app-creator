@@ -340,6 +340,40 @@ export default function SoftphonePane({
         </div>
       )}
 
+      {!sp.credError && (sp.snap.status === 'error' || sp.snap.status === 'connecting' || sp.snap.status === 'disconnected') && (
+        <div style={{
+          position: 'relative', zIndex: 1,
+          margin: compact ? '8px 12px 0' : '10px 16px 0',
+          padding: '10px 12px', borderRadius: 10,
+          background: sp.snap.status === 'error'
+            ? 'rgba(239,68,68,0.10)'
+            : 'rgba(245,158,11,0.10)',
+          border: sp.snap.status === 'error'
+            ? '1px solid rgba(239,68,68,0.35)'
+            : '1px solid rgba(245,158,11,0.35)',
+          color: '#fff', fontSize: 12,
+        }}>
+          <div style={{ fontWeight: 700, fontSize: 12 }}>
+            {sp.snap.status === 'error' ? '⚠️ SIP Registration Failed' : '🔄 Connecting to SIP...'}
+          </div>
+          {sp.snap.errorCause && (
+            <div style={{ marginTop: 4, opacity: 0.85, fontSize: 11 }}>{sp.snap.errorCause}</div>
+          )}
+          {sp.snap.status === 'error' && (
+            <button
+              onClick={() => sp.restart()}
+              style={{
+                marginTop: 8, background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)', borderRadius: 6,
+                color: '#fff', padding: '4px 10px', fontSize: 11, cursor: 'pointer',
+              }}
+            >🔄 Retry Connection</button>
+          )}
+        </div>
+      )}
+
+
+
 
       {/* CONTENT */}
       <div className="lemtel-scroll" style={{
