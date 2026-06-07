@@ -205,10 +205,17 @@ class JsSipProvider {
         'wss://pbxnode.lemtel.tel:7443',
       ].filter(Boolean))) as string[];
 
-      // Probe first URL for connectivity (non-blocking for UA start)
-      this.probeWss(fallbackUrls[0]).then((ok) => {
-        this.update({ wssReachable: ok, wssCheckedUrl: fallbackUrls[0] });
-      });
+      // Defer probe so it doesn't compete with the UA's own WS connection.
+      // Skip entirely if UA registers in time — registration proves reachability.
+      setTimeout(() => {
+        if (this.snap.status === "registered" || this.snap.status === "connected") {
+          this.update({ wssReachable: true, wssCheckedUrl: fallbackUrls[0] });
+          return;
+        }
+        this.probeWss(fallbackUrls[0]).then((ok) => {
+          this.update({ wssReachable: ok, wssCheckedUrl: fallbackUrls[0] });
+        });
+      }, 6000);
 
       const sockets = fallbackUrls.map((u) => new (JsSIP as any).WebSocketInterface(u));
       const ua = new (JsSIP as any).UA({
@@ -234,7 +241,7 @@ class JsSipProvider {
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
         this.reconnectTimer = setTimeout(() => { try { ua.start(); } catch {} }, 5000);
       });
-      ua.on("registered", () => { this.log("info", "sip", "Registered"); this.update({ status: "registered", errorCause: undefined }); });
+      ua.on("registered", () => { this.log("info", "sip", "Registered"); this.update({ status: "registered", errorCause: undefined, wssReachable: true }); });
       ua.on("unregistered", (e: any) => this.log("warn", "sip", "Unregistered", { cause: e?.cause }));
       ua.on("registrationFailed", (e: any) => {
         const cause = e?.cause || e?.response?.reason_phrase || "registration failed";
@@ -342,7 +349,19 @@ class JsSipProvider {
     }
     const target = `sip:${number}@${this.config.sipDomain}`;
     try {
-      this.ua.call(target, { mediaConstraints: { audio: true, video: false } });
+      this.ua.call(target, {
+        mediaConstraints: { audio: true, video: false },
+        rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
+        pcConfig: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+          ],
+          rtcpMuxPolicy: 'require',
+          bundlePolicy: 'max-bundle',
+        },
+        sessionTimersExpires: 120,
+      });
     } catch (err: any) {
       const msg = String(err?.message || err);
       this.logCall("error", `ua.call() threw: ${msg}`);
