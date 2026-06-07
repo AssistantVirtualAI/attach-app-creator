@@ -37,6 +37,13 @@ export default function App() {
     });
     const onResize = () => setWide(window.innerWidth >= 980);
     window.addEventListener('resize', onResize);
+
+    // Proactively request microphone (required), camera (optional), and
+    // verify speaker enumeration so the OS prompts surface at app launch.
+    import('./lib/mediaPermissions').then(({ requestMediaPermissions }) => {
+      requestMediaPermissions().catch(() => { /* noop */ });
+    });
+
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
