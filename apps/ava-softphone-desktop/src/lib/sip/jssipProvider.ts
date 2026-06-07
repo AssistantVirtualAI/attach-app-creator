@@ -97,11 +97,13 @@ class JsSipProvider {
     this.config = cfg;
 
     if (cfg.mock || !cfg.password) {
+      this.logEvent('warn', cfg.mock ? 'Mock mode — skipping JsSIP init' : 'No SIP password — skipping JsSIP init');
       this.update({ status: 'registered' });
       return;
     }
 
     if (!window.JsSIP) {
+      this.logEvent('error', 'JsSIP library not loaded on window');
       this.update({ status: 'error', errorCause: 'JsSIP not loaded' });
       return;
     }
@@ -115,10 +117,11 @@ class JsSipProvider {
         'wss://170.39.199.132:7443',
       ].filter(Boolean)));
 
+      this.logEvent('info', `Init sip:${cfg.extension}@${cfg.sipDomain} via ${fallbackUrls.length} WSS endpoint(s)`);
+
       const sockets = fallbackUrls.map(
         (url) => new window.JsSIP.WebSocketInterface(url),
       );
-      // JsSIP rotates through sockets on failure.
       sockets.forEach((s: any) => { try { s.via_transport = 'wss'; } catch { /* noop */ } });
 
       const ua = new window.JsSIP.UA({
@@ -136,15 +139,37 @@ class JsSipProvider {
         user_agent: 'Lemtel Telecom 1.0',
       });
 
-      ua.on('connected', () => this.update({ status: 'connected' }));
-      ua.on('disconnected', () => {
-        this.update({ status: 'disconnected' });
-        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-        this.reconnectTimer = setTimeout(() => { try { ua.start(); } catch { /* noop */ } }, 5000);
+      ua.on('connecting', () => {
+        this.logEvent('info', 'WebSocket connecting…');
+        this.update({ status: 'connecting' });
       });
-      ua.on('registered', () => this.update({ status: 'registered' }));
+      ua.on('connected', () => {
+        this.logEvent('info', 'WebSocket connected ✓');
+        this.update({ status: 'connected' });
+      });
+      ua.on('disconnected', (e: any) => {
+        const cause = e?.code ? `code=${e.code} reason=${e.reason || ''}` : (e?.reason || 'unknown');
+        this.logEvent('warn', `Disconnected (${cause}) — reconnecting in 5s`);
+        this.update({ status: 'disconnected', errorCause: cause });
+        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = setTimeout(() => {
+          this.logEvent('info', 'Reconnect attempt…');
+          try { ua.start(); } catch { /* noop */ }
+        }, 5000);
+      });
+      ua.on('registered', () => {
+        this.logEvent('info', 'Registered ✓');
+        this.update({ status: 'registered', errorCause: undefined });
+      });
+      ua.on('unregistered', () => {
+        this.logEvent('warn', 'Unregistered');
+      });
       ua.on('registrationFailed', (e: any) => {
-        this.update({ status: 'error', errorCause: e?.cause || 'registration failed' });
+        const code = e?.response?.status_code;
+        const reason = e?.response?.reason_phrase || e?.cause || 'registration failed';
+        const detail = code ? `${code} ${reason}` : reason;
+        this.logEvent('error', `Registration failed: ${detail}`);
+        this.update({ status: 'error', errorCause: detail });
       });
       ua.on('newRTCSession', (e: any) => this.attachSession(e.session, e.originator));
 
@@ -152,9 +177,11 @@ class JsSipProvider {
       this.ua = ua;
       this.update({ status: 'connecting' });
     } catch (err: any) {
+      this.logEvent('error', `Init exception: ${String(err?.message || err)}`);
       this.update({ status: 'error', errorCause: String(err?.message || err) });
     }
   }
+
 
   private attachSession(session: any, originator: string) {
     // If we already have a primary session, treat this as a secondary (attended xfer).
