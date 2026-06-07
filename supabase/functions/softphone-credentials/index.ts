@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
 
     const { data: sp } = await supabase
       .from("pbx_softphone_users")
-      .select("extension, organization_id, extension_id, display_name")
+      .select("extension, organization_id, extension_id, display_name, sip_password, wss_url")
       .eq("portal_user_id", user.id)
       .maybeSingle();
 
@@ -37,15 +37,16 @@ Deno.serve(async (req) => {
 
     // Fixed Lemtel endpoints — overridable via Vault for other tenants
     const sipDomain = Deno.env.get("FUSIONPBX_SIP_DOMAIN") || "lemtel.lemtel.tel";
-    const wssUrl = Deno.env.get("FUSIONPBX_WSS_URL") || "wss://lemtel.lemtel.tel:7443";
-    const wssUrls = [
+    const wssUrl = sp.wss_url || Deno.env.get("FUSIONPBX_WSS_URL") || "wss://lemtel.lemtel.tel:7443";
+    const wssUrls = Array.from(new Set([
       wssUrl,
+      "wss://lemtel.lemtel.tel:7443",
       "wss://pbxnode.lemtel.tel:7443",
       "wss://170.39.199.132:7443",
-    ];
+    ]));
 
-    let password = "";
-    if (sp.extension_id) {
+    let password = sp.sip_password || "";
+    if (!password && sp.extension_id) {
       const { data: ext } = await supabase
         .from("pbx_extensions").select("raw_data").eq("id", sp.extension_id).maybeSingle();
       password = (ext?.raw_data as any)?.password || (ext?.raw_data as any)?.sip_password || "";
@@ -63,9 +64,10 @@ Deno.serve(async (req) => {
     } catch { /* non-fatal */ }
 
     return json({
+      // SIP
       extension: sp.extension,
       display_name: sp.display_name || sp.extension,
-      displayName: sp.display_name || sp.extension, // backward compat
+      displayName: sp.display_name || sp.extension,
       sip_domain: sipDomain,
       sipDomain,
       wss_url: wssUrl,
@@ -73,8 +75,17 @@ Deno.serve(async (req) => {
       wss_urls: wssUrls,
       wssUrls,
       sip_password: password,
-      password, // backward compat with existing client
+      password,
+      // App config
+      portal_url: "https://avastatistic.ca",
       organization_id: sp.organization_id,
+      // User
+      email: user.email,
+      user_id: user.id,
+      // Flags
+      can_record: true,
+      can_sms: true,
+      can_ai: true,
       mock: false,
     });
   } catch (err) {
