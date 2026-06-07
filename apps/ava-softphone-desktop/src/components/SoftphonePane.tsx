@@ -796,10 +796,13 @@ function ActiveCall({
   return (
     <div style={{
       ...callViewStyle,
-      background: 'linear-gradient(180deg, #050510 0%, #0a0015 100%)',
+      background: 'linear-gradient(180deg, rgba(245,248,253,0.96) 0%, rgba(230,238,250,0.98) 100%)',
+      justifyContent: compact ? 'flex-start' : 'center',
+      minHeight: '100%',
+      padding: compact ? '18px 10px 20px' : callViewStyle.padding,
     }}>
       <div style={{
-        width: 92, height: 92, borderRadius: '50%',
+        width: compact ? 72 : 92, height: compact ? 72 : 92, borderRadius: '50%',
         background: 'linear-gradient(135deg, #003DA6, #7C3AED)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 36, fontWeight: 700, color: '#fff', boxShadow: glow.blue,
@@ -808,7 +811,7 @@ function ActiveCall({
         {String(remote).charAt(0).toUpperCase()}
       </div>
 
-      <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 4, color: c.text }}>{remote}</div>
+      <div style={{ fontSize: compact ? 17 : 20, fontWeight: 700, marginBottom: 4, color: c.text, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{remote}</div>
       <div style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
         padding: '3px 10px', borderRadius: 999,
@@ -826,13 +829,14 @@ function ActiveCall({
       <div style={{
         fontSize: 10, color: c.textSub, letterSpacing: 0.6,
         marginBottom: 18, display: 'flex', alignItems: 'center', gap: 4,
+        maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
         <span style={{ fontSize: 10 }}>🔊</span>
         {activeOutputLabel}
       </div>
 
       {/* Visualizer */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 32, marginBottom: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: compact ? 22 : 32, marginBottom: compact ? 14 : 22 }}>
         {[0.6, 0.9, 0.4, 1, 0.7, 0.5, 0.85].map((h, i) => (
           <div key={i} style={{
             width: 4, height: `${h * 100}%`, borderRadius: 2,
@@ -845,8 +849,8 @@ function ActiveCall({
 
       {showDTMF && (
         <div role="group" aria-label="DTMF keypad" style={{
-          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
-          marginBottom: 14, width: '100%', maxWidth: 240,
+          display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6,
+          marginBottom: 14, width: 'min(100%, 240px)',
         }}>
           {dialKeys.map(([k]) => (
             <button
