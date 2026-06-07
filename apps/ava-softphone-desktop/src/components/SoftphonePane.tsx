@@ -89,6 +89,62 @@ export default function SoftphonePane({
   const compact = paneWidth < 440;
   const ultraCompact = paneWidth < 360;
 
+  // Dev-only a11y audit on every DOM mutation inside the pane.
+  useEffect(() => {
+    if (!rootRef.current) return;
+    return watchA11y(rootRef.current, 'SoftphonePane');
+  }, []);
+
+  // ---- In-call keyboard shortcuts ----------------------------------------
+  // M = mute/unmute · H = hold/resume · K = toggle DTMF · T = blind transfer
+  // Shift+T = attended transfer · E or Esc = end call · 0-9 * # = DTMF tone
+  useEffect(() => {
+    const inActiveCall = sp.snap.callState === 'active' || sp.snap.callState === 'held';
+    if (!inActiveCall && sp.snap.callState !== 'ringing-in') return;
+
+    const onKey = (e: KeyboardEvent) => {
+      // Ignore when typing in inputs/selects/textareas/contenteditable.
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // Incoming ring → Enter answers, Esc declines (already wired globally,
+      // but we keep a local fallback so the pane works in isolation).
+      if (sp.snap.callState === 'ringing-in') {
+        if (e.key === 'Enter') { e.preventDefault(); sp.answer(); }
+        else if (e.key === 'Escape') { e.preventDefault(); sp.hangup(); }
+        return;
+      }
+
+      const k = e.key;
+      if (k === 'm' || k === 'M') {
+        e.preventDefault();
+        sp.snap.muted ? sp.unmute() : sp.mute();
+      } else if (k === 'h' || k === 'H') {
+        e.preventDefault();
+        sp.snap.onHold ? sp.unhold() : sp.hold();
+      } else if (k === 'k' || k === 'K') {
+        e.preventDefault();
+        setShowDTMF((v) => !v);
+      } else if (k === 'e' || k === 'E' || k === 'Escape') {
+        e.preventDefault();
+        sp.hangup();
+      } else if (k === 't') {
+        e.preventDefault();
+        setXferMode('blind'); setShowXfer(true);
+      } else if (k === 'T') {
+        e.preventDefault();
+        setXferMode('attended'); setShowXfer(true);
+      } else if (/^[0-9*#]$/.test(k)) {
+        e.preventDefault();
+        sp.sendDTMF(k);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sp.snap.callState, sp.snap.muted, sp.snap.onHold, sp]);
+
+
   // Broadcast SIP status to TitleBar
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('lemtel:sip-status', { detail: sp.snap.status }));
