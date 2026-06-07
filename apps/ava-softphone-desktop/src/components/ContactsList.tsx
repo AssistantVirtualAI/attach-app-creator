@@ -95,11 +95,11 @@ export default function ContactsList({ selfExtension, onCall }: Props) {
   if (err) return <div style={{ ...center, color: '#ff8a8a' }}>{err}</div>;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0, position: 'relative', zIndex: 1, width: '100%', minWidth: 0 }}>
-      <div style={{ position: 'relative', padding: '4px 8px 10px' }}>
+    <div className="lemtel-contacts-list" style={{ display: 'flex', flexDirection: 'column', gap: 0, position: 'relative', zIndex: 1, width: '100%', minWidth: 0 }}>
+      <div style={{ position: 'relative', padding: '4px clamp(6px, 2.5vw, 8px) 10px' }}>
         <span aria-hidden style={{
           position: 'absolute', left: 20, top: '50%', transform: 'translateY(-50%)',
-          color: 'rgba(255,255,255,0.4)', fontSize: 14, pointerEvents: 'none',
+          color: 'rgba(14,27,61,0.45)', fontSize: 14, pointerEvents: 'none',
         }}>🔍</span>
         <input
           value={q}
@@ -138,8 +138,8 @@ export default function ContactsList({ selfExtension, onCall }: Props) {
                 role="row"
                 className="lemtel-contact-row"
                 style={row}
-                onMouseEnter={(ev) => { (ev.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.07)'; }}
-                onMouseLeave={(ev) => { (ev.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.03)'; }}
+                onMouseEnter={(ev) => { (ev.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.9)'; }}
+                onMouseLeave={(ev) => { (ev.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.72)'; }}
               >
                 {/* Avatar */}
                 <div style={{
@@ -156,10 +156,9 @@ export default function ContactsList({ selfExtension, onCall }: Props) {
 
                 {/* Info */}
                 <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <div style={{
-                    color: '#fff', fontSize: 14, fontWeight: 500,
+                  <div className="lemtel-contact-name" style={{
+                    color: '#0E1B3D', fontSize: 14, fontWeight: 700,
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                    textShadow: '0 1px 2px rgba(0,0,0,0.4)',
                   }}>{name}</div>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                     <span style={{
@@ -190,9 +189,9 @@ export default function ContactsList({ selfExtension, onCall }: Props) {
                   aria-label={`Call ${name}, extension ${e.extension}`}
                   className="lemtel-contact-call"
                   style={{
-                    width: 36, height: 36, borderRadius: '50%',
+                    width: 38, height: 38, borderRadius: '50%',
                     background: 'linear-gradient(135deg, #059669, #10B981)',
-                    border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: '1px solid rgba(4,120,87,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     cursor: 'pointer', flexShrink: 0,
                     boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
                     transition: 'transform 0.2s, box-shadow 0.2s',
@@ -223,27 +222,28 @@ export default function ContactsList({ selfExtension, onCall }: Props) {
 
 const center: React.CSSProperties = {
   textAlign: 'center', padding: 40,
-  color: 'rgba(235,240,255,0.8)', fontSize: 12,
-  textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+  color: 'rgba(14,27,61,0.72)', fontSize: 12,
 };
 
 const row: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 12,
-  padding: '10px 16px',
-  background: 'rgba(255,255,255,0.03)',
-  borderBottom: '1px solid rgba(255,255,255,0.05)',
+  padding: '10px clamp(10px, 3vw, 16px)',
+  background: 'rgba(255,255,255,0.72)',
+  borderBottom: '1px solid rgba(0,61,166,0.10)',
   cursor: 'default',
   transition: 'background 0.15s ease',
   minWidth: 0,
+  width: '100%',
+  boxSizing: 'border-box',
 };
 
 const search: React.CSSProperties = {
   width: '100%',
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(255,255,255,0.72)',
+  border: '1px solid rgba(0,61,166,0.14)',
   borderRadius: 10,
   padding: '8px 12px 8px 36px',
-  color: '#fff', fontSize: 13, outline: 'none',
+  color: '#0E1B3D', fontSize: 13, outline: 'none',
   boxSizing: 'border-box',
   transition: 'border-color 150ms ease, background 150ms ease',
 };
