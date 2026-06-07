@@ -176,13 +176,12 @@ app.whenReady().then(() => {
   });
 
   createWindow();
+  setupTray(mainWindow);
 
-  // Auto-grant media/notification permissions to our own window so the SIP
-  // softphone can access the microphone, speaker output, and notifications
-  // without an extra Chromium prompt on top of the OS-level prompt.
-  const session = mainWindow?.webContents.session;
-  if (session) {
-    session.setPermissionRequestHandler((_wc, permission, callback) => {
+  // Auto-grant media/notification permissions to our own window's session too.
+  const winSession = mainWindow?.webContents.session;
+  if (winSession) {
+    winSession.setPermissionRequestHandler((_wc, permission, callback) => {
       const allowed = new Set([
         'media',
         'audioCapture',
@@ -193,7 +192,7 @@ app.whenReady().then(() => {
       ]);
       callback(allowed.has(permission));
     });
-    session.setPermissionCheckHandler((_wc, permission) => {
+    winSession.setPermissionCheckHandler((_wc, permission) => {
       return ['media', 'audioCapture', 'videoCapture', 'notifications'].includes(permission);
     });
   }
