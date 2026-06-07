@@ -275,7 +275,82 @@ Deno.serve(async (req) => {
       return pbxFetch(path, { method: "POST", body: JSON.stringify({ [key]: [{ ...payload, domain_uuid: FUSIONPBX_DOMAIN_UUID }] }) });
     }
 
-    if (action === "create-extension") return json(await writeCollection("extensions", "extensions", params), 200);
+    if (action === "create-extension") {
+      const extData = body.data || params || {};
+
+      console.log("Creating extension:", {
+        url: `${FUSIONPBX_API_URL}/app/api/7/extensions`,
+        extension: extData.extension,
+        domain_uuid: FUSIONPBX_DOMAIN_UUID,
+      });
+
+      const requestBody = {
+        extensions: [{
+          domain_uuid: extData.domain_uuid || FUSIONPBX_DOMAIN_UUID,
+          extension: String(extData.extension),
+          password: extData.password,
+          effective_caller_id_name: extData.effective_caller_id_name,
+          effective_caller_id_number: String(extData.extension),
+          outbound_caller_id_name:
+            extData.outbound_caller_id_name || extData.effective_caller_id_name,
+          outbound_caller_id_number:
+            extData.outbound_caller_id_number || "15144942888",
+          emergency_caller_id_name: "Lemtel",
+          emergency_caller_id_number: "5144942888",
+          call_timeout: String(extData.call_timeout || "30"),
+          call_group: extData.call_group || "",
+          user_record: extData.user_record || "none",
+          enabled: "true",
+          description: extData.description || extData.effective_caller_id_name,
+          user_context: "lemtel.lemtel.tel",
+          accountcode: "lemtel.lemtel.tel",
+          limit_max: "5",
+          limit_destination: "!USER_BUSY",
+          voicemail_enabled: extData.voicemail_enabled || "true",
+        }],
+      };
+
+      console.log("Request body:", JSON.stringify(requestBody));
+
+      const res = await fetch(`${FUSIONPBX_API_URL}/app/api/7/extensions`, {
+        method: "POST",
+        headers: {
+          Authorization: basicHeader,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const responseText = await res.text();
+      console.log("FusionPBX response status:", res.status);
+      console.log("FusionPBX response body:", responseText);
+
+      if (!res.ok) {
+        let errorDetail = responseText;
+        try { errorDetail = JSON.stringify(JSON.parse(responseText)); } catch {}
+        console.error("FusionPBX create-extension failed:", { status: res.status, body: errorDetail });
+        return json({ error: "CREATE_FAILED", status: res.status, details: errorDetail }, 200);
+      }
+
+      let responseData: any = {};
+      try { responseData = JSON.parse(responseText); } catch { responseData = { raw: responseText }; }
+
+      console.log("Extension created successfully:", responseData);
+
+      const extensionUuid =
+        responseData?.extensions?.[0]?.extension_uuid ||
+        responseData?.extension_uuid ||
+        responseData?.[0]?.extension_uuid ||
+        null;
+
+      return json({
+        success: true,
+        extension: extData.extension,
+        extension_uuid: extensionUuid,
+        raw_response: responseData,
+      }, 200);
+    }
     if (action === "update-extension") return json(await writeCollection("extensions", "extensions", params), 200);
     if (action === "delete-extension") {
       const id = params.extension_uuid;
