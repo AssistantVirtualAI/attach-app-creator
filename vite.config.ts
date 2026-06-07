@@ -21,6 +21,7 @@ const avaCacheBustPlugin = (): Plugin => {
         const VERSION_KEY = "ava_app_build_id";
         const FORCE_KEY = "ava_force_reload_count:" + BUILD_ID;
         const EVENTS_KEY = "ava_cache_bust_events";
+        const STYLE_RELOAD_KEY = "ava_style_reload_count:" + BUILD_ID;
         const remember = (event, details = {}) => {
           const entry = { at: new Date().toISOString(), buildId: BUILD_ID, event, details };
           console.info("%c[AVA cache-bust]", "color:#0023e6;font-weight:700", entry);
@@ -37,6 +38,44 @@ const avaCacheBustPlugin = (): Plugin => {
           const keys = await window.caches?.keys?.().catch(() => []) || [];
           await Promise.all(keys.map((key) => caches.delete(key)));
           remember("cache-cleared", { serviceWorkers: regs.length, caches: keys.length });
+        };
+        const hasRuntimeStyles = () => {
+          if (!document.body) return true;
+          const probe = document.createElement("div");
+          probe.className = "hidden p-4 bg-primary text-primary-foreground rounded-lg";
+          document.body.appendChild(probe);
+          const hasTokens = !!getComputedStyle(document.documentElement).getPropertyValue("--primary").trim();
+          const styles = getComputedStyle(probe);
+          const ok = hasTokens && styles.display === "none" && styles.paddingTop !== "0px";
+          probe.remove();
+          return ok;
+        };
+        const injectStylesheet = (href) => new Promise((resolve) => {
+          const absolute = new URL(href, location.origin).toString();
+          if ([...document.querySelectorAll('link[rel="stylesheet"]')].some((link) => link.href === absolute)) return resolve(true);
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = absolute + (absolute.includes("?") ? "&" : "?") + "_ava_css=" + Date.now().toString(36);
+          link.onload = () => resolve(true);
+          link.onerror = () => resolve(false);
+          document.head.appendChild(link);
+        });
+        const repairStyles = async (reason) => {
+          if (hasRuntimeStyles()) return remember("style-check-ok", { reason });
+          remember("missing-styles", { reason, href: location.href });
+          try {
+            const res = await fetch("/version.json?_ava_css=" + Date.now().toString(36), { cache: "no-store", headers: { "Cache-Control": "no-store", Pragma: "no-cache" } });
+            const latest = res.ok ? await res.json() : null;
+            await Promise.all((latest?.css || []).map(injectStylesheet));
+            await new Promise((resolve) => setTimeout(resolve, 700));
+            if (hasRuntimeStyles()) return remember("styles-recovered", { source: "version-json" });
+          } catch (error) {
+            remember("style-repair-failed", { message: String(error?.message || error) });
+          }
+          const count = Number(sessionStorage.getItem(STYLE_RELOAD_KEY) || "0") + 1;
+          sessionStorage.setItem(STYLE_RELOAD_KEY, String(count));
+          if (count <= 3) return hardReload("missing-styles-" + reason);
+          remember("style-reload-loop-stopped", { reason, count });
         };
         const hardReload = async (reason) => {
           const count = Number(sessionStorage.getItem(FORCE_KEY) || "0") + 1;
@@ -70,6 +109,17 @@ const avaCacheBustPlugin = (): Plugin => {
         window.__avaCacheBust = { BUILD_ID, BUILD_TIME, checkVersion, hardReload, clearBrowserCaches, events: () => JSON.parse(localStorage.getItem(EVENTS_KEY) || "[]") };
         clearBrowserCaches();
         checkVersion();
+        window.addEventListener("error", (event) => {
+          const target = event.target;
+          if (target?.tagName === "LINK" && target.rel === "stylesheet") {
+            remember("stylesheet-load-error", { href: target.href });
+            setTimeout(() => repairStyles("stylesheet-error"), 200);
+          }
+        }, true);
+        const runStyleRepair = () => setTimeout(() => repairStyles("boot"), 1000);
+        if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", runStyleRepair, { once: true }); else runStyleRepair();
+        window.addEventListener("pageshow", runStyleRepair);
+        window.addEventListener("focus", runStyleRepair);
         setInterval(checkVersion, 60000);
         document.addEventListener("visibilitychange", () => { if (!document.hidden) checkVersion(); });
       })();
