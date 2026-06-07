@@ -31,7 +31,16 @@ export function useSoftphone() {
           setConfig(null);
           return;
         }
-        const cfg = data as SoftphoneConfig;
+        const raw = data as any;
+        const cfg: SoftphoneConfig = {
+          extension: raw.extension,
+          displayName: raw.displayName || raw.display_name || raw.extension,
+          sipDomain: raw.sipDomain || raw.sip_domain || "lemtel.lemtel.tel",
+          wssUrl: raw.wssUrl || raw.wss_url || "wss://lemtel.lemtel.tel:7443",
+          wssUrls: raw.wssUrls || raw.wss_urls || [],
+          password: raw.password || raw.sip_password || "",
+          mock: !!raw.mock,
+        };
         setConfig(cfg);
         await sipProvider.init(cfg);
       } finally {
