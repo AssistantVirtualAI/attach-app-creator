@@ -331,9 +331,12 @@ Deno.serve(async (req) => {
       };
 
       const extStarted = Date.now();
-      const res = await fetch(`${FUSIONPBX_API_URL}/app/api/7/extensions`, {
+      const writeUrl = new URL(`${FUSIONPBX_API_URL}/app/api/7/extensions`);
+      writeUrl.searchParams.set("key", FUSIONPBX_API_KEY);
+      writeUrl.searchParams.set("username", FUSIONPBX_USERNAME);
+      const res = await fetch(writeUrl.toString(), {
         method: "POST",
-        headers: { Authorization: basicHeader, "Content-Type": "application/json", Accept: "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(requestBody),
       });
       const extLatency = Date.now() - extStarted;
