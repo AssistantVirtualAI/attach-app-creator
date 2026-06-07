@@ -78,8 +78,19 @@ const hideOverlay = () => {
   document.getElementById(OVERLAY_ID)?.remove();
 };
 
-const hasRuntimeStyles = () =>
-  Boolean(getComputedStyle(document.documentElement).getPropertyValue("--primary").trim());
+const hasRuntimeStyles = () => {
+  const probe = document.createElement("div");
+  probe.className = "hidden bg-primary text-primary-foreground p-4 rounded-lg";
+  document.body.appendChild(probe);
+
+  const styles = getComputedStyle(probe);
+  const hasTokens = Boolean(getComputedStyle(document.documentElement).getPropertyValue("--primary").trim());
+  const hasTailwindUtilities = styles.display === "none" && styles.paddingTop !== "0px";
+
+  probe.remove();
+
+  return hasTokens && hasTailwindUtilities;
+};
 
 const recoverFromMissingStyles = () => {
   if (hasRuntimeStyles()) return;
