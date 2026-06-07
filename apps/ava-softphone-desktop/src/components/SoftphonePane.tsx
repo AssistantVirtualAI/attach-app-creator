@@ -59,6 +59,7 @@ export default function SoftphonePane({
   });
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const [tab, setTab] = useState<Tab>('dial');
   const [dial, setDial] = useState('');
   const [timer, setTimer] = useState(0);
@@ -66,8 +67,25 @@ export default function SoftphonePane({
   const [xferTarget, setXferTarget] = useState('');
   const [xferMode, setXferMode] = useState<'blind' | 'attended'>('blind');
   const [showDTMF, setShowDTMF] = useState(false);
+  const [paneWidth, setPaneWidth] = useState<number>(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 480
+  );
 
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
+
+  // Track container width for responsive header/tabs/footer
+  useEffect(() => {
+    if (!rootRef.current || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w) setPaneWidth(w);
+    });
+    ro.observe(rootRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const compact = paneWidth < 440;
+  const ultraCompact = paneWidth < 360;
 
   // Broadcast SIP status to TitleBar
   useEffect(() => {
