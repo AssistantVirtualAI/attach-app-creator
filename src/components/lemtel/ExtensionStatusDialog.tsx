@@ -35,15 +35,18 @@ function StatusBadge({ ok, label }: { ok: boolean | null | undefined; label?: st
 export function ExtensionStatusDialog({ open, onOpenChange, ext }: Props) {
   const qc = useQueryClient();
   const [pushing, setPushing] = useState(false);
+  const [pwdInput, setPwdInput] = useState('');
   const { data: regs = [] } = usePbxRegistrations(open ? 15000 : 0);
+  const storedPassword = ext?.raw_data?.sip_password || ext?.raw_data?.password || '';
+  useEffect(() => {
+    if (ext) setPwdInput(storedPassword || generatePassword());
+  }, [ext?.id, storedPassword]);
+
   if (!ext) return null;
 
   const prov = ext?.raw_data?.provisioning ?? null;
   const extResult = prov?.extension_result;
   const vmResult = prov?.voicemail_result;
-  const storedPassword = ext?.raw_data?.sip_password || ext?.raw_data?.password || '';
-  const [pwdInput, setPwdInput] = useState('');
-  useEffect(() => { setPwdInput(storedPassword || generatePassword()); }, [ext?.id, storedPassword]);
   const registered = (regs as any[]).some((r) => String(r.extension ?? r.user ?? '').startsWith(String(ext.extension)));
 
   const pushToFusionPBX = async () => {
