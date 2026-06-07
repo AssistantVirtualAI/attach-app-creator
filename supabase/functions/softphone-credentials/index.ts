@@ -38,6 +38,11 @@ Deno.serve(async (req) => {
     // Fixed Lemtel endpoints — overridable via Vault for other tenants
     const sipDomain = Deno.env.get("FUSIONPBX_SIP_DOMAIN") || "lemtel.lemtel.tel";
     const wssUrl = Deno.env.get("FUSIONPBX_WSS_URL") || "wss://lemtel.lemtel.tel:7443";
+    const wssUrls = [
+      wssUrl,
+      "wss://pbxnode.lemtel.tel:7443",
+      "wss://170.39.199.132:7443",
+    ];
 
     let password = "";
     if (sp.extension_id) {
@@ -65,6 +70,8 @@ Deno.serve(async (req) => {
       sipDomain,
       wss_url: wssUrl,
       wssUrl,
+      wss_urls: wssUrls,
+      wssUrls,
       sip_password: password,
       password, // backward compat with existing client
       organization_id: sp.organization_id,
