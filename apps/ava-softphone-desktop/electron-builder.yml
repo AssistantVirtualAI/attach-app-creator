@@ -13,6 +13,13 @@ mac:
   identity: null
   hardenedRuntime: false
   gatekeeperAssess: false
+  extendInfo:
+    NSMicrophoneUsageDescription: "Lemtel Telecom needs microphone access to make and receive voice calls over your business phone system."
+    NSCameraUsageDescription: "Lemtel Telecom uses the camera for video calls."
+    NSContactsUsageDescription: "Lemtel Telecom accesses your contacts to display caller names and make dialing easier."
+    NSSpeechRecognitionUsageDescription: "Lemtel Telecom uses speech recognition to transcribe calls and provide AI insights."
+    NSBluetoothAlwaysUsageDescription: "Lemtel Telecom uses Bluetooth to connect to wireless headsets for calls."
+    NSLocalNetworkUsageDescription: "Lemtel Telecom uses your local network to connect to the SIP server."
   target:
     - target: dmg
       arch: [x64, arm64]
