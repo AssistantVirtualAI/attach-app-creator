@@ -164,6 +164,19 @@ export default function SoftphonePane({
     return () => clearInterval(id);
   }, [sp.snap.callState, sp.snap.startedAt]);
 
+  // Reset audio output to default when call ends if auto-reset is enabled
+  useEffect(() => {
+    const isInCall = sp.snap.callState === 'active' || sp.snap.callState === 'held';
+    if (prevCallStateRef.current && !isInCall && autoResetOutput) {
+      const el = audioRef.current as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> } | null;
+      if (el && typeof el.setSinkId === 'function') {
+        el.setSinkId('default').catch(() => {});
+      }
+      setActiveOutputLabel('System default');
+    }
+    prevCallStateRef.current = isInCall;
+  }, [sp.snap.callState, autoResetOutput]);
+
   const dotColor =
     sp.snap.status === 'registered' ? c.green :
     sp.snap.status === 'error' ? c.red : c.yellow;
