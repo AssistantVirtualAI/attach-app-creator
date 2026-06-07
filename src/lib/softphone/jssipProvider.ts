@@ -342,7 +342,19 @@ class JsSipProvider {
     }
     const target = `sip:${number}@${this.config.sipDomain}`;
     try {
-      this.ua.call(target, { mediaConstraints: { audio: true, video: false } });
+      this.ua.call(target, {
+        mediaConstraints: { audio: true, video: false },
+        rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
+        pcConfig: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+          ],
+          rtcpMuxPolicy: 'require',
+          bundlePolicy: 'max-bundle',
+        },
+        sessionTimersExpires: 120,
+      });
     } catch (err: any) {
       const msg = String(err?.message || err);
       this.logCall("error", `ua.call() threw: ${msg}`);
