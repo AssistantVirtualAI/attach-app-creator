@@ -140,7 +140,22 @@ jobs:
 
   # ============ MOBILE ============
 
+  test-mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install mobile deps
+        working-directory: apps/ava-softphone-mobile
+        run: npm install --legacy-peer-deps
+      - name: Run unit tests (creds web fallback + native Preferences)
+        working-directory: apps/ava-softphone-mobile
+        run: npm test
+
   build-android:
+    needs: test-mobile
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -156,6 +171,12 @@ jobs:
       - name: Install dependencies
         working-directory: apps/ava-softphone-mobile
         run: npm install --legacy-peer-deps
+      - name: Verify @capacitor/preferences resolves
+        working-directory: apps/ava-softphone-mobile
+        run: node -e "require.resolve('@capacitor/preferences'); console.log('@capacitor/preferences OK')"
+      - name: Run mobile unit tests
+        working-directory: apps/ava-softphone-mobile
+        run: npm test
       - name: Build web
         working-directory: apps/ava-softphone-mobile
         run: npx vite build
