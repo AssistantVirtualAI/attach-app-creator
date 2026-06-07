@@ -59,6 +59,7 @@ export default function SoftphonePane({
   });
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const [tab, setTab] = useState<Tab>('dial');
   const [dial, setDial] = useState('');
   const [timer, setTimer] = useState(0);
@@ -66,8 +67,25 @@ export default function SoftphonePane({
   const [xferTarget, setXferTarget] = useState('');
   const [xferMode, setXferMode] = useState<'blind' | 'attended'>('blind');
   const [showDTMF, setShowDTMF] = useState(false);
+  const [paneWidth, setPaneWidth] = useState<number>(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 480
+  );
 
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
+
+  // Track container width for responsive header/tabs/footer
+  useEffect(() => {
+    if (!rootRef.current || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w) setPaneWidth(w);
+    });
+    ro.observe(rootRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const compact = paneWidth < 440;
+  const ultraCompact = paneWidth < 360;
 
   // Broadcast SIP status to TitleBar
   useEffect(() => {
@@ -135,8 +153,11 @@ export default function SoftphonePane({
     ['*', ''], ['0', '+'], ['#', ''],
   ];
 
+
+
+
   return (
-    <div style={{
+    <div ref={rootRef} style={{
       display: 'flex', flexDirection: 'column', height: '100%',
       background: c.bg, color: c.text, position: 'relative', overflow: 'hidden',
     }}>
@@ -153,27 +174,35 @@ export default function SoftphonePane({
       <div style={{
         position: 'relative', zIndex: 1,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 14px', height: 52, boxSizing: 'border-box',
+        gap: compact ? 6 : 10,
+        padding: compact ? '8px 10px' : '10px 14px',
+        height: compact ? 46 : 52, boxSizing: 'border-box',
         background: 'rgba(0,0,0,0.3)',
         borderBottom: `1px solid ${c.border}`,
         backdropFilter: 'blur(12px)',
       }}>
         {/* Extension badge */}
         <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '4px 10px', borderRadius: 999,
+          display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
+          padding: compact ? '3px 8px' : '4px 10px', borderRadius: 999,
           background: c.goldDim, border: `1px solid ${c.borderGold}`,
-          color: c.gold, fontSize: 11, fontWeight: 700, letterSpacing: 0.5,
+          color: c.gold, fontSize: compact ? 10 : 11, fontWeight: 700, letterSpacing: 0.5,
           boxShadow: glow.gold,
         }}>
           Ext {creds.extension}
         </div>
 
-        <div style={{ fontSize: 12, fontWeight: 500, color: c.text, opacity: 0.85 }}>
-          {creds.displayName || creds.email}
-        </div>
+        {!ultraCompact && (
+          <div style={{
+            fontSize: compact ? 11 : 12, fontWeight: 500, color: c.text, opacity: 0.85,
+            flex: 1, minWidth: 0, textAlign: 'center',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {creds.displayName || creds.email}
+          </div>
+        )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 5 : 8, flexShrink: 0 }}>
           <span style={{
             width: 8, height: 8, borderRadius: '50%',
             background: dotColor, color: dotColor,
@@ -185,7 +214,8 @@ export default function SoftphonePane({
             style={{
               background: 'rgba(255,255,255,0.05)', color: c.text,
               border: `1px solid ${c.border}`, borderRadius: 8,
-              fontSize: 10, padding: '4px 6px', cursor: 'pointer',
+              fontSize: 10, padding: compact ? '3px 4px' : '4px 6px', cursor: 'pointer',
+              maxWidth: compact ? 70 : 'none',
             }}
           >
             <option value="auto">Auto</option>
@@ -198,7 +228,7 @@ export default function SoftphonePane({
             style={{
               background: 'rgba(255,255,255,0.05)', border: `1px solid ${c.border}`,
               color: c.text, cursor: 'pointer',
-              width: 30, height: 28, borderRadius: 8, fontSize: 14,
+              width: compact ? 26 : 30, height: compact ? 24 : 28, borderRadius: 8, fontSize: 14,
             }}
             aria-label="Settings"
           >⚙</button>
@@ -208,25 +238,25 @@ export default function SoftphonePane({
       {sp.credError && (
         <div style={{
           position: 'relative', zIndex: 1,
-          margin: '14px 16px 0',
-          padding: '14px 16px',
+          margin: compact ? '10px 12px 0' : '14px 16px 0',
+          padding: compact ? '10px 12px' : '14px 16px',
           borderRadius: 14,
           background: 'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(255,215,0,0.04))',
           border: '1px solid rgba(239,68,68,0.25)',
           boxShadow: '0 8px 24px -12px rgba(239,68,68,0.35)',
-          display: 'flex', gap: 12, alignItems: 'flex-start',
+          display: 'flex', gap: compact ? 10 : 12, alignItems: 'flex-start',
         }}>
           <div style={{
-            width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+            width: compact ? 26 : 32, height: compact ? 26 : 32, borderRadius: 10, flexShrink: 0,
             display: 'grid', placeItems: 'center',
             background: 'rgba(239,68,68,0.15)', color: c.red,
-            fontSize: 16, fontWeight: 700,
+            fontSize: compact ? 14 : 16, fontWeight: 700,
           }}>!</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: c.red, fontSize: 12, fontWeight: 700, letterSpacing: 0.3, marginBottom: 2 }}>
+            <div style={{ color: c.red, fontSize: compact ? 11 : 12, fontWeight: 700, letterSpacing: 0.3, marginBottom: 2 }}>
               SIP not registered — calls disabled
             </div>
-            <div style={{ color: c.textSub, fontSize: 11, lineHeight: 1.5 }}>
+            <div style={{ color: c.textSub, fontSize: compact ? 10 : 11, lineHeight: 1.5 }}>
               {sp.credError}
             </div>
           </div>
@@ -315,7 +345,8 @@ export default function SoftphonePane({
       {!inCall && !ringing && !hideTabs && (
         <div style={{
           position: 'relative', zIndex: 1, flexShrink: 0,
-          display: 'flex', height: 68,
+          display: 'flex',
+          height: ultraCompact ? 54 : compact ? 60 : 68,
           background: 'linear-gradient(180deg, rgba(15,15,30,0.6) 0%, rgba(8,8,18,0.95) 100%)',
           borderTop: `1px solid ${c.border}`,
           backdropFilter: 'blur(14px)',
@@ -325,33 +356,49 @@ export default function SoftphonePane({
             const { Icon, label } = TAB_META[tk];
             const isAI = tk === 'ai';
             const activeColor = isAI ? c.aiLight : c.gold;
+            const showLabel = !ultraCompact;
             return (
               <button
                 key={tk}
                 onClick={() => setTab(tk)}
+                title={label}
+                aria-label={label}
                 style={{
-                  flex: 1, background: 'none', border: 'none',
+                  flex: 1, minWidth: 0, background: 'none', border: 'none',
                   color: active ? activeColor : c.textSub,
                   cursor: 'pointer',
                   display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center', gap: 6,
+                  alignItems: 'center', justifyContent: 'center',
+                  gap: compact ? 3 : 6,
                   transition: 'color 180ms ease',
                   position: 'relative',
                   paddingTop: 4,
+                  paddingLeft: 2, paddingRight: 2,
+                  overflow: 'hidden',
                 }}
                 onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = c.text; }}
                 onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLButtonElement).style.color = c.textSub; }}
               >
                 {active && <span className={`lemtel-tab-dot${isAI ? ' lemtel-tab-dot--ai' : ''}`} />}
-                <Icon size={20} color={active ? activeColor : 'currentColor'} />
-                <span style={{ fontSize: 9.5, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: active ? 700 : 500 }}>
-                  {label}
-                </span>
+                <Icon size={compact ? 18 : 20} color={active ? activeColor : 'currentColor'} />
+                {showLabel && (
+                  <span style={{
+                    fontSize: compact ? 8.5 : 9.5,
+                    letterSpacing: compact ? 0.6 : 1.2,
+                    textTransform: 'uppercase',
+                    fontWeight: active ? 700 : 500,
+                    maxWidth: '100%',
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {label}
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
       )}
+
 
 
       {/* Transfer modal */}
@@ -393,27 +440,28 @@ export default function SoftphonePane({
       {/* Footer */}
       <div style={{
         position: 'relative', zIndex: 1, flexShrink: 0,
-        padding: '12px 14px 14px',
+        padding: compact ? '8px 10px 10px' : '12px 14px 14px',
         textAlign: 'center',
         borderTop: `1px solid ${c.border}`,
         background: c.bg,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: compact ? 3 : 6,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <LemtelLogo size="xs" glow />
           <BrandTagline size="sm" showPoweredBy={false} style={{ marginTop: 0 }} />
         </div>
-        <div style={{ fontSize: 10, color: c.textDim, letterSpacing: 0.5 }}>
-          v1.0.6 · Powered by{' '}
+        <div style={{ fontSize: compact ? 9 : 10, color: c.textDim, letterSpacing: 0.5 }}>
+          v1.0.6 {ultraCompact ? '' : '· Powered by '}
           <a
             onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal?.('https://assistantvirtualai.com'); }}
             href="#"
             style={{ color: c.gold, textDecoration: 'none', cursor: 'pointer', fontWeight: 600 }}
           >
-            AVA Statistic · assistantvirtualai.com
+            {ultraCompact ? 'AVA Statistic' : 'AVA Statistic · assistantvirtualai.com'}
           </a>
         </div>
       </div>
+
     </div>
   );
 }
