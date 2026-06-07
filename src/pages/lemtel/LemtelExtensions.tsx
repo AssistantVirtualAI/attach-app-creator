@@ -35,6 +35,8 @@ export default function LemtelExtensions() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [provisionOpen, setProvisionOpen] = useState(false);
+  const [prefill, setPrefill] = useState<{ extension?: string; displayName?: string; outboundCid?: string } | undefined>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: extensions = [], isLoading } = usePbxExtensions();
   const { data: softphones = [] } = usePbxSoftphoneUsers();
   const softphoneByExt = useMemo(() => {
