@@ -150,9 +150,12 @@ jobs:
       - name: Install mobile deps
         working-directory: apps/ava-softphone-mobile
         run: npm install --legacy-peer-deps
-      - name: Run unit tests (creds web fallback + native Preferences)
+      - name: Run unit tests (creds + useSoftphone hook)
         working-directory: apps/ava-softphone-mobile
         run: npm test
+      - name: Build + smoke test (verifies SIP hook errors when JsSIP missing)
+        working-directory: apps/ava-softphone-mobile
+        run: npm run test:smoke
 
   build-android:
     needs: test-mobile
