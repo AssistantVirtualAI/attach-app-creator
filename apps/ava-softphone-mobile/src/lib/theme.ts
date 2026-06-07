@@ -71,4 +71,3 @@ export const glass = {
   } as React.CSSProperties,
 } as const;
 
-import type React from 'react';
