@@ -180,7 +180,10 @@ const avaCacheBustPlugin = (monitoringUrl = "", monitoringKey = ""): Plugin => {
 };
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+
+  return ({
   server: {
     host: "::",
     port: 8080,
@@ -211,10 +214,15 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
-  plugins: [react(), avaCacheBustPlugin(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [
+    react(),
+    avaCacheBustPlugin(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_PUBLISHABLE_KEY),
+    mode === "development" && componentTagger(),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
-}));
+});
+});
