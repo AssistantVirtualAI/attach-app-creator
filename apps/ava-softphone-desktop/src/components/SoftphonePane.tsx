@@ -600,10 +600,11 @@ export default function SoftphonePane({
    ============================================================ */
 
 function Dialer({
-  dial, setDial, dialKeys, onCall, canCall, extension, compact = false,
+  dial, setDial, dialKeys, onCall, canCall, sipRegistered = true, extension, compact = false,
 }: {
   dial: string; setDial: (s: string | ((p: string) => string)) => void;
-  dialKeys: [string, string][]; onCall: () => void; canCall: boolean; extension: string;
+  dialKeys: [string, string][]; onCall: () => void; canCall: boolean;
+  sipRegistered?: boolean; extension: string;
   compact?: boolean;
 }) {
   return (
