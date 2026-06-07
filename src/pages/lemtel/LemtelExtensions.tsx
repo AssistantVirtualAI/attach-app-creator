@@ -6,10 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Smartphone, Plus, Circle, Loader2, X, BellOff, PhoneForwarded, AlertCircle } from 'lucide-react';
-import { usePbxExtensions } from '@/hooks/usePbxData';
+import { usePbxExtensions, usePbxSoftphoneUsers } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
 import { SyncEverythingButton } from '@/components/lemtel/SyncEverythingButton';
 import { ProvisionExtensionModal } from '@/components/lemtel/ProvisionExtensionModal';
+import { EnableSoftphonePopover } from '@/components/lemtel/EnableSoftphonePopover';
 import { formatDistanceToNow } from 'date-fns';
 
 type ExtType = { label: string; cls: string };
