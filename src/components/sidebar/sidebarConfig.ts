@@ -28,10 +28,9 @@ export interface NavGroup {
 export const sidebarGroups: NavGroup[] = [
   {
     id: 'overview',
-    labelKey: 'sidebar.groups.overview',
-    icon: LayoutDashboard,
+    labelKey: 'sidebar.dashboard',
+    icon: TrendingUp,
     items: [
-      { nameKey: 'sidebar.home', href: '/', icon: Home },
       { nameKey: 'sidebar.dashboard', href: '/dashboard', icon: TrendingUp },
     ]
   },
