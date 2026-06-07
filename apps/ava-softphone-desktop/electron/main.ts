@@ -131,6 +131,13 @@ app.whenReady().then(() => {
     });
   }
 
+  // macOS: trigger native OS prompts for microphone & camera (TCC). Speaker
+  // output never requires authorization. On Windows/Linux this is a no-op.
+  if (process.platform === 'darwin' && systemPreferences?.askForMediaAccess) {
+    systemPreferences.askForMediaAccess('microphone').catch(() => { /* noop */ });
+    systemPreferences.askForMediaAccess('camera').catch(() => { /* noop */ });
+  }
+
   if (store.get('launchOnStartup', true)) {
     app.setLoginItemSettings({ openAtLogin: true });
   }
