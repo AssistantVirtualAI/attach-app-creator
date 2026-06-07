@@ -919,11 +919,11 @@ function ControlBtn({
   active?: boolean; danger?: boolean; warning?: boolean; disabled?: boolean;
 }) {
   const bg = active
-    ? danger ? 'rgba(239,68,68,0.18)' : warning ? 'rgba(245,158,11,0.18)' : 'rgba(255,215,0,0.15)'
-    : 'rgba(255,255,255,0.05)';
+    ? danger ? 'rgba(254,226,226,0.98)' : warning ? 'rgba(255,247,237,0.98)' : 'rgba(255,251,235,0.98)'
+    : 'rgba(255,255,255,0.88)';
   const bd = active
-    ? danger ? 'rgba(239,68,68,0.5)' : warning ? 'rgba(245,158,11,0.5)' : c.borderGold
-    : c.border;
+    ? danger ? 'rgba(220,38,38,0.55)' : warning ? 'rgba(217,119,6,0.58)' : 'rgba(224,168,0,0.60)'
+    : 'rgba(0,61,166,0.18)';
   const col = active
     ? danger ? c.red : warning ? c.yellow : c.gold
     : c.text;
@@ -939,9 +939,10 @@ function ControlBtn({
         background: bg, border: `1px solid ${bd}`, color: col,
         cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        fontSize: 11, fontWeight: 600, letterSpacing: 0.3,
+        fontSize: 11, fontWeight: 800, letterSpacing: 0.3,
         transition: 'all .15s ease',
-        boxShadow: active ? `0 0 12px ${col}33` : 'none',
+        boxShadow: active ? `0 8px 18px -12px ${col}` : '0 5px 16px -14px rgba(0,61,166,0.55)',
+        whiteSpace: 'nowrap',
       }}
     >
       <span aria-hidden="true" style={{ fontSize: 14 }}>{icon}</span>
