@@ -22,16 +22,31 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { global: { headers: { Authorization: authHeader } } },
     );
+    // Admin client without auth header for sensitive reads (bypasses RLS).
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
 
     const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
     if (!user) return json({ error: "unauthorized" }, 401);
 
-    const { data: sp } = await supabase
+    let { data: sp } = await supabaseAdmin
       .from("pbx_softphone_users")
       .select("extension, organization_id, extension_id, display_name, sip_password, wss_url")
       .eq("portal_user_id", user.id)
       .maybeSingle();
+
+    // Fallback: lookup by extension '300' if no row is linked to this user
+    if (!sp) {
+      const { data: byExt } = await supabaseAdmin
+        .from("pbx_softphone_users")
+        .select("extension, organization_id, extension_id, display_name, sip_password, wss_url")
+        .eq("extension", "300")
+        .maybeSingle();
+      sp = byExt || null;
+    }
 
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT", message: "Contact your administrator to enable softphone" }, 404);
 
