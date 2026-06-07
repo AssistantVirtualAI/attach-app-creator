@@ -105,6 +105,7 @@ import TelephonyWebphone from "./pages/telephony/TelephonyWebphone";
 import TelephonyVoicemail from "./pages/telephony/TelephonyVoicemail";
 import TelephonyDiagnostics from "./pages/telephony/TelephonyDiagnostics";
 import TelephonyChecklist from "./pages/telephony/TelephonyChecklist";
+import TelephonyPortalMappings from "./pages/telephony/TelephonyPortalMappings";
 import TelephonyUsers from "./pages/telephony/TelephonyUsers";
 import { TelephonyLayout } from "./components/telephony/TelephonyLayout";
 import { PortalGuard } from "./components/telephony/PortalGuard";
