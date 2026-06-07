@@ -207,6 +207,7 @@ export default function LemtelExtensions() {
           )}
         </CardContent>
       </Card>
+      <ExtensionStatusDialog open={!!statusExt} onOpenChange={(v) => !v && setStatusExt(null)} ext={statusExt} />
       <p className="text-xs text-muted-foreground text-right">Press R to refresh</p>
     </div>
     </TooltipProvider>
