@@ -18,6 +18,32 @@ let isQuitting = false;
 
 app.setName(APP_NAME);
 
+// ---------- Crash recovery: prevent renderer crashes from killing the app ----------
+process.on('uncaughtException', (error) => {
+  console.error('[main] Uncaught exception:', error);
+});
+
+app.on('render-process-gone', (_event, _webContents, details) => {
+  console.error('[main] Renderer process gone:', details.reason);
+  if (details.reason !== 'clean-exit' && mainWindow) {
+    setTimeout(() => {
+      try {
+        if (process.env.NODE_ENV === 'development') {
+          mainWindow?.loadURL('http://localhost:5173');
+        } else {
+          mainWindow?.loadFile(path.join(__dirname, '../dist/index.html'));
+        }
+      } catch (e) {
+        console.error('[main] Failed to reload after crash:', e);
+      }
+    }, 1000);
+  }
+});
+
+app.on('child-process-gone', (_event, details) => {
+  console.error('[main] Child process gone:', details.type, details.reason);
+});
+
 // Register lemtel:// custom protocol
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
