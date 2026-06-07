@@ -1,12 +1,21 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { CheckCircle2, XCircle, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { usePbxRegistrations } from '@/hooks/usePbxData';
+
+function generatePassword(len = 16) {
+  const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*';
+  const arr = new Uint32Array(len);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (n) => chars[n % chars.length]).join('');
+}
 
 const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 const DOMAIN_UUID = '2936594e-17b7-42a9-9165-95be48627923';
@@ -32,11 +41,14 @@ export function ExtensionStatusDialog({ open, onOpenChange, ext }: Props) {
   const prov = ext?.raw_data?.provisioning ?? null;
   const extResult = prov?.extension_result;
   const vmResult = prov?.voicemail_result;
-  const sipPassword = ext?.raw_data?.sip_password || ext?.raw_data?.password;
+  const storedPassword = ext?.raw_data?.sip_password || ext?.raw_data?.password || '';
+  const [pwdInput, setPwdInput] = useState('');
+  useEffect(() => { setPwdInput(storedPassword || generatePassword()); }, [ext?.id, storedPassword]);
   const registered = (regs as any[]).some((r) => String(r.extension ?? r.user ?? '').startsWith(String(ext.extension)));
 
   const pushToFusionPBX = async () => {
-    if (!sipPassword) { toast.error('No stored SIP password — recreate the extension'); return; }
+    const sipPassword = (pwdInput || '').trim();
+    if (sipPassword.length < 8) { toast.error('SIP password must be at least 8 characters'); return; }
     setPushing(true);
     try {
       const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
@@ -63,6 +75,8 @@ export function ExtensionStatusDialog({ open, onOpenChange, ext }: Props) {
         pbx_uuid: r.extension_uuid ?? ext.pbx_uuid,
         raw_data: {
           ...(ext.raw_data || {}),
+          password: sipPassword,
+          sip_password: sipPassword,
           provisioning: {
             extension_result: r.extension_result,
             voicemail_result: r.voicemail_result,
@@ -71,6 +85,9 @@ export function ExtensionStatusDialog({ open, onOpenChange, ext }: Props) {
         },
         synced_at: new Date().toISOString(),
       }).eq('id', ext.id);
+      await supabase.from('pbx_softphone_users' as any)
+        .update({ sip_password: sipPassword })
+        .eq('extension', String(ext.extension));
       qc.invalidateQueries({ queryKey: ['pbx'] });
       toast.success(`Extension ${ext.extension} pushed to FusionPBX`);
     } catch (e: any) {
@@ -105,12 +122,23 @@ export function ExtensionStatusDialog({ open, onOpenChange, ext }: Props) {
           </div>
 
           {!ext.pbx_uuid && (
-            <div className="rounded-md border border-orange-500/40 bg-orange-500/10 p-3 flex items-center justify-between">
+            <div className="rounded-md border border-orange-500/40 bg-orange-500/10 p-3 space-y-3">
               <div className="text-sm">This extension exists locally but was not pushed to FusionPBX.</div>
-              <Button size="sm" onClick={pushToFusionPBX} disabled={pushing}>
-                {pushing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                Push to FusionPBX
-              </Button>
+              <div className="space-y-1">
+                <Label htmlFor="repair-pwd" className="text-xs">SIP password {storedPassword ? '(stored)' : '(generated — set/edit before push)'}</Label>
+                <div className="flex gap-2">
+                  <Input id="repair-pwd" value={pwdInput} onChange={(e) => setPwdInput(e.target.value)} className="font-mono text-xs" />
+                  <Button type="button" variant="outline" size="icon" onClick={() => setPwdInput(generatePassword())} title="Generate">
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button size="sm" onClick={pushToFusionPBX} disabled={pushing}>
+                  {pushing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                  Push to FusionPBX
+                </Button>
+              </div>
             </div>
           )}
 
