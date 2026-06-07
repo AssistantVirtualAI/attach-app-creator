@@ -1,6 +1,7 @@
+import * as JsSIP from 'jssip';
+
 // JsSIP UA lifecycle manager — desktop softphone.
 // Mirrors the web app provider with extras: attended transfer, audio device pinning.
-declare global { interface Window { JsSIP: any } }
 
 export type SipStatus =
   | 'idle' | 'connecting' | 'connected' | 'registered'
