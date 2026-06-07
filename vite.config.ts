@@ -8,6 +8,10 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    hmr: {
+      protocol: "wss",
+      clientPort: 443,
+    },
     headers: {
       "Cache-Control": "no-store, max-age=0, must-revalidate",
       Pragma: "no-cache",
