@@ -259,6 +259,7 @@ export const useAuth = () => {
     signIn,
     signInWithGoogle,
     signInWithMicrosoft,
+    signInWithApple,
     resetPassword,
     updatePassword,
     signOut,
