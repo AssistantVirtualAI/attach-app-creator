@@ -74,7 +74,20 @@ const PrivacyPolicy = () => {
         ],
       },
       {
-        title: '6. Contact',
+        title: '6. Extension Chrome Lemtel Telecom',
+        body: 'L\'extension Chrome Lemtel Telecom aide les utilisateurs à détecter les numéros de téléphone sur les pages web et à initier des actions de click-to-dial via les services télécom Lemtel/AVA autorisés.',
+        items: [
+          'L\'extension ne vend aucune donnée d\'utilisateur',
+          'L\'extension ne collecte pas l\'historique de navigation',
+          'L\'extension n\'utilise aucun code distant — tout le code exécutable est intégré dans l\'extension',
+          'L\'extension peut traiter localement le texte visible des pages web dans le navigateur afin de détecter les numéros de téléphone et d\'activer la fonctionnalité de click-to-dial',
+          'L\'extension peut stocker des paramètres limités dans le navigateur (préférences utilisateur, configuration de numérotation, paramètres de session nécessaires au fonctionnement)',
+          'Lorsqu\'un utilisateur lance un appel, l\'extension peut communiquer avec les services télécom Lemtel/AVA autorisés afin d\'initier l\'action d\'appel demandée. Les données transmises sont limitées à ce qui est nécessaire pour fournir le service télécom',
+        ],
+        footer: 'Pour toute question relative à l\'extension, contactez privacy@lemtel.ca.',
+      },
+      {
+        title: '7. Contact',
         body: 'Pour toute question relative à cette politique ou à vos données personnelles :',
       },
     ],
@@ -145,7 +158,20 @@ const PrivacyPolicy = () => {
         ],
       },
       {
-        title: '6. Contact',
+        title: '6. Lemtel Telecom Chrome Extension',
+        body: 'The Lemtel Telecom Chrome Extension helps users detect phone numbers on webpages and initiate click-to-dial actions through authorized Lemtel/AVA telecom services.',
+        items: [
+          'The extension does not sell user data',
+          'The extension does not collect browsing history',
+          'The extension does not use remote code — all executable code is packaged inside the extension',
+          'The extension may process visible webpage text locally in the browser to detect phone numbers and enable click-to-dial functionality',
+          'The extension may store limited settings in the browser, such as user preferences, dialing configuration, and session-related settings required to operate the extension',
+          'When a user starts a call, the extension may communicate with authorized Lemtel/AVA telecom services to initiate the requested calling action. Data transmitted is limited to what is necessary to provide the telecom service',
+        ],
+        footer: 'For questions about the extension, contact privacy@lemtel.ca.',
+      },
+      {
+        title: '7. Contact',
         body: 'For any questions regarding this policy or your personal data:',
       },
     ],
@@ -162,7 +188,10 @@ const PrivacyPolicy = () => {
     '4. User Rights': <User className="w-6 h-6 text-primary" />,
     '5. Sécurité': <Shield className="w-6 h-6 text-primary" />,
     '5. Security': <Shield className="w-6 h-6 text-primary" />,
+    '6. Extension Chrome Lemtel Telecom': <Globe className="w-6 h-6 text-primary" />,
+    '6. Lemtel Telecom Chrome Extension': <Globe className="w-6 h-6 text-primary" />,
     '6. Contact': <Mail className="w-6 h-6 text-primary" />,
+    '7. Contact': <Mail className="w-6 h-6 text-primary" />,
   };
 
   return (
