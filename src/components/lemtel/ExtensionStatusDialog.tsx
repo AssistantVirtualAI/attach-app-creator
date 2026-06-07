@@ -75,6 +75,8 @@ export function ExtensionStatusDialog({ open, onOpenChange, ext }: Props) {
         pbx_uuid: r.extension_uuid ?? ext.pbx_uuid,
         raw_data: {
           ...(ext.raw_data || {}),
+          password: sipPassword,
+          sip_password: sipPassword,
           provisioning: {
             extension_result: r.extension_result,
             voicemail_result: r.voicemail_result,
@@ -83,6 +85,9 @@ export function ExtensionStatusDialog({ open, onOpenChange, ext }: Props) {
         },
         synced_at: new Date().toISOString(),
       }).eq('id', ext.id);
+      await supabase.from('pbx_softphone_users' as any)
+        .update({ sip_password: sipPassword })
+        .eq('extension', String(ext.extension));
       qc.invalidateQueries({ queryKey: ['pbx'] });
       toast.success(`Extension ${ext.extension} pushed to FusionPBX`);
     } catch (e: any) {
