@@ -104,7 +104,7 @@ const avaCacheBustPlugin = (monitoringUrl = "", monitoringKey = ""): Plugin => {
           }
           const count = Number(sessionStorage.getItem(STYLE_RELOAD_KEY) || "0") + 1;
           sessionStorage.setItem(STYLE_RELOAD_KEY, String(count));
-          if (count <= 6) return hardReload("missing-styles-" + reason);
+          if (count <= 1) return hardReload("missing-styles-" + reason);
           remember("style-reload-loop-stopped", { reason, count });
         };
         const hardReload = async (reason) => {
