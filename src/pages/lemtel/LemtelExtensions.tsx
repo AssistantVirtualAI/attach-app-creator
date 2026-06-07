@@ -98,7 +98,7 @@ export default function LemtelExtensions() {
           <Button onClick={() => setProvisionOpen(true)}><Plus className="w-4 h-4 mr-2" /> New Extension</Button>
         </div>
       </div>
-      <ProvisionExtensionModal open={provisionOpen} onOpenChange={setProvisionOpen} />
+      <ProvisionExtensionModal open={provisionOpen} onOpenChange={(v) => { setProvisionOpen(v); if (!v) setPrefill(undefined); }} prefill={prefill} />
 
       <div className="flex flex-wrap gap-2 items-center">
         {Object.entries(stats).map(([k, v]) => {
