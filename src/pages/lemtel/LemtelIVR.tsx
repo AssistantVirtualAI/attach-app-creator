@@ -72,6 +72,7 @@ export default function LemtelIVR() {
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState<'generate' | 'save' | null>(null);
+  const selectedVoiceName = VOICES.find((voice) => voice.id === voiceId)?.name || voiceId;
 
   // Load existing greeting/audio when selecting an IVR
   useEffect(() => {
@@ -186,7 +187,6 @@ export default function LemtelIVR() {
     setSaveError(null);
     setSaving(true);
     try {
-      const voiceName = VOICES.find((voice) => voice.id === voiceId)?.name || voiceId;
       const { error } = await supabase
         .from('pbx_ivrs')
         .update({
@@ -199,7 +199,7 @@ export default function LemtelIVR() {
               storage_path: preview.storage_path,
               script_text: script,
               elevenlabs_voice_id: voiceId,
-              voice_name: voiceName,
+              voice_name: selectedVoiceName,
               language,
               saved_at: new Date().toISOString(),
             },
