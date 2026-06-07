@@ -123,7 +123,13 @@ class JsSipProvider {
       return;
     }
 
-    // JsSIP is imported as an npm module — always available
+    if (!JSSIP_MODULE_INFO.loaded) {
+      const msg = `JsSIP module failed to load: ${JSSIP_MODULE_INFO['error' as keyof typeof JSSIP_MODULE_INFO] || 'no UA export'}`;
+      this.logEvent('error', msg);
+      this.update({ status: 'error', errorCause: msg });
+      return;
+    }
+    this.logEvent('info', `JsSIP module ready (version=${JSSIP_MODULE_INFO.version})`);
 
     const isElectron = typeof window !== 'undefined' &&
       typeof window.navigator !== 'undefined' &&
@@ -140,8 +146,9 @@ class JsSipProvider {
         'wss://pbxnode.lemtel.tel:7443',
         'wss://170.39.199.132:7443',
       ].filter(Boolean)));
+      this.wssAttempted = fallbackUrls;
 
-      this.logEvent('info', `Init sip:${cfg.extension}@${cfg.sipDomain} via ${fallbackUrls.length} WSS endpoint(s)`);
+      this.logEvent('info', `Init sip:${cfg.extension}@${cfg.sipDomain} via ${fallbackUrls.length} WSS endpoint(s): ${fallbackUrls.join(', ')}`);
 
       const sockets = fallbackUrls.map(
         (url) => new JsSIP.WebSocketInterface(url),
