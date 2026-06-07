@@ -91,6 +91,20 @@ export default function SoftphonePane({
     return () => { if (permRef) permRef.onchange = null; };
   }, []);
 
+  // Pre-request microphone on mount so the first call can't crash the renderer
+  // by triggering an unhandled getUserMedia rejection inside JsSIP.
+  useEffect(() => {
+    navigator.mediaDevices?.getUserMedia({ audio: true })
+      .then((stream) => {
+        stream.getTracks().forEach((t) => t.stop());
+        setMicPermission('granted');
+        console.log('[softphone] Microphone pre-authorized ✅');
+      })
+      .catch((err) => {
+        console.warn('[softphone] Microphone pre-auth failed:', err?.message || err);
+      });
+  }, []);
+
   const requestMic = async () => {
     try {
       const s = await navigator.mediaDevices.getUserMedia({ audio: true });
