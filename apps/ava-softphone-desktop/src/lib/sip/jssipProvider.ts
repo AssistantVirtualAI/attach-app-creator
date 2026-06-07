@@ -1,6 +1,7 @@
+import * as JsSIP from 'jssip';
+
 // JsSIP UA lifecycle manager — desktop softphone.
 // Mirrors the web app provider with extras: attended transfer, audio device pinning.
-declare global { interface Window { JsSIP: any } }
 
 export type SipStatus =
   | 'idle' | 'connecting' | 'connected' | 'registered'
@@ -102,11 +103,7 @@ class JsSipProvider {
       return;
     }
 
-    if (!window.JsSIP) {
-      this.logEvent('error', 'JsSIP library not loaded on window');
-      this.update({ status: 'error', errorCause: 'JsSIP not loaded' });
-      return;
-    }
+    // JsSIP is imported as an npm module — always available
 
     const isElectron = typeof window !== 'undefined' &&
       typeof window.navigator !== 'undefined' &&
@@ -127,11 +124,11 @@ class JsSipProvider {
       this.logEvent('info', `Init sip:${cfg.extension}@${cfg.sipDomain} via ${fallbackUrls.length} WSS endpoint(s)`);
 
       const sockets = fallbackUrls.map(
-        (url) => new window.JsSIP.WebSocketInterface(url),
+        (url) => new JsSIP.WebSocketInterface(url),
       );
       sockets.forEach((s: any) => { try { s.via_transport = 'wss'; } catch { /* noop */ } });
 
-      const ua = new window.JsSIP.UA({
+      const ua = new JsSIP.UA({
         sockets,
         uri: `sip:${cfg.extension}@${cfg.sipDomain}`,
         password: cfg.password,
@@ -144,10 +141,7 @@ class JsSipProvider {
         connection_recovery_min_interval: 2,
         connection_recovery_max_interval: 30,
         user_agent: 'Lemtel Telecom 1.1',
-        hack_via_tcp: false,
-        hack_ip_in_contact: false,
-        hack_wss_in_transport: true,
-        use_preloaded_route: false,
+        hackWssInTransport: true,
       });
 
       ua.on('connecting', () => {
