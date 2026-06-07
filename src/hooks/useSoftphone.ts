@@ -76,6 +76,39 @@ export function useSoftphone() {
     }
   }, [snap.callState, snap.remoteIdentity, snap.remoteNumber]);
 
+  // Persist call history to pbx_call_records when a call ends
+  useEffect(() => {
+    if (snap.callState === "ringing-out" || snap.callState === "ringing-in" || snap.callState === "active") {
+      if (!callStartRef.current) callStartRef.current = Date.now();
+      callMetaRef.current = {
+        direction: snap.direction,
+        remote: snap.remoteNumber || snap.remoteIdentity || "",
+      };
+    }
+    if (snap.callState === "ended" && callStartRef.current && user) {
+      const startedAt = new Date(callStartRef.current).toISOString();
+      const endedAt = new Date().toISOString();
+      const durationSec = Math.max(0, Math.round((Date.now() - callStartRef.current) / 1000));
+      const meta = callMetaRef.current;
+      callStartRef.current = null;
+      callMetaRef.current = { direction: null, remote: "" };
+      if (meta.remote) {
+        (supabase.rpc as any)("log_softphone_call", {
+          _direction: meta.direction === "in" ? "inbound" : "outbound",
+          _remote_number: meta.remote,
+          _started_at: startedAt,
+          _ended_at: endedAt,
+          _duration_seconds: durationSec,
+          _hangup_cause: snap.errorCause || null,
+          _sip_call_id: null,
+        }).then(({ error }: any) => {
+          if (error) console.warn("[softphone] log_softphone_call failed:", error.message);
+          else queryClient.invalidateQueries({ queryKey: ["webphone-recents"] });
+        });
+      }
+    }
+  }, [snap.callState, snap.direction, snap.remoteNumber, snap.remoteIdentity, snap.errorCause, user, queryClient]);
+
   // Update status in DB
   const setStatus = useCallback(async (s: UserStatus) => {
     setUserStatus(s);
