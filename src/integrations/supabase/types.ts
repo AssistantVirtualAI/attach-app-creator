@@ -2282,6 +2282,107 @@ export type Database = {
           },
         ]
       }
+      org_chat_channels: {
+        Row: {
+          channel_type: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          members: string[]
+          name: string
+          organization_id: string
+          pinned_messages: string[]
+          updated_at: string
+        }
+        Insert: {
+          channel_type?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          members?: string[]
+          name: string
+          organization_id: string
+          pinned_messages?: string[]
+          updated_at?: string
+        }
+        Update: {
+          channel_type?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          members?: string[]
+          name?: string
+          organization_id?: string
+          pinned_messages?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      org_chat_messages: {
+        Row: {
+          attachments: Json
+          channel_id: string | null
+          content: string
+          created_at: string
+          edited_at: string | null
+          id: string
+          message_type: string
+          organization_id: string
+          reactions: Json
+          read_by: string[]
+          recipient_id: string | null
+          reply_to: string | null
+          sender_extension: string | null
+          sender_id: string | null
+          sender_name: string | null
+        }
+        Insert: {
+          attachments?: Json
+          channel_id?: string | null
+          content: string
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+          message_type?: string
+          organization_id: string
+          reactions?: Json
+          read_by?: string[]
+          recipient_id?: string | null
+          reply_to?: string | null
+          sender_extension?: string | null
+          sender_id?: string | null
+          sender_name?: string | null
+        }
+        Update: {
+          attachments?: Json
+          channel_id?: string | null
+          content?: string
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+          message_type?: string
+          organization_id?: string
+          reactions?: Json
+          read_by?: string[]
+          recipient_id?: string | null
+          reply_to?: string | null
+          sender_extension?: string | null
+          sender_id?: string | null
+          sender_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_chat_messages_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "org_chat_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_exports: {
         Row: {
           content: string
@@ -2837,6 +2938,63 @@ export type Database = {
           },
         ]
       }
+      pbx_call_forwarding: {
+        Row: {
+          allow_from: string
+          always_enabled: boolean
+          always_to: string | null
+          busy_enabled: boolean
+          busy_to: string | null
+          dnd_enabled: boolean
+          dnd_schedule: Json
+          no_answer_enabled: boolean
+          no_answer_seconds: number
+          no_answer_to: string | null
+          offline_enabled: boolean
+          offline_to: string | null
+          organization_id: string | null
+          updated_at: string
+          user_id: string
+          whitelist: string[]
+        }
+        Insert: {
+          allow_from?: string
+          always_enabled?: boolean
+          always_to?: string | null
+          busy_enabled?: boolean
+          busy_to?: string | null
+          dnd_enabled?: boolean
+          dnd_schedule?: Json
+          no_answer_enabled?: boolean
+          no_answer_seconds?: number
+          no_answer_to?: string | null
+          offline_enabled?: boolean
+          offline_to?: string | null
+          organization_id?: string | null
+          updated_at?: string
+          user_id: string
+          whitelist?: string[]
+        }
+        Update: {
+          allow_from?: string
+          always_enabled?: boolean
+          always_to?: string | null
+          busy_enabled?: boolean
+          busy_to?: string | null
+          dnd_enabled?: boolean
+          dnd_schedule?: Json
+          no_answer_enabled?: boolean
+          no_answer_seconds?: number
+          no_answer_to?: string | null
+          offline_enabled?: boolean
+          offline_to?: string | null
+          organization_id?: string | null
+          updated_at?: string
+          user_id?: string
+          whitelist?: string[]
+        }
+        Relationships: []
+      }
       pbx_call_queues: {
         Row: {
           client_id: string | null
@@ -2915,6 +3073,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pbx_call_recording_rules: {
+        Row: {
+          announce: boolean
+          record_all: boolean
+          record_inbound: boolean
+          record_outbound: boolean
+          retention_days: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          announce?: boolean
+          record_all?: boolean
+          record_inbound?: boolean
+          record_outbound?: boolean
+          retention_days?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          announce?: boolean
+          record_all?: boolean
+          record_inbound?: boolean
+          record_outbound?: boolean
+          retention_days?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       pbx_call_recordings: {
         Row: {
@@ -3005,6 +3193,7 @@ export type Database = {
           client_id: string | null
           codec: string | null
           created_at: string | null
+          crm_synced: boolean | null
           destination: string | null
           destination_number: string | null
           direction: string | null
@@ -3020,6 +3209,7 @@ export type Database = {
           ivr_menu_uuid: string | null
           missed_call: boolean | null
           mos: number | null
+          notes: string | null
           organization_id: string
           pbx_uuid: string | null
           pdd: number | null
@@ -3032,6 +3222,7 @@ export type Database = {
           sip_call_id: string | null
           source_number: string | null
           start_at: string | null
+          tags: string[] | null
           transcribed: boolean | null
           tta: number | null
           voicemail_message: string | null
@@ -3048,6 +3239,7 @@ export type Database = {
           client_id?: string | null
           codec?: string | null
           created_at?: string | null
+          crm_synced?: boolean | null
           destination?: string | null
           destination_number?: string | null
           direction?: string | null
@@ -3063,6 +3255,7 @@ export type Database = {
           ivr_menu_uuid?: string | null
           missed_call?: boolean | null
           mos?: number | null
+          notes?: string | null
           organization_id: string
           pbx_uuid?: string | null
           pdd?: number | null
@@ -3075,6 +3268,7 @@ export type Database = {
           sip_call_id?: string | null
           source_number?: string | null
           start_at?: string | null
+          tags?: string[] | null
           transcribed?: boolean | null
           tta?: number | null
           voicemail_message?: string | null
@@ -3091,6 +3285,7 @@ export type Database = {
           client_id?: string | null
           codec?: string | null
           created_at?: string | null
+          crm_synced?: boolean | null
           destination?: string | null
           destination_number?: string | null
           direction?: string | null
@@ -3106,6 +3301,7 @@ export type Database = {
           ivr_menu_uuid?: string | null
           missed_call?: boolean | null
           mos?: number | null
+          notes?: string | null
           organization_id?: string
           pbx_uuid?: string | null
           pdd?: number | null
@@ -3118,6 +3314,7 @@ export type Database = {
           sip_call_id?: string | null
           source_number?: string | null
           start_at?: string | null
+          tags?: string[] | null
           transcribed?: boolean | null
           tta?: number | null
           voicemail_message?: string | null
@@ -3763,6 +3960,42 @@ export type Database = {
           },
         ]
       }
+      pbx_queue_agent_state: {
+        Row: {
+          id: string
+          joined_at: string
+          last_call_at: string | null
+          organization_id: string | null
+          paused: boolean
+          queue_id: string
+          queue_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          last_call_at?: string | null
+          organization_id?: string | null
+          paused?: boolean
+          queue_id: string
+          queue_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          last_call_at?: string | null
+          organization_id?: string | null
+          paused?: boolean
+          queue_id?: string
+          queue_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       pbx_queue_agents: {
         Row: {
           agent_id: string | null
@@ -4107,6 +4340,7 @@ export type Database = {
           active_platforms: string[]
           client_id: string | null
           created_at: string | null
+          custom_status: string | null
           device_type: string | null
           display_name: string | null
           dnd_enabled: boolean
@@ -4123,10 +4357,12 @@ export type Database = {
           last_seen_web: string | null
           last_seen_windows: string | null
           organization_id: string
+          out_of_office_until: string | null
           portal_user_id: string | null
           sip_domain: string | null
           sip_password: string | null
           status: string | null
+          status_emoji: string | null
           total_calls: number
           updated_at: string | null
           wss_url: string | null
@@ -4136,6 +4372,7 @@ export type Database = {
           active_platforms?: string[]
           client_id?: string | null
           created_at?: string | null
+          custom_status?: string | null
           device_type?: string | null
           display_name?: string | null
           dnd_enabled?: boolean
@@ -4152,10 +4389,12 @@ export type Database = {
           last_seen_web?: string | null
           last_seen_windows?: string | null
           organization_id: string
+          out_of_office_until?: string | null
           portal_user_id?: string | null
           sip_domain?: string | null
           sip_password?: string | null
           status?: string | null
+          status_emoji?: string | null
           total_calls?: number
           updated_at?: string | null
           wss_url?: string | null
@@ -4165,6 +4404,7 @@ export type Database = {
           active_platforms?: string[]
           client_id?: string | null
           created_at?: string | null
+          custom_status?: string | null
           device_type?: string | null
           display_name?: string | null
           dnd_enabled?: boolean
@@ -4181,10 +4421,12 @@ export type Database = {
           last_seen_web?: string | null
           last_seen_windows?: string | null
           organization_id?: string
+          out_of_office_until?: string | null
           portal_user_id?: string | null
           sip_domain?: string | null
           sip_password?: string | null
           status?: string | null
+          status_emoji?: string | null
           total_calls?: number
           updated_at?: string | null
           wss_url?: string | null
@@ -4263,6 +4505,150 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pbx_user_devices: {
+        Row: {
+          created_at: string
+          current_session: boolean
+          device_name: string | null
+          id: string
+          last_active_at: string
+          platform: string
+          push_token: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_session?: boolean
+          device_name?: string | null
+          id?: string
+          last_active_at?: string
+          platform: string
+          push_token?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_session?: boolean
+          device_name?: string | null
+          id?: string
+          last_active_at?: string
+          platform?: string
+          push_token?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      pbx_voicemail_settings: {
+        Row: {
+          attach_audio_email: boolean
+          greeting_storage_path: string | null
+          greeting_tts_text: string | null
+          greeting_type: string
+          notify_email: boolean
+          notify_email_address: string | null
+          notify_push: boolean
+          notify_sms: boolean
+          notify_sms_number: string | null
+          pin_hash: string | null
+          transcription_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attach_audio_email?: boolean
+          greeting_storage_path?: string | null
+          greeting_tts_text?: string | null
+          greeting_type?: string
+          notify_email?: boolean
+          notify_email_address?: string | null
+          notify_push?: boolean
+          notify_sms?: boolean
+          notify_sms_number?: string | null
+          pin_hash?: string | null
+          transcription_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attach_audio_email?: boolean
+          greeting_storage_path?: string | null
+          greeting_tts_text?: string | null
+          greeting_type?: string
+          notify_email?: boolean
+          notify_email_address?: string | null
+          notify_push?: boolean
+          notify_sms?: boolean
+          notify_sms_number?: string | null
+          pin_hash?: string | null
+          transcription_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      pbx_voicemails: {
+        Row: {
+          ai_summary: string | null
+          ai_tags: string[]
+          audio_storage_path: string | null
+          caller_name: string | null
+          caller_number: string | null
+          created_at: string
+          deleted_at: string | null
+          duration_seconds: number
+          extension: string
+          folder: string
+          fusionpbx_uuid: string | null
+          id: string
+          mailbox: string | null
+          organization_id: string
+          read_at: string | null
+          received_at: string
+          transcript: string | null
+        }
+        Insert: {
+          ai_summary?: string | null
+          ai_tags?: string[]
+          audio_storage_path?: string | null
+          caller_name?: string | null
+          caller_number?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          duration_seconds?: number
+          extension: string
+          folder?: string
+          fusionpbx_uuid?: string | null
+          id?: string
+          mailbox?: string | null
+          organization_id: string
+          read_at?: string | null
+          received_at?: string
+          transcript?: string | null
+        }
+        Update: {
+          ai_summary?: string | null
+          ai_tags?: string[]
+          audio_storage_path?: string | null
+          caller_name?: string | null
+          caller_number?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          duration_seconds?: number
+          extension?: string
+          folder?: string
+          fusionpbx_uuid?: string | null
+          id?: string
+          mailbox?: string | null
+          organization_id?: string
+          read_at?: string | null
+          received_at?: string
+          transcript?: string | null
+        }
+        Relationships: []
       }
       performance_metrics: {
         Row: {
@@ -4777,6 +5163,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_notification_prefs: {
+        Row: {
+          prefs: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          prefs?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          prefs?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_presence: {
+        Row: {
+          call_state: string
+          extension: string | null
+          last_seen_at: string
+          organization_id: string | null
+          platform: string | null
+          return_at: string | null
+          status: string
+          status_emoji: string | null
+          status_message: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          call_state?: string
+          extension?: string | null
+          last_seen_at?: string
+          organization_id?: string | null
+          platform?: string | null
+          return_at?: string | null
+          status?: string
+          status_emoji?: string | null
+          status_message?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          call_state?: string
+          extension?: string | null
+          last_seen_at?: string
+          organization_id?: string | null
+          platform?: string | null
+          return_at?: string | null
+          status?: string
+          status_emoji?: string | null
+          status_message?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
@@ -5303,6 +5749,7 @@ export type Database = {
         Args: { _name: string; _slug: string }
         Returns: string
       }
+      current_user_org_ids: { Args: never; Returns: string[] }
       generate_agent_slug: { Args: { agent_name: string }; Returns: string }
       generate_api_key: { Args: never; Returns: string }
       generate_unique_username: { Args: { base_name: string }; Returns: string }
@@ -5342,12 +5789,31 @@ export type Database = {
         }
         Returns: string
       }
+      mark_voicemail_read: { Args: { _id: string }; Returns: undefined }
       run_security_audit: { Args: { _org_id: string }; Returns: Json }
+      set_call_notes: {
+        Args: { _call_id: string; _notes: string; _tags?: string[] }
+        Returns: undefined
+      }
       setup_new_user_organization: {
         Args: { _full_name?: string; _user_email: string; _user_id: string }
         Returns: string
       }
+      toggle_queue_pause: {
+        Args: { _paused: boolean; _queue_id: string }
+        Returns: undefined
+      }
       update_platform_seen: { Args: { p_platform: string }; Returns: undefined }
+      upsert_user_presence: {
+        Args: {
+          _call_state?: string
+          _emoji?: string
+          _message?: string
+          _platform?: string
+          _status: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "super_admin" | "org_admin" | "manager" | "agent" | "viewer"
