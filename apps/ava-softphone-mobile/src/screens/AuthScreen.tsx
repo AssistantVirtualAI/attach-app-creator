@@ -92,8 +92,9 @@ function Field({ label, value, onChange, type = 'text', autoFocus }: any) {
         onChange={(e) => onChange(e.target.value)}
         style={{
           height: 48, padding: '0 16px', borderRadius: 12,
-          background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)',
-          color: 'white', fontSize: 16, outline: 'none',
+          background: 'rgba(255,255,255,0.78)', border: '1px solid var(--border)',
+          color: 'var(--text)', fontSize: 16, outline: 'none',
+          backdropFilter: 'blur(10px)',
         }}
       />
     </label>
