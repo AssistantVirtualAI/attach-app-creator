@@ -104,6 +104,7 @@ import TelephonyAI from "./pages/telephony/TelephonyAI";
 import TelephonyWebphone from "./pages/telephony/TelephonyWebphone";
 import TelephonyVoicemail from "./pages/telephony/TelephonyVoicemail";
 import TelephonyTeam from "./pages/telephony/TelephonyTeam";
+import TelephonyUserPreferences from "./pages/telephony/TelephonyUserPreferences";
 import TelephonyDiagnostics from "./pages/telephony/TelephonyDiagnostics";
 import TelephonyChecklist from "./pages/telephony/TelephonyChecklist";
 import TelephonyPortalMappings from "./pages/telephony/TelephonyPortalMappings";
