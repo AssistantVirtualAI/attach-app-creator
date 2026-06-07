@@ -5330,6 +5330,18 @@ export type Database = {
         Args: { _action: string; _metadata?: Json; _org_id: string }
         Returns: undefined
       }
+      log_softphone_call: {
+        Args: {
+          _direction: string
+          _duration_seconds: number
+          _ended_at: string
+          _hangup_cause?: string
+          _remote_number: string
+          _sip_call_id?: string
+          _started_at: string
+        }
+        Returns: string
+      }
       run_security_audit: { Args: { _org_id: string }; Returns: Json }
       setup_new_user_organization: {
         Args: { _full_name?: string; _user_email: string; _user_id: string }
