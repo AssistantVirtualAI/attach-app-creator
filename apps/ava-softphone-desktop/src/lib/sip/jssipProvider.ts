@@ -1,5 +1,20 @@
 import * as JsSIP from 'jssip';
 
+// Module load probe — captured at import time so debug report can show it.
+const JSSIP_MODULE_INFO = (() => {
+  try {
+    const keys = JsSIP ? Object.keys(JsSIP as any) : [];
+    return {
+      loaded: !!(JsSIP && (JsSIP as any).UA),
+      version: (JsSIP as any)?.version || (JsSIP as any)?.default?.version || 'unknown',
+      exports: keys.slice(0, 20),
+      source: 'npm:jssip',
+    };
+  } catch (e: any) {
+    return { loaded: false, version: 'unknown', exports: [], source: 'npm:jssip', error: String(e?.message || e) };
+  }
+})();
+
 // JsSIP UA lifecycle manager — desktop softphone.
 // Mirrors the web app provider with extras: attended transfer, audio device pinning.
 
