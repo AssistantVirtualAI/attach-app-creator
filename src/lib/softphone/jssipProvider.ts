@@ -47,6 +47,7 @@ class JsSipProvider {
   private config: SoftphoneConfig | null = null;
   private listeners = new Set<Listener>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private mockTimers: ReturnType<typeof setTimeout>[] = [];
   private snap: SoftphoneSnapshot = {
     status: "idle",
     callState: "idle",
@@ -58,6 +59,11 @@ class JsSipProvider {
     startedAt: null,
   };
   audioEl: HTMLAudioElement | null = null;
+
+  private clearMockTimers() {
+    this.mockTimers.forEach((t) => clearTimeout(t));
+    this.mockTimers = [];
+  }
 
   subscribe(fn: Listener) {
     this.listeners.add(fn);
@@ -182,13 +188,21 @@ class JsSipProvider {
     if (!this.config) return;
     if (this.config.mock || !this.ua) {
       // Simulate a call in mock mode
+      this.clearMockTimers();
       this.update({
         callState: "ringing-out",
         remoteIdentity: number,
         remoteNumber: number,
         direction: "out",
       });
-      setTimeout(() => this.update({ callState: "active", startedAt: Date.now() }), 1500);
+      this.mockTimers.push(
+        setTimeout(() => {
+          // Only auto-connect if still ringing (user didn't hang up)
+          if (this.snap.callState === "ringing-out") {
+            this.update({ callState: "active", startedAt: Date.now() });
+          }
+        }, 1500)
+      );
       return;
     }
     const target = `sip:${number}@${this.config.sipDomain}`;
@@ -198,15 +212,20 @@ class JsSipProvider {
   answer() {
     if (this.session) {
       this.session.answer({ mediaConstraints: { audio: true, video: false } });
+    } else if (this.config?.mock) {
+      this.clearMockTimers();
+      this.update({ callState: "active", startedAt: Date.now() });
     }
   }
 
   hangup() {
     if (this.session) {
       try { this.session.terminate(); } catch {}
-    } else if (this.config?.mock) {
-      this.update({ callState: "ended" });
-      setTimeout(() => this.resetCall(), 1500);
+    }
+    if (this.config?.mock || !this.session) {
+      this.clearMockTimers();
+      this.update({ callState: "ended", startedAt: null });
+      this.mockTimers.push(setTimeout(() => this.resetCall(), 800));
     }
   }
 
@@ -238,6 +257,7 @@ class JsSipProvider {
   stop() {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
+    this.clearMockTimers();
     try { this.ua?.stop(); } catch {}
     this.ua = null;
     this.session = null;
