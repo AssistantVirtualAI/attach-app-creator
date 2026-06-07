@@ -48,6 +48,7 @@ export function useSoftphone(args: UseSoftphoneArgs) {
   const [loading, setLoading] = useState(true);
   const [credError, setCredError] = useState<string | null>(null);
   const [manualStatus, setManualStatus] = useState<ManualStatus>('auto');
+  const [retryTick, setRetryTick] = useState(0);
   const [recording, setRecording] = useState(false);
 
   useEffect(() => {
@@ -96,7 +97,7 @@ export function useSoftphone(args: UseSoftphoneArgs) {
       }
     })();
     return () => { cancelled = true; };
-  }, [args.accessToken, args.refreshToken, args.extension]);
+  }, [args.accessToken, args.refreshToken, args.extension, retryTick]);
 
   // Ringtone + system notification on incoming.
   useEffect(() => {
@@ -159,6 +160,11 @@ export function useSoftphone(args: UseSoftphoneArgs) {
     toggleRecording: useCallback(() => {
       sipProvider.sendDTMF('*2');
       setRecording((r) => !r);
+    }, []),
+    restart: useCallback(() => {
+      try { sipProvider.stop(); } catch { /* noop */ }
+      setCredError(null);
+      setRetryTick((n) => n + 1);
     }, []),
   };
 }
