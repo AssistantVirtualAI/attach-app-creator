@@ -77,6 +77,7 @@ import FeaturesPage from "./pages/Features";
 import DemoRequestPage from "./pages/DemoRequest";
 import ContactUs from "./pages/ContactUs";
 import AuditLogs from "./pages/AuditLogs";
+import Download from "./pages/Download";
 
 // Lemtel module
 import { LemtelGuard } from "./pages/lemtel/LemtelGuard";
