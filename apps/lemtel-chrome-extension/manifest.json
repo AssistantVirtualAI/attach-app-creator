@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Lemtel Telecom",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Click-to-dial for Lemtel Telecom. Detect phone numbers on any webpage and call with one click.",
   "author": "AVA AI - assistantvirtualai.com",
   "icons": {
@@ -35,8 +35,5 @@
     "contextMenus",
     "notifications"
   ],
-  "host_permissions": ["<all_urls>"],
-  "externally_connectable": {
-    "matches": ["*://avastatistic.ca/*"]
-  }
+  "host_permissions": ["<all_urls>"]
 }
