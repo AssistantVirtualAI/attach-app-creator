@@ -441,7 +441,8 @@ export default function SoftphonePane({
         }}>
           <div className={compact ? 'lemtel-tabbar' : undefined} style={{
             display: 'flex',
-            height: ultraCompact ? 56 : compact ? 62 : 68,
+            height: ultraCompact ? 58 : compact ? 64 : 68,
+            minWidth: 0,
             ...(compact ? {} : { width: '100%' }),
           }}>
             {(['dial', 'recents', 'contacts', 'voicemail', 'sms', 'recordings', 'ai'] as Tab[]).map((tk) => {
@@ -461,7 +462,7 @@ export default function SoftphonePane({
                   className={`lemtel-glass${isAI ? ' lemtel-glass--ai' : ''}`}
                   style={{
                     ...(compact
-                      ? { flex: '0 0 auto', minWidth: ultraCompact ? 48 : 56, padding: '6px 6px' }
+                      ? { flex: '0 0 auto', minWidth: ultraCompact ? 58 : 70, padding: '6px 6px' }
                       : { flex: 1, minWidth: 48, padding: '4px 4px 0' }),
 
                     background: active
@@ -566,15 +567,15 @@ export default function SoftphonePane({
       {/* Footer */}
       <div style={{
         position: 'relative', zIndex: 1, flexShrink: 0,
-        padding: compact ? '8px 10px 10px' : '12px 14px 14px',
+        padding: compact ? '7px 8px 8px' : '12px 14px 14px',
         textAlign: 'center',
         borderTop: `1px solid ${c.border}`,
         background: c.bg,
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: compact ? 3 : 6,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: compact ? 6 : 8, minWidth: 0, maxWidth: '100%', flexWrap: 'wrap' }}>
           <LemtelLogo size="xs" glow />
-          <BrandTagline size="sm" showPoweredBy={false} style={{ marginTop: 0 }} />
+          <BrandTagline size="sm" showPoweredBy={false} style={{ marginTop: 0, minWidth: 0 }} />
         </div>
         <div style={{ fontSize: compact ? 9 : 10, color: c.textDim, letterSpacing: 0.5 }}>
           v1.1.0 {ultraCompact ? '' : '· Powered by '}
