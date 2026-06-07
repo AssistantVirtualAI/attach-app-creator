@@ -515,7 +515,7 @@ function Dialer({
         {dialKeys.map(([key, sub]) => (
           <button
             key={key}
-            className="lemtel-key"
+            className="lemtel-key lemtel-glass"
             onClick={() => setDial((p) => p + key)}
             style={{
               height: 72, display: 'flex', flexDirection: 'column',
@@ -524,27 +524,8 @@ function Dialer({
               background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
               border: `1px solid ${c.border}`,
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
-              transition: 'transform 120ms cubic-bezier(.2,.8,.2,1), background 160ms ease, border-color 160ms ease, box-shadow 160ms ease',
               cursor: 'pointer', color: c.textIce,
               willChange: 'transform',
-            }}
-            onPointerDown={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.transform = 'scale(0.93)';
-              el.style.background = 'linear-gradient(180deg, rgba(255,215,0,0.12), rgba(0,82,204,0.08))';
-              el.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.10), 0 0 0 4px rgba(255,215,0,0.10)';
-            }}
-            onPointerUp={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.transform = 'scale(1)';
-              el.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))';
-              el.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.06)';
-            }}
-            onPointerLeave={(e) => {
-              const el = e.currentTarget as HTMLButtonElement;
-              el.style.transform = 'scale(1)';
-              el.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))';
-              el.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.06)';
             }}
           >
             <span style={{ fontSize: 24, fontWeight: 500, letterSpacing: 0.5 }}>{key}</span>
