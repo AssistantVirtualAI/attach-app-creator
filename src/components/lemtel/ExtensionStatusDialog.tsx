@@ -122,12 +122,23 @@ export function ExtensionStatusDialog({ open, onOpenChange, ext }: Props) {
           </div>
 
           {!ext.pbx_uuid && (
-            <div className="rounded-md border border-orange-500/40 bg-orange-500/10 p-3 flex items-center justify-between">
+            <div className="rounded-md border border-orange-500/40 bg-orange-500/10 p-3 space-y-3">
               <div className="text-sm">This extension exists locally but was not pushed to FusionPBX.</div>
-              <Button size="sm" onClick={pushToFusionPBX} disabled={pushing}>
-                {pushing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                Push to FusionPBX
-              </Button>
+              <div className="space-y-1">
+                <Label htmlFor="repair-pwd" className="text-xs">SIP password {storedPassword ? '(stored)' : '(generated — set/edit before push)'}</Label>
+                <div className="flex gap-2">
+                  <Input id="repair-pwd" value={pwdInput} onChange={(e) => setPwdInput(e.target.value)} className="font-mono text-xs" />
+                  <Button type="button" variant="outline" size="icon" onClick={() => setPwdInput(generatePassword())} title="Generate">
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button size="sm" onClick={pushToFusionPBX} disabled={pushing}>
+                  {pushing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                  Push to FusionPBX
+                </Button>
+              </div>
             </div>
           )}
 
