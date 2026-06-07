@@ -17,6 +17,7 @@ export const APP_VERSION = `v${BUILD_TIME.slice(0, 10)}·${BUILD_ID}`;
 export async function hardReload(reason = "manual") {
   try {
     console.warn(`[AVA] Hard reload triggered (${reason}). Build ${APP_VERSION}`);
+    localStorage.removeItem("ava_app_build_id");
     const sw = await navigator.serviceWorker?.getRegistrations?.();
     await Promise.all((sw || []).map((r) => r.unregister()));
     const keys = await window.caches?.keys?.();
@@ -25,6 +26,7 @@ export async function hardReload(reason = "manual") {
     console.warn("[AVA] cache clear failed", e);
   }
   const url = new URL(location.href);
+  url.searchParams.set("_ava_b", BUILD_ID);
   url.searchParams.set("_r", Date.now().toString(36));
   location.replace(url.toString());
 }

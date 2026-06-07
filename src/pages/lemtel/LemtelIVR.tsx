@@ -6,13 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Voicemail, Plus, Sparkles, Play, Volume2, Loader2, Mic, Save, Wand2 } from 'lucide-react';
+import { Voicemail, Plus, Sparkles, Play, Volume2, Loader2, Mic, Save, Wand2, AlertCircle, RotateCcw, CheckCircle2 } from 'lucide-react';
 import { usePbxIvrs, usePbxIvrOptions } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 // Curated ElevenLabs voices (multilingual v2 compatible)
 const VOICES = [
@@ -28,6 +29,32 @@ const VOICES = [
   { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam · Young Male' },
   { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie · Casual Male' },
 ];
+
+type IvrAudioPreview = {
+  id?: string;
+  audio_url?: string | null;
+  storage_path?: string | null;
+  script_text?: string | null;
+  elevenlabs_voice_id?: string | null;
+  language?: string | null;
+  status?: string | null;
+  created_at?: string | null;
+};
+
+const errorText = (error: any, fallback: string) =>
+  error?.message || error?.error_description || error?.details || error?.hint || fallback;
+
+const throwInvokeError = async (error: any, fallback: string) => {
+  if (!error) return;
+  let details = '';
+  try {
+    const body = await error.context?.json?.();
+    details = body?.error || body?.message || body?.details || '';
+  } catch {
+    details = '';
+  }
+  throw new Error(details || errorText(error, fallback));
+};
 
 export default function LemtelIVR() {
   const { selectedOrgId } = useOrganization();
@@ -53,13 +80,20 @@ export default function LemtelIVR() {
   const [language, setLanguage] = useState<'fr' | 'en' | 'es'>('fr');
   const [synthesizing, setSynthesizing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [preview, setPreview] = useState<IvrAudioPreview | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [lastAction, setLastAction] = useState<'generate' | 'save' | null>(null);
+  const selectedVoiceName = VOICES.find((voice) => voice.id === voiceId)?.name || voiceId;
+  const targetOrgId = selected?.organization_id || selectedOrgId;
 
   // Load existing greeting/audio when selecting an IVR
   useEffect(() => {
     if (selected) {
       setScript(selected.greet_long || selected.greet_short || '');
-      setAudioUrl(null);
+      setPreview(null);
+      setGenerateError(null);
+      setSaveError(null);
     }
   }, [selectedId]);
 
@@ -68,19 +102,27 @@ export default function LemtelIVR() {
     queryKey: ['ivr-audio', selectedId],
     enabled: !!selectedId,
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('pbx_ivr_audio')
         .select('*')
         .eq('ivr_id', selectedId!)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      return data;
+      if (error) throw error;
+      if (!data?.storage_path) return data;
+      const { data: signed } = await supabase.storage
+        .from('lemtel-ivr-audio')
+        .createSignedUrl(data.storage_path, 3600);
+      return { ...data, audio_url: signed?.signedUrl || data.audio_url };
     },
   });
 
   useEffect(() => {
-    if (lastAudio?.audio_url && !audioUrl) setAudioUrl(lastAudio.audio_url);
+    if (lastAudio?.audio_url && !preview) {
+      setPreview(lastAudio as IvrAudioPreview);
+      if (lastAudio.script_text) setScript(lastAudio.script_text);
+    }
     if (lastAudio?.elevenlabs_voice_id) setVoiceId(lastAudio.elevenlabs_voice_id);
     if (lastAudio?.language) setLanguage(lastAudio.language as any);
   }, [lastAudio?.id]);
@@ -92,7 +134,7 @@ export default function LemtelIVR() {
       const { data, error } = await supabase.functions.invoke('ivr-script-generator', {
         body: { prompt: aiPrompt, language: aiLang },
       });
-      if (error) throw error;
+      await throwInvokeError(error, 'Échec génération');
       const generated = (data as { script?: string })?.script ?? '';
       setScript(generated);
       toast.success('Script généré — vérifiez puis synthétisez la voix');
@@ -107,8 +149,12 @@ export default function LemtelIVR() {
 
   const synthesize = async () => {
     if (!script.trim()) return toast.error('Tapez un script');
-    if (!selectedOrgId) return toast.error('Organisation introuvable');
+    if (!targetOrgId) return toast.error('Organisation introuvable');
     if (!selectedId) return toast.error('Sélectionnez un IVR');
+    setLastAction('generate');
+    setGenerateError(null);
+    setSaveError(null);
+    setPreview(null);
     setSynthesizing(true);
     try {
       const { data, error } = await supabase.functions.invoke('elevenlabs-generate-greeting', {
@@ -117,17 +163,28 @@ export default function LemtelIVR() {
           voice_id: voiceId,
           language,
           ivr_id: selectedId,
-          organization_id: selectedOrgId,
+          organization_id: targetOrgId,
         },
       });
-      if (error) throw error;
+      await throwInvokeError(error, 'Échec de la génération ElevenLabs');
+      if ((data as any)?.error) throw new Error((data as any).error);
       const url = (data as any)?.audio_url;
       if (!url) throw new Error('No audio URL returned');
-      setAudioUrl(url);
+      setPreview({
+        id: (data as any)?.id,
+        audio_url: url,
+        storage_path: (data as any)?.storage_path,
+        script_text: script,
+        elevenlabs_voice_id: voiceId,
+        language,
+        status: 'ready',
+      });
       queryClient.invalidateQueries({ queryKey: ['ivr-audio', selectedId] });
-      toast.success('Voix générée ✓');
+      toast.success('Voix générée — écoutez l’aperçu avant d’enregistrer');
     } catch (e: any) {
-      toast.error(e?.message || 'Échec synthèse vocale');
+      const message = errorText(e, 'Échec de la génération ElevenLabs');
+      setGenerateError(message);
+      toast.error(message);
     } finally {
       setSynthesizing(false);
     }
@@ -135,20 +192,56 @@ export default function LemtelIVR() {
 
   const saveAsGreeting = async () => {
     if (!selected) return;
+    if (!preview?.audio_url) {
+      const message = 'Générez et écoutez un aperçu audio avant d’insérer le message dans l’IVR.';
+      setSaveError(message);
+      return toast.error(message);
+    }
+    setLastAction('save');
+    setSaveError(null);
     setSaving(true);
     try {
       const { error } = await supabase
         .from('pbx_ivrs')
-        .update({ greet_long: script })
+        .update({
+          greet_long: script,
+          raw_data: {
+            ...(typeof selected.raw_data === 'object' && selected.raw_data ? selected.raw_data : {}),
+            elevenlabs_greeting: {
+              audio_id: preview.id,
+              audio_url: preview.audio_url,
+              storage_path: preview.storage_path,
+              script_text: script,
+              elevenlabs_voice_id: voiceId,
+              voice_name: selectedVoiceName,
+              language,
+              saved_at: new Date().toISOString(),
+            },
+          },
+        } as any)
         .eq('id', selected.id);
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['pbx-ivrs'] });
+      if (preview.id) {
+        const { error: audioError } = await supabase.from('pbx_ivr_audio').update({ status: 'saved' }).eq('id', preview.id);
+        if (audioError) throw audioError;
+      }
+      setPreview((current) => current ? { ...current, status: 'saved' } : current);
+      queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivrs'] });
+      queryClient.invalidateQueries({ queryKey: ['ivr-audio', selectedId] });
       toast.success('Message d\'accueil mis à jour');
     } catch (e: any) {
-      toast.error(e?.message || 'Échec sauvegarde');
+      const message = errorText(e, 'Échec de l’enregistrement du message d’accueil');
+      setSaveError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleScriptChange = (value: string) => {
+    setScript(value);
+    setPreview(null);
+    setSaveError(null);
   };
 
   return (
@@ -259,7 +352,7 @@ export default function LemtelIVR() {
                     <Textarea
                       rows={5}
                       value={script}
-                      onChange={(e) => setScript(e.target.value)}
+                      onChange={(e) => handleScriptChange(e.target.value)}
                       placeholder="Bonjour, vous avez joint... Pour les ventes, faites le 1. Pour le support, faites le 2…"
                       className="mt-1 font-mono text-sm"
                     />
@@ -269,25 +362,47 @@ export default function LemtelIVR() {
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <Button onClick={synthesize} disabled={synthesizing || !script.trim()} size="sm">
+                    <Button onClick={synthesize} disabled={synthesizing || saving || !script.trim()} size="sm">
                       {synthesizing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
-                      Générer la voix
+                      {synthesizing ? 'Génération ElevenLabs…' : generateError && lastAction === 'generate' ? 'Réessayer la génération' : 'Générer la voix'}
                     </Button>
-                    <Button onClick={saveAsGreeting} disabled={saving || !script.trim()} variant="outline" size="sm">
+                    <Button onClick={saveAsGreeting} disabled={saving || synthesizing || !script.trim() || !preview?.audio_url} variant="outline" size="sm">
                       {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                      Enregistrer comme message d'accueil
+                      {saving ? 'Enregistrement…' : saveError && lastAction === 'save' ? 'Réessayer l’enregistrement' : 'Insérer définitivement dans l’IVR'}
                     </Button>
                   </div>
 
-                  {audioUrl && (
-                    <div className="rounded-md bg-background/60 p-3 border">
-                      <div className="text-xs text-muted-foreground mb-2 flex items-center gap-2">
-                        <Play className="w-3 h-3" /> Aperçu audio
+                  {(generateError || saveError) && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <span>{generateError || saveError}</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={generateError ? synthesize : saveAsGreeting}
+                          disabled={synthesizing || saving}
+                        >
+                          <RotateCcw className="w-3 h-3 mr-2" /> Réessayer
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {preview?.audio_url && (
+                    <div className="rounded-md bg-background/60 p-3 border space-y-3">
+                      <div className="text-xs text-muted-foreground flex items-center gap-2">
+                        <Play className="w-3 h-3" /> Aperçu synchronisé avant insertion
                       </div>
-                      <audio controls src={audioUrl} className="w-full" />
-                      <p className="text-[10px] text-muted-foreground mt-1">
-                        Fichier stocké dans <code>lemtel-ivr-audio</code> · prêt pour l'import FusionPBX.
-                      </p>
+                      <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">{preview.script_text || script}</div>
+                      <audio controls src={preview.audio_url} className="w-full" />
+                      <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                        <Badge variant="outline">{selectedVoiceName}</Badge>
+                        <Badge variant="outline">{language.toUpperCase()}</Badge>
+                        {preview.status === 'saved' && <span className="inline-flex items-center gap-1 text-primary"><CheckCircle2 className="w-3 h-3" /> Sauvegardé</span>}
+                        <span>Script + audio conservés pour relecture.</span>
+                      </div>
                     </div>
                   )}
                 </div>
