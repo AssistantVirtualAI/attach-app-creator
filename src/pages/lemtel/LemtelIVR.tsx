@@ -44,6 +44,18 @@ type IvrAudioPreview = {
 const errorText = (error: any, fallback: string) =>
   error?.message || error?.error_description || error?.details || error?.hint || fallback;
 
+const throwInvokeError = async (error: any, fallback: string) => {
+  if (!error) return;
+  let details = '';
+  try {
+    const body = await error.context?.json?.();
+    details = body?.error || body?.message || body?.details || '';
+  } catch {
+    details = '';
+  }
+  throw new Error(details || errorText(error, fallback));
+};
+
 export default function LemtelIVR() {
   const { selectedOrgId } = useOrganization();
   const queryClient = useQueryClient();
@@ -121,7 +133,7 @@ export default function LemtelIVR() {
       const { data, error } = await supabase.functions.invoke('ivr-script-generator', {
         body: { prompt: aiPrompt, language: aiLang },
       });
-      if (error) throw error;
+      await throwInvokeError(error, 'Échec génération');
       const generated = (data as { script?: string })?.script ?? '';
       setScript(generated);
       toast.success('Script généré — vérifiez puis synthétisez la voix');
@@ -153,7 +165,8 @@ export default function LemtelIVR() {
           organization_id: selectedOrgId,
         },
       });
-      if (error) throw error;
+      await throwInvokeError(error, 'Échec de la génération ElevenLabs');
+      if ((data as any)?.error) throw new Error((data as any).error);
       const url = (data as any)?.audio_url;
       if (!url) throw new Error('No audio URL returned');
       setPreview({
@@ -208,7 +221,8 @@ export default function LemtelIVR() {
         .eq('id', selected.id);
       if (error) throw error;
       if (preview.id) {
-        await supabase.from('pbx_ivr_audio').update({ status: 'saved' }).eq('id', preview.id);
+        const { error: audioError } = await supabase.from('pbx_ivr_audio').update({ status: 'saved' }).eq('id', preview.id);
+        if (audioError) throw audioError;
       }
       queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivrs'] });
       queryClient.invalidateQueries({ queryKey: ['ivr-audio', selectedId] });
