@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>AVA Statistics - Real-time Analytics Dashboard</title>
     <meta name="description" content="Advanced analytics and performance metrics dashboard with real-time data visualization">
     <meta name="author" content="AVA Statistics" />
@@ -68,6 +71,39 @@
 
         navigator.serviceWorker?.getRegistrations?.().then((registrations) => registrations.forEach((registration) => registration.unregister()));
         window.caches?.keys?.().then((keys) => keys.forEach((key) => caches.delete(key)));
+      })();
+    </script>
+    <script>
+      // Production version check + hard refresh on stale build
+      (() => {
+        const isProd = !location.hostname.includes("lovableproject.com") && location.hostname !== "localhost" && location.port !== "8080";
+        if (!isProd) return;
+
+        // Always nuke SW + caches in production too
+        navigator.serviceWorker?.getRegistrations?.().then((rs) => rs.forEach((r) => r.unregister()));
+        window.caches?.keys?.().then((keys) => keys.forEach((k) => caches.delete(k)));
+
+        const VERSION_KEY = "ava_app_build_id";
+        const checkVersion = async () => {
+          try {
+            const res = await fetch("/index.html", { cache: "no-store", headers: { "Cache-Control": "no-cache" } });
+            const html = await res.text();
+            // Hash main script tag (Vite injects /assets/index-<hash>.js)
+            const m = html.match(/\/assets\/index[^"']+\.js/);
+            const current = m ? m[0] : html.length.toString();
+            const stored = localStorage.getItem(VERSION_KEY);
+            if (stored && stored !== current) {
+              localStorage.setItem(VERSION_KEY, current);
+              // Hard reload bypassing cache
+              location.replace(location.pathname + "?_r=" + Date.now() + location.hash);
+              return;
+            }
+            if (!stored) localStorage.setItem(VERSION_KEY, current);
+          } catch {}
+        };
+        checkVersion();
+        setInterval(checkVersion, 60_000);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) checkVersion(); });
       })();
     </script>
     <script type="module" src="/src/main.tsx"></script>
