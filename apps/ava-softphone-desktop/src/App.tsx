@@ -5,8 +5,14 @@ import UpdateBanner from './components/UpdateBanner';
 import SoftphonePane from './components/SoftphonePane';
 import ConsoleLayout from './components/console/ConsoleLayout';
 import BrightnessOverlay from './components/BrightnessOverlay';
+import ResponsiveLab from './components/ResponsiveLab';
 import { useTheme } from './lib/theme';
 import { useContrast } from './hooks/useContrast';
+
+const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+const IS_LAB = qs?.get('lab') === 'responsive';
+const IS_EMBED = qs?.get('embed') === '1';
+
 
 type Creds = {
   portalUrl: string;
@@ -23,6 +29,10 @@ type Creds = {
 export default function App() {
   const { t } = useTheme();
   useContrast(); // applies low/med/high contrast preset on mount
+
+  // Responsive testing utility — visit ?lab=responsive to open it.
+  if (IS_LAB) return <ResponsiveLab />;
+
   const [creds, setCreds] = useState<Creds>(null);
   const [loading, setLoading] = useState(true);
   const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 980);
@@ -78,15 +88,15 @@ export default function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: t.bg, position: 'relative' }}>
       <BrightnessOverlay />
-      <TitleBar />
+      {!IS_EMBED && <TitleBar />}
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative', zIndex: 1 }}>
-        {wide ? (
+        {wide && !IS_EMBED ? (
           <ConsoleLayout creds={creds} onOpenSettings={openSettingsMobile} />
         ) : (
           <SoftphonePane creds={creds} onOpenSettings={openSettingsMobile} />
         )}
       </div>
-      <UpdateBanner />
+      {!IS_EMBED && <UpdateBanner />}
     </div>
   );
 }
