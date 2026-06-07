@@ -77,6 +77,11 @@ class JsSipProvider {
   };
   audioEl: HTMLAudioElement | null = null;
   outputDeviceId: string | null = null;
+  inputDeviceId: string | null = null;
+  boundOutputLabel: string = 'System default';
+  boundInputLabel: string = 'System default';
+  private wssAttempted: string[] = [];
+  private lastCallError: string | null = null;
 
   subscribe(fn: Listener) {
     this.listeners.add(fn);
@@ -90,7 +95,7 @@ class JsSipProvider {
   }
 
   private logEvent(level: SipEvent['level'], message: string) {
-    const next = [...this.snap.events, { at: Date.now(), level, message }].slice(-20);
+    const next = [...this.snap.events, { at: Date.now(), level, message }].slice(-50);
     // eslint-disable-next-line no-console
     console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log'](`[SIP] ${message}`);
     this.update({ events: next });
