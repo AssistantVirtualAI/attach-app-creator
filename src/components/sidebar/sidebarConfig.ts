@@ -107,15 +107,8 @@ export const sidebarGroups: NavGroup[] = [
       { nameKey: 'sidebar.saasConfig', href: '/saas-config', icon: Settings },
     ]
   },
-  {
-    id: 'administration',
-    labelKey: 'sidebar.groups.administration',
-    icon: Shield,
-    superAdminOnly: true,
-    items: [
-      { nameKey: 'sidebar.superAdmin', href: '/super-admin', icon: Building2 },
-    ]
-  },
+  // Administration group removed per request
+
   {
     id: 'phone-system',
     labelKey: '📞 Phone System',
