@@ -131,6 +131,7 @@ export const sidebarGroups: NavGroup[] = [
       { nameKey: 'Softphone', href: '/org/lemtel/telephony/webphone', icon: Phone },
       { nameKey: 'Voicemail', href: '/org/lemtel/telephony/voicemail', icon: Voicemail },
       { nameKey: 'Team', href: '/org/lemtel/telephony/team', icon: Users },
+      { nameKey: 'My Preferences', href: '/org/lemtel/telephony/preferences', icon: Sliders },
       { nameKey: 'PBX Settings', href: '/org/lemtel/telephony/settings', icon: Settings },
       { nameKey: 'Diagnostics', href: '/org/lemtel/telephony/diagnostics', icon: Activity },
       { nameKey: '✅ Go-Live Checklist', href: '/org/lemtel/telephony/checklist', icon: CheckSquare },
