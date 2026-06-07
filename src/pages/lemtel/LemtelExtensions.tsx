@@ -77,7 +77,7 @@ export default function LemtelExtensions() {
         <div className="flex gap-2">
           <PbxRefreshButton kind="config" />
           <SyncEverythingButton />
-          <Button onClick={() => setProvisionOpen(true)}><Plus className="w-4 h-4 mr-2" /> Provision Extension</Button>
+          <Button onClick={() => setProvisionOpen(true)}><Plus className="w-4 h-4 mr-2" /> New Extension</Button>
         </div>
       </div>
       <ProvisionExtensionModal open={provisionOpen} onOpenChange={setProvisionOpen} />
