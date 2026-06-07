@@ -20,20 +20,69 @@ jobs:
       - uses: actions/checkout@v4
       - run: cat apps/ava-softphone-desktop/package.json | grep '"version"'
 
-  build-windows:
+  build:
     needs: verify-version
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win
+            artifact_name: windows-build
+            artifact_glob: apps/ava-softphone-desktop/dist-electron/*.exe
+            builder_args: --win
+          - os: macos-latest
+            platform: mac
+            artifact_name: mac-build
+            artifact_glob: apps/ava-softphone-desktop/dist-electron/*.dmg
+            builder_args: --mac --x64 --arm64
+          - os: ubuntu-latest
+            platform: linux
+            artifact_name: linux-build
+            artifact_glob: apps/ava-softphone-desktop/dist-electron/*.AppImage
+            builder_args: --linux AppImage
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
 
+      - name: Install Linux system deps
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libnotify-dev \
+            libasound2-dev libcups2-dev libxss1 libxtst6 xvfb \
+            libx11-xcb1 libxcb-dri3-0 libdrm2 libgbm1 libnss3 \
+            libatk-bridge2.0-0 fakeroot
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
         working-directory: apps/ava-softphone-desktop
 
-      - name: Overwrite vite.config.ts
+      - name: Overwrite vite.config.ts (POSIX)
+        if: matrix.platform != 'win'
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          python3 -c "
+          lines = [
+            'import { defineConfig } from \"vite\"',
+            'import react from \"@vitejs/plugin-react\"',
+            'import path from \"path\"',
+            'export default defineConfig({',
+            '  plugins: [react()],',
+            '  resolve: { alias: { \"@\": path.resolve(__dirname, \"./src\") } },',
+            '  build: { outDir: \"dist\", emptyOutDir: true, rollupOptions: { external: [\"electron\"] } },',
+            '  base: \"./\",',
+            '})',
+          ]
+          open('vite.config.ts', 'w').write('\n'.join(lines) + '\n')
+          "
+          cat vite.config.ts
+
+      - name: Overwrite vite.config.ts (Windows)
+        if: matrix.platform == 'win'
         shell: pwsh
         working-directory: apps/ava-softphone-desktop
         run: |
@@ -50,170 +99,149 @@ jobs:
           Set-Content -Path "vite.config.ts" -Value $c -Encoding UTF8
           Get-Content "vite.config.ts"
 
-      - name: Delete root postcss + clear cache
-        shell: pwsh
-        working-directory: apps/ava-softphone-desktop
-        run: |
-          Remove-Item -Path "..\..\postcss.config.js" -Force -ErrorAction SilentlyContinue
-          Remove-Item -Path "..\..\postcss.config.cjs" -Force -ErrorAction SilentlyContinue
-          Remove-Item -Path "..\..\postcss.config.mjs" -Force -ErrorAction SilentlyContinue
-          Get-ChildItem -Path "." -Filter "vite.config.ts.timestamp*" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
-          if (Test-Path "node_modules/.vite") { Remove-Item -Recurse -Force "node_modules/.vite" }
-          Write-Host "Root postcss deleted, cache cleared"
-
-      - name: Build Windows
-        shell: pwsh
-        working-directory: apps/ava-softphone-desktop
-        run: |
-          npx vite build
-          npx tsc -p electron/tsconfig.json
-          npx electron-builder --win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          WIN_CSC_LINK: ''
-          WIN_CSC_KEY_PASSWORD: ''
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-build
-          path: apps/ava-softphone-desktop/dist-electron/*.exe
-          if-no-files-found: warn
-
-  build-mac:
-    needs: verify-version
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
-        working-directory: apps/ava-softphone-desktop
-
-      - name: Overwrite vite.config.ts
-        working-directory: apps/ava-softphone-desktop
-        run: |
-          python3 -c "
-          lines = [
-            'import { defineConfig } from \"vite\"',
-            'import react from \"@vitejs/plugin-react\"',
-            'import path from \"path\"',
-            'export default defineConfig({',
-            '  plugins: [react()],',
-            '  resolve: { alias: { \"@\": path.resolve(__dirname, \"./src\") } },',
-            '  build: { outDir: \"dist\", emptyOutDir: true, rollupOptions: { external: [\"electron\"] } },',
-            '  base: \"./\",',
-            '})',
-          ]
-          open('vite.config.ts', 'w').write('\n'.join(lines) + '\n')
-          "
-          cat vite.config.ts
-
-      - name: Delete root postcss + clear cache
+      - name: Delete root postcss + clear cache (POSIX)
+        if: matrix.platform != 'win'
         working-directory: apps/ava-softphone-desktop
         run: |
           rm -f ../../postcss.config.js ../../postcss.config.cjs ../../postcss.config.mjs
           find . -name "vite.config.ts.timestamp*" -delete 2>/dev/null || true
           rm -rf node_modules/.vite 2>/dev/null || true
-          echo "Root postcss deleted, cache cleared"
-          ls -la ../../postcss* 2>/dev/null || echo "No postcss files at root"
 
-      - name: Build Mac
+      - name: Delete root postcss + clear cache (Windows)
+        if: matrix.platform == 'win'
+        shell: pwsh
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          Remove-Item -Path "..\..\postcss.config.js","..\..\postcss.config.cjs","..\..\postcss.config.mjs" -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -Path "." -Filter "vite.config.ts.timestamp*" -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
+          if (Test-Path "node_modules/.vite") { Remove-Item -Recurse -Force "node_modules/.vite" }
+
+      - name: Build renderer + electron sources
         working-directory: apps/ava-softphone-desktop
         run: |
           npx vite build
-          npx tsc -p electron/tsconfig.json || true
-          npx electron-builder --mac --x64 --arm64
+          npx tsc -p electron/tsconfig.json
+        shell: bash
+
+      - name: Run electron-builder (capture logs)
+        working-directory: apps/ava-softphone-desktop
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CSC_LINK: ''
           CSC_KEY_PASSWORD: ''
+          WIN_CSC_LINK: ''
+          WIN_CSC_KEY_PASSWORD: ''
           APPLE_ID: ''
           APPLE_APP_SPECIFIC_PASSWORD: ''
           APPLE_TEAM_ID: ''
           ELECTRON_SKIP_NOTARIZE: '1'
           DEBUG: 'electron-builder'
+        run: |
+          set -o pipefail
+          npx electron-builder ${{ matrix.builder_args }} 2>&1 | tee builder.log
 
+      - name: Print electron-builder log tail
+        if: always()
+        working-directory: apps/ava-softphone-desktop
+        shell: bash
+        run: |
+          echo "===== electron-builder log (tail) ====="
+          tail -n 200 builder.log || true
+
+      - name: Fail on signing / metadata warnings
+        if: matrix.platform != 'win'
+        working-directory: apps/ava-softphone-desktop
+        shell: bash
+        run: |
+          set -e
+          LOG=builder.log
+          # Patterns we treat as hard failures going forward.
+          PATTERNS=(
+            "skipped macOS application code signing.*reason=identity explicitly is set to null"
+            "cannot find specified resource file"
+            "default Electron icon is used"
+            "Please specify .* in the build configuration"
+            "is required for"
+            "ENOENT"
+          )
+          FAIL=0
+          for p in "${PATTERNS[@]}"; do
+            # Allow the explicit "identity is null" message we intentionally configured.
+            if [ "$p" = "skipped macOS application code signing.*reason=identity explicitly is set to null" ]; then
+              continue
+            fi
+            if grep -E -i "$p" "$LOG" >/dev/null 2>&1; then
+              echo "::error::electron-builder log contains forbidden pattern: $p"
+              grep -E -i -n "$p" "$LOG" || true
+              FAIL=1
+            fi
+          done
+          # Generic warning sweep — fail if any non-whitelisted WARN appears.
+          if grep -E "^⚠|WARN " "$LOG" | grep -viE "identity explicitly is set to null|default electron icon|Sign tool|differentialDownloadInstaller" >/dev/null; then
+            echo "::error::electron-builder produced unexpected warnings:"
+            grep -E "^⚠|WARN " "$LOG" | grep -viE "identity explicitly is set to null|default electron icon|Sign tool|differentialDownloadInstaller"
+            FAIL=1
+          fi
+          exit $FAIL
+
+      - name: Verify Linux AppImage artifact
+        if: matrix.platform == 'linux'
+        working-directory: apps/ava-softphone-desktop
+        shell: bash
+        run: |
+          set -e
+          APP=$(ls dist-electron/*.AppImage | head -n1)
+          if [ -z "$APP" ]; then
+            echo "::error::No AppImage produced"; exit 1
+          fi
+          echo "AppImage: $APP"
+          ls -lh "$APP"
+          SIZE=$(stat -c%s "$APP")
+          if [ "$SIZE" -lt 40000000 ]; then
+            echo "::error::AppImage suspiciously small ($SIZE bytes)"; exit 1
+          fi
+          chmod +x "$APP"
+          # Extract embedded metadata without executing the app.
+          "$APP" --appimage-extract >/dev/null
+          DESKTOP=$(ls squashfs-root/*.desktop | head -n1)
+          echo "===== .desktop ====="
+          cat "$DESKTOP"
+          grep -q "^Name=Lemtel Telecom" "$DESKTOP" || (echo "::error::Missing Name=Lemtel Telecom" && exit 1)
+          grep -q "^Categories=" "$DESKTOP" || (echo "::error::Missing Categories" && exit 1)
+          # latest-linux.yml is required by electron-updater.
+          test -f dist-electron/latest-linux.yml || (echo "::error::latest-linux.yml missing — auto-update will break" && exit 1)
+          echo "===== latest-linux.yml ====="
+          cat dist-electron/latest-linux.yml
+          rm -rf squashfs-root
 
       - uses: actions/upload-artifact@v4
         with:
-          name: mac-build
-          path: apps/ava-softphone-desktop/dist-electron/*.dmg
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
+
+      - name: Upload electron-builder log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}-log
+          path: apps/ava-softphone-desktop/builder.log
           if-no-files-found: warn
 
-  build-linux:
-    needs: verify-version
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Upload updater manifests
+        if: matrix.platform != 'win' || always()
+        uses: actions/upload-artifact@v4
         with:
-          node-version: '24'
-
-      - name: Install Linux system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libnotify-dev \
-            libasound2-dev libcups2-dev libxss1 libxtst6 xvfb \
-            libx11-xcb1 libxcb-dri3-0 libdrm2 libgbm1 libnss3 \
-            libatk-bridge2.0-0
-
-      - name: Install dependencies
-        run: npm install --legacy-peer-deps
-        working-directory: apps/ava-softphone-desktop
-
-      - name: Overwrite vite.config.ts
-        working-directory: apps/ava-softphone-desktop
-        run: |
-          python3 -c "
-          lines = [
-            'import { defineConfig } from \"vite\"',
-            'import react from \"@vitejs/plugin-react\"',
-            'import path from \"path\"',
-            'export default defineConfig({',
-            '  plugins: [react()],',
-            '  resolve: { alias: { \"@\": path.resolve(__dirname, \"./src\") } },',
-            '  build: { outDir: \"dist\", emptyOutDir: true, rollupOptions: { external: [\"electron\"] } },',
-            '  base: \"./\",',
-            '})',
-          ]
-          open('vite.config.ts', 'w').write('\n'.join(lines) + '\n')
-          "
-          cat vite.config.ts
-
-      - name: Delete root postcss + clear cache
-        working-directory: apps/ava-softphone-desktop
-        run: |
-          rm -f ../../postcss.config.js ../../postcss.config.cjs ../../postcss.config.mjs
-          find . -name "vite.config.ts.timestamp*" -delete 2>/dev/null || true
-          rm -rf node_modules/.vite 2>/dev/null || true
-          echo "Root postcss deleted, cache cleared"
-          ls -la ../../postcss* 2>/dev/null || echo "No postcss files at root"
-
-      - name: Build Linux
-        working-directory: apps/ava-softphone-desktop
-        run: |
-          npx vite build
-          npx tsc -p electron/tsconfig.json
-          npx electron-builder --linux
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-build
+          name: ${{ matrix.artifact_name }}-updater
           path: |
-            apps/ava-softphone-desktop/dist-electron/*.AppImage
-            apps/ava-softphone-desktop/dist-electron/*.deb
+            apps/ava-softphone-desktop/dist-electron/latest*.yml
+            apps/ava-softphone-desktop/dist-electron/*.blockmap
           if-no-files-found: warn
 
   create-release:
-    needs: [build-windows, build-mac, build-linux]
+    needs: build
     runs-on: ubuntu-latest
     if: always()
     permissions:
@@ -228,6 +256,11 @@ jobs:
           startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.AppImage
+            artifacts/**/latest*.yml
+            artifacts/**/*.blockmap
           token: ${{ secrets.GITHUB_TOKEN }}
           fail_on_unmatched_files: false
