@@ -25,14 +25,16 @@ export function setContrast(c: Contrast) {
  */
 export function applyContrast(c: Contrast) {
   const root = document.documentElement;
-  // text boost variable consumed by .lemtel-soft classes (if any)
   root.style.setProperty('--lemtel-text-boost',
     c === 'low' ? '0.78' : c === 'high' ? '1.0' : '0.92');
-  // tiny global contrast nudge — safe range, preserves color identity
   root.style.filter =
     c === 'low' ? 'contrast(0.96) brightness(0.98)'
-    : c === 'high' ? 'contrast(1.08) brightness(1.04)'
+    : c === 'high' ? 'contrast(1.10) brightness(1.02)'
     : 'none';
+  // Toggle a global class so CSS can deliver a true high-contrast theme
+  // that overrides button colors, row backgrounds, and text shadows.
+  root.classList.toggle('lemtel-hc', c === 'high');
+  root.classList.toggle('lemtel-low', c === 'low');
 }
 
 export function useContrast() {
