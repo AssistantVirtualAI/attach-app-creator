@@ -32,6 +32,7 @@ win:
       arch: [x64]
   publisherName: "Lemtel Communications"
   signingHashAlgorithms: []
+  artifactName: "Lemtel.Telecom.Setup.${ext}"
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
@@ -43,6 +44,7 @@ linux:
     - AppImage
     - deb
   category: Office
+  artifactName: "Lemtel.Telecom.${ext}"
 publish:
   - provider: github
     owner: AssistantVirtualAI
