@@ -271,9 +271,37 @@ Deno.serve(async (req) => {
     }
 
     // ---- CREATE / UPDATE / DELETE helpers ----
-    async function writeCollection(path: string, key: string, payload: any) {
-      return pbxFetch(path, { method: "POST", body: JSON.stringify({ [key]: [{ ...payload, domain_uuid: FUSIONPBX_DOMAIN_UUID }] }) });
+    // FusionPBX API v7 requires QUERY-PARAM auth (?key=...&username=...) for
+    // POST/PUT/DELETE — the Authorization header returns 403 on writes.
+    async function pbxWrite(path: string, method: "POST" | "PUT" | "DELETE", payload?: unknown) {
+      const url = new URL(`${FUSIONPBX_API_URL}/app/api/7/${path}`);
+      url.searchParams.set("key", FUSIONPBX_API_KEY);
+      url.searchParams.set("username", FUSIONPBX_USERNAME);
+      const started = Date.now();
+      let res: Response;
+      try {
+        res = await fetch(url.toString(), {
+          method,
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: payload !== undefined ? JSON.stringify(payload) : undefined,
+        });
+      } catch (e: any) {
+        return { ok: false, status: 0, error: "FUSIONPBX_UNREACHABLE", message: e?.message || String(e), latency_ms: Date.now() - started };
+      }
+      const text = await res.text();
+      const latency_ms = Date.now() - started;
+      let data: any = {};
+      try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+      const embeddedCode = data?.code || data?.details?.[0]?.code;
+      const embeddedMessage = data?.details?.[0]?.message || data?.message || (typeof data?.raw === "string" ? data.raw : null);
+      const failed = !res.ok || (embeddedCode && String(embeddedCode) !== "200");
+      return { ok: !failed, status: res.status, data, latency_ms, embeddedCode: embeddedCode ?? null, message: embeddedMessage };
     }
+
+    async function writeCollection(path: string, key: string, payload: any) {
+      return pbxWrite(path, "POST", { [key]: [{ ...payload, domain_uuid: FUSIONPBX_DOMAIN_UUID }] });
+    }
+
 
     if (action === "create-extension") {
       const extData = body.data || params || {};
