@@ -140,6 +140,7 @@ export default function LemtelExtensions() {
                 <TableHead>Voicemail</TableHead>
                 <TableHead>Softphone</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Health</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
