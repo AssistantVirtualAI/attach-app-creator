@@ -51,6 +51,9 @@ const Landing = () => {
         transition={{ duration: 0.5 }}
       >
         <HeroSection />
+        <div id="nouveautes">
+          <WhatsNewSection />
+        </div>
         <TrustedBySection />
         <SectionDivider variant="wave" />
         <div id="portal-preview">
