@@ -108,6 +108,18 @@ export default function SoftphonePane({
     return () => window.removeEventListener('lemtel:dial-now', onDial);
   }, [dial, sp.snap.status]);
 
+  // Custom protocol (lemtel://call/<number>) from Chrome extension / OS
+  useEffect(() => {
+    const api = (window as unknown as { electronAPI?: { onProtocolCall?: (cb: (d: { number: string }) => void) => void } }).electronAPI;
+    api?.onProtocolCall?.(({ number }) => {
+      if (!number) return;
+      setDial(number);
+      setTimeout(() => {
+        if (sp.snap.status === 'registered') sp.call(number);
+      }, 1000);
+    });
+  }, []);
+
   const handleXferSubmit = () => {
     if (!xferTarget) return;
     if (xferMode === 'blind') sp.blindTransfer(xferTarget);

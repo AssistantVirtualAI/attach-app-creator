@@ -46,5 +46,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onSetStatus: (cb: (status: string) => void) =>
     ipcRenderer.on('set-status', (_e, status) => cb(status)),
 
+  // Custom protocol (lemtel://call/<number>)
+  onProtocolCall: (cb: (data: { number: string }) => void) =>
+    ipcRenderer.on('protocol-call', (_e, data) => cb(data)),
+
   platform: process.platform,
 });
