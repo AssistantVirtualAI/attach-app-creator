@@ -122,22 +122,24 @@ export function ProvisionExtensionModal({ open, onOpenChange, prefill }: Props) 
       const result = data as any;
       if (result?.error) {
         const code = result.error;
+        const embed = result.embeddedCode ? ` [FusionPBX ${result.embeddedCode}]` : '';
+        const msg = result.message || result.details?.details?.[0]?.message || code;
         if (code === 'FUSIONPBX_AUTH_FAILED') throw new Error('Authentication error — check API key');
-        if (code === 'DUPLICATE_EXTENSION' || /duplicate|exists/i.test(result.message || result.raw || '')) {
-          throw new Error(`Extension ${extension} already exists in FusionPBX`);
+        if (code === 'DUPLICATE_EXTENSION' || /duplicate|exists/i.test(msg)) {
+          throw new Error(`Extension ${extension} already exists in FusionPBX${embed}`);
         }
         if (code === 'FUSIONPBX_UNREACHABLE') throw new Error('Cannot reach FusionPBX — check connection');
-        throw new Error(result.message || code);
+        throw new Error(`${msg}${embed}`);
       }
 
       // Extract extension_uuid from FusionPBX response
       const extUuid =
-        result?.data?.extensions?.[0]?.extension_uuid ||
         result?.extension_uuid ||
+        result?.data?.extensions?.[0]?.extension_uuid ||
         result?.data?.extension_uuid ||
         null;
 
-      // Insert into pbx_extensions
+      // Insert into pbx_extensions with full provisioning metadata
       const { data: row, error: insErr } = await supabase
         .from('pbx_extensions' as any)
         .insert({
@@ -152,7 +154,15 @@ export function ProvisionExtensionModal({ open, onOpenChange, prefill }: Props) 
           enabled,
           description: displayName,
           domain_uuid: DOMAIN_UUID,
-          raw_data: { ...result, password: sipPassword, sip_password: sipPassword },
+          raw_data: {
+            password: sipPassword,
+            sip_password: sipPassword,
+            provisioning: {
+              extension_result: result?.extension_result ?? null,
+              voicemail_result: result?.voicemail_result ?? null,
+              completed_at: new Date().toISOString(),
+            },
+          },
           synced_at: new Date().toISOString(),
         })
         .select('id')
