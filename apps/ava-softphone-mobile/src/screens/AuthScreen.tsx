@@ -56,11 +56,10 @@ export default function AuthScreen({ onAuthenticated }: { onAuthenticated: (c: C
             </div>
           )}
 
-          <button type="submit" disabled={busy || !email || !password} style={{
-            marginTop: 8, height: 52, borderRadius: 26, border: 'none',
-            background: busy ? 'rgba(0,61,166,0.5)' : 'linear-gradient(135deg, var(--brand-blue), var(--brand-blue-2))',
-            color: 'white', fontSize: 16, fontWeight: 600, cursor: 'pointer',
-            boxShadow: '0 10px 30px rgba(0, 61, 166, 0.4)',
+          <button type="submit" disabled={busy || !email || !password} className="lemtel-shiny-btn" style={{
+            marginTop: 8, height: 52, borderRadius: 26,
+            fontSize: 16, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.2,
+            opacity: busy ? 0.7 : 1,
           }}>
             {busy ? 'Signing in…' : 'Sign In'}
           </button>
