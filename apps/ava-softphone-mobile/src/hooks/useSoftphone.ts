@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { createSIPUA, SIPConfig } from '../lib/sip/jssipProvider';
+import { createSIPUA, JsSIPUnavailableError, SIPConfig } from '../lib/sip/jssipProvider';
 
 export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'error';
 export type CallState = 'idle' | 'ringing' | 'active' | 'ended';
@@ -23,7 +23,10 @@ export interface UseSoftphoneReturn {
   setStatus: (status: string) => void;
 }
 
-export function useSoftphone(config: SIPConfig | null): UseSoftphoneReturn {
+export function useSoftphone(
+  config: SIPConfig | null,
+  opts: { jsSipTimeoutMs?: number } = {},
+): UseSoftphoneReturn {
   const [sipStatus, setSipStatus] = useState<SIPStatus>('idle');
   const [sipError, setSipError] = useState('');
   const [callState, setCallState] = useState<CallState>('idle');
@@ -38,62 +41,72 @@ export function useSoftphone(config: SIPConfig | null): UseSoftphoneReturn {
 
   useEffect(() => {
     if (!config) return;
+    let cancelled = false;
     setSipStatus('connecting');
+    setSipError('');
 
-    const ua = createSIPUA(config);
-    if (!ua) {
-      setSipStatus('error');
-      setSipError('JsSIP not available');
-      return;
-    }
-
-    ua.on('registered', () => {
-      setSipStatus('registered');
-      setSipError('');
-    });
-    ua.on('registrationFailed', (e: any) => {
-      setSipStatus('error');
-      setSipError(e?.cause || 'Registration failed');
-    });
-    ua.on('disconnected', () => setSipStatus('connecting'));
-
-    ua.on('newRTCSession', (data: any) => {
-      const session = data.session;
-      sessionRef.current = session;
-      const remoteNumber = session.remote_identity?.uri?.user || 'Unknown';
-      setActiveCallNumber(remoteNumber);
-      if (session.direction === 'incoming') setCallState('ringing');
-
-      session.on('confirmed', () => {
-        setCallState('active');
-        timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
+    createSIPUA(config, opts.jsSipTimeoutMs ?? 8000)
+      .then((ua) => {
+        if (cancelled) {
+          try { ua.stop(); } catch {}
+          return;
+        }
+        ua.on('registered', () => {
+          setSipStatus('registered');
+          setSipError('');
+        });
+        ua.on('registrationFailed', (e: any) => {
+          setSipStatus('error');
+          setSipError(e?.cause || 'Registration failed');
+        });
+        ua.on('disconnected', () => setSipStatus('connecting'));
+        ua.on('newRTCSession', (data: any) => {
+          const session = data.session;
+          sessionRef.current = session;
+          const remoteNumber = session.remote_identity?.uri?.user || 'Unknown';
+          setActiveCallNumber(remoteNumber);
+          if (session.direction === 'incoming') setCallState('ringing');
+          session.on('confirmed', () => {
+            setCallState('active');
+            timerRef.current = setInterval(() => setCallTimer((t) => t + 1), 1000);
+          });
+          session.on('ended', () => {
+            setCallState('ended');
+            if (timerRef.current) clearInterval(timerRef.current);
+            setTimeout(() => {
+              setCallState('idle');
+              setCallTimer(0);
+              setIsMuted(false);
+              setIsOnHold(false);
+              setActiveCallNumber('');
+            }, 2000);
+          });
+          session.on('failed', () => {
+            setCallState('idle');
+            if (timerRef.current) clearInterval(timerRef.current);
+            setActiveCallNumber('');
+          });
+        });
+        ua.start();
+        uaRef.current = ua;
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setSipStatus('error');
+        setSipError(
+          err instanceof JsSIPUnavailableError
+            ? 'Phone library failed to load. Check your internet connection and try again.'
+            : err?.message || 'SIP initialization failed',
+        );
       });
-      session.on('ended', () => {
-        setCallState('ended');
-        if (timerRef.current) clearInterval(timerRef.current);
-        setTimeout(() => {
-          setCallState('idle');
-          setCallTimer(0);
-          setIsMuted(false);
-          setIsOnHold(false);
-          setActiveCallNumber('');
-        }, 2000);
-      });
-      session.on('failed', () => {
-        setCallState('idle');
-        if (timerRef.current) clearInterval(timerRef.current);
-        setActiveCallNumber('');
-      });
-    });
-
-    ua.start();
-    uaRef.current = ua;
 
     return () => {
+      cancelled = true;
       if (timerRef.current) clearInterval(timerRef.current);
-      ua.stop();
+      try { uaRef.current?.stop(); } catch {}
+      uaRef.current = null;
     };
-  }, [config?.extension, config?.wssUrl]);
+  }, [config?.extension, config?.wssUrl, config?.domain, opts.jsSipTimeoutMs]);
 
   const call = (number: string) => {
     if (!uaRef.current || !config) return;
@@ -112,42 +125,16 @@ export function useSoftphone(config: SIPConfig | null): UseSoftphoneReturn {
   };
   const answer = () =>
     sessionRef.current?.answer({ mediaConstraints: { audio: true, video: false } });
-  const mute = () => {
-    sessionRef.current?.mute({ audio: true });
-    setIsMuted(true);
-  };
-  const unmute = () => {
-    sessionRef.current?.unmute({ audio: true });
-    setIsMuted(false);
-  };
-  const hold = () => {
-    sessionRef.current?.hold();
-    setIsOnHold(true);
-  };
-  const unhold = () => {
-    sessionRef.current?.unhold();
-    setIsOnHold(false);
-  };
+  const mute = () => { sessionRef.current?.mute({ audio: true }); setIsMuted(true); };
+  const unmute = () => { sessionRef.current?.unmute({ audio: true }); setIsMuted(false); };
+  const hold = () => { sessionRef.current?.hold(); setIsOnHold(true); };
+  const unhold = () => { sessionRef.current?.unhold(); setIsOnHold(false); };
   const sendDTMF = (key: string) =>
     sessionRef.current?.sendDTMF(key, { duration: 100, interToneGap: 70 });
   const setStatus = (status: string) => console.log('Status change:', status);
 
   return {
-    sipStatus,
-    sipError,
-    callState,
-    callTimer,
-    isMuted,
-    isOnHold,
-    activeCallNumber,
-    call,
-    hangup,
-    answer,
-    mute,
-    unmute,
-    hold,
-    unhold,
-    sendDTMF,
-    setStatus,
+    sipStatus, sipError, callState, callTimer, isMuted, isOnHold, activeCallNumber,
+    call, hangup, answer, mute, unmute, hold, unhold, sendDTMF, setStatus,
   };
 }

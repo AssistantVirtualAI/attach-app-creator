@@ -4,11 +4,6 @@ declare global {
   }
 }
 
-export function getJsSIP() {
-  if (typeof window !== 'undefined' && window.JsSIP) return window.JsSIP;
-  return null;
-}
-
 export interface SIPConfig {
   extension: string;
   password: string;
@@ -17,15 +12,45 @@ export interface SIPConfig {
   displayName?: string;
 }
 
-export function createSIPUA(config: SIPConfig) {
-  const JsSIP = getJsSIP();
-  if (!JsSIP) {
-    console.warn('JsSIP not loaded');
-    return null;
+export class JsSIPUnavailableError extends Error {
+  constructor(msg = 'JsSIP library failed to load') {
+    super(msg);
+    this.name = 'JsSIPUnavailableError';
   }
+}
 
+/** Polls for window.JsSIP until found or timeout (default 8s). */
+export function waitForJsSIP(timeoutMs = 8000, intervalMs = 100): Promise<any> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') {
+      reject(new JsSIPUnavailableError('No window (SSR/non-browser)'));
+      return;
+    }
+    if (window.JsSIP) {
+      resolve(window.JsSIP);
+      return;
+    }
+    const start = Date.now();
+    const id = setInterval(() => {
+      if (window.JsSIP) {
+        clearInterval(id);
+        resolve(window.JsSIP);
+      } else if (Date.now() - start >= timeoutMs) {
+        clearInterval(id);
+        reject(new JsSIPUnavailableError());
+      }
+    }, intervalMs);
+  });
+}
+
+export function getJsSIP() {
+  if (typeof window !== 'undefined' && window.JsSIP) return window.JsSIP;
+  return null;
+}
+
+export async function createSIPUA(config: SIPConfig, timeoutMs = 8000) {
+  const JsSIP = await waitForJsSIP(timeoutMs);
   const socket = new JsSIP.WebSocketInterface(config.wssUrl);
-
   return new JsSIP.UA({
     sockets: [socket],
     uri: `sip:${config.extension}@${config.domain}`,
