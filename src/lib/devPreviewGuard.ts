@@ -78,6 +78,17 @@ const hideOverlay = () => {
   document.getElementById(OVERLAY_ID)?.remove();
 };
 
+const hasRuntimeStyles = () =>
+  Boolean(getComputedStyle(document.documentElement).getPropertyValue("--primary").trim());
+
+const recoverFromMissingStyles = () => {
+  if (hasRuntimeStyles()) return;
+
+  writeTimestamp(DISCONNECT_KEY);
+  createOverlay();
+  hardReloadPreview();
+};
+
 const pingDevServer = async () => {
   try {
     const response = await fetch(`/@vite/client?preview-recovery=${now()}`, {
@@ -115,6 +126,16 @@ const isRecoverableDevError = (message: string) =>
   );
 
 const installErrorFallbacks = () => {
+  const originalLog = console.log.bind(console);
+  console.log = (...args: unknown[]) => {
+    originalLog(...args);
+
+    if (args.some((arg) => isRecoverableDevError(String(arg)))) {
+      writeTimestamp(DISCONNECT_KEY);
+      startRecoveryLoop();
+    }
+  };
+
   window.addEventListener("error", (event) => {
     const message = `${event.message || ""} ${(event.error as Error | undefined)?.message || ""}`;
 
@@ -152,8 +173,23 @@ const installViteHmrRecovery = () => {
   });
 };
 
+const installStyleHealthCheck = () => {
+  const run = () => window.setTimeout(recoverFromMissingStyles, 350);
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run, { once: true });
+  } else {
+    run();
+  }
+
+  window.addEventListener("pageshow", run);
+  window.addEventListener("focus", run);
+  window.setInterval(recoverFromMissingStyles, 5000);
+};
+
 if (import.meta.env.DEV && isBrowser) {
   clearRecoveryParam();
   installErrorFallbacks();
   installViteHmrRecovery();
+  installStyleHealthCheck();
 }
