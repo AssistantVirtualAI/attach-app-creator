@@ -459,8 +459,9 @@ export default function SoftphonePane({
                   className={`lemtel-glass${isAI ? ' lemtel-glass--ai' : ''}`}
                   style={{
                     ...(compact
-                      ? { flex: '0 0 auto', minWidth: 68, padding: '6px 10px' }
-                      : { flex: 1, minWidth: 0, padding: '4px 4px 0' }),
+                      ? { flex: '0 0 auto', minWidth: ultraCompact ? 48 : 56, padding: '6px 6px' }
+                      : { flex: 1, minWidth: 48, padding: '4px 4px 0' }),
+
                     background: active
                       ? (isAI
                           ? 'linear-gradient(180deg, rgba(157,111,240,0.18), rgba(157,111,240,0.04))'
