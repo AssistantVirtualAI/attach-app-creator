@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "vitest run",
     "cap:add:ios": "npx cap add ios",
     "cap:add:android": "npx cap add android",
     "sync:ios": "npx cap sync ios",
