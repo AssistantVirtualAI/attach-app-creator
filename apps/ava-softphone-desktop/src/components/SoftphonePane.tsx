@@ -873,8 +873,9 @@ function ActiveCall({
         onAutoResetChange={onAutoResetChange}
       />
 
-      {/* Controls — vertical grid normally, continuous swipe strip when compact
-          so every button stays reachable at very small widths. */}
+      {/* Controls — always a continuous horizontal swipe strip when compact
+          so every button stays reachable. In ultra-compact mode buttons
+          collapse to icon-only (labels still exposed via aria-label + title). */}
       <div
         role="toolbar"
         aria-label="Call controls"
@@ -889,12 +890,12 @@ function ActiveCall({
         }}
       >
 
-        <ControlBtn icon="🎤" label={sp.snap.muted ? 'Unmute' : 'Mute'} ariaLabel={`${sp.snap.muted ? 'Unmute microphone' : 'Mute microphone'} (shortcut M)`} active={sp.snap.muted} danger onClick={sp.snap.muted ? sp.unmute : sp.mute} />
-        <ControlBtn icon="⏸" label={sp.snap.onHold ? 'Resume' : 'Hold'} ariaLabel={`${sp.snap.onHold ? 'Resume call' : 'Place call on hold'} (shortcut H)`} active={sp.snap.onHold} warning onClick={sp.snap.onHold ? sp.unhold : sp.hold} />
-        <ControlBtn icon="#" label="Keypad" ariaLabel={`${showDTMF ? 'Hide DTMF keypad' : 'Show DTMF keypad'} (shortcut K)`} active={showDTMF} onClick={toggleDTMF} />
-        <ControlBtn icon="⏺" label={sp.recording ? 'Stop' : 'Record'} ariaLabel={sp.recording ? 'Stop recording call' : 'Start recording call'} active={sp.recording} onClick={sp.toggleRecording} />
-        <ControlBtn icon="↪" label="Blind Xfer" ariaLabel="Blind transfer call (shortcut T)" onClick={() => onTransfer('blind')} />
-        <ControlBtn icon="↗" label="Attended" ariaLabel="Attended transfer call (shortcut Shift+T)" onClick={() => onTransfer('attended')} disabled={sp.hasConsult()} active={sp.hasConsult()} />
+        <ControlBtn iconOnly={ultraCompact} icon="🎤" label={sp.snap.muted ? 'Unmute' : 'Mute'} ariaLabel={`${sp.snap.muted ? 'Unmute microphone' : 'Mute microphone'} (shortcut M)`} active={sp.snap.muted} danger onClick={sp.snap.muted ? sp.unmute : sp.mute} />
+        <ControlBtn iconOnly={ultraCompact} icon="⏸" label={sp.snap.onHold ? 'Resume' : 'Hold'} ariaLabel={`${sp.snap.onHold ? 'Resume call' : 'Place call on hold'} (shortcut H)`} active={sp.snap.onHold} warning onClick={sp.snap.onHold ? sp.unhold : sp.hold} />
+        <ControlBtn iconOnly={ultraCompact} icon="#" label="Keypad" ariaLabel={`${showDTMF ? 'Hide DTMF keypad' : 'Show DTMF keypad'} (shortcut K)`} active={showDTMF} onClick={toggleDTMF} />
+        <ControlBtn iconOnly={ultraCompact} icon="⏺" label={sp.recording ? 'Stop' : 'Record'} ariaLabel={sp.recording ? 'Stop recording call' : 'Start recording call'} active={sp.recording} onClick={sp.toggleRecording} />
+        <ControlBtn iconOnly={ultraCompact} icon="↪" label="Blind Xfer" ariaLabel="Blind transfer call (shortcut T)" onClick={() => onTransfer('blind')} />
+        <ControlBtn iconOnly={ultraCompact} icon="↗" label="Attended" ariaLabel="Attended transfer call (shortcut Shift+T)" onClick={() => onTransfer('attended')} disabled={sp.hasConsult()} active={sp.hasConsult()} />
       </div>
 
 
@@ -913,17 +914,17 @@ function ActiveCall({
 }
 
 function ControlBtn({
-  icon, label, ariaLabel, onClick, active, danger, warning, disabled,
+  icon, label, ariaLabel, onClick, active, danger, warning, disabled, iconOnly,
 }: {
   icon: string; label: string; ariaLabel?: string; onClick: () => void;
-  active?: boolean; danger?: boolean; warning?: boolean; disabled?: boolean;
+  active?: boolean; danger?: boolean; warning?: boolean; disabled?: boolean; iconOnly?: boolean;
 }) {
   const bg = active
     ? danger ? 'rgba(254,226,226,0.98)' : warning ? 'rgba(255,247,237,0.98)' : 'rgba(255,251,235,0.98)'
-    : 'rgba(255,255,255,0.88)';
+    : 'rgba(255,255,255,0.94)';
   const bd = active
-    ? danger ? 'rgba(220,38,38,0.55)' : warning ? 'rgba(217,119,6,0.58)' : 'rgba(224,168,0,0.60)'
-    : 'rgba(0,61,166,0.18)';
+    ? danger ? 'rgba(220,38,38,0.65)' : warning ? 'rgba(217,119,6,0.68)' : 'rgba(224,168,0,0.70)'
+    : 'rgba(0,61,166,0.32)';
   const col = active
     ? danger ? c.red : warning ? c.yellow : c.gold
     : c.text;
@@ -931,22 +932,30 @@ function ControlBtn({
     <button
       onClick={onClick}
       disabled={disabled}
+      title={label}
       aria-label={ariaLabel || label}
       aria-pressed={active ? true : undefined}
-      className={`lemtel-focus${disabled ? '' : ' lemtel-glass'}`}
+      data-control-btn="1"
+      className={`lemtel-focus lemtel-ctrlbtn${disabled ? '' : ' lemtel-glass'}`}
       style={{
-        height: 44, borderRadius: 12,
+        height: iconOnly ? 48 : 44,
+        width: iconOnly ? 48 : undefined,
+        minWidth: iconOnly ? 48 : undefined,
+        borderRadius: iconOnly ? 14 : 12,
         background: bg, border: `1px solid ${bd}`, color: col,
-        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        fontSize: 11, fontWeight: 800, letterSpacing: 0.3,
+        cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.55 : 1,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        gap: iconOnly ? 0 : 6,
+        fontSize: iconOnly ? 0 : 11, fontWeight: 800, letterSpacing: 0.3,
         transition: 'all .15s ease',
-        boxShadow: active ? `0 8px 18px -12px ${col}` : '0 5px 16px -14px rgba(0,61,166,0.55)',
+        boxShadow: active
+          ? `0 8px 18px -10px ${col}, inset 0 0 0 1px rgba(255,255,255,0.6)`
+          : '0 6px 18px -12px rgba(0,61,166,0.6), inset 0 0 0 1px rgba(255,255,255,0.55)',
         whiteSpace: 'nowrap',
       }}
     >
-      <span aria-hidden="true" style={{ fontSize: 14 }}>{icon}</span>
-      {label}
+      <span aria-hidden="true" style={{ fontSize: iconOnly ? 20 : 14 }}>{icon}</span>
+      {!iconOnly && label}
     </button>
   );
 }
