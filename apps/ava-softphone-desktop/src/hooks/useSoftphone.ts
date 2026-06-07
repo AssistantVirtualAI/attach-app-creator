@@ -97,7 +97,7 @@ export function useSoftphone(args: UseSoftphoneArgs) {
       }
     })();
     return () => { cancelled = true; };
-  }, [args.accessToken, args.refreshToken, args.extension]);
+  }, [args.accessToken, args.refreshToken, args.extension, retryTick]);
 
   // Ringtone + system notification on incoming.
   useEffect(() => {
