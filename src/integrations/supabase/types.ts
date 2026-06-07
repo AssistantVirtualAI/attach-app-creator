@@ -4043,8 +4043,11 @@ export type Database = {
       }
       pbx_softphone_users: {
         Row: {
+          account_status: string
+          active_platforms: string[]
           client_id: string | null
           created_at: string | null
+          device_type: string | null
           display_name: string | null
           dnd_enabled: boolean
           extension: string
@@ -4052,16 +4055,28 @@ export type Database = {
           forward_enabled: boolean
           forward_to: string | null
           id: string
+          last_seen_android: string | null
           last_seen_at: string | null
+          last_seen_ios: string | null
+          last_seen_linux: string | null
+          last_seen_mac: string | null
+          last_seen_web: string | null
+          last_seen_windows: string | null
           organization_id: string
           portal_user_id: string | null
           sip_domain: string | null
+          sip_password: string | null
           status: string | null
+          total_calls: number
           updated_at: string | null
+          wss_url: string | null
         }
         Insert: {
+          account_status?: string
+          active_platforms?: string[]
           client_id?: string | null
           created_at?: string | null
+          device_type?: string | null
           display_name?: string | null
           dnd_enabled?: boolean
           extension: string
@@ -4069,16 +4084,28 @@ export type Database = {
           forward_enabled?: boolean
           forward_to?: string | null
           id?: string
+          last_seen_android?: string | null
           last_seen_at?: string | null
+          last_seen_ios?: string | null
+          last_seen_linux?: string | null
+          last_seen_mac?: string | null
+          last_seen_web?: string | null
+          last_seen_windows?: string | null
           organization_id: string
           portal_user_id?: string | null
           sip_domain?: string | null
+          sip_password?: string | null
           status?: string | null
+          total_calls?: number
           updated_at?: string | null
+          wss_url?: string | null
         }
         Update: {
+          account_status?: string
+          active_platforms?: string[]
           client_id?: string | null
           created_at?: string | null
+          device_type?: string | null
           display_name?: string | null
           dnd_enabled?: boolean
           extension?: string
@@ -4086,12 +4113,21 @@ export type Database = {
           forward_enabled?: boolean
           forward_to?: string | null
           id?: string
+          last_seen_android?: string | null
           last_seen_at?: string | null
+          last_seen_ios?: string | null
+          last_seen_linux?: string | null
+          last_seen_mac?: string | null
+          last_seen_web?: string | null
+          last_seen_windows?: string | null
           organization_id?: string
           portal_user_id?: string | null
           sip_domain?: string | null
+          sip_password?: string | null
           status?: string | null
+          total_calls?: number
           updated_at?: string | null
+          wss_url?: string | null
         }
         Relationships: [
           {
@@ -5213,6 +5249,7 @@ export type Database = {
         Args: { _full_name?: string; _user_email: string; _user_id: string }
         Returns: string
       }
+      update_platform_seen: { Args: { p_platform: string }; Returns: undefined }
     }
     Enums: {
       app_role: "super_admin" | "org_admin" | "manager" | "agent" | "viewer"
