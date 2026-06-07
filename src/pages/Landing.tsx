@@ -73,9 +73,6 @@ const Landing = () => {
         <div id="features">
           <FeaturesSection />
         </div>
-        <div id="whats-new">
-          <WhatsNewSection />
-        </div>
         <div id="apps-showcase">
           <AppsShowcaseSection />
         </div>
