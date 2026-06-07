@@ -4041,6 +4041,66 @@ export type Database = {
           },
         ]
       }
+      pbx_softphone_portal_audit: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_user_id: string | null
+          created_at: string
+          extension: string
+          id: string
+          metadata: Json
+          new_portal_user_id: string | null
+          old_portal_user_id: string | null
+          organization_id: string
+          softphone_user_id: string
+          source: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          extension: string
+          id?: string
+          metadata?: Json
+          new_portal_user_id?: string | null
+          old_portal_user_id?: string | null
+          organization_id: string
+          softphone_user_id: string
+          source?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          extension?: string
+          id?: string
+          metadata?: Json
+          new_portal_user_id?: string | null
+          old_portal_user_id?: string | null
+          organization_id?: string
+          softphone_user_id?: string
+          source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pbx_softphone_portal_audit_softphone_user_id_fkey"
+            columns: ["softphone_user_id"]
+            isOneToOne: false
+            referencedRelation: "pbx_softphone_link_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_softphone_portal_audit_softphone_user_id_fkey"
+            columns: ["softphone_user_id"]
+            isOneToOne: false
+            referencedRelation: "pbx_softphone_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pbx_softphone_users: {
         Row: {
           account_status: string
@@ -5211,8 +5271,34 @@ export type Database = {
           },
         ]
       }
+      pbx_softphone_link_status: {
+        Row: {
+          display_name: string | null
+          extension: string | null
+          id: string | null
+          link_status: string | null
+          organization_id: string | null
+          portal_email: string | null
+          portal_full_name: string | null
+          portal_user_id: string | null
+          sip_domain: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pbx_softphone_users_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      admin_link_softphone_by_email: {
+        Args: { _email: string; _softphone_id: string }
+        Returns: Json
+      }
       create_organization_for_user: {
         Args: { _name: string; _slug: string }
         Returns: string
