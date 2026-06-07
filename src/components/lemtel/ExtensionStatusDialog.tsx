@@ -41,11 +41,14 @@ export function ExtensionStatusDialog({ open, onOpenChange, ext }: Props) {
   const prov = ext?.raw_data?.provisioning ?? null;
   const extResult = prov?.extension_result;
   const vmResult = prov?.voicemail_result;
-  const sipPassword = ext?.raw_data?.sip_password || ext?.raw_data?.password;
+  const storedPassword = ext?.raw_data?.sip_password || ext?.raw_data?.password || '';
+  const [pwdInput, setPwdInput] = useState('');
+  useEffect(() => { setPwdInput(storedPassword || generatePassword()); }, [ext?.id, storedPassword]);
   const registered = (regs as any[]).some((r) => String(r.extension ?? r.user ?? '').startsWith(String(ext.extension)));
 
   const pushToFusionPBX = async () => {
-    if (!sipPassword) { toast.error('No stored SIP password — recreate the extension'); return; }
+    const sipPassword = (pwdInput || '').trim();
+    if (sipPassword.length < 8) { toast.error('SIP password must be at least 8 characters'); return; }
     setPushing(true);
     try {
       const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
