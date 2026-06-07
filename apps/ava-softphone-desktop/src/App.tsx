@@ -29,6 +29,10 @@ type Creds = {
 export default function App() {
   const { t } = useTheme();
   useContrast(); // applies low/med/high contrast preset on mount
+
+  // Responsive testing utility — visit ?lab=responsive to open it.
+  if (IS_LAB) return <ResponsiveLab />;
+
   const [creds, setCreds] = useState<Creds>(null);
   const [loading, setLoading] = useState(true);
   const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 980);
