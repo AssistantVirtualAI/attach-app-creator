@@ -178,6 +178,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <span>Ext. {ext}</span>
         <span className={cn("w-2 h-2 rounded-full", statusDotClass(sipStatus))} />
+        {sp.config?.mock && <Badge variant="outline" className="h-4 text-[9px] px-1.5">Demo</Badge>}
       </div>
       <div className="flex items-center gap-1">
         <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
