@@ -284,7 +284,7 @@ const FlowDiagram = ({
       <motion.circle cx="220" cy="135" r="38"
         fill="hsl(var(--primary))" fillOpacity="0.06"
         stroke="hsl(var(--primary))" strokeWidth="1" strokeOpacity="0.2"
-        animate={{ r: [38, 44, 38] }}
+        animate={{ scale: [1, 1.16, 1] }}
         transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
       />
       <circle cx="220" cy="135" r="26" fill="hsl(var(--primary))" fillOpacity="0.1" />
@@ -363,7 +363,7 @@ const FlowDiagram = ({
             {isActive && (
               <motion.circle cx={x} cy={y} r={22} fill="none"
                 stroke={s.nodeColor} strokeWidth="1.5"
-                animate={{ r: [22, 30, 22], opacity: [0.6, 0, 0.6] }}
+                animate={{ scale: [1, 1.36, 1], opacity: [0.6, 0, 0.6] }}
                 transition={{ duration: 1.8, repeat: Infinity }}
               />
             )}
@@ -377,7 +377,7 @@ const FlowDiagram = ({
               r={isActive ? 19 : 16}
               fill={isActive || isDone ? s.nodeColor : "hsl(var(--muted))"}
               opacity={isActive || isDone ? 1 : 0.45}
-              animate={{ r: isActive ? 19 : 16 }}
+              animate={{ scale: isActive ? 1.12 : 1 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
             />
             {/* Icon/check */}

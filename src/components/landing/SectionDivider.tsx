@@ -55,7 +55,7 @@ const NetworkDivider = () => {
           fill="transparent"
           stroke="hsl(var(--primary))"
           strokeWidth="0.5"
-          animate={{ r: [1.8, 4, 1.8], opacity: [0.8, 0, 0.8] }}
+          animate={{ scale: [1, 2.2, 1], opacity: [0.8, 0, 0.8] }}
           transition={{ duration: 2.5, delay: i * 0.3, repeat: Infinity, ease: "easeOut" }}
         />
       ))}
