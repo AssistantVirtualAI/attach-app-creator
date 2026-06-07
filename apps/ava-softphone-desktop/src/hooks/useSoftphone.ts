@@ -154,6 +154,13 @@ export function useSoftphone(args: UseSoftphoneArgs) {
     hasConsult: useCallback(() => sipProvider.hasConsult(), []),
     setAudioEl: useCallback((el: HTMLAudioElement | null) => { sipProvider.audioEl = el; }, []),
     setOutputDevice: useCallback((id: string | null) => { sipProvider.outputDeviceId = id; }, []),
+    setInputDevice: useCallback((id: string | null) => { sipProvider.inputDeviceId = id; }, []),
+    testAudioDevices: useCallback(() => sipProvider.testAudioDevices(), []),
+    downloadDebugReport: useCallback(() => sipProvider.downloadDebugReport(), []),
+    getBoundDevices: useCallback(() => ({
+      input: sipProvider.boundInputLabel,
+      output: sipProvider.boundOutputLabel,
+    }), []),
     manualStatus,
     setManualStatus,
     recording,

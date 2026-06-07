@@ -1,5 +1,20 @@
 import * as JsSIP from 'jssip';
 
+// Module load probe — captured at import time so debug report can show it.
+const JSSIP_MODULE_INFO = (() => {
+  try {
+    const keys = JsSIP ? Object.keys(JsSIP as any) : [];
+    return {
+      loaded: !!(JsSIP && (JsSIP as any).UA),
+      version: (JsSIP as any)?.version || (JsSIP as any)?.default?.version || 'unknown',
+      exports: keys.slice(0, 20),
+      source: 'npm:jssip',
+    };
+  } catch (e: any) {
+    return { loaded: false, version: 'unknown', exports: [], source: 'npm:jssip', error: String(e?.message || e) };
+  }
+})();
+
 // JsSIP UA lifecycle manager — desktop softphone.
 // Mirrors the web app provider with extras: attended transfer, audio device pinning.
 
@@ -62,6 +77,11 @@ class JsSipProvider {
   };
   audioEl: HTMLAudioElement | null = null;
   outputDeviceId: string | null = null;
+  inputDeviceId: string | null = null;
+  boundOutputLabel: string = 'System default';
+  boundInputLabel: string = 'System default';
+  private wssAttempted: string[] = [];
+  private lastCallError: string | null = null;
 
   subscribe(fn: Listener) {
     this.listeners.add(fn);
@@ -75,7 +95,7 @@ class JsSipProvider {
   }
 
   private logEvent(level: SipEvent['level'], message: string) {
-    const next = [...this.snap.events, { at: Date.now(), level, message }].slice(-20);
+    const next = [...this.snap.events, { at: Date.now(), level, message }].slice(-50);
     // eslint-disable-next-line no-console
     console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log'](`[SIP] ${message}`);
     this.update({ events: next });
@@ -103,7 +123,13 @@ class JsSipProvider {
       return;
     }
 
-    // JsSIP is imported as an npm module — always available
+    if (!JSSIP_MODULE_INFO.loaded) {
+      const msg = `JsSIP module failed to load: ${JSSIP_MODULE_INFO['error' as keyof typeof JSSIP_MODULE_INFO] || 'no UA export'}`;
+      this.logEvent('error', msg);
+      this.update({ status: 'error', errorCause: msg });
+      return;
+    }
+    this.logEvent('info', `JsSIP module ready (version=${JSSIP_MODULE_INFO.version})`);
 
     const isElectron = typeof window !== 'undefined' &&
       typeof window.navigator !== 'undefined' &&
@@ -120,8 +146,9 @@ class JsSipProvider {
         'wss://pbxnode.lemtel.tel:7443',
         'wss://170.39.199.132:7443',
       ].filter(Boolean)));
+      this.wssAttempted = fallbackUrls;
 
-      this.logEvent('info', `Init sip:${cfg.extension}@${cfg.sipDomain} via ${fallbackUrls.length} WSS endpoint(s)`);
+      this.logEvent('info', `Init sip:${cfg.extension}@${cfg.sipDomain} via ${fallbackUrls.length} WSS endpoint(s): ${fallbackUrls.join(', ')}`);
 
       const sockets = fallbackUrls.map(
         (url) => new JsSIP.WebSocketInterface(url),
@@ -178,7 +205,13 @@ class JsSipProvider {
       });
       ua.on('newRTCSession', (e: any) => this.attachSession(e.session, e.originator));
 
-      ua.start();
+      try {
+        ua.start();
+        this.logEvent('info', 'UA.start() invoked');
+      } catch (startErr: any) {
+        this.logEvent('error', `UA.start() threw: ${String(startErr?.message || startErr)}`);
+        throw startErr;
+      }
       this.ua = ua;
       this.update({ status: 'connecting' });
     } catch (err: any) {
@@ -218,7 +251,13 @@ class JsSipProvider {
       this.update({ callState: 'active', startedAt: Date.now() });
     });
     session.on('failed', (e: any) => {
-      this.update({ callState: 'ended', errorCause: e?.cause });
+      const cause = e?.cause || 'unknown';
+      const reason = e?.message?.reason_phrase || e?.response?.reason_phrase || '';
+      const code = e?.message?.status_code || e?.response?.status_code;
+      const detail = [cause, code, reason].filter(Boolean).join(' ');
+      this.lastCallError = detail;
+      this.logEvent('error', `Call failed: ${detail}`);
+      this.update({ callState: 'ended', errorCause: detail });
       setTimeout(() => this.resetCall(), 2500);
     });
     session.on('ended', () => {
@@ -270,12 +309,17 @@ class JsSipProvider {
   /** Ensure mic permission before placing a call. Returns null on success or error message. */
   async ensureMicPermission(): Promise<string | null> {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        video: false,
-      });
+      const audioConstraints: MediaTrackConstraints = {
+        echoCancellation: true, noiseSuppression: true, autoGainControl: true,
+      };
+      if (this.inputDeviceId) (audioConstraints as any).deviceId = { exact: this.inputDeviceId };
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
+      const track = stream.getAudioTracks()[0];
+      if (track) {
+        this.boundInputLabel = track.label || 'System default';
+        this.logEvent('info', `Mic ready: ${this.boundInputLabel}`);
+      }
       stream.getTracks().forEach((t) => t.stop());
-      this.logEvent('info', 'Microphone permission granted');
       return null;
     } catch (err: any) {
       const msg = `Microphone access denied: ${err?.message || err}`;
@@ -284,21 +328,56 @@ class JsSipProvider {
     }
   }
 
+  /** List + verify audio devices. Returns labels of currently bound input/output. */
+  async testAudioDevices(): Promise<{ input: string; output: string; inputs: number; outputs: number; error?: string }> {
+    try {
+      // Trigger permission so labels populate.
+      const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
+      probe.getTracks().forEach((t) => t.stop());
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const inputs = devices.filter((d) => d.kind === 'audioinput');
+      const outputs = devices.filter((d) => d.kind === 'audiooutput');
+      const inDev = this.inputDeviceId
+        ? inputs.find((d) => d.deviceId === this.inputDeviceId)
+        : inputs.find((d) => d.deviceId === 'default') || inputs[0];
+      const outDev = this.outputDeviceId
+        ? outputs.find((d) => d.deviceId === this.outputDeviceId)
+        : outputs.find((d) => d.deviceId === 'default') || outputs[0];
+      this.boundInputLabel = inDev?.label || 'System default';
+      this.boundOutputLabel = outDev?.label || 'System default';
+      this.logEvent('info', `Device test OK — in: ${this.boundInputLabel} / out: ${this.boundOutputLabel} (${inputs.length} in, ${outputs.length} out)`);
+      return {
+        input: this.boundInputLabel,
+        output: this.boundOutputLabel,
+        inputs: inputs.length,
+        outputs: outputs.length,
+      };
+    } catch (err: any) {
+      const msg = String(err?.message || err);
+      this.logEvent('error', `Device test failed: ${msg}`);
+      return { input: '—', output: '—', inputs: 0, outputs: 0, error: msg };
+    }
+  }
+
   async call(number: string): Promise<string | null> {
     if (!this.config || !this.ua) return 'SIP not initialized';
     const micErr = await this.ensureMicPermission();
     if (micErr) {
       this.update({ errorCause: micErr });
+      this.lastCallError = micErr;
       return micErr;
     }
+    this.logEvent('info', `Starting call with input="${this.boundInputLabel}" output="${this.boundOutputLabel}"`);
     const target = `sip:${number}@${this.config.sipDomain}`;
     try {
+      const audioConstraints: MediaTrackConstraints = {};
+      if (this.inputDeviceId) (audioConstraints as any).deviceId = { exact: this.inputDeviceId };
       this.ua.call(target, {
-        mediaConstraints: { audio: true, video: false },
-        rtcOfferConstraints: {
-          offerToReceiveAudio: true,
-          offerToReceiveVideo: false,
+        mediaConstraints: {
+          audio: Object.keys(audioConstraints).length ? audioConstraints : true,
+          video: false,
         },
+        rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
         pcConfig: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
@@ -311,13 +390,71 @@ class JsSipProvider {
         sessionTimersExpires: 120,
         extraHeaders: ['X-App: Lemtel-Telecom-Desktop'],
       });
-      this.logEvent('info', `Call initiated → ${number}`);
+      this.logEvent('info', `Call initiated → ${target}`);
+      this.lastCallError = null;
       return null;
     } catch (err: any) {
       const msg = `Call error: ${err?.message || err}`;
       this.logEvent('error', msg);
+      this.lastCallError = msg;
       this.update({ errorCause: msg });
       return msg;
+    }
+  }
+
+  /** Build a debug report JSON with secrets masked. */
+  buildDebugReport(): string {
+    const cfg = this.config;
+    const masked = cfg ? {
+      extension: cfg.extension,
+      displayName: cfg.displayName,
+      sipDomain: cfg.sipDomain,
+      wssUrl: cfg.wssUrl,
+      wssUrls: cfg.wssUrls,
+      password: cfg.password ? `***${cfg.password.length}chars***` : '(none)',
+      mock: !!cfg.mock,
+    } : null;
+    const report = {
+      generatedAt: new Date().toISOString(),
+      jssipModule: JSSIP_MODULE_INFO,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'n/a',
+      isElectron: typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron'),
+      config: masked,
+      wssAttempted: this.wssAttempted,
+      audio: {
+        input: this.boundInputLabel,
+        output: this.boundOutputLabel,
+        inputDeviceId: this.inputDeviceId,
+        outputDeviceId: this.outputDeviceId,
+      },
+      sip: {
+        status: this.snap.status,
+        callState: this.snap.callState,
+        errorCause: this.snap.errorCause || null,
+        lastCallError: this.lastCallError,
+        hasUA: !!this.ua,
+        hasSession: !!this.session,
+      },
+      events: this.snap.events,
+    };
+    return JSON.stringify(report, null, 2);
+  }
+
+  downloadDebugReport() {
+    try {
+      const json = this.buildDebugReport();
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `lemtel-softphone-debug-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      this.logEvent('info', 'Debug report downloaded');
+    } catch (err: any) {
+      this.logEvent('error', `Debug report failed: ${err?.message || err}`);
     }
   }
 

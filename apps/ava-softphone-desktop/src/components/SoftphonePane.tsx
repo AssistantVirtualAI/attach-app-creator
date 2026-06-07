@@ -308,6 +308,21 @@ export default function SoftphonePane({
             background: dotColor, color: dotColor,
             animation: sp.snap.status === 'registered' ? 'statusPulse 2s ease-in-out infinite' : 'none',
           }} />
+          <span
+            title={sp.snap.errorCause || `SIP status: ${sp.snap.status}`}
+            style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase',
+              color: dotColor, maxWidth: compact ? 70 : 110,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}
+          >
+            {sp.snap.status === 'registered' ? 'Registered'
+              : sp.snap.status === 'connecting' ? 'Connecting…'
+              : sp.snap.status === 'connected' ? 'Registering…'
+              : sp.snap.status === 'error' ? 'Error'
+              : sp.snap.status === 'disconnected' ? 'Offline'
+              : 'Idle'}
+          </span>
           <select
             value={sp.manualStatus}
             onChange={(e) => sp.setManualStatus(e.target.value as ManualStatus)}
@@ -334,6 +349,9 @@ export default function SoftphonePane({
           >⚙</button>
         </div>
       </div>
+
+      {/* Diagnostics strip — always available */}
+      <SipDiagnostics sp={sp} compact={compact} c={c} />
 
       {sp.credError && (
         <div style={{
@@ -1107,3 +1125,114 @@ const ghostBtn: React.CSSProperties = {
   background: 'rgba(255,255,255,0.05)', border: `1px solid ${c.border}`,
   color: c.text, fontSize: 13, fontWeight: 600, cursor: 'pointer',
 };
+
+// ---------------------------------------------------------------------------
+// SipDiagnostics — visible status + device test + debug report download.
+// ---------------------------------------------------------------------------
+function SipDiagnostics({
+  sp, compact, c,
+}: {
+  sp: ReturnType<typeof useSoftphone>;
+  compact: boolean;
+  c: typeof theme.colors;
+}) {
+  const [open, setOpen] = useState(false);
+  const [devices, setDevices] = useState<{ input: string; output: string; inputs: number; outputs: number; error?: string } | null>(null);
+  const [testing, setTesting] = useState(false);
+
+  // Hydrate bound devices on mount so labels show before first test.
+  useEffect(() => {
+    const b = sp.getBoundDevices?.();
+    if (b) setDevices((d) => d || { input: b.input, output: b.output, inputs: 0, outputs: 0 });
+  }, [sp]);
+
+  const runTest = async () => {
+    setTesting(true);
+    try {
+      const r = await sp.testAudioDevices();
+      setDevices(r);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const statusColor =
+    sp.snap.status === 'registered' ? '#10B981' :
+    sp.snap.status === 'error' ? '#EF4444' :
+    sp.snap.status === 'disconnected' ? '#94A3B8' : '#F59E0B';
+
+  return (
+    <div style={{
+      position: 'relative', zIndex: 1,
+      margin: compact ? '6px 10px 0' : '8px 14px 0',
+      padding: '8px 10px', borderRadius: 10,
+      background: 'rgba(255,255,255,0.03)',
+      border: `1px solid ${c.border}`,
+      fontSize: 11,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+          <span style={{
+            display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: statusColor,
+          }} />
+          <span style={{ color: '#fff', fontWeight: 700, fontSize: 11 }}>SIP {sp.snap.status}</span>
+          {sp.snap.errorCause && (
+            <span title={sp.snap.errorCause} style={{
+              color: '#fca5a5', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap', minWidth: 0,
+            }}>
+              · {sp.snap.errorCause}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          style={{
+            background: 'rgba(255,255,255,0.06)', border: `1px solid ${c.border}`,
+            borderRadius: 6, color: c.text, fontSize: 10, padding: '3px 8px', cursor: 'pointer',
+          }}
+        >{open ? 'Hide' : 'Diagnostics'}</button>
+      </div>
+
+      {open && (
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button onClick={runTest} disabled={testing} style={diagBtn(c)}>
+              {testing ? 'Testing…' : '🎧 Test Audio Devices'}
+            </button>
+            <button onClick={() => sp.downloadDebugReport()} style={diagBtn(c)}>
+              ⬇ Download Debug Report
+            </button>
+            <button onClick={() => sp.restart()} style={diagBtn(c)}>
+              ↻ Restart SIP
+            </button>
+          </div>
+          {devices && (
+            <div style={{
+              padding: 6, borderRadius: 6, background: 'rgba(0,0,0,0.3)',
+              fontSize: 10, color: 'rgba(235,240,255,0.85)',
+              fontFamily: 'JetBrains Mono, Menlo, monospace',
+            }}>
+              <div>🎙  Input:  {devices.input}</div>
+              <div>🔊 Output: {devices.output}</div>
+              {!!devices.inputs && <div style={{ opacity: 0.6 }}>{devices.inputs} input · {devices.outputs} output device(s) detected</div>}
+              {devices.error && <div style={{ color: '#fca5a5' }}>{devices.error}</div>}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function diagBtn(c: typeof theme.colors): React.CSSProperties {
+  return {
+    flex: '1 1 auto',
+    background: 'rgba(255,255,255,0.05)',
+    border: `1px solid ${c.border}`,
+    borderRadius: 6, color: c.text,
+    fontSize: 10, fontWeight: 600,
+    padding: '5px 8px', cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  };
+}
