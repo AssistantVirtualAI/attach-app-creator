@@ -28,12 +28,14 @@ export default function TelephonyWebphone() {
   const { data: recents = [] } = useQuery({
     queryKey: ['webphone-recents'],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('pbx_call_records')
-        .select('id, direction, caller_id_number, destination_number, duration_seconds, start_stamp')
-        .order('start_stamp', { ascending: false }).limit(30);
+        .select('id, direction, caller_number, destination_number, duration_seconds, start_at, missed_call')
+        .order('start_at', { ascending: false }).limit(30);
+      if (error) console.warn('[webphone-recents] query failed:', error.message);
       return data || [];
     },
+    refetchInterval: 15000,
   });
 
   const filtered = contacts.filter((c: any) =>
