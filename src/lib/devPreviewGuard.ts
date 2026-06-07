@@ -19,6 +19,7 @@ const clearRecoveryParam = () => {
   if (!url.searchParams.has(DEV_RECOVERY_PARAM)) return;
 
   url.searchParams.delete(DEV_RECOVERY_PARAM);
+  window.sessionStorage.removeItem(DISCONNECT_KEY);
   window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
 };
 
