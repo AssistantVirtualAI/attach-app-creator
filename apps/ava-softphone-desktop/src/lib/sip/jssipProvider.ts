@@ -370,20 +370,34 @@ class JsSipProvider {
     this.logEvent('info', `Starting call with input="${this.boundInputLabel}" output="${this.boundOutputLabel}"`);
     const target = `sip:${number}@${this.config.sipDomain}`;
     try {
-      const audioConstraints: MediaTrackConstraints = {};
-      if (this.inputDeviceId) (audioConstraints as any).deviceId = { exact: this.inputDeviceId };
-      this.ua.call(target, {
-        mediaConstraints: {
-          audio: Object.keys(audioConstraints).length ? audioConstraints : true,
+      // Pre-fetch a real audio MediaStream and pass it directly to JsSIP.
+      // Avoids the "Bad Media Description" error that occurs when the SDP
+      // offer is generated before any audio track is attached to the peer.
+      let mediaStream: MediaStream | null = null;
+      try {
+        const constraints: MediaStreamConstraints = {
+          audio: this.inputDeviceId
+            ? { deviceId: { exact: this.inputDeviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+            : { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
           video: false,
-        },
+        };
+        mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (!mediaStream.getAudioTracks().length) throw new Error('No audio track in stream');
+      } catch (msErr: any) {
+        // Fallback to plain audio:true if device-pinned constraints failed.
+        this.logEvent('warn', `Specific mic constraint failed (${msErr?.message}); retrying with default mic`);
+        mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      }
+
+      this.ua.call(target, {
+        mediaStream,
+        mediaConstraints: { audio: true, video: false },
         rtcOfferConstraints: { offerToReceiveAudio: true, offerToReceiveVideo: false },
         pcConfig: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
           ],
-          iceTransportPolicy: 'all',
           bundlePolicy: 'balanced',
           rtcpMuxPolicy: 'require',
         },
