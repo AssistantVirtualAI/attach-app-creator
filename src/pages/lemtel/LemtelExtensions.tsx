@@ -155,6 +155,17 @@ export default function LemtelExtensions() {
                     </TableCell>
                     <TableCell>{e.voicemail_enabled ? <Badge variant="secondary">On</Badge> : <Badge variant="outline">Off</Badge>}</TableCell>
                     <TableCell>
+                      {softphoneByExt.has(String(e.extension)) ? (
+                        <Badge variant="outline" className="bg-green-500/15 text-green-600 border-green-500/30">✅ Active</Badge>
+                      ) : (
+                        <EnableSoftphonePopover
+                          extensionId={e.id}
+                          extension={String(e.extension)}
+                          defaultDisplayName={e.effective_cid_name || e.description || ''}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <span className="inline-flex items-center gap-1 text-sm">
                         <Circle className={`w-2.5 h-2.5 ${e.enabled ? 'fill-green-500 text-green-500' : 'fill-muted text-muted'}`} />
                         {e.enabled ? 'Enabled' : 'Disabled'}
