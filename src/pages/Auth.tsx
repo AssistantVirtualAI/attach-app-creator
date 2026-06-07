@@ -103,6 +103,15 @@ const AuthPage = () => {
     }
   };
 
+  const handleMicrosoftLogin = async () => {
+    setLoading(true);
+    try {
+      await signInWithMicrosoft();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getTitle = () => {
     switch (mode) {
       case 'login': return t('auth.login');
