@@ -52,6 +52,34 @@ Deno.serve(async (req) => {
       password = (ext?.raw_data as any)?.password || (ext?.raw_data as any)?.sip_password || "";
     }
 
+    // Fallback: ask FusionPBX directly via proxy, then persist for next time.
+    if (!password) {
+      try {
+        const { data: fp } = await supabase.functions.invoke("fusionpbx-proxy", {
+          body: { action: "get-extension", extension: sp.extension },
+        });
+        const fpPwd = (fp as any)?.extension?.password
+          || (fp as any)?.password
+          || (fp as any)?.data?.password
+          || "";
+        if (fpPwd) {
+          password = fpPwd;
+          await supabase
+            .from("pbx_softphone_users")
+            .update({ sip_password: fpPwd })
+            .eq("portal_user_id", user.id);
+        }
+      } catch (_e) { /* non-fatal */ }
+    }
+
+    if (!password) {
+      return json({
+        error: "NO_SIP_PASSWORD",
+        message: "Your extension is missing a SIP password. Contact your administrator or open the portal to configure it.",
+      }, 424);
+    }
+
+
     // Audit
     try {
       await supabase.from("audit_logs").insert({

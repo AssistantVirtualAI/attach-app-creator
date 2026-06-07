@@ -315,29 +315,31 @@ export default function SoftphonePane({
         <div style={{
           position: 'relative', zIndex: 1,
           margin: compact ? '10px 12px 0' : '14px 16px 0',
-          padding: compact ? '10px 12px' : '14px 16px',
-          borderRadius: 14,
-          background: 'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(255,215,0,0.04))',
-          border: '1px solid rgba(239,68,68,0.25)',
-          boxShadow: '0 8px 24px -12px rgba(239,68,68,0.35)',
-          display: 'flex', gap: compact ? 10 : 12, alignItems: 'flex-start',
+          padding: 16,
+          borderRadius: 12,
+          background: 'rgba(239,68,68,0.08)',
+          border: '1px solid rgba(239,68,68,0.3)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center',
         }}>
-          <div style={{
-            width: compact ? 26 : 32, height: compact ? 26 : 32, borderRadius: 10, flexShrink: 0,
-            display: 'grid', placeItems: 'center',
-            background: 'rgba(239,68,68,0.15)', color: c.red,
-            fontSize: compact ? 14 : 16, fontWeight: 700,
-          }}>!</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: c.red, fontSize: compact ? 11 : 12, fontWeight: 700, letterSpacing: 0.3, marginBottom: 2 }}>
-              SIP not registered — calls disabled
-            </div>
-            <div style={{ color: c.textSub, fontSize: compact ? 10 : 11, lineHeight: 1.5 }}>
-              {sp.credError}
-            </div>
+          <div style={{ fontSize: 32, lineHeight: 1 }} aria-hidden>🔐</div>
+          <div style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>SIP Not Configured</div>
+          <div style={{ color: 'rgba(235,240,255,0.78)', fontSize: 12, lineHeight: 1.5, maxWidth: 280 }}>
+            Your extension needs a SIP password. Contact your administrator or visit the portal.
           </div>
+          <button
+            onClick={() => window.electronAPI?.openExternal?.('https://avastatistic.ca')}
+            style={{
+              marginTop: 4, padding: '8px 16px', borderRadius: 10,
+              background: 'linear-gradient(135deg, #003DA6, #7C3AED)',
+              border: '1px solid rgba(255,255,255,0.18)',
+              color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
+            }}
+          >Open Portal →</button>
+          <div style={{ color: 'rgba(235,240,255,0.5)', fontSize: 10, marginTop: 4 }}>{sp.credError}</div>
         </div>
       )}
+
 
       {/* CONTENT */}
       <div className="lemtel-scroll" style={{
@@ -457,8 +459,9 @@ export default function SoftphonePane({
                   className={`lemtel-glass${isAI ? ' lemtel-glass--ai' : ''}`}
                   style={{
                     ...(compact
-                      ? { flex: '0 0 auto', minWidth: 68, padding: '6px 10px' }
-                      : { flex: 1, minWidth: 0, padding: '4px 4px 0' }),
+                      ? { flex: '0 0 auto', minWidth: ultraCompact ? 48 : 56, padding: '6px 6px' }
+                      : { flex: 1, minWidth: 48, padding: '4px 4px 0' }),
+
                     background: active
                       ? (isAI
                           ? 'linear-gradient(180deg, rgba(157,111,240,0.18), rgba(157,111,240,0.04))'
@@ -499,16 +502,19 @@ export default function SoftphonePane({
                 >
                   {active && <span className={`lemtel-tab-dot${isAI ? ' lemtel-tab-dot--ai' : ''}`} />}
                   <Icon size={compact ? 19 : 20} color={active ? activeColor : 'currentColor'} />
-                  <span style={{
-                    fontSize: compact ? 9 : 10,
-                    letterSpacing: compact ? 0.7 : 1.2,
-                    textTransform: 'uppercase',
-                    fontWeight: active ? 800 : 600,
-                    maxWidth: '100%',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {label}
-                  </span>
+                  {!ultraCompact && (
+                    <span style={{
+                      fontSize: compact ? 9 : 10,
+                      letterSpacing: compact ? 0.7 : 1.2,
+                      textTransform: 'uppercase',
+                      fontWeight: active ? 800 : 600,
+                      maxWidth: '100%',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {label}
+                    </span>
+                  )}
+
                 </button>
               );
             })}
@@ -569,7 +575,7 @@ export default function SoftphonePane({
           <BrandTagline size="sm" showPoweredBy={false} style={{ marginTop: 0 }} />
         </div>
         <div style={{ fontSize: compact ? 9 : 10, color: c.textDim, letterSpacing: 0.5 }}>
-          v1.0.6 {ultraCompact ? '' : '· Powered by '}
+          v1.1.0 {ultraCompact ? '' : '· Powered by '}
           <a
             onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal?.('https://assistantvirtualai.com'); }}
             href="#"
@@ -867,11 +873,12 @@ function ActiveCall({
         style={compact ? {
           width: '100%', marginBottom: 12,
         } : {
-          display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8,
-          width: '100%', maxWidth: 280, marginBottom: 12,
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10,
+          width: '100%', maxWidth: 300, marginBottom: 12,
           maxHeight: '38vh', overflowY: 'auto', paddingRight: 2,
         }}
       >
+
         <ControlBtn icon="🎤" label={sp.snap.muted ? 'Unmute' : 'Mute'} ariaLabel={`${sp.snap.muted ? 'Unmute microphone' : 'Mute microphone'} (shortcut M)`} active={sp.snap.muted} danger onClick={sp.snap.muted ? sp.unmute : sp.mute} />
         <ControlBtn icon="⏸" label={sp.snap.onHold ? 'Resume' : 'Hold'} ariaLabel={`${sp.snap.onHold ? 'Resume call' : 'Place call on hold'} (shortcut H)`} active={sp.snap.onHold} warning onClick={sp.snap.onHold ? sp.unhold : sp.hold} />
         <ControlBtn icon="#" label="Keypad" ariaLabel={`${showDTMF ? 'Hide DTMF keypad' : 'Show DTMF keypad'} (shortcut K)`} active={showDTMF} onClick={toggleDTMF} />
