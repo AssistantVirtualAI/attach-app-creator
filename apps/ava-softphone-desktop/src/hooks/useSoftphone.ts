@@ -48,6 +48,7 @@ export function useSoftphone(args: UseSoftphoneArgs) {
   const [loading, setLoading] = useState(true);
   const [credError, setCredError] = useState<string | null>(null);
   const [manualStatus, setManualStatus] = useState<ManualStatus>('auto');
+  const [retryTick, setRetryTick] = useState(0);
   const [recording, setRecording] = useState(false);
 
   useEffect(() => {
