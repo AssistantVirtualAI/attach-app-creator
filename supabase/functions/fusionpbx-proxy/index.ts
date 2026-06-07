@@ -277,12 +277,7 @@ Deno.serve(async (req) => {
 
     if (action === "create-extension") {
       const extData = body.data || params || {};
-
-      console.log("Creating extension:", {
-        url: `${FUSIONPBX_API_URL}/app/api/7/extensions`,
-        extension: extData.extension,
-        domain_uuid: FUSIONPBX_DOMAIN_UUID,
-      });
+      const attemptAt = new Date().toISOString();
 
       const requestBody = {
         extensions: [{
@@ -291,10 +286,8 @@ Deno.serve(async (req) => {
           password: extData.password,
           effective_caller_id_name: extData.effective_caller_id_name,
           effective_caller_id_number: String(extData.extension),
-          outbound_caller_id_name:
-            extData.outbound_caller_id_name || extData.effective_caller_id_name,
-          outbound_caller_id_number:
-            extData.outbound_caller_id_number || "15144942888",
+          outbound_caller_id_name: extData.outbound_caller_id_name || extData.effective_caller_id_name,
+          outbound_caller_id_number: extData.outbound_caller_id_number || "15144942888",
           emergency_caller_id_name: "Lemtel",
           emergency_caller_id_number: "5144942888",
           call_timeout: String(extData.call_timeout || "30"),
@@ -309,66 +302,87 @@ Deno.serve(async (req) => {
         }],
       };
 
-      console.log("Request body:", JSON.stringify(requestBody));
-
+      const extStarted = Date.now();
       const res = await fetch(`${FUSIONPBX_API_URL}/app/api/7/extensions`, {
         method: "POST",
-        headers: {
-          Authorization: basicHeader,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers: { Authorization: basicHeader, "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(requestBody),
       });
-
+      const extLatency = Date.now() - extStarted;
       const responseText = await res.text();
-      console.log("FusionPBX response status:", res.status);
-      console.log("FusionPBX response body:", responseText);
+      console.log("FusionPBX create-extension status=", res.status, "body=", responseText.slice(0, 500));
 
       let responseData: any = {};
       try { responseData = JSON.parse(responseText); } catch { responseData = { raw: responseText }; }
 
       // FusionPBX often returns HTTP 200 with an embedded error code. Detect both.
       const embeddedCode = responseData?.code || responseData?.details?.[0]?.code;
+      const embeddedMessage =
+        responseData?.details?.[0]?.message || responseData?.message ||
+        (typeof responseData?.raw === "string" ? responseData.raw : null);
       const failed = !res.ok || (embeddedCode && String(embeddedCode) !== "200");
+      const extensionResult = {
+        ok: !failed,
+        http_status: res.status,
+        embedded_code: embeddedCode ?? null,
+        message: embeddedMessage,
+        latency_ms: extLatency,
+        attempted_at: attemptAt,
+        response: responseData,
+      };
+
       if (failed) {
-        const msg = responseData?.details?.[0]?.message || responseData?.message || responseText;
-        console.error("FusionPBX create-extension failed:", { status: res.status, embeddedCode, msg });
-        if (/voicemail_enabled/i.test(msg)) {
-          // Enable voicemail in a follow-up call only if the extension actually exists.
-        }
         return json({
           error: "CREATE_FAILED",
-          message: msg,
+          message: embeddedMessage || `HTTP ${res.status}`,
           status: res.status,
           embeddedCode,
           details: responseData,
+          extension_result: extensionResult,
         }, 200);
       }
-
-      console.log("Extension created successfully:", responseData);
 
       const extensionUuid =
         responseData?.extensions?.[0]?.extension_uuid ||
         responseData?.extension_uuid ||
-        responseData?.[0]?.extension_uuid ||
-        null;
+        responseData?.[0]?.extension_uuid || null;
 
-      // Best-effort: provision voicemail entry separately (column lives on v_voicemails)
-      if (extensionUuid && (extData.voicemail_enabled === "true" || extData.voicemail_enabled === true)) {
+      // Dedicated voicemail provisioning step (/voicemails endpoint)
+      let voicemailResult: any = { skipped: true };
+      if (extData.voicemail_enabled === "true" || extData.voicemail_enabled === true) {
+        const vmStarted = Date.now();
         try {
-          await fetch(`${FUSIONPBX_API_URL}/app/api/7/voicemails`, {
+          const vmRes = await fetch(`${FUSIONPBX_API_URL}/app/api/7/voicemails`, {
             method: "POST",
             headers: { Authorization: basicHeader, "Content-Type": "application/json", Accept: "application/json" },
             body: JSON.stringify({ voicemails: [{
               domain_uuid: extData.domain_uuid || FUSIONPBX_DOMAIN_UUID,
               voicemail_id: String(extData.extension),
-              voicemail_password: String(extData.extension),
+              voicemail_password: extData.voicemail_password || String(extData.extension),
+              voicemail_mail_to: extData.voicemail_mail_to || "",
+              voicemail_attach_file: "true",
+              voicemail_local_after_email: "true",
               voicemail_enabled: "true",
-              voicemail_mail_to: "",
+              voicemail_description: extData.description || "",
             }]}),
           });
-        } catch (e) { console.warn("voicemail provision failed", e); }
+          const vmText = await vmRes.text();
+          let vmData: any = {}; try { vmData = JSON.parse(vmText); } catch { vmData = { raw: vmText }; }
+          const vmCode = vmData?.code || vmData?.details?.[0]?.code;
+          const vmMsg = vmData?.details?.[0]?.message || vmData?.message || (typeof vmData?.raw === "string" ? vmData.raw : null);
+          const vmFailed = !vmRes.ok || (vmCode && String(vmCode) !== "200");
+          voicemailResult = {
+            ok: !vmFailed,
+            http_status: vmRes.status,
+            embedded_code: vmCode ?? null,
+            message: vmMsg,
+            latency_ms: Date.now() - vmStarted,
+            attempted_at: new Date().toISOString(),
+            response: vmData,
+          };
+        } catch (e: any) {
+          voicemailResult = { ok: false, error: e?.message || String(e), attempted_at: new Date().toISOString() };
+        }
       }
 
       return json({
@@ -376,6 +390,8 @@ Deno.serve(async (req) => {
         extension: extData.extension,
         extension_uuid: extensionUuid,
         raw_response: responseData,
+        extension_result: extensionResult,
+        voicemail_result: voicemailResult,
       }, 200);
     }
     if (action === "update-extension") return json(await writeCollection("extensions", "extensions", params), 200);

@@ -6,12 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Smartphone, Plus, Circle, Loader2, X, BellOff, PhoneForwarded, AlertCircle } from 'lucide-react';
+import { Smartphone, Plus, Circle, Loader2, X, BellOff, PhoneForwarded, AlertCircle, Activity } from 'lucide-react';
 import { usePbxExtensions, usePbxSoftphoneUsers } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
 import { SyncEverythingButton } from '@/components/lemtel/SyncEverythingButton';
 import { ProvisionExtensionModal } from '@/components/lemtel/ProvisionExtensionModal';
 import { EnableSoftphonePopover } from '@/components/lemtel/EnableSoftphonePopover';
+import { ExtensionStatusDialog } from '@/components/lemtel/ExtensionStatusDialog';
 import { formatDistanceToNow } from 'date-fns';
 
 type ExtType = { label: string; cls: string };
@@ -35,6 +36,7 @@ export default function LemtelExtensions() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [provisionOpen, setProvisionOpen] = useState(false);
+  const [statusExt, setStatusExt] = useState<any | null>(null);
   const [prefill, setPrefill] = useState<{ extension?: string; displayName?: string; outboundCid?: string } | undefined>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: extensions = [], isLoading } = usePbxExtensions();
@@ -138,6 +140,7 @@ export default function LemtelExtensions() {
                 <TableHead>Voicemail</TableHead>
                 <TableHead>Softphone</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Health</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -189,6 +192,13 @@ export default function LemtelExtensions() {
                         {e.enabled ? 'Enabled' : 'Disabled'}
                       </span>
                     </TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant={e.pbx_uuid ? 'ghost' : 'outline'} onClick={() => setStatusExt(e)}
+                        className={!e.pbx_uuid ? 'border-orange-500/40 text-orange-600' : ''}>
+                        <Activity className="w-3.5 h-3.5 mr-1" />
+                        {e.pbx_uuid ? 'Status' : 'Not pushed'}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -197,6 +207,7 @@ export default function LemtelExtensions() {
           )}
         </CardContent>
       </Card>
+      <ExtensionStatusDialog open={!!statusExt} onOpenChange={(v) => !v && setStatusExt(null)} ext={statusExt} />
       <p className="text-xs text-muted-foreground text-right">Press R to refresh</p>
     </div>
     </TooltipProvider>
