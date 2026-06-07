@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
+const BUILD_ID = Date.now().toString(36);
+const BUILD_TIME = new Date().toISOString();
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -21,6 +24,10 @@ export default defineConfig(({ mode }) => ({
       usePolling: true,
       interval: 1000,
     },
+  },
+  define: {
+    __APP_BUILD_ID__: JSON.stringify(BUILD_ID),
+    __APP_BUILD_TIME__: JSON.stringify(BUILD_TIME),
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
