@@ -715,7 +715,7 @@ function ActiveCall({
           marginBottom: 14, width: '100%', maxWidth: 240,
         }}>
           {dialKeys.map(([k]) => (
-            <button key={k} className="lemtel-key" onClick={() => sp.sendDTMF(k)} style={{ padding: '10px 0', fontSize: 16 }}>{k}</button>
+            <button key={k} className="lemtel-key lemtel-glass" onClick={() => sp.sendDTMF(k)} style={{ padding: '10px 0', fontSize: 16 }}>{k}</button>
           ))}
         </div>
       )}
