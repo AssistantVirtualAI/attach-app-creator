@@ -161,5 +161,10 @@ export function useSoftphone(args: UseSoftphoneArgs) {
       sipProvider.sendDTMF('*2');
       setRecording((r) => !r);
     }, []),
+    restart: useCallback(() => {
+      try { sipProvider.stop(); } catch { /* noop */ }
+      setCredError(null);
+      setRetryTick((n) => n + 1);
+    }, []),
   };
 }
