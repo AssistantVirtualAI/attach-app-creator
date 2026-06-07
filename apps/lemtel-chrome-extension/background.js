@@ -37,18 +37,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
-function dialViaDesktop(number, tab) {
-  if (tab?.id) {
-    chrome.tabs.update(tab.id, { url: `lemtel://call/${number}` });
-  }
-
-  setTimeout(() => {
-    chrome.storage.local.get(['lemtel_portal_url'], (result) => {
-      const portal = result.lemtel_portal_url || 'https://avastatistic.ca';
-      chrome.tabs.create({
-        url: `${portal}/dial?number=${number}`,
-        active: false,
-      });
-    });
-  }, 1000);
+// Triggers the system / linked-mobile phone app via the tel: protocol.
+// We open a tiny popup window so the current tab is never navigated away,
+// and we never fall back to the web portal (that was opening avastatistic.ca).
+function dialViaDesktop(number) {
+  const clean = String(number).replace(/\D/g, '');
+  if (!clean) return;
+  chrome.windows.create({
+    url: `tel:${clean}`,
+    type: 'popup',
+    width: 1,
+    height: 1,
+    focused: false,
+  }, (win) => {
+    // Close immediately — the OS has already received the tel: handoff.
+    if (win?.id) setTimeout(() => chrome.windows.remove(win.id).catch(() => {}), 300);
+  });
 }
