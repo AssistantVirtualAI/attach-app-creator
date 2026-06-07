@@ -377,7 +377,7 @@ const FlowDiagram = ({
               r={isActive ? 19 : 16}
               fill={isActive || isDone ? s.nodeColor : "hsl(var(--muted))"}
               opacity={isActive || isDone ? 1 : 0.45}
-              animate={{ r: isActive ? 19 : 16 }}
+              animate={{ scale: isActive ? 1.12 : 1 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
             />
             {/* Icon/check */}
