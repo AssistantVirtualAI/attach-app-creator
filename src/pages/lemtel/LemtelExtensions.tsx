@@ -35,6 +35,12 @@ export default function LemtelExtensions() {
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [provisionOpen, setProvisionOpen] = useState(false);
   const { data: extensions = [], isLoading } = usePbxExtensions();
+  const { data: softphones = [] } = usePbxSoftphoneUsers();
+  const softphoneByExt = useMemo(() => {
+    const m = new Map<string, any>();
+    (softphones as any[]).forEach(s => m.set(String(s.extension), s));
+    return m;
+  }, [softphones]);
   const all = extensions as any[];
 
   const stats = useMemo(() => {
