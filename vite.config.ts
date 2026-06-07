@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from "fs";
@@ -7,7 +7,7 @@ import { componentTagger } from "lovable-tagger";
 const BUILD_ID = Date.now().toString(36);
 const BUILD_TIME = new Date().toISOString();
 
-const avaCacheBustPlugin = () => {
+const avaCacheBustPlugin = (): Plugin => {
   let outDir = "dist";
   const bootScript = `
     <meta name="ava-build-id" content="${BUILD_ID}" />
@@ -80,7 +80,7 @@ const avaCacheBustPlugin = () => {
     configResolved(config) {
       outDir = config.build.outDir;
     },
-    transformIndexHtml(html) {
+    transformIndexHtml(html: string) {
       return html.replace("</head>", `${bootScript}\n</head>`);
     },
     closeBundle() {
