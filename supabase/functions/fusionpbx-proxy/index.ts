@@ -271,9 +271,37 @@ Deno.serve(async (req) => {
     }
 
     // ---- CREATE / UPDATE / DELETE helpers ----
-    async function writeCollection(path: string, key: string, payload: any) {
-      return pbxFetch(path, { method: "POST", body: JSON.stringify({ [key]: [{ ...payload, domain_uuid: FUSIONPBX_DOMAIN_UUID }] }) });
+    // FusionPBX API v7 requires QUERY-PARAM auth (?key=...&username=...) for
+    // POST/PUT/DELETE — the Authorization header returns 403 on writes.
+    async function pbxWrite(path: string, method: "POST" | "PUT" | "DELETE", payload?: unknown) {
+      const url = new URL(`${FUSIONPBX_API_URL}/app/api/7/${path}`);
+      url.searchParams.set("key", FUSIONPBX_API_KEY);
+      url.searchParams.set("username", FUSIONPBX_USERNAME);
+      const started = Date.now();
+      let res: Response;
+      try {
+        res = await fetch(url.toString(), {
+          method,
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: payload !== undefined ? JSON.stringify(payload) : undefined,
+        });
+      } catch (e: any) {
+        return { ok: false, status: 0, error: "FUSIONPBX_UNREACHABLE", message: e?.message || String(e), latency_ms: Date.now() - started };
+      }
+      const text = await res.text();
+      const latency_ms = Date.now() - started;
+      let data: any = {};
+      try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+      const embeddedCode = data?.code || data?.details?.[0]?.code;
+      const embeddedMessage = data?.details?.[0]?.message || data?.message || (typeof data?.raw === "string" ? data.raw : null);
+      const failed = !res.ok || (embeddedCode && String(embeddedCode) !== "200");
+      return { ok: !failed, status: res.status, data, latency_ms, embeddedCode: embeddedCode ?? null, message: embeddedMessage };
     }
+
+    async function writeCollection(path: string, key: string, payload: any) {
+      return pbxWrite(path, "POST", { [key]: [{ ...payload, domain_uuid: FUSIONPBX_DOMAIN_UUID }] });
+    }
+
 
     if (action === "create-extension") {
       const extData = body.data || params || {};
@@ -303,9 +331,12 @@ Deno.serve(async (req) => {
       };
 
       const extStarted = Date.now();
-      const res = await fetch(`${FUSIONPBX_API_URL}/app/api/7/extensions`, {
+      const writeUrl = new URL(`${FUSIONPBX_API_URL}/app/api/7/extensions`);
+      writeUrl.searchParams.set("key", FUSIONPBX_API_KEY);
+      writeUrl.searchParams.set("username", FUSIONPBX_USERNAME);
+      const res = await fetch(writeUrl.toString(), {
         method: "POST",
-        headers: { Authorization: basicHeader, "Content-Type": "application/json", Accept: "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(requestBody),
       });
       const extLatency = Date.now() - extStarted;
@@ -352,9 +383,12 @@ Deno.serve(async (req) => {
       if (extData.voicemail_enabled === "true" || extData.voicemail_enabled === true) {
         const vmStarted = Date.now();
         try {
-          const vmRes = await fetch(`${FUSIONPBX_API_URL}/app/api/7/voicemails`, {
+          const vmUrl = new URL(`${FUSIONPBX_API_URL}/app/api/7/voicemails`);
+          vmUrl.searchParams.set("key", FUSIONPBX_API_KEY);
+          vmUrl.searchParams.set("username", FUSIONPBX_USERNAME);
+          const vmRes = await fetch(vmUrl.toString(), {
             method: "POST",
-            headers: { Authorization: basicHeader, "Content-Type": "application/json", Accept: "application/json" },
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
             body: JSON.stringify({ voicemails: [{
               domain_uuid: extData.domain_uuid || FUSIONPBX_DOMAIN_UUID,
               voicemail_id: String(extData.extension),
@@ -398,21 +432,21 @@ Deno.serve(async (req) => {
     if (action === "delete-extension") {
       const id = params.extension_uuid;
       if (!id) return json({ error: "extension_uuid required" }, 400);
-      return json(await pbxFetch(`extensions/${id}`, { method: "DELETE" }));
+      return json(await pbxWrite(`extensions/${id}`, "DELETE"));
     }
     if (action === "create-device") return json(await writeCollection("devices", "devices", params));
     if (action === "update-device") return json(await writeCollection("devices", "devices", params));
     if (action === "delete-device") {
       const id = params.device_uuid;
       if (!id) return json({ error: "device_uuid required" }, 400);
-      return json(await pbxFetch(`devices/${id}`, { method: "DELETE" }));
+      return json(await pbxWrite(`devices/${id}`, "DELETE"));
     }
     if (action === "create-ivr") return json(await writeCollection("ivr_menus", "ivr_menus", params));
     if (action === "update-ivr") return json(await writeCollection("ivr_menus", "ivr_menus", params));
     if (action === "delete-ivr") {
       const id = params.ivr_menu_uuid;
       if (!id) return json({ error: "ivr_menu_uuid required" }, 400);
-      return json(await pbxFetch(`ivr_menus/${id}`, { method: "DELETE" }));
+      return json(await pbxWrite(`ivr_menus/${id}`, "DELETE"));
     }
     if (action === "create-queue") return json(await writeCollection("call_center_queues", "call_center_queues", params));
     if (action === "update-queue") return json(await writeCollection("call_center_queues", "call_center_queues", params));
