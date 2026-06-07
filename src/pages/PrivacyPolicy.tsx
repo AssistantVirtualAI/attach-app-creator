@@ -188,7 +188,10 @@ const PrivacyPolicy = () => {
     '4. User Rights': <User className="w-6 h-6 text-primary" />,
     '5. Sécurité': <Shield className="w-6 h-6 text-primary" />,
     '5. Security': <Shield className="w-6 h-6 text-primary" />,
+    '6. Extension Chrome Lemtel Telecom': <Globe className="w-6 h-6 text-primary" />,
+    '6. Lemtel Telecom Chrome Extension': <Globe className="w-6 h-6 text-primary" />,
     '6. Contact': <Mail className="w-6 h-6 text-primary" />,
+    '7. Contact': <Mail className="w-6 h-6 text-primary" />,
   };
 
   return (
