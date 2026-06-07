@@ -31,10 +31,10 @@ export default function CallForwarding({ extension }: { extension: string }) {
   };
 
   return (
-    <div style={{ marginBottom: 12, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 10 }}>
+    <div style={{ marginBottom: 12, background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(0,61,166,0.10)', borderRadius: 8, padding: 10, minWidth: 0 }}>
       <button
         onClick={() => setOpen((v) => !v)}
-        style={{ background: 'none', border: 'none', color: '#FFD700', fontSize: 11, fontWeight: 600, cursor: 'pointer', width: '100%', textAlign: 'left' }}
+        style={{ background: 'none', border: 'none', color: '#0E1B3D', fontSize: 11, fontWeight: 800, cursor: 'pointer', width: '100%', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
       >
         ↪ Call forwarding {enabled ? `· → ${target || '(unset)'}` : '· off'} {open ? '▾' : '▸'}
       </button>
@@ -56,8 +56,8 @@ export default function CallForwarding({ extension }: { extension: string }) {
             placeholder="Extension or external number"
             style={{
               width: '100%', padding: 8, fontSize: 12, borderRadius: 6,
-              background: 'rgba(255,255,255,0.08)', color: '#fff',
-              border: '1px solid rgba(255,255,255,0.15)', outline: 'none', boxSizing: 'border-box',
+              background: 'rgba(255,255,255,0.88)', color: '#0E1B3D',
+              border: '1px solid rgba(0,61,166,0.18)', outline: 'none', boxSizing: 'border-box',
             }}
           />
         </div>

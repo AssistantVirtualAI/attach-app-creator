@@ -344,7 +344,8 @@ export default function SoftphonePane({
       {/* CONTENT */}
       <div className="lemtel-scroll" style={{
         flex: 1, overflowY: 'auto', position: 'relative', zIndex: 1,
-        padding: ringing || inCall ? 0 : '20px 16px 12px',
+        padding: ringing || inCall ? 0 : compact ? '12px 10px 10px' : '20px 16px 12px',
+        minWidth: 0,
       }}>
         {/* Incoming */}
         {sp.snap.callState === 'ringing-in' && (
@@ -394,6 +395,7 @@ export default function SoftphonePane({
             onCall={handleCall}
             canCall={!!dial && sp.snap.status === 'registered'}
             extension={creds.extension}
+            compact={compact}
           />
         )}
 
@@ -403,7 +405,7 @@ export default function SoftphonePane({
           </div>
         )}
         {!inCall && !ringing && tab === 'contacts' && (
-          <div style={{ animation: 'fadeIn .25s ease-out' }}>
+          <div style={{ animation: 'fadeIn .25s ease-out', minWidth: 0, width: '100%' }}>
             <ContactsList selfExtension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
           </div>
         )}
@@ -439,7 +441,8 @@ export default function SoftphonePane({
         }}>
           <div className={compact ? 'lemtel-tabbar' : undefined} style={{
             display: 'flex',
-            height: ultraCompact ? 56 : compact ? 62 : 68,
+            height: ultraCompact ? 58 : compact ? 64 : 68,
+            minWidth: 0,
             ...(compact ? {} : { width: '100%' }),
           }}>
             {(['dial', 'recents', 'contacts', 'voicemail', 'sms', 'recordings', 'ai'] as Tab[]).map((tk) => {
@@ -448,7 +451,7 @@ export default function SoftphonePane({
               const isAI = tk === 'ai';
               const activeColor = isAI ? c.aiLight : c.gold;
               // High-contrast inactive color so tabs are clearly readable on dark glass bar
-              const inactiveColor = 'rgba(235,240,255,0.82)';
+              const inactiveColor = '#EAF1FF';
               const hoverColor = '#FFFFFF';
               return (
                 <button
@@ -459,17 +462,17 @@ export default function SoftphonePane({
                   className={`lemtel-glass${isAI ? ' lemtel-glass--ai' : ''}`}
                   style={{
                     ...(compact
-                      ? { flex: '0 0 auto', minWidth: ultraCompact ? 48 : 56, padding: '6px 6px' }
+                      ? { flex: '0 0 auto', minWidth: ultraCompact ? 58 : 70, padding: '6px 6px' }
                       : { flex: 1, minWidth: 48, padding: '4px 4px 0' }),
 
                     background: active
                       ? (isAI
-                          ? 'linear-gradient(180deg, rgba(157,111,240,0.18), rgba(157,111,240,0.04))'
-                          : 'linear-gradient(180deg, rgba(255,215,0,0.18), rgba(255,215,0,0.04))')
-                      : 'rgba(255,255,255,0.04)',
+                          ? 'linear-gradient(180deg, rgba(157,111,240,0.34), rgba(58,38,118,0.22))'
+                          : 'linear-gradient(180deg, rgba(255,215,0,0.30), rgba(78,62,18,0.24))')
+                      : 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06))',
                     border: active
-                      ? `1px solid ${isAI ? 'rgba(157,111,240,0.55)' : 'rgba(255,215,0,0.55)'}`
-                      : '1px solid rgba(255,255,255,0.08)',
+                      ? `1px solid ${isAI ? 'rgba(201,178,255,0.72)' : 'rgba(255,215,0,0.78)'}`
+                      : '1px solid rgba(235,240,255,0.20)',
                     borderRadius: 12,
                     margin: compact ? '6px 3px 6px' : '6px 3px',
                     color: active ? activeColor : inactiveColor,
@@ -487,16 +490,16 @@ export default function SoftphonePane({
                     const el = e.currentTarget as HTMLButtonElement;
                     if (!active) {
                       el.style.color = hoverColor;
-                      el.style.background = 'rgba(255,255,255,0.09)';
-                      el.style.borderColor = 'rgba(255,215,0,0.35)';
+                      el.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.10))';
+                      el.style.borderColor = 'rgba(255,215,0,0.48)';
                     }
                   }}
                   onMouseLeave={(e) => {
                     const el = e.currentTarget as HTMLButtonElement;
                     if (!active) {
                       el.style.color = inactiveColor;
-                      el.style.background = 'rgba(255,255,255,0.04)';
-                      el.style.borderColor = 'rgba(255,255,255,0.08)';
+                      el.style.background = 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06))';
+                      el.style.borderColor = 'rgba(235,240,255,0.20)';
                     }
                   }}
                 >
@@ -564,15 +567,15 @@ export default function SoftphonePane({
       {/* Footer */}
       <div style={{
         position: 'relative', zIndex: 1, flexShrink: 0,
-        padding: compact ? '8px 10px 10px' : '12px 14px 14px',
+        padding: compact ? '7px 8px 8px' : '12px 14px 14px',
         textAlign: 'center',
         borderTop: `1px solid ${c.border}`,
         background: c.bg,
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: compact ? 3 : 6,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: compact ? 6 : 8, minWidth: 0, maxWidth: '100%', flexWrap: 'wrap' }}>
           <LemtelLogo size="xs" glow />
-          <BrandTagline size="sm" showPoweredBy={false} style={{ marginTop: 0 }} />
+          <BrandTagline size="sm" showPoweredBy={false} style={{ marginTop: 0, minWidth: 0 }} />
         </div>
         <div style={{ fontSize: compact ? 9 : 10, color: c.textDim, letterSpacing: 0.5 }}>
           v1.1.0 {ultraCompact ? '' : '· Powered by '}
@@ -596,19 +599,21 @@ export default function SoftphonePane({
    ============================================================ */
 
 function Dialer({
-  dial, setDial, dialKeys, onCall, canCall, extension,
+  dial, setDial, dialKeys, onCall, canCall, extension, compact = false,
 }: {
   dial: string; setDial: (s: string | ((p: string) => string)) => void;
   dialKeys: [string, string][]; onCall: () => void; canCall: boolean; extension: string;
+  compact?: boolean;
 }) {
   return (
-    <div style={{ animation: 'fadeIn .25s ease-out', padding: '4px 4px 8px' }}>
+    <div style={{ animation: 'fadeIn .25s ease-out', padding: compact ? '2px 0 8px' : '4px 4px 8px', minWidth: 0 }}>
       <CallForwarding extension={extension} />
 
       {/* Number display — premium glass tile */}
       <div style={{
-        margin: '4px auto 22px', maxWidth: 320,
-        padding: '18px 20px', borderRadius: 18,
+        margin: compact ? '4px auto 16px' : '4px auto 22px', maxWidth: 320,
+        width: '100%', boxSizing: 'border-box',
+        padding: compact ? '14px 12px' : '18px 20px', borderRadius: 18,
         background: 'linear-gradient(180deg, rgba(0,82,204,0.10), rgba(10,21,48,0.40))',
         border: `1px solid ${c.border}`,
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 28px -16px rgba(0,82,204,0.5)',
@@ -617,10 +622,11 @@ function Dialer({
       }}>
         <div style={{
           fontFamily: 'JetBrains Mono, Menlo, monospace',
-          fontSize: 30, letterSpacing: 3, fontWeight: 500,
+          fontSize: compact ? 24 : 30, letterSpacing: compact ? 1.5 : 3, fontWeight: 500,
           color: dial ? c.textIce : c.textDim,
           textShadow: dial ? '0 0 22px rgba(255,215,0,0.35)' : 'none',
           minHeight: 36,
+          maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {dial || 'Enter a number'}
         </div>
@@ -633,8 +639,8 @@ function Dialer({
 
       {/* Dialpad */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14,
-        maxWidth: 296, margin: '0 auto 26px',
+        display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: compact ? 8 : 14,
+        width: 'min(100%, 296px)', margin: compact ? '0 auto 20px' : '0 auto 26px',
       }}>
         {dialKeys.map(([key, sub]) => (
           <button
@@ -642,7 +648,7 @@ function Dialer({
             className="lemtel-key lemtel-glass"
             onClick={() => setDial((p) => p + key)}
             style={{
-              height: 72, display: 'flex', flexDirection: 'column',
+              height: compact ? 58 : 72, display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center', gap: 2,
               borderRadius: 16,
               background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
@@ -652,7 +658,7 @@ function Dialer({
               willChange: 'transform',
             }}
           >
-            <span style={{ fontSize: 24, fontWeight: 500, letterSpacing: 0.5 }}>{key}</span>
+            <span style={{ fontSize: compact ? 22 : 24, fontWeight: 500, letterSpacing: 0.5 }}>{key}</span>
             {sub && <span style={{ fontSize: 9, color: 'rgba(159,179,214,0.55)', letterSpacing: 2, fontWeight: 700 }}>{sub}</span>}
           </button>
         ))}
@@ -790,10 +796,13 @@ function ActiveCall({
   return (
     <div style={{
       ...callViewStyle,
-      background: 'linear-gradient(180deg, #050510 0%, #0a0015 100%)',
+      background: 'linear-gradient(180deg, rgba(245,248,253,0.96) 0%, rgba(230,238,250,0.98) 100%)',
+      justifyContent: compact ? 'flex-start' : 'center',
+      minHeight: '100%',
+      padding: compact ? '18px 10px 20px' : callViewStyle.padding,
     }}>
       <div style={{
-        width: 92, height: 92, borderRadius: '50%',
+        width: compact ? 72 : 92, height: compact ? 72 : 92, borderRadius: '50%',
         background: 'linear-gradient(135deg, #003DA6, #7C3AED)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 36, fontWeight: 700, color: '#fff', boxShadow: glow.blue,
@@ -802,7 +811,7 @@ function ActiveCall({
         {String(remote).charAt(0).toUpperCase()}
       </div>
 
-      <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 4, color: c.text }}>{remote}</div>
+      <div style={{ fontSize: compact ? 17 : 20, fontWeight: 700, marginBottom: 4, color: c.text, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{remote}</div>
       <div style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
         padding: '3px 10px', borderRadius: 999,
@@ -820,13 +829,14 @@ function ActiveCall({
       <div style={{
         fontSize: 10, color: c.textSub, letterSpacing: 0.6,
         marginBottom: 18, display: 'flex', alignItems: 'center', gap: 4,
+        maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
         <span style={{ fontSize: 10 }}>🔊</span>
         {activeOutputLabel}
       </div>
 
       {/* Visualizer */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 32, marginBottom: 22 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: compact ? 22 : 32, marginBottom: compact ? 14 : 22 }}>
         {[0.6, 0.9, 0.4, 1, 0.7, 0.5, 0.85].map((h, i) => (
           <div key={i} style={{
             width: 4, height: `${h * 100}%`, borderRadius: 2,
@@ -839,8 +849,8 @@ function ActiveCall({
 
       {showDTMF && (
         <div role="group" aria-label="DTMF keypad" style={{
-          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
-          marginBottom: 14, width: '100%', maxWidth: 240,
+          display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6,
+          marginBottom: 14, width: 'min(100%, 240px)',
         }}>
           {dialKeys.map(([k]) => (
             <button
@@ -909,11 +919,11 @@ function ControlBtn({
   active?: boolean; danger?: boolean; warning?: boolean; disabled?: boolean;
 }) {
   const bg = active
-    ? danger ? 'rgba(239,68,68,0.18)' : warning ? 'rgba(245,158,11,0.18)' : 'rgba(255,215,0,0.15)'
-    : 'rgba(255,255,255,0.05)';
+    ? danger ? 'rgba(254,226,226,0.98)' : warning ? 'rgba(255,247,237,0.98)' : 'rgba(255,251,235,0.98)'
+    : 'rgba(255,255,255,0.88)';
   const bd = active
-    ? danger ? 'rgba(239,68,68,0.5)' : warning ? 'rgba(245,158,11,0.5)' : c.borderGold
-    : c.border;
+    ? danger ? 'rgba(220,38,38,0.55)' : warning ? 'rgba(217,119,6,0.58)' : 'rgba(224,168,0,0.60)'
+    : 'rgba(0,61,166,0.18)';
   const col = active
     ? danger ? c.red : warning ? c.yellow : c.gold
     : c.text;
@@ -929,9 +939,10 @@ function ControlBtn({
         background: bg, border: `1px solid ${bd}`, color: col,
         cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        fontSize: 11, fontWeight: 600, letterSpacing: 0.3,
+        fontSize: 11, fontWeight: 800, letterSpacing: 0.3,
         transition: 'all .15s ease',
-        boxShadow: active ? `0 0 12px ${col}33` : 'none',
+        boxShadow: active ? `0 8px 18px -12px ${col}` : '0 5px 16px -14px rgba(0,61,166,0.55)',
+        whiteSpace: 'nowrap',
       }}
     >
       <span aria-hidden="true" style={{ fontSize: 14 }}>{icon}</span>

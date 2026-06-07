@@ -40,6 +40,8 @@ export default function BrandTagline({
         alignItems: align === 'center' ? 'center' : 'flex-start',
         gap: size === 'lg' ? 6 : 4,
         textAlign: align,
+        minWidth: 0,
+        maxWidth: '100%',
         ...style,
       }}
     >
@@ -55,9 +57,11 @@ export default function BrandTagline({
           color: colors.text,
           letterSpacing: 0.2,
           lineHeight: 1.25,
+          minWidth: 0,
+          maxWidth: '100%',
         }}
       >
-        <span>
+        <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
           Lemtel Communications
           <span style={{ color: colors.gold, margin: '0 6px', opacity: 0.85 }}>—</span>
           <span style={{ color: colors.textSub, fontWeight: 500 }}>
