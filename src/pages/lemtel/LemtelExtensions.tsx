@@ -46,6 +46,21 @@ export default function LemtelExtensions() {
   }, [softphones]);
   const all = extensions as any[];
 
+  useEffect(() => {
+    const create = searchParams.get('create');
+    if (create) {
+      setPrefill({
+        extension: create,
+        displayName: searchParams.get('name') || '',
+        outboundCid: searchParams.get('cid') || undefined,
+      });
+      setProvisionOpen(true);
+      searchParams.delete('create'); searchParams.delete('name'); searchParams.delete('cid');
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const stats = useMemo(() => {
     const s: Record<string, number> = {};
     all.forEach(e => { const t = getExtensionType(e).label; s[t] = (s[t] ?? 0) + 1; });
