@@ -105,6 +105,9 @@ import TelephonyWebphone from "./pages/telephony/TelephonyWebphone";
 import TelephonyVoicemail from "./pages/telephony/TelephonyVoicemail";
 import TelephonyTeam from "./pages/telephony/TelephonyTeam";
 import TelephonyUserPreferences from "./pages/telephony/TelephonyUserPreferences";
+import CallCenterAgent from "./pages/callcenter/CallCenterAgent";
+import CallCenterWallboard from "./pages/callcenter/CallCenterWallboard";
+import CallCenterAdmin from "./pages/callcenter/CallCenterAdmin";
 import TelephonyDiagnostics from "./pages/telephony/TelephonyDiagnostics";
 import TelephonyChecklist from "./pages/telephony/TelephonyChecklist";
 import TelephonyPortalMappings from "./pages/telephony/TelephonyPortalMappings";
@@ -545,6 +548,9 @@ const App = () => (
                 <Route path="/org/lemtel/telephony/voicemail" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyVoicemail /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/team" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyTeam /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/preferences" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyUserPreferences /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/callcenter/agent" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><CallCenterAgent /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/callcenter/wallboard" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><CallCenterWallboard /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/callcenter/admin" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><CallCenterAdmin /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/diagnostics" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyDiagnostics /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/checklist" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyChecklist /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/portal-mappings" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyPortalMappings /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />

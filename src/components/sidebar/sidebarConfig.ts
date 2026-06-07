@@ -137,6 +137,17 @@ export const sidebarGroups: NavGroup[] = [
       { nameKey: '✅ Go-Live Checklist', href: '/org/lemtel/telephony/checklist', icon: CheckSquare },
     ]
   },
+  {
+    id: 'callcenter',
+    labelKey: 'Call Center',
+    icon: Headphones,
+    lemtelOnly: true,
+    items: [
+      { nameKey: 'Agent Console', href: '/org/lemtel/callcenter/agent', icon: Phone },
+      { nameKey: 'Wallboard', href: '/org/lemtel/callcenter/wallboard', icon: Activity },
+      { nameKey: 'CC Admin', href: '/org/lemtel/callcenter/admin', icon: Shield },
+    ]
+  },
 ];
 
 export const settingsLink: NavItem = {
