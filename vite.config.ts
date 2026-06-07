@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import fs from "fs";
@@ -7,7 +7,7 @@ import { componentTagger } from "lovable-tagger";
 const BUILD_ID = Date.now().toString(36);
 const BUILD_TIME = new Date().toISOString();
 
-const avaCacheBustPlugin = (): Plugin => {
+const avaCacheBustPlugin = (monitoringUrl = "", monitoringKey = ""): Plugin => {
   let outDir = "dist";
   const bootScript = `
     <meta name="ava-build-id" content="${BUILD_ID}" />
@@ -22,6 +22,21 @@ const avaCacheBustPlugin = (): Plugin => {
         const FORCE_KEY = "ava_force_reload_count:" + BUILD_ID;
         const EVENTS_KEY = "ava_cache_bust_events";
         const STYLE_RELOAD_KEY = "ava_style_reload_count:" + BUILD_ID;
+        const MONITORING_URL = ${JSON.stringify(monitoringUrl)};
+        const MONITORING_KEY = ${JSON.stringify(monitoringKey)};
+        const showToast = (message) => {
+          try {
+            const id = "ava-cache-bust-toast";
+            document.getElementById(id)?.remove();
+            const el = document.createElement("div");
+            el.id = id;
+            el.setAttribute("role", "status");
+            el.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:2147483647;max-width:min(420px,calc(100vw - 32px));padding:12px 14px;border-radius:10px;border:1px solid hsl(231 100% 60% / .38);background:hsl(240 6% 13% / .96);box-shadow:0 18px 54px hsl(0 0% 0% / .42);color:hsl(0 0% 98%);font:700 13px/1.4 Inter,system-ui,sans-serif";
+            el.textContent = message;
+            document.body?.appendChild(el);
+            setTimeout(() => el.remove(), 7000);
+          } catch (_) {}
+        };
         const remember = (event, details = {}) => {
           const entry = { at: new Date().toISOString(), buildId: BUILD_ID, event, details };
           console.info("%c[AVA cache-bust]", "color:#0023e6;font-weight:700", entry);
@@ -31,10 +46,19 @@ const avaCacheBustPlugin = (): Plugin => {
             localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
             window.__avaCacheBustEvents = events;
           } catch (_) {}
+          if (MONITORING_URL && MONITORING_KEY) {
+            fetch(MONITORING_URL + "/functions/v1/portal-guard-log", {
+              method: "POST",
+              keepalive: true,
+              headers: { "Content-Type": "application/json", apikey: MONITORING_KEY, Authorization: "Bearer " + MONITORING_KEY },
+              body: JSON.stringify({ events: [entry] }),
+            }).catch(() => {});
+          }
         };
         const clearBrowserCaches = async () => {
           const regs = await navigator.serviceWorker?.getRegistrations?.().catch(() => []) || [];
           await Promise.all(regs.map((reg) => reg.unregister()));
+          await navigator.serviceWorker?.register?.("/sw.js?_ava_kill=" + Date.now().toString(36), { scope: "/" }).catch(() => undefined);
           const keys = await window.caches?.keys?.().catch(() => []) || [];
           await Promise.all(keys.map((key) => caches.delete(key)));
           remember("cache-cleared", { serviceWorkers: regs.length, caches: keys.length });
@@ -43,6 +67,9 @@ const avaCacheBustPlugin = (): Plugin => {
           if (!document.body) return true;
           const probe = document.createElement("div");
           probe.className = "hidden p-4 bg-primary text-primary-foreground rounded-lg";
+          probe.style.position = "absolute";
+          probe.style.pointerEvents = "none";
+          probe.style.visibility = "hidden";
           document.body.appendChild(probe);
           const hasTokens = !!getComputedStyle(document.documentElement).getPropertyValue("--primary").trim();
           const styles = getComputedStyle(probe);
@@ -62,6 +89,7 @@ const avaCacheBustPlugin = (): Plugin => {
         });
         const repairStyles = async (reason) => {
           if (hasRuntimeStyles()) return remember("style-check-ok", { reason });
+          showToast("CSS manquant détecté — réparation automatique du portail…");
           remember("missing-styles", { reason, href: location.href });
           try {
             const res = await fetch("/version.json?_ava_css=" + Date.now().toString(36), { cache: "no-store", headers: { "Cache-Control": "no-store", Pragma: "no-cache" } });
@@ -74,24 +102,28 @@ const avaCacheBustPlugin = (): Plugin => {
           }
           const count = Number(sessionStorage.getItem(STYLE_RELOAD_KEY) || "0") + 1;
           sessionStorage.setItem(STYLE_RELOAD_KEY, String(count));
-          if (count <= 3) return hardReload("missing-styles-" + reason);
+          if (count <= 6) return hardReload("missing-styles-" + reason);
           remember("style-reload-loop-stopped", { reason, count });
         };
         const hardReload = async (reason) => {
           const count = Number(sessionStorage.getItem(FORCE_KEY) || "0") + 1;
           sessionStorage.setItem(FORCE_KEY, String(count));
           remember("hard-reload", { reason, count });
-          if (count > 3) return remember("reload-loop-stopped", { reason });
+          showToast("Version invalide détectée — rechargement complet du portail…");
+          if (count > 6) return remember("reload-loop-stopped", { reason });
           await clearBrowserCaches();
           const url = new URL(location.href);
           url.searchParams.set("_ava_b", BUILD_ID);
           url.searchParams.set("_r", Date.now().toString(36));
+          url.searchParams.delete("__vite_recovered");
           location.replace(url.toString());
         };
         const checkVersion = async () => {
           const stored = localStorage.getItem(VERSION_KEY);
           if (stored && stored !== BUILD_ID && new URL(location.href).searchParams.get("_ava_b") !== BUILD_ID) {
             localStorage.setItem(VERSION_KEY, BUILD_ID);
+            showToast("Nouvelle version détectée — rechargement automatique…");
+            remember("version-mismatch", { stored, current: BUILD_ID });
             return hardReload("html-build-changed");
           }
           localStorage.setItem(VERSION_KEY, BUILD_ID);
@@ -100,7 +132,11 @@ const avaCacheBustPlugin = (): Plugin => {
             if (res.ok) {
               const latest = await res.json();
               remember("version-check", { current: BUILD_ID, latest: latest.buildId });
-              if (latest.buildId && latest.buildId !== BUILD_ID) return hardReload("version-json-newer");
+              if (latest.buildId && latest.buildId !== BUILD_ID) {
+                showToast("Version invalide détectée — rechargement automatique…");
+                remember("version-mismatch", { current: BUILD_ID, latest: latest.buildId });
+                return hardReload("version-json-newer");
+              }
             }
           } catch (error) {
             remember("version-check-failed", { message: String(error?.message || error) });
@@ -145,7 +181,10 @@ const avaCacheBustPlugin = (): Plugin => {
 };
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+
+  return ({
   server: {
     host: "::",
     port: 8080,
@@ -176,10 +215,15 @@ export default defineConfig(({ mode }) => ({
       },
     },
   },
-  plugins: [react(), avaCacheBustPlugin(), mode === "development" && componentTagger()].filter(Boolean),
+  plugins: [
+    react(),
+    avaCacheBustPlugin(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_PUBLISHABLE_KEY),
+    mode === "development" && componentTagger(),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
-}));
+});
+});

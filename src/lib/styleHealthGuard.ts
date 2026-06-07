@@ -1,4 +1,5 @@
 import { APP_VERSION, BUILD_ID, hardReload } from "@/lib/version";
+import { showPortalGuardToast, trackPortalGuardEvent } from "@/lib/portalGuardMonitoring";
 
 const STYLE_EVENTS_KEY = "ava_style_guard_events";
 const STYLE_RELOAD_KEY = `ava_style_reload_count:${BUILD_ID}`;
@@ -9,6 +10,7 @@ const isBrowser = typeof window !== "undefined" && typeof document !== "undefine
 const remember = (event: string, details: Record<string, unknown> = {}) => {
   const entry = { at: new Date().toISOString(), buildId: BUILD_ID, event, details };
   console.warn("%c[AVA style-guard]", "color:#0023e6;font-weight:700", entry);
+  trackPortalGuardEvent(event, { ...details, buildId: BUILD_ID, version: APP_VERSION }, event.includes("failed") || event.includes("missing") ? "warning" : "info");
 
   try {
     const events = JSON.parse(localStorage.getItem(STYLE_EVENTS_KEY) || "[]").slice(-24);
@@ -62,7 +64,12 @@ const showOverlay = () => {
       <button type="button" data-ava-style-repair style="cursor:pointer;border:0;border-radius:8px;padding:11px 14px;background:linear-gradient(135deg,hsl(231 100% 50%),hsl(280 85% 55%));color:white;font:800 13px/1 Inter,system-ui,sans-serif">Réparer maintenant</button>
     </div>
   `;
-  el.querySelector("[data-ava-style-repair]")?.addEventListener("click", () => hardReload("style-guard-user-repair"));
+  (window as any).__avaStyleGuardForceRepair = () => {
+    sessionStorage.removeItem(STYLE_RELOAD_KEY);
+    trackPortalGuardEvent("style-repair-button-clicked", { buildId: BUILD_ID, version: APP_VERSION }, "warning");
+    void hardReload("style-guard-user-repair");
+  };
+  el.querySelector("[data-ava-style-repair]")?.addEventListener("click", () => (window as any).__avaStyleGuardForceRepair());
   document.body.appendChild(el);
 };
 
@@ -87,6 +94,21 @@ const injectStylesheet = (href: string) =>
 const tryInjectLatestCss = async () => {
   const targets = [location.pathname || "/", "/"];
   const discovered = new Set<string>();
+
+  if (import.meta.env.DEV) discovered.add("/src/index.css");
+
+  try {
+    const version = await fetch(`/version.json?_ava_css=${Date.now().toString(36)}`, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-store", Pragma: "no-cache" },
+    });
+    if (version.ok) {
+      const latest = await version.json();
+      (latest?.css || []).forEach((href: string) => discovered.add(href));
+    }
+  } catch (error) {
+    remember("version-css-discovery-failed", { message: String((error as Error)?.message || error) });
+  }
 
   for (const target of targets) {
     try {
@@ -115,6 +137,7 @@ const recoverStyles = async (reason: string) => {
   }
 
   showOverlay();
+  showPortalGuardToast("CSS manquant détecté — réparation automatique en cours…", "warning");
   remember("missing-styles", { reason, href: location.href });
 
   if (await tryInjectLatestCss()) {
@@ -127,7 +150,11 @@ const recoverStyles = async (reason: string) => {
   sessionStorage.setItem(STYLE_RELOAD_KEY, String(count));
   remember("style-hard-reload", { count });
 
-  if (count <= 3) await hardReload(`style-guard-${reason}`);
+  if (count <= 6) await hardReload(`style-guard-${reason}`);
+  else {
+    remember("style-reload-loop-stopped", { reason, count });
+    showPortalGuardToast("Réparation automatique bloquée — cliquez Réparer maintenant pour forcer un nouveau chargement.", "error");
+  }
 };
 
 const installStylesheetErrorLogger = () => {
