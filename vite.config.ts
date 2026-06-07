@@ -86,8 +86,10 @@ const avaCacheBustPlugin = (): Plugin => {
     closeBundle() {
       const indexPath = path.resolve(outDir, "index.html");
       if (!fs.existsSync(indexPath)) return;
+      const html = fs.readFileSync(indexPath, "utf8");
+      const cssLinks = Array.from(html.matchAll(/<link[^>]+rel=["']stylesheet["'][^>]+href=["']([^"']+)["'][^>]*>/g)).map((match) => match[1]);
       fs.copyFileSync(indexPath, path.resolve(outDir, `index.${BUILD_ID}.html`));
-      fs.writeFileSync(path.resolve(outDir, "version.json"), JSON.stringify({ buildId: BUILD_ID, buildTime: BUILD_TIME, index: `index.${BUILD_ID}.html` }));
+      fs.writeFileSync(path.resolve(outDir, "version.json"), JSON.stringify({ buildId: BUILD_ID, buildTime: BUILD_TIME, index: `index.${BUILD_ID}.html`, css: cssLinks }));
     },
   };
 };
@@ -114,6 +116,15 @@ export default defineConfig(({ mode }) => ({
   define: {
     __APP_BUILD_ID__: JSON.stringify(BUILD_ID),
     __APP_BUILD_TIME__: JSON.stringify(BUILD_TIME),
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        entryFileNames: "assets/[name]-[hash].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash][extname]",
+      },
+    },
   },
   plugins: [react(), avaCacheBustPlugin(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
