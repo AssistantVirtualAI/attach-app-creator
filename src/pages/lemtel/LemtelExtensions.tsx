@@ -192,6 +192,13 @@ export default function LemtelExtensions() {
                         {e.enabled ? 'Enabled' : 'Disabled'}
                       </span>
                     </TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant={e.pbx_uuid ? 'ghost' : 'outline'} onClick={() => setStatusExt(e)}
+                        className={!e.pbx_uuid ? 'border-orange-500/40 text-orange-600' : ''}>
+                        <Activity className="w-3.5 h-3.5 mr-1" />
+                        {e.pbx_uuid ? 'Status' : 'Not pushed'}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               })}
