@@ -35,8 +35,5 @@
     "contextMenus",
     "notifications"
   ],
-  "host_permissions": ["<all_urls>"],
-  "externally_connectable": {
-    "matches": ["*://avastatistic.ca/*"]
-  }
+  "host_permissions": ["<all_urls>"]
 }
