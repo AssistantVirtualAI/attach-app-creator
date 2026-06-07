@@ -372,7 +372,7 @@ class JsSipProvider {
     try {
       const audioConstraints: MediaTrackConstraints = {};
       if (this.inputDeviceId) (audioConstraints as any).deviceId = { exact: this.inputDeviceId };
-      this.ua.call(realTarget, {
+      this.ua.call(target, {
         mediaConstraints: {
           audio: Object.keys(audioConstraints).length ? audioConstraints : true,
           video: false,
