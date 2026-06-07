@@ -10,6 +10,12 @@ export type CallState =
   | 'idle' | 'ringing-out' | 'ringing-in'
   | 'active' | 'held' | 'ended';
 
+export interface SipEvent {
+  at: number;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+}
+
 export interface SoftphoneSnapshot {
   status: SipStatus;
   callState: CallState;
@@ -20,6 +26,7 @@ export interface SoftphoneSnapshot {
   onHold: boolean;
   direction: 'in' | 'out' | null;
   startedAt: number | null;
+  events: SipEvent[];
 }
 
 export interface SoftphoneConfig {
