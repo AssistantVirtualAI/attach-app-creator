@@ -9,6 +9,7 @@ import {
 import { autoUpdater } from 'electron-updater';
 import Store from 'electron-store';
 import path from 'path';
+import fs from 'fs';
 import { setupTray, updateTrayStatus } from './tray';
 
 const APP_NAME = 'Lemtel';
@@ -18,13 +19,32 @@ let isQuitting = false;
 
 app.setName(APP_NAME);
 
+// ---------- Crash log persistence ----------
+const CRASH_LOG_PATH = path.join(app.getPath('userData'), 'crash.log');
+function writeCrashLog(scope: string, payload: Record<string, unknown>) {
+  const line = JSON.stringify({
+    at: new Date().toISOString(),
+    scope,
+    ...payload,
+  }) + '\n';
+  try {
+    fs.appendFileSync(CRASH_LOG_PATH, line);
+  } catch (e) {
+    console.error('[main] Failed to write crash log:', e);
+  }
+  console.error(`[crash:${scope}]`, payload);
+}
+
 // ---------- Crash recovery: prevent renderer crashes from killing the app ----------
 process.on('uncaughtException', (error) => {
-  console.error('[main] Uncaught exception:', error);
+  writeCrashLog('uncaughtException', { message: error.message, stack: error.stack });
+});
+process.on('unhandledRejection', (reason: any) => {
+  writeCrashLog('unhandledRejection', { reason: String(reason?.message || reason), stack: reason?.stack });
 });
 
 app.on('render-process-gone', (_event, _webContents, details) => {
-  console.error('[main] Renderer process gone:', details.reason);
+  writeCrashLog('render-process-gone', { reason: details.reason, exitCode: details.exitCode });
   if (details.reason !== 'clean-exit' && mainWindow) {
     setTimeout(() => {
       try {
@@ -33,15 +53,25 @@ app.on('render-process-gone', (_event, _webContents, details) => {
         } else {
           mainWindow?.loadFile(path.join(__dirname, '../dist/index.html'));
         }
-      } catch (e) {
-        console.error('[main] Failed to reload after crash:', e);
+      } catch (e: any) {
+        writeCrashLog('reload-failed', { message: e?.message });
       }
     }, 1000);
   }
 });
 
 app.on('child-process-gone', (_event, details) => {
-  console.error('[main] Child process gone:', details.type, details.reason);
+  writeCrashLog('child-process-gone', { type: details.type, reason: details.reason, exitCode: details.exitCode });
+});
+
+// IPC: renderer-side crashes flow here too.
+ipcMain.handle('log-renderer-crash', (_e, payload: Record<string, unknown>) => {
+  writeCrashLog('renderer', payload);
+});
+ipcMain.handle('get-crash-log-path', () => CRASH_LOG_PATH);
+ipcMain.handle('read-crash-log', () => {
+  try { return fs.existsSync(CRASH_LOG_PATH) ? fs.readFileSync(CRASH_LOG_PATH, 'utf-8') : ''; }
+  catch { return ''; }
 });
 
 // Register lemtel:// custom protocol
