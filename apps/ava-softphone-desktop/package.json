@@ -15,7 +15,8 @@
     "build:win": "vite build && tsc -p electron/tsconfig.json && electron-builder --win",
     "build:mac": "vite build && tsc -p electron/tsconfig.json && electron-builder --mac --x64 --arm64",
     "build:linux": "vite build && tsc -p electron/tsconfig.json && electron-builder --linux",
-    "dist": "npm run build"
+    "dist": "npm run build",
+    "smoke": "node scripts/smoke-electron.mjs"
   },
   "dependencies": {
     "react": "^18.2.0",
