@@ -373,6 +373,13 @@ export default function SoftphonePane({
             onTransfer={(m) => { setXferMode(m); setShowXfer(true); }}
             compact={compact}
             audioEl={audioRef.current}
+            activeOutputLabel={activeOutputLabel}
+            autoResetOutput={autoResetOutput}
+            onAutoResetChange={(v: boolean) => {
+              setAutoResetOutput(v);
+              try { localStorage.setItem('lemtel.autoResetOutput', String(v)); } catch {}
+            }}
+            onActiveOutputLabel={setActiveOutputLabel}
           />
         )}
 
