@@ -227,10 +227,23 @@ export default function SoftphonePane({
     return `${m}:${sec}`;
   };
 
+  const [callBusy, setCallBusy] = useState(false);
+  const sipReady = sp.snap.status === 'registered';
+  const callDisabledReason =
+    !sipReady ? 'SIP not registered yet' :
+    micPermission === 'denied' ? 'Microphone denied — click Allow' :
+    callBusy ? 'Starting call…' : '';
+
   const handleCall = async () => {
-    if (dial.length < 3) return;
+    if (dial.length < 3 || callBusy) return;
     if (micPermission === 'denied') { await requestMic(); return; }
-    await sp.call(dial);
+    if (!sipReady) return;
+    setCallBusy(true);
+    try {
+      await sp.call(dial);
+    } finally {
+      setTimeout(() => setCallBusy(false), 1500);
+    }
   };
 
   // Global "dial now" shortcut (⌘/Ctrl + Enter) wires in from useShortcuts.
