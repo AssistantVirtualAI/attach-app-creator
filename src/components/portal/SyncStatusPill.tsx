@@ -11,8 +11,8 @@ export function SyncStatusPill() {
     latest?.status === 'error' ? 'bg-red-500' : 'bg-green-500';
   const label =
     syncing ? 'Syncing…' :
-    latest?.status === 'error' ? `Sync failed ${latest.finished_at ? formatDistanceToNow(new Date(latest.finished_at), { addSuffix: true }) : ''}` :
-    latest?.finished_at ? `FusionPBX synced ${formatDistanceToNow(new Date(latest.finished_at), { addSuffix: true })}` :
+    latest?.status === 'error' ? `Sync failed ${latest.completed_at ? formatDistanceToNow(new Date(latest.completed_at), { addSuffix: true }) : ''}` :
+    latest?.completed_at ? `FusionPBX synced ${formatDistanceToNow(new Date(latest.completed_at), { addSuffix: true })}` :
     'Awaiting first sync';
 
   return (

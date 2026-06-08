@@ -134,7 +134,7 @@ function SyncStatusChip() {
   const { data: jobs = [] } = usePbxSyncJobs(5);
   const latest = jobs[0];
   if (!latest) return <Badge variant="outline"><Clock className="w-3 h-3 mr-1" /> No sync yet</Badge>;
-  const when = latest.finished_at || latest.started_at;
+  const when = latest.completed_at || latest.finished_at || latest.started_at;
   const ago = when ? formatDistanceToNow(new Date(when), { addSuffix: true }) : '';
   if (latest.status === 'error') {
     return (

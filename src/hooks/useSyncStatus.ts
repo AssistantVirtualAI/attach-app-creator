@@ -5,10 +5,10 @@ const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 
 export type SyncJob = {
   id: string;
-  kind: string;
-  status: 'running' | 'success' | 'error';
+  job_type: string;
+  status: 'running' | 'success' | 'completed' | 'error';
   started_at: string;
-  finished_at: string | null;
+  completed_at: string | null;
   error: string | null;
 };
 
@@ -19,7 +19,7 @@ export function useSyncStatus(organizationId: string = LEMTEL_ORG_ID) {
   const fetchLatest = useCallback(async () => {
     const { data } = await (supabase as any)
       .from('pbx_sync_jobs')
-      .select('id,kind,status,started_at,finished_at,error')
+      .select('id,job_type,status,started_at,completed_at,error')
       .eq('organization_id', organizationId)
       .order('started_at', { ascending: false })
       .limit(1)
