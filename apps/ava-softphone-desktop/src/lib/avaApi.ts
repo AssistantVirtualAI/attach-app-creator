@@ -29,7 +29,14 @@ export interface Ivr { id: string; name: string; greeting: string; options: numb
 export interface CallQueue { id: string; name: string; strategy: string; agents: number; waiting: number; }
 export interface RingGroup { id: string; name: string; members: number; strategy: string; }
 export interface VoicemailItem { id: string; from: string; customer?: string; receivedAt: string; durationSec: number; isNew: boolean; transcript: string; summary: string; sentiment: 'positive'|'neutral'|'negative'; priority: 'low'|'normal'|'high'; handled?: boolean; }
-export interface RecordingItem { id: string; callId: string; from: string; to: string; recordedAt: string; durationSec: number; sentiment?: string; summary?: string; topics?: string[]; }
+export interface RecordingItem {
+  id: string; callId: string; from: string; to: string; recordedAt: string;
+  durationSec: number; sizeKb: number;
+  sentiment: 'positive'|'neutral'|'negative';
+  summary: string; topics: string[]; tags: string[];
+  qualityScore: number; customer?: string;
+  feedback: Feedback;
+}
 export interface ContactItem { id: string; name: string; phone: string; lastInteraction: string; totalCalls: number; totalMessages: number; sentiment: 'positive'|'neutral'|'negative'; aiNote: string; tags: string[]; favorite: boolean; }
 export interface SmsThread { id: string; contact: string; lastMessage: string; lastAt: string; unread: number; number: string; }
 export type Feedback = 'up' | 'down' | null;
