@@ -224,10 +224,11 @@ function ChannelView({ channel, userId, t }: { channel: Channel; userId: string;
 }
 
 function MessageBubble({
-  msg, isOwn, onDelete, onReact, getSignedUrl, t,
+  msg, isOwn, onDelete, onReact, onOpenThread, getSignedUrl, t,
 }: {
   msg: any; isOwn: boolean;
   onDelete: () => void; onReact: (emoji: string) => void;
+  onOpenThread?: () => void;
   getSignedUrl: (p: string) => Promise<string>;
   t: (en: string, fr: string) => string;
 }) {
