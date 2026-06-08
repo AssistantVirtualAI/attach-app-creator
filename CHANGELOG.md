@@ -2,6 +2,8 @@
 
 Auto-generated from git commits.
 
+- fix: remove -c.publish=never flag from electron-builder commands (2026-06-08) — AssistantVirtualAI
+- docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
 - fix: remove publish section from electron-builder to prevent CI failures (2026-06-08) — AssistantVirtualAI
 - docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
 - Changes (2026-06-08) — gpt-engineer-app[bot]
@@ -35,8 +37,6 @@ Auto-generated from git commits.
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
-- Changes (2026-06-08) — gpt-engineer-app[bot]
-- Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
