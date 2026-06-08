@@ -3081,6 +3081,7 @@ export type Database = {
           parent_org_id: string | null
           primary_color: string | null
           privacy_policy_url: string | null
+          reseller_id: string | null
           root_org_id: string | null
           slug: string
           status: string | null
@@ -3143,6 +3144,7 @@ export type Database = {
           parent_org_id?: string | null
           primary_color?: string | null
           privacy_policy_url?: string | null
+          reseller_id?: string | null
           root_org_id?: string | null
           slug: string
           status?: string | null
@@ -3205,6 +3207,7 @@ export type Database = {
           parent_org_id?: string | null
           primary_color?: string | null
           privacy_policy_url?: string | null
+          reseller_id?: string | null
           root_org_id?: string | null
           slug?: string
           status?: string | null
@@ -3218,6 +3221,13 @@ export type Database = {
           {
             foreignKeyName: "organizations_parent_org_id_fkey"
             columns: ["parent_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizations_reseller_id_fkey"
+            columns: ["reseller_id"]
             isOneToOne: false
             referencedRelation: "organizations"
             referencedColumns: ["id"]
