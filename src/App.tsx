@@ -763,6 +763,8 @@ const App = () => (
                   <Route path="telephony" element={<TelephonyDashboard />} />
                   <Route path="billing" element={<MasterBilling />} />
                   <Route path="system" element={<MasterSystem />} />
+                  <Route path="health" element={<PlatformSystemHealth />} />
+                  <Route path="qa" element={<PlatformTelephonyQA />} />
                   <Route path="audit" element={<MasterAuditLogs />} />
                   <Route path="settings" element={<LemtelSettings />} />
                 </Route>
