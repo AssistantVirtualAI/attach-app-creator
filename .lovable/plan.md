@@ -1,79 +1,67 @@
-# Phases 4b + 5 + 6 — Livraison groupée
 
-L'utilisateur souhaite tout livrer en une seule itération. Voici la plan d'exécution consolidé.
+## Goal
+Make the Lemtel admin phone-system pages fully bidirectional with FusionPBX: create / edit / delete from the UI, and pull live state back. Surface the existing customer + impersonation flow on `/org/lemtel/admin/*` so you can actually use it.
 
-## Phase 4b — Threads & recherche chat
+## What's wrong today
+- **Devices** (`LemtelDevices.tsx`, 62 lines): read-only table, no "New device" button, no edit dialog. The proxy already supports `create-device` / `update-device` / `delete-device` — the UI just never calls them.
+- **Queues** (`LemtelQueues.tsx`): has CRUD scaffolding but it isn't reliably calling `create-queue` / `update-queue` / tier + agent endpoints, and errors are swallowed.
+- **Customers**: `LemtelCustomers.tsx` only inserts into `public.clients`. It does NOT call `create-organization` edge function, so no FusionPBX domain is provisioned, no admin user is created, and no per-customer portal link appears. The richer flow (organizations + users + impersonation) lives under `/org/lemtel/master/organizations` (`MasterOrganizations.tsx`) and isn't linked from the admin nav you're on.
+- **Impersonation**: `ImpersonationBanner` + `useImpersonation().enter()` are only used in `master/*` and `reseller/*` shells. The admin shell at `/org/lemtel/admin/*` doesn't render the banner or offer an "Impersonate" button per customer.
 
-### Schéma
-- `org_chat_messages` : ajouter `parent_message_id uuid REFERENCES org_chat_messages(id) ON DELETE CASCADE`, `reply_count int DEFAULT 0`, `last_reply_at timestamptz`.
-- Trigger `bump_thread_counters` qui maintient `reply_count` / `last_reply_at` sur le message parent.
-- Colonne `tsv tsvector` + index GIN + trigger `to_tsvector('french', coalesce(content,''))`.
+## Plan
 
-### Edge function `org-chat` (extensions)
-- `list_thread(message_id)` — messages dont parent = id, tri ASC.
-- `send_message` accepte `parent_message_id`.
-- `search_messages(query, channel_id?, limit, before)` — `tsv @@ websearch_to_tsquery('french', q)` filtré par channels accessibles.
+### 1. Devices — full bidirectional CRUD
+- Add a **"New device"** button on `LemtelDevices.tsx` opening a `DeviceEditDialog`.
+- Fields: label, MAC address (validated), vendor (select from `src/data/pbxDeviceModels.ts` — Yealink / Polycom / Grandstream / Cisco / Fanvil / Snom), model (filtered by vendor), template (auto-suggested), assigned extension (dropdown from `pbx_extensions`), enabled toggle.
+- On submit → `supabase.functions.invoke('fusionpbx-proxy', { body: { action: 'create-device', params: {...} } })` then invalidate `['pbx','devices']`.
+- Row actions: **Edit** (same dialog → `update-device`), **Delete** (confirm → `delete-device`), **Resync** (calls `realtime-sync` with `kind: 'devices'`).
+- Show live registration via `get-registrations` polled every 10s (reuse pattern from `useQueueAgent`).
+- Add a `PbxRefreshButton kind="devices"` (already imported) — confirm it actually triggers the proxy sync.
 
-### Frontend
-- `chat/ThreadPanel.tsx` : panneau latéral droit, composer, liste des replies, fermeture.
-- `MessageBubble` : badge "N réponses" + "Répondre dans un fil".
-- `chat/SearchBar.tsx` + `chat/SearchResults.tsx` : barre Cmd+K dans la sidebar, résultats avec extrait + highlight + jump-to-message.
-- Hook `useOrgChatThread(messageId)` (React Query + realtime filtré).
+### 2. Queues — finish bidirectional CRUD
+- Audit `LemtelQueues.tsx` and ensure every mutation goes through the proxy:
+  - Create/Edit queue → `create-queue` / `update-queue` with strategy, timeout, MOH, wrap-up, max wait.
+  - Tiers panel → `list-queue-tiers` / `add-queue-tier` / `remove-queue-tier`.
+  - Agents panel → `list-queue-agents` / `create-queue-agent` / `delete-queue-agent`.
+  - Delete queue → `delete-queue` with confirm.
+- Surface proxy errors via `toast.error(error.message)` instead of swallowing them.
+- After every write: invalidate `['pbx','queues']` and re-fetch live stats via existing `queue-stats` action.
 
-## Phase 5 — Notifications & mentions
+### 3. Customers — full org provisioning + portal link + impersonation
+Replace the current "insert into `clients`" dialog with the real `create-organization` flow that already exists:
+- New customer dialog calls edge function `create-organization` with `{ name, admin_email, plan, parent_org_id: LEMTEL_ORG }`. That function already: creates FusionPBX domain via `fusionpbx-proxy createDomain`, inserts `organizations`, creates the admin auth user, inserts `org_members` + `organization_members`, audits, and sends welcome email.
+- Customers table columns: Name, Admin email, Plan, FusionPBX domain, Users count, Created, **Actions**.
+- Row actions:
+  - **Open portal** → opens `/org/{slug}/portal` in new tab (uses `brand_portal_domain` if set).
+  - **Manage users** → drawer listing `organization_members` for that org with **Invite user** (calls existing invite edge function), role select, and remove.
+  - **Impersonate** → calls `useImpersonation().enter(orgId, name)` (which already invokes `start-impersonation` and writes audit) then navigates to `/org/{slug}/admin`.
+  - **Edit settings**, **Delete** (soft-disable via `is_active=false`).
+- Add `ImpersonationBanner` to the admin shell (`LemtelAdminPage`) so the orange "Exit impersonation" bar is visible while impersonating from `/org/lemtel/admin/customers`.
 
-### Schéma
-- Réutiliser `org_notifications` (existant).
-- Trigger `notify_mentions_on_message` : parse `@uuid` dans `content`, insert lignes `org_notifications` (`type='chat_mention'`, payload = {channel_id, message_id}).
-- Table `user_notification_prefs` (existante) : ajouter colonnes `email_mentions bool`, `email_dm bool`, `email_voicemail bool`, `email_missed_call bool`.
+### 4. Bidirectional guarantees across the phone-system pages
+For Extensions, DIDs, IVR, Ring Groups, Devices, Queues, Voicemail:
+- All write operations route through `fusionpbx-proxy` (no direct table writes that bypass PBX).
+- After each successful write, trigger `realtime-sync` for that `kind` so the local cache row matches PBX immediately.
+- Add a shared `<PbxLiveBadge>` next to each page title showing last sync timestamp from `pbx_sync_jobs` + a manual "Resync" button (reuse existing `PbxRefreshButton`).
+- Surface proxy failures with `toast.error` + a "View logs" link to `/platform/qa`.
 
-### Edge function `notifications`
-- `list(limit, before)` — flux paginé.
-- `mark_read(ids[])` / `mark_all_read()`.
-- `prefs_get` / `prefs_update`.
-- Worker `dispatch_email_notifications` (trigger pg_net post → fonction edge) qui envoie via Resend en respectant les prefs et un debounce 5 min.
+### 5. Navigation
+- Add **Customers** and **Devices** to the `/org/lemtel/admin` sidebar (they exist as routes but may not be in the nav). Add **Queues** if missing.
+- Add a "Customer admin link" copy-to-clipboard button per row in Customers.
 
-### Realtime + Frontend
-- `useNotifications()` : subscription `org_notifications` filtré `user_id=eq.<me>` ; cache React Query.
-- `NotificationBell.tsx` dans `PortalShells` : badge unread, popover liste, "Tout marquer lu", deep-link vers ressource.
-- `pages/my/NotificationSettings.tsx` : toggles prefs.
-- Composer chat : auto-complétion `@` via membres de l'organisation, insertion `@<uuid>` rendu en `@DisplayName` côté bulle.
+## Out of scope
+- No changes to widget / landing / download pages.
+- No new migrations expected; all backend pieces (`create-organization`, `start-impersonation`, proxy CRUD actions, `org_members`, audit) already exist.
 
-## Phase 6 — Calendrier & rendez-vous
+## Files to touch
+- `src/pages/lemtel/LemtelDevices.tsx` (rebuild with CRUD)
+- `src/components/lemtel/DeviceEditDialog.tsx` (new)
+- `src/pages/lemtel/LemtelQueues.tsx` (wire mutations to proxy, error surfacing)
+- `src/pages/lemtel/LemtelCustomers.tsx` (replace with org-provisioning + users drawer + impersonate)
+- `src/components/lemtel/CustomerUsersDrawer.tsx` (new)
+- `src/components/lemtel/admin/LemtelAdminPage.tsx` (or equivalent shell) — mount `ImpersonationBanner`, add nav items
+- `src/components/lemtel/PbxLiveBadge.tsx` (new, optional)
 
-### Schéma (table `appointments` existante — l'étendre)
-- Ajouter `host_user_id uuid`, `host_kind text ('user'|'agent'|'team')`, `team_members uuid[]`, `location_type text ('phone'|'video'|'in_person')`, `meeting_url text`, `reminder_offsets int[] DEFAULT '{1440,60}'`, `timezone text`.
-- Nouvelle table `appointment_slots` (slots de dispo générés / bookables publics).
-- Nouvelle table `appointment_reminders` (sent_at, channel).
-
-### Edge function `appointments`
-- `list(range, host?)`, `create`, `update`, `cancel`, `reschedule`.
-- `public_availability(host_id, range)` : calcule créneaux libres en croisant `user_working_hours`, `org_business_hours`, et appointments existants.
-- `public_book(host_id, slot, contact)` — endpoint anon avec rate-limit + captcha-light.
-- Worker `process_appointment_reminders` (déclenché par pg_cron toutes les 5 min) : envoie SMS Telnyx + email Resend selon `reminder_offsets`.
-
-### Frontend
-- `pages/my/Calendar.tsx` :
-  - Vue Mois / Semaine / Jour (composant interne, pas de dep).
-  - Sidebar mini-calendrier + filtres (host, status).
-  - Drag-to-create + dialog edit.
-- `pages/customer/Calendar.tsx` : variante orga avec multi-host.
-- Page publique `/book/:slug` : créneaux dispo + formulaire contact + confirmation.
-- Hooks `useAppointments`, `useAvailability`, `usePublicBooking`.
-
-## Sécurité (toutes phases)
-- Toutes les edge functions valident JWT + appartenance org via `current_user_org_ids()` ou `can_access_org`.
-- Public booking : pas de JWT mais slug org/host validé + IP rate-limit (table `rate_limits` simple).
-- RLS strictes sur nouvelles tables ; GRANT explicites `authenticated`/`service_role`.
-
-## Hors scope
-- Visio embarquée (juste lien meeting_url externe pour cette itération).
-- Sync Google/Outlook 2-way (Phase 7 — table `calendar_integrations` déjà présente).
-- Notifications push web (web push) → Phase 7.
-
-## Validation
-- Chat : ouvrir thread, envoyer reply, voir compteur, rechercher mot et jumper.
-- Mention `@user` → bell badge + email reçu (si pref on).
-- Créer RDV, voir reminder envoyé à T-1h, page publique `/book/:slug` permet booking.
-
-Sur OK je passe en build mode et j'enchaîne les trois phases dans l'ordre 4b → 5 → 6.
+## Confirmation needed
+1. Should "New customer" actually provision a FusionPBX domain immediately (recommended), or just create the org row and let you provision later?
+2. For Devices, should the vendor/model list be the static `pbxDeviceModels.ts` catalog, or do you want me to also pull provisioning templates live from FusionPBX (`device_templates`) for whatever your PBX has installed?
