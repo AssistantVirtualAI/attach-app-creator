@@ -179,9 +179,30 @@ export default function TelephonyUsers() {
           <h1 className="text-3xl font-bold flex items-center gap-2"><Users className="w-7 h-7" /> Team Members</h1>
           <p className="text-muted-foreground">Manage softphone users across all platforms</p>
         </div>
-        <Button onClick={() => setOpen(true)} disabled={!isAdmin}>
-          <Plus className="w-4 h-4 mr-2" /> Add User
-        </Button>
+        <div className="flex gap-2 flex-wrap items-center">
+          {isAdmin && customers.length > 0 && (
+            <Select
+              value={csvOrgId}
+              onValueChange={(v) => {
+                setCsvOrgId(v);
+                setCsvOrgName(customers.find((c: any) => c.id === v)?.name || '');
+              }}
+            >
+              <SelectTrigger className="w-56"><SelectValue placeholder="Import target customer" /></SelectTrigger>
+              <SelectContent>
+                {customers.map((c: any) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name} {c.org_type ? `· ${c.org_type}` : ''}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button variant="outline" onClick={() => setCsvOpen(true)} disabled={!isAdmin}>
+            <Upload className="w-4 h-4 mr-2" /> Import CSV
+          </Button>
+          <Button onClick={() => setOpen(true)} disabled={!isAdmin}>
+            <Plus className="w-4 h-4 mr-2" /> Add User
+          </Button>
+        </div>
       </div>
 
       {!isAdmin && (
