@@ -91,7 +91,22 @@ export default function TelephonyUsers() {
   const { data: users = [], isLoading, refetch } = useSoftphoneUsers();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [csvOpen, setCsvOpen] = useState(false);
+  const [csvOrgId, setCsvOrgId] = useState<string>(LEMTEL_ORG);
+  const [csvOrgName, setCsvOrgName] = useState<string>('Lemtel');
   const qc = useQueryClient();
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers-for-csv'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('organizations')
+        .select('id, name, slug, org_type')
+        .order('name');
+      return (data || []) as any[];
+    },
+    enabled: isAdmin,
+  });
 
   const stats = useMemo(() => {
     const total = users.length;
