@@ -663,6 +663,45 @@ export type Database = {
           },
         ]
       }
+      app_releases: {
+        Row: {
+          assets: Json | null
+          created_at: string | null
+          id: string
+          is_latest: boolean | null
+          name: string | null
+          platform_urls: Json | null
+          published_at: string | null
+          tag: string
+          updated_at: string | null
+          url: string | null
+        }
+        Insert: {
+          assets?: Json | null
+          created_at?: string | null
+          id?: string
+          is_latest?: boolean | null
+          name?: string | null
+          platform_urls?: Json | null
+          published_at?: string | null
+          tag: string
+          updated_at?: string | null
+          url?: string | null
+        }
+        Update: {
+          assets?: Json | null
+          created_at?: string | null
+          id?: string
+          is_latest?: boolean | null
+          name?: string | null
+          platform_urls?: Json | null
+          published_at?: string | null
+          tag?: string
+          updated_at?: string | null
+          url?: string | null
+        }
+        Relationships: []
+      }
       appointments: {
         Row: {
           agent_id: string | null

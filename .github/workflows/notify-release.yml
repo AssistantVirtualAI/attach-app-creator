@@ -1,0 +1,23 @@
+name: Notify on New Release
+
+on:
+  release:
+    types: [published, created]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send webhook to AVA Portal
+        run: |
+          curl -X POST \
+            "https://gejxisrqtvxavbrfcoxz.supabase.co/functions/v1/release-webhook" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -d '{
+              "release_tag": "${{ github.event.release.tag_name }}",
+              "release_name": "${{ github.event.release.name }}",
+              "release_url": "${{ github.event.release.html_url }}",
+              "published_at": "${{ github.event.release.published_at }}",
+              "assets": ${{ toJSON(github.event.release.assets) }}
+            }'
