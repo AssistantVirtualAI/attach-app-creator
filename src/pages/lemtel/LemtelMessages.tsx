@@ -152,6 +152,22 @@ export default function LemtelMessages() {
                 </div>
               </ScrollArea>
               <div className="border-t p-3 flex gap-2">
+                {templates.length > 0 && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="icon" title="Templates"><FileText className="w-4 h-4" /></Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-1">
+                      {templates.map((tpl) => (
+                        <button key={tpl.id} onClick={() => setInput(tpl.content)}
+                          className="w-full text-left p-2 rounded hover:bg-muted text-sm">
+                          <div className="font-medium">{tpl.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">{tpl.content}</div>
+                        </button>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                )}
                 <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Type a message..."
                   onKeyDown={(e) => e.key === 'Enter' && send()} />
                 <Button onClick={send} disabled={sending || !input.trim()}><Send className="w-4 h-4" /></Button>
