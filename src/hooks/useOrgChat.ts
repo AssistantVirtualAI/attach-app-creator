@@ -1,114 +1,127 @@
 import { useEffect, useState, useCallback } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 
-export type ChatChannel = {
+export type Channel = {
   id: string;
   organization_id: string;
   name: string;
   description: string | null;
-  channel_type: "public" | "private" | "dm" | "announcement";
+  channel_type: "public" | "private";
   members: string[];
   created_at: string;
 };
 
 export type ChatMessage = {
   id: string;
-  organization_id: string;
-  channel_id: string | null;
-  sender_id: string | null;
+  channel_id: string;
+  sender_id: string;
   sender_name: string | null;
-  sender_extension: string | null;
-  recipient_id: string | null;
-  message_type: string;
   content: string;
-  attachments: any[];
-  reactions: Record<string, string[]>;
-  reply_to: string | null;
-  read_by: string[];
+  attachments: Array<{ path: string; name: string; mime: string; size: number }> | null;
+  reactions: Record<string, string[]> | null;
+  message_type: string;
   edited_at: string | null;
   created_at: string;
 };
 
-export function useOrgChat(organizationId?: string | null) {
-  const { user } = useAuth();
-  const [channels, setChannels] = useState<ChatChannel[]>([]);
-  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+async function invoke(action: string, payload?: any) {
+  const { data, error } = await supabase.functions.invoke("org-chat", { body: { action, payload } });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+export function useChannels() {
+  const qc = useQueryClient();
+  const query = useQuery<{ channels: Channel[] }>({
+    queryKey: ["org-chat-channels"],
+    queryFn: () => invoke("list_channels"),
+  });
+  const create = useMutation({
+    mutationFn: (p: { name: string; channel_type: "public" | "private"; description?: string; members?: string[] }) =>
+      invoke("create_channel", p),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["org-chat-channels"] }),
+  });
+  return { query, create };
+}
+
+export function useChatMessages(channelId: string | null) {
+  const qc = useQueryClient();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  const loadChannels = useCallback(async () => {
-    if (!organizationId) return;
-    const { data } = await supabase
-      .from("org_chat_channels")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: true });
-    setChannels((data as any) || []);
-  }, [organizationId]);
-
-  const loadMessages = useCallback(async (channelId: string) => {
-    setLoading(true);
-    const { data } = await supabase
-      .from("org_chat_messages")
-      .select("*")
-      .eq("channel_id", channelId)
-      .order("created_at", { ascending: true })
-      .limit(500);
-    setMessages((data as any) || []);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { loadChannels(); }, [loadChannels]);
-  useEffect(() => { if (activeChannelId) loadMessages(activeChannelId); }, [activeChannelId, loadMessages]);
+  const query = useQuery<{ messages: ChatMessage[] }>({
+    queryKey: ["org-chat-messages", channelId],
+    queryFn: () => invoke("list_messages", { channel_id: channelId }),
+    enabled: !!channelId,
+  });
 
   useEffect(() => {
-    if (!organizationId) return;
+    if (query.data?.messages) setMessages(query.data.messages);
+  }, [query.data]);
+
+  useEffect(() => {
+    if (!channelId) return;
     const ch = supabase
-      .channel(`chat-${organizationId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "org_chat_messages", filter: `organization_id=eq.${organizationId}` },
-        (payload) => {
-          const m = payload.new as ChatMessage;
-          if (m.channel_id === activeChannelId) setMessages((prev) => [...prev, m]);
-        }
-      )
+      .channel(`org-chat-${channelId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "org_chat_messages", filter: `channel_id=eq.${channelId}` }, (p: any) => {
+        setMessages((prev) => (prev.some((m) => m.id === p.new.id) ? prev : [...prev, p.new]));
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "org_chat_messages", filter: `channel_id=eq.${channelId}` }, (p: any) => {
+        setMessages((prev) => prev.map((m) => (m.id === p.new.id ? p.new : m)));
+      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [organizationId, activeChannelId]);
+  }, [channelId]);
 
-  const sendMessage = useCallback(
-    async (content: string, channelId?: string, messageType = "text", attachments: any[] = []) => {
-      if (!user || !organizationId) return;
-      const cid = channelId ?? activeChannelId;
-      if (!cid) return;
-      await supabase.from("org_chat_messages").insert({
-        organization_id: organizationId,
-        channel_id: cid,
-        sender_id: user.id,
-        sender_name: user.user_metadata?.full_name || user.email,
-        message_type: messageType,
-        content,
-        attachments,
-      });
+  const send = useMutation({
+    mutationFn: (p: { content: string; attachments?: any[] }) =>
+      invoke("send_message", { channel_id: channelId, ...p }),
+  });
+  const edit = useMutation({
+    mutationFn: (p: { id: string; content: string }) => invoke("edit_message", p),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => invoke("delete_message", { id }),
+  });
+  const react = useMutation({
+    mutationFn: (p: { id: string; emoji: string }) => invoke("toggle_reaction", p),
+  });
+
+  const uploadAttachment = useCallback(async (file: File) => {
+    const up: any = await invoke("upload_url", { filename: file.name });
+    const r = await fetch(up.signedUrl, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+    if (!r.ok) throw new Error("upload_failed");
+    return { path: up.path, name: file.name, mime: file.type, size: file.size };
+  }, []);
+
+  const getSignedUrl = useCallback(async (path: string) => {
+    const r: any = await invoke("signed_url", { path });
+    return r.url as string;
+  }, []);
+
+  return { query, messages, send, edit, remove, react, uploadAttachment, getSignedUrl };
+}
+
+// --- Legacy compat for TelephonyTeam (Phase < 4) ---
+export function useOrgChat(_orgId?: string) {
+  const { query: channelsQuery, create } = useChannels();
+  const channels = channelsQuery.data?.channels ?? [];
+  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const { messages, send } = useChatMessages(activeChannelId);
+
+  return {
+    channels,
+    activeChannelId,
+    setActiveChannelId,
+    messages,
+    loading: channelsQuery.isLoading,
+    sendMessage: async (content: string) => {
+      if (!activeChannelId) return;
+      await send.mutateAsync({ content });
     },
-    [user, organizationId, activeChannelId]
-  );
-
-  const createChannel = useCallback(
-    async (name: string, channel_type: "public" | "private" = "public", description?: string) => {
-      if (!user || !organizationId) return null;
-      const { data } = await supabase
-        .from("org_chat_channels")
-        .insert({ organization_id: organizationId, name, channel_type, description, created_by: user.id })
-        .select()
-        .single();
-      await loadChannels();
-      return data as any;
+    createChannel: async (name: string, channel_type: "public" | "private" = "public") => {
+      return await create.mutateAsync({ name, channel_type });
     },
-    [user, organizationId, loadChannels]
-  );
-
-  return { channels, activeChannelId, setActiveChannelId, messages, loading, sendMessage, createChannel, reloadChannels: loadChannels };
+  };
 }
