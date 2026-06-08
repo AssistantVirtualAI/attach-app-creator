@@ -8,6 +8,8 @@ import BrightnessOverlay from './components/BrightnessOverlay';
 import ResponsiveLab from './components/ResponsiveLab';
 import { useTheme } from './lib/theme';
 import { useContrast } from './hooks/useContrast';
+import { supabase } from './lib/supabaseClient';
+import { sipProvider } from './lib/sip/jssipProvider';
 
 const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 const IS_LAB = qs?.get('lab') === 'responsive';
