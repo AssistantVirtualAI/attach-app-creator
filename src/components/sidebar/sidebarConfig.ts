@@ -148,6 +148,41 @@ export const sidebarGroups: NavGroup[] = [
       { nameKey: 'CC Admin', href: '/org/lemtel/callcenter/admin', icon: Shield },
     ]
   },
+  {
+    id: 'lemtel-admin-v3',
+    labelKey: '🛠️ Lemtel Admin (v3)',
+    icon: Shield,
+    lemtelOnly: true,
+    items: [
+      { nameKey: 'Admin Dashboard', href: '/org/lemtel/admin/dashboard', icon: LayoutDashboard },
+      { nameKey: 'Extensions', href: '/org/lemtel/admin/extensions', icon: Smartphone },
+      { nameKey: 'Devices', href: '/org/lemtel/admin/devices', icon: Router },
+      { nameKey: 'Phone Numbers', href: '/org/lemtel/admin/dids', icon: Phone },
+      { nameKey: 'IVR / Auto-Attendant', href: '/org/lemtel/admin/ivr', icon: Voicemail },
+      { nameKey: 'Call Queues', href: '/org/lemtel/admin/queues', icon: Headphones },
+      { nameKey: 'Ring Groups', href: '/org/lemtel/admin/ring-groups', icon: Bell },
+      { nameKey: 'Recordings', href: '/org/lemtel/admin/recordings', icon: Disc },
+      { nameKey: 'Voicemail', href: '/org/lemtel/admin/voicemail', icon: Voicemail },
+      { nameKey: 'Reports', href: '/org/lemtel/admin/reports', icon: BarChart3 },
+      { nameKey: 'Settings', href: '/org/lemtel/admin/settings', icon: Settings },
+      { nameKey: 'Downloads', href: '/org/lemtel/admin/downloads', icon: Smartphone },
+    ]
+  },
+  {
+    id: 'lemtel-my-v3',
+    labelKey: '🏠 My Workspace',
+    icon: Users,
+    lemtelOnly: true,
+    items: [
+      { nameKey: 'My Dashboard', href: '/org/lemtel/my/dashboard', icon: LayoutDashboard },
+      { nameKey: 'My Calls', href: '/org/lemtel/my/calls', icon: PhoneCall },
+      { nameKey: 'My Recordings', href: '/org/lemtel/my/recordings', icon: Disc },
+      { nameKey: 'My Voicemail', href: '/org/lemtel/my/voicemail', icon: Voicemail },
+      { nameKey: 'My SMS', href: '/org/lemtel/my/sms', icon: MessageSquare },
+      { nameKey: 'My Settings', href: '/org/lemtel/my/settings', icon: Sliders },
+      { nameKey: 'Download Apps', href: '/org/lemtel/my/downloads', icon: Smartphone },
+    ]
+  },
 ];
 
 export const settingsLink: NavItem = {

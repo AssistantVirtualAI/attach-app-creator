@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
+import { ActiveCallsGrid } from '@/components/portal/ActiveCallsGrid';
 
 const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 
@@ -110,6 +111,8 @@ export default function AdminDashboard() {
           )}
         </CardContent>
       </Card>
+
+      <ActiveCallsGrid canMonitor />
     </div>
   );
 }
