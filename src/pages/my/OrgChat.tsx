@@ -261,6 +261,11 @@ function MessageBubble({
             {msg.edited_at && <em className="ml-1">({t("edited", "modifié")})</em>}
           </span>
           <div className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1">
+            {onOpenThread && (
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onOpenThread} title={t("Reply in thread", "Répondre en fil")}>
+                <MessageSquare className="h-3 w-3" />
+              </Button>
+            )}
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setShowEmoji((s) => !s)}>
               <Smile className="h-3 w-3" />
             </Button>
@@ -272,6 +277,11 @@ function MessageBubble({
           </div>
         </div>
         {msg.content && <div className="text-sm whitespace-pre-wrap break-words">{msg.content}</div>}
+        {msg.reply_count > 0 && onOpenThread && (
+          <button onClick={onOpenThread} className="mt-1 text-xs text-primary hover:underline flex items-center gap-1">
+            <MessageSquare className="h-3 w-3" /> {msg.reply_count} {t("replies", "réponses")}
+          </button>
+        )}
         {(msg.attachments ?? []).map((a: any) => (
           <div key={a.path} className="mt-1">
             {a.mime?.startsWith("image/") && urls[a.path] ? (
