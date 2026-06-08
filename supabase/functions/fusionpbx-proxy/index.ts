@@ -252,6 +252,18 @@ Deno.serve(async (req) => {
       return json({ status: "ok", latency_ms: r.latency_ms, extensions_count: exts.length });
     }
 
+    // ---- GET single extension (full FusionPBX config) ----
+    if (action === "get-extension") {
+      const extUuid = params.extension_uuid || (body as any).extension_uuid;
+      if (!extUuid) return json({ error: "extension_uuid required" }, 400);
+      const r = await pbxFetch(`extensions/${extUuid}`);
+      if (!r.ok) return json({ error: "fetch failed", details: r }, r.status || 500);
+      const d: any = r.data;
+      const ext = d?.extensions?.[0] || d?.extension || d;
+      return json({ ok: true, extension: ext });
+    }
+
+
     // ---- LIST actions ----
     const listMap: Record<string, { path: string; key: string }> = {
       "list-extensions":    { path: `extensions?${domainQ}`,          key: "extensions" },
