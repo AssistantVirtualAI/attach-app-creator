@@ -78,7 +78,7 @@ export function useChatMessages(channelId: string | null) {
   }, [channelId]);
 
   const send = useMutation({
-    mutationFn: (p: { content: string; attachments?: any[] }) =>
+    mutationFn: (p: { content: string; attachments?: any[]; parent_message_id?: string | null }) =>
       invoke("send_message", { channel_id: channelId, ...p }),
   });
   const edit = useMutation({
