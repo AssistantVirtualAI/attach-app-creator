@@ -13,6 +13,7 @@ export interface LatestRelease {
   name: string;
   published_at: string;
   html_url: string;
+  body?: string;
   assets: ReleaseAsset[];
   urls: {
     mac_arm64?: string;
