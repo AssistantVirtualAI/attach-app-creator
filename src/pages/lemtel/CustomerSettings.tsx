@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Palette, Phone, Users, CreditCard, Save } from "lucide-react";
+import { Palette, Phone, Users, CreditCard, Save, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { InviteUserDialog } from "@/components/portal/InviteUserDialog";
 
 export default function CustomerSettings() {
   const { slug } = useParams();
@@ -28,6 +29,7 @@ export default function CustomerSettings() {
   const [brandLogo, setBrandLogo] = useState("");
   const [brandColor, setBrandColor] = useState("#0023e6");
   const [supportEmail, setSupportEmail] = useState("");
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   useEffect(() => {
     if (org) {
@@ -122,26 +124,44 @@ export default function CustomerSettings() {
 
         <TabsContent value="users">
           <Card>
-            <CardHeader><CardTitle>Team members ({members.length})</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Team members ({members.length})</CardTitle>
+              <Button size="sm" onClick={() => setInviteOpen(true)} disabled={!org?.id}>
+                <UserPlus className="h-4 w-4 mr-1" /> Invite user
+              </Button>
+            </CardHeader>
             <CardContent>
               {members.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No members yet. Use the user provisioning flow to add one.</p>
+                <p className="text-sm text-muted-foreground">No members yet. Click "Invite user" to add one.</p>
               ) : (
                 <table className="w-full text-sm">
-                  <thead className="border-b"><tr className="text-left"><th className="p-2">User</th><th className="p-2">Role</th></tr></thead>
+                  <thead className="border-b"><tr className="text-left"><th className="p-2">User</th><th className="p-2">Role</th><th className="p-2">Permissions</th></tr></thead>
                   <tbody>
-                    {members.map((m: any) => (
-                      <tr key={m.id} className="border-b">
-                        <td className="p-2 font-mono text-xs">{m.user_id?.slice(0, 12)}</td>
-                        <td className="p-2"><Badge variant="outline">{m.role}</Badge></td>
-                      </tr>
-                    ))}
+                    {members.map((m: any) => {
+                      const perms = Object.entries(m).filter(([k, v]) => k.startsWith("can_") && v === true).map(([k]) => k.replace("can_", ""));
+                      return (
+                        <tr key={m.id} className="border-b">
+                          <td className="p-2 font-mono text-xs">{m.user_id?.slice(0, 12)}</td>
+                          <td className="p-2"><Badge variant="outline">{m.role}</Badge></td>
+                          <td className="p-2 text-xs">{perms.length ? perms.join(", ") : <span className="text-muted-foreground">—</span>}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
             </CardContent>
           </Card>
+          {org?.id && (
+            <InviteUserDialog
+              open={inviteOpen}
+              onOpenChange={setInviteOpen}
+              organizationId={org.id}
+              onInvited={() => qc.invalidateQueries({ queryKey: ["org-members-list", org.id] })}
+            />
+          )}
         </TabsContent>
+
 
         <TabsContent value="billing">
           <Card>
