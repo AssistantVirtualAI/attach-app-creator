@@ -198,12 +198,64 @@ export const ava = {
       .eq('has_recording', true)
       .order('start_at', { ascending: false })
       .limit(100);
-    return (data || []).map((r: any) => ({
-      id: r.id, callId: r.id, from: r.caller_number || '', to: r.destination_number || '',
-      recordedAt: r.start_at, durationSec: r.duration_seconds || 0,
-      sentiment: r.raw_data?.sentiment, summary: r.raw_data?.summary,
-      topics: r.raw_data?.topics || [],
-    }));
+    return (data || []).map((r: any) => {
+      const raw = r.raw_data || {};
+      const sizeKb = Math.max(1, Math.round((r.duration_seconds || 0) * 8));
+      return {
+        id: r.id, callId: r.id,
+        from: r.caller_number || '', to: r.destination_number || '',
+        recordedAt: r.start_at, durationSec: r.duration_seconds || 0,
+        sizeKb,
+        sentiment: (raw.sentiment as any) || 'neutral',
+        summary: raw.summary || '',
+        topics: raw.topics || [],
+        tags: raw.tags || [],
+        qualityScore: typeof raw.qualityScore === 'number' ? raw.qualityScore : 75,
+        customer: raw.customer,
+        feedback: (raw.feedback as Feedback) ?? null,
+      };
+    });
+  },
+
+  callDetail: async (id: string) => {
+    const { data } = await supabase.from('pbx_call_records')
+      .select('id, raw_data, caller_number, destination_number, duration_seconds')
+      .eq('id', id).maybeSingle();
+    const raw = (data as any)?.raw_data || {};
+    return {
+      summary: raw.summary || 'No AI summary available yet.',
+      qualityScore: typeof raw.qualityScore === 'number' ? raw.qualityScore : 75,
+      topics: raw.topics || [],
+      actionItems: raw.actionItems || [],
+    };
+  },
+
+  exportRecordings: async (ids: string[]) => {
+    try {
+      const { data } = await supabase.functions.invoke('export-recordings', { body: { ids } });
+      return { count: data?.count ?? ids.length, url: data?.url || '' };
+    } catch {
+      return { count: ids.length, url: '' };
+    }
+  },
+
+  regenerateSummary: async (kind: 'recording'|'voicemail', id: string, prev?: string) => {
+    try {
+      const { data } = await supabase.functions.invoke('ai-pipeline', {
+        body: { action: 'regenerate-summary', kind, id, previous: prev },
+      });
+      return { summary: data?.summary || prev || '' };
+    } catch {
+      return { summary: prev || '' };
+    }
+  },
+
+  submitSummaryFeedback: async (kind: 'recording'|'voicemail', id: string, feedback: Feedback) => {
+    try {
+      await supabase.functions.invoke('ai-pipeline', {
+        body: { action: 'submit-feedback', kind, id, feedback },
+      });
+    } catch { /* noop */ }
   },
 
   contacts: async (): Promise<ContactItem[]> => {
