@@ -506,6 +506,38 @@ Deno.serve(async (req) => {
     }
     if (action === "create-queue") return json(await writeCollection("call_center_queues", "call_center_queues", params));
     if (action === "update-queue") return json(await writeCollection("call_center_queues", "call_center_queues", params));
+    if (action === "delete-queue") {
+      const id = params.call_center_queue_uuid || params.queue_uuid;
+      if (!id) return json({ error: "call_center_queue_uuid required" }, 400);
+      return json(await pbxWrite(`call_center_queues/${id}`, "DELETE"));
+    }
+    if (action === "list-queue-tiers") {
+      const r = await pbxFetch(`call_center_tiers?${domainQ}`);
+      if (!r.ok) return json(r, r.status || 500);
+      return json({ ok: true, data: collection(r.data, "call_center_tiers"), latency_ms: r.latency_ms });
+    }
+    if (action === "add-queue-tier" || action === "update-queue-tier") {
+      // tier links an agent to a queue with a level (1=supervisor priority) and position
+      return json(await writeCollection("call_center_tiers", "call_center_tiers", params));
+    }
+    if (action === "remove-queue-tier") {
+      const id = params.call_center_tier_uuid || params.tier_uuid;
+      if (!id) return json({ error: "call_center_tier_uuid required" }, 400);
+      return json(await pbxWrite(`call_center_tiers/${id}`, "DELETE"));
+    }
+    if (action === "list-queue-agents") {
+      const r = await pbxFetch(`call_center_agents?${domainQ}`);
+      if (!r.ok) return json(r, r.status || 500);
+      return json({ ok: true, data: collection(r.data, "call_center_agents"), latency_ms: r.latency_ms });
+    }
+    if (action === "create-queue-agent" || action === "update-queue-agent") {
+      return json(await writeCollection("call_center_agents", "call_center_agents", params));
+    }
+    if (action === "delete-queue-agent") {
+      const id = params.call_center_agent_uuid || params.agent_uuid;
+      if (!id) return json({ error: "call_center_agent_uuid required" }, 400);
+      return json(await pbxWrite(`call_center_agents/${id}`, "DELETE"));
+    }
     if (action === "create-ring-group") return json(await writeCollection("ring_groups", "ring_groups", params));
 
     // ---- CDR endpoint fallback helper ----
