@@ -20,10 +20,9 @@ export default function BusinessHours() {
   const { data: org } = useQuery({
     queryKey: ["org", slug],
     queryFn: async () => {
-      const { data } = await supabase.from("organizations").select("id,name").eq("slug", slug!).maybeSingle();
+      const { data } = await supabase.from("organizations").select("id,name").eq("slug", slug ?? "lemtel").maybeSingle();
       return data as any;
     },
-    enabled: !!slug,
   });
 
   const { data: row } = useQuery({
@@ -61,15 +60,13 @@ export default function BusinessHours() {
     if (!org?.id) return;
     setSaving(true);
     try {
-      // Push to FusionPBX
       const { data: pbx, error: pbxErr } = await supabase.functions.invoke("fusionpbx-proxy", {
         body: {
           action: "upsert-time-condition",
           organization_id: org.id,
           params: {
             name, schedule: slots,
-            open_destination: openDest,
-            closed_destination: closedDest,
+            open_destination: openDest, closed_destination: closedDest,
             dialplan_uuid: row?.fusionpbx_dialplan_uuid || undefined,
           },
         },
@@ -77,7 +74,7 @@ export default function BusinessHours() {
       if (pbxErr) throw pbxErr;
       const dpUuid = (pbx as any)?.dialplan_uuid;
 
-      const payload = {
+      const payload: any = {
         organization_id: org.id, name, timezone: tz,
         schedule: slots, open_destination: openDest, closed_destination: closedDest,
         fusionpbx_dialplan_uuid: dpUuid,
@@ -106,14 +103,8 @@ export default function BusinessHours() {
         <CardHeader><CardTitle>Schedule</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Name</Label>
-              <Input value={name} onChange={e => setName(e.target.value)} />
-            </div>
-            <div>
-              <Label>Timezone</Label>
-              <Input value={tz} onChange={e => setTz(e.target.value)} placeholder="America/Toronto" />
-            </div>
+            <div><Label>Name</Label><Input value={name} onChange={e => setName(e.target.value)} /></div>
+            <div><Label>Timezone</Label><Input value={tz} onChange={e => setTz(e.target.value)} placeholder="America/Toronto" /></div>
           </div>
 
           <div className="space-y-2">
@@ -126,14 +117,10 @@ export default function BusinessHours() {
                     {DAYS.map((d, idx) => <option key={idx} value={idx}>{d}</option>)}
                   </select>
                 </div>
-                <div className="flex-1">
-                  <Label>Open</Label>
-                  <Input type="time" value={s.start} onChange={e => updateSlot(i, { start: e.target.value })} />
-                </div>
-                <div className="flex-1">
-                  <Label>Close</Label>
-                  <Input type="time" value={s.end} onChange={e => updateSlot(i, { end: e.target.value })} />
-                </div>
+                <div className="flex-1"><Label>Open</Label>
+                  <Input type="time" value={s.start} onChange={e => updateSlot(i, { start: e.target.value })} /></div>
+                <div className="flex-1"><Label>Close</Label>
+                  <Input type="time" value={s.end} onChange={e => updateSlot(i, { end: e.target.value })} /></div>
                 <Button size="icon" variant="ghost" onClick={() => setSlots(slots.filter((_, k) => k !== i))}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -146,14 +133,10 @@ export default function BusinessHours() {
           </div>
 
           <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-            <div>
-              <Label>Open destination (extension / queue)</Label>
-              <Input value={openDest} onChange={e => setOpenDest(e.target.value)} placeholder="100" />
-            </div>
-            <div>
-              <Label>Closed destination (voicemail / IVR)</Label>
-              <Input value={closedDest} onChange={e => setClosedDest(e.target.value)} placeholder="*99100" />
-            </div>
+            <div><Label>Open destination</Label>
+              <Input value={openDest} onChange={e => setOpenDest(e.target.value)} placeholder="100" /></div>
+            <div><Label>Closed destination</Label>
+              <Input value={closedDest} onChange={e => setClosedDest(e.target.value)} placeholder="*99100" /></div>
           </div>
 
           <Button onClick={save} disabled={saving}>
