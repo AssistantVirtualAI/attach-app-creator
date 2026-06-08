@@ -95,6 +95,7 @@ import LemtelExtensions from "./pages/lemtel/LemtelExtensions";
 import LemtelDIDs from "./pages/lemtel/LemtelDIDs";
 import LemtelQueues from "./pages/lemtel/LemtelQueues";
 import LemtelIVR from "./pages/lemtel/LemtelIVR";
+import BusinessHours from "./pages/lemtel/BusinessHours";
 import LemtelVoiceAgents from "./pages/lemtel/LemtelVoiceAgents";
 import LemtelSoftphoneUsers from "./pages/lemtel/LemtelSoftphoneUsers";
 import LemtelDevices from "./pages/lemtel/LemtelDevices";
@@ -587,6 +588,8 @@ const App = () => (
                 <Route path="/org/lemtel/admin/devices" element={<ProtectedRoute><LemtelGuard><AdminPortalLayout><LemtelDevices /></AdminPortalLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/admin/ivr" element={<ProtectedRoute><LemtelGuard><AdminPortalLayout><LemtelIVR /></AdminPortalLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/admin/queues" element={<ProtectedRoute><LemtelGuard><AdminPortalLayout><LemtelQueues /></AdminPortalLayout></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/admin/hours" element={<ProtectedRoute><LemtelGuard><AdminPortalLayout><BusinessHours /></AdminPortalLayout></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/:slug/admin/hours" element={<ProtectedRoute><AdminPortalLayout><BusinessHours /></AdminPortalLayout></ProtectedRoute>} />
                 <Route path="/org/lemtel/admin/ring-groups" element={<ProtectedRoute><LemtelGuard><AdminPortalLayout><TelephonyRingGroups /></AdminPortalLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/admin/recordings" element={<ProtectedRoute><LemtelGuard><AdminPortalLayout><AdminRecordings /></AdminPortalLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/admin/voicemail" element={<ProtectedRoute><LemtelGuard><AdminPortalLayout><AdminVoicemail /></AdminPortalLayout></LemtelGuard></ProtectedRoute>} />
