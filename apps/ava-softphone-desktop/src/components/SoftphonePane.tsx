@@ -16,6 +16,12 @@ import {
 } from './TabIcons';
 import OutputDevicePicker from './OutputDevicePicker';
 import { watchA11y } from '../lib/a11yAudit';
+import pkg from '../../package.json';
+
+const APP_VERSION: string =
+  (typeof window !== 'undefined' && (window as any).electronAPI?.getVersion?.()) ||
+  (pkg as { version?: string }).version ||
+  '2.1.1';
 
 interface Creds {
   extension: string;
