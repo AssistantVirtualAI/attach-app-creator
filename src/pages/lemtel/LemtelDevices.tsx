@@ -101,8 +101,10 @@ export default function LemtelDevices() {
 function DeviceDialog({ mode, device, extensions, trigger }:
   { mode: 'create' | 'edit'; device?: Device; extensions: any[]; trigger: React.ReactNode }) {
   const qc = useQueryClient();
+  const { data: catalog } = usePbxDeviceCatalog();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [provisioning, setProvisioning] = useState<null | { mac: string; ext?: string; params: any }>(null);
   const [form, setForm] = useState({
     label: device?.label || '',
     mac: device?.mac_address || '',
@@ -113,7 +115,14 @@ function DeviceDialog({ mode, device, extensions, trigger }:
     enabled: device?.enabled ?? true,
   });
 
-  const models = useMemo(() => PBX_DEVICE_BRANDS[form.vendor] || [], [form.vendor]);
+  const vendors = catalog?.vendors?.length ? catalog.vendors : Object.keys(PBX_DEVICE_BRANDS);
+  const models = useMemo(() => {
+    if (catalog?.modelsByVendor[form.vendor]) return catalog.modelsByVendor[form.vendor];
+    return (PBX_DEVICE_BRANDS[form.vendor] || []).map((m) => ({
+      model: m,
+      template: `${form.vendor.toLowerCase().split('/')[0]}/${m}`,
+    }));
+  }, [catalog, form.vendor]);
 
   const submit = async () => {
     const macClean = form.mac.replace(/[^0-9a-fA-F]/g, '').toLowerCase();
@@ -121,116 +130,146 @@ function DeviceDialog({ mode, device, extensions, trigger }:
       toast.error('MAC must be 12 hex characters');
       return;
     }
-    setBusy(true);
-    try {
-      const action = mode === 'create' ? 'create-device' : 'update-device';
-      const params: any = {
-        device_label: form.label || macClean,
-        device_mac_address: macClean,
-        device_vendor: form.vendor,
-        device_model: form.model,
-        device_template: form.template || `${form.vendor.toLowerCase()}/${form.model}`,
-        device_enabled: form.enabled ? 'true' : 'false',
-      };
-      if (form.extension) {
-        const ext = (extensions as any[]).find((e) => e.extension === form.extension);
-        if (ext?.pbx_uuid) params.device_user_uuid = ext.pbx_uuid;
-        params.device_user_extension = form.extension;
-      }
-      if (mode === 'edit') params.device_uuid = device.pbx_uuid;
-
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { organization_id: LEMTEL_ORG, action, params },
-      });
-      if (error) throw error;
-      if (data?.ok === false || data?.error) throw new Error(data?.message || data?.error || 'FusionPBX error');
-
-      // Pull fresh device list from PBX
-      await supabase.functions.invoke('realtime-sync', { body: { organizationId: LEMTEL_ORG, kind: 'devices' } });
-      qc.invalidateQueries({ queryKey: ['pbx'] });
-      toast.success(mode === 'create' ? 'Device created' : 'Device updated');
-      setOpen(false);
-    } catch (e: any) {
-      toast.error(e.message || 'Failed');
-    } finally {
-      setBusy(false);
+    const tplGuess = models.find((m) => m.model === form.model)?.template
+      || `${form.vendor.toLowerCase().split('/')[0]}/${form.model}`;
+    const params: any = {
+      device_label: form.label || macClean,
+      device_mac_address: macClean,
+      device_vendor: form.vendor,
+      device_model: form.model,
+      device_template: form.template || tplGuess,
+      device_enabled: form.enabled ? 'true' : 'false',
+    };
+    if (form.extension) {
+      const ext = (extensions as any[]).find((e) => e.extension === form.extension);
+      if (ext?.pbx_uuid) params.device_user_uuid = ext.pbx_uuid;
+      params.device_user_extension = form.extension;
     }
+
+    if (mode === 'edit') {
+      setBusy(true);
+      try {
+        params.device_uuid = device.pbx_uuid;
+        const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+          body: { organization_id: LEMTEL_ORG, action: 'update-device', params },
+        });
+        if (error) throw error;
+        if (data?.ok === false) throw new Error(data?.message || 'FusionPBX error');
+        await supabase.functions.invoke('realtime-sync', {
+          body: { organizationId: LEMTEL_ORG, kind: 'devices' },
+        });
+        qc.invalidateQueries({ queryKey: ['pbx'] });
+        toast.success('Device updated');
+        setOpen(false);
+      } catch (e: any) {
+        toast.error(e.message || 'Failed');
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    // create → launch provisioning panel
+    setProvisioning({ mac: macClean, ext: form.extension, params });
+  };
+
+  const onPanelDone = () => {
+    qc.invalidateQueries({ queryKey: ['pbx'] });
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setProvisioning(null); }}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? 'Provision new device' : `Edit ${device?.label || device?.mac_address}`}</DialogTitle>
-          <DialogDescription>Provisioning is pushed live to FusionPBX. Compatible vendors are loaded from the device catalog.</DialogDescription>
+          <DialogDescription>
+            {catalog?.live ? 'Compatible models loaded live from FusionPBX.' : 'Using built-in device catalog (FusionPBX catalog unreachable).'}
+          </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2">
-            <Label>Label</Label>
-            <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Reception phone" />
+        {provisioning ? (
+          <DeviceProvisioningPanel
+            mac={provisioning.mac}
+            extension={provisioning.ext}
+            createParams={provisioning.params}
+            onDone={onPanelDone}
+          />
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <Label>Label</Label>
+              <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Reception phone" />
+            </div>
+            <div className="col-span-2">
+              <Label>MAC address</Label>
+              <Input
+                value={form.mac}
+                onChange={(e) => setForm({ ...form, mac: formatMac(e.target.value) })}
+                placeholder="aa:bb:cc:dd:ee:ff"
+                className="font-mono"
+              />
+            </div>
+            <div>
+              <Label>Vendor</Label>
+              <Select value={form.vendor} onValueChange={(v) => setForm({ ...form, vendor: v, model: '', template: '' })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {vendors.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Model</Label>
+              <Select value={form.model} onValueChange={(v) => {
+                const tpl = models.find((m) => m.model === v)?.template || '';
+                setForm({ ...form, model: v, template: tpl });
+              }}>
+                <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectContent>
+                  {models.map((m) => <SelectItem key={m.model} value={m.model}>{m.model}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2">
+              <Label>Assigned extension</Label>
+              <Select value={form.extension || 'none'} onValueChange={(v) => setForm({ ...form, extension: v === 'none' ? '' : v })}>
+                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— None —</SelectItem>
+                  {(extensions as any[]).map((e: any) => (
+                    <SelectItem key={e.id} value={e.extension}>
+                      {e.extension}{e.display_name ? ` · ${e.display_name}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2">
+              <Label>Template override (optional)</Label>
+              <Input
+                value={form.template}
+                onChange={(e) => setForm({ ...form, template: e.target.value })}
+                placeholder={`${form.vendor.toLowerCase().split('/')[0]}/${form.model || 'auto'}`}
+                className="font-mono text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-2 col-span-2">
+              <Switch checked={form.enabled} onCheckedChange={(v) => setForm({ ...form, enabled: v })} />
+              <Label>Enabled</Label>
+            </div>
           </div>
-          <div className="col-span-2">
-            <Label>MAC address</Label>
-            <Input
-              value={form.mac}
-              onChange={(e) => setForm({ ...form, mac: formatMac(e.target.value) })}
-              placeholder="aa:bb:cc:dd:ee:ff"
-              className="font-mono"
-            />
-          </div>
-          <div>
-            <Label>Vendor</Label>
-            <Select value={form.vendor} onValueChange={(v) => setForm({ ...form, vendor: v, model: '' })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {Object.keys(PBX_DEVICE_BRANDS).map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Model</Label>
-            <Select value={form.model} onValueChange={(v) => setForm({ ...form, model: v })}>
-              <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
-              <SelectContent>
-                {models.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="col-span-2">
-            <Label>Assigned extension</Label>
-            <Select value={form.extension || 'none'} onValueChange={(v) => setForm({ ...form, extension: v === 'none' ? '' : v })}>
-              <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">— None —</SelectItem>
-                {(extensions as any[]).map((e: any) => (
-                  <SelectItem key={e.id} value={e.extension}>
-                    {e.extension}{e.display_name ? ` · ${e.display_name}` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="col-span-2">
-            <Label>Template override (optional)</Label>
-            <Input
-              value={form.template}
-              onChange={(e) => setForm({ ...form, template: e.target.value })}
-              placeholder={`${form.vendor.toLowerCase()}/${form.model || 'auto'}`}
-              className="font-mono text-xs"
-            />
-          </div>
-          <div className="flex items-center gap-2 col-span-2">
-            <Switch checked={form.enabled} onCheckedChange={(v) => setForm({ ...form, enabled: v })} />
-            <Label>Enabled</Label>
-          </div>
-        </div>
+        )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={submit} disabled={busy || !form.mac || !form.model}>
-            {busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {mode === 'create' ? 'Provision' : 'Save'}
-          </Button>
+          {provisioning ? (
+            <Button onClick={() => setOpen(false)}>Done</Button>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button onClick={submit} disabled={busy || !form.mac || !form.model}>
+                {busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {mode === 'create' ? 'Provision' : 'Save'}
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
