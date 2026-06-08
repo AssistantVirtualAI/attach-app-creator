@@ -83,9 +83,27 @@ serve(async (req) => {
     }
 
 
-    // Generate OTP code
+    // Generate OTP code and persist a hashed copy for server-side verification
     const otpCode = generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+    const codeHash = await sha256Hex(`${otpCode}:${organizationId}:${email.toLowerCase()}`);
+    // Invalidate any previous unused OTPs for the same email/org
+    await supabase
+      .from("two_factor_otps")
+      .update({ consumed_at: new Date().toISOString() })
+      .eq("email", email.toLowerCase())
+      .eq("organization_id", organizationId)
+      .is("consumed_at", null);
+    const { error: otpInsertErr } = await supabase.from("two_factor_otps").insert({
+      email: email.toLowerCase(),
+      organization_id: organizationId,
+      code_hash: codeHash,
+      expires_at: expiresAt.toISOString(),
+    });
+    if (otpInsertErr) {
+      console.error("Failed to persist OTP hash:", otpInsertErr);
+      throw new Error("Failed to issue OTP");
+    }
 
     // Get the 2FA email template for the organization
     const { data: template } = await supabase
