@@ -6,12 +6,11 @@ import { useAuth } from "@/hooks/useAuth";
 type Portal = "platform" | "customer" | "my";
 
 /**
- * Enforces strict role separation between portals.
+ * Enforces role separation between portals.
  *  - platform: super_admin or master_admin only
  *  - customer: org_admin / reseller_admin / manager (or higher)
  *  - my: any authenticated user
- *
- * Unauthorized users are redirected to the portal they DO have access to.
+ * Wrong-role users get redirected to the portal they DO have access to.
  */
 export function RolePortalGuard({ portal, children }: { portal: Portal; children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -23,14 +22,13 @@ export function RolePortalGuard({ portal, children }: { portal: Portal; children
     (async () => {
       try {
         const { data: isSuper } = await supabase.rpc("is_super_admin", { _user_id: user.id });
-        let isMaster = false;
         const { data: masterRow } = await supabase
           .from("org_members")
           .select("role")
           .eq("user_id", user.id)
           .eq("role", "master_admin")
           .maybeSingle();
-        isMaster = !!masterRow;
+        const isMaster = !!masterRow;
 
         const { data: roles } = await supabase
           .from("user_roles")

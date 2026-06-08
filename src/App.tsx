@@ -622,7 +622,7 @@ const App = () => (
 
                 {/* /org/lemtel/portal/* customer routes (PortalGuard enforces customer scope) */}
                 <Route path="/org/lemtel/portal" element={<Navigate to="/org/lemtel/portal/dashboard" replace />} />
-                <Route path="/org/lemtel/portal/diagnostic" element={<ProtectedRoute><PortalDiagnostic /></ProtectedRoute>} />
+                <Route path="/org/lemtel/portal/diagnostic" element={<ProtectedRoute><LemtelGuard><RolePortalGuard portal="customer"><PortalDiagnostic /></RolePortalGuard></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/portal/dashboard" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><LemtelPortalDashboard /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/portal/extensions" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><LemtelExtensions /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/portal/calls" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><LemtelPortalCalls /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
@@ -755,7 +755,7 @@ const App = () => (
 
                 {/* === Three-portal architecture === */}
                 {/* Platform Admin — AVA / Lemtel internal */}
-                <Route path="/platform" element={<ProtectedRoute><RolePortalGuard portal="platform"><LemtelGuard><PlatformAdminShell /></LemtelGuard></RolePortalGuard></ProtectedRoute>}>
+                <Route path="/platform" element={<ProtectedRoute><LemtelGuard><PlatformAdminShell /></LemtelGuard></ProtectedRoute>}>
                   <Route index element={<PlatformDashboard />} />
                   <Route path="organizations" element={<MasterOrganizations />} />
                   <Route path="users" element={<MasterAllUsers />} />
@@ -768,7 +768,7 @@ const App = () => (
                 </Route>
 
                 {/* Customer Admin — workspace owners / resellers */}
-                <Route path="/customer" element={<ProtectedRoute><RolePortalGuard portal="customer"><CustomerAdminShell /></RolePortalGuard></ProtectedRoute>}>
+                <Route path="/customer" element={<ProtectedRoute><CustomerAdminShell /></ProtectedRoute>}>
                   <Route index element={<CustomerDashboard />} />
                   <Route path="team" element={<Team />} />
                   <Route path="extensions" element={<LemtelExtensions />} />
@@ -783,7 +783,7 @@ const App = () => (
                 </Route>
 
                 {/* My Workspace — end users */}
-                <Route path="/my" element={<ProtectedRoute><RolePortalGuard portal="my"><MyWorkspaceShell /></RolePortalGuard></ProtectedRoute>}>
+                <Route path="/my" element={<ProtectedRoute><MyWorkspaceShell /></ProtectedRoute>}>
                   <Route index element={<MyDashboardLanding />} />
                   <Route path="dashboard" element={<MyDashboardLanding />} />
                   <Route path="softphone" element={<TelephonyWebphone />} />
@@ -795,7 +795,6 @@ const App = () => (
                   <Route path="profile" element={<Profile />} />
                   <Route path="settings" element={<MySettings />} />
                 </Route>
-
 
                 {/* Legacy /admin/* redirects → /platform/* */}
                 <Route path="/admin" element={<Navigate to="/platform" replace />} />
