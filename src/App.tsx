@@ -11,7 +11,7 @@ import { ClientProvider } from "@/context/ClientContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AppErrorBoundary } from "@/components/errors/AppErrorBoundary";
 
-import Landing from "./pages/Landing";
+import Landing from "./pages/LandingPage";
 import AuthPage from "./pages/Auth";
 import AgencyHome from "./pages/AgencyHome";
 import PostLoginRedirect from "./pages/PostLoginRedirect";
