@@ -11,7 +11,7 @@ import { ClientProvider } from "@/context/ClientContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AppErrorBoundary } from "@/components/errors/AppErrorBoundary";
 
-import Landing from "./pages/Landing";
+import Landing from "./pages/LandingPage";
 import AuthPage from "./pages/Auth";
 import AgencyHome from "./pages/AgencyHome";
 import PostLoginRedirect from "./pages/PostLoginRedirect";
@@ -237,6 +237,8 @@ const App = () => (
 
                 {/* Public download page */}
                 <Route path="/download" element={<Download />} />
+                <Route path="/my/download" element={<Download />} />
+                <Route path="/org/:slug/downloads" element={<Download />} />
                 
                 {/* Universal login - redirects based on user type */}
                 <Route path="/login" element={<UniversalLogin />} />
