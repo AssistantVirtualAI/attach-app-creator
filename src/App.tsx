@@ -601,6 +601,7 @@ const App = () => (
                 <Route path="/org/lemtel/my/voicemail" element={<ProtectedRoute><LemtelGuard><UserPortalLayout><AdminVoicemail scope="mine" /></UserPortalLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/my/sms" element={<ProtectedRoute><LemtelGuard><UserPortalLayout><LemtelMessages /></UserPortalLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/my/settings" element={<ProtectedRoute><LemtelGuard><UserPortalLayout><MySettings /></UserPortalLayout></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/my/extension" element={<ProtectedRoute><LemtelGuard><UserPortalLayout><MyExtension /></UserPortalLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/my/downloads" element={<ProtectedRoute><LemtelGuard><UserPortalLayout><DownloadCenter personalize /></UserPortalLayout></LemtelGuard></ProtectedRoute>} />
 
                 {/* /org/lemtel/portal/* customer routes (PortalGuard enforces customer scope) */}
