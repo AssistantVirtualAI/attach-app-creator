@@ -428,7 +428,179 @@ Deno.serve(async (req) => {
         voicemail_result: voicemailResult,
       }, 200);
     }
-    if (action === "update-extension") return json(await writeCollection("extensions", "extensions", params), 200);
+    if (action === "update-extension") {
+      const extData = (body.data?.extensions?.[0]) || params || {};
+      const extUuid = extData.extension_uuid;
+      if (!extUuid) return json({ error: "extension_uuid required" }, 400);
+
+      // FusionPBX PUT to /app/api/7/extensions/{uuid}
+      const url = new URL(`${FUSIONPBX_API_URL}/app/api/7/extensions/${extUuid}`);
+      url.searchParams.set("key", FUSIONPBX_API_KEY);
+      url.searchParams.set("username", FUSIONPBX_USERNAME);
+
+      const requestBody = {
+        extensions: [{
+          ...extData,
+          domain_uuid: extData.domain_uuid || FUSIONPBX_DOMAIN_UUID,
+          user_context: extData.user_context || "lemtel.lemtel.tel",
+          accountcode: extData.accountcode || "lemtel.lemtel.tel",
+        }],
+      };
+
+      let res: Response;
+      try {
+        res = await fetch(url.toString(), {
+          method: "PUT",
+          headers: {
+            Authorization: basicHeader,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+      } catch (e: any) {
+        return json({ error: "FUSIONPBX_UNREACHABLE", message: e?.message || String(e) }, 200);
+      }
+      const responseText = await res.text();
+      let responseData: any = {};
+      try { responseData = JSON.parse(responseText); } catch { responseData = { raw: responseText }; }
+      const embeddedCode = responseData?.code || responseData?.details?.[0]?.code;
+      const failed = !res.ok || (embeddedCode && String(embeddedCode) !== "200");
+      if (failed) {
+        return json({ error: "UPDATE_FAILED", status: res.status, details: responseData }, 200);
+      }
+
+      // Mirror to Supabase pbx_extensions
+      const dbUpdate: Record<string, any> = {
+        extension: extData.extension,
+        password: extData.password,
+        effective_cid_name: extData.effective_caller_id_name,
+        effective_cid_number: extData.effective_caller_id_number,
+        outbound_cid_name: extData.outbound_caller_id_name,
+        outbound_cid_number: extData.outbound_caller_id_number,
+        emergency_cid_name: extData.emergency_caller_id_name,
+        emergency_cid_number: extData.emergency_caller_id_number,
+        directory_first_name: extData.directory_first_name,
+        directory_last_name: extData.directory_last_name,
+        directory_visible: extData.directory_visible === true || extData.directory_visible === "true",
+        directory_exten_visible: extData.directory_exten_visible === true || extData.directory_exten_visible === "true",
+        call_timeout: extData.call_timeout ? parseInt(String(extData.call_timeout)) : null,
+        call_group: extData.call_group,
+        call_screen: extData.call_screen_enabled === true || extData.call_screen_enabled === "true",
+        hold_music: extData.hold_music,
+        extension_language: extData.extension_language,
+        extension_dialect: extData.extension_dialect,
+        extension_voice: extData.extension_voice,
+        extension_type: extData.extension_type,
+        accountcode: extData.accountcode,
+        limit_max: extData.limit_max ? String(extData.limit_max) : null,
+        limit_destination: extData.limit_destination,
+        max_registrations: extData.max_registrations ? parseInt(String(extData.max_registrations)) : null,
+        voicemail_enabled: extData.voicemail_enabled === true || extData.voicemail_enabled === "true",
+        voicemail_mail_to: extData.voicemail_mail_to,
+        do_not_disturb: extData.do_not_disturb === true || extData.do_not_disturb === "true",
+        forward_all_enabled: extData.forward_all_enabled === true || extData.forward_all_enabled === "true",
+        forward_all_destination: extData.forward_all_destination,
+        forward_busy_enabled: extData.forward_busy_enabled === true || extData.forward_busy_enabled === "true",
+        forward_busy_destination: extData.forward_busy_destination,
+        forward_no_answer_enabled: extData.forward_no_answer_enabled === true || extData.forward_no_answer_enabled === "true",
+        forward_no_answer_destination: extData.forward_no_answer_destination,
+        forward_user_not_registered_enabled: extData.forward_user_not_registered_enabled === true || extData.forward_user_not_registered_enabled === "true",
+        forward_user_not_registered_destination: extData.forward_user_not_registered_destination,
+        user_record: extData.user_record,
+        absolute_codec_string: extData.absolute_codec_string,
+        sip_bypass_media: extData.sip_bypass_media,
+        force_ping: extData.force_ping === true || extData.force_ping === "true",
+        sip_force_contact: extData.sip_force_contact,
+        sip_force_expires: extData.sip_force_expires ? parseInt(String(extData.sip_force_expires)) : null,
+        cidr: extData.cidr,
+        auth_acl: extData.auth_acl,
+        toll_allow: extData.toll_allow,
+        missed_call_app: extData.missed_call_app,
+        missed_call_data: extData.missed_call_data,
+        enabled: extData.enabled === true || extData.enabled === "true",
+        description: extData.description,
+        synced_at: new Date().toISOString(),
+        raw_data: responseData,
+      };
+      // Strip undefined to avoid clobbering with nulls
+      Object.keys(dbUpdate).forEach((k) => dbUpdate[k] === undefined && delete dbUpdate[k]);
+
+      const { error: updErr } = await admin
+        .from("pbx_extensions")
+        .update(dbUpdate)
+        .eq("pbx_uuid", extUuid);
+      if (updErr) console.error("pbx_extensions update error", updErr);
+
+      if (extData.password) {
+        await admin
+          .from("pbx_softphone_users")
+          .update({ sip_password: extData.password })
+          .eq("extension", String(extData.extension));
+      }
+
+      await admin.from("audit_logs").insert({
+        organization_id,
+        user_id: userId,
+        action: "extension_updated",
+        resource_type: "pbx_extension",
+        resource_id: String(extData.extension ?? extUuid),
+        metadata: { extension: extData.extension, fields_updated: Object.keys(extData) },
+      });
+
+      return json({ success: true, extension: extData.extension, fusionpbx_response: responseData }, 200);
+    }
+
+    if (action === "sync-extensions") {
+      const r = await pbxFetch(`extensions?${domainQ}`);
+      if (!r.ok) return json(r, r.status || 500);
+      const exts = collection(r.data, "extensions");
+      let upserts = 0;
+      for (const e of exts) {
+        const row = {
+          ...mapExtension(e),
+          password: e.password ?? null,
+          accountcode: e.accountcode ?? null,
+          outbound_cid_name: e.outbound_caller_id_name ?? null,
+          outbound_cid_number: e.outbound_caller_id_number ?? null,
+          emergency_cid_name: e.emergency_caller_id_name ?? null,
+          emergency_cid_number: e.emergency_caller_id_number ?? null,
+          directory_first_name: e.directory_first_name ?? null,
+          directory_last_name: e.directory_last_name ?? null,
+          directory_visible: e.directory_visible === "true" || e.directory_visible === true,
+          directory_exten_visible: e.directory_exten_visible === "true" || e.directory_exten_visible === true,
+          call_timeout: e.call_timeout ? parseInt(String(e.call_timeout)) : null,
+          hold_music: e.hold_music ?? null,
+          extension_language: e.extension_language ?? null,
+          extension_dialect: e.extension_dialect ?? null,
+          extension_voice: e.extension_voice ?? null,
+          extension_type: e.extension_type ?? null,
+          limit_max: e.limit_max ?? null,
+          limit_destination: e.limit_destination ?? null,
+          voicemail_mail_to: e.voicemail_mail_to ?? null,
+          forward_all_enabled: e.forward_all_enabled === "true" || e.forward_all_enabled === true,
+          forward_all_destination: e.forward_all_destination ?? null,
+          forward_busy_enabled: e.forward_busy_enabled === "true" || e.forward_busy_enabled === true,
+          forward_busy_destination: e.forward_busy_destination ?? null,
+          forward_no_answer_enabled: e.forward_no_answer_enabled === "true" || e.forward_no_answer_enabled === true,
+          forward_no_answer_destination: e.forward_no_answer_destination ?? null,
+          forward_user_not_registered_enabled: e.forward_user_not_registered_enabled === "true" || e.forward_user_not_registered_enabled === true,
+          forward_user_not_registered_destination: e.forward_user_not_registered_destination ?? null,
+          user_record: e.user_record ?? "none",
+          toll_allow: e.toll_allow ?? null,
+          cidr: e.cidr ?? null,
+          auth_acl: e.auth_acl ?? null,
+          absolute_codec_string: e.absolute_codec_string ?? null,
+          sip_bypass_media: e.sip_bypass_media ?? null,
+          org_id: organization_id,
+        };
+        const { error } = await admin
+          .from("pbx_extensions")
+          .upsert(row, { onConflict: "pbx_uuid" });
+        if (!error) upserts++;
+      }
+      return json({ success: true, stats: { fetched: exts.length, upserted: upserts } });
+    }
     if (action === "delete-extension") {
       const id = params.extension_uuid;
       if (!id) return json({ error: "extension_uuid required" }, 400);
