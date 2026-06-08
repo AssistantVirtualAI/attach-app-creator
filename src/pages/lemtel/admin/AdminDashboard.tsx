@@ -111,6 +111,8 @@ export default function AdminDashboard() {
           )}
         </CardContent>
       </Card>
+
+      <ActiveCallsGrid canMonitor />
     </div>
   );
 }
