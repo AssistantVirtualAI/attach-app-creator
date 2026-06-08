@@ -117,17 +117,22 @@ Deno.serve(async (req) => {
       headers: { "Lovable-API-Key": lovableKey, "X-Lovable-AIG-SDK": "vercel-ai-sdk" },
     });
 
-    const result = streamText({
+    const result = await generateText({
       model: provider("google/gemini-2.5-flash"),
       system: `You are AVA, the Lemtel Telecom phone system assistant. The user's role is "${role}". \
 You can read PBX state and (if they are admin) make changes via tools. \
 Be concise. After tool calls, summarize the outcome in 1-2 sentences. Reply in the user's language (French or English).`,
-      messages: await convertToModelMessages(messages),
+      messages: messages.map((m) => ({ role: m.role as any, content: m.content })),
       tools,
       stopWhen: stepCountIs(8),
     });
 
-    return result.toUIMessageStreamResponse({ headers: corsHeaders });
+    const toolCalls = (result.steps || []).flatMap((s: any) =>
+      (s.toolCalls || []).map((tc: any) => ({ name: tc.toolName, input: tc.input })),
+    );
+    return new Response(JSON.stringify({ text: result.text, toolCalls }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e: any) {
     console.error("[pbx-chat-agent]", e);
     return new Response(JSON.stringify({ error: e?.message || String(e) }), { status: 500, headers: corsHeaders });
