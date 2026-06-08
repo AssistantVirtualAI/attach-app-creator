@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { usePortal, PortalProvider } from '@/hooks/usePortalAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { getPostLoginRoute } from '@/lib/postLoginRoute';
 import { Loader2, AlertTriangle, Globe, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AvaStatisticsLogo as AvaLogo } from '@/components/shared/AvaStatisticsLogo';
@@ -48,7 +49,8 @@ const UniversalLoginContent = () => {
         });
 
         if (!authError && data.user) {
-          navigate('/dashboard');
+          const route = await getPostLoginRoute(data.user.id);
+          navigate(route);
           return;
         }
       }
