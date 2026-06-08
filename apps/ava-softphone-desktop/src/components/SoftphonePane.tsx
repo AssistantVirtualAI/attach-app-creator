@@ -734,7 +734,7 @@ export default function SoftphonePane({
           <BrandTagline size="sm" showPoweredBy={false} style={{ marginTop: 0, minWidth: 0 }} />
         </div>
         <div style={{ fontSize: compact ? 9 : 10, color: c.textDim, letterSpacing: 0.5 }}>
-          v1.1.0 {ultraCompact ? '' : '· Powered by '}
+          v{APP_VERSION} {ultraCompact ? '' : '· Powered by '}
           <a
             onClick={(e) => { e.preventDefault(); window.electronAPI?.openExternal?.('https://assistantvirtualai.com'); }}
             href="#"
