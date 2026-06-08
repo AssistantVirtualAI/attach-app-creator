@@ -102,3 +102,26 @@ export function useChatMessages(channelId: string | null) {
 
   return { query, messages, send, edit, remove, react, uploadAttachment, getSignedUrl };
 }
+
+// --- Legacy compat for TelephonyTeam (Phase < 4) ---
+export function useOrgChat(_orgId?: string) {
+  const { query: channelsQuery, create } = useChannels();
+  const channels = channelsQuery.data?.channels ?? [];
+  const [activeChannelId, setActiveChannelId] = useState<string | null>(null);
+  const { messages, send } = useChatMessages(activeChannelId);
+
+  return {
+    channels,
+    activeChannelId,
+    setActiveChannelId,
+    messages,
+    loading: channelsQuery.isLoading,
+    sendMessage: async (content: string) => {
+      if (!activeChannelId) return;
+      await send.mutateAsync({ content });
+    },
+    createChannel: async (name: string, channel_type: "public" | "private" = "public") => {
+      return await create.mutateAsync({ name, channel_type });
+    },
+  };
+}
