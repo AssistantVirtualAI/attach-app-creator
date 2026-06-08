@@ -163,6 +163,7 @@ import { PlatformAdminShell, CustomerAdminShell, MyWorkspaceShell } from "./comp
 const MyTelecomSettings = lazy(() => import("./pages/my/TelecomSettings"));
 const MyOrgChat = lazy(() => import("./pages/my/OrgChat"));
 const MyAIAssistant = lazy(() => import("./pages/my/AIAssistant"));
+const MyVoicemail = lazy(() => import("./pages/my/Voicemail"));
 const CustomerAdminAIChat = lazy(() => import("./pages/customer/AdminAIChat"));
 import { RolePortalGuard } from "./components/portals/RolePortalGuard";
 import PlatformDashboard from "./pages/portals/PlatformDashboard";
@@ -821,7 +822,7 @@ const App = () => (
                   <Route path="dashboard" element={<MyDashboardLanding />} />
                   <Route path="softphone" element={<TelephonyWebphone />} />
                   <Route path="calls" element={<LemtelPortalCalls />} />
-                  <Route path="voicemail" element={<AdminVoicemail scope="mine" />} />
+                  <Route path="voicemail" element={<MyVoicemail />} />
                   <Route path="messages" element={<LemtelMessages />} />
                   <Route path="recordings" element={<AdminRecordings scope="mine" />} />
                   <Route path="chat" element={<MyOrgChat />} />
