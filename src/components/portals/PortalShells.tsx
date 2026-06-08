@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   Shield, Building2, User, LayoutDashboard, Users, Phone, BarChart3, Settings,
   CreditCard, FileText, Headphones, Voicemail, Download, MessageSquare, Database,
-  Server, Activity,
+  Server, Activity, Sliders, Sparkles, Bot,
 } from "lucide-react";
 
 type NavItem = { label: string; to: string; icon: React.ComponentType<{ className?: string }> };
@@ -89,6 +89,9 @@ export function CustomerAdminShell({ children }: { children?: ReactNode }) {
         { label: "IVR", to: "/customer/ivr", icon: Server },
         { label: "Numbers", to: "/customer/numbers", icon: Phone },
         { label: "Calls & Recordings", to: "/customer/calls", icon: FileText },
+        { label: "Org Chat", to: "/customer/chat", icon: MessageSquare },
+        { label: "AI Admin", to: "/customer/ai-admin", icon: Bot },
+        { label: "Reports", to: "/customer/reports", icon: BarChart3 },
         { label: "Analytics", to: "/customer/analytics", icon: BarChart3 },
         { label: "Knowledge Base", to: "/customer/knowledge", icon: Database },
         { label: "Billing", to: "/customer/billing", icon: CreditCard },
@@ -111,6 +114,9 @@ export function MyWorkspaceShell({ children }: { children?: ReactNode }) {
         { label: "Voicemail", to: "/my/voicemail", icon: Voicemail },
         { label: "Messages", to: "/my/messages", icon: MessageSquare },
         { label: "Recordings", to: "/my/recordings", icon: Headphones },
+        { label: "Org Chat", to: "/my/chat", icon: MessageSquare },
+        { label: "Telecom", to: "/my/telecom", icon: Sliders },
+        { label: "AI Assistant", to: "/my/ai", icon: Sparkles },
         { label: "Downloads", to: "/my/downloads", icon: Download },
         { label: "Profile", to: "/my/profile", icon: User },
         { label: "Settings", to: "/my/settings", icon: Settings },
