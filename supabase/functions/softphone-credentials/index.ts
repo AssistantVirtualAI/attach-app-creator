@@ -66,14 +66,15 @@ Deno.serve(async (req) => {
       return json({ error: "NO_SOFTPHONE_ACCOUNT", message: "Contact your administrator to enable softphone" }, 404);
     }
 
-    // Fixed Lemtel endpoints — overridable via Vault for other tenants
+    // Fixed Lemtel endpoints — overridable via Vault for other tenants.
+    // Primary host MUST be covered by a valid TLS certificate (browsers reject WSS on SAN mismatch).
     const sipDomain = Deno.env.get("FUSIONPBX_SIP_DOMAIN") || "lemtel.lemtel.tel";
-    const wssUrl = sp.wss_url || Deno.env.get("FUSIONPBX_WSS_URL") || "wss://lemtel.lemtel.tel:7443";
+    const wssUrl = sp.wss_url || Deno.env.get("FUSIONPBX_WSS_URL") || "wss://pbxnode.lemtel.tel:7443";
     const wssUrls = Array.from(new Set([
       wssUrl,
-      "wss://lemtel.lemtel.tel:7443",
       "wss://pbxnode.lemtel.tel:7443",
-      "wss://170.39.199.132:7443",
+      "wss://portal.lemtel.tel:7443",
+      "wss://lemtel.lemtel.tel:7443",
     ]));
 
     let password = sp.sip_password || "";

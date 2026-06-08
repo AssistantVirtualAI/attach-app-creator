@@ -14,7 +14,7 @@ const json = (b: unknown, s = 200) =>
 
 const LEMTEL_ORG = "71755d33-ed64-4ad5-a828-61c9d2029eb7";
 const SIP_DOMAIN = "lemtel.lemtel.tel";
-const WSS_URL = "wss://lemtel.lemtel.tel:7443";
+const WSS_URL = "wss://pbxnode.lemtel.tel:7443";
 const DEFAULT_OUTBOUND_CID = "15144942888";
 
 function generatePassword(len = 16) {
