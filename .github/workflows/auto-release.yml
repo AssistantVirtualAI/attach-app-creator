@@ -84,8 +84,8 @@ jobs:
           ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true npx electron-builder --mac --x64 --arm64 --publish=never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          GH_TOKEN: ""
-          PUBLISH_FOR_PULL_REQUEST: "false"
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-mac
@@ -132,8 +132,8 @@ jobs:
           npx electron-builder --win --publish=never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          GH_TOKEN: ""
-          PUBLISH_FOR_PULL_REQUEST: "false"
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-windows
@@ -181,8 +181,8 @@ jobs:
           ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true npx electron-builder --linux --publish=never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          GH_TOKEN: ""
-          PUBLISH_FOR_PULL_REQUEST: "false"
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-linux
