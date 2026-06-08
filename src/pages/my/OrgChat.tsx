@@ -132,6 +132,7 @@ function ChannelView({ channel, userId, t }: { channel: Channel; userId: string;
   const { messages, send, remove, react, uploadAttachment, getSignedUrl, query } = useChatMessages(channel.id);
   const [draft, setDraft] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [threadParent, setThreadParent] = useState<any | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
