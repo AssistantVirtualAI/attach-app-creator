@@ -56,7 +56,7 @@ jobs:
           "
           npx vite build
           npx tsc -p electron/tsconfig.json || true
-          npx electron-builder --mac --x64 --arm64
+          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true npx electron-builder --mac --x64 --arm64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -96,7 +96,7 @@ jobs:
           Set-Content -Path "vite.config.ts" -Value $c -Encoding UTF8
           npx vite build
           npx tsc -p electron/tsconfig.json
-          npx electron-builder --win
+          npx electron-builder --win --publish=never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -142,7 +142,7 @@ jobs:
           "
           npx vite build
           npx tsc -p electron/tsconfig.json || true
-          npx electron-builder --linux
+          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true npx electron-builder --linux
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

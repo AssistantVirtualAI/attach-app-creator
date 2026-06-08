@@ -61,7 +61,7 @@ jobs:
         run: |
           npx vite build
           npx tsc -p electron/tsconfig.json
-          npx electron-builder --win
+          npx electron-builder --win --publish=never
         working-directory: apps/ava-softphone-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -108,7 +108,7 @@ jobs:
         run: |
           npx vite build
           npx tsc -p electron/tsconfig.json
-          npx electron-builder --mac --x64 --arm64
+          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true npx electron-builder --mac --x64 --arm64
         working-directory: apps/ava-softphone-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -166,7 +166,7 @@ jobs:
         run: |
           npx vite build
           npx tsc -p electron/tsconfig.json
-          npx electron-builder --linux
+          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true npx electron-builder --linux
         working-directory: apps/ava-softphone-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

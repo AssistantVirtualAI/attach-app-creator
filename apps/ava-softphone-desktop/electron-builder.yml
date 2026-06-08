@@ -37,5 +37,3 @@ linux:
     - AppImage
   category: Office
   maintainer: "Lemtel Communications <support@assistantvirtualai.com>"
-
-afterAllArtifactBuild: false
