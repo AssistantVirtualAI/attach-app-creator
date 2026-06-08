@@ -187,13 +187,51 @@ All colors MUST be HSL.
   }
 
   .glass-card {
-    @apply backdrop-blur-xl bg-gradient-to-br from-card/40 to-card/20 border border-border/50;
+    @apply backdrop-blur-xl bg-card/40 border border-white/10 rounded-xl;
+    box-shadow: var(--shadow-glass, 0 8px 32px rgba(0,0,0,0.25));
+  }
+
+  .glass-panel {
+    @apply backdrop-blur-2xl bg-card/60 border border-white/10;
+    box-shadow: var(--shadow-glass, 0 8px 32px rgba(0,0,0,0.25));
+  }
+
+  .glass-surface {
+    background: linear-gradient(135deg, hsl(var(--card) / 0.55), hsl(var(--card) / 0.25));
+    @apply backdrop-blur-xl border border-white/10;
   }
 
   .neon-border {
     @apply border border-primary/50;
     box-shadow: var(--shadow-neon);
   }
+
+  .aurora-bg {
+    position: relative;
+    isolation: isolate;
+  }
+  .aurora-bg::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--gradient-aurora);
+    pointer-events: none;
+    z-index: -1;
+    animation: auroraShift 18s ease-in-out infinite alternate;
+  }
+  @keyframes auroraShift {
+    0% { transform: translate3d(0,0,0) scale(1); opacity: 0.9; }
+    100% { transform: translate3d(-2%, 1%, 0) scale(1.05); opacity: 1; }
+  }
+
+  .glow-hover {
+    @apply transition-all duration-300;
+  }
+  .glow-hover:hover {
+    box-shadow: var(--shadow-glow-primary, 0 0 40px hsl(var(--primary) / 0.4));
+    transform: translateY(-1px);
+  }
+
 
   .cyber-grid {
     background-image: 
