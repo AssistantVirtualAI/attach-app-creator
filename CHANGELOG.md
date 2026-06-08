@@ -4,6 +4,8 @@ Auto-generated from git commits.
 
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
+- Changes (2026-06-08) — gpt-engineer-app[bot]
+- docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
 - fix: make lint and ios jobs non-blocking (2026-06-08) — AssistantVirtualAI
 - docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
 - fix: use GH_TOKEN secret for electron-builder publish (2026-06-08) — AssistantVirtualAI
@@ -33,8 +35,6 @@ Auto-generated from git commits.
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
-- Changes (2026-06-08) — gpt-engineer-app[bot]
-- Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
