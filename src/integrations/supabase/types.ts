@@ -3112,6 +3112,7 @@ export type Database = {
           hipaa_enabled: boolean | null
           id: string
           is_active: boolean | null
+          is_internal: boolean
           loading_icon: string | null
           loading_icon_size: string | null
           logo_dashboard_url: string | null
@@ -3175,6 +3176,7 @@ export type Database = {
           hipaa_enabled?: boolean | null
           id?: string
           is_active?: boolean | null
+          is_internal?: boolean
           loading_icon?: string | null
           loading_icon_size?: string | null
           logo_dashboard_url?: string | null
@@ -3238,6 +3240,7 @@ export type Database = {
           hipaa_enabled?: boolean | null
           id?: string
           is_active?: boolean | null
+          is_internal?: boolean
           loading_icon?: string | null
           loading_icon_size?: string | null
           logo_dashboard_url?: string | null
@@ -6446,6 +6449,10 @@ export type Database = {
         Returns: boolean
       }
       can_manage_org_members: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_view_org: {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
       }
