@@ -237,6 +237,8 @@ const App = () => (
 
                 {/* Public download page */}
                 <Route path="/download" element={<Download />} />
+                <Route path="/my/download" element={<Download />} />
+                <Route path="/org/:slug/downloads" element={<Download />} />
                 
                 {/* Universal login - redirects based on user type */}
                 <Route path="/login" element={<UniversalLogin />} />
