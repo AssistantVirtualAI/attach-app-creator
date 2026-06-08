@@ -39,7 +39,8 @@ export default function RecordingsView() {
   const [exportNote, setExportNote] = useState<string | null>(null);
   const [regenLoading, setRegenLoading] = useState(false);
 
-  useEffect(() => { ava.recordings().then((d) => { setItems(d); setLoading(false); }); }, []);
+  const load = () => { setLoading(true); ava.recordings().then((d) => { setItems(d); setLoading(false); }); };
+  useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
     const cutoff = rangeCutoff(range);
@@ -126,16 +127,21 @@ export default function RecordingsView() {
           icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>}
         />
 
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search recordings, customers, topics…"
-          style={{
-            width: '100%', padding: '10px 12px', borderRadius: 10,
-            background: c.bgCard, border: `1px solid ${c.border}`,
-            color: c.textIce, fontSize: 13, marginBottom: 10, outline: 'none',
-          }}
-        />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search recordings, customers, topics…"
+            style={{
+              flex: 1, padding: '10px 12px', borderRadius: 10,
+              background: c.bgCard, border: `1px solid ${c.border}`,
+              color: c.textIce, fontSize: 13, outline: 'none',
+            }}
+          />
+          <button onClick={load} style={{ padding: '8px 14px', borderRadius: 10, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+            ↻ Refresh
+          </button>
+        </div>
 
         <div style={{ display: 'flex', gap: 14, marginBottom: 14, flexWrap: 'wrap' }}>
           <FilterGroup label="Quality" value={q} onChange={(v) => setQ(v as Quality)} options={['all', 'high', 'medium', 'low']} />
