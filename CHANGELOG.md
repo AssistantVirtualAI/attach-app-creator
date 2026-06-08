@@ -3,6 +3,8 @@
 Auto-generated from git commits.
 
 - Changes (2026-06-08) — gpt-engineer-app[bot]
+- docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
+- Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
@@ -49,6 +51,4 @@ Auto-generated from git commits.
 - docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
 - fix: use GH_TOKEN secret for electron-builder publish (2026-06-08) — AssistantVirtualAI
 - fix: normalize electron-builder publish disabled flags (2026-06-08) — AssistantVirtualAI
-- docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
-- fix: disable electron-builder publish in auto-release workflow (2026-06-08) — AssistantVirtualAI
 - docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
