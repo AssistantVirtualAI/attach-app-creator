@@ -201,6 +201,12 @@ export default function MasterOrganizations() {
         }}
         onCreated={() => qc.invalidateQueries({ queryKey: ["all-orgs"] })}
       />
+      <CsvUserImportDialog
+        open={!!csvOrg}
+        onOpenChange={(v) => !v && setCsvOrg(null)}
+        organizationId={csvOrg?.id || ''}
+        organizationName={csvOrg?.name}
+      />
     </div>
   );
 }
