@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -160,6 +160,10 @@ import PortalChooser from "./pages/PortalChooser";
 
 // Three-portal architecture (Platform / Customer / My)
 import { PlatformAdminShell, CustomerAdminShell, MyWorkspaceShell } from "./components/portals/PortalShells";
+const MyTelecomSettings = lazy(() => import("./pages/my/TelecomSettings"));
+const MyOrgChat = lazy(() => import("./pages/my/OrgChat"));
+const MyAIAssistant = lazy(() => import("./pages/my/AIAssistant"));
+const CustomerAdminAIChat = lazy(() => import("./pages/customer/AdminAIChat"));
 import { RolePortalGuard } from "./components/portals/RolePortalGuard";
 import PlatformDashboard from "./pages/portals/PlatformDashboard";
 import PlatformSystemHealth from "./pages/platform/SystemHealth";
@@ -806,6 +810,9 @@ const App = () => (
                   <Route path="knowledge" element={<KnowledgeBase />} />
                   <Route path="billing" element={<StripeBilling />} />
                   <Route path="settings" element={<Settings />} />
+                  <Route path="chat" element={<MyOrgChat />} />
+                  <Route path="ai-admin" element={<CustomerAdminAIChat />} />
+                  <Route path="reports" element={<LemtelAnalytics />} />
                 </Route>
 
                 {/* My Workspace — end users */}
@@ -817,6 +824,9 @@ const App = () => (
                   <Route path="voicemail" element={<AdminVoicemail scope="mine" />} />
                   <Route path="messages" element={<LemtelMessages />} />
                   <Route path="recordings" element={<AdminRecordings scope="mine" />} />
+                  <Route path="chat" element={<MyOrgChat />} />
+                  <Route path="telecom" element={<MyTelecomSettings />} />
+                  <Route path="ai" element={<MyAIAssistant />} />
                   <Route path="downloads" element={<DownloadCenter personalize />} />
                   <Route path="profile" element={<Profile />} />
                   <Route path="settings" element={<MySettings />} />
