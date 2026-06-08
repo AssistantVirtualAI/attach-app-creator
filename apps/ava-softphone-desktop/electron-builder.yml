@@ -1,8 +1,9 @@
 appId: com.lemtel.softphone
 productName: Lemtel Telecom
-copyright: "Copyright 2026 Lemtel Communications. Powered by AVA AI."
+copyright: "Copyright 2026 Lemtel Communications."
 directories:
   output: dist-electron
+icon: assets/icon.png
 files:
   - dist/**/*
   - electron-compiled/**/*
@@ -13,43 +14,29 @@ mac:
   identity: null
   hardenedRuntime: false
   gatekeeperAssess: false
-  notarize: false
-  extendInfo:
-    NSMicrophoneUsageDescription: "Lemtel Telecom needs microphone access to make and receive voice calls over your business phone system."
-    NSCameraUsageDescription: "Lemtel Telecom uses the camera for video calls."
-    NSContactsUsageDescription: "Lemtel Telecom accesses your contacts to display caller names and make dialing easier."
-    NSSpeechRecognitionUsageDescription: "Lemtel Telecom uses speech recognition to transcribe calls and provide AI insights."
-    NSBluetoothAlwaysUsageDescription: "Lemtel Telecom uses Bluetooth to connect to wireless headsets for calls."
-    NSLocalNetworkUsageDescription: "Lemtel Telecom uses your local network to connect to the SIP server."
+  icon: assets/icon.png
   target:
     - target: dmg
       arch: [x64, arm64]
     - target: zip
       arch: [x64, arm64]
-  artifactName: "Lemtel.Telecom-${arch}.${ext}"
 win:
+  icon: assets/icon.png
   target:
     - target: nsis
       arch: [x64]
   publisherName: "Lemtel Communications"
-  signingHashAlgorithms: []
-  artifactName: "Lemtel.Telecom.Setup.${ext}"
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
-  createStartMenuShortcut: true
   shortcutName: "Lemtel Telecom"
 linux:
+  icon: assets/icon.png
   target:
     - AppImage
   category: Office
-  description: "AI-powered business softphone for Lemtel Communications"
   maintainer: "Lemtel Communications <support@assistantvirtualai.com>"
-  vendor: "Lemtel Communications"
-  synopsis: "AI Business Phone System"
-  artifactName: "Lemtel.Telecom.${ext}"
-
 publish:
   - provider: github
     owner: AssistantVirtualAI
