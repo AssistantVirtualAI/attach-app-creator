@@ -1,94 +1,59 @@
-# Phase 2 — Telecom Settings utilisateur
+# Phase 3 — Voicemail + AI Greeting
 
-Objectif : transformer `/my/telecom` (stub) en page fonctionnelle où chaque user gère son extension, ses heures de travail, son availability et son routage hors-heures, le tout persisté en DB et synchronisé FusionPBX via Edge Function sécurisée.
+Objectif : permettre à chaque user de gérer sa boîte vocale (lecture, transcription, résumé IA) et de générer un greeting personnalisé via ElevenLabs TTS.
 
-## 1. Base de données
+## Livrables
 
-Nouvelle migration :
+### 1. Backend (DB + Edge Functions)
+- Migration : étendre `pbx_voicemail_settings` (greeting_url, greeting_text, greeting_voice_id, greeting_mode `default|recorded|tts`, transcription_enabled, ai_summary_enabled).
+- Edge Function `user-voicemail` :
+  - `list` — voicemails de l'utilisateur (via `pbx_voicemails` + jointure softphone)
+  - `mark_read` / `delete` (soft delete + audit_logs)
+  - `get_audio_url` — signed URL temporaire bucket `voicemail-audio`
+  - `transcribe` — ElevenLabs `scribe_v2` (batch), stocke dans `pbx_call_transcripts`
+  - `summarize` — Lovable AI Gateway (`google/gemini-3-flash-preview`), stocke résumé + intent
+- Edge Function `user-voicemail-greeting` :
+  - `get_settings` / `save_settings`
+  - `generate_tts` — ElevenLabs TTS (`eleven_multilingual_v2`), upload `voicemail-greetings`, retourne URL
+  - `upload_recorded` — accepte blob recorded mic, upload bucket
+  - sync FusionPBX via `fusionpbx-proxy` (mailbox greeting)
 
-- **Table `user_working_hours`** (une ligne par user+jour)
-  - `id`, `organization_id`, `user_id`, `day_of_week` (0–6), `is_working_day` bool, `start_time` time, `end_time` time, `break_start` time null, `break_end` time null, `timezone` text, `created_at`, `updated_at`
-  - Unique `(user_id, day_of_week)`
-  - GRANTs `authenticated` + `service_role`
-  - RLS : user manage ses lignes ; `org_admin` (via `has_role`) read/write dans son org ; super_admin read all
-  - Trigger `updated_at`
+### 2. Frontend `/my/voicemail` (nouvelle page)
+- Liste voicemails : caller, durée, date, badge unread, player audio inline.
+- Actions par item : Play, Transcribe, Summarize (IA), Mark read, Delete.
+- Panel détail : transcript + résumé IA + tags + notes (réutilise `set_call_notes`).
+- Section "Greeting" :
+  - 3 modes : Default org / Recorded (MediaRecorder) / AI TTS (textarea + voice picker parmi top voices).
+  - Preview audio + Save.
+- Skeletons, empty states, FR/EN.
 
-- **Table `user_call_handling`** (1 ligne par user)
-  - `id`, `organization_id`, `user_id` unique, `availability` enum (`available|busy|dnd|away|vacation`), `after_hours_action` enum (`voicemail|forward_extension|forward_external|follow_org_default`), `forward_target` text, `timezone` text, `sync_status` enum (`pending|synced|failed`), `sync_error` text, `last_synced_at`, timestamps
-  - GRANTs + RLS identiques
+### 3. Hooks & composants
+- `useMyVoicemails` (React Query : list/mutations)
+- `useMyGreeting`
+- `components/voicemail/VoicemailList.tsx`
+- `components/voicemail/VoicemailDetail.tsx`
+- `components/voicemail/GreetingEditor.tsx` (3 tabs : Default | Record | AI Voice)
+- `components/voicemail/VoicePicker.tsx` (top 5 voices ElevenLabs)
 
-- **Extension d'`audit_logs`** : aucune nouvelle table, on écrit `source='desktop_app'`, `action='user_telecom_settings.update'`.
+### 4. Routing & Sidebar
+- Ajouter `/my/voicemail` (lazy) dans `App.tsx`.
+- Ajouter item "Voicemail" dans `PortalShells` (user workspace).
 
-## 2. Edge Function `user-telecom-settings`
+### 5. Sécurité
+- RLS : user lit/écrit uniquement ses voicemails (via `portal_user_id` du softphone lié).
+- Org admin peut voir/réécouter (déjà couvert par policies existantes).
+- `ELEVENLABS_API_KEY` déjà présent côté secrets — utilisé uniquement server-side.
+- Tous les `transcribe` / `summarize` / `generate_tts` loggés dans `audit_logs`.
 
-Fichier `supabase/functions/user-telecom-settings/index.ts`.
+## Détails techniques
+- TTS modèle par défaut : `eleven_multilingual_v2`, format `mp3_44100_128`.
+- STT modèle : `scribe_v2`, langue auto-détectée + override `fr`/`en`.
+- Résumé IA prompt : extraction de `caller_intent`, `priority`, `callback_required`, `summary` (≤ 3 phrases), structured output via `Output.object`.
+- Bucket `voicemail-greetings` existe déjà (privé) — signed URL 1h pour preview.
 
-- Validate JWT in code, charge user via service-role.
-- Routes (POST body `{ action, payload }`) :
-  - `get` → renvoie working_hours + call_handling + extension (depuis `pbx_softphone_users` du user).
-  - `save_hours` → upsert 7 lignes `user_working_hours`, marque `sync_status='pending'`, push vers FusionPBX (time conditions) via `fusionpbx-proxy` interne, met à jour `synced`/`failed`.
-  - `save_handling` → upsert `user_call_handling`, applique forwarding/voicemail via FusionPBX `pbx_call_forwarding` table + sync proxy, log audit.
-  - `reset_to_org_default` → copie depuis `org_business_hours`.
-- Jamais de credential PBX renvoyée au client.
-- CORS + erreurs explicites (`tts_not_configured` style) avec code support.
+## Hors scope (phases suivantes)
+- Notifications email/push voicemail → Phase 7 (Reports/Notifications).
+- Greeting after-hours distinct du greeting busy → extension possible plus tard.
 
-## 3. Frontend `/my/telecom`
-
-Refonte de `src/pages/my/TelecomSettings.tsx` en 3 sections :
-
-### a. Extension & SIP
-- Hook `useMyExtension()` → lit `pbx_softphone_users` par `portal_user_id`, retourne `{ extension, sip_domain, registered }`.
-- Statut SIP via `useSyncStatus` existant + softphone snap. Aucun password.
-- Badge : Connected / Registered / Not configured.
-
-### b. Working Hours
-- Composant `WorkingHoursEditor` : table 7 jours, toggle jour actif, 2 TimePickers (start/end), break optionnel, timezone select (Intl).
-- Bouton **Save**, **Reset to org default**, badge sync (saved / pending / synced / failed) par save.
-- Appelle Edge Function `user-telecom-settings:save_hours`.
-
-### c. Availability & After-hours
-- `AvailabilitySelector` (5 états) + `AfterHoursPanel` :
-  - Radio : Send to voicemail / Forward to extension (input ext) / Forward to external (input E.164, désactivé si permission off) / Follow org default.
-- Save via `:save_handling`.
-
-### d. UX cross-section
-- Loading skeletons, empty states, toasts succès/erreur (i18n FR/EN).
-- Aucune string codée — entrées dans `src/locales/{en,fr}.ts` sous clé `telecomSettings.*`.
-
-## 4. Hook partagé
-
-`src/hooks/useMyTelecomSettings.ts` :
-- `useQuery` get → cache TanStack.
-- `useMutation` save/reset → invalidate.
-- Centralise les appels `supabase.functions.invoke('user-telecom-settings', ...)`.
-
-## 5. Sécurité & audit
-
-- Edge Function valide que `payload.user_id === auth.uid()` (ou caller est `org_admin` éditant un user de son org).
-- Forward external bloqué si `org_members.can_manage_users === false` OU flag org `allow_external_forward=false` (lecture depuis `organizations`).
-- Chaque save → `audit_logs` (`source='desktop_app'`, before/after value).
-
-## 6. Tests manuels (acceptance)
-
-1. User normal ouvre `/my/telecom` → voit son extension + 7 jours par défaut.
-2. Édite Lundi 9–17, save → badge "Synced", row visible dans `user_working_hours`.
-3. Choisit "Forward to extension 205" → save → entrée dans `pbx_call_forwarding` + audit log.
-4. Reload → valeurs persistées.
-5. Reset to org default → repop. valeurs depuis `org_business_hours`.
-6. User non-admin tente de PATCH une autre `user_id` → 403.
-
-## Fichiers touchés
-
-- **Nouveaux** :
-  - `supabase/migrations/<ts>_user_telecom_settings.sql`
-  - `supabase/functions/user-telecom-settings/index.ts`
-  - `src/hooks/useMyTelecomSettings.ts`
-  - `src/hooks/useMyExtension.ts`
-  - `src/components/telecom/WorkingHoursEditor.tsx`
-  - `src/components/telecom/AfterHoursPanel.tsx`
-  - `src/components/telecom/AvailabilitySelector.tsx`
-- **Modifiés** :
-  - `src/pages/my/TelecomSettings.tsx` (page complète)
-  - `src/locales/en.ts`, `src/locales/fr.ts` (clés `telecomSettings.*`)
-
-Veux-tu que je lance la migration + Edge Function d'abord, ou je commence par le frontend avec un mode "draft local" en attendant la validation de la migration ?
+## Prochaine action
+Sur ton OK je passe en build mode et j'enchaîne migration → edge functions → UI.
