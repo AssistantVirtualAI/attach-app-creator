@@ -180,18 +180,21 @@ function ChannelView({ channel, userId, t }: { channel: Channel; userId: string;
             {t("No messages yet. Say hi 👋", "Aucun message. Lance la discussion 👋")}
           </div>
         )}
-        {messages.map((m) => (
+        {messages.filter((m: any) => !m.parent_message_id).map((m) => (
           <MessageBubble
             key={m.id}
             msg={m}
             isOwn={m.sender_id === userId}
             onDelete={() => remove.mutate(m.id)}
             onReact={(emoji) => react.mutate({ id: m.id, emoji })}
+            onOpenThread={() => setThreadParent(m)}
             getSignedUrl={getSignedUrl}
             t={t}
           />
         ))}
       </div>
+      <ThreadPanel parent={threadParent} channelId={channel.id} onClose={() => setThreadParent(null)} />
+
 
       <div className="border-t p-3 flex items-end gap-2">
         <Button
