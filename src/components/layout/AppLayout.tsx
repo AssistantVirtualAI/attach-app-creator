@@ -103,11 +103,16 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const visibleGroups = useMemo(() => sidebarGroups.filter(g => {
     const groupScope = g.scope ?? 'legacy';
     if (currentScope === 'admin') return false; // admin portal uses its own layout
-    if (groupScope !== currentScope) return false;
     if (g.lemtelOnly && !isLemtelMember) return false;
     if (g.hideForLemtel && isLemtelMember) return false;
+    // Lemtel members (incl. super admins) always see telephony org + my groups,
+    // regardless of the current route scope, so the full phone system stays
+    // accessible from a single unified sidebar.
+    if (isLemtelMember && (groupScope === 'org' || groupScope === 'my')) return true;
+    if (groupScope !== currentScope) return false;
     return true;
   }), [isLemtelMember, currentScope]);
+
 
   // Sidebar group ordering with drag & drop
   const sensors = useSensors(
