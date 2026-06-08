@@ -120,7 +120,7 @@ export default function TelephonyQA() {
       // 2. Last sync job
       const { data: sync, error: syncErr } = await supabase
         .from("pbx_sync_jobs")
-        .select("status, completed_at, error_message, job_type")
+        .select("status, completed_at, error, job_type")
         .order("completed_at", { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
@@ -136,10 +136,11 @@ export default function TelephonyQA() {
       } else {
         upd("sync_job", {
           status: "fail",
-          error: sync.error_message || sync.status,
+          error: sync.error || sync.status,
           fix: "Trigger fusionpbx-sync-config / fusionpbx-sync-cdr manually and review logs.",
         });
       }
+
 
       // 3. WSS
       const wss = (spHealth.data as any)?.checks?.current_user_lookup?.wss_url
