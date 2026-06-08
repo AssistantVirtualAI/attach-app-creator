@@ -422,17 +422,15 @@ class JsSipProvider {
     }
   }
 
-  async call(number: string): Promise<string | null> {
+  async call(number: string, _isRetry = false): Promise<string | null> {
     if (!this.config || !this.ua) {
       this.logEvent('error', 'UA not ready — cannot call');
       return 'SIP not initialized';
     }
     const target = `sip:${number}@${this.config.sipDomain}`;
-    this.logEvent('info', `Dialing ${number}`);
+    this.lastDialed = number;
+    this.logEvent('info', _isRetry ? `Auto-redialing ${number} after 488` : `Dialing ${number}`);
     try {
-      // Let JsSIP handle getUserMedia internally. Pre-fetching the stream
-      // causes "Bad Media Description" + unhandled rejections that crash
-      // the Electron renderer (black screen).
       this.ua.call(target, {
         mediaConstraints: { audio: true, video: false },
       } as any);
@@ -446,6 +444,7 @@ class JsSipProvider {
       return msg;
     }
   }
+
 
   /** Build a debug report JSON with secrets masked. */
   buildDebugReport(): string {
