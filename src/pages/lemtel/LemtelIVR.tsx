@@ -63,6 +63,11 @@ export default function LemtelIVR() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = (ivrs as any[]).find(i => i.id === selectedId) || null;
   const { data: options = [] } = usePbxIvrOptions(selectedId);
+  const [optDialogOpen, setOptDialogOpen] = useState(false);
+  const [optDigit, setOptDigit] = useState('');
+  const [optDestType, setOptDestType] = useState<string>('extension');
+  const [optDestId, setOptDestId] = useState('');
+  const [optDesc, setOptDesc] = useState('');
 
   useEffect(() => {
     if (!selectedId && ivrs.length > 0) setSelectedId((ivrs as any[])[0].id);
@@ -409,7 +414,12 @@ export default function LemtelIVR() {
 
                 {/* Menu Options */}
                 <div>
-                  <Label>Options du menu</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Options du menu</Label>
+                    <Button size="sm" variant="outline" onClick={() => { setOptDigit(''); setOptDestType('extension'); setOptDestId(''); setOptDesc(''); setOptDialogOpen(true); }}>
+                      <Plus className="w-3 h-3 mr-1" /> Ajouter
+                    </Button>
+                  </div>
                   <div className="mt-2 space-y-2">
                     {(options as any[]).map((opt: any) => (
                       <div key={opt.id} className="flex items-center gap-2 p-3 border rounded-lg bg-muted/30">
@@ -418,11 +428,57 @@ export default function LemtelIVR() {
                           <div className="text-sm font-medium capitalize">{(opt.destination_type || '').replace('_', ' ')}</div>
                           <div className="text-xs text-muted-foreground">→ {opt.destination_id || opt.description || '—'}</div>
                         </div>
+                        <Button size="sm" variant="ghost" onClick={async () => {
+                          const { error } = await supabase.from('pbx_ivr_options').delete().eq('id', opt.id);
+                          if (error) toast.error(error.message);
+                          else { toast.success('Option supprimée'); queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivr_options', selectedId] }); }
+                        }}>×</Button>
                       </div>
                     ))}
                     {options.length === 0 && <p className="text-sm text-muted-foreground">Aucune option configurée.</p>}
                   </div>
                 </div>
+
+                <Dialog open={optDialogOpen} onOpenChange={setOptDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Nouvelle option IVR</DialogTitle></DialogHeader>
+                    <div className="space-y-3">
+                      <div><Label>Touche (0-9, *, #)</Label><input className="w-full mt-1 px-3 py-2 rounded-md border bg-background" maxLength={1} value={optDigit} onChange={(e) => setOptDigit(e.target.value)} /></div>
+                      <div>
+                        <Label>Destination</Label>
+                        <Select value={optDestType} onValueChange={setOptDestType}>
+                          <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="extension">Extension</SelectItem>
+                            <SelectItem value="ring_group">Ring group</SelectItem>
+                            <SelectItem value="queue">Queue</SelectItem>
+                            <SelectItem value="voicemail">Voicemail</SelectItem>
+                            <SelectItem value="external">Numéro externe</SelectItem>
+                            <SelectItem value="hangup">Raccrocher</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div><Label>Cible (ID/numéro)</Label><input className="w-full mt-1 px-3 py-2 rounded-md border bg-background" value={optDestId} onChange={(e) => setOptDestId(e.target.value)} /></div>
+                      <div><Label>Description</Label><input className="w-full mt-1 px-3 py-2 rounded-md border bg-background" value={optDesc} onChange={(e) => setOptDesc(e.target.value)} /></div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setOptDialogOpen(false)}>Annuler</Button>
+                      <Button onClick={async () => {
+                        if (!selectedId || !optDigit) return;
+                        const { error } = await supabase.from('pbx_ivr_options').insert({
+                          ivr_id: selectedId, digit: optDigit, destination_type: optDestType,
+                          destination_id: optDestId || null, description: optDesc || null,
+                        });
+                        if (error) toast.error(error.message);
+                        else {
+                          toast.success('Option ajoutée');
+                          setOptDialogOpen(false);
+                          queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivr_options', selectedId] });
+                        }
+                      }}>Ajouter</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </CardContent>
             </>
           ) : (
