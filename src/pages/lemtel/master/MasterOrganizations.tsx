@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Eye, Edit, Pause, Trash2, FileBarChart, DollarSign } from "lucide-react";
+import { Eye, Edit, Pause, Trash2, FileBarChart, DollarSign, Upload } from "lucide-react";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useNavigate } from "react-router-dom";
 import { CreateOrgWizard } from "@/components/portal/CreateOrgWizard";
+import { CsvUserImportDialog } from "@/components/lemtel/CsvUserImportDialog";
 import { toast } from "sonner";
 
 type Filter = "all" | "reseller" | "customer" | "direct" | "suspended" | "trial";
