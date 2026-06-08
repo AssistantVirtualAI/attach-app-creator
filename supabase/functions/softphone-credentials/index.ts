@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     }
     log("authenticated user", { id: user.id, email: user.email });
 
-    let { data: sp, error: spErr } = await supabaseAdmin
+    const { data: sp, error: spErr } = await supabaseAdmin
       .from("pbx_softphone_users")
       .select("extension, organization_id, extension_id, display_name, sip_password, wss_url")
       .eq("portal_user_id", user.id)
@@ -59,8 +59,9 @@ Deno.serve(async (req) => {
     if (spErr) log("lookup by portal_user_id error", spErr.message);
     log("lookup by portal_user_id", { found: !!sp, extension: sp?.extension });
 
-    // Fallback: lookup by extension '300' if no row is linked to this user
-    if (!sp) {
+    // SECURITY: removed extension-300 fallback that leaked SIP credentials to unrelated users.
+    // Users without a linked softphone account receive NO_SOFTPHONE_ACCOUNT below.
+    if (false) {
       const { data: byExt, error: extErr } = await supabaseAdmin
         .from("pbx_softphone_users")
         .select("extension, organization_id, extension_id, display_name, sip_password, wss_url")
