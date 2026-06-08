@@ -1,0 +1,165 @@
+import { useEffect, useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+
+type Props = {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  extension: any | null;
+};
+
+export function ExtensionEditDialog({ open, onOpenChange, extension }: Props) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<any>({});
+
+  useEffect(() => {
+    if (!open || !extension) return;
+    setForm({
+      extension: extension.extension,
+      effective_caller_id_name: extension.effective_cid_name || '',
+      effective_caller_id_number: extension.effective_cid_number || '',
+      password: extension.password || '',
+      voicemail_password: extension.voicemail_password || '',
+      voicemail_enabled: !!extension.voicemail_enabled,
+      do_not_disturb: !!extension.do_not_disturb,
+      forward_all_enabled: !!extension.forward_all_enabled,
+      forward_all_destination: extension.forward_all_destination || '',
+      call_timeout: extension.call_timeout ?? 30,
+      enabled: extension.enabled !== false,
+      description: extension.description || '',
+    });
+    // Try to fetch the latest config from FusionPBX
+    if (extension.pbx_uuid) {
+      setLoading(true);
+      supabase.functions
+        .invoke('fusionpbx-proxy', {
+          body: { action: 'get-extension', extension_uuid: extension.pbx_uuid, extension: extension.extension },
+        })
+        .then(({ data }) => {
+          const ext = (data as any)?.extension || (data as any)?.extensions?.[0] || (data as any)?.data;
+          if (ext) {
+            setForm((f: any) => ({
+              ...f,
+              effective_caller_id_name: ext.effective_caller_id_name ?? f.effective_caller_id_name,
+              effective_caller_id_number: ext.effective_caller_id_number ?? f.effective_caller_id_number,
+              password: ext.password ?? f.password,
+              voicemail_password: ext.voicemail_password ?? f.voicemail_password,
+              voicemail_enabled: ext.voicemail_enabled ?? f.voicemail_enabled,
+              do_not_disturb: ext.do_not_disturb ?? f.do_not_disturb,
+              forward_all_enabled: ext.forward_all_enabled ?? f.forward_all_enabled,
+              forward_all_destination: ext.forward_all_destination ?? f.forward_all_destination,
+              call_timeout: ext.call_timeout ?? f.call_timeout,
+              enabled: ext.enabled ?? f.enabled,
+              description: ext.description ?? f.description,
+            }));
+          }
+        })
+        .catch((e) => console.warn('get-extension failed', e))
+        .finally(() => setLoading(false));
+    }
+  }, [open, extension]);
+
+  const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
+
+  const onSave = async () => {
+    if (!extension) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: {
+          action: 'update-extension',
+          extension_uuid: extension.pbx_uuid,
+          extension: extension.extension,
+          fields: form,
+        },
+      });
+      if (error) throw error;
+      toast({ title: 'Extension updated', description: `Synced to FusionPBX` });
+      qc.invalidateQueries({ queryKey: ['pbx_extensions'] });
+      onOpenChange(false);
+    } catch (e: any) {
+      toast({ title: 'Update failed', description: e?.message || String(e), variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!extension) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            Edit extension {extension.extension}
+            {loading && <Loader2 className="inline w-4 h-4 ml-2 animate-spin" />}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-4 py-2">
+          <div className="col-span-2">
+            <Label>Description</Label>
+            <Input value={form.description || ''} onChange={(e) => set('description', e.target.value)} />
+          </div>
+          <div>
+            <Label>Caller ID name</Label>
+            <Input value={form.effective_caller_id_name || ''} onChange={(e) => set('effective_caller_id_name', e.target.value)} />
+          </div>
+          <div>
+            <Label>Caller ID number</Label>
+            <Input value={form.effective_caller_id_number || ''} onChange={(e) => set('effective_caller_id_number', e.target.value)} />
+          </div>
+          <div>
+            <Label>SIP password</Label>
+            <Input type="password" value={form.password || ''} onChange={(e) => set('password', e.target.value)} />
+          </div>
+          <div>
+            <Label>Voicemail password</Label>
+            <Input type="password" value={form.voicemail_password || ''} onChange={(e) => set('voicemail_password', e.target.value)} />
+          </div>
+          <div>
+            <Label>Call timeout (sec)</Label>
+            <Input type="number" value={form.call_timeout ?? 30} onChange={(e) => set('call_timeout', Number(e.target.value))} />
+          </div>
+          <div>
+            <Label>Forward all to</Label>
+            <Input value={form.forward_all_destination || ''} onChange={(e) => set('forward_all_destination', e.target.value)} />
+          </div>
+          <div className="flex items-center justify-between border rounded p-3">
+            <Label htmlFor="vm">Voicemail enabled</Label>
+            <Switch id="vm" checked={!!form.voicemail_enabled} onCheckedChange={(v) => set('voicemail_enabled', v)} />
+          </div>
+          <div className="flex items-center justify-between border rounded p-3">
+            <Label htmlFor="dnd">Do Not Disturb</Label>
+            <Switch id="dnd" checked={!!form.do_not_disturb} onCheckedChange={(v) => set('do_not_disturb', v)} />
+          </div>
+          <div className="flex items-center justify-between border rounded p-3">
+            <Label htmlFor="fwd">Forward all</Label>
+            <Switch id="fwd" checked={!!form.forward_all_enabled} onCheckedChange={(v) => set('forward_all_enabled', v)} />
+          </div>
+          <div className="flex items-center justify-between border rounded p-3">
+            <Label htmlFor="en">Enabled</Label>
+            <Switch id="en" checked={!!form.enabled} onCheckedChange={(v) => set('enabled', v)} />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={onSave} disabled={saving || loading}>
+            {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save & sync to FusionPBX
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

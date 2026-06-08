@@ -6,13 +6,17 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Smartphone, Plus, Circle, Loader2, X, BellOff, PhoneForwarded, AlertCircle, Activity } from 'lucide-react';
+import { Smartphone, Plus, Circle, Loader2, X, BellOff, PhoneForwarded, AlertCircle, Activity, Pencil, Trash2 } from 'lucide-react';
 import { usePbxExtensions, usePbxSoftphoneUsers } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
 import { SyncEverythingButton } from '@/components/lemtel/SyncEverythingButton';
 import { ProvisionExtensionModal } from '@/components/lemtel/ProvisionExtensionModal';
 import { EnableSoftphonePopover } from '@/components/lemtel/EnableSoftphonePopover';
 import { ExtensionStatusDialog } from '@/components/lemtel/ExtensionStatusDialog';
+import { ExtensionEditDialog } from '@/components/lemtel/ExtensionEditDialog';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 
 type ExtType = { label: string; cls: string };
