@@ -149,6 +149,14 @@ export default function MasterOrganizations() {
                     <Button size="sm" variant="ghost" title="Edit">
                       <Edit className="h-4 w-4" />
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setCsvOrg({ id: o.id, name: o.name })}
+                      title="Import users from CSV"
+                    >
+                      <Upload className="h-4 w-4" />
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => suspend(o.id, o.status)} title="Suspend">
                       <Pause className="h-4 w-4" />
                     </Button>
