@@ -40,7 +40,7 @@ const AuthPage = () => {
 
   useEffect(() => {
     if (user && mode !== 'reset') {
-      navigate('/home');
+      navigate('/post-login');
     }
   }, [user, navigate, mode]);
 
@@ -59,7 +59,7 @@ const AuthPage = () => {
       if (mode === 'login') {
         const { error } = await signIn(email, password);
         if (!error) {
-          navigate('/home');
+          navigate('/post-login');
         }
       } else if (mode === 'signup') {
         const { error } = await signUp(email, password, fullName);
@@ -72,7 +72,7 @@ const AuthPage = () => {
         }
         const { error } = await updatePassword(password);
         if (!error) {
-          navigate('/home');
+          navigate('/post-login');
         }
       }
     } finally {
