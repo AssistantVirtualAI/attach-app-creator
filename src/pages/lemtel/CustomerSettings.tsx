@@ -88,7 +88,7 @@ export default function CustomerSettings() {
     queryKey: ["org-dids", org?.id],
     enabled: !!org?.id,
     queryFn: async () => {
-      const { data } = await (supabase as any).from("pbx_dids").select("*").eq("organization_id", org.id);
+      const { data } = await (supabase as any).from("phone_numbers").select("*").eq("organization_id", org.id);
       return (data || []) as any[];
     },
   });

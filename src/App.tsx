@@ -795,7 +795,18 @@ const App = () => (
                   <Route path="settings" element={<MySettings />} />
                 </Route>
 
+                {/* Legacy /admin/* redirects → /platform/* */}
+                <Route path="/admin" element={<Navigate to="/platform" replace />} />
+                <Route path="/admin/users" element={<Navigate to="/platform/users" replace />} />
+                <Route path="/admin/audit" element={<Navigate to="/platform/audit" replace />} />
+                <Route path="/admin/organizations" element={<Navigate to="/platform/organizations" replace />} />
+                <Route path="/admin/billing" element={<Navigate to="/platform/billing" replace />} />
+                <Route path="/admin/system" element={<Navigate to="/platform/system" replace />} />
+                <Route path="/admin/settings" element={<Navigate to="/platform/settings" replace />} />
+                <Route path="/admin/*" element={<Navigate to="/platform" replace />} />
+
                 <Route path="*" element={<NotFound />} />
+
 
               </Routes>
             </Suspense>

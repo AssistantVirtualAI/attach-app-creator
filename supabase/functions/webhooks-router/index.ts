@@ -163,7 +163,12 @@ serve(async (req) => {
       }
       console.log(`Webhook signature verified for platform: ${platform}`);
     } else {
-      console.warn(`No webhook secret configured for platform: ${platform}, org: ${organizationId} - skipping signature verification`);
+      // SECURITY: never silently accept unsigned webhooks on a public endpoint.
+      console.error(`No webhook secret configured for platform: ${platform}, org: ${organizationId} - rejecting request`);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Webhook secret not configured for this organization/platform. Configure a secret before sending events.' }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Parse webhook payload
