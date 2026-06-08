@@ -23,7 +23,7 @@ const stamp = (n?: number | null) => n ? new Date(n).toLocaleTimeString() : '—
 export default function TelephonyDiagnostics() {
   const { data: providerStatus, refetch: refetchProvider } = useTelephonyStatus();
   const softphone = useSoftphone();
-  const audioRef = (typeof document !== 'undefined') ? null : null;
+  
   const [running, setRunning] = useState(false);
   const [filterGroup, setFilterGroup] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
