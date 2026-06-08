@@ -12,7 +12,8 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { SidebarFooter } from '@/components/sidebar/SidebarFooter';
 import { SidebarNavGroup } from '@/components/sidebar/SidebarNavGroup';
-import { sidebarGroups, settingsLink, NavGroup } from '@/components/sidebar/sidebarConfig';
+import { sidebarGroups, settingsLink, NavGroup, getSidebarScope } from '@/components/sidebar/sidebarConfig';
+import { UserCircle2, ArrowLeft } from 'lucide-react';
 import { CookieConsentBanner } from '@/components/gdpr/CookieConsentBanner';
 import { motion } from 'framer-motion';
 import {
