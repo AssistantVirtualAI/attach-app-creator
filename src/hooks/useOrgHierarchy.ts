@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+const LEMTEL_ORG_ID = "71755d33-ed64-4ad5-a828-61c9d2029eb7";
+
 export interface OrgNode {
   id: string;
   name: string;
@@ -26,8 +28,26 @@ export function useOrgHierarchy() {
         .order("name", { ascending: true });
       if (error) throw error;
       const all = (data || []) as any[];
+
+      // Only include Lemtel + its descendants. Excludes "AVA Main Dashboard"
+      // and any other internal/unrelated organizations.
+      const included = new Set<string>([LEMTEL_ORG_ID]);
+      let added = true;
+      while (added) {
+        added = false;
+        for (const o of all) {
+          if (!included.has(o.id) && o.parent_org_id && included.has(o.parent_org_id)) {
+            included.add(o.id);
+            added = true;
+          }
+        }
+      }
+      const scoped = all.filter(
+        (o) => included.has(o.id) && o.org_type !== "internal"
+      );
+
       const map = new Map<string, OrgNode>();
-      all.forEach((o) => map.set(o.id, { ...o, children: [] }));
+      scoped.forEach((o) => map.set(o.id, { ...o, children: [] }));
       const roots: OrgNode[] = [];
       map.forEach((node) => {
         if (node.parent_org_id && map.has(node.parent_org_id)) {

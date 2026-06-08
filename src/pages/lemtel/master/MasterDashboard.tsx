@@ -50,14 +50,32 @@ export default function MasterDashboard() {
   const { data: stats } = useQuery({
     queryKey: ["master-stats"],
     queryFn: async () => {
+      const LEMTEL = "71755d33-ed64-4ad5-a828-61c9d2029eb7";
+      // Lemtel subtree: Lemtel + any org whose parent is Lemtel
+      const { data: subtreeRows } = await supabase
+        .from("organizations")
+        .select("id")
+        .or(`id.eq.${LEMTEL},parent_org_id.eq.${LEMTEL}`);
+      const subtreeIds = (subtreeRows || []).map((r: any) => r.id);
+      const ids = subtreeIds.length ? subtreeIds : [LEMTEL];
+
+      const startOfDay = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+
       const [orgs, users, exts, calls] = await Promise.all([
-        supabase.from("organizations").select("id", { count: "exact", head: true }),
-        supabase.from("profiles").select("id", { count: "exact", head: true }),
-        supabase.from("pbx_softphone_users" as any).select("id", { count: "exact", head: true }),
+        Promise.resolve({ count: ids.length }),
+        supabase
+          .from("organization_members")
+          .select("user_id", { count: "exact", head: true })
+          .in("organization_id", ids),
+        supabase
+          .from("pbx_extensions" as any)
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", LEMTEL),
         supabase
           .from("pbx_call_records" as any)
           .select("id", { count: "exact", head: true })
-          .gte("start_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
+          .eq("organization_id", LEMTEL)
+          .gte("start_at", startOfDay),
       ]);
       return {
         orgs: orgs.count || 0,
