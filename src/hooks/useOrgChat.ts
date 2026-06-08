@@ -128,3 +128,35 @@ export function useOrgChat(_orgId?: string) {
     },
   };
 }
+
+export function useThread(parentId: string | null) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const query = useQuery<{ messages: ChatMessage[] }>({
+    queryKey: ["org-chat-thread", parentId],
+    queryFn: () => invoke("list_thread", { parent_message_id: parentId }),
+    enabled: !!parentId,
+  });
+  useEffect(() => { if (query.data?.messages) setMessages(query.data.messages); }, [query.data]);
+  useEffect(() => {
+    if (!parentId) return;
+    const ch = supabase
+      .channel(`org-chat-thread-${parentId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "org_chat_messages", filter: `parent_message_id=eq.${parentId}` }, (p: any) => {
+        setMessages((prev) => (prev.some((m) => m.id === p.new.id) ? prev : [...prev, p.new]));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [parentId]);
+  const reply = useMutation({
+    mutationFn: (p: { channel_id: string; content: string; attachments?: any[] }) =>
+      invoke("send_message", { ...p, parent_message_id: parentId }),
+  });
+  return { query, messages, reply };
+}
+
+export function useChatSearch() {
+  return useMutation({
+    mutationFn: (p: { query: string; channel_id?: string }) => invoke("search_messages", p),
+  });
+}
+
