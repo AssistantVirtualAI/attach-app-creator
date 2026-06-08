@@ -67,6 +67,38 @@ serve(async (req) => {
 
     const serverConfig = server as MCPServerConfig;
 
+    // SSRF guard: only https:// and block private/loopback/link-local hosts
+    const urlCheck = (() => {
+      try {
+        const u = new URL(serverConfig.server_url);
+        if (u.protocol !== 'https:') return 'scheme';
+        const h = u.hostname.toLowerCase();
+        if (h === 'localhost' || h === '::1' || h.endsWith('.localhost')) return 'host';
+        // IPv4 private/loopback/link-local
+        const m = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+        if (m) {
+          const [a, b] = [parseInt(m[1]), parseInt(m[2])];
+          if (a === 10) return 'host';
+          if (a === 127) return 'host';
+          if (a === 0) return 'host';
+          if (a === 169 && b === 254) return 'host';
+          if (a === 172 && b >= 16 && b <= 31) return 'host';
+          if (a === 192 && b === 168) return 'host';
+          if (a >= 224) return 'host'; // multicast/reserved
+        }
+        // IPv6 private ranges
+        if (h.startsWith('fc') || h.startsWith('fd') || h.startsWith('fe80')) return 'host';
+        return null;
+      } catch { return 'invalid'; }
+    })();
+    if (urlCheck) {
+      return new Response(
+        JSON.stringify({ error: `Disallowed server_url (${urlCheck})` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+
     // Build headers based on auth type
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

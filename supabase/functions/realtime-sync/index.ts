@@ -73,10 +73,47 @@ async function runOne(supabase: ReturnType<typeof createClient>, kind: SyncKind,
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
+    // AUTH: only service-role or org admins/super-admins can trigger sync
+    const authHeader = req.headers.get('Authorization') || '';
+    const token = authHeader.replace(/^Bearer\s+/i, '');
     const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
     const orgId = (body.organizationId as string) || LEMTEL_ORG_ID;
     const requested: SyncKind = (body.kind as SyncKind) || 'all';
+
+    const isServiceRole = token && token === SERVICE_ROLE;
+    if (!isServiceRole) {
+      if (!token) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const userClient = createClient(SUPABASE_URL, SERVICE_ROLE, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user } } = await userClient.auth.getUser();
+      if (!user) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+      const { data: isSuper } = await admin.rpc('is_super_admin', { _user_id: user.id });
+      let allowed = !!isSuper;
+      if (!allowed) {
+        const { data: hasAdmin } = await admin.rpc('has_role', {
+          _user_id: user.id, _org_id: orgId, _role: 'org_admin',
+        });
+        allowed = !!hasAdmin;
+      }
+      if (!allowed) {
+        return new Response(JSON.stringify({ error: 'forbidden' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
+
 
     const kinds: SyncKind[] = requested === 'all'
       ? ['extensions', 'devices', 'dids', 'ivr', 'queues', 'ring-groups', 'cdrs', 'recordings', 'voicemails']

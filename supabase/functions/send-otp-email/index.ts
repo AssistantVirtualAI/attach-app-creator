@@ -32,11 +32,49 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // SECURITY: require authenticated caller (org_admin or super_admin)
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401, headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+    const userClient = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !user) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401, headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
     const { email, name, organizationId }: OTPEmailRequest = await req.json();
 
     if (!email || !organizationId) {
       throw new Error("Email and organizationId are required");
     }
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!EMAIL_RE.test(email) || email.length > 320) {
+      return new Response(JSON.stringify({ error: "invalid_email" }), {
+        status: 400, headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
+    const { data: isSuper } = await supabase.rpc("is_super_admin", { _user_id: user.id });
+    let allowed = !!isSuper;
+    if (!allowed) {
+      const { data: hasAdmin } = await supabase.rpc("has_role", {
+        _user_id: user.id, _org_id: organizationId, _role: "org_admin",
+      });
+      allowed = !!hasAdmin;
+    }
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "forbidden" }), {
+        status: 403, headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
 
     // Generate OTP code
     const otpCode = generateOTP();
