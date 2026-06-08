@@ -169,7 +169,12 @@ class JsSipProvider {
         connection_recovery_max_interval: 30,
         user_agent: 'Lemtel Telecom 1.1',
         hackWssInTransport: true,
-      });
+        pcConfig: {
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+          rtcpMuxPolicy: 'require',
+          bundlePolicy: 'max-bundle',
+        },
+      } as any);
 
       ua.on('connecting', () => {
         this.logEvent('info', 'WebSocket connecting…');
