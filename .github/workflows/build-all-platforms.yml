@@ -385,11 +385,7 @@ jobs:
   create-release:
     needs: [build-mac, build-windows, build-linux, build-android, build-ios]
     runs-on: ubuntu-latest
-    if: always() && (
-      needs.build-mac.result == 'success' ||
-      needs.build-windows.result == 'success' ||
-      needs.build-linux.result == 'success'
-    )
+    if: ${{ always() && (needs.build-mac.result == 'success' || needs.build-windows.result == 'success' || needs.build-linux.result == 'success') }}
     permissions:
       contents: write
     steps:
