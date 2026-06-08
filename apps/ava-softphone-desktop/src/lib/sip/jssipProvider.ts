@@ -169,7 +169,12 @@ class JsSipProvider {
         connection_recovery_max_interval: 30,
         user_agent: 'Lemtel Telecom 1.1',
         hackWssInTransport: true,
-      });
+        pcConfig: {
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+          rtcpMuxPolicy: 'require',
+          bundlePolicy: 'max-bundle',
+        },
+      } as any);
 
       ua.on('connecting', () => {
         this.logEvent('info', 'WebSocket connecting…');
@@ -281,6 +286,19 @@ class JsSipProvider {
   private bindMedia(session: any) {
     const pc = session.connection;
     if (!pc) return;
+
+    // SDP munging: re-order audio codecs to PCMU, PCMA, opus, telephone-event.
+    // FusionPBX often rejects (488) opus-only offers; PSTN gateways want G.711.
+    const originalSLD = pc.setLocalDescription?.bind(pc);
+    if (originalSLD) {
+      pc.setLocalDescription = (desc: any) => {
+        try {
+          if (desc?.sdp) desc = { type: desc.type, sdp: preferAudioCodecs(desc.sdp) };
+        } catch { /* noop */ }
+        return originalSLD(desc);
+      };
+    }
+
     pc.addEventListener('track', (ev: any) => {
       if (this.audioEl && ev.streams[0]) {
         this.audioEl.srcObject = ev.streams[0];
@@ -295,6 +313,11 @@ class JsSipProvider {
   private resetCall() {
     this.session = null;
     this.secondSession = null;
+    // Clear audio element to avoid stale stream / black-screen after failed call.
+    if (this.audioEl) {
+      try { this.audioEl.pause(); } catch { /* noop */ }
+      try { this.audioEl.srcObject = null; } catch { /* noop */ }
+    }
     this.update({
       callState: 'idle',
       remoteIdentity: '',
@@ -303,6 +326,7 @@ class JsSipProvider {
       startedAt: null,
       muted: false,
       onHold: false,
+      errorCause: undefined,
     });
   }
 
@@ -498,3 +522,34 @@ class JsSipProvider {
 }
 
 export const sipProvider = new JsSipProvider();
+
+/**
+ * Re-orders the audio m-line's payload types so PCMU(0), PCMA(8), then opus are
+ * advertised first, with telephone-event preserved. FusionPBX trunks generally
+ * require G.711 and return SIP 488 "Incompatible SDP" if only opus is offered.
+ */
+export function preferAudioCodecs(sdp: string): string {
+  const lines = sdp.split(/\r?\n/);
+  const audioIdx = lines.findIndex((l) => l.startsWith('m=audio'));
+  if (audioIdx === -1) return sdp;
+
+  // Map payload type -> codec name from rtpmap lines.
+  const rtpmap = new Map<string, string>();
+  for (const l of lines) {
+    const m = l.match(/^a=rtpmap:(\d+)\s+([A-Za-z0-9\-]+)\//);
+    if (m) rtpmap.set(m[1], m[2].toLowerCase());
+  }
+
+  const mParts = lines[audioIdx].split(' ');
+  const header = mParts.slice(0, 3); // m=audio PORT PROTO
+  const pts = mParts.slice(3);
+  const priority = ['pcmu', 'pcma', 'opus', 'telephone-event'];
+  const score = (pt: string) => {
+    const name = rtpmap.get(pt) || '';
+    const idx = priority.indexOf(name);
+    return idx === -1 ? 999 : idx;
+  };
+  const sorted = [...pts].sort((a, b) => score(a) - score(b));
+  lines[audioIdx] = [...header, ...sorted].join(' ');
+  return lines.join('\r\n');
+}

@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi } from '../lib/mobileApi';
 import { Card, Chip, AIPanel, SectionTitle, PrimaryButton, GhostButton } from '../components/ui/Primitives';
 import { AvaBadge } from '../components/Brand';
 
-type Module = 'intelligence' | 'actions' | 'greetings' | 'queues' | 'agents';
+type Module = 'chat' | 'intelligence' | 'actions' | 'greetings' | 'queues' | 'agents';
 
 const MODULES: { id: Module; label: string; desc: string; tone: 'violet' | 'cyan' | 'gold' | 'success' | 'danger' }[] = [
+  { id: 'chat',         label: 'Chat with AVA',     desc: 'Manage your phone system by chatting with AVA.',     tone: 'cyan' },
   { id: 'intelligence', label: 'Call Intelligence', desc: 'Summaries, sentiment, topics, opportunities, risks.', tone: 'violet' },
   { id: 'actions',      label: 'Action Center',     desc: 'Follow-ups extracted from calls and messages.',     tone: 'cyan' },
   { id: 'greetings',    label: 'Greeting Studio',   desc: 'Generate IVR/voicemail greetings with ElevenLabs.', tone: 'gold' },
@@ -15,7 +16,7 @@ const MODULES: { id: Module; label: string; desc: string; tone: 'violet' | 'cyan
 ];
 
 export default function AIScreen() {
-  const [active, setActive] = useState<Module>('intelligence');
+  const [active, setActive] = useState<Module>('chat');
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
@@ -44,6 +45,7 @@ export default function AIScreen() {
         })}
       </div>
 
+      {active === 'chat' && <ChatWithAva />}
       {active === 'intelligence' && <Intelligence />}
       {active === 'actions' && <Actions />}
       {active === 'greetings' && <Greetings />}
@@ -174,5 +176,76 @@ function Agents() {
         </Card>
       ))}
     </>
+  );
+}
+
+interface ChatMsg { role: 'user' | 'assistant'; content: string; tools?: { name: string }[] }
+
+function ChatWithAva() {
+  const [messages, setMessages] = useState<ChatMsg[]>([
+    { role: 'assistant', content: 'Bonjour 👋 I can manage your phone system. Try "show recent calls" or "list extensions".' },
+  ]);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages, busy]);
+
+  const send = async () => {
+    const text = input.trim();
+    if (!text || busy) return;
+    const next: ChatMsg[] = [...messages, { role: 'user', content: text }];
+    setMessages(next);
+    setInput('');
+    setBusy(true);
+    try {
+      const data: any = await mobileApi.chatWithAva(next.map((m) => ({ role: m.role, content: m.content })));
+      setMessages([...next, { role: 'assistant', content: data?.text || '(empty)', tools: data?.toolCalls }]);
+    } catch (e: any) {
+      setMessages([...next, { role: 'assistant', content: `⚠ ${e?.message || 'Request failed'}` }]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card padded={true} accent="cyan">
+      <div ref={scrollRef} style={{ maxHeight: 360, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+        {messages.map((m, i) => (
+          <div key={i} style={{
+            alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%',
+            padding: '8px 12px', borderRadius: 12,
+            background: m.role === 'user' ? gradients.ava : colors.midnight2,
+            color: m.role === 'user' ? '#fff' : colors.textIce,
+            fontSize: font.sm, lineHeight: 1.45, whiteSpace: 'pre-wrap',
+            border: m.role === 'user' ? 'none' : `1px solid ${colors.border}`,
+          }}>
+            {m.content}
+            {m.tools && m.tools.length > 0 && (
+              <div style={{ marginTop: 6, fontSize: 10, color: colors.avaCyan, opacity: 0.85 }}>
+                ✓ {m.tools.map((t) => t.name).join(' · ')}
+              </div>
+            )}
+          </div>
+        ))}
+        {busy && <div style={{ fontSize: font.xs, color: colors.mutedSilver, alignSelf: 'flex-start' }}>AVA is thinking…</div>}
+      </div>
+      <form onSubmit={(e) => { e.preventDefault(); send(); }} style={{ display: 'flex', gap: 6 }}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask AVA…"
+          disabled={busy}
+          style={{
+            flex: 1, padding: '10px 12px', borderRadius: 10,
+            background: colors.midnight2, border: `1px solid ${colors.borderAI}`,
+            color: colors.textIce, fontSize: font.base, outline: 'none',
+          }}
+        />
+        <PrimaryButton type="submit" disabled={busy || !input.trim()}>Send</PrimaryButton>
+      </form>
+    </Card>
   );
 }

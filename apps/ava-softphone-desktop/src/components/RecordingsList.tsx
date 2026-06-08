@@ -40,15 +40,24 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
 
   const analyze = async (id: string) => {
     setWorking(id);
+    setError(null);
     try {
       const r1 = await supabase.functions.invoke('ai-transcribe-call', {
         body: { call_record_id: id, organization_id: LEMTEL_ORG },
       });
-      if (r1.error) throw r1.error;
+      if (r1.error) throw new Error(r1.error.message || 'Transcription failed');
+      if (r1.data?.error === 'NO_RECORDING_YET') {
+        setError('Recording is not yet available from the PBX. Please try again in a few moments.');
+        return;
+      }
       const r2 = await supabase.functions.invoke('ai-analyze-call', {
-        body: { call_record_id: id, organization_id: LEMTEL_ORG },
+        body: {
+          call_record_id: id,
+          organization_id: LEMTEL_ORG,
+          transcript_text: r1.data?.transcript_text || '',
+        },
       });
-      if (r2.error) throw r2.error;
+      if (r2.error) throw new Error(r2.error.message || 'Analysis failed');
       onAnalyze?.(id);
       await load();
     } catch (e: any) {

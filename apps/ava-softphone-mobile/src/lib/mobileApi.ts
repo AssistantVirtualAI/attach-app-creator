@@ -202,4 +202,9 @@ export const mobileApi = {
   setDnd: (enabled: boolean) => call<{ ok: true }>(
     '/mobile-settings-dnd', { method: 'POST', body: JSON.stringify({ enabled }) }, { ok: true },
   ),
+
+  chatWithAva: (messages: { role: string; content: string }[]) => call<{ text: string; toolCalls: { name: string }[] }>(
+    '/pbx-chat-agent', { method: 'POST', body: JSON.stringify({ messages }) },
+    { text: 'Sign in to use AVA chat.', toolCalls: [] },
+  ),
 };

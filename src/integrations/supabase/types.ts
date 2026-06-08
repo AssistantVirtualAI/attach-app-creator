@@ -3451,6 +3451,36 @@ export type Database = {
           },
         ]
       }
+      pbx_ai_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          messages: Json
+          organization_id: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          organization_id: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          organization_id?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       pbx_ai_insights: {
         Row: {
           action_items: string[] | null
@@ -3542,6 +3572,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pbx_ai_jobs: {
+        Row: {
+          call_record_id: string | null
+          created_at: string
+          created_by: string | null
+          error: string | null
+          id: string
+          kind: string
+          organization_id: string
+          result: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          call_record_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          kind?: string
+          organization_id: string
+          result?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          call_record_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          error?: string | null
+          id?: string
+          kind?: string
+          organization_id?: string
+          result?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       pbx_call_forwarding: {
         Row: {
