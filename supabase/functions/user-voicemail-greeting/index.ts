@@ -1,0 +1,145 @@
+// @ts-nocheck
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+const ELEVEN_KEY = Deno.env.get("ELEVENLABS_API_KEY") ?? "";
+
+const TOP_VOICES = [
+  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah" },
+  { id: "JBFqnCBsd6RMkjVDRZzb", name: "George" },
+  { id: "CwhRBWXzGAHq8TQ4Fs17", name: "Roger" },
+  { id: "FGY2WhTYpPnrIDTdsKH5", name: "Laura" },
+  { id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam" },
+  { id: "Xb7hH8MSUJpSbSDYk0k2", name: "Alice" },
+];
+
+async function ttsToBlob(text: string, voiceId: string): Promise<ArrayBuffer> {
+  if (!ELEVEN_KEY) throw new Error("missing_elevenlabs_key");
+  const r = await fetch(
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
+    {
+      method: "POST",
+      headers: { "xi-api-key": ELEVEN_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        model_id: "eleven_multilingual_v2",
+        voice_settings: { stability: 0.5, similarity_boost: 0.75, use_speaker_boost: true },
+      }),
+    },
+  );
+  if (!r.ok) throw new Error("tts_failed: " + (await r.text()));
+  return r.arrayBuffer();
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  try {
+    const auth = req.headers.get("Authorization") ?? "";
+    const token = auth.replace(/^Bearer\s+/i, "");
+    if (!token) return json({ error: "missing_auth" }, 401);
+
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const { data: userRes } = await userClient.auth.getUser();
+    if (!userRes?.user) return json({ error: "invalid_auth" }, 401);
+    const userId = userRes.user.id;
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+
+    const { action, payload } = await req.json().catch(() => ({}));
+    if (!action) return json({ error: "missing_action" }, 400);
+
+    const { data: spu } = await admin
+      .from("pbx_softphone_users")
+      .select("id, organization_id, extension")
+      .eq("portal_user_id", userId)
+      .maybeSingle();
+
+    if (action === "voices") return json({ voices: TOP_VOICES });
+
+    if (action === "get_settings") {
+      if (!spu) return json({ settings: null });
+      const { data } = await admin
+        .from("pbx_voicemail_settings")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle();
+      return json({ settings: data ?? null, voices: TOP_VOICES });
+    }
+
+    if (action === "save_settings") {
+      if (!spu) return json({ error: "no_extension" }, 400);
+      const row = {
+        user_id: userId,
+        organization_id: spu.organization_id,
+        greeting_type: payload.greeting_type ?? "default",
+        greeting_tts_text: payload.greeting_tts_text ?? null,
+        greeting_voice_id: payload.greeting_voice_id ?? null,
+        greeting_voice_name: payload.greeting_voice_name ?? null,
+        greeting_storage_path: payload.greeting_storage_path ?? null,
+        greeting_audio_url: payload.greeting_audio_url ?? null,
+        transcription_enabled: payload.transcription_enabled ?? true,
+        ai_summary_enabled: payload.ai_summary_enabled ?? true,
+        notify_email: payload.notify_email ?? true,
+        attach_audio_email: payload.attach_audio_email ?? false,
+        greeting_updated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await admin
+        .from("pbx_voicemail_settings")
+        .upsert(row, { onConflict: "user_id" });
+      if (error) throw error;
+      await admin.from("audit_logs").insert({
+        organization_id: spu.organization_id,
+        user_id: userId,
+        action: "voicemail_settings_saved",
+        resource_type: "pbx_voicemail_settings",
+        metadata: { source: "desktop_app", greeting_type: row.greeting_type },
+      });
+      return json({ ok: true });
+    }
+
+    if (action === "generate_tts") {
+      if (!spu) return json({ error: "no_extension" }, 400);
+      const text: string = String(payload?.text ?? "").trim();
+      const voiceId: string = String(payload?.voice_id ?? "EXAVITQu4vr4xnSDxMaL");
+      if (!text) return json({ error: "missing_text" }, 400);
+      const audio = await ttsToBlob(text, voiceId);
+      const path = `${spu.organization_id}/${userId}/greeting-${Date.now()}.mp3`;
+      const { error: upErr } = await admin.storage.from("voicemail-greetings").upload(path, new Uint8Array(audio), {
+        contentType: "audio/mpeg",
+        upsert: true,
+      });
+      if (upErr) throw upErr;
+      const { data: signed } = await admin.storage.from("voicemail-greetings").createSignedUrl(path, 3600);
+      return json({ storage_path: path, url: signed?.signedUrl ?? null });
+    }
+
+    if (action === "get_greeting_url") {
+      const path: string = payload?.path;
+      if (!path) return json({ url: null });
+      const { data, error } = await admin.storage.from("voicemail-greetings").createSignedUrl(path, 3600);
+      if (error) throw error;
+      return json({ url: data.signedUrl });
+    }
+
+    return json({ error: "unknown_action" }, 400);
+  } catch (e) {
+    return json({ error: String(e?.message ?? e) }, 500);
+  }
+});
