@@ -38,7 +38,8 @@ export default function CustomerSettings() {
       setBrandName(org.brand_name || org.name || "");
       setBrandLogo(org.brand_logo_url || "");
       setBrandColor(org.brand_primary_color || "#0023e6");
-      setSupportEmail(org.support_email || "");
+      setSupportEmail(org.support_email || org.brand_support_email || "");
+      setPortalDomain(org.brand_portal_domain || "");
     }
   }, [org]);
 
@@ -46,11 +47,32 @@ export default function CustomerSettings() {
     if (!org?.id) return;
     const { error } = await supabase.from("organizations").update({
       brand_name: brandName, brand_logo_url: brandLogo,
-      brand_primary_color: brandColor, support_email: supportEmail,
+      brand_primary_color: brandColor, brand_support_email: supportEmail,
     }).eq("id", org.id);
     if (error) return toast.error(error.message);
     toast.success("Branding saved");
     qc.invalidateQueries({ queryKey: ["org-full", slug] });
+  };
+
+  const saveDomain = async () => {
+    if (!org?.id) return;
+    const domain = portalDomain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
+    if (domain && !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) {
+      return toast.error("Enter a valid domain (e.g. portal.acme.com)");
+    }
+    setSavingDomain(true);
+    const { error } = await supabase.from("organizations").update({
+      brand_portal_domain: domain || null,
+    }).eq("id", org.id);
+    setSavingDomain(false);
+    if (error) return toast.error(error.message);
+    toast.success("Domain saved");
+    qc.invalidateQueries({ queryKey: ["org-full", slug] });
+  };
+
+  const copy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied");
   };
 
   const { data: members = [] } = useQuery({
