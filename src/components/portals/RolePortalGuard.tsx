@@ -13,7 +13,7 @@ type Portal = "platform" | "customer" | "my";
  *
  * Unauthorized users are redirected to the portal they DO have access to.
  */
-export function PortalGuard({ portal, children }: { portal: Portal; children: ReactNode }) {
+export function RolePortalGuard({ portal, children }: { portal: Portal; children: ReactNode }) {
   const { user, loading } = useAuth();
   const [state, setState] = useState<"checking" | "allow" | "deny-platform" | "deny-customer">("checking");
 
