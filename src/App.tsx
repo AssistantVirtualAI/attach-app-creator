@@ -14,6 +14,8 @@ import { AppErrorBoundary } from "@/components/errors/AppErrorBoundary";
 import Landing from "./pages/Landing";
 import AuthPage from "./pages/Auth";
 import AgencyHome from "./pages/AgencyHome";
+import PostLoginRedirect from "./pages/PostLoginRedirect";
+
 import Dashboard from "./pages/Dashboard";
 import VoiceAnalytics from "./pages/VoiceAnalytics";
 import Conversations from "./pages/Conversations";
