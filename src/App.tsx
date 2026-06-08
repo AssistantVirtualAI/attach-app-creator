@@ -127,6 +127,7 @@ import AdminVoicemail from "./pages/lemtel/admin/AdminVoicemail";
 import AdminReports from "./pages/lemtel/admin/AdminReports";
 import MySettings from "./pages/lemtel/my/MySettings";
 import { DownloadCenter } from "./components/portal/DownloadCenter";
+import { AppLayout } from "./components/layout/AppLayout";
 
 // v4.0.0 — Multi-tenant reseller architecture
 import { WhitelabelProvider } from "./contexts/WhitelabelContext";
@@ -182,6 +183,18 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   return <TrialExpiredGate>{children}</TrialExpiredGate>;
 };
+
+const LemtelAdminPage = ({ children }: { children: React.ReactNode }) => (
+  <ProtectedRoute><LemtelGuard><AppLayout><AdminPortalLayout>{children}</AdminPortalLayout></AppLayout></LemtelGuard></ProtectedRoute>
+);
+
+const LemtelUserPage = ({ children }: { children: React.ReactNode }) => (
+  <ProtectedRoute><LemtelGuard><AppLayout><UserPortalLayout>{children}</UserPortalLayout></AppLayout></LemtelGuard></ProtectedRoute>
+);
+
+const LemtelTelephonyPage = ({ children }: { children: React.ReactNode }) => (
+  <ProtectedRoute><LemtelGuard><AppLayout><TelephonyLayout>{children}</TelephonyLayout></AppLayout></LemtelGuard></ProtectedRoute>
+);
 
 const App = () => (
   <AppErrorBoundary>
