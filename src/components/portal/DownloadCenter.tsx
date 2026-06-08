@@ -15,7 +15,22 @@ function fmtSize(b?: number) {
 }
 
 export function DownloadCenter({ personalize = false }: { personalize?: boolean }) {
-  const { data: release } = useQuery({
+  const { data: dbRelease } = useQuery({
+    queryKey: ['app_releases_latest'],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from('app_releases')
+        .select('tag, name, platform_urls, assets, published_at')
+        .eq('is_latest', true)
+        .order('published_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: ghRelease } = useQuery({
     queryKey: ['gh-release', GH_REPO],
     queryFn: async () => {
       const r = await fetch(`https://api.github.com/repos/${GH_REPO}/releases/latest`);
@@ -24,7 +39,9 @@ export function DownloadCenter({ personalize = false }: { personalize?: boolean 
     },
     retry: false,
     staleTime: 60 * 60_000,
+    enabled: !dbRelease,
   });
+  const release = dbRelease || ghRelease;
 
   const [me, setMe] = useState<{ email?: string; ext?: string }>({});
   useEffect(() => {
