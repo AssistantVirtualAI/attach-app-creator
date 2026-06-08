@@ -751,6 +751,50 @@ const App = () => (
                 </Route>
 
                 <Route path="/post-login" element={<ProtectedRoute><PostLoginRedirect /></ProtectedRoute>} />
+
+                {/* === Three-portal architecture === */}
+                {/* Platform Admin — AVA / Lemtel internal */}
+                <Route path="/platform" element={<ProtectedRoute><LemtelGuard><PlatformAdminShell /></LemtelGuard></ProtectedRoute>}>
+                  <Route index element={<PlatformDashboard />} />
+                  <Route path="organizations" element={<MasterOrganizations />} />
+                  <Route path="users" element={<MasterAllUsers />} />
+                  <Route path="calls" element={<MasterAllCalls />} />
+                  <Route path="telephony" element={<TelephonyDashboard />} />
+                  <Route path="billing" element={<MasterBilling />} />
+                  <Route path="system" element={<MasterSystem />} />
+                  <Route path="audit" element={<MasterAuditLogs />} />
+                  <Route path="settings" element={<LemtelSettings />} />
+                </Route>
+
+                {/* Customer Admin — workspace owners / resellers */}
+                <Route path="/customer" element={<ProtectedRoute><CustomerAdminShell /></ProtectedRoute>}>
+                  <Route index element={<CustomerDashboard />} />
+                  <Route path="team" element={<Team />} />
+                  <Route path="extensions" element={<LemtelExtensions />} />
+                  <Route path="queues" element={<LemtelQueues />} />
+                  <Route path="ivr" element={<LemtelIVR />} />
+                  <Route path="numbers" element={<PhoneNumbers />} />
+                  <Route path="calls" element={<LemtelPortalCalls />} />
+                  <Route path="analytics" element={<LemtelAnalytics />} />
+                  <Route path="knowledge" element={<KnowledgeBase />} />
+                  <Route path="billing" element={<StripeBilling />} />
+                  <Route path="settings" element={<Settings />} />
+                </Route>
+
+                {/* My Workspace — end users */}
+                <Route path="/my" element={<ProtectedRoute><MyWorkspaceShell /></ProtectedRoute>}>
+                  <Route index element={<MyDashboardLanding />} />
+                  <Route path="dashboard" element={<MyDashboardLanding />} />
+                  <Route path="softphone" element={<TelephonyWebphone />} />
+                  <Route path="calls" element={<LemtelPortalCalls />} />
+                  <Route path="voicemail" element={<AdminVoicemail scope="mine" />} />
+                  <Route path="messages" element={<LemtelMessages />} />
+                  <Route path="recordings" element={<AdminRecordings scope="mine" />} />
+                  <Route path="downloads" element={<DownloadCenter personalize />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="settings" element={<MySettings />} />
+                </Route>
+
                 <Route path="*" element={<NotFound />} />
 
               </Routes>
