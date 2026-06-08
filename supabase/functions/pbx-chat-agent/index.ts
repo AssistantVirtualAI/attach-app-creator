@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
 
-    const { messages, organization_id }: { messages: UIMessage[]; organization_id?: string } = await req.json();
+    const { messages, organization_id }: { messages: { role: string; content: string }[]; organization_id?: string } = await req.json();
     const orgId = organization_id || LEMTEL_ORG;
 
     // Resolve caller's role for permission gating.
