@@ -10,6 +10,19 @@ Auto-generated from git commits.
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
+- Changes (2026-06-08) — gpt-engineer-app[bot]
+- Changes (2026-06-08) — gpt-engineer-app[bot]
+- Changes (2026-06-08) — gpt-engineer-app[bot]
+- Changes (2026-06-08) — gpt-engineer-app[bot]
+- docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
+- Changes (2026-06-08) — gpt-engineer-app[bot]
+- Changes (2026-06-08) — gpt-engineer-app[bot]
+- Changes (2026-06-08) — gpt-engineer-app[bot]
+- Changes (2026-06-08) — gpt-engineer-app[bot]
+- Changes (2026-06-08) — gpt-engineer-app[bot]
+- Changes (2026-06-08) — gpt-engineer-app[bot]
+- Changes (2026-06-08) — gpt-engineer-app[bot]
+- Changes (2026-06-08) — gpt-engineer-app[bot]
 - docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
@@ -39,16 +52,3 @@ Auto-generated from git commits.
 - docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
 - fix: disable electron-builder publish in auto-release workflow (2026-06-08) — AssistantVirtualAI
 - docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
-- fix: add repository field to package.json for electron-builder (2026-06-08) — AssistantVirtualAI
-- docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
-- fix: disable GH_TOKEN publish in release-desktop workflow (2026-06-08) — AssistantVirtualAI
-- docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
-- fix: disable electron-builder publish via GH_TOKEN empty + clean yml (2026-06-08) — AssistantVirtualAI
-- docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
-- fix: remove all publish=never flags + disable auto-publish in CI (2026-06-08) — AssistantVirtualAI
-- docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
-- fix: remove -c.publish=never flag from electron-builder commands (2026-06-08) — AssistantVirtualAI
-- docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
-- fix: remove publish section from electron-builder to prevent CI failures (2026-06-08) — AssistantVirtualAI
-- docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
-- Changes (2026-06-08) — gpt-engineer-app[bot]
