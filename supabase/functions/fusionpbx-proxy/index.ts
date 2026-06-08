@@ -687,7 +687,11 @@ Deno.serve(async (req) => {
     if (action === "sync-all") {
       const t0 = Date.now();
       // Optional resources filter: ['extensions','devices','ivrs','queues','ring_groups','destinations','cdrs']
-      const requested: string[] | null = Array.isArray((body as any).resources) ? (body as any).resources : null;
+      const requested: string[] | null = Array.isArray((body as any).resources)
+        ? (body as any).resources
+        : Array.isArray(params.resources)
+          ? params.resources
+          : null;
       const want = (k: string) => !requested || requested.includes(k);
       const tasks: Promise<{ k: string; r: any }>[] = [];
       if (want("extensions"))   tasks.push(pbxFetch(`extensions?${domainQ}`).then((r) => ({ k: "extensions", r })));
