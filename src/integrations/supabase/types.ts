@@ -5819,6 +5819,51 @@ export type Database = {
           },
         ]
       }
+      user_call_handling: {
+        Row: {
+          after_hours_action: Database["public"]["Enums"]["after_hours_action"]
+          availability: Database["public"]["Enums"]["user_availability"]
+          created_at: string
+          forward_target: string | null
+          id: string
+          last_synced_at: string | null
+          organization_id: string
+          sync_error: string | null
+          sync_status: Database["public"]["Enums"]["telecom_sync_status"]
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          after_hours_action?: Database["public"]["Enums"]["after_hours_action"]
+          availability?: Database["public"]["Enums"]["user_availability"]
+          created_at?: string
+          forward_target?: string | null
+          id?: string
+          last_synced_at?: string | null
+          organization_id: string
+          sync_error?: string | null
+          sync_status?: Database["public"]["Enums"]["telecom_sync_status"]
+          timezone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          after_hours_action?: Database["public"]["Enums"]["after_hours_action"]
+          availability?: Database["public"]["Enums"]["user_availability"]
+          created_at?: string
+          forward_target?: string | null
+          id?: string
+          last_synced_at?: string | null
+          organization_id?: string
+          sync_error?: string | null
+          sync_status?: Database["public"]["Enums"]["telecom_sync_status"]
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_consents: {
         Row: {
           consent_type: string
@@ -5954,6 +5999,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_working_hours: {
+        Row: {
+          break_end: string | null
+          break_start: string | null
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          is_working_day: boolean
+          organization_id: string
+          start_time: string
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          break_end?: string | null
+          break_start?: string | null
+          created_at?: string
+          day_of_week: number
+          end_time?: string
+          id?: string
+          is_working_day?: boolean
+          organization_id: string
+          start_time?: string
+          timezone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          break_end?: string | null
+          break_start?: string | null
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_working_day?: boolean
+          organization_id?: string
+          start_time?: string
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       webhook_delivery_logs: {
         Row: {
@@ -6530,7 +6620,14 @@ export type Database = {
       }
     }
     Enums: {
+      after_hours_action:
+        | "voicemail"
+        | "forward_extension"
+        | "forward_external"
+        | "follow_org_default"
       app_role: "super_admin" | "org_admin" | "manager" | "agent" | "viewer"
+      telecom_sync_status: "pending" | "synced" | "failed"
+      user_availability: "available" | "busy" | "dnd" | "away" | "vacation"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -6658,7 +6755,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      after_hours_action: [
+        "voicemail",
+        "forward_extension",
+        "forward_external",
+        "follow_org_default",
+      ],
       app_role: ["super_admin", "org_admin", "manager", "agent", "viewer"],
+      telecom_sync_status: ["pending", "synced", "failed"],
+      user_availability: ["available", "busy", "dnd", "away", "vacation"],
     },
   },
 } as const
