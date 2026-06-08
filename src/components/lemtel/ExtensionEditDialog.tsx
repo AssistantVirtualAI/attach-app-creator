@@ -16,12 +16,22 @@ type Props = {
   extension: any | null;
 };
 
+function genPassword(len = 16) {
+  const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const arr = new Uint32Array(len);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (n) => chars[n % chars.length]).join('');
+}
+
 export function ExtensionEditDialog({ open, onOpenChange, extension }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<any>({});
+  const [showQR, setShowQR] = useState(false);
+  const [assignEmail, setAssignEmail] = useState('');
+  const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
     if (!open || !extension) return;
