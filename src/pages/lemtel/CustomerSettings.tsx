@@ -238,14 +238,32 @@ export default function CustomerSettings() {
         <TabsContent value="billing">
           <Card>
             <CardHeader><CardTitle>Plan & billing</CardTitle></CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Plan</span><span className="font-medium capitalize">{org?.billing_plan || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Status</span><Badge>{org?.status || "—"}</Badge></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Max extensions</span><span>{org?.max_extensions || "—"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Max DIDs</span><span>{org?.max_dids || "—"}</span></div>
+            <CardContent className="space-y-4 text-sm">
+              <div className="space-y-2">
+                <div className="flex justify-between"><span className="text-muted-foreground">Plan</span><span className="font-medium capitalize">{org?.billing_plan || "—"}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Status</span><Badge>{org?.status || "—"}</Badge></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Max extensions</span><span>{org?.max_extensions || "—"}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Max DIDs</span><span>{org?.max_dids || "—"}</span></div>
+              </div>
+              <div className="flex gap-2 pt-2 border-t">
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    if (!org?.id) return;
+                    const { data, error } = await supabase.functions.invoke("stripe-portal", {
+                      body: { organizationId: org.id, returnUrl: window.location.href },
+                    });
+                    if (error || !data?.url) return toast.error(error?.message || "Could not open billing portal");
+                    window.open(data.url, "_blank");
+                  }}
+                >
+                  <CreditCard className="h-4 w-4 mr-2" /> Manage subscription
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
+
       </Tabs>
     </div>
   );
