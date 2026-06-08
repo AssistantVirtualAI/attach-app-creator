@@ -379,7 +379,7 @@ const sections: Section[] = [
     checks: [
       { id: '7.1', name: 'DIDs Configured', description: 'Inbound numbers linked to destinations',
         run: async () => {
-          const { count } = await (supabase as any).from('pbx_dids')
+          const { count } = await (supabase as any).from('phone_numbers')
             .select('*', { count: 'exact', head: true })
             .eq('organization_id', LEMTEL_ORG_ID);
           return count ? { status: 'pass', detail: `${count} DIDs active` } : { status: 'warn', detail: 'No DIDs found' };
