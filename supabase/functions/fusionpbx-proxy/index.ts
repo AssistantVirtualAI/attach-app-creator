@@ -508,6 +508,90 @@ Deno.serve(async (req) => {
     if (action === "update-queue") return json(await writeCollection("call_center_queues", "call_center_queues", params));
     if (action === "create-ring-group") return json(await writeCollection("ring_groups", "ring_groups", params));
 
+    // ---- Business Hours / Time Conditions (FusionPBX dialplans) ----
+    // params: { name, schedule: [{ day:0-6, start:'HH:MM', end:'HH:MM' }], open_destination, closed_destination, dialplan_uuid? }
+    if (action === "upsert-time-condition") {
+      const { name, schedule = [], open_destination, closed_destination, dialplan_uuid } = params;
+      if (!name || !open_destination || !closed_destination) {
+        return json({ error: "name, open_destination, closed_destination required" }, 400);
+      }
+      const dpUuid = dialplan_uuid || crypto.randomUUID();
+      // Build dialplan body
+      const dp = {
+        dialplan_uuid: dpUuid,
+        domain_uuid: FUSIONPBX_DOMAIN_UUID,
+        dialplan_name: name,
+        dialplan_number: "",
+        dialplan_context: (Deno.env.get("FUSIONPBX_SIP_DOMAIN") || "default"),
+        dialplan_continue: "false",
+        dialplan_order: 100,
+        dialplan_enabled: "true",
+        dialplan_description: `Business hours: ${name}`,
+      };
+      const dpRes = await pbxFetch("dialplans", {
+        method: "POST",
+        body: JSON.stringify(dp),
+        headers: { "Content-Type": "application/json" },
+      });
+      const details: any[] = [];
+      let order = 10;
+      for (const slot of schedule) {
+        details.push({
+          dialplan_detail_uuid: crypto.randomUUID(),
+          dialplan_uuid: dpUuid,
+          dialplan_detail_tag: "condition",
+          dialplan_detail_type: "wday",
+          dialplan_detail_data: String((slot.day ?? 0) + 1),
+          dialplan_detail_order: order++,
+        });
+        details.push({
+          dialplan_detail_uuid: crypto.randomUUID(),
+          dialplan_uuid: dpUuid,
+          dialplan_detail_tag: "condition",
+          dialplan_detail_type: "time-of-day",
+          dialplan_detail_data: `${slot.start}-${slot.end}`,
+          dialplan_detail_order: order++,
+        });
+        details.push({
+          dialplan_detail_uuid: crypto.randomUUID(),
+          dialplan_uuid: dpUuid,
+          dialplan_detail_tag: "action",
+          dialplan_detail_type: "transfer",
+          dialplan_detail_data: open_destination,
+          dialplan_detail_order: order++,
+        });
+      }
+      details.push({
+        dialplan_detail_uuid: crypto.randomUUID(),
+        dialplan_uuid: dpUuid,
+        dialplan_detail_tag: "action",
+        dialplan_detail_type: "transfer",
+        dialplan_detail_data: closed_destination,
+        dialplan_detail_order: 9999,
+      });
+      for (const d of details) {
+        await pbxFetch("dialplan_details", {
+          method: "POST",
+          body: JSON.stringify(d),
+          headers: { "Content-Type": "application/json" },
+        }).catch(() => null);
+      }
+      return json({ ok: true, dialplan_uuid: dpUuid, dialplan: dpRes });
+    }
+
+    if (action === "list-time-conditions") {
+      const r = await pbxFetch(`dialplans?${domainQ}`);
+      return json(r);
+    }
+
+    if (action === "delete-time-condition") {
+      const id = params.dialplan_uuid;
+      if (!id) return json({ error: "dialplan_uuid required" }, 400);
+      return json(await pbxFetch(`dialplans/${id}`, { method: "DELETE" }));
+    }
+
+
+
     // ---- CDR endpoint fallback helper ----
     const CDR_ENDPOINTS = [
       "/app/api/7/xml_cdr",
