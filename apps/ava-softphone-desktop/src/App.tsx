@@ -40,23 +40,73 @@ export default function App() {
   const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 980);
 
   useEffect(() => {
-    window.electronAPI?.getCredentials().then((c: any) => {
-      setCreds(c);
+    let cancelled = false;
+
+    const init = async () => {
+      const saved = await window.electronAPI?.getCredentials?.().catch(() => null);
+
+      // Restore session from saved tokens BEFORE checking session
+      if (saved?.accessToken && saved?.refreshToken) {
+        await supabase.auth.setSession({
+          access_token: saved.accessToken,
+          refresh_token: saved.refreshToken,
+        }).catch(() => { /* token expired — fall through */ });
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (cancelled) return;
+
+      if (!session) {
+        // No valid session → force login wizard
+        if (saved) await window.electronAPI?.saveCredentials?.(null).catch(() => {});
+        setCreds(null);
+      } else if (saved) {
+        // Refresh stored tokens in case they rotated
+        setCreds({
+          ...saved,
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+        });
+      } else {
+        setCreds(null);
+      }
       setLoading(false);
+    };
+
+    init();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        try { await sipProvider.stop?.(); } catch { /* noop */ }
+        await window.electronAPI?.saveCredentials?.(null).catch(() => {});
+        setCreds(null);
+        return;
+      }
+      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+        setCreds((prev) => prev ? {
+          ...prev,
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+        } : prev);
+      }
     });
+
     window.electronAPI?.onSetStatus?.((s: any) => {
       window.dispatchEvent(new CustomEvent('lemtel:set-status', { detail: s }));
     });
     const onResize = () => setWide(window.innerWidth >= 980);
     window.addEventListener('resize', onResize);
 
-    // Proactively request microphone (required), camera (optional), and
-    // verify speaker enumeration so the OS prompts surface at app launch.
     import('./lib/mediaPermissions').then(({ requestMediaPermissions }) => {
       requestMediaPermissions().catch(() => { /* noop */ });
     });
 
-    return () => window.removeEventListener('resize', onResize);
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+      window.removeEventListener('resize', onResize);
+    };
   }, []);
 
   const openSettingsMobile = () => {
