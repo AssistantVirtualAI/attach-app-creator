@@ -156,6 +156,7 @@ import UniversalLogin from "./pages/UniversalLogin";
 
 // Three-portal architecture (Platform / Customer / My)
 import { PlatformAdminShell, CustomerAdminShell, MyWorkspaceShell } from "./components/portals/PortalShells";
+import { RolePortalGuard } from "./components/portals/RolePortalGuard";
 import PlatformDashboard from "./pages/portals/PlatformDashboard";
 import CustomerDashboard from "./pages/portals/CustomerDashboard";
 import MyDashboardLanding from "./pages/portals/MyDashboardLanding";
