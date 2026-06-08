@@ -44,6 +44,22 @@ Deno.serve(async (req) => {
     userId = user.id;
   }
 
+  // Parse body early to know which action is being requested
+  let _bodyEarly: any = {};
+  try { _bodyEarly = await req.clone().json(); } catch { /* allow empty */ }
+  const _earlyAction: string = _bodyEarly.action || "ping";
+
+  // Authorization: only Lemtel members/admins can hit the FusionPBX proxy.
+  if (!isServiceCall && userId) {
+    const readOnly = new Set(["ping", "list-extensions", "list-domains", "list-cdrs", "get-recording", "list-queues", "list-ivrs", "list-ring-groups", "get-extension"]);
+    const isRead = readOnly.has(_earlyAction);
+    const rpcName = isRead ? "is_lemtel_member" : "is_lemtel_admin";
+    const { data: allowed, error: roleErr } = await admin.rpc(rpcName, { _user_id: userId });
+    if (roleErr || !allowed) {
+      return json({ error: "Forbidden", action: _earlyAction, required: rpcName }, 403);
+    }
+  }
+
   let body: any = {};
   try { body = await req.json(); } catch { /* allow empty */ }
   const action: string = body.action || "ping";
