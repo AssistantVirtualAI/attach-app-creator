@@ -118,6 +118,11 @@ import LemtelAnalytics from "./pages/lemtel/LemtelAnalytics";
 import { AdminPortalLayout, UserPortalLayout } from "./components/portal/LemtelPortalShells";
 import AdminDashboard from "./pages/lemtel/admin/AdminDashboard";
 import MyDashboard from "./pages/lemtel/my/MyDashboard";
+import AdminRecordings from "./pages/lemtel/admin/AdminRecordings";
+import AdminVoicemail from "./pages/lemtel/admin/AdminVoicemail";
+import AdminReports from "./pages/lemtel/admin/AdminReports";
+import MySettings from "./pages/lemtel/my/MySettings";
+import { DownloadCenter } from "./components/portal/DownloadCenter";
 
 // Portal pages
 import PortalLogin from "./pages/PortalLogin";
