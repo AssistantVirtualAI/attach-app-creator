@@ -1239,6 +1239,25 @@ function SipDiagnostics({
             <button onClick={() => sp.restart()} style={diagBtn(c)}>
               ↻ Restart SIP
             </button>
+            <button
+              onClick={async () => {
+                setTesting(true);
+                try {
+                  const r = await (sp as any).restartAndCodecTest?.();
+                  if (r) {
+                    setDevices({
+                      input: r.devices.input, output: r.devices.output,
+                      inputs: 0, outputs: 0,
+                      error: r.error || (r.ok ? undefined : 'Test reported a problem'),
+                    });
+                  }
+                } finally { setTesting(false); }
+              }}
+              disabled={testing}
+              style={{ ...diagBtn(c), borderColor: '#F59E0B', color: '#F59E0B', fontWeight: 700 }}
+            >
+              {testing ? '…' : '⚡ Fix 488 (Restart + Codec Test)'}
+            </button>
           </div>
           {devices && (
             <div style={{
@@ -1248,6 +1267,7 @@ function SipDiagnostics({
             }}>
               <div>🎙  Input:  {devices.input}</div>
               <div>🔊 Output: {devices.output}</div>
+              <div style={{ opacity: 0.7, marginTop: 2 }}>Codec order: PCMU › PCMA › opus › telephone-event</div>
               {!!devices.inputs && <div style={{ opacity: 0.6 }}>{devices.inputs} input · {devices.outputs} output device(s) detected</div>}
               {devices.error && <div style={{ color: '#fca5a5' }}>{devices.error}</div>}
             </div>

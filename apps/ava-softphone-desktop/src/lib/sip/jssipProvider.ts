@@ -82,6 +82,8 @@ class JsSipProvider {
   boundInputLabel: string = 'System default';
   private wssAttempted: string[] = [];
   private lastCallError: string | null = null;
+  private lastDialed: string | null = null;
+  private retryingAfter488 = false;
 
   subscribe(fn: Listener) {
     this.listeners.add(fn);
@@ -111,6 +113,21 @@ class JsSipProvider {
     this.stop();
     if (cfg) await this.init(cfg);
   }
+
+  /** One-click: restart UA, verify devices, and report codec preference. */
+  async restartAndCodecTest(): Promise<{ ok: boolean; codecs: string[]; devices: { input: string; output: string }; error?: string }> {
+    this.logEvent('info', 'Codec test + SIP restart triggered');
+    try {
+      await this.restart();
+      const d = await this.testAudioDevices();
+      const codecs = ['PCMU', 'PCMA', 'opus', 'telephone-event'];
+      this.logEvent('info', `Codec preference: ${codecs.join(' › ')}`);
+      return { ok: !d.error, codecs, devices: { input: d.input, output: d.output }, error: d.error };
+    } catch (e: any) {
+      return { ok: false, codecs: [], devices: { input: '—', output: '—' }, error: String(e?.message || e) };
+    }
+  }
+
 
 
   async init(cfg: SoftphoneConfig) {
@@ -263,6 +280,28 @@ class JsSipProvider {
       this.lastCallError = detail;
       this.logEvent('error', `Call failed: ${detail}`);
       this.update({ callState: 'ended', errorCause: detail });
+
+      // SDP 488 auto-retry: restart UA + redial once with codec re-prefer.
+      if (code === 488 && !this.retryingAfter488 && this.lastDialed) {
+        const target = this.lastDialed;
+        this.retryingAfter488 = true;
+        this.logEvent('warn', `488 Incompatible SDP — auto-retrying ${target} after SIP restart…`);
+        setTimeout(async () => {
+          try {
+            await this.restart();
+            // Wait for register before redial (up to 6s).
+            const start = Date.now();
+            while (this.snap.status !== 'registered' && Date.now() - start < 6000) {
+              await new Promise((r) => setTimeout(r, 300));
+            }
+            this.resetCall();
+            await this.call(target, true);
+          } finally {
+            setTimeout(() => { this.retryingAfter488 = false; }, 4000);
+          }
+        }, 800);
+        return;
+      }
       setTimeout(() => this.resetCall(), 2500);
     });
     session.on('ended', () => {
@@ -383,17 +422,15 @@ class JsSipProvider {
     }
   }
 
-  async call(number: string): Promise<string | null> {
+  async call(number: string, _isRetry = false): Promise<string | null> {
     if (!this.config || !this.ua) {
       this.logEvent('error', 'UA not ready — cannot call');
       return 'SIP not initialized';
     }
     const target = `sip:${number}@${this.config.sipDomain}`;
-    this.logEvent('info', `Dialing ${number}`);
+    this.lastDialed = number;
+    this.logEvent('info', _isRetry ? `Auto-redialing ${number} after 488` : `Dialing ${number}`);
     try {
-      // Let JsSIP handle getUserMedia internally. Pre-fetching the stream
-      // causes "Bad Media Description" + unhandled rejections that crash
-      // the Electron renderer (black screen).
       this.ua.call(target, {
         mediaConstraints: { audio: true, video: false },
       } as any);
@@ -407,6 +444,7 @@ class JsSipProvider {
       return msg;
     }
   }
+
 
   /** Build a debug report JSON with secrets masked. */
   buildDebugReport(): string {
