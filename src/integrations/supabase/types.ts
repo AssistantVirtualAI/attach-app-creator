@@ -5984,6 +5984,39 @@ export type Database = {
           },
         ]
       }
+      two_factor_otps: {
+        Row: {
+          attempts: number
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          organization_id: string
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          organization_id: string
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          organization_id?: string
+        }
+        Relationships: []
+      }
       user_call_handling: {
         Row: {
           after_hours_action: Database["public"]["Enums"]["after_hours_action"]
@@ -6713,6 +6746,10 @@ export type Database = {
       admin_link_softphone_by_email: {
         Args: { _email: string; _softphone_id: string }
         Returns: Json
+      }
+      can_access_chat_channel: {
+        Args: { _channel_id: string; _user_id: string }
+        Returns: boolean
       }
       can_access_org: {
         Args: { _org_id: string; _user_id: string }
