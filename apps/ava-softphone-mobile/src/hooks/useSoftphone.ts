@@ -1,6 +1,28 @@
 import { useState, useEffect, useRef } from 'react';
 import { createSIPUA, JsSIPUnavailableError, SIPConfig } from '../lib/sip/jssipProvider';
 
+/** Re-order audio codecs so PCMU/PCMA come first. Fixes FusionPBX SIP 488. */
+function preferAudioCodecs(sdp: string): string {
+  const lines = sdp.split(/\r?\n/);
+  const i = lines.findIndex((l) => l.startsWith('m=audio'));
+  if (i === -1) return sdp;
+  const rtpmap = new Map<string, string>();
+  for (const l of lines) {
+    const m = l.match(/^a=rtpmap:(\d+)\s+([A-Za-z0-9\-]+)\//);
+    if (m) rtpmap.set(m[1], m[2].toLowerCase());
+  }
+  const parts = lines[i].split(' ');
+  const head = parts.slice(0, 3);
+  const pts = parts.slice(3);
+  const priority = ['pcmu', 'pcma', 'opus', 'telephone-event'];
+  const score = (pt: string) => {
+    const idx = priority.indexOf(rtpmap.get(pt) || '');
+    return idx === -1 ? 999 : idx;
+  };
+  lines[i] = [...head, ...pts.sort((a, b) => score(a) - score(b))].join(' ');
+  return lines.join('\r\n');
+}
+
 export type SIPStatus = 'idle' | 'connecting' | 'registered' | 'error';
 export type CallState = 'idle' | 'ringing' | 'active' | 'ended';
 
