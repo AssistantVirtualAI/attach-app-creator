@@ -64,14 +64,16 @@ export function PlatformAdminShell({ children }: { children?: ReactNode }) {
         { label: "All Users", to: "/platform/users", icon: Users },
         { label: "All Calls", to: "/platform/calls", icon: Phone },
         { label: "Telephony Core", to: "/platform/telephony", icon: Server },
+        { label: "Telephony QA", to: "/platform/qa", icon: Activity },
+        { label: "System Health", to: "/platform/health", icon: Activity },
         { label: "Billing", to: "/platform/billing", icon: CreditCard },
-        { label: "System Health", to: "/platform/system", icon: Activity },
         { label: "Audit Logs", to: "/platform/audit", icon: FileText },
         { label: "Settings", to: "/platform/settings", icon: Settings },
       ]}
     />
   );
 }
+
 
 export function CustomerAdminShell({ children }: { children?: ReactNode }) {
   return (
