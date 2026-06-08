@@ -65,7 +65,46 @@ export default function LemtelMessages() {
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
-      <h1 className="text-3xl font-bold mb-4">Messages (SMS)</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-3xl font-bold">Messages (SMS)</h1>
+        <Dialog open={newOpen} onOpenChange={setNewOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" disabled={!activeDid}><Plus className="w-4 h-4 mr-1" />New conversation</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>New SMS — from {activeDid || '—'}</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div><Label>To</Label><Input value={newTo} onChange={(e) => setNewTo(e.target.value)} placeholder="+15551234567" /></div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <Label>Message</Label>
+                  {templates.length > 0 && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs"><FileText className="w-3 h-3 mr-1" />Templates</Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-72 p-1">
+                        {templates.map((tpl) => (
+                          <button key={tpl.id} onClick={() => setNewText(tpl.content)}
+                            className="w-full text-left p-2 rounded hover:bg-muted text-sm">
+                            <div className="font-medium">{tpl.name}</div>
+                            <div className="text-xs text-muted-foreground truncate">{tpl.content}</div>
+                          </button>
+                        ))}
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+                <Input value={newText} onChange={(e) => setNewText(e.target.value)} placeholder="Type your message..." />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setNewOpen(false)}>Cancel</Button>
+              <Button onClick={startNew} disabled={sending || !newTo.trim() || !newText.trim()}>Send</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
       <div className="flex-1 flex gap-4 min-h-0">
         <Card className="w-48 p-3 overflow-auto">
           <h3 className="text-xs font-semibold text-muted-foreground mb-2">DIDs</h3>
