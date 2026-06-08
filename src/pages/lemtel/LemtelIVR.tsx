@@ -63,6 +63,11 @@ export default function LemtelIVR() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = (ivrs as any[]).find(i => i.id === selectedId) || null;
   const { data: options = [] } = usePbxIvrOptions(selectedId);
+  const [optDialogOpen, setOptDialogOpen] = useState(false);
+  const [optDigit, setOptDigit] = useState('');
+  const [optDestType, setOptDestType] = useState<string>('extension');
+  const [optDestId, setOptDestId] = useState('');
+  const [optDesc, setOptDesc] = useState('');
 
   useEffect(() => {
     if (!selectedId && ivrs.length > 0) setSelectedId((ivrs as any[])[0].id);
