@@ -1,4 +1,5 @@
 import { DesktopDownloadCard } from "@/components/telephony/DesktopDownloadCard";
+import { LiveReleaseCard } from "@/components/telephony/LiveReleaseCard";
 import { Card } from "@/components/ui/card";
 
 export default function Download() {
