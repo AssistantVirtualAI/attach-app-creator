@@ -154,6 +154,9 @@ import PortalPrompt from "./pages/PortalPrompt";
 import PortalSettings from "./pages/PortalSettings";
 import PortalProfile from "./pages/PortalProfile";
 import UniversalLogin from "./pages/UniversalLogin";
+import EndUserLogin from "./pages/EndUserLogin";
+import PortalChooser from "./pages/PortalChooser";
+
 
 // Three-portal architecture (Platform / Customer / My)
 import { PlatformAdminShell, CustomerAdminShell, MyWorkspaceShell } from "./components/portals/PortalShells";
