@@ -144,6 +144,15 @@ export default function MyVoicemail() {
                     <Sparkles className="h-3 w-3 mr-1" />
                     {t("AI Summary", "Résumé IA")}
                   </Button>
+                  {selected.caller_number && (
+                    <Button
+                      size="sm"
+                      onClick={() => { window.location.href = `tel:${selected.caller_number}`; }}
+                    >
+                      <PhoneCall className="h-3 w-3 mr-1" />
+                      {t("Call back", "Rappeler")}
+                    </Button>
+                  )}
                   {!selected.read_at && (
                     <Button size="sm" variant="outline" onClick={() => markRead.mutate(selected.id)}>
                       <CheckCircle2 className="h-3 w-3 mr-1" />
