@@ -104,17 +104,13 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
     queryKey: ["softphone-contacts"],
     enabled: isMember,
     queryFn: async () => {
-      const [{ data: exts }, { data: clients }] = await Promise.all([
+      const [{ data: exts }] = await Promise.all([
         supabase.from("pbx_extensions").select("id, extension, effective_cid_name, description"),
-        supabase.from("clients").select("id, name, phone_number").not("phone_number", "is", null),
       ]);
       const merged = [
         ...(exts || []).map((e: any) => ({
           id: `ext-${e.id}`, name: e.effective_cid_name || e.description || `Ext ${e.extension}`,
           number: e.extension, type: "internal" as const,
-        })),
-        ...(clients || []).map((c: any) => ({
-          id: `cli-${c.id}`, name: c.name, number: c.phone_number, type: "external" as const,
         })),
       ];
       return merged;

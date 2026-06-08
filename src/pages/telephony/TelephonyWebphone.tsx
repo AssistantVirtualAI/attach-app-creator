@@ -14,13 +14,11 @@ export default function TelephonyWebphone() {
   const { data: contacts = [] } = useQuery({
     queryKey: ['webphone-contacts'],
     queryFn: async () => {
-      const [{ data: exts }, { data: clients }] = await Promise.all([
+      const [{ data: exts }] = await Promise.all([
         supabase.from('pbx_extensions').select('id, extension, effective_cid_name, description'),
-        supabase.from('clients').select('id, name, phone_number').not('phone_number', 'is', null),
       ]);
       return [
         ...(exts || []).map((e: any) => ({ id: `e-${e.id}`, name: e.effective_cid_name || `Ext ${e.extension}`, number: e.extension, type: 'internal' })),
-        ...(clients || []).map((c: any) => ({ id: `c-${c.id}`, name: c.name, number: c.phone_number, type: 'external' })),
       ];
     },
   });
