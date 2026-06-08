@@ -822,7 +822,7 @@ const App = () => (
                   <Route path="dashboard" element={<MyDashboardLanding />} />
                   <Route path="softphone" element={<TelephonyWebphone />} />
                   <Route path="calls" element={<LemtelPortalCalls />} />
-                  <Route path="voicemail" element={<AdminVoicemail scope="mine" />} />
+                  <Route path="voicemail" element={<MyVoicemail />} />
                   <Route path="messages" element={<LemtelMessages />} />
                   <Route path="recordings" element={<AdminRecordings scope="mine" />} />
                   <Route path="chat" element={<MyOrgChat />} />
