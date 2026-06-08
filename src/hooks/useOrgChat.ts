@@ -23,6 +23,9 @@ export type ChatMessage = {
   message_type: string;
   edited_at: string | null;
   created_at: string;
+  parent_message_id?: string | null;
+  reply_count?: number;
+  last_reply_at?: string | null;
 };
 
 async function invoke(action: string, payload?: any) {
@@ -75,7 +78,7 @@ export function useChatMessages(channelId: string | null) {
   }, [channelId]);
 
   const send = useMutation({
-    mutationFn: (p: { content: string; attachments?: any[] }) =>
+    mutationFn: (p: { content: string; attachments?: any[]; parent_message_id?: string | null }) =>
       invoke("send_message", { channel_id: channelId, ...p }),
   });
   const edit = useMutation({
@@ -125,3 +128,35 @@ export function useOrgChat(_orgId?: string) {
     },
   };
 }
+
+export function useThread(parentId: string | null) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const query = useQuery<{ messages: ChatMessage[] }>({
+    queryKey: ["org-chat-thread", parentId],
+    queryFn: () => invoke("list_thread", { parent_message_id: parentId }),
+    enabled: !!parentId,
+  });
+  useEffect(() => { if (query.data?.messages) setMessages(query.data.messages); }, [query.data]);
+  useEffect(() => {
+    if (!parentId) return;
+    const ch = supabase
+      .channel(`org-chat-thread-${parentId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "org_chat_messages", filter: `parent_message_id=eq.${parentId}` }, (p: any) => {
+        setMessages((prev) => (prev.some((m) => m.id === p.new.id) ? prev : [...prev, p.new]));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [parentId]);
+  const reply = useMutation({
+    mutationFn: (p: { channel_id: string; content: string; attachments?: any[] }) =>
+      invoke("send_message", { ...p, parent_message_id: parentId }),
+  });
+  return { query, messages, reply };
+}
+
+export function useChatSearch() {
+  return useMutation({
+    mutationFn: (p: { query: string; channel_id?: string }) => invoke("search_messages", p),
+  });
+}
+

@@ -702,6 +702,50 @@ export type Database = {
         }
         Relationships: []
       }
+      appointment_reminders: {
+        Row: {
+          appointment_id: string
+          channel: string
+          created_at: string
+          error: string | null
+          id: string
+          offset_minutes: number
+          organization_id: string
+          sent_at: string
+          status: string
+        }
+        Insert: {
+          appointment_id: string
+          channel: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          offset_minutes: number
+          organization_id: string
+          sent_at?: string
+          status?: string
+        }
+        Update: {
+          appointment_id?: string
+          channel?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          offset_minutes?: number
+          organization_id?: string
+          sent_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_reminders_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           agent_id: string | null
@@ -715,11 +759,17 @@ export type Database = {
           description: string | null
           end_time: string
           external_event_id: string | null
+          host_kind: string | null
+          host_user_id: string | null
           id: string
+          location_type: string | null
+          meeting_url: string | null
           metadata: Json | null
           organization_id: string
+          reminder_offsets: number[]
           start_time: string
           status: string
+          timezone: string | null
           title: string
           updated_at: string
         }
@@ -735,11 +785,17 @@ export type Database = {
           description?: string | null
           end_time: string
           external_event_id?: string | null
+          host_kind?: string | null
+          host_user_id?: string | null
           id?: string
+          location_type?: string | null
+          meeting_url?: string | null
           metadata?: Json | null
           organization_id: string
+          reminder_offsets?: number[]
           start_time: string
           status?: string
+          timezone?: string | null
           title: string
           updated_at?: string
         }
@@ -755,11 +811,17 @@ export type Database = {
           description?: string | null
           end_time?: string
           external_event_id?: string | null
+          host_kind?: string | null
+          host_user_id?: string | null
           id?: string
+          location_type?: string | null
+          meeting_url?: string | null
           metadata?: Json | null
           organization_id?: string
+          reminder_offsets?: number[]
           start_time?: string
           status?: string
+          timezone?: string | null
           title?: string
           updated_at?: string
         }
@@ -2670,15 +2732,19 @@ export type Database = {
           created_at: string
           edited_at: string | null
           id: string
+          last_reply_at: string | null
           message_type: string
           organization_id: string
+          parent_message_id: string | null
           reactions: Json
           read_by: string[]
           recipient_id: string | null
+          reply_count: number
           reply_to: string | null
           sender_extension: string | null
           sender_id: string | null
           sender_name: string | null
+          tsv: unknown
         }
         Insert: {
           attachments?: Json
@@ -2687,15 +2753,19 @@ export type Database = {
           created_at?: string
           edited_at?: string | null
           id?: string
+          last_reply_at?: string | null
           message_type?: string
           organization_id: string
+          parent_message_id?: string | null
           reactions?: Json
           read_by?: string[]
           recipient_id?: string | null
+          reply_count?: number
           reply_to?: string | null
           sender_extension?: string | null
           sender_id?: string | null
           sender_name?: string | null
+          tsv?: unknown
         }
         Update: {
           attachments?: Json
@@ -2704,15 +2774,19 @@ export type Database = {
           created_at?: string
           edited_at?: string | null
           id?: string
+          last_reply_at?: string | null
           message_type?: string
           organization_id?: string
+          parent_message_id?: string | null
           reactions?: Json
           read_by?: string[]
           recipient_id?: string | null
+          reply_count?: number
           reply_to?: string | null
           sender_extension?: string | null
           sender_id?: string | null
           sender_name?: string | null
+          tsv?: unknown
         }
         Relationships: [
           {
@@ -2720,6 +2794,13 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "org_chat_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_chat_messages_parent_message_id_fkey"
+            columns: ["parent_message_id"]
+            isOneToOne: false
+            referencedRelation: "org_chat_messages"
             referencedColumns: ["id"]
           },
         ]
@@ -5925,16 +6006,31 @@ export type Database = {
       }
       user_notification_prefs: {
         Row: {
+          email_dm: boolean
+          email_mentions: boolean
+          email_missed_call: boolean
+          email_voicemail: boolean
+          inapp_mentions: boolean
           prefs: Json
           updated_at: string
           user_id: string
         }
         Insert: {
+          email_dm?: boolean
+          email_mentions?: boolean
+          email_missed_call?: boolean
+          email_voicemail?: boolean
+          inapp_mentions?: boolean
           prefs?: Json
           updated_at?: string
           user_id: string
         }
         Update: {
+          email_dm?: boolean
+          email_mentions?: boolean
+          email_missed_call?: boolean
+          email_voicemail?: boolean
+          inapp_mentions?: boolean
           prefs?: Json
           updated_at?: string
           user_id?: string

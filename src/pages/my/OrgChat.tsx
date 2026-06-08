@@ -8,7 +8,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Hash, Lock, Plus, Send, Paperclip, Smile, Trash2 } from "lucide-react";
+import { Hash, Lock, Plus, Send, Paperclip, Smile, Trash2, MessageSquare } from "lucide-react";
+import { ThreadPanel } from "@/components/chat/ThreadPanel";
+import { ChatSearchBar } from "@/components/chat/ChatSearchBar";
 import { useChannels, useChatMessages, type Channel } from "@/hooks/useOrgChat";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -130,6 +132,7 @@ function ChannelView({ channel, userId, t }: { channel: Channel; userId: string;
   const { messages, send, remove, react, uploadAttachment, getSignedUrl, query } = useChatMessages(channel.id);
   const [draft, setDraft] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [threadParent, setThreadParent] = useState<any | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -162,29 +165,36 @@ function ChannelView({ channel, userId, t }: { channel: Channel; userId: string;
       <div className="border-b px-4 py-2 flex items-center gap-2">
         {channel.channel_type === "private" ? <Lock className="h-4 w-4" /> : <Hash className="h-4 w-4" />}
         <h2 className="font-semibold">{channel.name}</h2>
-        {channel.description && <span className="text-sm text-muted-foreground">— {channel.description}</span>}
-        <Badge variant="outline" className="ml-auto text-xs">{channel.members?.length ?? 0} {t("members", "membres")}</Badge>
+        {channel.description && <span className="text-sm text-muted-foreground hidden md:inline">— {channel.description}</span>}
+        <div className="ml-auto flex items-center gap-2">
+          <div className="w-56"><ChatSearchBar /></div>
+          <Badge variant="outline" className="text-xs">{channel.members?.length ?? 0} {t("members", "membres")}</Badge>
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+
         {query.isLoading && <Skeleton className="h-20 w-full" />}
         {!query.isLoading && messages.length === 0 && (
           <div className="text-center text-muted-foreground text-sm py-12">
             {t("No messages yet. Say hi 👋", "Aucun message. Lance la discussion 👋")}
           </div>
         )}
-        {messages.map((m) => (
+        {messages.filter((m: any) => !m.parent_message_id).map((m) => (
           <MessageBubble
             key={m.id}
             msg={m}
             isOwn={m.sender_id === userId}
             onDelete={() => remove.mutate(m.id)}
             onReact={(emoji) => react.mutate({ id: m.id, emoji })}
+            onOpenThread={() => setThreadParent(m)}
             getSignedUrl={getSignedUrl}
             t={t}
           />
         ))}
       </div>
+      <ThreadPanel parent={threadParent} channelId={channel.id} onClose={() => setThreadParent(null)} />
+
 
       <div className="border-t p-3 flex items-end gap-2">
         <Button
@@ -214,10 +224,11 @@ function ChannelView({ channel, userId, t }: { channel: Channel; userId: string;
 }
 
 function MessageBubble({
-  msg, isOwn, onDelete, onReact, getSignedUrl, t,
+  msg, isOwn, onDelete, onReact, onOpenThread, getSignedUrl, t,
 }: {
   msg: any; isOwn: boolean;
   onDelete: () => void; onReact: (emoji: string) => void;
+  onOpenThread?: () => void;
   getSignedUrl: (p: string) => Promise<string>;
   t: (en: string, fr: string) => string;
 }) {
@@ -250,6 +261,11 @@ function MessageBubble({
             {msg.edited_at && <em className="ml-1">({t("edited", "modifié")})</em>}
           </span>
           <div className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1">
+            {onOpenThread && (
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onOpenThread} title={t("Reply in thread", "Répondre en fil")}>
+                <MessageSquare className="h-3 w-3" />
+              </Button>
+            )}
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setShowEmoji((s) => !s)}>
               <Smile className="h-3 w-3" />
             </Button>
@@ -261,6 +277,11 @@ function MessageBubble({
           </div>
         </div>
         {msg.content && <div className="text-sm whitespace-pre-wrap break-words">{msg.content}</div>}
+        {msg.reply_count > 0 && onOpenThread && (
+          <button onClick={onOpenThread} className="mt-1 text-xs text-primary hover:underline flex items-center gap-1">
+            <MessageSquare className="h-3 w-3" /> {msg.reply_count} {t("replies", "réponses")}
+          </button>
+        )}
         {(msg.attachments ?? []).map((a: any) => (
           <div key={a.path} className="mt-1">
             {a.mime?.startsWith("image/") && urls[a.path] ? (
