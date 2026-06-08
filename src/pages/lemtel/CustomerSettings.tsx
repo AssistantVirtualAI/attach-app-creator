@@ -99,6 +99,7 @@ export default function CustomerSettings() {
       <Tabs defaultValue="branding">
         <TabsList>
           <TabsTrigger value="branding"><Palette className="h-4 w-4 mr-1" />Branding</TabsTrigger>
+          <TabsTrigger value="domain"><Globe className="h-4 w-4 mr-1" />Domain</TabsTrigger>
           <TabsTrigger value="numbers"><Phone className="h-4 w-4 mr-1" />Numbers</TabsTrigger>
           <TabsTrigger value="users"><Users className="h-4 w-4 mr-1" />Users</TabsTrigger>
           <TabsTrigger value="billing"><CreditCard className="h-4 w-4 mr-1" />Billing</TabsTrigger>
