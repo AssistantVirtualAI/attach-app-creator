@@ -14,11 +14,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   Users, Plus, Mail, KeyRound, Settings as SettingsIcon, Trash2, RefreshCw,
   Loader2, ShieldAlert, CheckCircle2, AlertCircle, Smartphone, Apple, Monitor,
-  Globe,
+  Globe, Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { useLemtelAccess } from '@/hooks/useLemtelAccess';
+import { CsvUserImportDialog } from '@/components/lemtel/CsvUserImportDialog';
 
 const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 const DEFAULT_OUTBOUND_CID = '15144942888';
@@ -90,7 +91,22 @@ export default function TelephonyUsers() {
   const { data: users = [], isLoading, refetch } = useSoftphoneUsers();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [csvOpen, setCsvOpen] = useState(false);
+  const [csvOrgId, setCsvOrgId] = useState<string>(LEMTEL_ORG);
+  const [csvOrgName, setCsvOrgName] = useState<string>('Lemtel');
   const qc = useQueryClient();
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers-for-csv'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('organizations')
+        .select('id, name, slug, org_type')
+        .order('name');
+      return (data || []) as any[];
+    },
+    enabled: isAdmin,
+  });
 
   const stats = useMemo(() => {
     const total = users.length;
@@ -163,9 +179,30 @@ export default function TelephonyUsers() {
           <h1 className="text-3xl font-bold flex items-center gap-2"><Users className="w-7 h-7" /> Team Members</h1>
           <p className="text-muted-foreground">Manage softphone users across all platforms</p>
         </div>
-        <Button onClick={() => setOpen(true)} disabled={!isAdmin}>
-          <Plus className="w-4 h-4 mr-2" /> Add User
-        </Button>
+        <div className="flex gap-2 flex-wrap items-center">
+          {isAdmin && customers.length > 0 && (
+            <Select
+              value={csvOrgId}
+              onValueChange={(v) => {
+                setCsvOrgId(v);
+                setCsvOrgName(customers.find((c: any) => c.id === v)?.name || '');
+              }}
+            >
+              <SelectTrigger className="w-56"><SelectValue placeholder="Import target customer" /></SelectTrigger>
+              <SelectContent>
+                {customers.map((c: any) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name} {c.org_type ? `· ${c.org_type}` : ''}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button variant="outline" onClick={() => setCsvOpen(true)} disabled={!isAdmin}>
+            <Upload className="w-4 h-4 mr-2" /> Import CSV
+          </Button>
+          <Button onClick={() => setOpen(true)} disabled={!isAdmin}>
+            <Plus className="w-4 h-4 mr-2" /> Add User
+          </Button>
+        </div>
       </div>
 
       {!isAdmin && (
@@ -254,6 +291,13 @@ export default function TelephonyUsers() {
       </Card>
 
       <AddUserDialog open={open} onOpenChange={setOpen} suggestedExtension={nextExtension} />
+      <CsvUserImportDialog
+        open={csvOpen}
+        onOpenChange={setCsvOpen}
+        organizationId={csvOrgId}
+        organizationName={csvOrgName}
+        onComplete={() => refetch()}
+      />
     </div>
   );
 }
