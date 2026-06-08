@@ -1,0 +1,290 @@
+name: Auto Release on Push
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/ava-softphone-desktop/**'
+      - 'apps/ava-softphone-mobile/**'
+      - 'apps/lemtel-chrome-extension/**'
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      desktop_changed: ${{ steps.changes.outputs.desktop }}
+      mobile_changed: ${{ steps.changes.outputs.mobile }}
+      extension_changed: ${{ steps.changes.outputs.extension }}
+      new_version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed apps
+        id: changes
+        run: |
+          DESKTOP=$(git diff --name-only HEAD~1 HEAD | grep -c "apps/ava-softphone-desktop" || true)
+          MOBILE=$(git diff --name-only HEAD~1 HEAD | grep -c "apps/ava-softphone-mobile" || true)
+          EXTENSION=$(git diff --name-only HEAD~1 HEAD | grep -c "apps/lemtel-chrome-extension" || true)
+          echo "desktop=$([[ $DESKTOP -gt 0 ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "mobile=$([[ $MOBILE -gt 0 ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+          echo "extension=$([[ $EXTENSION -gt 0 ]] && echo true || echo false)" >> $GITHUB_OUTPUT
+
+      - name: Generate version
+        id: version
+        run: |
+          DATE=$(date +%Y.%m.%d)
+          SHA=$(git rev-parse --short HEAD)
+          VERSION="${DATE}-${SHA}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+  build-desktop-mac:
+    needs: check-changes
+    if: needs.check-changes.outputs.desktop_changed == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+        working-directory: apps/ava-softphone-desktop
+      - name: Fix vite config
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          python3 -c "
+          content = '''import { defineConfig } from \"vite\"
+          import react from \"@vitejs/plugin-react\"
+          import path from \"path\"
+          export default defineConfig({
+            plugins: [react()],
+            css: { postcss: false },
+            resolve: { alias: { \"@\": path.resolve(__dirname, \"./src\") } },
+            build: { outDir: \"dist\", emptyOutDir: true, rollupOptions: { external: [\"electron\"] } },
+            base: \"./\",
+          })'''
+          open('vite.config.ts', 'w').write(content)
+          "
+      - name: Build Mac
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          npx vite build
+          npx tsc -p electron/tsconfig.json || true
+          npx electron-builder --mac --x64 --arm64 -c.publish=never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-mac
+          path: |
+            apps/ava-softphone-desktop/dist-electron/*.dmg
+            apps/ava-softphone-desktop/dist-electron/*.zip
+          if-no-files-found: warn
+          retention-days: 7
+
+  build-desktop-windows:
+    needs: check-changes
+    if: needs.check-changes.outputs.desktop_changed == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+        working-directory: apps/ava-softphone-desktop
+      - name: Fix vite config
+        shell: pwsh
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          $nl = [Environment]::NewLine
+          $c = 'import { defineConfig } from ''vite''' + $nl
+          $c += 'import react from ''@vitejs/plugin-react''' + $nl
+          $c += 'import path from ''path''' + $nl
+          $c += 'export default defineConfig({' + $nl
+          $c += '  plugins: [react()],' + $nl
+          $c += '  css: { postcss: false },' + $nl
+          $c += '  resolve: { alias: { ''@'': path.resolve(__dirname, ''./src'') } },' + $nl
+          $c += '  build: { outDir: ''dist'', emptyOutDir: true, rollupOptions: { external: [''electron''] } },' + $nl
+          $c += '  base: ''./'',' + $nl
+          $c += '})' + $nl
+          Set-Content -Path "vite.config.ts" -Value $c -Encoding UTF8
+      - name: Build Windows
+        shell: pwsh
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          npx vite build
+          npx tsc -p electron/tsconfig.json
+          npx electron-builder --win -c.publish=never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows
+          path: apps/ava-softphone-desktop/dist-electron/*.exe
+          if-no-files-found: warn
+          retention-days: 7
+
+  build-desktop-linux:
+    needs: check-changes
+    if: needs.check-changes.outputs.desktop_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Linux deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libnotify-dev libasound2-dev libcups2-dev libxss1 libxtst6 xvfb libx11-xcb1 libxcb-dri3-0 libdrm2 libgbm1 libnss3 libatk-bridge2.0-0
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+        working-directory: apps/ava-softphone-desktop
+      - name: Fix vite config
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          python3 -c "
+          content = '''import { defineConfig } from \"vite\"
+          import react from \"@vitejs/plugin-react\"
+          import path from \"path\"
+          export default defineConfig({
+            plugins: [react()],
+            css: { postcss: false },
+            resolve: { alias: { \"@\": path.resolve(__dirname, \"./src\") } },
+            build: { outDir: \"dist\", emptyOutDir: true, rollupOptions: { external: [\"electron\"] } },
+            base: \"./\",
+          })'''
+          open('vite.config.ts', 'w').write(content)
+          "
+      - name: Build Linux
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          npx vite build
+          npx tsc -p electron/tsconfig.json || true
+          npx electron-builder --linux -c.publish=never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux
+          path: |
+            apps/ava-softphone-desktop/dist-electron/*.AppImage
+            apps/ava-softphone-desktop/dist-electron/*.deb
+          if-no-files-found: warn
+          retention-days: 7
+
+  build-mobile-android:
+    needs: check-changes
+    if: needs.check-changes.outputs.mobile_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install + Build Android
+        working-directory: apps/ava-softphone-mobile
+        run: |
+          npm install --legacy-peer-deps
+          npm run build
+          npx cap sync android
+      - name: Build APK
+        working-directory: apps/ava-softphone-mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease || ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-android
+          path: apps/ava-softphone-mobile/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
+          retention-days: 7
+
+  build-chrome-extension:
+    needs: check-changes
+    if: needs.check-changes.outputs.extension_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package Chrome Extension
+        run: |
+          cd apps/lemtel-chrome-extension
+          zip -r ../../lemtel-chrome-extension.zip . --exclude "*.git*" --exclude "*node_modules*" --exclude "*.DS_Store*"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension
+          path: lemtel-chrome-extension.zip
+          if-no-files-found: warn
+          retention-days: 7
+
+  create-release:
+    needs: [check-changes, build-desktop-mac, build-desktop-windows, build-desktop-linux, build-mobile-android, build-chrome-extension]
+    runs-on: ubuntu-latest
+    if: always() && (needs.build-desktop-mac.result == 'success' || needs.build-desktop-windows.result == 'success' || needs.build-desktop-linux.result == 'success' || needs.build-mobile-android.result == 'success' || needs.build-chrome-extension.result == 'success')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+      - name: List artifacts
+        run: find release-artifacts -type f | sort
+      - name: Get commit info
+        id: commit
+        run: |
+          echo "message=$(git log -1 --pretty=%s)" >> $GITHUB_OUTPUT
+          echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
+          echo "date=$(date '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_OUTPUT
+          echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "auto-${{ needs.check-changes.outputs.new_version }}"
+          name: "Lemtel Telecom — ${{ needs.check-changes.outputs.new_version }}"
+          body: |
+            ## 🚀 Auto Release — ${{ steps.commit.outputs.date }}
+
+            **Commit:** `${{ steps.commit.outputs.sha }}`
+            **Message:** ${{ steps.commit.outputs.message }}
+            **By:** ${{ steps.commit.outputs.author }}
+
+            ---
+
+            ### ⬇️ Downloads
+
+            | Platform | File | Notes |
+            |----------|------|-------|
+            | 🍎 Mac Apple Silicon | `Lemtel.Telecom-arm64.dmg` | M1/M2/M3/M4 |
+            | 🍎 Mac Intel | `Lemtel.Telecom-x64.dmg` | Intel Macs |
+            | 🪟 Windows | `Lemtel.Telecom.Setup.exe` | Windows 10+ |
+            | 🐧 Linux | `Lemtel.Telecom.AppImage` | All distros |
+            | 🤖 Android | `app-release.apk` | Android 8+ |
+            | 🔌 Chrome | `lemtel-chrome-extension.zip` | Chrome/Edge |
+
+            ---
+            *Powered by AVA AI · assistantvirtualai.com*
+          files: release-artifacts/**/*
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_unmatched_files: false
+          make_latest: true
