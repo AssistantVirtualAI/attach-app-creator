@@ -563,9 +563,11 @@ Deno.serve(async (req) => {
         if (last?.completed_at) startDate = last.completed_at;
       }
       const extra: Record<string, string> = { limit: String(params.limit ?? b.limit ?? 100) };
-      if (startDate) extra.start_date = startDate;
-      if (endDate) extra.end_date = endDate;
+      // FusionPBX xml_cdr column is start_stamp, not start_date
+      if (startDate) extra.start_stamp = `>=${startDate}`;
+      if (endDate) extra.end_stamp = `<=${endDate}`;
       if (extension) extra.extension = extension;
+
 
       const r = await fetchCdrsWithFallback(extra);
       if (!r.ok) {
