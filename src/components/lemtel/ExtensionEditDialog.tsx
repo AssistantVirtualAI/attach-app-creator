@@ -132,7 +132,13 @@ export function ExtensionEditDialog({ open, onOpenChange, extension }: Props) {
           </div>
           <div>
             <Label>SIP password</Label>
-            <Input type="password" value={form.password || ''} onChange={(e) => set('password', e.target.value)} />
+            <div className="flex gap-2">
+              <Input type="password" value={form.password || ''} onChange={(e) => set('password', e.target.value)} />
+              <Button type="button" variant="outline" size="icon" title="Generate new password"
+                onClick={() => { set('password', genPassword()); toast({ title: 'New password generated', description: 'Click Save to apply.' }); }}>
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
           <div>
             <Label>Voicemail password</Label>
