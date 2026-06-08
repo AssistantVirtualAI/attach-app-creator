@@ -314,9 +314,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
 
       {/* Main content */}
       <main className="pt-14 md:pt-0 md:ml-[18rem] lg:ml-80 min-h-screen flex flex-col">
-        <div className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 py-1.5 backdrop-blur flex justify-end">
-          <VersionBadge />
-        </div>
+
         <div className="p-4 lg:p-6 flex-1">
           {children}
         </div>
