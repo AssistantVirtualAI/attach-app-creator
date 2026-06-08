@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Hash, Lock, Plus, Send, Paperclip, Smile, Trash2 } from "lucide-react";
 import { useChannels, useChatMessages, type Channel } from "@/hooks/useOrgChat";
 import { useLanguage } from "@/context/LanguageContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
