@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Voicemail as VmIcon, Play, Sparkles, FileText, Trash2, CheckCircle2, Inbox } from "lucide-react";
+import { Voicemail as VmIcon, Play, Sparkles, FileText, Trash2, CheckCircle2, Inbox, PhoneCall } from "lucide-react";
 import { useMyVoicemails, type Voicemail } from "@/hooks/useMyVoicemail";
 import { useLanguage } from "@/context/LanguageContext";
 import { toast } from "sonner";
@@ -144,6 +144,15 @@ export default function MyVoicemail() {
                     <Sparkles className="h-3 w-3 mr-1" />
                     {t("AI Summary", "Résumé IA")}
                   </Button>
+                  {selected.caller_number && (
+                    <Button
+                      size="sm"
+                      onClick={() => { window.location.href = `tel:${selected.caller_number}`; }}
+                    >
+                      <PhoneCall className="h-3 w-3 mr-1" />
+                      {t("Call back", "Rappeler")}
+                    </Button>
+                  )}
                   {!selected.read_at && (
                     <Button size="sm" variant="outline" onClick={() => markRead.mutate(selected.id)}>
                       <CheckCircle2 className="h-3 w-3 mr-1" />

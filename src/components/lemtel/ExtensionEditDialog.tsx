@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RefreshCw, QrCode, UserPlus } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -15,12 +16,22 @@ type Props = {
   extension: any | null;
 };
 
+function genPassword(len = 16) {
+  const chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const arr = new Uint32Array(len);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (n) => chars[n % chars.length]).join('');
+}
+
 export function ExtensionEditDialog({ open, onOpenChange, extension }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<any>({});
+  const [showQR, setShowQR] = useState(false);
+  const [assignEmail, setAssignEmail] = useState('');
+  const [assigning, setAssigning] = useState(false);
 
   useEffect(() => {
     if (!open || !extension) return;
@@ -121,7 +132,13 @@ export function ExtensionEditDialog({ open, onOpenChange, extension }: Props) {
           </div>
           <div>
             <Label>SIP password</Label>
-            <Input type="password" value={form.password || ''} onChange={(e) => set('password', e.target.value)} />
+            <div className="flex gap-2">
+              <Input type="password" value={form.password || ''} onChange={(e) => set('password', e.target.value)} />
+              <Button type="button" variant="outline" size="icon" title="Generate new password"
+                onClick={() => { set('password', genPassword()); toast({ title: 'New password generated', description: 'Click Save to apply.' }); }}>
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
           <div>
             <Label>Voicemail password</Label>
@@ -152,6 +169,61 @@ export function ExtensionEditDialog({ open, onOpenChange, extension }: Props) {
             <Switch id="en" checked={!!form.enabled} onCheckedChange={(v) => set('enabled', v)} />
           </div>
         </div>
+
+        <div className="border-t pt-4 mt-2 space-y-4">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="flex items-center gap-2"><UserPlus className="w-4 h-4" /> Assign portal user (by email)</Label>
+              {extension.portal_user_id && <span className="text-xs text-muted-foreground">Currently linked</span>}
+            </div>
+            <div className="flex gap-2">
+              <Input placeholder="user@example.com" value={assignEmail} onChange={(e) => setAssignEmail(e.target.value)} />
+              <Button type="button" variant="outline" disabled={assigning || !extension.id}
+                onClick={async () => {
+                  setAssigning(true);
+                  try {
+                    const { data, error } = await (supabase as any).rpc('admin_link_softphone_by_email', {
+                      _softphone_id: extension.id, _email: assignEmail.trim(),
+                    });
+                    if (error) throw error;
+                    toast({ title: 'User linked', description: assignEmail || 'Unlinked' });
+                    qc.invalidateQueries({ queryKey: ['pbx_extensions'] });
+                  } catch (e: any) {
+                    toast({ title: 'Link failed', description: e?.message || String(e), variant: 'destructive' });
+                  } finally { setAssigning(false); }
+                }}>
+                {assigning && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Link
+              </Button>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="flex items-center gap-2"><QrCode className="w-4 h-4" /> Mobile provisioning QR</Label>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setShowQR((v) => !v)}>
+                {showQR ? 'Hide' : 'Show'}
+              </Button>
+            </div>
+            {showQR && (
+              <div className="flex items-center gap-4 rounded-md border p-3 bg-muted/30">
+                <QRCodeSVG
+                  size={140}
+                  value={JSON.stringify({
+                    portal: 'avastatistic.ca',
+                    extension: extension.extension,
+                    sip_domain: extension.sip_domain || 'lemtel.lemtel.tel',
+                    wss: 'wss://lemtel.lemtel.tel:7443',
+                    password: form.password || '',
+                  })}
+                />
+                <div className="text-xs text-muted-foreground">
+                  Scan in the AVA Softphone mobile app to auto-configure SIP credentials for this extension.
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>Cancel</Button>

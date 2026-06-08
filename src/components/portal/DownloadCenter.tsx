@@ -15,7 +15,22 @@ function fmtSize(b?: number) {
 }
 
 export function DownloadCenter({ personalize = false }: { personalize?: boolean }) {
-  const { data: release } = useQuery({
+  const { data: dbRelease } = useQuery({
+    queryKey: ['app_releases_latest'],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from('app_releases')
+        .select('tag, name, platform_urls, assets, published_at')
+        .eq('is_latest', true)
+        .order('published_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: ghRelease } = useQuery({
     queryKey: ['gh-release', GH_REPO],
     queryFn: async () => {
       const r = await fetch(`https://api.github.com/repos/${GH_REPO}/releases/latest`);
@@ -24,7 +39,9 @@ export function DownloadCenter({ personalize = false }: { personalize?: boolean 
     },
     retry: false,
     staleTime: 60 * 60_000,
+    enabled: !dbRelease,
   });
+  const release = dbRelease || ghRelease;
 
   const [me, setMe] = useState<{ email?: string; ext?: string }>({});
   useEffect(() => {
@@ -38,13 +55,15 @@ export function DownloadCenter({ personalize = false }: { personalize?: boolean 
     })();
   }, [personalize]);
 
-  const asset = (suffix: string) =>
-    (release?.assets ?? []).find((a: any) => a.name?.toLowerCase().endsWith(suffix.toLowerCase()));
-  const macArm = asset('arm64.dmg');
-  const macX64 = asset('x64.dmg');
-  const win = asset('.exe');
-  const linux = asset('.AppImage');
-  const ver = release?.tag_name ?? '';
+  const platformUrls = (release as any)?.platform_urls || {};
+  const assetsList: any[] = Array.isArray((release as any)?.assets) ? (release as any).assets : [];
+  const findAsset = (suffix: string) =>
+    assetsList.find((a: any) => (a.name || '').toLowerCase().endsWith(suffix.toLowerCase()));
+  const macArm = platformUrls.mac_arm64 ? { name: 'macOS Apple Silicon', browser_download_url: platformUrls.mac_arm64, size: 0 } : findAsset('arm64.dmg');
+  const macX64 = platformUrls.mac_x64 ? { name: 'macOS Intel', browser_download_url: platformUrls.mac_x64, size: 0 } : findAsset('x64.dmg');
+  const win = platformUrls.windows ? { name: 'Windows', browser_download_url: platformUrls.windows, size: 0 } : findAsset('.exe');
+  const linux = platformUrls.linux ? { name: 'Linux', browser_download_url: platformUrls.linux, size: 0 } : findAsset('.AppImage');
+  const ver = (release as any)?.tag || (release as any)?.tag_name || '';
 
   const qrPayload = JSON.stringify({
     portal: 'avastatistic.ca',
