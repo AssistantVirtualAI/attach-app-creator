@@ -576,30 +576,31 @@ const App = () => (
                 <Route path="/lemtel/portal/softphone" element={<ProtectedRoute><LemtelGuard><LemtelStub title="Softphone" description="Use the floating softphone widget at the bottom-right." /></LemtelGuard></ProtectedRoute>} />
 
                 {/* New /org/lemtel/telephony/* admin routes */}
-                <Route path="/org/lemtel/telephony/dashboard" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyDashboard /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/numbers" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><LemtelDIDs /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/extensions" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><LemtelExtensions /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/users" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyUsers /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/devices" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><LemtelDevices /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/calls" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><LemtelPortalCalls /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/recordings" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyRecordings /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/ivr" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><LemtelIVR /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/queues" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><LemtelQueues /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/ring-groups" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyRingGroups /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/messages" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><LemtelMessages /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/agents" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><LemtelVoiceAgents /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/ai" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyAI /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/webphone" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyWebphone /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/settings" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonySettings /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/voicemail" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyVoicemail /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/team" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyTeam /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/preferences" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyUserPreferences /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/callcenter/agent" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><CallCenterAgent /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/callcenter/wallboard" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><CallCenterWallboard /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/callcenter/admin" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><CallCenterAdmin /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/diagnostics" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyDiagnostics /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/checklist" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyChecklist /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/telephony/portal-mappings" element={<ProtectedRoute><LemtelGuard><TelephonyLayout><TelephonyPortalMappings /></TelephonyLayout></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/telephony/dashboard" element={<LemtelTelephonyPage><TelephonyDashboard /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/numbers" element={<LemtelTelephonyPage><LemtelDIDs /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/extensions" element={<LemtelTelephonyPage><LemtelExtensions /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/users" element={<LemtelTelephonyPage><TelephonyUsers /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/devices" element={<LemtelTelephonyPage><LemtelDevices /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/calls" element={<LemtelTelephonyPage><LemtelPortalCalls /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/recordings" element={<LemtelTelephonyPage><TelephonyRecordings /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/ivr" element={<LemtelTelephonyPage><LemtelIVR /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/queues" element={<LemtelTelephonyPage><LemtelQueues /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/ring-groups" element={<LemtelTelephonyPage><TelephonyRingGroups /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/messages" element={<LemtelTelephonyPage><LemtelMessages /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/agents" element={<LemtelTelephonyPage><LemtelVoiceAgents /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/ai" element={<LemtelTelephonyPage><TelephonyAI /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/webphone" element={<LemtelTelephonyPage><TelephonyWebphone /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/settings" element={<LemtelTelephonyPage><TelephonySettings /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/voicemail" element={<LemtelTelephonyPage><TelephonyVoicemail /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/team" element={<LemtelTelephonyPage><TelephonyTeam /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/preferences" element={<LemtelTelephonyPage><TelephonyUserPreferences /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/callcenter/agent" element={<LemtelTelephonyPage><CallCenterAgent /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/callcenter/wallboard" element={<LemtelTelephonyPage><CallCenterWallboard /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/callcenter/admin" element={<LemtelTelephonyPage><CallCenterAdmin /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/diagnostics" element={<LemtelTelephonyPage><TelephonyDiagnostics /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/qa" element={<LemtelTelephonyPage><TelephonyDiagnostics /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/checklist" element={<LemtelTelephonyPage><TelephonyChecklist /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/portal-mappings" element={<LemtelTelephonyPage><TelephonyPortalMappings /></LemtelTelephonyPage>} />
 
                 {/* v3.0 Admin Portal (/org/lemtel/admin/*) */}
                 <Route path="/org/lemtel/admin" element={<Navigate to="/org/lemtel/admin/dashboard" replace />} />
