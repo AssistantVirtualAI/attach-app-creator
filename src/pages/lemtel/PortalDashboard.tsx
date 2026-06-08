@@ -49,9 +49,9 @@ export default function PortalDashboard() {
       // Fire in parallel so each list renders as soon as it's ready
       supabase
         .from("pbx_call_records")
-        .select("id, direction, caller_id_number, destination_number, duration_seconds, start_stamp, missed_call")
-        .or(`caller_id_number.eq.${sp.extension},destination_number.eq.${sp.extension}`)
-        .order("start_stamp", { ascending: false })
+        .select("id, direction, caller_number, destination_number, duration_seconds, start_at, missed_call")
+        .or(`caller_number.eq.${sp.extension},destination_number.eq.${sp.extension}`)
+        .order("start_at", { ascending: false })
         .limit(20)
         .then(({ data }) => {
           if (!cancelled) {
@@ -75,7 +75,7 @@ export default function PortalDashboard() {
     return () => { cancelled = true; };
   }, [user?.id]);
 
-  const todayCalls = calls.filter((c) => c.start_stamp && new Date(c.start_stamp).toDateString() === new Date().toDateString());
+  const todayCalls = calls.filter((c) => c.start_at && new Date(c.start_at).toDateString() === new Date().toDateString());
   const missed = todayCalls.filter((c) => c.missed_call).length;
   const inbound = todayCalls.filter((c) => c.direction === "inbound").length;
   const outbound = todayCalls.filter((c) => c.direction === "outbound").length;
@@ -161,11 +161,11 @@ export default function PortalDashboard() {
                       c.direction === "inbound" ? <PhoneIncoming className="w-4 h-4 text-emerald-500 shrink-0" /> :
                       <PhoneOutgoing className="w-4 h-4 text-indigo-500 shrink-0" />}
                     <span className="font-mono text-xs flex-1 truncate min-w-0">
-                      {c.direction === "inbound" ? c.caller_id_number : c.destination_number}
+                      {c.direction === "inbound" ? c.caller_number : c.destination_number}
                     </span>
                     <span className="text-xs text-muted-foreground shrink-0">{c.duration_seconds || 0}s</span>
                     <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline">
-                      {c.start_stamp ? formatDistanceToNow(new Date(c.start_stamp), { addSuffix: true }) : ""}
+                      {c.start_at ? formatDistanceToNow(new Date(c.start_at), { addSuffix: true }) : ""}
                     </span>
                   </li>
                 ))}

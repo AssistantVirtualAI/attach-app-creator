@@ -92,8 +92,8 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
     queryFn: async () => {
       const { data } = await supabase
         .from("pbx_call_records")
-        .select("id, direction, caller_id_number, destination_number, duration_seconds, start_stamp")
-        .order("start_stamp", { ascending: false })
+        .select("id, direction, caller_number, destination_number, duration_seconds, start_at")
+        .order("start_at", { ascending: false })
         .limit(20);
       return data || [];
     },
@@ -104,17 +104,13 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
     queryKey: ["softphone-contacts"],
     enabled: isMember,
     queryFn: async () => {
-      const [{ data: exts }, { data: clients }] = await Promise.all([
+      const [{ data: exts }] = await Promise.all([
         supabase.from("pbx_extensions").select("id, extension, effective_cid_name, description"),
-        supabase.from("clients").select("id, name, phone").not("phone", "is", null),
       ]);
       const merged = [
         ...(exts || []).map((e: any) => ({
           id: `ext-${e.id}`, name: e.effective_cid_name || e.description || `Ext ${e.extension}`,
           number: e.extension, type: "internal" as const,
-        })),
-        ...(clients || []).map((c: any) => ({
-          id: `cli-${c.id}`, name: c.name, number: c.phone, type: "external" as const,
         })),
       ];
       return merged;
@@ -376,7 +372,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
         ) : recents.map((c: any) => (
           <button
             key={c.id}
-            onClick={() => { setNumber(c.direction === "outbound" ? c.destination_number : c.caller_id_number); setTab("dial"); }}
+            onClick={() => { setNumber(c.direction === "outbound" ? c.destination_number : c.caller_number); setTab("dial"); }}
             className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-muted/60 text-left"
           >
             <span className={cn(
@@ -386,8 +382,8 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
               <Phone className="w-3 h-3" />
             </span>
             <div className="flex-1 min-w-0">
-              <div className="text-sm truncate">{c.direction === "outbound" ? c.destination_number : c.caller_id_number}</div>
-              <div className="text-[10px] text-muted-foreground">{new Date(c.start_stamp).toLocaleString()}</div>
+              <div className="text-sm truncate">{c.direction === "outbound" ? c.destination_number : c.caller_number}</div>
+              <div className="text-[10px] text-muted-foreground">{new Date(c.start_at).toLocaleString()}</div>
             </div>
             <div className="text-xs text-muted-foreground">{c.duration_seconds || 0}s</div>
           </button>

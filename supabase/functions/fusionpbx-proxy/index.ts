@@ -554,7 +554,22 @@ Deno.serve(async (req) => {
       if (!id) return json({ error: "call_center_agent_uuid required" }, 400);
       return json(await pbxWrite(`call_center_agents/${id}`, "DELETE"));
     }
-    if (action === "create-ring-group") return json(await writeCollection("ring_groups", "ring_groups", params));
+    if (action === "create-ring-group" || action === "update-ring-group") {
+      return json(await writeCollection("ring_groups", "ring_groups", params));
+    }
+    if (action === "delete-ring-group") {
+      const id = params.ring_group_uuid;
+      if (!id) return json({ error: "ring_group_uuid required" }, 400);
+      return json(await pbxWrite(`ring_groups/${id}`, "DELETE"));
+    }
+    if (action === "create-destination" || action === "update-destination") {
+      return json(await writeCollection("destinations", "destinations", params));
+    }
+    if (action === "delete-destination") {
+      const id = params.destination_uuid;
+      if (!id) return json({ error: "destination_uuid required" }, 400);
+      return json(await pbxWrite(`destinations/${id}`, "DELETE"));
+    }
 
     // ---- CDR endpoint fallback helper ----
     const CDR_ENDPOINTS = [
@@ -672,7 +687,11 @@ Deno.serve(async (req) => {
     if (action === "sync-all") {
       const t0 = Date.now();
       // Optional resources filter: ['extensions','devices','ivrs','queues','ring_groups','destinations','cdrs']
-      const requested: string[] | null = Array.isArray((body as any).resources) ? (body as any).resources : null;
+      const requested: string[] | null = Array.isArray((body as any).resources)
+        ? (body as any).resources
+        : Array.isArray(params.resources)
+          ? params.resources
+          : null;
       const want = (k: string) => !requested || requested.includes(k);
       const tasks: Promise<{ k: string; r: any }>[] = [];
       if (want("extensions"))   tasks.push(pbxFetch(`extensions?${domainQ}`).then((r) => ({ k: "extensions", r })));

@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import {
   CheckCircle2, XCircle, AlertTriangle, Loader2, Circle,
-  Database, Plug, Phone, MessageSquare, Bot, Shield, Rocket, RefreshCw, FileDown
+  Database, Activity, Plug, Phone, PhoneIncoming, MessageSquare, Bot, Shield, Rocket, RefreshCw, FileDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -372,6 +372,51 @@ const sections: Section[] = [
         } },
       { id: '6.6', name: 'RLS isolation', description: 'Cross-org data secured',
         run: async () => ({ status: 'pass' as const, detail: 'RLS policies enforced (verify with audit)' }) },
+    ],
+  },
+  {
+    id: 'inbound', title: 'Inbound Routing', icon: PhoneIncoming,
+    checks: [
+      { id: '7.1', name: 'DIDs Configured', description: 'Inbound numbers linked to destinations',
+        run: async () => {
+          const { count } = await (supabase as any).from('phone_numbers')
+            .select('*', { count: 'exact', head: true })
+            .eq('organization_id', LEMTEL_ORG_ID);
+          return count ? { status: 'pass', detail: `${count} DIDs active` } : { status: 'warn', detail: 'No DIDs found' };
+        } },
+      { id: '7.2', name: 'Ring Groups', description: 'At least one ring group exists',
+        run: async () => {
+          const { count } = await (supabase as any).from('pbx_ring_groups')
+            .select('*', { count: 'exact', head: true })
+            .eq('organization_id', LEMTEL_ORG_ID);
+          return count ? { status: 'pass', detail: `${count} ring groups` } : { status: 'warn', detail: 'No ring groups found' };
+        } },
+    ],
+  },
+  {
+    id: 'data', title: 'Data Quality & CDR Sync', icon: Activity,
+    checks: [
+      { id: '8.1', name: 'CDR Completeness', description: 'Recent calls have direction and duration',
+        run: async () => {
+          const { data } = await (supabase as any).from('pbx_call_records')
+            .select('direction, duration_seconds')
+            .eq('organization_id', LEMTEL_ORG_ID)
+            .order('start_at', { ascending: false }).limit(20);
+          if (!data?.length) return { status: 'warn', detail: 'No CDRs to verify' };
+          const bad = (data as any[]).filter((c: any) => !c.direction || c.duration_seconds === null).length;
+          return bad === 0 ? { status: 'pass', detail: 'Recent 20 CDRs look healthy' } : { status: 'fail', detail: `${bad}/20 records missing data` };
+        } },
+      { id: '8.2', name: 'SIP Registration Freshness', description: 'Recent activity from softphone users',
+        run: async () => {
+          const { data } = await (supabase as any).from('pbx_softphone_users')
+            .select('extension, last_seen_at')
+            .eq('organization_id', LEMTEL_ORG_ID)
+            .order('last_seen_at', { ascending: false }).limit(5);
+          if (!data?.length) return { status: 'warn', detail: 'No softphone users' };
+          const last = data[0].last_seen_at;
+          const mins = last ? (Date.now() - new Date(last).getTime()) / 60000 : Infinity;
+          return mins < 60 ? { status: 'pass', detail: `Active (last seen ${Math.round(mins)}m ago)` } : { status: 'warn', detail: `No activity in >1h` };
+        } },
     ],
   },
 ];

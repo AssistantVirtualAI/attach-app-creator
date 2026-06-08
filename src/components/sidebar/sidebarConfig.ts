@@ -3,7 +3,7 @@ import {
   Bot, Sparkles, FileQuestion, Users, UserPlus, Calendar,
   Phone, MessageCircle, GitBranch, Sliders, Webhook,
   CreditCard, Settings, Tag, Headphones, LayoutDashboard, Globe,
-  Shield, PhoneCall, Voicemail, Smartphone, Disc, Bell, Brain, Router, Activity, Home, Download, Inbox
+  Shield, PhoneCall, Voicemail, Smartphone, Disc, Bell, Brain, Router, Activity, Home, Download, Inbox, Server, Building2
 } from 'lucide-react';
 
 export interface NavItem {
@@ -23,8 +23,8 @@ export interface NavGroup {
   lemtelOnly?: boolean;
   lemtelCustomerOnly?: boolean;
   hideForLemtel?: boolean;
-  /** scope: 'org' shown on /org/<slug>/ (not /my/), 'my' shown on /org/<slug>/my/, 'legacy' shown elsewhere */
-  scope?: 'org' | 'my' | 'legacy';
+  /** scope controls where this group appears */
+  scope?: 'org' | 'my' | 'legacy' | 'platform' | 'customer';
 }
 
 // =========================================================================
@@ -103,17 +103,20 @@ const ORG_GROUPS: NavGroup[] = [
       { nameKey: 'Devices', href: '/org/lemtel/admin/devices', icon: Router },
       { nameKey: 'Phone Numbers', href: '/org/lemtel/admin/dids', icon: Phone },
       { nameKey: 'IVR / Auto-Attendant', href: '/org/lemtel/admin/ivr', icon: Voicemail },
-      { nameKey: 'Call Queues', href: '/org/lemtel/admin/queues', icon: Headphones },
       { nameKey: 'Ring Groups', href: '/org/lemtel/admin/ring-groups', icon: Bell },
+      { nameKey: 'Voice Agents', href: '/org/lemtel/admin/agents', icon: Bot },
       { nameKey: 'PBX Settings', href: '/org/lemtel/admin/settings', icon: Settings },
     ],
   },
   {
     id: 'org-call-center', labelKey: '🎧 Call Center', icon: Headphones, scope: 'org', lemtelOnly: true,
     items: [
+      { nameKey: 'Call Queues', href: '/org/lemtel/admin/queues', icon: Headphones },
+      { nameKey: 'Queue Agents', href: '/org/lemtel/admin/queues', icon: Users },
       { nameKey: 'Wallboard', href: '/org/lemtel/callcenter/wallboard', icon: Activity },
       { nameKey: 'Agent Console', href: '/org/lemtel/callcenter/agent', icon: Phone },
       { nameKey: 'CC Admin', href: '/org/lemtel/callcenter/admin', icon: Shield },
+      { nameKey: 'Telephony QA', href: '/org/lemtel/telephony/qa', icon: Activity },
     ],
   },
   {
