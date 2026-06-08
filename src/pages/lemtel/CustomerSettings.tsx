@@ -30,6 +30,8 @@ export default function CustomerSettings() {
   const [brandColor, setBrandColor] = useState("#0023e6");
   const [supportEmail, setSupportEmail] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [portalDomain, setPortalDomain] = useState("");
+  const [savingDomain, setSavingDomain] = useState(false);
 
   useEffect(() => {
     if (org) {
