@@ -89,15 +89,23 @@ Transcript:
 ${transcript_text}` }],
         }),
       });
+      if (!res.ok) {
+        const details = await res.text();
+        console.error("Anthropic analyze error", res.status, details);
+        throw new Error("AI analysis service error");
+      }
       const data = await res.json();
-      const raw = data.content?.[0]?.text?.match(/\{[\s\S]*\}/)?.[0] || "{}";
+      const raw = data.content?.[0]?.text?.match(/\{[\s\S]*\}/)?.[0];
+      if (!raw) throw new Error("AI analysis returned no structured result");
       insights = JSON.parse(raw);
     }
 
-    await admin.from("pbx_ai_insights").insert({
+    await admin.from("pbx_ai_insights").delete().eq("call_record_id", call_record_id);
+    const { error: insightError } = await admin.from("pbx_ai_insights").insert({
       organization_id, call_record_id, ...insights,
       prompt_version: "v1", ai_model: "claude-sonnet-4-20250514",
     });
+    if (insightError) throw new Error(insightError.message);
     await admin.from("pbx_call_records").update({ analyzed: true, ai_processing: false }).eq("id", call_record_id);
 
     return new Response(JSON.stringify(insights), { headers: corsHeaders });
