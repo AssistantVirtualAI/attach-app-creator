@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi } from '../lib/mobileApi';
 import { Card, Chip, AIPanel, SectionTitle, PrimaryButton, GhostButton } from '../components/ui/Primitives';
 import { AvaBadge } from '../components/Brand';
 
-type Module = 'intelligence' | 'actions' | 'greetings' | 'queues' | 'agents';
+type Module = 'chat' | 'intelligence' | 'actions' | 'greetings' | 'queues' | 'agents';
 
 const MODULES: { id: Module; label: string; desc: string; tone: 'violet' | 'cyan' | 'gold' | 'success' | 'danger' }[] = [
+  { id: 'chat',         label: 'Chat with AVA',     desc: 'Manage your phone system by chatting with AVA.',     tone: 'cyan' },
   { id: 'intelligence', label: 'Call Intelligence', desc: 'Summaries, sentiment, topics, opportunities, risks.', tone: 'violet' },
   { id: 'actions',      label: 'Action Center',     desc: 'Follow-ups extracted from calls and messages.',     tone: 'cyan' },
   { id: 'greetings',    label: 'Greeting Studio',   desc: 'Generate IVR/voicemail greetings with ElevenLabs.', tone: 'gold' },
@@ -15,7 +16,7 @@ const MODULES: { id: Module; label: string; desc: string; tone: 'violet' | 'cyan
 ];
 
 export default function AIScreen() {
-  const [active, setActive] = useState<Module>('intelligence');
+  const [active, setActive] = useState<Module>('chat');
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '14px 14px 20px' }}>
