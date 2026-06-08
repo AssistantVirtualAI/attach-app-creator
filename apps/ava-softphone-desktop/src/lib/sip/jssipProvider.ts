@@ -286,6 +286,19 @@ class JsSipProvider {
   private bindMedia(session: any) {
     const pc = session.connection;
     if (!pc) return;
+
+    // SDP munging: re-order audio codecs to PCMU, PCMA, opus, telephone-event.
+    // FusionPBX often rejects (488) opus-only offers; PSTN gateways want G.711.
+    const originalSLD = pc.setLocalDescription?.bind(pc);
+    if (originalSLD) {
+      pc.setLocalDescription = (desc: any) => {
+        try {
+          if (desc?.sdp) desc = { type: desc.type, sdp: preferAudioCodecs(desc.sdp) };
+        } catch { /* noop */ }
+        return originalSLD(desc);
+      };
+    }
+
     pc.addEventListener('track', (ev: any) => {
       if (this.audioEl && ev.streams[0]) {
         this.audioEl.srcObject = ev.streams[0];
@@ -300,6 +313,11 @@ class JsSipProvider {
   private resetCall() {
     this.session = null;
     this.secondSession = null;
+    // Clear audio element to avoid stale stream / black-screen after failed call.
+    if (this.audioEl) {
+      try { this.audioEl.pause(); } catch { /* noop */ }
+      try { this.audioEl.srcObject = null; } catch { /* noop */ }
+    }
     this.update({
       callState: 'idle',
       remoteIdentity: '',
@@ -308,6 +326,7 @@ class JsSipProvider {
       startedAt: null,
       muted: false,
       onHold: false,
+      errorCause: undefined,
     });
   }
 
