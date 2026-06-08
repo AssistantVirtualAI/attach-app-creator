@@ -81,7 +81,7 @@ jobs:
         run: |
           npx vite build
           npx tsc -p electron/tsconfig.json || true
-          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true npx electron-builder --mac --x64 --arm64
+          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true npx electron-builder --mac --publish=never --x64 --arm64 --publish=never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           GH_TOKEN: ""
@@ -178,7 +178,7 @@ jobs:
         run: |
           npx vite build
           npx tsc -p electron/tsconfig.json || true
-          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true npx electron-builder --linux
+          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true npx electron-builder --linux --publish=never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           GH_TOKEN: ""
