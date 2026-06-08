@@ -12,7 +12,8 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { SidebarFooter } from '@/components/sidebar/SidebarFooter';
 import { SidebarNavGroup } from '@/components/sidebar/SidebarNavGroup';
-import { sidebarGroups, settingsLink, NavGroup } from '@/components/sidebar/sidebarConfig';
+import { sidebarGroups, settingsLink, NavGroup, getSidebarScope } from '@/components/sidebar/sidebarConfig';
+import { UserCircle2, ArrowLeft } from 'lucide-react';
 import { CookieConsentBanner } from '@/components/gdpr/CookieConsentBanner';
 import { motion } from 'framer-motion';
 import {
@@ -96,13 +97,17 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Debug: log sidebar visibility info
   console.log('[Sidebar Debug] Role:', role, 'isSuperAdmin:', isSuperAdmin, 'isLoading:', isLoading, 'userRole:', userRole);
 
-  // Filter groups based on role and Lemtel org membership
+  // Filter groups based on route scope, role and Lemtel org membership
   const isLemtelMember = isSuperAdmin || organizationMemberships.some(m => m.organization.id === '71755d33-ed64-4ad5-a828-61c9d2029eb7');
+  const currentScope = getSidebarScope(location.pathname);
   const visibleGroups = useMemo(() => sidebarGroups.filter(g => {
+    const groupScope = g.scope ?? 'legacy';
+    if (currentScope === 'admin') return false; // admin portal uses its own layout
+    if (groupScope !== currentScope) return false;
     if (g.lemtelOnly && !isLemtelMember) return false;
     if (g.hideForLemtel && isLemtelMember) return false;
     return true;
-  }), [isLemtelMember]);
+  }), [isLemtelMember, currentScope]);
 
   // Sidebar group ordering with drag & drop
   const sensors = useSensors(
@@ -265,11 +270,33 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
               </SortableContext>
             </DndContext>
 
+            {/* Portal switcher (Lemtel only) */}
+            {isLemtelMember && currentScope === 'org' && (
+              <Link
+                to="/org/lemtel/my/dashboard"
+                onClick={() => setIsSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 mt-3 text-muted-foreground hover:text-foreground hover:bg-muted border border-dashed border-border/60"
+              >
+                <UserCircle2 className="w-4 h-4" />
+                <span className="font-medium text-sm">👤 My Workspace →</span>
+              </Link>
+            )}
+            {isLemtelMember && currentScope === 'my' && (
+              <Link
+                to="/org/lemtel/admin/dashboard"
+                onClick={() => setIsSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 mt-3 text-muted-foreground hover:text-foreground hover:bg-muted border border-dashed border-border/60"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="font-medium text-sm">Back to Org Portal</span>
+              </Link>
+            )}
+
             {/* Settings link - always visible */}
             <Link
               to={settingsLink.href}
               onClick={() => setIsSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 mt-3 ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 mt-1 ${
                 isSettingsActive
                   ? 'bg-primary/15 text-foreground border border-primary/30'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted'
