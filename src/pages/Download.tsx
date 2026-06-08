@@ -24,6 +24,7 @@ export default function Download() {
           </p>
         </section>
 
+        <LiveReleaseCard />
         <DesktopDownloadCard />
 
         <Card className="p-6">
