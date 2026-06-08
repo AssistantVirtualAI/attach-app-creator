@@ -23,6 +23,9 @@ export type ChatMessage = {
   message_type: string;
   edited_at: string | null;
   created_at: string;
+  parent_message_id?: string | null;
+  reply_count?: number;
+  last_reply_at?: string | null;
 };
 
 async function invoke(action: string, payload?: any) {
