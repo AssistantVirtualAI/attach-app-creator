@@ -42,9 +42,23 @@ Deno.serve(async (req) => {
 
     // 2. Determine parent + level
     const parentId = body.parent_org_id || "71755d33-ed64-4ad5-a828-61c9d2029eb7";
-    const { data: parent } = await admin.from("organizations").select("org_level,root_org_id,id").eq("id", parentId).maybeSingle();
+    const { data: parent } = await admin.from("organizations").select("org_level,root_org_id,id,org_type").eq("id", parentId).maybeSingle();
     const orgLevel = (parent?.org_level ?? 1) + 1;
     const rootId = parent?.root_org_id || parent?.id || parentId;
+
+    // 2b. If the creator is a reseller_admin, set reseller_id to their org
+    let resellerId: string | null = body.reseller_id || null;
+    if (!resellerId && !isMaster) {
+      const { data: resMembership } = await admin
+        .from("org_members")
+        .select("org_id")
+        .eq("user_id", user.id)
+        .eq("role", "reseller_admin")
+        .limit(1)
+        .maybeSingle();
+      if (resMembership?.org_id) resellerId = resMembership.org_id;
+    }
+    if (!resellerId && parent?.org_type === "reseller") resellerId = parent.id;
 
     // 3. Insert organization
     const { data: org, error: orgErr } = await admin
