@@ -23,11 +23,14 @@ const stamp = (n?: number | null) => n ? new Date(n).toLocaleTimeString() : '—
 export default function TelephonyDiagnostics() {
   const { data: providerStatus, refetch: refetchProvider } = useTelephonyStatus();
   const softphone = useSoftphone();
+  
   const [running, setRunning] = useState(false);
   const [filterGroup, setFilterGroup] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [testNumber, setTestNumber] = useState('');
+  const [outboundTarget, setOutboundTarget] = useState('');
   const [checks, setChecks] = useState<QaCheck[]>([]);
+
 
   const { data: syncJobs = [], refetch: refetchJobs } = useQuery({
     queryKey: ['telephony-qa-sync-jobs'],
@@ -125,7 +128,22 @@ export default function TelephonyDiagnostics() {
             {!softphone.snap.events.length && <p className="text-sm text-muted-foreground py-8 text-center">No SIP events yet.</p>}
           </ScrollArea>
         </CardContent>
+        <CardContent className="border-t pt-4 flex flex-wrap gap-2 items-end">
+          <div className="flex-1 min-w-[200px]">
+            <Label>Outbound test number</Label>
+            <Input value={outboundTarget} onChange={(e) => setOutboundTarget(e.target.value)} placeholder="e.g. *9196 echo test or a real number" />
+          </div>
+          <Button
+            size="sm"
+            disabled={!outboundTarget || softphone.snap.status !== 'registered'}
+            onClick={() => softphone.call(outboundTarget)}
+          >Place outbound test call</Button>
+          <Button size="sm" variant="outline" disabled={softphone.snap.callState === 'idle'} onClick={() => softphone.hangup()}>Hang up</Button>
+          <audio ref={(el) => softphone.setAudioEl(el)} autoPlay />
+        </CardContent>
       </Card>
+
+
 
       <Card>
         <CardHeader><CardTitle className="text-base">QA filters</CardTitle></CardHeader>
