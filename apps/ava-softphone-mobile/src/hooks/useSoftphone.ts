@@ -63,6 +63,17 @@ export function useSoftphone(
         ua.on('newRTCSession', (data: any) => {
           const session = data.session;
           sessionRef.current = session;
+          // SDP munging: prefer PCMU/PCMA (FusionPBX trunks reject opus-only with 488).
+          try {
+            const pc = session.connection;
+            const orig = pc?.setLocalDescription?.bind(pc);
+            if (orig) {
+              pc.setLocalDescription = (desc: any) => {
+                try { if (desc?.sdp) desc = { type: desc.type, sdp: preferAudioCodecs(desc.sdp) }; } catch {}
+                return orig(desc);
+              };
+            }
+          } catch {}
           const remoteNumber = session.remote_identity?.uri?.user || 'Unknown';
           setActiveCallNumber(remoteNumber);
           if (session.direction === 'incoming') setCallState('ringing');
