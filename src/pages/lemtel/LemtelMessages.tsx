@@ -17,10 +17,16 @@ export default function LemtelMessages() {
   const { toast } = useToast();
   const { data: threads = [] } = usePbxSmsThreads();
   const qc = useQueryClient();
+  const { data: threads = [] } = usePbxSmsThreads();
+  const { templates } = useSmsTemplates();
+  const qc = useQueryClient();
   const [selectedDid, setSelectedDid] = useState<string | null>(null);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
+  const [newTo, setNewTo] = useState('');
+  const [newText, setNewText] = useState('');
 
   const selectedThread = (threads as any[]).find(t => t.id === selectedThreadId) || null;
   const { data: messages = [] } = usePbxSmsMessages(selectedThreadId);
@@ -28,6 +34,21 @@ export default function LemtelMessages() {
   const dids = Array.from(new Set((threads as any[]).map(t => t.did_number)));
   const activeDid = selectedDid || dids[0];
   const didThreads = (threads as any[]).filter(t => t.did_number === activeDid);
+
+  const startNew = async () => {
+    if (!activeDid || !newTo.trim() || !newText.trim()) return;
+    setSending(true);
+    const { error } = await supabase.functions.invoke('telnyx-sms', {
+      body: { from: activeDid, to: newTo.trim(), text: newText },
+    });
+    setSending(false);
+    if (error) toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
+    else {
+      toast({ title: 'Message sent' });
+      setNewOpen(false); setNewTo(''); setNewText('');
+      qc.invalidateQueries({ queryKey: ['pbx', 'pbx_sms_threads'] });
+    }
+  };
 
   const send = async () => {
     if (!selectedThread || !input.trim()) return;
