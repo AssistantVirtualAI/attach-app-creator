@@ -24,6 +24,7 @@ export default function MasterOrganizations() {
   const [open, setOpen] = useState(params.get("create") === "1");
   const { enter } = useImpersonation();
   const navigate = useNavigate();
+  const [csvOrg, setCsvOrg] = useState<{ id: string; name: string } | null>(null);
 
   const { data: orgs = [] } = useQuery({
     queryKey: ["all-orgs"],
