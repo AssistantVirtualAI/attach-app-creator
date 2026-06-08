@@ -16,33 +16,35 @@ function Shell({ title, badge, accent, items }: {
 }) {
   const { pathname } = useLocation();
   return (
-    <div className="min-h-screen flex w-full bg-background">
-      <aside className="w-60 border-r bg-card/40 flex flex-col">
-        <div className="h-14 px-4 flex items-center gap-2 border-b">
-          <div className={`w-2 h-2 rounded-full ${accent}`} />
-          <div>
-            <div className="text-sm font-semibold leading-tight">{title}</div>
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{badge}</div>
-          </div>
+    <div className="flex flex-col min-h-full bg-background">
+      <div className="px-6 py-3 border-b flex items-center gap-3 flex-wrap bg-card/40 sticky top-0 z-30 backdrop-blur">
+        <div className={`w-2 h-2 rounded-full ${accent}`} />
+        <div className="mr-4">
+          <div className="text-sm font-semibold leading-tight">{title}</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{badge}</div>
         </div>
-        <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+        <nav className="flex items-center gap-1 flex-wrap">
           {items.map((it) => {
-            const active = pathname === it.to || pathname.startsWith(it.to + "/");
+            const isRoot = it.to.split("/").length <= 2;
+            const active = isRoot ? pathname === it.to : pathname === it.to || pathname.startsWith(it.to + "/");
             return (
               <NavLink
                 key={it.to}
                 to={it.to}
-                className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                  active ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                end={isRoot}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  active
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                 }`}
               >
-                <it.icon className="h-4 w-4" />
+                <it.icon className="h-3.5 w-3.5" />
                 <span>{it.label}</span>
               </NavLink>
             );
           })}
         </nav>
-      </aside>
+      </div>
       <main className="flex-1 overflow-x-hidden">
         <Outlet />
       </main>
