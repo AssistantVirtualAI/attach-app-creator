@@ -69,6 +69,7 @@ Deno.serve(async (req) => {
         org_type: body.org_type,
         org_level: orgLevel,
         parent_org_id: parentId,
+        reseller_id: resellerId,
         root_org_id: rootId,
         billing_email: body.billing_email,
         billing_plan: body.billing_plan,
