@@ -303,7 +303,35 @@ Deno.serve(async (req) => {
     }
 
 
+    if (action === "get-extension") {
+      const id = body.extension_uuid || params.extension_uuid;
+      const extNum = body.extension || params.extension;
+      const domId = body.domain_uuid || params.domain_uuid || FUSIONPBX_DOMAIN_UUID;
+      let url: URL;
+      if (id) {
+        url = new URL(`${FUSIONPBX_API_URL}/app/api/7/extensions/${id}`);
+      } else if (extNum) {
+        url = new URL(`${FUSIONPBX_API_URL}/app/api/7/extensions`);
+        url.searchParams.set("extension", String(extNum));
+        url.searchParams.set("domain_uuid", domId);
+      } else {
+        return json({ error: "Need extension_uuid or extension" }, 400);
+      }
+      url.searchParams.set("key", FUSIONPBX_API_KEY);
+      url.searchParams.set("username", FUSIONPBX_USERNAME);
+      try {
+        const res = await fetch(url.toString(), { headers: { Authorization: basicHeader, Accept: "application/json" } });
+        const text = await res.text();
+        let data: any;
+        try { data = JSON.parse(text); } catch { return json({ error: "PARSE_ERROR", raw: text.slice(0, 400) }, 200); }
+        return json(data, 200);
+      } catch (e: any) {
+        return json({ error: "FETCH_FAILED", message: e?.message || String(e) }, 200);
+      }
+    }
+
     if (action === "create-extension") {
+
       const extData = body.data || params || {};
       const attemptAt = new Date().toISOString();
 

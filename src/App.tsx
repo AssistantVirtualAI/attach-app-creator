@@ -593,6 +593,10 @@ const App = () => (
                 <Route path="/org/lemtel/admin/reports" element={<ProtectedRoute><LemtelGuard><AdminPortalLayout><AdminReports /></AdminPortalLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/admin/settings" element={<ProtectedRoute><LemtelGuard><AdminPortalLayout><TelephonySettings /></AdminPortalLayout></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/admin/downloads" element={<ProtectedRoute><LemtelGuard><AdminPortalLayout><DownloadCenter /></AdminPortalLayout></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/analytics/cdrs" element={<Navigate to="/org/lemtel/telephony/calls" replace />} />
+                <Route path="/org/lemtel/analytics/calls" element={<Navigate to="/org/lemtel/telephony/calls" replace />} />
+                <Route path="/org/lemtel/analytics" element={<Navigate to="/org/lemtel/telephony/calls" replace />} />
+
 
                 {/* v3.0 User Portal (/org/lemtel/my/*) */}
                 <Route path="/org/lemtel/my" element={<Navigate to="/org/lemtel/my/dashboard" replace />} />

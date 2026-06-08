@@ -11,48 +11,70 @@ export default function MyDashboard() {
   const { data } = useQuery({
     queryKey: ['my-dashboard'],
     queryFn: async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      const uid = auth.user?.id;
-      if (!uid) return null;
-      const { data: spu } = await (supabase as any)
-        .from('pbx_softphone_users')
-        .select('extension,display_name,organization_id,status')
-        .eq('portal_user_id', uid)
-        .maybeSingle();
-      if (!spu) return { ext: null };
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const uid = auth.user?.id;
+        const email = auth.user?.email;
+        if (!uid) return { ext: null };
 
-      const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
-      const [callsRes, vmRes, recentRes] = await Promise.all([
-        (supabase as any).from('pbx_call_records')
-          .select('id,duration_seconds')
-          .eq('organization_id', spu.organization_id)
-          .eq('extension', spu.extension)
-          .gte('start_at', startOfDay.toISOString()),
-        (supabase as any).from('pbx_voicemails')
-          .select('id', { count: 'exact', head: true })
-          .eq('organization_id', spu.organization_id)
-          .eq('extension', spu.extension)
-          .is('read_at', null),
-        (supabase as any).from('pbx_call_records')
-          .select('id,direction,caller_number,destination_number,duration_seconds,start_at')
-          .eq('organization_id', spu.organization_id)
-          .eq('extension', spu.extension)
-          .order('start_at', { ascending: false })
-          .limit(5),
-      ]);
-      const callRows = (callsRes.data ?? []) as any[];
-      const talkSec = callRows.reduce((s, r) => s + (r.duration_seconds || 0), 0);
-      return {
-        ext: spu.extension,
-        name: spu.display_name,
-        status: spu.status || 'offline',
-        callsToday: callRows.length,
-        voicemails: vmRes.count ?? 0,
-        talkTime: `${Math.floor(talkSec / 3600)}h ${Math.floor((talkSec % 3600) / 60)}m`,
-        recent: (recentRes.data ?? []) as any[],
-      };
+        let spu: any = null;
+        const { data: byId } = await (supabase as any)
+          .from('pbx_softphone_users')
+          .select('extension,display_name,organization_id,status,sip_domain')
+          .eq('portal_user_id', uid)
+          .maybeSingle();
+        spu = byId;
+
+        if (!spu && email) {
+          const local = email.split('@')[0];
+          const { data: byName } = await (supabase as any)
+            .from('pbx_softphone_users')
+            .select('extension,display_name,organization_id,status,sip_domain')
+            .ilike('display_name', `%${local}%`)
+            .maybeSingle();
+          spu = byName;
+        }
+
+        if (!spu) return { ext: null, name: email };
+
+        const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+        const [callsRes, vmRes, recentRes] = await Promise.all([
+          (supabase as any).from('pbx_call_records')
+            .select('id,duration_seconds')
+            .eq('organization_id', spu.organization_id)
+            .eq('extension', spu.extension)
+            .gte('start_at', startOfDay.toISOString()),
+          (supabase as any).from('pbx_voicemails')
+            .select('id', { count: 'exact', head: true })
+            .eq('organization_id', spu.organization_id)
+            .eq('extension', spu.extension)
+            .is('read_at', null),
+          (supabase as any).from('pbx_call_records')
+            .select('id,direction,caller_number,destination_number,duration_seconds,start_at')
+            .eq('organization_id', spu.organization_id)
+            .eq('extension', spu.extension)
+            .order('start_at', { ascending: false })
+            .limit(5),
+        ]);
+        const callRows = (callsRes.data ?? []) as any[];
+        const talkSec = callRows.reduce((s, r) => s + (r.duration_seconds || 0), 0);
+        return {
+          ext: spu.extension,
+          name: spu.display_name,
+          status: spu.status || 'offline',
+          callsToday: callRows.length,
+          voicemails: vmRes.count ?? 0,
+          talkTime: `${Math.floor(talkSec / 3600)}h ${Math.floor((talkSec % 3600) / 60)}m`,
+          recent: (recentRes.data ?? []) as any[],
+        };
+      } catch (err) {
+        console.error('MyDashboard load error:', err);
+        return { ext: null };
+      }
     },
+    retry: false,
   });
+
 
   return (
     <div className="space-y-6">
