@@ -55,6 +55,7 @@ export async function getLatestRelease(): Promise<LatestRelease> {
       name: data.name,
       published_at: data.published_at,
       html_url: data.html_url,
+      body: data.body || '',
       assets: data.assets ?? [],
       urls,
     };
