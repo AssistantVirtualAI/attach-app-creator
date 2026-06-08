@@ -12,6 +12,8 @@ import { Router, Circle, Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 import { usePbxDevices, usePbxExtensions, LEMTEL_ORG } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
 import { PBX_DEVICE_BRANDS, formatMac } from '@/data/pbxDeviceModels';
+import { usePbxDeviceCatalog } from '@/hooks/usePbxDeviceCatalog';
+import { DeviceProvisioningPanel } from '@/components/lemtel/DeviceProvisioningPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
