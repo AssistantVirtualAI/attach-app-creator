@@ -16,8 +16,6 @@ import { Label } from '@/components/ui/label';
 export default function LemtelMessages() {
   const { toast } = useToast();
   const { data: threads = [] } = usePbxSmsThreads();
-  const qc = useQueryClient();
-  const { data: threads = [] } = usePbxSmsThreads();
   const { templates } = useSmsTemplates();
   const qc = useQueryClient();
   const [selectedDid, setSelectedDid] = useState<string | null>(null);
