@@ -131,8 +131,11 @@ Deno.serve(async (req) => {
     }
 
     if (action === "get_greeting_url") {
-      const path: string = payload?.path;
-      if (!path) return json({ url: null });
+      const path: string = String(payload?.path ?? "");
+      // SECURITY: enforce that the path belongs to the authenticated user
+      if (!path || !path.startsWith(`${spu.organization_id}/${userId}/`)) {
+        return json({ error: "forbidden" }, 403);
+      }
       const { data, error } = await admin.storage.from("voicemail-greetings").createSignedUrl(path, 3600);
       if (error) throw error;
       return json({ url: data.signedUrl });

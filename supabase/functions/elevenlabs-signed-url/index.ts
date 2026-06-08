@@ -85,7 +85,7 @@ serve(async (req) => {
     // Fetch agent with API key - also verify agent is active and has required config
     const { data: agent, error: agentError } = await supabase
       .from('agents')
-      .select('platform_agent_id, platform_api_key, platform, organization_id')
+      .select('platform_agent_id, platform_api_key, platform, organization_id, is_external')
       .eq('id', agentId)
       .single();
 
@@ -95,6 +95,40 @@ serve(async (req) => {
         JSON.stringify({ error: 'Agent not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // SECURITY: only `is_external` agents may be reached without authentication.
+    // Internal agents require a valid Supabase JWT belonging to the agent's organization.
+    if (!agent.is_external) {
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      const userClient = createClient(supabaseUrl, supabaseServiceKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: { user }, error: userErr } = await userClient.auth.getUser();
+      if (userErr || !user) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      const { data: isSuper } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+      let allowed = !!isSuper;
+      if (!allowed) {
+        const { data: orgIds } = await supabase.rpc('get_user_organization_ids', { _user_id: user.id });
+        allowed = Array.isArray(orgIds) && orgIds.includes(agent.organization_id);
+      }
+      if (!allowed) {
+        return new Response(
+          JSON.stringify({ error: 'Forbidden' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Verify organization exists and is active
