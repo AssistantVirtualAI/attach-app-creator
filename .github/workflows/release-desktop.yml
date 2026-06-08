@@ -61,10 +61,11 @@ jobs:
         run: |
           npx vite build
           npx tsc -p electron/tsconfig.json
-          npx electron-builder --win --publish=never
+          npx electron-builder --win
         working-directory: apps/ava-softphone-desktop
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ""
+          ELECTRON_BUILDER_PUBLISH: "never"
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           WIN_CSC_LINK: ''
           WIN_CSC_KEY_PASSWORD: ''
@@ -111,7 +112,8 @@ jobs:
           ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true npx electron-builder --mac --x64 --arm64
         working-directory: apps/ava-softphone-desktop
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ""
+          ELECTRON_BUILDER_PUBLISH: "never"
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CSC_LINK: ''
           APPLE_ID: ''
@@ -169,7 +171,8 @@ jobs:
           ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true npx electron-builder --linux
         working-directory: apps/ava-softphone-desktop
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ""
+          ELECTRON_BUILDER_PUBLISH: "never"
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
       - name: Upload artifact
