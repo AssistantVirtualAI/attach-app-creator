@@ -45,6 +45,7 @@ export default function AIScreen() {
         })}
       </div>
 
+      {active === 'chat' && <ChatWithAva />}
       {active === 'intelligence' && <Intelligence />}
       {active === 'actions' && <Actions />}
       {active === 'greetings' && <Greetings />}
