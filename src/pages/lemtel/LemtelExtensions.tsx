@@ -41,6 +41,10 @@ export default function LemtelExtensions() {
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [provisionOpen, setProvisionOpen] = useState(false);
   const [statusExt, setStatusExt] = useState<any | null>(null);
+  const [editExt, setEditExt] = useState<any | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [prefill, setPrefill] = useState<{ extension?: string; displayName?: string; outboundCid?: string } | undefined>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: extensions = [], isLoading } = usePbxExtensions();
@@ -51,6 +55,23 @@ export default function LemtelExtensions() {
     return m;
   }, [softphones]);
   const all = extensions as any[];
+
+  const handleDelete = async (e: any) => {
+    if (!confirm(`Delete extension ${e.extension}? This removes it from FusionPBX.`)) return;
+    setDeletingId(e.id);
+    try {
+      const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'delete-extension', extension_uuid: e.pbx_uuid, extension: e.extension },
+      });
+      if (error) throw error;
+      toast({ title: 'Extension deleted' });
+      queryClient.invalidateQueries({ queryKey: ['pbx_extensions'] });
+    } catch (err: any) {
+      toast({ title: 'Delete failed', description: err?.message || String(err), variant: 'destructive' });
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   useEffect(() => {
     const create = searchParams.get('create');
@@ -145,7 +166,7 @@ export default function LemtelExtensions() {
                 <TableHead>Softphone</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Health</TableHead>
-              </TableRow>
+                <TableHead className="text-right">Actions</TableHead>
             </TableHeader>
             <TableBody>
               {exts.map((e: any) => {
