@@ -16,11 +16,11 @@ export default function TelephonyWebphone() {
     queryFn: async () => {
       const [{ data: exts }, { data: clients }] = await Promise.all([
         supabase.from('pbx_extensions').select('id, extension, effective_cid_name, description'),
-        supabase.from('clients').select('id, name, phone').not('phone', 'is', null),
+        supabase.from('clients').select('id, name, phone_number').not('phone_number', 'is', null),
       ]);
       return [
         ...(exts || []).map((e: any) => ({ id: `e-${e.id}`, name: e.effective_cid_name || `Ext ${e.extension}`, number: e.extension, type: 'internal' })),
-        ...(clients || []).map((c: any) => ({ id: `c-${c.id}`, name: c.name, number: c.phone, type: 'external' })),
+        ...(clients || []).map((c: any) => ({ id: `c-${c.id}`, name: c.name, number: c.phone_number, type: 'external' })),
       ];
     },
   });
