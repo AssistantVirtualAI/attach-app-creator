@@ -45,12 +45,31 @@ export default function LemtelPortalCalls() {
 
   const analyze = async (call_record_id: string) => {
     setAnalyzing(call_record_id);
-    const { error } = await supabase.functions.invoke('ai-analyze-call', {
-      body: { call_record_id, transcript_text: '', organization_id: LEMTEL_ORG },
-    });
-    setAnalyzing(null);
-    if (error) toast({ title: 'Analysis failed', description: error.message, variant: 'destructive' });
-    else { toast({ title: 'Analyzed' }); qc.invalidateQueries({ queryKey: ['pbx', 'pbx_call_records'] }); }
+    try {
+      // 1. Transcribe first (server returns/uses existing transcription if any)
+      const t = await supabase.functions.invoke('ai-transcribe-call', {
+        body: { call_record_id, organization_id: LEMTEL_ORG },
+      });
+      if (t.error) throw new Error(t.error.message || 'Transcription failed');
+      const transcript_text =
+        (t.data as any)?.transcript_text ||
+        (t.data as any)?.transcript ||
+        (t.data as any)?.text || '';
+      if (!transcript_text) throw new Error('No transcript available (no recording or transcription failed)');
+
+      // 2. Analyze with transcript
+      const a = await supabase.functions.invoke('ai-analyze-call', {
+        body: { call_record_id, transcript_text, organization_id: LEMTEL_ORG },
+      });
+      if (a.error) throw new Error(a.error.message || 'Analysis failed');
+
+      toast({ title: 'Analyzed' });
+      qc.invalidateQueries({ queryKey: ['pbx', 'pbx_call_records'] });
+    } catch (e: any) {
+      toast({ title: 'Analysis failed', description: e?.message, variant: 'destructive' });
+    } finally {
+      setAnalyzing(null);
+    }
   };
 
   const playRecording = async (c: any) => {
