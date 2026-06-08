@@ -17,7 +17,7 @@ export function useSyncStatus(organizationId: string = LEMTEL_ORG_ID) {
   const [syncing, setSyncing] = useState(false);
 
   const fetchLatest = useCallback(async () => {
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from('pbx_sync_jobs')
       .select('id,kind,status,started_at,finished_at,error')
       .eq('organization_id', organizationId)
