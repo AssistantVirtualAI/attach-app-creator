@@ -1,6 +1,5 @@
 // JsSIP UA lifecycle manager — desktop softphone.
-// Mirrors the web app provider with extras: attended transfer, audio device pinning.
-declare global { interface Window { JsSIP: any } }
+import * as JsSIP from 'jssip';
 
 export type SipStatus =
   | 'idle' | 'connecting' | 'connected' | 'registered'
@@ -44,7 +43,7 @@ type Listener = (snap: SoftphoneSnapshot) => void;
 class JsSipProvider {
   private ua: any = null;
   private session: any = null;
-  private secondSession: any = null; // attended transfer hold-buffer
+  private secondSession: any = null;
   private config: SoftphoneConfig | null = null;
   private listeners = new Set<Listener>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -75,7 +74,6 @@ class JsSipProvider {
 
   private logEvent(level: SipEvent['level'], message: string) {
     const next = [...this.snap.events, { at: Date.now(), level, message }].slice(-20);
-    // eslint-disable-next-line no-console
     console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log'](`[SIP] ${message}`);
     this.update({ events: next });
   }
@@ -91,20 +89,13 @@ class JsSipProvider {
     if (cfg) await this.init(cfg);
   }
 
-
   async init(cfg: SoftphoneConfig) {
     if (this.ua) this.stop();
     this.config = cfg;
 
     if (cfg.mock || !cfg.password) {
-      this.logEvent('warn', cfg.mock ? 'Mock mode — skipping JsSIP init' : 'No SIP password — skipping JsSIP init');
+      this.logEvent('warn', cfg.mock ? 'Mock mode' : 'No SIP password');
       this.update({ status: 'registered' });
-      return;
-    }
-
-    if (!window.JsSIP) {
-      this.logEvent('error', 'JsSIP library not loaded on window');
-      this.update({ status: 'error', errorCause: 'JsSIP not loaded' });
       return;
     }
 
@@ -120,11 +111,10 @@ class JsSipProvider {
       this.logEvent('info', `Init sip:${cfg.extension}@${cfg.sipDomain} via ${fallbackUrls.length} WSS endpoint(s)`);
 
       const sockets = fallbackUrls.map(
-        (url) => new window.JsSIP.WebSocketInterface(url),
+        (url) => new JsSIP.WebSocketInterface(url)
       );
-      sockets.forEach((s: any) => { try { s.via_transport = 'wss'; } catch { /* noop */ } });
 
-      const ua = new window.JsSIP.UA({
+      const ua = new JsSIP.UA({
         sockets,
         uri: `sip:${cfg.extension}@${cfg.sipDomain}`,
         password: cfg.password,
@@ -137,7 +127,7 @@ class JsSipProvider {
         connection_recovery_min_interval: 2,
         connection_recovery_max_interval: 30,
         user_agent: 'Lemtel Telecom 1.0',
-      });
+      } as any);
 
       ua.on('connecting', () => {
         this.logEvent('info', 'WebSocket connecting…');
@@ -148,8 +138,8 @@ class JsSipProvider {
         this.update({ status: 'connected' });
       });
       ua.on('disconnected', (e: any) => {
-        const cause = e?.code ? `code=${e.code} reason=${e.reason || ''}` : (e?.reason || 'unknown');
-        this.logEvent('warn', `Disconnected (${cause}) — reconnecting in 5s`);
+        const cause = e?.code ? `code=${e.code}` : (e?.reason || 'unknown');
+        this.logEvent('warn', `Disconnected (${cause})`);
         this.update({ status: 'disconnected', errorCause: cause });
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
         this.reconnectTimer = setTimeout(() => {
@@ -166,7 +156,7 @@ class JsSipProvider {
       });
       ua.on('registrationFailed', (e: any) => {
         const code = e?.response?.status_code;
-        const reason = e?.response?.reason_phrase || e?.cause || 'registration failed';
+        const reason = e?.response?.reason_phrase || e?.cause || 'failed';
         const detail = code ? `${code} ${reason}` : reason;
         this.logEvent('error', `Registration failed: ${detail}`);
         this.update({ status: 'error', errorCause: detail });
@@ -182,9 +172,7 @@ class JsSipProvider {
     }
   }
 
-
   private attachSession(session: any, originator: string) {
-    // If we already have a primary session, treat this as a secondary (attended xfer).
     if (this.session && originator !== 'remote') {
       this.secondSession = session;
       this.bindSecondary(session);
@@ -240,9 +228,9 @@ class JsSipProvider {
       if (this.audioEl && ev.streams[0]) {
         this.audioEl.srcObject = ev.streams[0];
         if (this.outputDeviceId && (this.audioEl as any).setSinkId) {
-          (this.audioEl as any).setSinkId(this.outputDeviceId).catch(() => { /* noop */ });
+          (this.audioEl as any).setSinkId(this.outputDeviceId).catch(() => {});
         }
-        this.audioEl.play().catch(() => { /* noop */ });
+        this.audioEl.play().catch(() => {});
       }
     });
   }
@@ -266,15 +254,19 @@ class JsSipProvider {
     const target = `sip:${number}@${this.config.sipDomain}`;
     this.ua.call(target, {
       mediaConstraints: { audio: true, video: false },
+      rtcOfferConstraints: {
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: false,
+      },
       pcConfig: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
         ],
         iceTransportPolicy: 'all',
-        bundlePolicy: 'balanced',
+        sdpSemantics: 'unified-plan',
       },
-    });
+    } as any);
   }
 
   answer() {
@@ -294,21 +286,19 @@ class JsSipProvider {
     this.session?.sendDTMF(key, { duration: 100, interToneGap: 70 });
   }
 
-  /** Blind transfer — refer current call to target extension. */
   blindTransfer(target: string) {
     if (!this.session || !this.config) return;
     this.session.refer(`sip:${target}@${this.config.sipDomain}`);
   }
 
-  /** Attended transfer — start a consult call. Caller must then complete with completeAttendedTransfer(). */
   startAttendedConsult(target: string) {
     if (!this.ua || !this.session || !this.config) return;
     this.session.hold();
-    const uri = `sip:${target}@${this.config.sipDomain}`;
-    this.ua.call(uri, { mediaConstraints: { audio: true, video: false } });
+    this.ua.call(`sip:${target}@${this.config.sipDomain}`, {
+      mediaConstraints: { audio: true, video: false }
+    });
   }
 
-  /** After consult is established, transfer original call to the consult party. */
   completeAttendedTransfer() {
     if (!this.session || !this.secondSession) return;
     try { this.session.refer(this.secondSession); } catch { /* noop */ }
