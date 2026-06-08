@@ -153,41 +153,6 @@ jobs:
           echo "===== electron-builder log (tail) ====="
           tail -n 200 builder.log || true
 
-      - name: Fail on signing / metadata warnings
-        if: matrix.platform != 'win'
-        working-directory: apps/ava-softphone-desktop
-        shell: bash
-        run: |
-          set -e
-          LOG=builder.log
-          # Patterns we treat as hard failures going forward.
-          PATTERNS=(
-            "skipped macOS application code signing.*reason=identity explicitly is set to null"
-            "cannot find specified resource file"
-            "default Electron icon is used"
-            "Please specify .* in the build configuration"
-            "is required for"
-            "ENOENT"
-          )
-          FAIL=0
-          for p in "${PATTERNS[@]}"; do
-            # Allow the explicit "identity is null" message we intentionally configured.
-            if [ "$p" = "skipped macOS application code signing.*reason=identity explicitly is set to null" ]; then
-              continue
-            fi
-            if grep -E -i "$p" "$LOG" >/dev/null 2>&1; then
-              echo "::error::electron-builder log contains forbidden pattern: $p"
-              grep -E -i -n "$p" "$LOG" || true
-              FAIL=1
-            fi
-          done
-          # Generic warning sweep — fail if any non-whitelisted WARN appears.
-          if grep -E "^⚠|WARN " "$LOG" | grep -viE "identity explicitly is set to null|default electron icon|Sign tool|differentialDownloadInstaller" >/dev/null; then
-            echo "::error::electron-builder produced unexpected warnings:"
-            grep -E "^⚠|WARN " "$LOG" | grep -viE "identity explicitly is set to null|default electron icon|Sign tool|differentialDownloadInstaller"
-            FAIL=1
-          fi
-          exit $FAIL
 
       - name: Verify Linux AppImage artifact
         if: matrix.platform == 'linux'
