@@ -96,13 +96,18 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Debug: log sidebar visibility info
   console.log('[Sidebar Debug] Role:', role, 'isSuperAdmin:', isSuperAdmin, 'isLoading:', isLoading, 'userRole:', userRole);
 
-  // Filter groups based on role and Lemtel org membership
+  // Portal-aware sidebar: /admin, /org/[slug], /my override the default groups.
+  const portalGroups = getPortalGroups(location.pathname);
   const isLemtelMember = isSuperAdmin || organizationMemberships.some(m => m.organization.id === '71755d33-ed64-4ad5-a828-61c9d2029eb7');
-  const visibleGroups = useMemo(() => sidebarGroups.filter(g => {
-    if (g.lemtelOnly && !isLemtelMember) return false;
-    if (g.hideForLemtel && isLemtelMember) return false;
-    return true;
-  }), [isLemtelMember]);
+  const visibleGroups = useMemo(() => {
+    const source = portalGroups ?? sidebarGroups;
+    return source.filter(g => {
+      if (g.lemtelOnly && !isLemtelMember) return false;
+      if (g.hideForLemtel && isLemtelMember) return false;
+      return true;
+    });
+  }, [isLemtelMember, portalGroups]);
+
 
   // Sidebar group ordering with drag & drop
   const sensors = useSensors(
