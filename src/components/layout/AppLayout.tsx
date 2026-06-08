@@ -178,12 +178,12 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background aurora-bg relative">
       {/* Mobile Header with Hamburger */}
-      <header className="fixed top-0 left-0 right-0 h-14 bg-card/95 backdrop-blur-xl border-b border-border z-40 flex items-center px-4 md:hidden">
+      <header className="fixed top-0 left-0 right-0 h-14 backdrop-blur-2xl bg-card/60 border-b border-white/10 z-40 flex items-center px-4 md:hidden shadow-glass">
         <button
           onClick={() => setIsSidebarOpen(true)}
-          className="p-2 rounded-lg hover:bg-muted transition-colors"
+          className="p-2 rounded-lg hover:bg-white/5 transition-colors"
         >
           <Menu className="w-6 h-6 text-foreground" />
         </button>
@@ -195,15 +195,18 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed left-0 top-0 h-screen w-[18rem] lg:w-80 bg-sidebar backdrop-blur-xl border-r border-sidebar-border z-50 transition-transform duration-300 ease-in-out ${
+      <aside className={`fixed left-0 top-0 h-screen w-[18rem] lg:w-80 bg-sidebar/70 backdrop-blur-2xl border-r border-white/10 shadow-glass z-50 transition-transform duration-300 ease-in-out ${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } md:translate-x-0`}>
+        {/* Subtle vertical neon edge */}
+        <div className="pointer-events-none absolute top-0 right-0 h-full w-px bg-gradient-to-b from-transparent via-primary/40 to-transparent" />
+
         <div className="flex flex-col h-full">
           {/* Header: Logo + Org name */}
           <div className="px-4 py-4 border-b border-sidebar-border flex items-center gap-3">
