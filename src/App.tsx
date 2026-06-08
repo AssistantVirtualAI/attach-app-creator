@@ -124,6 +124,20 @@ import AdminReports from "./pages/lemtel/admin/AdminReports";
 import MySettings from "./pages/lemtel/my/MySettings";
 import { DownloadCenter } from "./components/portal/DownloadCenter";
 
+// v4.0.0 — Multi-tenant reseller architecture
+import { WhitelabelProvider } from "./contexts/WhitelabelContext";
+import { ImpersonationProvider } from "./contexts/ImpersonationContext";
+import { MasterShell, ResellerShell } from "./components/portal/MasterShells";
+import MasterDashboard from "./pages/lemtel/master/MasterDashboard";
+import MasterOrganizations from "./pages/lemtel/master/MasterOrganizations";
+import MasterAllUsers from "./pages/lemtel/master/MasterAllUsers";
+import MasterAllCalls from "./pages/lemtel/master/MasterAllCalls";
+import MasterBilling from "./pages/lemtel/master/MasterBilling";
+import MasterSystem from "./pages/lemtel/master/MasterSystem";
+import MasterAuditLogs from "./pages/lemtel/master/MasterAuditLogs";
+import ResellerDashboard from "./pages/lemtel/reseller/ResellerDashboard";
+import ResellerSettings from "./pages/lemtel/reseller/ResellerSettings";
+
 // Portal pages
 import PortalLogin from "./pages/PortalLogin";
 import PortalLayout from "./components/portal/PortalLayout";
@@ -675,6 +689,49 @@ const App = () => (
                 {/* Public Widget Routes - No authentication */}
                 <Route path="/prototype/:agentId" element={<WidgetPrototype />} />
                 <Route path="/iframe/:agentId" element={<WidgetIframe />} />
+
+                {/* v4.0.0 — Multi-tenant routes (white-labelled per :slug) */}
+                <Route
+                  path="/org/:slug/master"
+                  element={
+                    <ProtectedRoute>
+                      <WhitelabelProvider>
+                        <ImpersonationProvider>
+                          <LemtelGuard>
+                            <MasterShell />
+                          </LemtelGuard>
+                        </ImpersonationProvider>
+                      </WhitelabelProvider>
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="dashboard" element={<MasterDashboard />} />
+                  <Route path="organizations" element={<MasterOrganizations />} />
+                  <Route path="users" element={<MasterAllUsers />} />
+                  <Route path="calls" element={<MasterAllCalls />} />
+                  <Route path="billing" element={<MasterBilling />} />
+                  <Route path="system" element={<MasterSystem />} />
+                  <Route path="audit" element={<MasterAuditLogs />} />
+                </Route>
+
+                <Route
+                  path="/org/:slug/reseller"
+                  element={
+                    <ProtectedRoute>
+                      <WhitelabelProvider>
+                        <ImpersonationProvider>
+                          <ResellerShell />
+                        </ImpersonationProvider>
+                      </WhitelabelProvider>
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="dashboard" element={<ResellerDashboard />} />
+                  <Route path="customers" element={<ResellerDashboard />} />
+                  <Route path="users" element={<ResellerDashboard />} />
+                  <Route path="settings" element={<ResellerSettings />} />
+                  <Route path="billing" element={<ResellerDashboard />} />
+                </Route>
 
                 <Route path="*" element={<NotFound />} />
               </Routes>

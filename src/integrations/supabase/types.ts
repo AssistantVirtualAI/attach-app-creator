@@ -788,37 +788,49 @@ export type Database = {
           action: string
           created_at: string | null
           id: string
+          impersonated_org_id: string | null
+          impersonator_id: string | null
           ip_address: string | null
           metadata: Json | null
+          org_id: string | null
           organization_id: string | null
           resource_id: string | null
           resource_type: string
           user_agent: string | null
           user_id: string | null
+          user_org_id: string | null
         }
         Insert: {
           action: string
           created_at?: string | null
           id?: string
+          impersonated_org_id?: string | null
+          impersonator_id?: string | null
           ip_address?: string | null
           metadata?: Json | null
+          org_id?: string | null
           organization_id?: string | null
           resource_id?: string | null
           resource_type: string
           user_agent?: string | null
           user_id?: string | null
+          user_org_id?: string | null
         }
         Update: {
           action?: string
           created_at?: string | null
           id?: string
+          impersonated_org_id?: string | null
+          impersonator_id?: string | null
           ip_address?: string | null
           metadata?: Json | null
+          org_id?: string | null
           organization_id?: string | null
           resource_id?: string | null
           resource_type?: string
           user_agent?: string | null
           user_id?: string | null
+          user_org_id?: string | null
         }
         Relationships: [
           {
@@ -894,6 +906,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      billing_plans: {
+        Row: {
+          created_at: string | null
+          features: Json | null
+          id: string
+          max_dids: number | null
+          max_extensions: number | null
+          max_resellers: number | null
+          max_storage_gb: number | null
+          name: string
+          price_monthly: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          features?: Json | null
+          id: string
+          max_dids?: number | null
+          max_extensions?: number | null
+          max_resellers?: number | null
+          max_storage_gb?: number | null
+          name: string
+          price_monthly?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          features?: Json | null
+          id?: string
+          max_dids?: number | null
+          max_extensions?: number | null
+          max_resellers?: number | null
+          max_storage_gb?: number | null
+          name?: string
+          price_monthly?: number | null
+        }
+        Relationships: []
       }
       calendar_integrations: {
         Row: {
@@ -2629,6 +2677,83 @@ export type Database = {
         }
         Relationships: []
       }
+      org_members: {
+        Row: {
+          access_all_children: boolean | null
+          can_export_data: boolean | null
+          can_listen_calls: boolean | null
+          can_manage_billing: boolean | null
+          can_manage_extensions: boolean | null
+          can_manage_ivr: boolean | null
+          can_manage_queues: boolean | null
+          can_manage_resellers: boolean | null
+          can_manage_users: boolean | null
+          can_view_recordings: boolean | null
+          can_white_label: boolean | null
+          created_at: string | null
+          id: string
+          invited_by: string | null
+          joined_at: string | null
+          last_active_at: string | null
+          org_id: string
+          role: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_all_children?: boolean | null
+          can_export_data?: boolean | null
+          can_listen_calls?: boolean | null
+          can_manage_billing?: boolean | null
+          can_manage_extensions?: boolean | null
+          can_manage_ivr?: boolean | null
+          can_manage_queues?: boolean | null
+          can_manage_resellers?: boolean | null
+          can_manage_users?: boolean | null
+          can_view_recordings?: boolean | null
+          can_white_label?: boolean | null
+          created_at?: string | null
+          id?: string
+          invited_by?: string | null
+          joined_at?: string | null
+          last_active_at?: string | null
+          org_id: string
+          role?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_all_children?: boolean | null
+          can_export_data?: boolean | null
+          can_listen_calls?: boolean | null
+          can_manage_billing?: boolean | null
+          can_manage_extensions?: boolean | null
+          can_manage_ivr?: boolean | null
+          can_manage_queues?: boolean | null
+          can_manage_resellers?: boolean | null
+          can_manage_users?: boolean | null
+          can_view_recordings?: boolean | null
+          can_white_label?: boolean | null
+          created_at?: string | null
+          id?: string
+          invited_by?: string | null
+          joined_at?: string | null
+          last_active_at?: string | null
+          org_id?: string
+          role?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_notifications: {
         Row: {
           body: string | null
@@ -2870,6 +2995,18 @@ export type Database = {
           baa_signed_at: string | null
           baa_signed_by: string | null
           backend_domain: string | null
+          billing_email: string | null
+          billing_plan: string | null
+          brand_accent_color: string | null
+          brand_app_name: string | null
+          brand_favicon_url: string | null
+          brand_logo_url: string | null
+          brand_name: string | null
+          brand_portal_domain: string | null
+          brand_primary_color: string | null
+          brand_support_email: string | null
+          brand_support_phone: string | null
+          brand_website: string | null
           client_limit: number | null
           client_portal_favicon_url: string | null
           client_portal_logo_url: string | null
@@ -2882,6 +3019,9 @@ export type Database = {
           email_sender: string | null
           email_sender_name: string | null
           favicon_url: string | null
+          fusionpbx_domain_name: string | null
+          fusionpbx_domain_uuid: string | null
+          fusionpbx_server_url: string | null
           gdpr_enabled: boolean | null
           hipaa_enabled: boolean | null
           id: string
@@ -2891,12 +3031,23 @@ export type Database = {
           logo_dashboard_url: string | null
           logo_login_url: string | null
           logo_url: string | null
+          max_dids: number | null
+          max_extensions: number | null
+          max_resellers: number | null
+          max_storage_gb: number | null
           name: string
           onboarding_completed: boolean | null
+          org_level: number | null
+          org_type: string | null
+          parent_org_id: string | null
           primary_color: string | null
           privacy_policy_url: string | null
+          root_org_id: string | null
           slug: string
+          status: string | null
+          stripe_customer_id: string | null
           terms_url: string | null
+          trial_ends_at: string | null
           updated_at: string
           website_title: string | null
         }
@@ -2906,6 +3057,18 @@ export type Database = {
           baa_signed_at?: string | null
           baa_signed_by?: string | null
           backend_domain?: string | null
+          billing_email?: string | null
+          billing_plan?: string | null
+          brand_accent_color?: string | null
+          brand_app_name?: string | null
+          brand_favicon_url?: string | null
+          brand_logo_url?: string | null
+          brand_name?: string | null
+          brand_portal_domain?: string | null
+          brand_primary_color?: string | null
+          brand_support_email?: string | null
+          brand_support_phone?: string | null
+          brand_website?: string | null
           client_limit?: number | null
           client_portal_favicon_url?: string | null
           client_portal_logo_url?: string | null
@@ -2918,6 +3081,9 @@ export type Database = {
           email_sender?: string | null
           email_sender_name?: string | null
           favicon_url?: string | null
+          fusionpbx_domain_name?: string | null
+          fusionpbx_domain_uuid?: string | null
+          fusionpbx_server_url?: string | null
           gdpr_enabled?: boolean | null
           hipaa_enabled?: boolean | null
           id?: string
@@ -2927,12 +3093,23 @@ export type Database = {
           logo_dashboard_url?: string | null
           logo_login_url?: string | null
           logo_url?: string | null
+          max_dids?: number | null
+          max_extensions?: number | null
+          max_resellers?: number | null
+          max_storage_gb?: number | null
           name: string
           onboarding_completed?: boolean | null
+          org_level?: number | null
+          org_type?: string | null
+          parent_org_id?: string | null
           primary_color?: string | null
           privacy_policy_url?: string | null
+          root_org_id?: string | null
           slug: string
+          status?: string | null
+          stripe_customer_id?: string | null
           terms_url?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           website_title?: string | null
         }
@@ -2942,6 +3119,18 @@ export type Database = {
           baa_signed_at?: string | null
           baa_signed_by?: string | null
           backend_domain?: string | null
+          billing_email?: string | null
+          billing_plan?: string | null
+          brand_accent_color?: string | null
+          brand_app_name?: string | null
+          brand_favicon_url?: string | null
+          brand_logo_url?: string | null
+          brand_name?: string | null
+          brand_portal_domain?: string | null
+          brand_primary_color?: string | null
+          brand_support_email?: string | null
+          brand_support_phone?: string | null
+          brand_website?: string | null
           client_limit?: number | null
           client_portal_favicon_url?: string | null
           client_portal_logo_url?: string | null
@@ -2954,6 +3143,9 @@ export type Database = {
           email_sender?: string | null
           email_sender_name?: string | null
           favicon_url?: string | null
+          fusionpbx_domain_name?: string | null
+          fusionpbx_domain_uuid?: string | null
+          fusionpbx_server_url?: string | null
           gdpr_enabled?: boolean | null
           hipaa_enabled?: boolean | null
           id?: string
@@ -2963,16 +3155,42 @@ export type Database = {
           logo_dashboard_url?: string | null
           logo_login_url?: string | null
           logo_url?: string | null
+          max_dids?: number | null
+          max_extensions?: number | null
+          max_resellers?: number | null
+          max_storage_gb?: number | null
           name?: string
           onboarding_completed?: boolean | null
+          org_level?: number | null
+          org_type?: string | null
+          parent_org_id?: string | null
           primary_color?: string | null
           privacy_policy_url?: string | null
+          root_org_id?: string | null
           slug?: string
+          status?: string | null
+          stripe_customer_id?: string | null
           terms_url?: string | null
+          trial_ends_at?: string | null
           updated_at?: string
           website_title?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "organizations_parent_org_id_fkey"
+            columns: ["parent_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizations_root_org_id_fkey"
+            columns: ["root_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       outbound_campaigns: {
         Row: {
@@ -5976,6 +6194,10 @@ export type Database = {
         Args: { _email: string; _softphone_id: string }
         Returns: Json
       }
+      can_access_org: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
       create_organization_for_user: {
         Args: { _name: string; _slug: string }
         Returns: string
@@ -5984,6 +6206,7 @@ export type Database = {
       generate_agent_slug: { Args: { agent_name: string }; Returns: string }
       generate_api_key: { Args: never; Returns: string }
       generate_unique_username: { Args: { base_name: string }; Returns: string }
+      get_accessible_org_ids: { Args: { _user_id: string }; Returns: string[] }
       get_user_organization_ids: {
         Args: { _user_id: string }
         Returns: string[]
@@ -6004,6 +6227,7 @@ export type Database = {
       is_cc_supervisor: { Args: { _user_id: string }; Returns: boolean }
       is_lemtel_admin: { Args: { _user_id: string }; Returns: boolean }
       is_lemtel_member: { Args: { _user_id: string }; Returns: boolean }
+      is_master_admin: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       log_agent_access: {
         Args: { _action: string; _metadata?: Json; _org_id: string }

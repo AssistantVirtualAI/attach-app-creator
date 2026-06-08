@@ -1,51 +1,107 @@
-# Customer Portal v3.0.0 — Phases 3-7
+# Multi-Tenant Reseller Architecture — v4.0.0
 
-Continuing the approved v3.0.0 plan. Phases 1-2 (foundations, layouts, sync engine, dashboards, cron) already shipped. Below is the work remaining, grouped so each phase is independently reviewable.
+Transform AVA Statistics Portal into a hierarchical multi-tenant system: AVA → Lemtel (master) → Resellers → Customers, with white-label branding, impersonation, and per-org billing.
 
-## Phase 3 — Admin Dashboard polish & Live Activity
+## Phase 1 — Database Foundation
 
-- `ActiveCallsGrid.tsx` — live in-progress call cards driven by `pbx_call_records` realtime where `end_at IS NULL`; supervisor-only `[Monitor]` button gated by `is_cc_supervisor`.
-- Storage gauge wired to a new `storage-usage` edge function that sums `lemtel-recordings` + `voicemail-audio` bucket sizes for the org.
-- Yesterday-vs-today delta on Calls Today KPI, plus week-over-week deltas for Avg Duration and SLA.
+**Extend `organizations`** with: `parent_org_id`, `root_org_id`, `org_level`, `org_type`, brand fields (`brand_name`, `brand_logo_url`, `brand_primary_color`, `brand_accent_color`, `brand_favicon_url`, `brand_portal_domain`, `brand_app_name`, `brand_support_email`, `brand_support_phone`, `brand_website`), FusionPBX config (`fusionpbx_domain_uuid`, `fusionpbx_domain_name`, `fusionpbx_server_url`), limits (`max_extensions`, `max_dids`, `max_storage_gb`, `max_resellers`), `status`, `trial_ends_at`, billing fields.
 
-## Phase 4 — Extensions, Devices, DIDs, Ring Groups
+**New `org_members`** table (separate from existing `organization_members`/`user_roles` — keeps backward compatibility) with granular permission booleans (`can_manage_users`, `can_manage_billing`, `can_manage_resellers`, `can_listen_calls`, `can_white_label`, etc.) and `access_all_children` scope flag.
 
-- `AddExtensionWizard.tsx` (5 steps: basic → call → voicemail → forwarding → softphone) called from `AdminExtensions` toolbar. Submits through `fusionpbx-proxy` `create-extension` then provisions a portal account via a new `provision-portal-user` edge function and triggers the existing Resend welcome email template.
-- Replace `AdminDevices` with full device manager: brand/model taxonomy file `src/data/pbxDeviceModels.ts` covering Poly, Yealink, Grandstream, Cisco, Snom, Fanvil, Aastra/Mitel, AudioCodes, Htek, Escene. MAC formatter, `qrcode.react` provisioning QR, `[Reboot]/[Re-provision]/[Factory Reset]` buttons hitting `fusionpbx-proxy`.
-- `AdminDIDs` enhancements: destination type editor (Extension/Queue/RingGroup/IVR/VM/Conference), SMS + Fax toggles.
-- `AdminRingGroups` — drag-ordered members via `@dnd-kit/sortable`, strategy/timeout/fail-action editors.
+**New `billing_plans`** seeded with starter/basic/pro/reseller/enterprise tiers.
 
-## Phase 5 — Recordings, Voicemail, Queues, IVR
+**Security definer fns:**
+- `get_accessible_org_ids(uuid)` → returns array of org ids the user can access (direct + descendants for reseller/master roles), used in RLS.
+- `is_master_admin(uuid)`, `can_access_org(uuid, uuid)` helpers.
+- `descendants_of(uuid)` recursive CTE wrapper.
 
-- `AdminRecordings` rebuild: `wavesurfer.js` waveform player, per-row transcript + AI insights panels, bulk selection with new `recordings-bulk-export` edge function (zip via Deno `compress`), signed share-link generator (24h/7d/30d TTL).
-- `AdminVoicemail` per-extension grouped inbox, inline player, greeting recorder/uploader, AI greeting generator → new `voicemail-greeting-tts` edge function using ElevenLabs.
-- `AdminQueues` enhancements: live stats cards, drag agents in/out, full settings modal (timing, overflow, announcements, recording, virtual queue/callback). New `MohLibrary` tab + `moh-generate` edge function using ElevenLabs Music API; uploads stored in new `lemtel-moh` bucket (migration adds bucket + RLS policies on `storage.objects`).
-- `AdminIVR` v2: `@xyflow/react` visual builder with node palette (Play, Menu, Transfer, TimeCondition, CallerIdCheck, Queue, AIAgent, Voicemail, Loop, Hangup). Client-side simulator + serializer that posts dialplan XML to `fusionpbx-proxy`.
+**RLS:** rewrite policies on `organizations`, telephony tables (`pbx_*`), and `org_members` to use `get_accessible_org_ids(auth.uid())` so master/reseller admins see their subtree.
 
-## Phase 6 — Reports, Settings, Download Center
+**Audit logs:** add `org_id`, `user_org_id`, `impersonator_id`, `impersonated_org_id`, `ip_address`, `user_agent` columns.
 
-- `AdminReports` (replaces current `LemtelAnalytics` mount): Recharts Volume Trend, Hourly Heatmap, Extension Performance, Disposition Pie, SLA Area. Advanced CDR table with sortable columns, CSV/Excel/PDF export using `xlsx` + `jspdf`. New table `pbx_report_schedules` + UI for daily/weekly scheduled email digests (Resend).
-- `AdminSettings` tabbed page: Organization (logo/timezone/lang), Phone System (codec drag-order, recording defaults, retention), Notifications (admin alert recipients), Integrations (M365/Google/HubSpot/Salesforce/Zoho connector buttons; Telnyx + ElevenLabs status from `fetch_secrets`).
-- `DownloadCenter` page (mounted at `/org/lemtel/admin/downloads` and `/org/lemtel/my/downloads`): pulls latest release metadata from GitHub Releases API, store badges for iOS/Android, Chrome Web Store badge, dynamic system requirements. User variant pre-fills extension/email and renders QR for mobile auto-config.
+**Seed:** ensure Lemtel row has `org_level=1`, `org_type='master'`, brand defaults; backfill `root_org_id`/`parent_org_id` for existing orgs.
 
-## Phase 7 — User Portal (`/my/*`) full surface
+## Phase 2 — White-Label Engine
 
-- `MyCalls.tsx`, `MyRecordings.tsx`, `MyVoicemail.tsx`, `MySMS.tsx` — same components as the admin counterparts but scoped to current user's extension via `pbx_softphone_users.portal_user_id = auth.uid()`.
-- `MySettings.tsx` tabs: Caller ID, Call Forwarding (writes through `fusionpbx-proxy` + existing `useCallForwarding`), DND with schedule, Voicemail (PIN, notifications, transcription, greeting), Call Settings (ring timeout, call waiting), My Devices list.
-- Presence selector in `UserPortalLayout` header bound to `upsert_user_presence`.
-- Update sidebar config: admin sidebar shows the full admin item list under "Lemtel Admin"; user sidebar shows the `/my/*` items under "My Workspace".
+- `src/lib/whitelabel.ts` — `WhitelabelConfig` interface, `loadWhitelabel(orgId)`, `applyWhitelabel(config)` (CSS vars, favicon, title), `getPlanFeatures(plan)`.
+- `src/contexts/WhitelabelContext.tsx` — provider that resolves config from current org slug/custom domain, applies to `:root`, exposes feature flags.
+- `src/hooks/useFeatureFlag.ts` — gate UI by plan.
+- Wrap App with provider; replace hardcoded "AVA Statistic"/"Lemtel" in shells with `useWhitelabel()`.
+
+## Phase 3 — Lemtel Master Control Center
+
+Routes under `/org/lemtel/master/*`:
+- `MasterDashboard.tsx` — org tree (react-arborist or custom recursive component), system health cards (FusionPBX/Supabase/Telnyx/ElevenLabs ping via edge fn), global activity feed (realtime on audit_logs).
+- `MasterOrganizations.tsx` — filterable table (All/Resellers/Customers/Direct/Suspended/Trial), row actions.
+- `CreateOrgWizard.tsx` — 6-step wizard (type → basic → FusionPBX → limits/plan → branding+live preview → admin user). Calls new edge fn `create-organization` that: inserts org, provisions FusionPBX domain (Option A) via `fusionpbx-proxy`, creates auth user via admin API, inserts `org_members`, sends branded welcome email via Resend.
+- `MasterAllUsers.tsx`, `MasterAllCalls.tsx`, `MasterBilling.tsx`, `MasterSystem.tsx`, `MasterAuditLogs.tsx` (filter by org/user/action/date/IP, CSV export).
+
+## Phase 4 — Impersonation
+
+- `src/contexts/ImpersonationContext.tsx` — stores `impersonated_org_id` in sessionStorage, exposes `enter(orgId)`/`exit()`.
+- `ImpersonationBanner.tsx` — orange sticky top bar with org name + Exit button.
+- Edge fn `start-impersonation` — verifies caller is master/reseller admin with rights over target, writes audit row, returns scoped context token.
+- All data hooks read `effectiveOrgId = impersonated ?? currentOrg`.
+- Audit trigger on key tables logs `impersonator_id` when present.
+
+## Phase 5 — Org Switcher & Navigation
+
+- `OrgSwitcher.tsx` in top bar — hierarchical dropdown (recursive tree), grouped by reseller, with "+ Create Organization" footer.
+- `OrgBreadcrumb.tsx` — Lemtel > Reseller A > Customer A1 > page.
+- Router updates: `/org/:slug/admin/*`, `/org/:slug/my/*`, `/org/:slug/master/*` (master only), `/org/:slug/reseller/*` (reseller only).
+- `RequireOrgRole` guard component.
+
+## Phase 6 — Reseller Portal
+
+Routes `/org/:slug/reseller/*`:
+- `ResellerDashboard.tsx` — own org + aggregated customer stats.
+- `ResellerCustomers.tsx` — table + Create Customer wizard (reuses Phase 3 wizard scoped to reseller as parent).
+- `ResellerUsers.tsx` — flat list across all child customers.
+- `ResellerSettings.tsx` — edit own branding (logo upload to `organization-assets`, color pickers, support info), email templates, custom domain DNS instructions.
+- `ResellerBilling.tsx` — see own plan, customer subscriptions.
+
+## Phase 7 — Customer Admin Scoping
+
+Existing `/org/:slug/admin/*` pages already exist from v3.0.0. Update them to:
+- Resolve org from slug (not hardcoded Lemtel).
+- Gate features via `useFeatureFlag`.
+- Enforce plan limits (extensions/DIDs/storage) with usage bars + "Upgrade" CTA.
+- Hide reseller-only menus.
+
+## Phase 8 — Custom Domain Routing
+
+- Edge fn `domain-router` — given `Host` header, returns org config; called at app bootstrap before whitelabel load.
+- `src/lib/domainResolver.ts` — maps `window.location.hostname` → org (cached).
+- Reseller settings → Custom Domain panel with DNS CNAME instructions and verification status.
+
+## Phase 9 — Per-Org Email Templates
+
+- Extend existing email infra: new `org_email_templates` table (org_id, template_key, subject, html, variables).
+- Edge fn `send-org-email` resolves template per org with brand variables `{{brand_name}}`, `{{portal_url}}`, etc.
+- Welcome email triggered by `create-organization`.
+
+## Phase 10 — Polish
+
+- Bump `package.json` to `4.0.0`.
+- Update `sidebarConfig.ts` with Master / Reseller / Customer sections, role-gated.
+- README + in-app changelog entry.
 
 ## Technical Notes
 
-- All new tables follow CREATE → GRANT → ENABLE RLS → POLICY, scoped via `current_user_org_ids()` or `is_lemtel_admin`.
-- New `lemtel-moh` bucket: private, RLS lets org members read/write their org's prefix.
-- New runtime secrets: none — Resend, ElevenLabs, FusionPBX, Lovable AI already configured.
-- New npm deps: `wavesurfer.js`, `qrcode.react`, `xlsx`. `jspdf`, `@xyflow/react`, `@dnd-kit/sortable`, `recharts`, `framer-motion` already installed.
-- All sensitive reads continue through `_safe` views per Core memory.
+- New deps: none required; reuse `@dnd-kit`, `recharts`, `@tanstack/react-query`, `react-color` already present (verify; add `react-colorful` if missing for color picker).
+- All new edge functions: `create-organization`, `start-impersonation`, `domain-router`, `send-org-email`, `org-health-check`.
+- All new public tables include explicit GRANTs + RLS + service_role grants per project rules.
+- Existing `organization_members`/`user_roles` kept; `org_members` is the new RBAC surface — write a one-time migration that mirrors existing memberships into `org_members` with mapped permission booleans so nothing breaks.
+- Storage: reuse `organization-assets` bucket for logos/favicons (already exists, public).
+- FusionPBX domain provisioning via existing `fusionpbx-proxy` with new `createDomain` action.
+
+## Build Order
 
 ```text
-Phase 3 ─▶ Phase 4 ─▶ Phase 5 ─▶ Phase 6 ─▶ Phase 7
-   (dashboard)  (config)    (UC features)  (reports/settings)  (user portal)
+1 (DB) → 2 (whitelabel) → 5 (switcher/nav) →
+3 (master center) + 4 (impersonation) →
+6 (reseller) → 7 (customer scoping) →
+8 (custom domain) → 9 (emails) → 10 (polish)
 ```
 
-Approve to ship Phase 3 first, then continue sequentially through 7.
+Estimated 9–12 build turns. Approve to proceed.
