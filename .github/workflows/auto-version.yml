@@ -1,0 +1,60 @@
+name: Auto Bump Version
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/ava-softphone-desktop/src/**'
+      - 'apps/ava-softphone-mobile/src/**'
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Configure git
+        run: |
+          git config user.name "AVA Bot"
+          git config user.email "bot@assistantvirtualai.com"
+
+      - name: Bump desktop patch version
+        if: contains(join(github.event.commits.*.modified, ','), 'ava-softphone-desktop')
+        working-directory: apps/ava-softphone-desktop
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          IFS='.' read -ra PARTS <<< "$CURRENT"
+          NEW_VERSION="${PARTS[0]}.${PARTS[1]}.$((${PARTS[2]} + 1))"
+          npm version $NEW_VERSION --no-git-tag-version
+          echo "Desktop: $CURRENT → $NEW_VERSION"
+
+      - name: Bump mobile patch version
+        if: contains(join(github.event.commits.*.modified, ','), 'ava-softphone-mobile')
+        working-directory: apps/ava-softphone-mobile
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          IFS='.' read -ra PARTS <<< "$CURRENT"
+          NEW_VERSION="${PARTS[0]}.${PARTS[1]}.$((${PARTS[2]} + 1))"
+          npm version $NEW_VERSION --no-git-tag-version
+          echo "Mobile: $CURRENT → $NEW_VERSION"
+
+      - name: Commit version bumps
+        run: |
+          git add apps/ava-softphone-desktop/package.json apps/ava-softphone-mobile/package.json 2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "No version changes to commit"
+          else
+            git commit -m "chore: auto-bump version [skip ci]"
+            git push
+          fi
