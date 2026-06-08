@@ -185,14 +185,28 @@ const UniversalLoginContent = () => {
                 </Button>
               </form>
 
-              <div className="mt-6 text-center">
+              <div className="mt-6 flex flex-col gap-2 text-center">
                 <Link 
                   to="/client/forgot-password" 
                   className="text-sm text-muted-foreground hover:text-primary transition-colors"
                 >
                   {t('auth.buttons.forgotPassword')}
                 </Link>
+                <div className="flex items-center justify-center gap-3 text-xs text-muted-foreground pt-2 border-t border-border/30">
+                  <Link to="/client/login" className="hover:text-primary transition-colors">
+                    {language === 'fr' ? 'Portail client' : 'Client portal'}
+                  </Link>
+                  <span>·</span>
+                  <Link to="/end-user/login" className="hover:text-primary transition-colors">
+                    {language === 'fr' ? 'Portail utilisateur' : 'End-user portal'}
+                  </Link>
+                  <span>·</span>
+                  <Link to="/portals" className="hover:text-primary transition-colors">
+                    {language === 'fr' ? 'Tous les portails' : 'All portals'}
+                  </Link>
+                </div>
               </div>
+
             </CardContent>
           </Card>
         </motion.div>
