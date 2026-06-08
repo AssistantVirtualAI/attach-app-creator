@@ -554,7 +554,14 @@ Deno.serve(async (req) => {
       if (!id) return json({ error: "call_center_agent_uuid required" }, 400);
       return json(await pbxWrite(`call_center_agents/${id}`, "DELETE"));
     }
-    if (action === "create-ring-group") return json(await writeCollection("ring_groups", "ring_groups", params));
+    if (action === "create-ring-group" || action === "update-ring-group") {
+      return json(await writeCollection("ring_groups", "ring_groups", params));
+    }
+    if (action === "delete-ring-group") {
+      const id = params.ring_group_uuid;
+      if (!id) return json({ error: "ring_group_uuid required" }, 400);
+      return json(await pbxWrite(`ring_groups/${id}`, "DELETE"));
+    }
 
     // ---- CDR endpoint fallback helper ----
     const CDR_ENDPOINTS = [
