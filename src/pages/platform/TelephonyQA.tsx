@@ -78,28 +78,25 @@ export default function TelephonyQA() {
 
   // Reflect live SIP registration state
   useEffect(() => {
-    if (!sp?.status) return;
-    if (sp.status === "registered") {
-      upd("sip_reg", { status: "pass", detail: `Registered as ext ${(sp as any).extension || ""}`.trim() });
-    } else if (sp.status === "config-error" || sp.status === "cert-error" || sp.status === "disconnected") {
+    const status = sp?.snap?.status;
+    const cause = sp?.snap?.errorCause;
+    if (!status) return;
+    if (status === "registered") {
+      upd("sip_reg", { status: "pass", detail: `Registered as ext ${sp?.config?.extension || ""}`.trim() });
+    } else if (status === "error" || status === "disconnected") {
       upd("sip_reg", {
         status: "fail",
-        error: (sp as any).configError?.message || sp.status,
+        error: cause || status,
         fix:
-          sp.status === "cert-error"
-            ? "Use WSS host whose TLS cert matches (pbxnode.lemtel.tel) — fusionpbx_wss_url backend secret."
+          (cause || "").toLowerCase().includes("cert") || (cause || "").toLowerCase().includes("ssl")
+            ? "Use a WSS host whose TLS cert matches (e.g. pbxnode.lemtel.tel) — FUSIONPBX_WSS_URL secret."
             : "Re-check softphone-credentials response and FusionPBX user provisioning.",
       });
-    } else if (sp.status === "no-account" || sp.status === "no-password") {
-      upd("sip_reg", {
-        status: "fail",
-        error: sp.status,
-        fix: "Provision a pbx_softphone_users row for this portal_user_id with sip_password.",
-      });
     } else {
-      upd("sip_reg", { status: "pending", detail: sp.status });
+      upd("sip_reg", { status: "pending", detail: status });
     }
-  }, [sp?.status, upd]);
+  }, [sp?.snap?.status, sp?.snap?.errorCause, sp?.config?.extension, upd]);
+
 
   const runAll = useCallback(async () => {
     setRunning(true);
