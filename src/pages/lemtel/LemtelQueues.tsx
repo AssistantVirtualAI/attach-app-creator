@@ -22,8 +22,13 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallCenterRole } from '@/hooks/useCallCenterRole';
 import { formatDistanceToNow } from 'date-fns';
+import { useLanguage } from '@/context/LanguageContext';
 
 const STRATEGIES = ['ring-all', 'longest-idle-agent', 'round-robin', 'top-down', 'agent-with-least-talk-time', 'agent-with-fewest-calls', 'sequentially-by-agent-order', 'random'];
+const qCopy = {
+  en: { title: 'Call Center · Queues', subtitle: 'Manage queues, agents, supervisors and live activity — synced with FusionPBX.', empty: 'No queues yet — create one to start routing calls.', select: 'Select a queue to manage agents and supervisors.', noSup: 'No supervisors assigned — add one to monitor and manage this queue.', noAgents: 'No agents assigned — add extensions that should answer this queue.', readonly: 'Read-only view', create: 'New Queue' },
+  fr: { title: 'Centre d’appel · Files', subtitle: 'Gérer les files, agents, superviseurs et activité live — synchronisé avec FusionPBX.', empty: 'Aucune file — créez-en une pour commencer le routage.', select: 'Sélectionnez une file pour gérer les agents et superviseurs.', noSup: 'Aucun superviseur assigné — ajoutez-en un pour gérer cette file.', noAgents: 'Aucun agent assigné — ajoutez les extensions qui doivent répondre.', readonly: 'Vue lecture seule', create: 'Nouvelle file' },
+};
 
 type Perms = { canManage: boolean; canAssign: boolean; reason: string };
 
@@ -39,6 +44,8 @@ function usePerms(): Perms {
 
 export default function LemtelQueues() {
   const { data: queues = [], isLoading } = usePbxQueues();
+  const { language } = useLanguage();
+  const txt = qCopy[language];
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const perms = usePerms();
   const selected = (queues as any[]).find((q) => q.id === selectedId) || null;
@@ -47,21 +54,21 @@ export default function LemtelQueues() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2"><Headphones className="w-7 h-7" /> Call Center · Queues</h1>
-          <p className="text-muted-foreground">Manage ACD queues, agents, supervisors and live activity — synced with FusionPBX</p>
+          <h1 className="text-3xl font-bold flex items-center gap-2"><Headphones className="w-7 h-7" /> {txt.title}</h1>
+          <p className="text-muted-foreground">{txt.subtitle}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <SyncStatusChip />
           <PbxRefreshButton kind="ivr-queues" />
           <CsvIO queues={queues as any[]} disabled={!perms.canManage} />
-          {perms.canManage && <QueueDialog mode="create" trigger={<Button><Plus className="w-4 h-4 mr-2" /> New Queue</Button>} />}
+          {perms.canManage && <QueueDialog mode="create" trigger={<Button><Plus className="w-4 h-4 mr-2" /> {txt.create}</Button>} />}
         </div>
       </div>
 
       {!perms.canManage && (
         <Alert>
           <Lock className="w-4 h-4" />
-          <AlertTitle>Read-only view ({perms.reason})</AlertTitle>
+          <AlertTitle>{txt.readonly} ({perms.reason})</AlertTitle>
           <AlertDescription>Only call-center admins can create or edit queues. Supervisors can assign agents.</AlertDescription>
         </Alert>
       )}
@@ -103,7 +110,7 @@ export default function LemtelQueues() {
                       </TableRow>
                     ))}
                     {queues.length === 0 && (
-                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No queues yet — click <b>New Queue</b> to create one in FusionPBX.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-10">{txt.empty}</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -113,7 +120,7 @@ export default function LemtelQueues() {
         </TabsContent>
 
         <TabsContent value="agents">
-          {selected ? <QueueAgentsPanel queue={selected} perms={perms} /> : <Card><CardContent className="p-6 text-muted-foreground">Select a queue first.</CardContent></Card>}
+          {selected ? <QueueAgentsPanel queue={selected} perms={perms} txt={txt} /> : <Card><CardContent className="p-6 text-muted-foreground">{txt.select}</CardContent></Card>}
         </TabsContent>
 
         <TabsContent value="live"><LiveStatsPanel queues={queues as any[]} /></TabsContent>
