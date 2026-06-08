@@ -3974,67 +3974,211 @@ export type Database = {
       }
       pbx_extensions: {
         Row: {
+          absolute_codec_string: string | null
+          accountcode: string | null
+          assigned_user_ids: string[] | null
+          auth_acl: string | null
           call_group: string | null
           call_recording: string | null
+          call_screen: boolean | null
+          call_timeout: number | null
+          cidr: string | null
           client_id: string | null
           created_at: string | null
           description: string | null
+          device_lines: Json | null
+          directory_exten_visible: boolean | null
+          directory_first_name: string | null
+          directory_last_name: string | null
+          directory_visible: boolean | null
           do_not_disturb: boolean | null
           domain_uuid: string | null
           effective_cid_name: string | null
           effective_cid_number: string | null
+          emergency_cid_name: string | null
+          emergency_cid_number: string | null
           enabled: boolean | null
           extension: string
+          extension_dialect: string | null
+          extension_language: string | null
+          extension_type: string | null
+          extension_voice: string | null
+          force_ping: boolean | null
           forward_all_destination: string | null
+          forward_all_enabled: boolean | null
+          forward_busy_destination: string | null
+          forward_busy_enabled: boolean | null
+          forward_no_answer_destination: string | null
+          forward_no_answer_enabled: boolean | null
+          forward_user_not_registered_destination: string | null
+          forward_user_not_registered_enabled: boolean | null
+          hold_music: string | null
           id: string
+          limit_destination: string | null
+          limit_max: string | null
+          max_registrations: number | null
+          missed_call_app: string | null
+          missed_call_data: string | null
+          org_id: string | null
           organization_id: string
+          outbound_cid_name: string | null
+          outbound_cid_number: string | null
+          password: string | null
           pbx_uuid: string | null
+          portal_user_id: string | null
           raw_data: Json | null
+          sip_bypass_media: string | null
+          sip_force_contact: string | null
+          sip_force_expires: number | null
           synced_at: string | null
+          toll_allow: string | null
           updated_at: string | null
+          user_record: string | null
+          voicemail_custom_prompt: boolean | null
           voicemail_enabled: boolean | null
+          voicemail_file: string | null
+          voicemail_keep_local: boolean | null
+          voicemail_mail_to: string | null
+          voicemail_password: string | null
+          voicemail_transcription: boolean | null
         }
         Insert: {
+          absolute_codec_string?: string | null
+          accountcode?: string | null
+          assigned_user_ids?: string[] | null
+          auth_acl?: string | null
           call_group?: string | null
           call_recording?: string | null
+          call_screen?: boolean | null
+          call_timeout?: number | null
+          cidr?: string | null
           client_id?: string | null
           created_at?: string | null
           description?: string | null
+          device_lines?: Json | null
+          directory_exten_visible?: boolean | null
+          directory_first_name?: string | null
+          directory_last_name?: string | null
+          directory_visible?: boolean | null
           do_not_disturb?: boolean | null
           domain_uuid?: string | null
           effective_cid_name?: string | null
           effective_cid_number?: string | null
+          emergency_cid_name?: string | null
+          emergency_cid_number?: string | null
           enabled?: boolean | null
           extension: string
+          extension_dialect?: string | null
+          extension_language?: string | null
+          extension_type?: string | null
+          extension_voice?: string | null
+          force_ping?: boolean | null
           forward_all_destination?: string | null
+          forward_all_enabled?: boolean | null
+          forward_busy_destination?: string | null
+          forward_busy_enabled?: boolean | null
+          forward_no_answer_destination?: string | null
+          forward_no_answer_enabled?: boolean | null
+          forward_user_not_registered_destination?: string | null
+          forward_user_not_registered_enabled?: boolean | null
+          hold_music?: string | null
           id?: string
+          limit_destination?: string | null
+          limit_max?: string | null
+          max_registrations?: number | null
+          missed_call_app?: string | null
+          missed_call_data?: string | null
+          org_id?: string | null
           organization_id: string
+          outbound_cid_name?: string | null
+          outbound_cid_number?: string | null
+          password?: string | null
           pbx_uuid?: string | null
+          portal_user_id?: string | null
           raw_data?: Json | null
+          sip_bypass_media?: string | null
+          sip_force_contact?: string | null
+          sip_force_expires?: number | null
           synced_at?: string | null
+          toll_allow?: string | null
           updated_at?: string | null
+          user_record?: string | null
+          voicemail_custom_prompt?: boolean | null
           voicemail_enabled?: boolean | null
+          voicemail_file?: string | null
+          voicemail_keep_local?: boolean | null
+          voicemail_mail_to?: string | null
+          voicemail_password?: string | null
+          voicemail_transcription?: boolean | null
         }
         Update: {
+          absolute_codec_string?: string | null
+          accountcode?: string | null
+          assigned_user_ids?: string[] | null
+          auth_acl?: string | null
           call_group?: string | null
           call_recording?: string | null
+          call_screen?: boolean | null
+          call_timeout?: number | null
+          cidr?: string | null
           client_id?: string | null
           created_at?: string | null
           description?: string | null
+          device_lines?: Json | null
+          directory_exten_visible?: boolean | null
+          directory_first_name?: string | null
+          directory_last_name?: string | null
+          directory_visible?: boolean | null
           do_not_disturb?: boolean | null
           domain_uuid?: string | null
           effective_cid_name?: string | null
           effective_cid_number?: string | null
+          emergency_cid_name?: string | null
+          emergency_cid_number?: string | null
           enabled?: boolean | null
           extension?: string
+          extension_dialect?: string | null
+          extension_language?: string | null
+          extension_type?: string | null
+          extension_voice?: string | null
+          force_ping?: boolean | null
           forward_all_destination?: string | null
+          forward_all_enabled?: boolean | null
+          forward_busy_destination?: string | null
+          forward_busy_enabled?: boolean | null
+          forward_no_answer_destination?: string | null
+          forward_no_answer_enabled?: boolean | null
+          forward_user_not_registered_destination?: string | null
+          forward_user_not_registered_enabled?: boolean | null
+          hold_music?: string | null
           id?: string
+          limit_destination?: string | null
+          limit_max?: string | null
+          max_registrations?: number | null
+          missed_call_app?: string | null
+          missed_call_data?: string | null
+          org_id?: string | null
           organization_id?: string
+          outbound_cid_name?: string | null
+          outbound_cid_number?: string | null
+          password?: string | null
           pbx_uuid?: string | null
+          portal_user_id?: string | null
           raw_data?: Json | null
+          sip_bypass_media?: string | null
+          sip_force_contact?: string | null
+          sip_force_expires?: number | null
           synced_at?: string | null
+          toll_allow?: string | null
           updated_at?: string | null
+          user_record?: string | null
+          voicemail_custom_prompt?: boolean | null
           voicemail_enabled?: boolean | null
+          voicemail_file?: string | null
+          voicemail_keep_local?: boolean | null
+          voicemail_mail_to?: string | null
+          voicemail_password?: string | null
+          voicemail_transcription?: boolean | null
         }
         Relationships: [
           {
@@ -4049,6 +4193,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_extensions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
           {
