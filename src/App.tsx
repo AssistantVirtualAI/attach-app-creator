@@ -154,6 +154,12 @@ import PortalSettings from "./pages/PortalSettings";
 import PortalProfile from "./pages/PortalProfile";
 import UniversalLogin from "./pages/UniversalLogin";
 
+// Three-portal architecture (Platform / Customer / My)
+import { PlatformAdminShell, CustomerAdminShell, MyWorkspaceShell } from "./components/portals/PortalShells";
+import PlatformDashboard from "./pages/portals/PlatformDashboard";
+import CustomerDashboard from "./pages/portals/CustomerDashboard";
+import MyDashboardLanding from "./pages/portals/MyDashboardLanding";
+
 const queryClient = new QueryClient();
 
 import { TrialExpiredGate } from "./components/billing/TrialExpiredGate";
