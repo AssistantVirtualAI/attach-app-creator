@@ -96,3 +96,82 @@ export default function LemtelDIDs() {
     </div>
   );
 }
+
+function displayDestination(a: any, lists: { extensions: any[]; queues: any[]; ivrs: any[]; ringGroups: any[] }) {
+  const all = [...lists.extensions, ...lists.queues, ...lists.ivrs, ...lists.ringGroups];
+  const match = all.find((x) => x.id === a?.destination_id || x.pbx_uuid === a?.destination_id || x.extension === a?.destination_id);
+  return match?.name || match?.display_name || match?.extension || a?.destination_id || '—';
+}
+
+function optionsFor(type: string, lists: { extensions: any[]; queues: any[]; ivrs: any[]; ringGroups: any[] }) {
+  if (type === 'extension') return lists.extensions.map((x) => ({ id: x.extension || x.id, label: `${x.extension} — ${x.display_name || x.effective_cid_name || ''}` }));
+  if (type === 'queue') return lists.queues.map((x) => ({ id: x.extension || x.pbx_uuid || x.id, label: `${x.extension || ''} — ${x.name}` }));
+  if (type === 'ivr') return lists.ivrs.map((x) => ({ id: x.extension || x.pbx_uuid || x.id, label: `${x.extension || ''} — ${x.name}` }));
+  if (type === 'ring_group') return lists.ringGroups.map((x) => ({ id: x.extension || x.pbx_uuid || x.id, label: `${x.extension || ''} — ${x.name}` }));
+  return [];
+}
+
+function DidRoutingDialog({ number, assignment, clients, extensions, queues, ivrs, ringGroups, trigger, txt }: { number: any; assignment?: any; clients: any[]; extensions: any[]; queues: any[]; ivrs: any[]; ringGroups: any[]; trigger: React.ReactNode; txt: typeof label.en }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [destinationType, setDestinationType] = useState(assignment?.destination_type || 'extension');
+  const [destinationId, setDestinationId] = useState(assignment?.destination_id || '');
+  const [clientId, setClientId] = useState(assignment?.client_id || 'none');
+  const [smsEnabled, setSmsEnabled] = useState(!!assignment?.sms_enabled);
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const lists = { extensions, queues, ivrs, ringGroups };
+  const destinationOptions = optionsFor(destinationType, lists);
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      const destination = destinationType === 'custom' ? destinationId : destinationId;
+      const params = {
+        destination_uuid: (number.metadata as any)?.destination_uuid,
+        destination_number: number.phone_number,
+        destination_type: 'inbound',
+        destination_context: 'public',
+        destination_action: `${destinationType}:${destination}`,
+        destination_enabled: 'true',
+        destination_description: `${destinationType} ${destination}`,
+      };
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { organization_id: LEMTEL_ORG, action: params.destination_uuid ? 'update-destination' : 'create-destination', params },
+      });
+      if (error || data?.ok === false) throw new Error(data?.message || error?.message || txt.failed);
+      const payload = {
+        organization_id: LEMTEL_ORG,
+        phone_number_id: number.id,
+        client_id: clientId === 'none' ? null : clientId,
+        destination_type: destinationType,
+        destination_id: destination,
+        sms_enabled: smsEnabled,
+        routing_rules: { fusionpbx_destination: params.destination_action, synced_at: new Date().toISOString() },
+      };
+      if (assignment?.id) await supabase.from('pbx_phone_number_assignments' as any).update(payload).eq('id', assignment.id);
+      else await supabase.from('pbx_phone_number_assignments' as any).insert(payload);
+      await supabase.functions.invoke('fusionpbx-proxy', { body: { organization_id: LEMTEL_ORG, action: 'sync-all', params: { resources: ['destinations'] } } });
+      qc.invalidateQueries({ queryKey: ['pbx'] });
+      toast({ title: txt.synced });
+      setOpen(false);
+    } catch (e: any) { toast({ title: txt.failed, description: e.message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle><Route className="inline w-4 h-4 mr-2" />{txt.route} · {number.phone_number}</DialogTitle><DialogDescription>{txt.subtitle}</DialogDescription></DialogHeader>
+        <div className="space-y-3">
+          <div><Label>{txt.customer}</Label><Select value={clientId} onValueChange={setClientId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">—</SelectItem>{clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
+          <div><Label>{txt.destinationType}</Label><Select value={destinationType} onValueChange={(v) => { setDestinationType(v); setDestinationId(''); }}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="extension">Extension</SelectItem><SelectItem value="queue">Call queue</SelectItem><SelectItem value="ivr">IVR</SelectItem><SelectItem value="ring_group">Ring group</SelectItem><SelectItem value="custom">Custom</SelectItem></SelectContent></Select></div>
+          <div><Label>{txt.destination}</Label>{destinationType === 'custom' ? <Input value={destinationId} onChange={(e) => setDestinationId(e.target.value)} placeholder="transfer:300 XML lemtel.tel" /> : <Select value={destinationId} onValueChange={setDestinationId}><SelectTrigger><SelectValue placeholder={txt.destination} /></SelectTrigger><SelectContent>{destinationOptions.map((o) => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)}</SelectContent></Select>}</div>
+          <div className="flex items-center gap-2"><Switch checked={smsEnabled} onCheckedChange={setSmsEnabled} /><Label>{txt.sms}</Label></div>
+        </div>
+        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>{txt.cancel}</Button><Button disabled={busy || !destinationId} onClick={submit}>{busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}{txt.save}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
