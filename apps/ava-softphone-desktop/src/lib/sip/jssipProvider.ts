@@ -522,3 +522,34 @@ class JsSipProvider {
 }
 
 export const sipProvider = new JsSipProvider();
+
+/**
+ * Re-orders the audio m-line's payload types so PCMU(0), PCMA(8), then opus are
+ * advertised first, with telephone-event preserved. FusionPBX trunks generally
+ * require G.711 and return SIP 488 "Incompatible SDP" if only opus is offered.
+ */
+export function preferAudioCodecs(sdp: string): string {
+  const lines = sdp.split(/\r?\n/);
+  const audioIdx = lines.findIndex((l) => l.startsWith('m=audio'));
+  if (audioIdx === -1) return sdp;
+
+  // Map payload type -> codec name from rtpmap lines.
+  const rtpmap = new Map<string, string>();
+  for (const l of lines) {
+    const m = l.match(/^a=rtpmap:(\d+)\s+([A-Za-z0-9\-]+)\//);
+    if (m) rtpmap.set(m[1], m[2].toLowerCase());
+  }
+
+  const mParts = lines[audioIdx].split(' ');
+  const header = mParts.slice(0, 3); // m=audio PORT PROTO
+  const pts = mParts.slice(3);
+  const priority = ['pcmu', 'pcma', 'opus', 'telephone-event'];
+  const score = (pt: string) => {
+    const name = rtpmap.get(pt) || '';
+    const idx = priority.indexOf(name);
+    return idx === -1 ? 999 : idx;
+  };
+  const sorted = [...pts].sort((a, b) => score(a) - score(b));
+  lines[audioIdx] = [...header, ...sorted].join(' ');
+  return lines.join('\r\n');
+}
