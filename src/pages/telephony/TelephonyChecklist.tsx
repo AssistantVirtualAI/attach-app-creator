@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import {
   CheckCircle2, XCircle, AlertTriangle, Loader2, Circle,
-  Database, Plug, Phone, MessageSquare, Bot, Shield, Rocket, RefreshCw, FileDown
+  Database, Activity, Plug, Phone, PhoneIncoming, MessageSquare, Bot, Shield, Rocket, RefreshCw, FileDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 
