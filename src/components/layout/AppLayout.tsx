@@ -97,13 +97,17 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Debug: log sidebar visibility info
   console.log('[Sidebar Debug] Role:', role, 'isSuperAdmin:', isSuperAdmin, 'isLoading:', isLoading, 'userRole:', userRole);
 
-  // Filter groups based on role and Lemtel org membership
+  // Filter groups based on route scope, role and Lemtel org membership
   const isLemtelMember = isSuperAdmin || organizationMemberships.some(m => m.organization.id === '71755d33-ed64-4ad5-a828-61c9d2029eb7');
+  const currentScope = getSidebarScope(location.pathname);
   const visibleGroups = useMemo(() => sidebarGroups.filter(g => {
+    const groupScope = g.scope ?? 'legacy';
+    if (currentScope === 'admin') return false; // admin portal uses its own layout
+    if (groupScope !== currentScope) return false;
     if (g.lemtelOnly && !isLemtelMember) return false;
     if (g.hideForLemtel && isLemtelMember) return false;
     return true;
-  }), [isLemtelMember]);
+  }), [isLemtelMember, currentScope]);
 
   // Sidebar group ordering with drag & drop
   const sensors = useSensors(
