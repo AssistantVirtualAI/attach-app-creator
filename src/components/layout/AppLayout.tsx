@@ -270,11 +270,33 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
               </SortableContext>
             </DndContext>
 
+            {/* Portal switcher (Lemtel only) */}
+            {isLemtelMember && currentScope === 'org' && (
+              <Link
+                to="/org/lemtel/my/dashboard"
+                onClick={() => setIsSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 mt-3 text-muted-foreground hover:text-foreground hover:bg-muted border border-dashed border-border/60"
+              >
+                <UserCircle2 className="w-4 h-4" />
+                <span className="font-medium text-sm">👤 My Workspace →</span>
+              </Link>
+            )}
+            {isLemtelMember && currentScope === 'my' && (
+              <Link
+                to="/org/lemtel/admin/dashboard"
+                onClick={() => setIsSidebarOpen(false)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 mt-3 text-muted-foreground hover:text-foreground hover:bg-muted border border-dashed border-border/60"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="font-medium text-sm">Back to Org Portal</span>
+              </Link>
+            )}
+
             {/* Settings link - always visible */}
             <Link
               to={settingsLink.href}
               onClick={() => setIsSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 mt-3 ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 mt-1 ${
                 isSettingsActive
                   ? 'bg-primary/15 text-foreground border border-primary/30'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted'
