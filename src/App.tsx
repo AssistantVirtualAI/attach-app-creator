@@ -11,7 +11,7 @@ import { ClientProvider } from "@/context/ClientContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AppErrorBoundary } from "@/components/errors/AppErrorBoundary";
 
-import Landing from "./pages/LandingPage";
+import Landing from "./pages/Landing";
 import AuthPage from "./pages/Auth";
 import AgencyHome from "./pages/AgencyHome";
 import PostLoginRedirect from "./pages/PostLoginRedirect";
@@ -237,9 +237,6 @@ const App = () => (
 
                 {/* Public download page */}
                 <Route path="/download" element={<Download />} />
-                {/* Authenticated download pages */}
-                <Route path="/my/download" element={<ProtectedRoute><Download /></ProtectedRoute>} />
-                <Route path="/org/:slug/downloads" element={<ProtectedRoute><Download /></ProtectedRoute>} />
                 
                 {/* Universal login - redirects based on user type */}
                 <Route path="/login" element={<UniversalLogin />} />
@@ -625,7 +622,6 @@ const App = () => (
                 <Route path="/org/lemtel/admin/extensions" element={<LemtelAdminPage><LemtelExtensions /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/dids" element={<LemtelAdminPage><LemtelDIDs /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/devices" element={<LemtelAdminPage><LemtelDevices /></LemtelAdminPage>} />
-                <Route path="/org/lemtel/admin/customers" element={<LemtelAdminPage><MasterOrganizations /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/ivr" element={<LemtelAdminPage><LemtelIVR /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/queues" element={<LemtelAdminPage><LemtelQueues /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/ring-groups" element={<LemtelAdminPage><TelephonyRingGroups /></LemtelAdminPage>} />

@@ -1,7 +1,7 @@
 {
   "name": "lemtel-softphone",
-  "version": "2.2.0",
-  "description": "Lemtel Telecom \u2014 AI-Powered Business Communications",
+  "version": "2.1.1",
+  "description": "Lemtel Telecom — AI-Powered Business Communications",
   "main": "electron-compiled/main.js",
   "homepage": "https://assistantvirtualai.com",
   "author": {
@@ -38,9 +38,5 @@
   },
   "build": {
     "extends": "./electron-builder.yml"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/AssistantVirtualAI/attach-app-creator.git"
   }
 }

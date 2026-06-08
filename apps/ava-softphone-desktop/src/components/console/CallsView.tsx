@@ -21,34 +21,20 @@ export default function CallsView() {
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'missed' | 'in' | 'out' | 'recorded'>('all');
-  const [range, setRange] = useState<'all'|'24h'|'7d'|'30d'>('all');
-  const [search, setSearch] = useState('');
   const [sel, setSel] = useState<CallRecord | null>(null);
   const [insight, setInsight] = useState<any>(null);
 
-  const load = () => {
-    setLoading(true);
-    ava.calls().then((d) => { setCalls(d); setLoading(false); });
-  };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { ava.calls().then((d) => { setCalls(d); setLoading(false); }); }, []);
   useEffect(() => {
     if (sel) { setInsight(null); ava.callDetail(sel.id).then(setInsight); }
   }, [sel]);
 
-  const cutoff = range === 'all' ? 0 :
-    Date.now() - ({ '24h': 864e5, '7d': 7*864e5, '30d': 30*864e5 } as any)[range];
-
-  const filtered = calls.filter((cr) => {
-    if (cutoff && new Date(cr.startedAt).getTime() < cutoff) return false;
-    if (filter === 'missed' && cr.status !== 'missed') return false;
-    if (filter === 'recorded' && !cr.hasRecording) return false;
-    if ((filter === 'in' || filter === 'out') && cr.direction !== filter) return false;
-    if (search) {
-      const t = search.toLowerCase();
-      if (!`${cr.from} ${cr.to} ${cr.customer || ''}`.toLowerCase().includes(t)) return false;
-    }
-    return true;
-  });
+  const filtered = calls.filter((cr) =>
+    filter === 'all' ? true :
+    filter === 'missed' ? cr.status === 'missed' :
+    filter === 'recorded' ? cr.hasRecording :
+    cr.direction === filter
+  );
 
   return (
     <div style={{ display: 'flex', height: '100%' }}>
@@ -61,22 +47,9 @@ export default function CallsView() {
           icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.8a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.35 1.84.59 2.8.72A2 2 0 0 1 22 16.92z"/></svg>}
         />
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search number, customer…"
-            style={{ flex: 1, minWidth: 180, padding: '8px 10px', borderRadius: 8, background: c.bgCard, border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, outline: 'none' }} />
-          <button onClick={load} style={{ padding: '7px 12px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-            ↻ Refresh
-          </button>
-          <span style={{ fontSize: 10, color: c.mutedSilver }}>{filtered.length} / {calls.length}</span>
-        </div>
-
-        <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
           {(['all', 'missed', 'in', 'out', 'recorded'] as const).map((f) => (
             <button key={f} onClick={() => setFilter(f)} style={chip(filter === f)}>{f.toUpperCase()}</button>
-          ))}
-          <span style={{ width: 1, background: c.border, margin: '0 4px' }} />
-          {(['all','24h','7d','30d'] as const).map((r) => (
-            <button key={r} onClick={() => setRange(r)} style={chip(range === r)}>{r.toUpperCase()}</button>
           ))}
         </div>
 

@@ -81,11 +81,9 @@ jobs:
         run: |
           npx vite build
           npx tsc -p electron/tsconfig.json || true
-          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true npx electron-builder --mac --x64 --arm64 --publish=never
+          npx electron-builder --mac --x64 --arm64 -c.publish=never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-mac
@@ -129,11 +127,9 @@ jobs:
         run: |
           npx vite build
           npx tsc -p electron/tsconfig.json
-          npx electron-builder --win --publish=never
+          npx electron-builder --win -c.publish=never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-windows
@@ -178,11 +174,9 @@ jobs:
         run: |
           npx vite build
           npx tsc -p electron/tsconfig.json || true
-          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true npx electron-builder --linux --publish=never
+          npx electron-builder --linux -c.publish=never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-linux

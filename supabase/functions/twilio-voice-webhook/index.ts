@@ -18,24 +18,19 @@ Deno.serve(async (req) => {
     const dataObj: Record<string, string> = {};
     formData.forEach((v, k) => { dataObj[k] = String(v); });
 
-    // Validate Twilio signature (mandatory)
+    // Validate Twilio signature
     const { validateTwilioSignature } = await import('../_shared/twilio.ts');
     const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     const signature = req.headers.get('X-Twilio-Signature') || '';
-    if (!twilioAuthToken) {
-      console.error('TWILIO_AUTH_TOKEN not configured - rejecting request');
-      return new Response(
-        `<?xml version="1.0" encoding="UTF-8"?><Response><Say>Webhook secret not configured</Say></Response>`,
-        { status: 503, headers: corsHeaders }
-      );
-    }
-    const isValid = await validateTwilioSignature(twilioAuthToken, signature, req.url, dataObj);
-    if (!isValid) {
-      console.warn('Invalid Twilio signature on voice webhook');
-      return new Response(
-        `<?xml version="1.0" encoding="UTF-8"?><Response><Say>Unauthorized</Say></Response>`,
-        { status: 403, headers: corsHeaders }
-      );
+    if (twilioAuthToken) {
+      const isValid = await validateTwilioSignature(twilioAuthToken, signature, req.url, dataObj);
+      if (!isValid) {
+        console.warn('Invalid Twilio signature on voice webhook');
+        return new Response(
+          `<?xml version="1.0" encoding="UTF-8"?><Response><Say>Unauthorized</Say></Response>`,
+          { status: 403, headers: corsHeaders }
+        );
+      }
     }
 
     const to = dataObj['To'];

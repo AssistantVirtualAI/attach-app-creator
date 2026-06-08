@@ -7,11 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Eye, Edit, Pause, Trash2, FileBarChart, DollarSign, Upload } from "lucide-react";
+import { Eye, Edit, Pause, Trash2, FileBarChart, DollarSign } from "lucide-react";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useNavigate } from "react-router-dom";
 import { CreateOrgWizard } from "@/components/portal/CreateOrgWizard";
-import { CsvUserImportDialog } from "@/components/lemtel/CsvUserImportDialog";
 import { toast } from "sonner";
 
 type Filter = "all" | "reseller" | "customer" | "direct" | "suspended" | "trial";
@@ -24,7 +23,6 @@ export default function MasterOrganizations() {
   const [open, setOpen] = useState(params.get("create") === "1");
   const { enter } = useImpersonation();
   const navigate = useNavigate();
-  const [csvOrg, setCsvOrg] = useState<{ id: string; name: string } | null>(null);
 
   const { data: orgs = [] } = useQuery({
     queryKey: ["all-orgs"],
@@ -149,14 +147,6 @@ export default function MasterOrganizations() {
                     <Button size="sm" variant="ghost" title="Edit">
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setCsvOrg({ id: o.id, name: o.name })}
-                      title="Import users from CSV"
-                    >
-                      <Upload className="h-4 w-4" />
-                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => suspend(o.id, o.status)} title="Suspend">
                       <Pause className="h-4 w-4" />
                     </Button>
@@ -200,12 +190,6 @@ export default function MasterOrganizations() {
           }
         }}
         onCreated={() => qc.invalidateQueries({ queryKey: ["all-orgs"] })}
-      />
-      <CsvUserImportDialog
-        open={!!csvOrg}
-        onOpenChange={(v) => !v && setCsvOrg(null)}
-        organizationId={csvOrg?.id || ''}
-        organizationName={csvOrg?.name}
       />
     </div>
   );

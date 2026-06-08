@@ -82,8 +82,6 @@ class JsSipProvider {
   boundInputLabel: string = 'System default';
   private wssAttempted: string[] = [];
   private lastCallError: string | null = null;
-  private lastDialed: string | null = null;
-  private retryingAfter488 = false;
 
   subscribe(fn: Listener) {
     this.listeners.add(fn);
@@ -113,21 +111,6 @@ class JsSipProvider {
     this.stop();
     if (cfg) await this.init(cfg);
   }
-
-  /** One-click: restart UA, verify devices, and report codec preference. */
-  async restartAndCodecTest(): Promise<{ ok: boolean; codecs: string[]; devices: { input: string; output: string }; error?: string }> {
-    this.logEvent('info', 'Codec test + SIP restart triggered');
-    try {
-      await this.restart();
-      const d = await this.testAudioDevices();
-      const codecs = ['PCMU', 'PCMA', 'opus', 'telephone-event'];
-      this.logEvent('info', `Codec preference: ${codecs.join(' › ')}`);
-      return { ok: !d.error, codecs, devices: { input: d.input, output: d.output }, error: d.error };
-    } catch (e: any) {
-      return { ok: false, codecs: [], devices: { input: '—', output: '—' }, error: String(e?.message || e) };
-    }
-  }
-
 
 
   async init(cfg: SoftphoneConfig) {
@@ -186,12 +169,7 @@ class JsSipProvider {
         connection_recovery_max_interval: 30,
         user_agent: 'Lemtel Telecom 1.1',
         hackWssInTransport: true,
-        pcConfig: {
-          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-          rtcpMuxPolicy: 'require',
-          bundlePolicy: 'max-bundle',
-        },
-      } as any);
+      });
 
       ua.on('connecting', () => {
         this.logEvent('info', 'WebSocket connecting…');
@@ -280,28 +258,6 @@ class JsSipProvider {
       this.lastCallError = detail;
       this.logEvent('error', `Call failed: ${detail}`);
       this.update({ callState: 'ended', errorCause: detail });
-
-      // SDP 488 auto-retry: restart UA + redial once with codec re-prefer.
-      if (code === 488 && !this.retryingAfter488 && this.lastDialed) {
-        const target = this.lastDialed;
-        this.retryingAfter488 = true;
-        this.logEvent('warn', `488 Incompatible SDP — auto-retrying ${target} after SIP restart…`);
-        setTimeout(async () => {
-          try {
-            await this.restart();
-            // Wait for register before redial (up to 6s).
-            const start = Date.now();
-            while (this.snap.status !== 'registered' && Date.now() - start < 6000) {
-              await new Promise((r) => setTimeout(r, 300));
-            }
-            this.resetCall();
-            await this.call(target, true);
-          } finally {
-            setTimeout(() => { this.retryingAfter488 = false; }, 4000);
-          }
-        }, 800);
-        return;
-      }
       setTimeout(() => this.resetCall(), 2500);
     });
     session.on('ended', () => {
@@ -325,19 +281,6 @@ class JsSipProvider {
   private bindMedia(session: any) {
     const pc = session.connection;
     if (!pc) return;
-
-    // SDP munging: re-order audio codecs to PCMU, PCMA, opus, telephone-event.
-    // FusionPBX often rejects (488) opus-only offers; PSTN gateways want G.711.
-    const originalSLD = pc.setLocalDescription?.bind(pc);
-    if (originalSLD) {
-      pc.setLocalDescription = (desc: any) => {
-        try {
-          if (desc?.sdp) desc = { type: desc.type, sdp: preferAudioCodecs(desc.sdp) };
-        } catch { /* noop */ }
-        return originalSLD(desc);
-      };
-    }
-
     pc.addEventListener('track', (ev: any) => {
       if (this.audioEl && ev.streams[0]) {
         this.audioEl.srcObject = ev.streams[0];
@@ -352,11 +295,6 @@ class JsSipProvider {
   private resetCall() {
     this.session = null;
     this.secondSession = null;
-    // Clear audio element to avoid stale stream / black-screen after failed call.
-    if (this.audioEl) {
-      try { this.audioEl.pause(); } catch { /* noop */ }
-      try { this.audioEl.srcObject = null; } catch { /* noop */ }
-    }
     this.update({
       callState: 'idle',
       remoteIdentity: '',
@@ -365,7 +303,6 @@ class JsSipProvider {
       startedAt: null,
       muted: false,
       onHold: false,
-      errorCause: undefined,
     });
   }
 
@@ -422,15 +359,17 @@ class JsSipProvider {
     }
   }
 
-  async call(number: string, _isRetry = false): Promise<string | null> {
+  async call(number: string): Promise<string | null> {
     if (!this.config || !this.ua) {
       this.logEvent('error', 'UA not ready — cannot call');
       return 'SIP not initialized';
     }
     const target = `sip:${number}@${this.config.sipDomain}`;
-    this.lastDialed = number;
-    this.logEvent('info', _isRetry ? `Auto-redialing ${number} after 488` : `Dialing ${number}`);
+    this.logEvent('info', `Dialing ${number}`);
     try {
+      // Let JsSIP handle getUserMedia internally. Pre-fetching the stream
+      // causes "Bad Media Description" + unhandled rejections that crash
+      // the Electron renderer (black screen).
       this.ua.call(target, {
         mediaConstraints: { audio: true, video: false },
       } as any);
@@ -444,7 +383,6 @@ class JsSipProvider {
       return msg;
     }
   }
-
 
   /** Build a debug report JSON with secrets masked. */
   buildDebugReport(): string {
@@ -560,34 +498,3 @@ class JsSipProvider {
 }
 
 export const sipProvider = new JsSipProvider();
-
-/**
- * Re-orders the audio m-line's payload types so PCMU(0), PCMA(8), then opus are
- * advertised first, with telephone-event preserved. FusionPBX trunks generally
- * require G.711 and return SIP 488 "Incompatible SDP" if only opus is offered.
- */
-export function preferAudioCodecs(sdp: string): string {
-  const lines = sdp.split(/\r?\n/);
-  const audioIdx = lines.findIndex((l) => l.startsWith('m=audio'));
-  if (audioIdx === -1) return sdp;
-
-  // Map payload type -> codec name from rtpmap lines.
-  const rtpmap = new Map<string, string>();
-  for (const l of lines) {
-    const m = l.match(/^a=rtpmap:(\d+)\s+([A-Za-z0-9\-]+)\//);
-    if (m) rtpmap.set(m[1], m[2].toLowerCase());
-  }
-
-  const mParts = lines[audioIdx].split(' ');
-  const header = mParts.slice(0, 3); // m=audio PORT PROTO
-  const pts = mParts.slice(3);
-  const priority = ['pcmu', 'pcma', 'opus', 'telephone-event'];
-  const score = (pt: string) => {
-    const name = rtpmap.get(pt) || '';
-    const idx = priority.indexOf(name);
-    return idx === -1 ? 999 : idx;
-  };
-  const sorted = [...pts].sort((a, b) => score(a) - score(b));
-  lines[audioIdx] = [...header, ...sorted].join(' ');
-  return lines.join('\r\n');
-}

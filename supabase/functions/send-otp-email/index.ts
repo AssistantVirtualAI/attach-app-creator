@@ -12,16 +12,9 @@ interface OTPEmailRequest {
   organizationId: string;
 }
 
-// Cryptographically secure 6-digit OTP
+// Generate a 6-digit OTP code
 function generateOTP(): string {
-  const arr = new Uint32Array(1);
-  crypto.getRandomValues(arr);
-  return (100000 + (arr[0] % 900000)).toString();
-}
-
-async function sha256Hex(input: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 serve(async (req) => {
@@ -83,27 +76,9 @@ serve(async (req) => {
     }
 
 
-    // Generate OTP code and persist a hashed copy for server-side verification
+    // Generate OTP code
     const otpCode = generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
-    const codeHash = await sha256Hex(`${otpCode}:${organizationId}:${email.toLowerCase()}`);
-    // Invalidate any previous unused OTPs for the same email/org
-    await supabase
-      .from("two_factor_otps")
-      .update({ consumed_at: new Date().toISOString() })
-      .eq("email", email.toLowerCase())
-      .eq("organization_id", organizationId)
-      .is("consumed_at", null);
-    const { error: otpInsertErr } = await supabase.from("two_factor_otps").insert({
-      email: email.toLowerCase(),
-      organization_id: organizationId,
-      code_hash: codeHash,
-      expires_at: expiresAt.toISOString(),
-    });
-    if (otpInsertErr) {
-      console.error("Failed to persist OTP hash:", otpInsertErr);
-      throw new Error("Failed to issue OTP");
-    }
 
     // Get the 2FA email template for the organization
     const { data: template } = await supabase

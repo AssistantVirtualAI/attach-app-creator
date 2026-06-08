@@ -3451,36 +3451,6 @@ export type Database = {
           },
         ]
       }
-      pbx_ai_conversations: {
-        Row: {
-          created_at: string
-          id: string
-          messages: Json
-          organization_id: string
-          title: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          messages?: Json
-          organization_id: string
-          title?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          messages?: Json
-          organization_id?: string
-          title?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       pbx_ai_insights: {
         Row: {
           action_items: string[] | null
@@ -3572,45 +3542,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      pbx_ai_jobs: {
-        Row: {
-          call_record_id: string | null
-          created_at: string
-          created_by: string | null
-          error: string | null
-          id: string
-          kind: string
-          organization_id: string
-          result: Json | null
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          call_record_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          error?: string | null
-          id?: string
-          kind?: string
-          organization_id: string
-          result?: Json | null
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          call_record_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          error?: string | null
-          id?: string
-          kind?: string
-          organization_id?: string
-          result?: Json | null
-          status?: string
-          updated_at?: string
-        }
-        Relationships: []
       }
       pbx_call_forwarding: {
         Row: {
@@ -5984,39 +5915,6 @@ export type Database = {
           },
         ]
       }
-      two_factor_otps: {
-        Row: {
-          attempts: number
-          code_hash: string
-          consumed_at: string | null
-          created_at: string
-          email: string
-          expires_at: string
-          id: string
-          organization_id: string
-        }
-        Insert: {
-          attempts?: number
-          code_hash: string
-          consumed_at?: string | null
-          created_at?: string
-          email: string
-          expires_at: string
-          id?: string
-          organization_id: string
-        }
-        Update: {
-          attempts?: number
-          code_hash?: string
-          consumed_at?: string | null
-          created_at?: string
-          email?: string
-          expires_at?: string
-          id?: string
-          organization_id?: string
-        }
-        Relationships: []
-      }
       user_call_handling: {
         Row: {
           after_hours_action: Database["public"]["Enums"]["after_hours_action"]
@@ -6746,10 +6644,6 @@ export type Database = {
       admin_link_softphone_by_email: {
         Args: { _email: string; _softphone_id: string }
         Returns: Json
-      }
-      can_access_chat_channel: {
-        Args: { _channel_id: string; _user_id: string }
-        Returns: boolean
       }
       can_access_org: {
         Args: { _org_id: string; _user_id: string }

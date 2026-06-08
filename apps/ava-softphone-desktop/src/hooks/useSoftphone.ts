@@ -173,11 +173,5 @@ export function useSoftphone(args: UseSoftphoneArgs) {
       await sipProvider.restart();
       setRetryTick((n) => n + 1);
     }, []),
-    restartAndCodecTest: useCallback(async () => {
-      setCredError(null);
-      const r = await sipProvider.restartAndCodecTest();
-      setRetryTick((n) => n + 1);
-      return r;
-    }, []),
   };
 }

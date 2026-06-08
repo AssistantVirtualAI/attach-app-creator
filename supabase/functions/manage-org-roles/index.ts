@@ -220,25 +220,20 @@ serve(async (req) => {
       const user_id = body?.user_id as string | undefined;
       if (!user_id) return json(400, { error: "user_id is required" });
 
-      // Caller must share at least one org with target (or be super admin).
-      // Non-super-admins can only learn about orgs they themselves belong to.
-      let sharedIds: string[] = [];
+      // Caller must share at least one org with target (or be super admin)
       if (!isSuperAdmin) {
         const { data: shared } = await supabase
           .from("organization_members")
           .select("organization_id")
           .eq("user_id", callingUser.id);
-        sharedIds = (shared ?? []).map((s) => s.organization_id);
+        const sharedIds = (shared ?? []).map((s) => s.organization_id);
         if (!sharedIds.length) return json(403, { error: "Forbidden" });
       }
 
-      let query = supabase
+      const { data: memberships } = await supabase
         .from("organization_members")
         .select("organization_id")
         .eq("user_id", user_id);
-      if (!isSuperAdmin) query = query.in("organization_id", sharedIds);
-
-      const { data: memberships } = await query;
       const orgIds = (memberships ?? []).map((m) => m.organization_id);
       if (!orgIds.length) return json(200, { organizations: [] });
 

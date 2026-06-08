@@ -1,77 +1,79 @@
-# Plan – Refonte visuelle futuriste du portail AVA Statistic
+# Phases 4b + 5 + 6 — Livraison groupée
 
-Objectif : moderniser visuellement **tout le portail web** (admin + client) avec une esthétique cyberpunk/glassmorphism élégante, sans toucher à la logique métier ni aux apps desktop/mobile.
+L'utilisateur souhaite tout livrer en une seule itération. Voici la plan d'exécution consolidé.
 
-## 1. Fondations du design system (`src/index.css` + `tailwind.config.ts`)
+## Phase 4b — Threads & recherche chat
 
-- **Palette enrichie** autour du primary actuel `#0023e6` :
-  - Ajout de tokens `--surface-glass`, `--surface-glass-strong`, `--border-glass`
-  - Couleurs d'accent néon : cyan électrique, violet, magenta (utilisés avec parcimonie)
-  - Fond dégradé profond (deep navy → near black) avec halos radiaux
-- **Nouveaux tokens** :
-  - `--gradient-aurora`, `--gradient-mesh`, `--gradient-primary-glow`
-  - `--shadow-glass`, `--shadow-glow-primary`, `--shadow-elevated`
-  - `--blur-glass: 20px`, `--blur-glass-strong: 40px`
-- **Typographie** : conserver Inter, ajouter un display font pour les titres (ex. Space Grotesk ou Sora) pour le côté futuriste.
-- **Rayons** : passer à un système plus généreux (`--radius: 1rem`) pour les cartes principales.
+### Schéma
+- `org_chat_messages` : ajouter `parent_message_id uuid REFERENCES org_chat_messages(id) ON DELETE CASCADE`, `reply_count int DEFAULT 0`, `last_reply_at timestamptz`.
+- Trigger `bump_thread_counters` qui maintient `reply_count` / `last_reply_at` sur le message parent.
+- Colonne `tsv tsvector` + index GIN + trigger `to_tsvector('french', coalesce(content,''))`.
 
-## 2. Primitives réutilisables
+### Edge function `org-chat` (extensions)
+- `list_thread(message_id)` — messages dont parent = id, tri ASC.
+- `send_message` accepte `parent_message_id`.
+- `search_messages(query, channel_id?, limit, before)` — `tsv @@ websearch_to_tsquery('french', q)` filtré par channels accessibles.
 
-Créer dans `src/components/ui/` :
-- `glass-card.tsx` — wrapper carte avec `backdrop-blur`, bordure dégradée, hover glow
-- `glow-button.tsx` — variante bouton avec halo lumineux animé
-- `aurora-background.tsx` — fond animé subtil (mesh gradient) pour pages clés
-- `noise-overlay.tsx` — texture grain légère pour casser l'aspect plastique
+### Frontend
+- `chat/ThreadPanel.tsx` : panneau latéral droit, composer, liste des replies, fermeture.
+- `MessageBubble` : badge "N réponses" + "Répondre dans un fil".
+- `chat/SearchBar.tsx` + `chat/SearchResults.tsx` : barre Cmd+K dans la sidebar, résultats avec extrait + highlight + jump-to-message.
+- Hook `useOrgChatThread(messageId)` (React Query + realtime filtré).
 
-## 3. Layout global (`src/components/layout/`)
+## Phase 5 — Notifications & mentions
 
-- **AppLayout** : fond global avec aurora + grille subtile (style MagicUI `AnimatedGridPattern`)
-- **Sidebar** : 
-  - Verre teinté semi-transparent, bordure droite lumineuse
-  - Item actif avec barre néon verticale + glow
-  - Icônes avec micro-animation au hover
-- **Header/Topbar** : barre flottante en glass, sticky, avec recherche redesignée
+### Schéma
+- Réutiliser `org_notifications` (existant).
+- Trigger `notify_mentions_on_message` : parse `@uuid` dans `content`, insert lignes `org_notifications` (`type='chat_mention'`, payload = {channel_id, message_id}).
+- Table `user_notification_prefs` (existante) : ajouter colonnes `email_mentions bool`, `email_dm bool`, `email_voicemail bool`, `email_missed_call bool`.
 
-## 4. Pages prioritaires à retravailler
+### Edge function `notifications`
+- `list(limit, before)` — flux paginé.
+- `mark_read(ids[])` / `mark_all_read()`.
+- `prefs_get` / `prefs_update`.
+- Worker `dispatch_email_notifications` (trigger pg_net post → fonction edge) qui envoie via Resend en respectant les prefs et un debounce 5 min.
 
-Ordre d'impact visuel :
-1. **Dashboard** (`src/pages/Dashboard.tsx`) — KPI cards en glass + sparklines glow, graphiques avec gradients
-2. **Agents / Clients / Conversations** — listes en glass cards, états hover avec border-beam
-3. **Analytics** — recharts re-stylés (gradients, glow lines, tooltip glass)
-4. **Settings / Billing** — formulaires en glass panels
-5. **Landing publique** — hero avec Meteors/Particles, sections en bento grid
-6. **Client portal** — même langage visuel, palette légèrement adoucie
+### Realtime + Frontend
+- `useNotifications()` : subscription `org_notifications` filtré `user_id=eq.<me>` ; cache React Query.
+- `NotificationBell.tsx` dans `PortalShells` : badge unread, popover liste, "Tout marquer lu", deep-link vers ressource.
+- `pages/my/NotificationSettings.tsx` : toggles prefs.
+- Composer chat : auto-complétion `@` via membres de l'organisation, insertion `@<uuid>` rendu en `@DisplayName` côté bulle.
 
-## 5. Micro-interactions & motion
+## Phase 6 — Calendrier & rendez-vous
 
-- Framer Motion : fade+slide à l'entrée de page, stagger sur les listes
-- Hover : scale subtil (1.02) + glow renforcé sur cards
-- Border-beam (MagicUI) sur cartes premium / CTA
-- Shimmer sur les états loading (remplace skeletons gris plats)
+### Schéma (table `appointments` existante — l'étendre)
+- Ajouter `host_user_id uuid`, `host_kind text ('user'|'agent'|'team')`, `team_members uuid[]`, `location_type text ('phone'|'video'|'in_person')`, `meeting_url text`, `reminder_offsets int[] DEFAULT '{1440,60}'`, `timezone text`.
+- Nouvelle table `appointment_slots` (slots de dispo générés / bookables publics).
+- Nouvelle table `appointment_reminders` (sent_at, channel).
 
-## 6. Composants MagicUI à intégrer
+### Edge function `appointments`
+- `list(range, host?)`, `create`, `update`, `cancel`, `reschedule`.
+- `public_availability(host_id, range)` : calcule créneaux libres en croisant `user_working_hours`, `org_business_hours`, et appointments existants.
+- `public_book(host_id, slot, contact)` — endpoint anon avec rate-limit + captcha-light.
+- Worker `process_appointment_reminders` (déclenché par pg_cron toutes les 5 min) : envoie SMS Telnyx + email Resend selon `reminder_offsets`.
 
-- `AnimatedGridPattern` — fond layout
-- `BorderBeam` — cards highlight (plan actif, agent featured)
-- `Meteors` / `Particles` — hero landing
-- `NumberTicker` — KPI dashboard
-- `Shimmer` — loading states
+### Frontend
+- `pages/my/Calendar.tsx` :
+  - Vue Mois / Semaine / Jour (composant interne, pas de dep).
+  - Sidebar mini-calendrier + filtres (host, status).
+  - Drag-to-create + dialog edit.
+- `pages/customer/Calendar.tsx` : variante orga avec multi-host.
+- Page publique `/book/:slug` : créneaux dispo + formulaire contact + confirmation.
+- Hooks `useAppointments`, `useAvailability`, `usePublicBooking`.
 
-## 7. QA visuelle
-
-- Vérifier contraste WCAG AA sur tous les tokens
-- Tester light/dark (le portail est dark-first ; s'assurer que le light reste cohérent ou le retirer si non utilisé)
-- Vérifier sur mobile (sidebar collapse, cards stack)
-- Pas de régression sur les pages non-touchées (tokens sémantiques préservés)
+## Sécurité (toutes phases)
+- Toutes les edge functions valident JWT + appartenance org via `current_user_org_ids()` ou `can_access_org`.
+- Public booking : pas de JWT mais slug org/host validé + IP rate-limit (table `rate_limits` simple).
+- RLS strictes sur nouvelles tables ; GRANT explicites `authenticated`/`service_role`.
 
 ## Hors scope
+- Visio embarquée (juste lien meeting_url externe pour cette itération).
+- Sync Google/Outlook 2-way (Phase 7 — table `calendar_integrations` déjà présente).
+- Notifications push web (web push) → Phase 7.
 
-- Aucune modification fonctionnelle (API, queries, RLS, edge functions)
-- Aucun changement dans `apps/ava-softphone-desktop/` ni `apps/ava-softphone-mobile/`
-- Aucun changement aux fichiers CI/CD protégés
+## Validation
+- Chat : ouvrir thread, envoyer reply, voir compteur, rechercher mot et jumper.
+- Mention `@user` → bell badge + email reçu (si pref on).
+- Créer RDV, voir reminder envoyé à T-1h, page publique `/book/:slug` permet booking.
 
----
-
-## Question avant de coder
-
-Avant d'implémenter, je te propose de **choisir la direction visuelle** via 3 questions rapides (palette, typographie, ambiance) — comme ça la refonte reflète exactement ton goût plutôt que mes suppositions. Veux-tu qu'on passe par cette étape, ou je fonce direct avec la direction "cyberpunk glass bleu électrique" décrite ci-dessus ?
+Sur OK je passe en build mode et j'enchaîne les trois phases dans l'ordre 4b → 5 → 6.

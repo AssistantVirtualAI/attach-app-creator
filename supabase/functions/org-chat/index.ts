@@ -212,11 +212,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "signed_url") {
-      const path = String(payload?.path ?? "");
-      // SECURITY: enforce that the path belongs to the caller's org
-      if (!path || !path.startsWith(`${orgId}/`)) {
-        return json({ error: "forbidden" }, 403);
-      }
+      const path = String(payload?.path);
       const { data, error } = await admin.storage.from("chat-attachments").createSignedUrl(path, 3600);
       if (error) throw error;
       return json({ url: data.signedUrl });

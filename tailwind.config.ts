@@ -88,8 +88,6 @@ export default {
         "gradient-secondary": "var(--gradient-secondary)",
         "gradient-card": "var(--gradient-card)",
         "gradient-hero": "var(--gradient-hero)",
-        "gradient-aurora": "var(--gradient-aurora)",
-        "gradient-glow": "var(--gradient-glow)",
       },
       boxShadow: {
         sm: "var(--shadow-sm)",
@@ -97,13 +95,6 @@ export default {
         lg: "var(--shadow-lg)",
         glow: "var(--shadow-glow)",
         neon: "var(--shadow-neon)",
-        cyan: "var(--shadow-cyan)",
-        glass: "var(--shadow-glass)",
-        "glow-primary": "var(--shadow-glow-primary)",
-      },
-      backdropBlur: {
-        glass: "var(--blur-glass, 20px)",
-        "glass-strong": "var(--blur-glass-strong, 32px)",
       },
       borderRadius: {
         lg: "var(--radius)",

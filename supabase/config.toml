@@ -188,9 +188,3 @@ verify_jwt = false
 
 [functions.landing-chatbot]
 verify_jwt = false
-
-[functions.verify-otp]
-verify_jwt = false
-
-[functions.telnyx-webhook]
-verify_jwt = false

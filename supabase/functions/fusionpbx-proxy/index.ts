@@ -278,18 +278,11 @@ Deno.serve(async (req) => {
       "list-destinations":  { path: `destinations?${domainQ}`,        key: "destinations" },
       "list-voicemails":    { path: `voicemails?${domainQ}`,          key: "voicemails" },
       "list-registrations": { path: `registrations?${domainQ}`,       key: "registrations" },
-      "list-device-vendors":   { path: `device_vendors`,                  key: "device_vendors" },
-      "list-device-templates": { path: `device_vendor_functions`,         key: "device_vendor_functions" },
     };
     if (listMap[action]) {
       const m = listMap[action];
       const r = await pbxFetch(m.path);
-      if (!r.ok) {
-        if (action === "list-device-vendors" || action === "list-device-templates") {
-          return json({ ok: true, data: [], fallback: true });
-        }
-        return json(r, r.status || 500);
-      }
+      if (!r.ok) return json(r, r.status || 500);
       return json({ ok: true, data: collection(r.data, m.key), latency_ms: r.latency_ms });
     }
 
