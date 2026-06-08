@@ -315,7 +315,7 @@ function DeleteQueueBtn({ queue }: { queue: any }) {
 }
 
 // ---------- Agents per queue ----------
-function QueueAgentsPanel({ queue, perms }: { queue: any; perms: Perms }) {
+function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt: typeof qCopy.en }) {
   const [agents, setAgents] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -382,7 +382,7 @@ function QueueAgentsPanel({ queue, perms }: { queue: any; perms: Perms }) {
           {perms.canAssign && <AddAgentBtn extensions={availableExt} onAdd={(id) => addAgent(id, 'supervisor')} role="supervisor" />}
         </CardHeader>
         <CardContent>
-          {supervisors.length === 0 ? <p className="text-sm text-muted-foreground">No supervisors yet.</p> : (
+          {supervisors.length === 0 ? <p className="text-sm text-muted-foreground">{txt.noSup}</p> : (
             <div className="space-y-1">{supervisors.map((a) => (
               <div key={a.id} className="flex items-center justify-between p-2 border rounded">
                 <div><div className="font-medium">{a.agent_name}</div><div className="text-xs text-muted-foreground font-mono">Ext {a.agent_id} · pos {a.tier_position}</div></div>
@@ -399,7 +399,7 @@ function QueueAgentsPanel({ queue, perms }: { queue: any; perms: Perms }) {
           {perms.canAssign && <AddAgentBtn extensions={availableExt} onAdd={(id) => addAgent(id, 'agent')} role="agent" />}
         </CardHeader>
         <CardContent>
-          {regularAgents.length === 0 ? <p className="text-sm text-muted-foreground">No agents yet.</p> : (
+          {regularAgents.length === 0 ? <p className="text-sm text-muted-foreground">{txt.noAgents}</p> : (
             <div className="space-y-1">{regularAgents.map((a) => (
               <div key={a.id} className="flex items-center justify-between p-2 border rounded">
                 <div><div className="font-medium">{a.agent_name}</div><div className="text-xs text-muted-foreground font-mono">Ext {a.agent_id} · {a.status}</div></div>
