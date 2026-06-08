@@ -271,7 +271,7 @@ export default function TelephonyQA() {
                 placeholder="+15145551234"
               />
             </div>
-            <Button onClick={placeTestCall} disabled={!testNumber || sp?.status !== "registered"}>
+            <Button onClick={placeTestCall} disabled={!testNumber || sp?.snap?.status !== "registered"}>
               Dial
             </Button>
           </div>
