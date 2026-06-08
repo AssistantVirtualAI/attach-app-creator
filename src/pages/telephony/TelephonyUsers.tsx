@@ -291,6 +291,13 @@ export default function TelephonyUsers() {
       </Card>
 
       <AddUserDialog open={open} onOpenChange={setOpen} suggestedExtension={nextExtension} />
+      <CsvUserImportDialog
+        open={csvOpen}
+        onOpenChange={setCsvOpen}
+        organizationId={csvOrgId}
+        organizationName={csvOrgName}
+        onComplete={() => refetch()}
+      />
     </div>
   );
 }
