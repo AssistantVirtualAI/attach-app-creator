@@ -43,25 +43,39 @@ export default function LemtelPortalCalls() {
   const [toDate, setToDate] = useState(today());
   const [extFilter, setExtFilter] = useState('');
 
-  const analyze = async (call_record_id: string) => {
+  const analyze = async (call: any) => {
+    const call_record_id = call.id;
     setAnalyzing(call_record_id);
     try {
-      // 1. Transcribe first (server returns/uses existing transcription if any)
-      const t = await supabase.functions.invoke('ai-transcribe-call', {
-        body: { call_record_id, organization_id: LEMTEL_ORG },
-      });
-      if (t.error) throw new Error(t.error.message || 'Transcription failed');
-      const transcript_text =
-        (t.data as any)?.transcript_text ||
-        (t.data as any)?.transcript ||
-        (t.data as any)?.text || '';
-      if (!transcript_text) throw new Error('No transcript available (no recording or transcription failed)');
+      let transcript_text = '';
 
-      // 2. Analyze with transcript
+      if (call.recording_url) {
+        const t = await supabase.functions.invoke('ai-transcribe-call', {
+          body: { call_record_id, recording_url: call.recording_url, organization_id: LEMTEL_ORG },
+        });
+        transcript_text =
+          (t.data as any)?.transcript_text ||
+          (t.data as any)?.transcript ||
+          (t.data as any)?.text || '';
+      }
+
+      if (!transcript_text) {
+        transcript_text = [
+          `CDR only call record.`,
+          `Direction: ${call.direction || 'unknown'}.`,
+          `Status: ${call.call_status || (call.missed_call ? 'missed' : 'unknown')}.`,
+          `From: ${call.caller_number || call.source_number || 'unknown'}.`,
+          `To: ${call.destination_number || call.destination || 'unknown'}.`,
+          `Duration: ${call.duration_seconds || 0} seconds.`,
+          `Started: ${call.start_at || 'unknown'}.`,
+          `Hangup cause: ${call.hangup_cause || 'unknown'}.`,
+        ].join('\n');
+      }
+
       const a = await supabase.functions.invoke('ai-analyze-call', {
         body: { call_record_id, transcript_text, organization_id: LEMTEL_ORG },
       });
-      if (a.error) throw new Error(a.error.message || 'Analysis failed');
+      if (a.error || (a.data as any)?.error) throw new Error((a.data as any)?.error || a.error?.message || 'Analysis failed');
 
       toast({ title: 'Analyzed' });
       qc.invalidateQueries({ queryKey: ['pbx', 'pbx_call_records'] });
@@ -187,7 +201,7 @@ export default function LemtelPortalCalls() {
                   </td>
                   <td className="p-3">
                     {c.analyzed ? <Badge variant="default">Analyzed</Badge> : (
-                      <Button size="sm" variant="outline" onClick={() => analyze(c.id)} disabled={analyzing === c.id}>
+                      <Button size="sm" variant="outline" onClick={() => analyze(c)} disabled={analyzing === c.id}>
                         {analyzing === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><Sparkles className="w-3 h-3 mr-1" />Analyze</>}
                       </Button>
                     )}
