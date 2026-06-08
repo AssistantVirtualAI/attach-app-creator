@@ -2,7 +2,7 @@
 // Streams responses through Lovable AI Gateway with tool calling.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { createOpenAICompatible } from "https://esm.sh/@ai-sdk/openai-compatible@0.2.14";
-import { streamText, tool, convertToModelMessages, stepCountIs, type UIMessage } from "https://esm.sh/ai@5.0.0";
+import { generateText, tool, stepCountIs } from "https://esm.sh/ai@5.0.0";
 import { z } from "https://esm.sh/zod@3.23.8";
 
 const corsHeaders = {
