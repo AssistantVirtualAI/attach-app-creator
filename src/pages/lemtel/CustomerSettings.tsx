@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { Palette, Phone, Users, CreditCard, Save, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { InviteUserDialog } from "@/components/portal/InviteUserDialog";
-import { useState as useStateBase } from "react";
 
 export default function CustomerSettings() {
   const { slug } = useParams();
