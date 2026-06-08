@@ -122,6 +122,7 @@ import AdminRecordings from "./pages/lemtel/admin/AdminRecordings";
 import AdminVoicemail from "./pages/lemtel/admin/AdminVoicemail";
 import AdminReports from "./pages/lemtel/admin/AdminReports";
 import MySettings from "./pages/lemtel/my/MySettings";
+import MyExtension from "./pages/lemtel/my/MyExtension";
 import { DownloadCenter } from "./components/portal/DownloadCenter";
 
 // v4.0.0 — Multi-tenant reseller architecture
