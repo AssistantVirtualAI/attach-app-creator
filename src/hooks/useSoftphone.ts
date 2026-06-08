@@ -141,10 +141,23 @@ export function useSoftphone() {
       .eq("portal_user_id", user.id);
   }, [user?.id]);
 
+  // Derive a clear, UI-friendly status for the softphone
+  let status: SoftphoneStatus = "idle";
+  if (loading) status = "loading-config";
+  else if (configError?.code === "NO_SOFTPHONE_ACCOUNT") status = "no-account";
+  else if (configError?.code === "NO_SIP_PASSWORD") status = "no-password";
+  else if (configError) status = "config-error";
+  else if (snap.status === "registered") status = "registered";
+  else if (snap.status === "disconnected") status = "disconnected";
+  else if (config && snap.status === "connected") status = "registering";
+  else if (config) status = "ready";
+
   return {
     snap,
     config,
     loading,
+    configError,
+    status,
     userStatus,
     setStatus,
     call: (n: string) => sipProvider.call(n),
