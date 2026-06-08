@@ -735,7 +735,9 @@ const App = () => (
                   <Route path="billing" element={<ResellerDashboard />} />
                 </Route>
 
+                <Route path="/post-login" element={<ProtectedRoute><PostLoginRedirect /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
+
               </Routes>
             </Suspense>
           </OrganizationProvider>
