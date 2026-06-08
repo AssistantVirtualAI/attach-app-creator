@@ -42,6 +42,7 @@ export interface SoftphoneSnapshot {
   events: SipEvent[];
   callEvents: SipEvent[];
   wssReachable: boolean | null;
+  lastRegistrationAt: number | null;
   wssCheckedUrl?: string;
 }
 
@@ -74,6 +75,7 @@ class JsSipProvider {
     direction: null,
     startedAt: null,
     events: [],
+    lastRegistrationAt: null,
     callEvents: [],
     wssReachable: null,
   };
@@ -241,7 +243,7 @@ class JsSipProvider {
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
         this.reconnectTimer = setTimeout(() => { try { ua.start(); } catch {} }, 5000);
       });
-      ua.on("registered", () => { this.log("info", "sip", "Registered"); this.update({ status: "registered", errorCause: undefined, wssReachable: true }); });
+      ua.on("registered", () => { this.log("info", "sip", "Registered"); this.update({ status: "registered", errorCause: undefined, wssReachable: true, lastRegistrationAt: Date.now() }); });
       ua.on("unregistered", (e: any) => this.log("warn", "sip", "Unregistered", { cause: e?.cause }));
       ua.on("registrationFailed", (e: any) => {
         const cause = e?.cause || e?.response?.reason_phrase || "registration failed";
