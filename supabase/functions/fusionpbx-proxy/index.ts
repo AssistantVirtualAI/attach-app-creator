@@ -553,19 +553,14 @@ Deno.serve(async (req) => {
     // ---- CDRs (list / sync) ----
     if (action === "list-cdrs" || action === "sync-cdrs" || action === "get-cdrs") {
       const b: any = body;
-      let startDate: string | undefined = params.start_date ?? b.start_date;
-      const endDate: string | undefined = params.end_date ?? b.end_date;
       const extension: string | undefined = params.extension ?? b.extension;
-      if (action === "sync-cdrs" && !startDate) {
-        const { data: last } = await admin.from("pbx_sync_jobs")
-          .select("completed_at").eq("job_type", "sync-cdrs").eq("status", "completed")
-          .order("completed_at", { ascending: false }).limit(1).maybeSingle();
-        if (last?.completed_at) startDate = last.completed_at;
-      }
+      // FusionPBX xml_cdr API does not accept start_date/end_date or operators
+      // in querystring filters — it triggers internal SQL errors. We always
+      // pull the latest N rows and rely on upsert to dedupe.
       const extra: Record<string, string> = { limit: String(params.limit ?? b.limit ?? 100) };
-      if (startDate) extra.start_date = startDate;
-      if (endDate) extra.end_date = endDate;
       if (extension) extra.extension = extension;
+
+
 
       const r = await fetchCdrsWithFallback(extra);
       if (!r.ok) {
