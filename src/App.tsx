@@ -163,6 +163,7 @@ import { PlatformAdminShell, CustomerAdminShell, MyWorkspaceShell } from "./comp
 const MyTelecomSettings = lazy(() => import("./pages/my/TelecomSettings"));
 const MyOrgChat = lazy(() => import("./pages/my/OrgChat"));
 const MyAIAssistant = lazy(() => import("./pages/my/AIAssistant"));
+const MyVoicemail = lazy(() => import("./pages/my/Voicemail"));
 const CustomerAdminAIChat = lazy(() => import("./pages/customer/AdminAIChat"));
 import { RolePortalGuard } from "./components/portals/RolePortalGuard";
 import PlatformDashboard from "./pages/portals/PlatformDashboard";
