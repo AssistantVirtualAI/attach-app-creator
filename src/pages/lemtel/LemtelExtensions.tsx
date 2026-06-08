@@ -167,6 +167,7 @@ export default function LemtelExtensions() {
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Health</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
             </TableHeader>
             <TableBody>
               {exts.map((e: any) => {
@@ -224,6 +225,17 @@ export default function LemtelExtensions() {
                         {e.pbx_uuid ? 'Status' : 'Not pushed'}
                       </Button>
                     </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-1 justify-end">
+                        <Button size="sm" variant="outline" onClick={() => setEditExt(e)}>
+                          <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+                        </Button>
+                        <Button size="sm" variant="outline" className="text-red-600 border-red-500/30 hover:bg-red-500/10"
+                          disabled={deletingId === e.id} onClick={() => handleDelete(e)}>
+                          {deletingId === e.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -233,6 +245,7 @@ export default function LemtelExtensions() {
         </CardContent>
       </Card>
       <ExtensionStatusDialog open={!!statusExt} onOpenChange={(v) => !v && setStatusExt(null)} ext={statusExt} />
+      <ExtensionEditDialog open={!!editExt} onOpenChange={(v) => !v && setEditExt(null)} extension={editExt} />
       <p className="text-xs text-muted-foreground text-right">Press R to refresh</p>
     </div>
     </TooltipProvider>
