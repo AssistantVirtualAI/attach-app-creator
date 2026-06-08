@@ -1,10 +1,9 @@
-import {
-  Home, TrendingUp, MessageSquare, BarChart3, BookOpen,
+import { 
+  Home, TrendingUp, MessageSquare, BarChart3, BookOpen, 
   Bot, Sparkles, FileQuestion, Users, UserPlus, Calendar,
   Phone, MessageCircle, GitBranch, Sliders, Webhook,
   CreditCard, Settings, Tag, Headphones, LayoutDashboard, Radio, Globe,
-  Shield, Building2, PhoneCall, Voicemail, Smartphone, Disc, Bell, Brain, Router, Activity, CheckSquare,
-  Music, Download, User
+  Shield, Building2, PhoneCall, Voicemail, Smartphone, Disc, Bell, Brain, Router, Activity, CheckSquare
 } from 'lucide-react';
 
 export interface NavItem {
@@ -26,10 +25,6 @@ export interface NavGroup {
   hideForLemtel?: boolean;
 }
 
-/**
- * Default (legacy AVA AI workspace) sidebar.
- * Used for non-Lemtel orgs and on routes outside /admin, /org, /my.
- */
 export const sidebarGroups: NavGroup[] = [
   {
     id: 'overview',
@@ -112,131 +107,83 @@ export const sidebarGroups: NavGroup[] = [
       { nameKey: 'sidebar.saasConfig', href: '/saas-config', icon: Settings },
     ]
   },
-];
+  // Administration group removed per request
 
-/** Lemtel master admin (/admin/*) */
-export const adminPortalGroups: NavGroup[] = [
   {
-    id: 'admin-main',
-    labelKey: 'Lemtel Admin',
+    id: 'phone-system',
+    labelKey: '📞 Phone System',
+    icon: PhoneCall,
+    lemtelOnly: true,
+    items: [
+      { nameKey: 'Dashboard', href: '/org/lemtel/telephony/dashboard', icon: LayoutDashboard },
+      { nameKey: 'Phone Numbers', href: '/org/lemtel/telephony/numbers', icon: Phone },
+      { nameKey: 'Extensions', href: '/org/lemtel/telephony/extensions', icon: Smartphone },
+      { nameKey: 'Users', href: '/org/lemtel/telephony/users', icon: Users },
+      { nameKey: 'Devices', href: '/org/lemtel/telephony/devices', icon: Router },
+      { nameKey: 'Call History', href: '/org/lemtel/telephony/calls', icon: PhoneCall },
+      { nameKey: 'Recordings', href: '/org/lemtel/telephony/recordings', icon: Disc },
+      { nameKey: 'Auto-Attendant', href: '/org/lemtel/telephony/ivr', icon: Voicemail },
+      { nameKey: 'Call Queues', href: '/org/lemtel/telephony/queues', icon: Headphones },
+      { nameKey: 'Ring Groups', href: '/org/lemtel/telephony/ring-groups', icon: Bell },
+      { nameKey: 'SMS / Messages', href: '/org/lemtel/telephony/messages', icon: MessageSquare },
+      { nameKey: 'Voice Agents', href: '/org/lemtel/telephony/agents', icon: Bot },
+      { nameKey: 'AI Intelligence', href: '/org/lemtel/telephony/ai', icon: Brain },
+      { nameKey: 'Softphone', href: '/org/lemtel/telephony/webphone', icon: Phone },
+      { nameKey: 'Voicemail', href: '/org/lemtel/telephony/voicemail', icon: Voicemail },
+      { nameKey: 'Team', href: '/org/lemtel/telephony/team', icon: Users },
+      { nameKey: 'My Preferences', href: '/org/lemtel/telephony/preferences', icon: Sliders },
+      { nameKey: 'PBX Settings', href: '/org/lemtel/telephony/settings', icon: Settings },
+      { nameKey: 'Diagnostics', href: '/org/lemtel/telephony/diagnostics', icon: Activity },
+      { nameKey: '✅ Go-Live Checklist', href: '/org/lemtel/telephony/checklist', icon: CheckSquare },
+    ]
+  },
+  {
+    id: 'callcenter',
+    labelKey: 'Call Center',
+    icon: Headphones,
+    lemtelOnly: true,
+    items: [
+      { nameKey: 'Agent Console', href: '/org/lemtel/callcenter/agent', icon: Phone },
+      { nameKey: 'Wallboard', href: '/org/lemtel/callcenter/wallboard', icon: Activity },
+      { nameKey: 'CC Admin', href: '/org/lemtel/callcenter/admin', icon: Shield },
+    ]
+  },
+  {
+    id: 'lemtel-admin-v3',
+    labelKey: '🛠️ Lemtel Admin (v3)',
     icon: Shield,
+    lemtelOnly: true,
     items: [
-      { nameKey: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-      { nameKey: 'Organizations', href: '/admin/organizations', icon: Building2 },
-      { nameKey: 'All Users', href: '/admin/users', icon: Users },
-      { nameKey: 'All Calls', href: '/admin/calls', icon: PhoneCall },
-      { nameKey: 'Reports', href: '/admin/reports', icon: BarChart3 },
-      { nameKey: 'Billing', href: '/admin/billing', icon: CreditCard },
-      { nameKey: 'Audit Logs', href: '/admin/audit', icon: Shield },
-      { nameKey: 'System Settings', href: '/admin/system', icon: Settings },
+      { nameKey: 'Admin Dashboard', href: '/org/lemtel/admin/dashboard', icon: LayoutDashboard },
+      { nameKey: 'Extensions', href: '/org/lemtel/admin/extensions', icon: Smartphone },
+      { nameKey: 'Devices', href: '/org/lemtel/admin/devices', icon: Router },
+      { nameKey: 'Phone Numbers', href: '/org/lemtel/admin/dids', icon: Phone },
+      { nameKey: 'IVR / Auto-Attendant', href: '/org/lemtel/admin/ivr', icon: Voicemail },
+      { nameKey: 'Call Queues', href: '/org/lemtel/admin/queues', icon: Headphones },
+      { nameKey: 'Ring Groups', href: '/org/lemtel/admin/ring-groups', icon: Bell },
+      { nameKey: 'Recordings', href: '/org/lemtel/admin/recordings', icon: Disc },
+      { nameKey: 'Voicemail', href: '/org/lemtel/admin/voicemail', icon: Voicemail },
+      { nameKey: 'Reports', href: '/org/lemtel/admin/reports', icon: BarChart3 },
+      { nameKey: 'Settings', href: '/org/lemtel/admin/settings', icon: Settings },
+      { nameKey: 'Downloads', href: '/org/lemtel/admin/downloads', icon: Smartphone },
     ]
   },
-];
-
-/** Organization portal (/org/[slug]/*) */
-export function buildOrgPortalGroups(slug: string): NavGroup[] {
-  const base = `/org/${slug}`;
-  return [
-    {
-      id: 'org-overview',
-      labelKey: 'Overview',
-      icon: TrendingUp,
-      items: [
-        { nameKey: 'Dashboard', href: `${base}/dashboard`, icon: LayoutDashboard },
-      ]
-    },
-    {
-      id: 'phone-system',
-      labelKey: '📞 Phone System',
-      icon: PhoneCall,
-      items: [
-        { nameKey: 'Extensions', href: `${base}/phone-system/extensions`, icon: Smartphone },
-        { nameKey: 'Devices', href: `${base}/phone-system/devices`, icon: Router },
-        { nameKey: 'Phone Numbers', href: `${base}/phone-system/dids`, icon: Phone },
-        { nameKey: 'IVR / Auto-Attendant', href: `${base}/phone-system/ivr`, icon: Voicemail },
-        { nameKey: 'Call Queues', href: `${base}/phone-system/queues`, icon: Headphones },
-        { nameKey: 'Ring Groups', href: `${base}/phone-system/ring-groups`, icon: Bell },
-        { nameKey: 'Music on Hold', href: `${base}/phone-system/moh`, icon: Music },
-        { nameKey: 'PBX Settings', href: `${base}/phone-system/settings`, icon: Settings },
-      ]
-    },
-    {
-      id: 'call-center',
-      labelKey: '🎧 Call Center',
-      icon: Headphones,
-      items: [
-        { nameKey: 'Wallboard', href: `${base}/call-center/wallboard`, icon: Activity },
-        { nameKey: 'Agents', href: `${base}/call-center/agents`, icon: User },
-        { nameKey: 'Supervisors', href: `${base}/call-center/supervisors`, icon: Shield },
-        { nameKey: 'Queues Config', href: `${base}/call-center/queues`, icon: Headphones },
-        { nameKey: 'Reports', href: `${base}/call-center/reports`, icon: BarChart3 },
-        { nameKey: 'Settings', href: `${base}/call-center/config`, icon: Settings },
-      ]
-    },
-    {
-      id: 'analytics',
-      labelKey: '📈 Analytics',
-      icon: BarChart3,
-      items: [
-        { nameKey: 'Call Recordings', href: `${base}/recordings`, icon: Disc },
-        { nameKey: 'Call History (CDRs)', href: `${base}/analytics/cdrs`, icon: PhoneCall },
-        { nameKey: 'AI Insights', href: `${base}/ai`, icon: Brain },
-        { nameKey: 'Reports', href: `${base}/analytics/reports`, icon: BarChart3 },
-      ]
-    },
-    {
-      id: 'communications',
-      labelKey: 'Communications',
-      icon: MessageSquare,
-      items: [
-        { nameKey: 'Messages (SMS/MMS)', href: `${base}/messages`, icon: MessageSquare },
-        { nameKey: 'Voicemail', href: `${base}/voicemail`, icon: Voicemail },
-        { nameKey: 'Team Chat', href: `${base}/team`, icon: Users },
-      ]
-    },
-    {
-      id: 'org-admin',
-      labelKey: 'Admin',
-      icon: Settings,
-      items: [
-        { nameKey: 'Users & Access', href: `${base}/users`, icon: Users },
-        { nameKey: 'Downloads', href: `${base}/downloads`, icon: Download },
-        { nameKey: 'Settings', href: `${base}/settings`, icon: Settings },
-      ]
-    },
-  ];
-}
-
-/** End-user portal (/my/*) */
-export const myPortalGroups: NavGroup[] = [
   {
-    id: 'my',
-    labelKey: 'My Workspace',
-    icon: Home,
+    id: 'lemtel-my-v3',
+    labelKey: '🏠 My Workspace',
+    icon: Users,
+    lemtelOnly: true,
     items: [
-      { nameKey: 'My Dashboard', href: '/my/dashboard', icon: LayoutDashboard },
-      { nameKey: 'My Extension', href: '/my/extension', icon: Smartphone },
-      { nameKey: 'My Call History', href: '/my/calls', icon: PhoneCall },
-      { nameKey: 'My Recordings', href: '/my/recordings', icon: Disc },
-      { nameKey: 'My Voicemail', href: '/my/voicemail', icon: Voicemail },
-      { nameKey: 'My Messages', href: '/my/messages', icon: MessageSquare },
-      { nameKey: 'Download Apps', href: '/my/download', icon: Download },
-      { nameKey: 'My Settings', href: '/my/settings', icon: Sliders },
+      { nameKey: 'My Dashboard', href: '/org/lemtel/my/dashboard', icon: LayoutDashboard },
+      { nameKey: 'My Calls', href: '/org/lemtel/my/calls', icon: PhoneCall },
+      { nameKey: 'My Recordings', href: '/org/lemtel/my/recordings', icon: Disc },
+      { nameKey: 'My Voicemail', href: '/org/lemtel/my/voicemail', icon: Voicemail },
+      { nameKey: 'My SMS', href: '/org/lemtel/my/sms', icon: MessageSquare },
+      { nameKey: 'My Settings', href: '/org/lemtel/my/settings', icon: Sliders },
+      { nameKey: 'Download Apps', href: '/org/lemtel/my/downloads', icon: Smartphone },
     ]
   },
 ];
-
-/**
- * Pick the correct sidebar group set based on the current pathname.
- * Returns null when no portal-specific override applies.
- */
-export function getPortalGroups(pathname: string): NavGroup[] | null {
-  if (pathname.startsWith('/admin')) return adminPortalGroups;
-  if (pathname.startsWith('/my')) return myPortalGroups;
-  const orgMatch = pathname.match(/^\/org\/([^/]+)/);
-  if (orgMatch) return buildOrgPortalGroups(orgMatch[1]);
-  return null;
-}
 
 export const settingsLink: NavItem = {
   nameKey: 'sidebar.settings',

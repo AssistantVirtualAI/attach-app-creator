@@ -12,7 +12,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { SidebarFooter } from '@/components/sidebar/SidebarFooter';
 import { SidebarNavGroup } from '@/components/sidebar/SidebarNavGroup';
-import { sidebarGroups, settingsLink, NavGroup, getPortalGroups } from '@/components/sidebar/sidebarConfig';
+import { sidebarGroups, settingsLink, NavGroup } from '@/components/sidebar/sidebarConfig';
 import { CookieConsentBanner } from '@/components/gdpr/CookieConsentBanner';
 import { motion } from 'framer-motion';
 import {
@@ -96,18 +96,13 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   // Debug: log sidebar visibility info
   console.log('[Sidebar Debug] Role:', role, 'isSuperAdmin:', isSuperAdmin, 'isLoading:', isLoading, 'userRole:', userRole);
 
-  // Portal-aware sidebar: /admin, /org/[slug], /my override the default groups.
-  const portalGroups = getPortalGroups(location.pathname);
+  // Filter groups based on role and Lemtel org membership
   const isLemtelMember = isSuperAdmin || organizationMemberships.some(m => m.organization.id === '71755d33-ed64-4ad5-a828-61c9d2029eb7');
-  const visibleGroups = useMemo(() => {
-    const source = portalGroups ?? sidebarGroups;
-    return source.filter(g => {
-      if (g.lemtelOnly && !isLemtelMember) return false;
-      if (g.hideForLemtel && isLemtelMember) return false;
-      return true;
-    });
-  }, [isLemtelMember, portalGroups]);
-
+  const visibleGroups = useMemo(() => sidebarGroups.filter(g => {
+    if (g.lemtelOnly && !isLemtelMember) return false;
+    if (g.hideForLemtel && isLemtelMember) return false;
+    return true;
+  }), [isLemtelMember]);
 
   // Sidebar group ordering with drag & drop
   const sensors = useSensors(
