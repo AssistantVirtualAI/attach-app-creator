@@ -128,15 +128,6 @@ export default function TelephonyDiagnostics() {
             {!softphone.snap.events.length && <p className="text-sm text-muted-foreground py-8 text-center">No SIP events yet.</p>}
           </ScrollArea>
         </CardContent>
-      <Card>
-        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Radio className="w-4 h-4" /> Live SIP registration events</CardTitle><CardDescription>Consumed from the webphone hook snapshot in real time.</CardDescription></CardHeader>
-        <CardContent className="grid lg:grid-cols-2 gap-3">
-          <StatusRow check={sipStatus} />
-          <ScrollArea className="h-32 border rounded-md p-2">
-            {softphone.snap.events.slice().reverse().map((e) => <div key={`${e.at}-${e.message}`} className="text-xs py-1 border-b last:border-0"><span className="text-muted-foreground">{stamp(e.at)}</span> <span className="font-medium">{e.category}</span> — {e.message}</div>)}
-            {!softphone.snap.events.length && <p className="text-sm text-muted-foreground py-8 text-center">No SIP events yet.</p>}
-          </ScrollArea>
-        </CardContent>
         <CardContent className="border-t pt-4 flex flex-wrap gap-2 items-end">
           <div className="flex-1 min-w-[200px]">
             <Label>Outbound test number</Label>
@@ -151,6 +142,7 @@ export default function TelephonyDiagnostics() {
           <audio ref={(el) => softphone.setAudioEl(el)} autoPlay />
         </CardContent>
       </Card>
+
 
 
       <Card>
