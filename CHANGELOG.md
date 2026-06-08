@@ -2,6 +2,8 @@
 
 Auto-generated from git commits.
 
+- fix: add repository field to package.json for electron-builder (2026-06-08) — AssistantVirtualAI
+- docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
 - fix: disable GH_TOKEN publish in release-desktop workflow (2026-06-08) — AssistantVirtualAI
 - docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
 - fix: disable electron-builder publish via GH_TOKEN empty + clean yml (2026-06-08) — AssistantVirtualAI
@@ -43,8 +45,6 @@ Auto-generated from git commits.
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - docs: update CHANGELOG [skip ci] (2026-06-08) — AVA Bot
-- Changes (2026-06-08) — gpt-engineer-app[bot]
-- Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
 - Changes (2026-06-08) — gpt-engineer-app[bot]
