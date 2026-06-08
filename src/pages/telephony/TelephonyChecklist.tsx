@@ -382,51 +382,6 @@ const sections: Section[] = [
           const { count } = await (supabase as any).from('pbx_dids')
             .select('*', { count: 'exact', head: true })
             .eq('organization_id', LEMTEL_ORG_ID);
-          return count ? { status: 'pass', detail:  } : { status: 'warn', detail: 'No DIDs found' };
-        } },
-      { id: '7.2', name: 'Ring Groups', description: 'At least one ring group exists',
-        run: async () => {
-          const { count } = await (supabase as any).from('pbx_ring_groups')
-            .select('*', { count: 'exact', head: true })
-            .eq('organization_id', LEMTEL_ORG_ID);
-          return count ? { status: 'pass', detail:  } : { status: 'warn', detail: 'No ring groups found' };
-        } },
-    ],
-  },
-  {
-    id: 'data', title: 'Data Quality & CDR Sync', icon: Activity,
-    checks: [
-      { id: '8.1', name: 'CDR Completeness', description: 'Recent calls have direction and duration',
-        run: async () => {
-          const { data } = await (supabase as any).from('pbx_call_records')
-            .select('direction, duration_seconds')
-            .eq('organization_id', LEMTEL_ORG_ID)
-            .order('start_at', { ascending: false }).limit(20);
-          if (!data?.length) return { status: 'warn', detail: 'No CDRs to verify' };
-          const bad = data.filter((c: any) => !c.direction || c.duration_seconds === null).length;
-          return bad === 0 ? { status: 'pass', detail: 'Recent 20 CDRs look healthy' } : { status: 'fail', detail:  };
-        } },
-      { id: '8.2', name: 'SIP Registration Freshness', description: 'Recent activity from softphone users',
-        run: async () => {
-          const { data } = await (supabase as any).from('pbx_softphone_users')
-            .select('extension, last_seen_at')
-            .eq('organization_id', LEMTEL_ORG_ID)
-            .order('last_seen_at', { ascending: false }).limit(5);
-          if (!data?.length) return { status: 'warn', detail: 'No softphone users' };
-          const last = data[0].last_seen_at;
-          const mins = last ? (Date.now() - new Date(last).getTime()) / 60000 : Infinity;
-          return mins < 60 ? { status: 'pass', detail:  } : { status: 'warn', detail:  };
-        } },
-    ],
-  },
-  {
-    id: 'inbound', title: 'Inbound Routing', icon: PhoneIncoming,
-    checks: [
-      { id: '7.1', name: 'DIDs Configured', description: 'Inbound numbers linked to destinations',
-        run: async () => {
-          const { count } = await (supabase as any).from('pbx_dids')
-            .select('*', { count: 'exact', head: true })
-            .eq('organization_id', LEMTEL_ORG_ID);
           return count ? { status: 'pass', detail: `${count} DIDs active` } : { status: 'warn', detail: 'No DIDs found' };
         } },
       { id: '7.2', name: 'Ring Groups', description: 'At least one ring group exists',
