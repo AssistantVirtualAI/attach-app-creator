@@ -5243,10 +5243,15 @@ export type Database = {
       }
       pbx_voicemail_settings: {
         Row: {
+          ai_summary_enabled: boolean
           attach_audio_email: boolean
+          greeting_audio_url: string | null
           greeting_storage_path: string | null
           greeting_tts_text: string | null
           greeting_type: string
+          greeting_updated_at: string | null
+          greeting_voice_id: string | null
+          greeting_voice_name: string | null
           notify_email: boolean
           notify_email_address: string | null
           notify_push: boolean
@@ -5258,10 +5263,15 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ai_summary_enabled?: boolean
           attach_audio_email?: boolean
+          greeting_audio_url?: string | null
           greeting_storage_path?: string | null
           greeting_tts_text?: string | null
           greeting_type?: string
+          greeting_updated_at?: string | null
+          greeting_voice_id?: string | null
+          greeting_voice_name?: string | null
           notify_email?: boolean
           notify_email_address?: string | null
           notify_push?: boolean
@@ -5273,10 +5283,15 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ai_summary_enabled?: boolean
           attach_audio_email?: boolean
+          greeting_audio_url?: string | null
           greeting_storage_path?: string | null
           greeting_tts_text?: string | null
           greeting_type?: string
+          greeting_updated_at?: string | null
+          greeting_voice_id?: string | null
+          greeting_voice_name?: string | null
           notify_email?: boolean
           notify_email_address?: string | null
           notify_push?: boolean
@@ -6536,6 +6551,10 @@ export type Database = {
       }
       can_access_org: {
         Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_access_voicemail: {
+        Args: { _user_id: string; _vm_id: string }
         Returns: boolean
       }
       can_manage_org_members: {
