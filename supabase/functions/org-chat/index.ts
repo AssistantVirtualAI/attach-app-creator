@@ -95,9 +95,14 @@ Deno.serve(async (req) => {
       const channelId = payload?.channel_id;
       const content = String(payload?.content ?? "").trim();
       const attachments = payload?.attachments ?? [];
+      const parentId = payload?.parent_message_id ?? null;
       if (!channelId || (!content && attachments.length === 0)) return json({ error: "empty" }, 400);
       const access = await isMember(channelId);
       if (!access.ok) return json({ error: "forbidden" }, 403);
+      if (parentId) {
+        const { data: parent } = await admin.from("org_chat_messages").select("channel_id").eq("id", parentId).maybeSingle();
+        if (!parent || parent.channel_id !== channelId) return json({ error: "invalid_parent" }, 400);
+      }
       const { data, error } = await admin
         .from("org_chat_messages")
         .insert({
@@ -110,11 +115,53 @@ Deno.serve(async (req) => {
           message_type: "text",
           reactions: {},
           read_by: [userId],
+          parent_message_id: parentId,
         })
         .select()
         .single();
       if (error) throw error;
       return json({ message: data });
+    }
+
+    if (action === "list_thread") {
+      const parentId = payload?.parent_message_id;
+      if (!parentId) return json({ error: "missing_parent" }, 400);
+      const { data: parent } = await admin.from("org_chat_messages").select("channel_id").eq("id", parentId).maybeSingle();
+      if (!parent) return json({ error: "not_found" }, 404);
+      const access = await isMember(parent.channel_id);
+      if (!access.ok) return json({ error: "forbidden" }, 403);
+      const { data, error } = await admin
+        .from("org_chat_messages")
+        .select("*")
+        .eq("parent_message_id", parentId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return json({ messages: data ?? [] });
+    }
+
+    if (action === "search_messages") {
+      const q = String(payload?.query ?? "").trim();
+      if (!q) return json({ messages: [] });
+      const limit = Math.min(payload?.limit ?? 30, 100);
+      const { data: channels } = await admin
+        .from("org_chat_channels")
+        .select("id, name, channel_type, members")
+        .eq("organization_id", orgId);
+      const accessible = (channels ?? [])
+        .filter((c: any) => c.channel_type === "public" || (c.members ?? []).includes(userId))
+        .map((c: any) => c.id);
+      if (accessible.length === 0) return json({ messages: [] });
+      const ids = payload?.channel_id ? [payload.channel_id].filter((id: string) => accessible.includes(id)) : accessible;
+      if (ids.length === 0) return json({ messages: [] });
+      const { data, error } = await admin
+        .from("org_chat_messages")
+        .select("*")
+        .in("channel_id", ids)
+        .textSearch("tsv", q, { type: "websearch", config: "french" })
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return json({ messages: data ?? [] });
     }
 
     if (action === "edit_message") {
