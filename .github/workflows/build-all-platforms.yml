@@ -69,6 +69,7 @@ jobs:
           if-no-files-found: warn
 
   build-windows:
+    needs: validate-workflows
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -107,6 +108,7 @@ jobs:
           if-no-files-found: warn
 
   build-linux:
+    needs: validate-workflows
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
