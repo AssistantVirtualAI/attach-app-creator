@@ -37,9 +37,3 @@ linux:
     - AppImage
   category: Office
   maintainer: "Lemtel Communications <support@assistantvirtualai.com>"
-publish:
-  - provider: github
-    owner: AssistantVirtualAI
-    repo: attach-app-creator
-    private: false
-    releaseType: release
