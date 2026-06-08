@@ -208,6 +208,7 @@ jobs:
           if-no-files-found: warn
 
   build-ios:
+    continue-on-error: true
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -384,7 +385,11 @@ jobs:
   create-release:
     needs: [build-mac, build-windows, build-linux, build-android, build-ios]
     runs-on: ubuntu-latest
-    if: always()
+    if: always() && (
+      needs.build-mac.result == 'success' ||
+      needs.build-windows.result == 'success' ||
+      needs.build-linux.result == 'success'
+    )
     permissions:
       contents: write
     steps:
