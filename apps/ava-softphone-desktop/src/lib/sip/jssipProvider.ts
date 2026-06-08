@@ -280,6 +280,28 @@ class JsSipProvider {
       this.lastCallError = detail;
       this.logEvent('error', `Call failed: ${detail}`);
       this.update({ callState: 'ended', errorCause: detail });
+
+      // SDP 488 auto-retry: restart UA + redial once with codec re-prefer.
+      if (code === 488 && !this.retryingAfter488 && this.lastDialed) {
+        const target = this.lastDialed;
+        this.retryingAfter488 = true;
+        this.logEvent('warn', `488 Incompatible SDP — auto-retrying ${target} after SIP restart…`);
+        setTimeout(async () => {
+          try {
+            await this.restart();
+            // Wait for register before redial (up to 6s).
+            const start = Date.now();
+            while (this.snap.status !== 'registered' && Date.now() - start < 6000) {
+              await new Promise((r) => setTimeout(r, 300));
+            }
+            this.resetCall();
+            await this.call(target, true);
+          } finally {
+            setTimeout(() => { this.retryingAfter488 = false; }, 4000);
+          }
+        }, 800);
+        return;
+      }
       setTimeout(() => this.resetCall(), 2500);
     });
     session.on('ended', () => {
