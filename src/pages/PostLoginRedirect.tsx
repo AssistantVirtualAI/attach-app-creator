@@ -4,11 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 /**
- * Smart redirect after login based on the user's highest role.
- *  - super_admin / master_admin → /admin/dashboard
- *  - org_admin (Lemtel member)  → /org/<slug>/dashboard
- *  - org_admin (other org)      → /home (legacy AVA workspace)
- *  - everyone else              → /my/dashboard
+ * Three-portal post-login routing:
+ *  - super_admin / master_admin           → /platform
+ *  - org_admin / reseller_admin           → /customer
+ *  - agent / user / everyone else         → /my
  */
 export default function PostLoginRedirect() {
   const { user } = useAuth();
@@ -20,7 +19,7 @@ export default function PostLoginRedirect() {
       try {
         const { data: superAdmin } = await supabase.rpc('is_super_admin', { _user_id: user.id });
         if (superAdmin) {
-          navigate('/admin/dashboard', { replace: true });
+          navigate('/platform', { replace: true });
           return;
         }
 
@@ -31,25 +30,26 @@ export default function PostLoginRedirect() {
           .eq('role', 'master_admin')
           .maybeSingle();
         if (masterRow) {
-          navigate('/admin/dashboard', { replace: true });
+          navigate('/platform', { replace: true });
           return;
         }
 
         const { data: roles } = await supabase
           .from('user_roles')
-          .select('role, organization_id, organizations!inner(slug)')
+          .select('role')
           .eq('user_id', user.id);
 
-        const adminRow = roles?.find((r: any) => r.role === 'org_admin');
-        if (adminRow) {
-          const slug = (adminRow as any).organizations?.slug;
-          navigate(slug ? `/org/${slug}/dashboard` : '/home', { replace: true });
+        const isAdmin = roles?.some((r: any) =>
+          r.role === 'org_admin' || r.role === 'reseller_admin' || r.role === 'manager'
+        );
+        if (isAdmin) {
+          navigate('/customer', { replace: true });
           return;
         }
 
-        navigate('/my/dashboard', { replace: true });
+        navigate('/my', { replace: true });
       } catch {
-        navigate('/home', { replace: true });
+        navigate('/my', { replace: true });
       }
     })();
   }, [user, navigate]);
