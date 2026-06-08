@@ -82,6 +82,8 @@ class JsSipProvider {
   boundInputLabel: string = 'System default';
   private wssAttempted: string[] = [];
   private lastCallError: string | null = null;
+  private lastDialed: string | null = null;
+  private retryingAfter488 = false;
 
   subscribe(fn: Listener) {
     this.listeners.add(fn);
@@ -111,6 +113,21 @@ class JsSipProvider {
     this.stop();
     if (cfg) await this.init(cfg);
   }
+
+  /** One-click: restart UA, verify devices, and report codec preference. */
+  async restartAndCodecTest(): Promise<{ ok: boolean; codecs: string[]; devices: { input: string; output: string }; error?: string }> {
+    this.logEvent('info', 'Codec test + SIP restart triggered');
+    try {
+      await this.restart();
+      const d = await this.testAudioDevices();
+      const codecs = ['PCMU', 'PCMA', 'opus', 'telephone-event'];
+      this.logEvent('info', `Codec preference: ${codecs.join(' › ')}`);
+      return { ok: !d.error, codecs, devices: { input: d.input, output: d.output }, error: d.error };
+    } catch (e: any) {
+      return { ok: false, codecs: [], devices: { input: '—', output: '—' }, error: String(e?.message || e) };
+    }
+  }
+
 
 
   async init(cfg: SoftphoneConfig) {
