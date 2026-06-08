@@ -2576,6 +2576,53 @@ export type Database = {
           },
         ]
       }
+      org_business_hours: {
+        Row: {
+          closed_destination: string | null
+          created_at: string
+          fusionpbx_dialplan_uuid: string | null
+          id: string
+          name: string
+          open_destination: string | null
+          organization_id: string
+          schedule: Json
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          closed_destination?: string | null
+          created_at?: string
+          fusionpbx_dialplan_uuid?: string | null
+          id?: string
+          name?: string
+          open_destination?: string | null
+          organization_id: string
+          schedule?: Json
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          closed_destination?: string | null
+          created_at?: string
+          fusionpbx_dialplan_uuid?: string | null
+          id?: string
+          name?: string
+          open_destination?: string | null
+          organization_id?: string
+          schedule?: Json
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_business_hours_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_chat_channels: {
         Row: {
           channel_type: string
