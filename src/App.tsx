@@ -754,7 +754,7 @@ const App = () => (
 
                 {/* === Three-portal architecture === */}
                 {/* Platform Admin — AVA / Lemtel internal */}
-                <Route path="/platform" element={<ProtectedRoute><LemtelGuard><PlatformAdminShell /></LemtelGuard></ProtectedRoute>}>
+                <Route path="/platform" element={<ProtectedRoute><RolePortalGuard portal="platform"><LemtelGuard><PlatformAdminShell /></LemtelGuard></RolePortalGuard></ProtectedRoute>}>
                   <Route index element={<PlatformDashboard />} />
                   <Route path="organizations" element={<MasterOrganizations />} />
                   <Route path="users" element={<MasterAllUsers />} />
@@ -767,7 +767,7 @@ const App = () => (
                 </Route>
 
                 {/* Customer Admin — workspace owners / resellers */}
-                <Route path="/customer" element={<ProtectedRoute><CustomerAdminShell /></ProtectedRoute>}>
+                <Route path="/customer" element={<ProtectedRoute><RolePortalGuard portal="customer"><CustomerAdminShell /></RolePortalGuard></ProtectedRoute>}>
                   <Route index element={<CustomerDashboard />} />
                   <Route path="team" element={<Team />} />
                   <Route path="extensions" element={<LemtelExtensions />} />
@@ -782,7 +782,7 @@ const App = () => (
                 </Route>
 
                 {/* My Workspace — end users */}
-                <Route path="/my" element={<ProtectedRoute><MyWorkspaceShell /></ProtectedRoute>}>
+                <Route path="/my" element={<ProtectedRoute><RolePortalGuard portal="my"><MyWorkspaceShell /></RolePortalGuard></ProtectedRoute>}>
                   <Route index element={<MyDashboardLanding />} />
                   <Route path="dashboard" element={<MyDashboardLanding />} />
                   <Route path="softphone" element={<TelephonyWebphone />} />
@@ -794,6 +794,7 @@ const App = () => (
                   <Route path="profile" element={<Profile />} />
                   <Route path="settings" element={<MySettings />} />
                 </Route>
+
 
                 {/* Legacy /admin/* redirects → /platform/* */}
                 <Route path="/admin" element={<Navigate to="/platform" replace />} />
