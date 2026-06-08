@@ -13,6 +13,7 @@ export interface LatestRelease {
   name: string;
   published_at: string;
   html_url: string;
+  body?: string;
   assets: ReleaseAsset[];
   urls: {
     mac_arm64?: string;
@@ -54,6 +55,7 @@ export async function getLatestRelease(): Promise<LatestRelease> {
       name: data.name,
       published_at: data.published_at,
       html_url: data.html_url,
+      body: data.body || '',
       assets: data.assets ?? [],
       urls,
     };

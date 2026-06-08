@@ -237,8 +237,9 @@ const App = () => (
 
                 {/* Public download page */}
                 <Route path="/download" element={<Download />} />
-                <Route path="/my/download" element={<Download />} />
-                <Route path="/org/:slug/downloads" element={<Download />} />
+                {/* Authenticated download pages */}
+                <Route path="/my/download" element={<ProtectedRoute><Download /></ProtectedRoute>} />
+                <Route path="/org/:slug/downloads" element={<ProtectedRoute><Download /></ProtectedRoute>} />
                 
                 {/* Universal login - redirects based on user type */}
                 <Route path="/login" element={<UniversalLogin />} />
