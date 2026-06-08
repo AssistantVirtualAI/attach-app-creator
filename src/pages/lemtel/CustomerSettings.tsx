@@ -123,6 +123,53 @@ export default function CustomerSettings() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="domain">
+          <Card>
+            <CardHeader><CardTitle>Custom portal domain</CardTitle></CardHeader>
+            <CardContent className="space-y-4 max-w-2xl">
+              <div>
+                <Label>Portal hostname</Label>
+                <div className="flex gap-2">
+                  <Input value={portalDomain} onChange={(e) => setPortalDomain(e.target.value)} placeholder="portal.acme.com" />
+                  <Button onClick={saveDomain} disabled={savingDomain}><Save className="h-4 w-4 mr-2" />Save</Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Customers will reach their portal at this hostname after DNS is verified.</p>
+              </div>
+
+              {org?.brand_portal_domain && (
+                <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Globe className="h-4 w-4" /> DNS configuration
+                  </div>
+                  <p className="text-xs text-muted-foreground">Add the following CNAME record at your DNS provider for <span className="font-mono">{org.brand_portal_domain}</span>.</p>
+                  <div className="rounded-md bg-background border p-3 font-mono text-xs space-y-1">
+                    <div className="grid grid-cols-[80px_1fr_auto] gap-2 items-center">
+                      <span className="text-muted-foreground">Type</span><span>CNAME</span><span />
+                    </div>
+                    <div className="grid grid-cols-[80px_1fr_auto] gap-2 items-center">
+                      <span className="text-muted-foreground">Host</span><span>{org.brand_portal_domain}</span>
+                      <Button size="sm" variant="ghost" onClick={() => copy(org.brand_portal_domain)}><Copy className="h-3 w-3" /></Button>
+                    </div>
+                    <div className="grid grid-cols-[80px_1fr_auto] gap-2 items-center">
+                      <span className="text-muted-foreground">Target</span><span>portal.lemtel.tel</span>
+                      <Button size="sm" variant="ghost" onClick={() => copy("portal.lemtel.tel")}><Copy className="h-3 w-3" /></Button>
+                    </div>
+                    <div className="grid grid-cols-[80px_1fr_auto] gap-2 items-center">
+                      <span className="text-muted-foreground">TTL</span><span>3600</span><span />
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                    <span>After DNS propagates (1–60 min), TLS is auto-provisioned. The portal will serve under the new hostname with the customer's branding.</span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+
+
         <TabsContent value="numbers">
           <Card>
             <CardHeader><CardTitle>Phone numbers ({dids.length})</CardTitle></CardHeader>
