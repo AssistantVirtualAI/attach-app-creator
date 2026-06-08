@@ -6570,6 +6570,10 @@ export type Database = {
         Returns: string
       }
       current_user_org_ids: { Args: never; Returns: string[] }
+      ensure_general_channel: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: string
+      }
       generate_agent_slug: { Args: { agent_name: string }; Returns: string }
       generate_api_key: { Args: never; Returns: string }
       generate_unique_username: { Args: { base_name: string }; Returns: string }
