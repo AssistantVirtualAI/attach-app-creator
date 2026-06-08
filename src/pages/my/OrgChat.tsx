@@ -165,11 +165,15 @@ function ChannelView({ channel, userId, t }: { channel: Channel; userId: string;
       <div className="border-b px-4 py-2 flex items-center gap-2">
         {channel.channel_type === "private" ? <Lock className="h-4 w-4" /> : <Hash className="h-4 w-4" />}
         <h2 className="font-semibold">{channel.name}</h2>
-        {channel.description && <span className="text-sm text-muted-foreground">— {channel.description}</span>}
-        <Badge variant="outline" className="ml-auto text-xs">{channel.members?.length ?? 0} {t("members", "membres")}</Badge>
+        {channel.description && <span className="text-sm text-muted-foreground hidden md:inline">— {channel.description}</span>}
+        <div className="ml-auto flex items-center gap-2">
+          <div className="w-56"><ChatSearchBar /></div>
+          <Badge variant="outline" className="text-xs">{channel.members?.length ?? 0} {t("members", "membres")}</Badge>
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+
         {query.isLoading && <Skeleton className="h-20 w-full" />}
         {!query.isLoading && messages.length === 0 && (
           <div className="text-center text-muted-foreground text-sm py-12">
