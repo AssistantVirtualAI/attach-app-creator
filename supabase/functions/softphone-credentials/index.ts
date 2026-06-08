@@ -60,17 +60,6 @@ Deno.serve(async (req) => {
     log("lookup by portal_user_id", { found: !!sp, extension: sp?.extension });
 
     // SECURITY: removed extension-300 fallback that leaked SIP credentials to unrelated users.
-    // Users without a linked softphone account receive NO_SOFTPHONE_ACCOUNT below.
-    if (false) {
-      const { data: byExt, error: extErr } = await supabaseAdmin
-        .from("pbx_softphone_users")
-        .select("extension, organization_id, extension_id, display_name, sip_password, wss_url")
-        .eq("extension", "300")
-        .maybeSingle();
-      if (extErr) log("fallback ext 300 error", extErr.message);
-      log("fallback to extension 300", { found: !!byExt });
-      sp = byExt || null;
-    }
 
     if (!sp) {
       log("NO_SOFTPHONE_ACCOUNT");
