@@ -1,8 +1,8 @@
 // pbx-chat-agent: AI chatbot that controls the phone system via fusionpbx-proxy.
 // Streams responses through Lovable AI Gateway with tool calling.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { createOpenAICompatible } from "https://esm.sh/@ai-sdk/openai-compatible@0.2.14";
-import { generateText, tool, stepCountIs } from "https://esm.sh/ai@5.0.0";
+import { createOpenAICompatible } from "https://esm.sh/@ai-sdk/openai-compatible@1.0.20";
+import { generateText, tool, stepCountIs } from "https://esm.sh/ai@5.0.59";
 import { z } from "https://esm.sh/zod@3.23.8";
 
 const corsHeaders = {
