@@ -1,59 +1,71 @@
-# Phase 3 — Voicemail + AI Greeting
+# Phase 4 — Org Chat temps réel
 
-Objectif : permettre à chaque user de gérer sa boîte vocale (lecture, transcription, résumé IA) et de générer un greeting personnalisé via ElevenLabs TTS.
+Objectif : transformer `MyOrgChat` en messagerie d'équipe Slack-like, temps réel, accessible depuis Customer Admin et My Workspace.
+
+## État actuel
+- Tables `org_chat_channels` / `org_chat_messages` existent avec RLS.
+- Page `src/pages/my/OrgChat.tsx` créée mais squelette/placeholder.
+- Bucket `chat-attachments` privé existant.
 
 ## Livrables
 
-### 1. Backend (DB + Edge Functions)
-- Migration : étendre `pbx_voicemail_settings` (greeting_url, greeting_text, greeting_voice_id, greeting_mode `default|recorded|tts`, transcription_enabled, ai_summary_enabled).
-- Edge Function `user-voicemail` :
-  - `list` — voicemails de l'utilisateur (via `pbx_voicemails` + jointure softphone)
-  - `mark_read` / `delete` (soft delete + audit_logs)
-  - `get_audio_url` — signed URL temporaire bucket `voicemail-audio`
-  - `transcribe` — ElevenLabs `scribe_v2` (batch), stocke dans `pbx_call_transcripts`
-  - `summarize` — Lovable AI Gateway (`google/gemini-3-flash-preview`), stocke résumé + intent
-- Edge Function `user-voicemail-greeting` :
-  - `get_settings` / `save_settings`
-  - `generate_tts` — ElevenLabs TTS (`eleven_multilingual_v2`), upload `voicemail-greetings`, retourne URL
-  - `upload_recorded` — accepte blob recorded mic, upload bucket
-  - sync FusionPBX via `fusionpbx-proxy` (mailbox greeting)
+### 1. Edge Function `org-chat`
+- `list_channels` — channels visibles (#general auto-créé si absent + DMs)
+- `create_channel` — public/privé, nom unique, membres initiaux
+- `list_messages` — paginé (avant un cursor), tri desc
+- `send_message` — texte + attachments[] (paths storage)
+- `edit_message` / `delete_message` (soft)
+- `add_reaction` / `remove_reaction`
+- `mark_read` — met à jour `last_read_at` côté membre
+- `upload_url` — signed upload URL bucket `chat-attachments`
+- `presence_ping` — réutilise `upsert_user_presence`
+- Audit minimal (audit_logs)
 
-### 2. Frontend `/my/voicemail` (nouvelle page)
-- Liste voicemails : caller, durée, date, badge unread, player audio inline.
-- Actions par item : Play, Transcribe, Summarize (IA), Mark read, Delete.
-- Panel détail : transcript + résumé IA + tags + notes (réutilise `set_call_notes`).
-- Section "Greeting" :
-  - 3 modes : Default org / Recorded (MediaRecorder) / AI TTS (textarea + voice picker parmi top voices).
-  - Preview audio + Save.
-- Skeletons, empty states, FR/EN.
+### 2. Realtime
+- Activer `supabase_realtime` publication sur `org_chat_messages`.
+- Hook `useOrgChat(channelId)` :
+  - React Query pour fetch initial paginé
+  - Subscription Postgres Changes filtrée `channel_id=eq.X` pour INSERT/UPDATE/DELETE
+  - Présence canal via Realtime Presence (`channel:org-chat:{channelId}`)
 
-### 3. Hooks & composants
-- `useMyVoicemails` (React Query : list/mutations)
-- `useMyGreeting`
-- `components/voicemail/VoicemailList.tsx`
-- `components/voicemail/VoicemailDetail.tsx`
-- `components/voicemail/GreetingEditor.tsx` (3 tabs : Default | Record | AI Voice)
-- `components/voicemail/VoicePicker.tsx` (top 5 voices ElevenLabs)
+### 3. Frontend
+- `src/pages/my/OrgChat.tsx` refonte :
+  - Layout 3 colonnes : sidebar channels + DMs / message list / detail panel
+  - Composer (textarea, drop file, emoji simple, /commands optional)
+  - Bulles messages avec avatar, time, reactions, edited badge
+  - Indicator unread + scroll auto + "jump to bottom"
+  - Empty/Loading/Error states
+- Composants partagés :
+  - `chat/ChannelSidebar.tsx`
+  - `chat/MessageList.tsx`
+  - `chat/MessageBubble.tsx`
+  - `chat/MessageComposer.tsx`
+  - `chat/CreateChannelDialog.tsx`
+  - `chat/ChatAttachmentPreview.tsx`
+- Hook `useOrgChat.ts` (channels + messages + realtime + mutations)
+- FR/EN via `useLanguage`
 
-### 4. Routing & Sidebar
-- Ajouter `/my/voicemail` (lazy) dans `App.tsx`.
-- Ajouter item "Voicemail" dans `PortalShells` (user workspace).
+### 4. Intégration portails
+- Customer Admin → route existante `/customer/chat` réutilise même page (vue org).
+- My Workspace → `/my/chat`.
+- Badge unread dans `PortalShells` sidebar (via count messages non lus).
 
 ### 5. Sécurité
-- RLS : user lit/écrit uniquement ses voicemails (via `portal_user_id` du softphone lié).
-- Org admin peut voir/réécouter (déjà couvert par policies existantes).
-- `ELEVENLABS_API_KEY` déjà présent côté secrets — utilisé uniquement server-side.
-- Tous les `transcribe` / `summarize` / `generate_tts` loggés dans `audit_logs`.
+- Edge function valide JWT + appartenance org/channel avant tout write.
+- Bucket `chat-attachments` : signed URLs uniquement (1h), pas d'accès public.
+- RLS existante sur `org_chat_messages` reste source de vérité ; edge function utilise service_role mais filtre toujours par `organization_id` du caller.
+- Attachments scannés taille max 25 MB.
 
-## Détails techniques
-- TTS modèle par défaut : `eleven_multilingual_v2`, format `mp3_44100_128`.
-- STT modèle : `scribe_v2`, langue auto-détectée + override `fr`/`en`.
-- Résumé IA prompt : extraction de `caller_intent`, `priority`, `callback_required`, `summary` (≤ 3 phrases), structured output via `Output.object`.
-- Bucket `voicemail-greetings` existe déjà (privé) — signed URL 1h pour preview.
+## Hors scope (suite)
+- Threads (replies) → Phase 4b si demandé.
+- Notifications push/email mention → Phase 7.
+- Recherche full-text → Phase 4c.
 
-## Hors scope (phases suivantes)
-- Notifications email/push voicemail → Phase 7 (Reports/Notifications).
-- Greeting after-hours distinct du greeting busy → extension possible plus tard.
+## Validation
+- Envoi message visible <1s sur 2 onglets différents.
+- Création channel + invitation membres.
+- Upload + preview image attachment.
+- Reactions toggle.
+- Unread badge décroît en marquant lu.
 
-## Prochaine action
-Sur ton OK je passe en build mode et j'enchaîne migration → edge functions → UI.
+Sur OK je passe en build mode.
