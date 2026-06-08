@@ -302,6 +302,34 @@ Deno.serve(async (req) => {
       return pbxWrite(path, "POST", { [key]: [{ ...payload, domain_uuid: FUSIONPBX_DOMAIN_UUID }] });
     }
 
+    // ---- DOMAIN management (multi-tenant provisioning) ----
+    if (action === "create-domain" || action === "createDomain") {
+      const domain_name = body.domain_name || params.domain_name;
+      const description = body.domain_description || params.domain_description || `Customer domain`;
+      if (!domain_name) return json({ ok: false, error: "domain_name required" }, 400);
+      const r = await pbxWrite("domains", "POST", {
+        domains: [{ domain_name, domain_description: description, domain_enabled: "true" }],
+      });
+      if (!r.ok) return json(r, r.status || 500);
+      // Try to read back the UUID
+      const list = await pbxFetch(`domains?domain_name=${encodeURIComponent(domain_name)}`);
+      const arr = collection(list.data, "domains");
+      const created = arr.find((d: any) => d.domain_name === domain_name) || arr[0];
+      return json({ ok: true, domain_uuid: created?.domain_uuid || null, domain_name, raw: r.data });
+    }
+
+    if (action === "delete-domain") {
+      const id = body.domain_uuid || params.domain_uuid;
+      if (!id) return json({ ok: false, error: "domain_uuid required" }, 400);
+      return json(await pbxWrite(`domains/${id}`, "DELETE"));
+    }
+
+    if (action === "get-registrations") {
+      const r = await pbxFetch(`registrations?${domainQ}`);
+      if (!r.ok) return json(r, r.status || 500);
+      return json({ ok: true, data: collection(r.data, "registrations") });
+    }
+
 
     if (action === "get-extension") {
       const id = body.extension_uuid || params.extension_uuid;
