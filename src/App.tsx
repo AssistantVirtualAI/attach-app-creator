@@ -158,6 +158,8 @@ import UniversalLogin from "./pages/UniversalLogin";
 import { PlatformAdminShell, CustomerAdminShell, MyWorkspaceShell } from "./components/portals/PortalShells";
 import { RolePortalGuard } from "./components/portals/RolePortalGuard";
 import PlatformDashboard from "./pages/portals/PlatformDashboard";
+import PlatformSystemHealth from "./pages/platform/SystemHealth";
+import PlatformTelephonyQA from "./pages/platform/TelephonyQA";
 import CustomerDashboard from "./pages/portals/CustomerDashboard";
 import MyDashboardLanding from "./pages/portals/MyDashboardLanding";
 
