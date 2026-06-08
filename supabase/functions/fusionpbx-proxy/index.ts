@@ -473,7 +473,9 @@ Deno.serve(async (req) => {
 
       for (const ep of ordered) {
         const isPhp = ep.endsWith(".php");
-        const qp = new URLSearchParams({ domain_uuid: FUSIONPBX_DOMAIN_UUID, order: "desc", limit: "100", ...extraQp });
+        // NOTE: 'order' must NOT be passed — it conflicts with the PostgreSQL reserved word
+        // inside the FusionPBX API handler and causes "syntax error at order".
+        const qp = new URLSearchParams({ domain_uuid: FUSIONPBX_DOMAIN_UUID, limit: "100", ...extraQp });
         if (isPhp) {
           qp.set("key", FUSIONPBX_API_KEY);
           qp.set("username", FUSIONPBX_USERNAME);
