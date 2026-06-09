@@ -320,7 +320,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       </aside>
 
       {/* Main content */}
-      <main className="pt-14 md:pt-0 md:ml-[18rem] lg:ml-80 min-h-screen flex flex-col">
+      <main className="pt-14 md:pt-0 md:ml-[18rem] lg:ml-80 min-h-screen flex flex-col cockpit-scope">
 
         <div className="p-4 lg:p-6 flex-1">
           {children}
