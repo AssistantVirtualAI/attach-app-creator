@@ -21,6 +21,8 @@ import ActiveCallDock from './ActiveCallDock';
 import { useCallShortcuts } from '../../hooks/useShortcuts';
 import { callBus } from '../../hooks/useCallBus';
 import { useDesktopRole } from '../../hooks/useDesktopRole';
+import { useTenant } from '../../hooks/useTenant';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { theme } from '../../lib/theme';
 
 const { colors: c } = theme;
@@ -59,6 +61,8 @@ export default function ConsoleLayout({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
   const { isAdmin } = useDesktopRole();
+  const { orgId, orgName } = useTenant();
+  useRealtimeSync(orgId);
 
   // Redirect non-admins away from admin-only views
   useEffect(() => {

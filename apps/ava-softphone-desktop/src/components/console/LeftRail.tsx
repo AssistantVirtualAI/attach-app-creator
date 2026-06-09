@@ -3,6 +3,7 @@ import { theme } from '../../lib/theme';
 import LemtelLogo from '../LemtelLogo';
 import { useTranslation, type I18nKey } from '../../lib/i18n';
 import LanguageSwitcher from '../ui/LanguageSwitcher';
+import { useSyncStatus, formatAge } from '../../hooks/useSyncStatus';
 
 const { colors: c } = theme;
 
@@ -56,8 +57,17 @@ interface Props {
 
 export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch, compact, isAdmin }: Props) {
   const { t } = useTranslation();
+  const { pbx, syncConnected, lastEvent, ageMs, healthy } = useSyncStatus();
   const ITEMS: ConsoleView[] = isAdmin ? [...USER_ITEMS, ...ADMIN_ITEMS] : USER_ITEMS;
   if (compact) return <CompactRail view={view} onChange={onChange} onOpenSettings={onOpenSettings} items={ITEMS} />;
+
+  const glowColor = pbx === 'error'
+    ? '#ff5577'
+    : healthy
+      ? '#23d6ff'
+      : pbx === 'registered'
+        ? c.signalGold
+        : c.borderAI;
 
   return (
     <aside style={{
@@ -69,10 +79,28 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
       WebkitAppRegion: 'drag' as any,
       position: 'relative',
     }}>
+      {/* Premium glow strip — synced to PBX + sync */}
+      <div aria-hidden style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+        background: `linear-gradient(90deg, transparent, ${glowColor}, transparent)`,
+        opacity: healthy ? 0.95 : pbx === 'error' ? 0.8 : 0.45,
+        boxShadow: `0 0 18px ${glowColor}, 0 0 36px ${glowColor}66`,
+        transition: 'all .4s ease',
+        animation: healthy ? 'statusPulse 2.6s ease-in-out infinite' : undefined,
+        pointerEvents: 'none',
+      }} />
+      <div aria-hidden style={{
+        position: 'absolute', top: 0, bottom: 0, right: -1, width: 1,
+        background: `linear-gradient(180deg, transparent, ${glowColor}55, transparent)`,
+        opacity: healthy ? 0.6 : 0.25,
+        transition: 'opacity .4s ease',
+        pointerEvents: 'none',
+      }} />
+
       {/* Brand block */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        padding: '6px 8px 16px',
+        padding: '6px 8px 12px',
         WebkitAppRegion: 'no-drag' as any,
       }}>
         <LemtelLogo size="sm" glow />
@@ -80,6 +108,33 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
           <span style={{ fontSize: 15, fontWeight: 800, color: c.textIce, letterSpacing: 0.3 }}>Lemtel</span>
           <span style={{ fontSize: 9, fontWeight: 700, color: c.signalGold, letterSpacing: 1.6, textTransform: 'uppercase', marginTop: 3 }}>
             Telecom · AI Phone
+          </span>
+        </div>
+      </div>
+
+      {/* Status chip — PBX + sync */}
+      <div style={{
+        margin: '0 4px 12px', padding: '7px 10px',
+        borderRadius: 10,
+        background: `linear-gradient(135deg, ${glowColor}14, transparent)`,
+        border: `1px solid ${glowColor}44`,
+        display: 'flex', alignItems: 'center', gap: 8,
+        WebkitAppRegion: 'no-drag' as any,
+        boxShadow: healthy ? `0 0 14px -4px ${glowColor}99` : 'none',
+        transition: 'all .35s ease',
+      }}>
+        <span style={{
+          width: 8, height: 8, borderRadius: '50%',
+          background: glowColor,
+          boxShadow: `0 0 8px ${glowColor}`,
+          animation: healthy ? 'statusPulse 2s ease-in-out infinite' : undefined,
+        }} />
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0 }}>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: c.textIce, letterSpacing: 0.4 }}>
+            {pbx === 'registered' ? 'PBX Online' : pbx === 'error' ? 'PBX Error' : 'Connecting…'}
+          </span>
+          <span style={{ fontSize: 9.5, color: c.mutedSilver, letterSpacing: 0.3 }}>
+            {syncConnected ? (lastEvent ? `Sync · ${formatAge(ageMs)}` : 'Sync live') : 'Sync offline'}
           </span>
         </div>
       </div>
