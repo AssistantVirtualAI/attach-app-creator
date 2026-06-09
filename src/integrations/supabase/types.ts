@@ -3286,6 +3286,7 @@ export type Database = {
       }
       organizations: {
         Row: {
+          allow_user_self_forwarding: boolean
           allowed_platforms: string[] | null
           api_key: string | null
           baa_signed_at: string | null
@@ -3350,6 +3351,7 @@ export type Database = {
           website_title: string | null
         }
         Insert: {
+          allow_user_self_forwarding?: boolean
           allowed_platforms?: string[] | null
           api_key?: string | null
           baa_signed_at?: string | null
@@ -3414,6 +3416,7 @@ export type Database = {
           website_title?: string | null
         }
         Update: {
+          allow_user_self_forwarding?: boolean
           allowed_platforms?: string[] | null
           api_key?: string | null
           baa_signed_at?: string | null
@@ -7793,6 +7796,7 @@ export type Database = {
       generate_api_key: { Args: never; Returns: string }
       generate_unique_username: { Args: { base_name: string }; Returns: string }
       get_accessible_org_ids: { Args: { _user_id: string }; Returns: string[] }
+      get_my_extension_summary: { Args: never; Returns: Json }
       get_user_organization_ids: {
         Args: { _user_id: string }
         Returns: string[]
@@ -7856,6 +7860,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      verify_tenant_isolation: { Args: { _org_id: string }; Returns: Json }
     }
     Enums: {
       after_hours_action:
