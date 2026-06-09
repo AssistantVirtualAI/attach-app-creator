@@ -540,3 +540,15 @@ button[aria-disabled="true"] {
   background: #04081A !important;
   border: 1.5px solid #FFFFFF !important;
 }
+
+/* ============================================
+   Phase 9 — StateView / StatusPill
+   ============================================ */
+@keyframes lemtel-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes lemtel-pulse {
+  0%   { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  70%  { box-shadow: 0 0 0 8px transparent; opacity: 0.8; }
+  100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+}
