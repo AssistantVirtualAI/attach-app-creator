@@ -20,6 +20,7 @@ import {
   GTRow,
   GTCell,
 } from "@/components/ui-cockpit";
+import { CockpitShell } from "@/components/cockpit/CockpitShell";
 
 export default function DesignPreview() {
   if (!import.meta.env.DEV) {
@@ -31,18 +32,23 @@ export default function DesignPreview() {
   }
 
   return (
-    <div className="cockpit-bg min-h-screen p-8 space-y-10">
-      <SectionHeader
-        icon={<Sparkles className="h-5 w-5" />}
-        title="Cockpit Design System"
-        subtitle="Phase 1 primitives — glass surfaces, neon accents, live indicators."
-        actions={
-          <>
-            <NeonButton variant="outline" size="sm">Secondary</NeonButton>
-            <NeonButton size="sm"><Plus className="h-4 w-4" /> Primary</NeonButton>
-          </>
-        }
-      />
+    <CockpitShell
+      header={
+        <SectionHeader
+          icon={<Sparkles className="h-5 w-5" />}
+          title="Cockpit Design System"
+          subtitle="Phase 1 + 2 — glass shell, role nav, live badges, primitives."
+          actions={
+            <>
+              <NeonButton variant="outline" size="sm">Secondary</NeonButton>
+              <NeonButton size="sm"><Plus className="h-4 w-4" /> Primary</NeonButton>
+            </>
+          }
+        />
+      }
+    >
+      <div className="space-y-8">
+
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard label="Active calls" value={12} icon={<PhoneCall className="h-4 w-4" />} accent="cyan" live trend={{ value: 8, label: "vs last hour" }} />
