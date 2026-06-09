@@ -1,79 +1,78 @@
-# Phases 4b + 5 + 6 — Livraison groupée
 
-L'utilisateur souhaite tout livrer en une seule itération. Voici la plan d'exécution consolidé.
+# Plan: Réappliquer les améliorations portail org
 
-## Phase 4b — Threads & recherche chat
+**Règle absolue:** ne pas modifier `src/pages/Landing.tsx` ni les composants `src/components/landing/**`. Tout le travail reste dans les portails (`/org/*`, `/my/*`, `/platform/*`) et leurs primitives partagées.
 
-### Schéma
-- `org_chat_messages` : ajouter `parent_message_id uuid REFERENCES org_chat_messages(id) ON DELETE CASCADE`, `reply_count int DEFAULT 0`, `last_reply_at timestamptz`.
-- Trigger `bump_thread_counters` qui maintient `reply_count` / `last_reply_at` sur le message parent.
-- Colonne `tsv tsvector` + index GIN + trigger `to_tsvector('french', coalesce(content,''))`.
+## 1. Verrouiller la landing page
 
-### Edge function `org-chat` (extensions)
-- `list_thread(message_id)` — messages dont parent = id, tri ASC.
-- `send_message` accepte `parent_message_id`.
-- `search_messages(query, channel_id?, limit, before)` — `tsv @@ websearch_to_tsquery('french', q)` filtré par channels accessibles.
+- Ajouter une note dans `mem://index.md` Core: « Ne jamais modifier `src/pages/Landing.tsx` ni `src/components/landing/**` sans demande explicite de l'utilisateur ».
+- Aucune édition de fichiers landing dans ce plan.
 
-### Frontend
-- `chat/ThreadPanel.tsx` : panneau latéral droit, composer, liste des replies, fermeture.
-- `MessageBubble` : badge "N réponses" + "Répondre dans un fil".
-- `chat/SearchBar.tsx` + `chat/SearchResults.tsx` : barre Cmd+K dans la sidebar, résultats avec extrait + highlight + jump-to-message.
-- Hook `useOrgChatThread(messageId)` (React Query + realtime filtré).
+## 2. Restaurer le système visuel "glass / aurora" pour les portails uniquement
 
-## Phase 5 — Notifications & mentions
+Cible: `src/index.css` (déjà chargé), nouvelles classes scopées aux layouts portails (pas de styles globaux qui pourraient impacter la landing).
 
-### Schéma
-- Réutiliser `org_notifications` (existant).
-- Trigger `notify_mentions_on_message` : parse `@uuid` dans `content`, insert lignes `org_notifications` (`type='chat_mention'`, payload = {channel_id, message_id}).
-- Table `user_notification_prefs` (existante) : ajouter colonnes `email_mentions bool`, `email_dm bool`, `email_voicemail bool`, `email_missed_call bool`.
+- Ajouter tokens dark mode "aurora": `--glass-bg`, `--glass-border`, `--glass-blur`, `--neon-edge`, `--shadow-glass`, `--shadow-glow-primary`.
+- Ajouter utilitaires CSS scopés sous `.portal-shell` :
+  - `.portal-shell .glass-card`, `.glass-panel`, `.glow-hover`, `.aurora-bg`
+- Wrapper portail: ajouter la classe `portal-shell` dans:
+  - `AdminPortalLayout` (org)
+  - `MyPortalLayout` (my)
+  - `PlatformPortalLayout` (platform)
+- Background aurore (fixed, `prefers-reduced-motion` respecté) injecté uniquement dans ces layouts.
 
-### Edge function `notifications`
-- `list(limit, before)` — flux paginé.
-- `mark_read(ids[])` / `mark_all_read()`.
-- `prefs_get` / `prefs_update`.
-- Worker `dispatch_email_notifications` (trigger pg_net post → fonction edge) qui envoie via Resend en respectant les prefs et un debounce 5 min.
+## 3. Modernisation Sidebar + Header portails
 
-### Realtime + Frontend
-- `useNotifications()` : subscription `org_notifications` filtré `user_id=eq.<me>` ; cache React Query.
-- `NotificationBell.tsx` dans `PortalShells` : badge unread, popover liste, "Tout marquer lu", deep-link vers ressource.
-- `pages/my/NotificationSettings.tsx` : toggles prefs.
-- Composer chat : auto-complétion `@` via membres de l'organisation, insertion `@<uuid>` rendu en `@DisplayName` côté bulle.
+- Sidebar (org/my/platform): fond verre flou, border néon, item actif avec halo, séparateurs subtils.
+- Header: barre verre, blur, ombre douce, breadcrumbs cohérents.
+- Aucune modification des sidebars/headers de la landing.
 
-## Phase 6 — Calendrier & rendez-vous
+## 4. Tables, listes, cards (portails)
 
-### Schéma (table `appointments` existante — l'étendre)
-- Ajouter `host_user_id uuid`, `host_kind text ('user'|'agent'|'team')`, `team_members uuid[]`, `location_type text ('phone'|'video'|'in_person')`, `meeting_url text`, `reminder_offsets int[] DEFAULT '{1440,60}'`, `timezone text`.
-- Nouvelle table `appointment_slots` (slots de dispo générés / bookables publics).
-- Nouvelle table `appointment_reminders` (sent_at, channel).
+- Tables admin (Devices, Queues, Customers, Extensions, IVR, SMS, Voicemail, etc.): rangées glass, hover halo, alignements et espacement uniformes.
+- Cards stats: bordure dégradée subtile + shadow-glow au hover.
 
-### Edge function `appointments`
-- `list(range, host?)`, `create`, `update`, `cancel`, `reschedule`.
-- `public_availability(host_id, range)` : calcule créneaux libres en croisant `user_working_hours`, `org_business_hours`, et appointments existants.
-- `public_book(host_id, slot, contact)` — endpoint anon avec rate-limit + captcha-light.
-- Worker `process_appointment_reminders` (déclenché par pg_cron toutes les 5 min) : envoie SMS Telnyx + email Resend selon `reminder_offsets`.
+## 5. Boutons, inputs, focus (a11y)
 
-### Frontend
-- `pages/my/Calendar.tsx` :
-  - Vue Mois / Semaine / Jour (composant interne, pas de dep).
-  - Sidebar mini-calendrier + filtres (host, status).
-  - Drag-to-create + dialog edit.
-- `pages/customer/Calendar.tsx` : variante orga avec multi-host.
-- Page publique `/book/:slug` : créneaux dispo + formulaire contact + confirmation.
-- Hooks `useAppointments`, `useAvailability`, `usePublicBooking`.
+- Surcharger les variants shadcn (`button`, `input`, `textarea`, `select`, `badge`, `dropdown`) avec:
+  - Variante `neon` pour CTA principaux portail.
+  - Focus ring double (primary 80% + offset) pour navigation clavier.
+  - Contrastes WCAG AA validés en dark mode.
 
-## Sécurité (toutes phases)
-- Toutes les edge functions valident JWT + appartenance org via `current_user_org_ids()` ou `can_access_org`.
-- Public booking : pas de JWT mais slug org/host validé + IP rate-limit (table `rate_limits` simple).
-- RLS strictes sur nouvelles tables ; GRANT explicites `authenticated`/`service_role`.
+## 6. Spec design portail
 
-## Hors scope
-- Visio embarquée (juste lien meeting_url externe pour cette itération).
-- Sync Google/Outlook 2-way (Phase 7 — table `calendar_integrations` déjà présente).
-- Notifications push web (web push) → Phase 7.
+- Créer/mettre à jour `docs/portal-design-spec.md` (tokens, scale typographique, spacing 4px, motifs de composants). Sert de référence aux pages futures.
 
-## Validation
-- Chat : ouvrir thread, envoyer reply, voir compteur, rechercher mot et jumper.
-- Mention `@user` → bell badge + email reçu (si pref on).
-- Créer RDV, voir reminder envoyé à T-1h, page publique `/book/:slug` permet booking.
+## 7. Pages portail à finaliser (uniformiser au nouveau spec)
 
-Sur OK je passe en build mode et j'enchaîne les trois phases dans l'ordre 4b → 5 → 6.
+- `/org/lemtel/admin/customers` (vérifier bouton "Create Organization" + impersonation).
+- `/org/lemtel/admin/devices` (catalogue vendor/model, CSV import, statut provisioning).
+- `/org/lemtel/admin/queues` (boutons New/Edit/Delete déjà visibles pour super_admin).
+- Voicemail, SMS, IVR, Extensions, Downloads, Recordings: appliquer glass + empty states + skeletons.
+
+## 8. Sweep FR/EN final
+
+- Passer en revue les modules télécom restants pour clés i18n manquantes (`useTranslation`).
+
+## 9. QA visuelle
+
+- Vérifier `/org/{slug}/admin`, `/my/dashboard`, `/platform` en clair + sombre.
+- Confirmer que `/` (landing) est strictement inchangée (diff = 0 sur landing files).
+
+## Détails techniques
+
+- Fichiers touchés (prévisionnel):
+  - `src/index.css` (tokens + utilitaires sous `.portal-shell`)
+  - `src/components/portals/AdminPortalLayout.tsx`, `MyPortalLayout.tsx`, `PlatformPortalLayout.tsx`
+  - `src/components/ui/{button,input,textarea,select,badge,dropdown-menu,table,card}.tsx` (variants additionnels, pas de breaking changes)
+  - Pages portail listées au §7
+  - `docs/portal-design-spec.md` (nouveau)
+  - `mem://index.md` (règle landing)
+- Fichiers **interdits** ce tour: `src/pages/Landing.tsx`, `src/components/landing/**`, `src/App.css` (déjà neutre, on n'y retouche pas).
+
+## Critères d'acceptation
+
+- Landing `/` pixel-identique avant/après.
+- Portails arborent un look glass/aurora cohérent, accessible clavier, contrastes AA.
+- Boutons CRUD visibles pour super_admin sur Queues/Devices/Customers.
+- Spec documentée; nouveaux écrans héritent automatiquement.
