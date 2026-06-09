@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabaseClient';
+import { useTranslation, type I18nKey } from '../../lib/i18n';
+import StatusPill from '../ui/StatusPill';
+import StateView from '../ui/StateView';
 
 const { colors: c } = theme;
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_KEYS: I18nKey[] = ['day.sun', 'day.mon', 'day.tue', 'day.wed', 'day.thu', 'day.fri', 'day.sat'];
 type Hour = {
   day_of_week: number;
   is_working_day: boolean;
@@ -31,18 +34,15 @@ async function call(action: string, payload?: any) {
   return data;
 }
 
-function Badge({ status }: { status: 'idle' | 'saving' | 'saved' | 'error' }) {
-  const map: Record<string, [string, string]> = {
-    idle: ['—', c.mutedSilver],
-    saving: ['Saving…', c.signalGold],
-    saved: ['● Synced', c.success],
-    error: ['● Failed', c.danger],
-  };
-  const [label, color] = map[status];
-  return <span style={{ fontSize: 11, fontWeight: 700, color, letterSpacing: 1 }}>{label}</span>;
+function SaveBadge({ status }: { status: 'idle' | 'saving' | 'saved' | 'error' }) {
+  if (status === 'idle') return <span style={{ fontSize: 11, color: c.mutedSilver }}>—</span>;
+  if (status === 'saving') return <StatusPill variant="sync-pending" pulse />;
+  if (status === 'saved') return <StatusPill variant="connected" />;
+  return <StatusPill variant="sync-failed" />;
 }
 
 export default function TelecomSettingsView() {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [ext, setExt] = useState<any>(null);
   const [hours, setHours] = useState<Hour[]>([]);
@@ -101,14 +101,14 @@ export default function TelecomSettingsView() {
     catch (e: any) { setErr(e.message); setHStatus('error'); }
   };
 
-  if (loading) return <div style={{ padding: 32, color: c.mutedSilver }}>Loading…</div>;
+  if (loading) return <StateView mode="loading" />;
 
   return (
     <div style={{ padding: '24px 28px', overflowY: 'auto', height: '100%' }}>
       <header style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Telecom Settings</h1>
+        <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>{t('telecom.title')}</h1>
         <div style={{ marginTop: 6, fontSize: 12, color: c.mutedSilver }}>
-          Ext. <b style={{ color: c.textIce }}>{ext?.extension ?? '—'}</b> · {ext?.display_name ?? ''} · {ext?.sip_domain ?? ''}
+          {t('telecom.extension')} <b style={{ color: c.textIce }}>{ext?.extension ?? '—'}</b> · {ext?.display_name ?? ''} · {ext?.sip_domain ?? ''}
         </div>
       </header>
 
@@ -117,15 +117,15 @@ export default function TelecomSettingsView() {
       {/* Working hours */}
       <section style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, padding: 18, marginBottom: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h2 style={{ fontSize: 14, color: c.textIce, margin: 0, letterSpacing: 0.5 }}>Working Hours</h2>
-          <Badge status={hStatus} />
+          <h2 style={{ fontSize: 14, color: c.textIce, margin: 0, letterSpacing: 0.5 }}>{t('telecom.workingHours')}</h2>
+          <SaveBadge status={hStatus} />
         </div>
         {hours.map((h, i) => (
           <div key={i} style={{ display: 'grid', gridTemplateColumns: '60px 80px 1fr 1fr 100px', gap: 8, padding: '6px 0', alignItems: 'center', borderTop: i ? `1px solid ${c.border}` : 'none' }}>
-            <span style={{ color: c.textIce, fontSize: 12, fontWeight: 600 }}>{DAYS[h.day_of_week]}</span>
+            <span style={{ color: c.textIce, fontSize: 12, fontWeight: 600 }}>{t(DAY_KEYS[h.day_of_week])}</span>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: c.mutedSilver }}>
               <input type="checkbox" checked={h.is_working_day} onChange={(e) => { const v = [...hours]; v[i] = { ...h, is_working_day: e.target.checked }; setHours(v); }} />
-              On
+              {t('telecom.on')}
             </label>
             <input type="time" value={h.start_time} disabled={!h.is_working_day}
               onChange={(e) => { const v = [...hours]; v[i] = { ...h, start_time: e.target.value }; setHours(v); }}
@@ -137,33 +137,33 @@ export default function TelecomSettingsView() {
           </div>
         ))}
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <button onClick={saveHours} style={primaryBtn}>Save schedule</button>
-          <button onClick={resetDefault} style={ghostBtn}>Reset to org default</button>
+          <button onClick={saveHours} style={primaryBtn}>{t('telecom.saveSchedule')}</button>
+          <button onClick={resetDefault} style={ghostBtn}>{t('telecom.resetDefault')}</button>
         </div>
       </section>
 
       {/* Availability + handling */}
       <section style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, padding: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h2 style={{ fontSize: 14, color: c.textIce, margin: 0, letterSpacing: 0.5 }}>Availability & Call Handling</h2>
-          <Badge status={cStatus} />
+          <h2 style={{ fontSize: 14, color: c.textIce, margin: 0, letterSpacing: 0.5 }}>{t('telecom.handling')}</h2>
+          <SaveBadge status={cStatus} />
         </div>
-        <Row label="Availability">
+        <Row label={t('telecom.availability')}>
           <select value={handling.availability} onChange={(e) => setHandling({ ...handling, availability: e.target.value })} style={inputStyle}>
             {AVAIL.map((a) => <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>)}
           </select>
         </Row>
-        <Row label="After-hours">
+        <Row label={t('telecom.afterHours')}>
           <select value={handling.after_hours_action} onChange={(e) => setHandling({ ...handling, after_hours_action: e.target.value })} style={inputStyle}>
             {AFTER.map((a) => <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>)}
           </select>
         </Row>
         {handling.after_hours_action.startsWith('forward') && (
-          <Row label={handling.after_hours_action === 'forward_external' ? 'External number' : 'Extension'}>
+          <Row label={handling.after_hours_action === 'forward_external' ? t('telecom.externalNumber') : t('telecom.extension')}>
             <input type="text" value={handling.forward_target ?? ''} onChange={(e) => setHandling({ ...handling, forward_target: e.target.value })} placeholder="e.g. 201 or +15145550123" style={inputStyle} />
           </Row>
         )}
-        <button onClick={saveHandling} style={{ ...primaryBtn, marginTop: 14 }}>Save handling</button>
+        <button onClick={saveHandling} style={{ ...primaryBtn, marginTop: 14 }}>{t('telecom.saveHandling')}</button>
       </section>
     </div>
   );

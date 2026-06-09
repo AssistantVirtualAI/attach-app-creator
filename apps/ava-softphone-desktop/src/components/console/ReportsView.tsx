@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabaseClient';
 import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
+import { useTranslation } from '../../lib/i18n';
 
 const { colors: c } = theme;
 
@@ -28,6 +29,7 @@ function rangeStart(r: Range): string {
 }
 
 export default function ReportsView() {
+  const { t } = useTranslation();
   const [range, setRange] = useState<Range>('7d');
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,9 +101,9 @@ Focus on missed-call rate, busiest extensions, and one concrete improvement.`,
   return (
     <div style={{ padding: '24px 28px', overflowY: 'auto', height: '100%' }}>
       <PageHeader
-        eyebrow="Insights"
-        title="Reports"
-        subtitle="Call volume, performance, and AVA-generated executive summaries."
+        eyebrow={t('reports.eyebrow')}
+        title={t('reports.title')}
+        subtitle={t('reports.subtitle')}
         accent={c.avaCyan}
       />
 
@@ -121,24 +123,24 @@ Focus on missed-call rate, busiest extensions, and one concrete improvement.`,
           background: `linear-gradient(135deg, ${c.avaViolet}, ${c.avaCyan})`,
           border: 'none', color: '#fff', fontSize: 12, fontWeight: 700,
           cursor: aiLoading ? 'wait' : 'pointer', opacity: aiLoading ? 0.6 : 1,
-        }}>{aiLoading ? 'Generating…' : '✨ AVA Summary'}</button>
+        }}>{aiLoading ? t('reports.generating') : `✨ ${t('reports.avaSummary')}`}</button>
       </div>
 
       {loading && <ListSkeleton rows={4} />}
       {!loading && rows.length === 0 && (
-        <EmptyState icon="📊" title="No calls in this range" hint="Adjust the range or wait for call activity." accent={c.avaCyan} />
+        <EmptyState icon="📊" title={t('reports.noCalls')} hint={t('reports.noCallsHint')} accent={c.avaCyan} />
       )}
 
       {!loading && rows.length > 0 && (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 18 }}>
-            <Stat label="Total calls" value={metrics.total} />
-            <Stat label="Answered" value={metrics.answered} accent={c.success} />
-            <Stat label="Missed" value={metrics.missed} accent={c.danger} />
-            <Stat label="Inbound" value={metrics.inbound} />
-            <Stat label="Outbound" value={metrics.outbound} />
-            <Stat label="Avg duration" value={fmtDur(metrics.avg)} />
-            <Stat label="Total talk time" value={fmtDur(metrics.totalSec)} accent={c.signalGold} />
+            <Stat label={t('reports.totalCalls')} value={metrics.total} />
+            <Stat label={t('reports.answered')} value={metrics.answered} accent={c.success} />
+            <Stat label={t('reports.missed')} value={metrics.missed} accent={c.danger} />
+            <Stat label={t('reports.inbound')} value={metrics.inbound} />
+            <Stat label={t('reports.outbound')} value={metrics.outbound} />
+            <Stat label={t('reports.avgDuration')} value={fmtDur(metrics.avg)} />
+            <Stat label={t('reports.totalTalk')} value={fmtDur(metrics.totalSec)} accent={c.signalGold} />
           </div>
 
           {aiSummary && (
@@ -147,26 +149,26 @@ Focus on missed-call rate, busiest extensions, and one concrete improvement.`,
               background: 'linear-gradient(135deg, rgba(122,76,255,0.10), rgba(35,214,255,0.04))',
               border: `1px solid ${c.borderAI}`,
             }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: c.avaCyan, textTransform: 'uppercase', marginBottom: 6 }}>AVA Summary</div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: c.avaCyan, textTransform: 'uppercase', marginBottom: 6 }}>{t('reports.avaSummary')}</div>
               <p style={{ fontSize: 12.5, lineHeight: 1.55, color: c.textIce, margin: 0, whiteSpace: 'pre-wrap' }}>{aiSummary}</p>
             </div>
           )}
 
           <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden', marginBottom: 18 }}>
             <div style={{ padding: '10px 14px', borderBottom: `1px solid ${c.border}`, background: c.deepPanel, fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: c.mutedSilver, textTransform: 'uppercase' }}>
-              Top extensions
+              {t('reports.topExtensions')}
             </div>
             {metrics.top.map(([ext, count]) => (
               <div key={ext} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', borderBottom: `1px solid ${c.border}`, fontSize: 12.5, color: c.textIce }}>
                 <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{ext}</span>
-                <span style={{ color: c.mutedSilver }}>{count} calls</span>
+                <span style={{ color: c.mutedSilver }}>{count} {t('reports.calls')}</span>
               </div>
             ))}
           </div>
 
           <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ padding: '10px 14px', borderBottom: `1px solid ${c.border}`, background: c.deepPanel, fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: c.mutedSilver, textTransform: 'uppercase' }}>
-              Recent calls
+              {t('reports.recentCalls')}
             </div>
             {rows.slice(0, 25).map((r) => (
               <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '70px 1fr 90px 90px 70px', padding: '9px 14px', borderBottom: `1px solid ${c.border}`, fontSize: 12, color: c.textIce, alignItems: 'center', gap: 8 }}>

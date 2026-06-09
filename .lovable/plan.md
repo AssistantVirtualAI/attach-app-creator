@@ -54,6 +54,12 @@ This is the last open phase from the desktop telecom plan. Everything else (Phas
 
 ## Progress
 - ✅ StatusPill + StateView components added (`apps/ava-softphone-desktop/src/components/ui/`)
-- ✅ Desktop i18n hook + EN/FR dictionaries (`apps/ava-softphone-desktop/src/lib/i18n.ts`)
+- ✅ Desktop i18n hook + EN/FR dictionaries extended (telecom, orgchat, aiadmin, reports, days, common)
+- ✅ LanguageSwitcher (EN/FR pill) wired into LeftRail footer
 - ✅ LeftRail labels, search, settings, and aria-labels translated; focus ring on rail items
-- ✅ Spin + pulse keyframes appended to `styles/animations.css`
+- ✅ TelecomSettingsView translated; Badge replaced by StatusPill; StateView on loading
+- ✅ OrgChatView translated (channels, placeholders, send)
+- ✅ AdminAIChatView translated; Status replaced by StatusPill variants
+- ✅ ReportsView translated (header, stats, top extensions, recent calls)
+- ✅ Spin + pulse keyframes available in `styles/animations.css`
+- Phase 9 ✅
