@@ -98,8 +98,6 @@ import LemtelIVR from "./pages/lemtel/LemtelIVR";
 import BusinessHours from "./pages/lemtel/BusinessHours";
 import CustomerSettings from "./pages/lemtel/CustomerSettings";
 import LemtelVoiceAgents from "./pages/lemtel/LemtelVoiceAgents";
-import LemtelVoiceAgentClients from "./pages/lemtel/LemtelVoiceAgentClients";
-import TelecomSyncHealth from "./pages/lemtel/admin/TelecomSyncHealth";
 import LemtelSoftphoneUsers from "./pages/lemtel/LemtelSoftphoneUsers";
 import LemtelDevices from "./pages/lemtel/LemtelDevices";
 import TelephonyDashboard from "./pages/telephony/TelephonyDashboard";
@@ -127,6 +125,10 @@ import MyDashboard from "./pages/lemtel/my/MyDashboard";
 import AdminRecordings from "./pages/lemtel/admin/AdminRecordings";
 import AdminVoicemail from "./pages/lemtel/admin/AdminVoicemail";
 import AdminReports from "./pages/lemtel/admin/AdminReports";
+import TelecomSyncHealth from "./pages/lemtel/admin/TelecomSyncHealth";
+import LemtelVoiceAgentClients from "./pages/lemtel/LemtelVoiceAgentClients";
+import AvaAdminChat from "./pages/lemtel/admin/AvaAdminChat";
+import AiVoicemailInbox from "./pages/lemtel/admin/AiVoicemailInbox";
 import MySettings from "./pages/lemtel/my/MySettings";
 import { DownloadCenter } from "./components/portal/DownloadCenter";
 import { AppLayout } from "./components/layout/AppLayout";
@@ -630,12 +632,6 @@ const App = () => (
                 <Route path="/org/lemtel/admin/queues" element={<LemtelAdminPage><LemtelQueues /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/ring-groups" element={<LemtelAdminPage><TelephonyRingGroups /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/agents" element={<LemtelAdminPage><LemtelVoiceAgents /></LemtelAdminPage>} />
-                <Route path="/org/lemtel/admin/agent-builder" element={<LemtelAdminPage><AgentBuilder /></LemtelAdminPage>} />
-                <Route path="/org/lemtel/admin/va-conversations" element={<LemtelAdminPage><Conversations /></LemtelAdminPage>} />
-                <Route path="/org/lemtel/admin/knowledge-base" element={<LemtelAdminPage><KnowledgeBase /></LemtelAdminPage>} />
-                <Route path="/org/lemtel/admin/voice-clients" element={<LemtelAdminPage><LemtelVoiceAgentClients /></LemtelAdminPage>} />
-                <Route path="/org/lemtel/admin/va-reports" element={<LemtelAdminPage><AgentReports /></LemtelAdminPage>} />
-                <Route path="/org/lemtel/admin/sync-health" element={<LemtelAdminPage><TelecomSyncHealth /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/recordings" element={<LemtelAdminPage><AdminRecordings /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/voicemail" element={<LemtelAdminPage><AdminVoicemail /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/reports" element={<LemtelAdminPage><AdminReports /></LemtelAdminPage>} />
@@ -644,6 +640,10 @@ const App = () => (
                 <Route path="/org/:slug/admin/hours" element={<ProtectedRoute><AdminPortalLayout><BusinessHours /></AdminPortalLayout></ProtectedRoute>} />
                 <Route path="/org/:slug/admin/settings" element={<ProtectedRoute><AdminPortalLayout><CustomerSettings /></AdminPortalLayout></ProtectedRoute>} />
                 <Route path="/org/lemtel/admin/downloads" element={<LemtelAdminPage><DownloadCenter /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/sync-health" element={<LemtelAdminPage><TelecomSyncHealth /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/voice-clients" element={<LemtelAdminPage><LemtelVoiceAgentClients /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/ai-voicemail" element={<LemtelAdminPage><AiVoicemailInbox /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/ava" element={<LemtelAdminPage><AvaAdminChat /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/analytics/cdrs" element={<Navigate to="/org/lemtel/telephony/calls" replace />} />
                 <Route path="/org/lemtel/analytics/calls" element={<Navigate to="/org/lemtel/telephony/calls" replace />} />
                 <Route path="/org/lemtel/analytics" element={<Navigate to="/org/lemtel/telephony/calls" replace />} />

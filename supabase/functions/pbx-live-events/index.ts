@@ -1,54 +1,56 @@
-// pbx-live-events : maintains telecom_live_calls from FusionPBX event source.
-// This implementation polls the live-calls REST endpoint each invocation (every minute via cron).
-// A persistent WSS Event Socket can be added when stable infrastructure is available.
-import { corsHeaders, runSync, resolveOrgIds, fpbxJson, adminClient } from "../_shared/fusionpbx.ts";
+// Receives FusionPBX/FreeSWITCH webhook events and upserts telecom_live_calls.
+// Frontend subscribes to telecom_live_calls via Supabase Realtime.
+import { corsHeaders, getServiceClient, jsonResponse } from "../_shared/fusionpbx.ts";
+
+interface EventPayload {
+  organizationId: string;
+  channelUuid: string;
+  state: "ringing" | "answered" | "hold" | "ended";
+  direction?: string;
+  callerNumber?: string;
+  callerName?: string;
+  destinationNumber?: string;
+  extension?: string;
+  queue?: string;
+  sipCallId?: string;
+  raw?: Record<string, unknown>;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  try {
-    const body = await req.json().catch(() => ({}));
-    const orgIds = await resolveOrgIds(body);
-    const results: any[] = [];
-
-    for (const organization_id of orgIds) {
-      const r = await runSync("live-events", organization_id, async () => {
-        const supa = adminClient();
-        const calls = await fpbxJson<any[]>("/app/active_calls/active_calls_json.php").catch(() => []);
-        const activeIds: string[] = [];
-        let rows = 0;
-        for (const c of (Array.isArray(calls) ? calls : [])) {
-          const uuid = c.uuid || c.call_uuid;
-          if (!uuid) continue;
-          activeIds.push(uuid);
-          await supa.from("telecom_live_calls").upsert({
-            organization_id,
-            call_uuid: uuid,
-            direction: c.direction || "inbound",
-            caller_number: c.cid_num || c.caller_id_number || null,
-            callee_number: c.dest || c.destination_number || null,
-            extension: c.dest || null,
-            state: c.state || "active",
-            started_at: c.created_epoch ? new Date(parseInt(c.created_epoch, 10) * 1000).toISOString() : new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "call_uuid" });
-          rows++;
-        }
-        // Clear stale rows (not in current snapshot, older than 30s)
-        await supa.from("telecom_live_calls").delete()
-          .eq("organization_id", organization_id)
-          .not("call_uuid", "in", `(${activeIds.length ? activeIds.map(i => `"${i}"`).join(",") : '""'})`)
-          .lt("updated_at", new Date(Date.now() - 30000).toISOString());
-        return { rows_synced: rows };
-      });
-      results.push({ organization_id, ...r });
-    }
-
-    return new Response(JSON.stringify({ ok: true, results }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (e: any) {
-    return new Response(JSON.stringify({ ok: false, error: String(e?.message || e) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  if (req.method !== "POST") return jsonResponse(405, { error: "method not allowed" });
+  const supabase = getServiceClient();
+  const body = (await req.json().catch(() => null)) as EventPayload | null;
+  if (!body?.organizationId || !body?.channelUuid || !body?.state) {
+    return jsonResponse(400, { error: "missing required fields" });
   }
+  const now = new Date().toISOString();
+  if (body.state === "ended") {
+    await supabase
+      .from("telecom_live_calls")
+      .delete()
+      .eq("organization_id", body.organizationId)
+      .eq("channel_uuid", body.channelUuid);
+    return jsonResponse(200, { ok: true, removed: true });
+  }
+  const row: Record<string, unknown> = {
+    organization_id: body.organizationId,
+    channel_uuid: body.channelUuid,
+    state: body.state,
+    direction: body.direction ?? null,
+    caller_number: body.callerNumber ?? null,
+    caller_name: body.callerName ?? null,
+    destination_number: body.destinationNumber ?? null,
+    extension: body.extension ?? null,
+    queue: body.queue ?? null,
+    sip_call_id: body.sipCallId ?? null,
+    last_event_at: now,
+    raw: body.raw ?? {},
+  };
+  if (body.state === "answered") row.answered_at = now;
+  const { error } = await supabase
+    .from("telecom_live_calls")
+    .upsert(row, { onConflict: "organization_id,channel_uuid" });
+  if (error) return jsonResponse(500, { error: error.message });
+  return jsonResponse(200, { ok: true });
 });

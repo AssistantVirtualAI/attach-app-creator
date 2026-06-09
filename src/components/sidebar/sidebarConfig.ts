@@ -104,18 +104,16 @@ const ORG_GROUPS: NavGroup[] = [
       { nameKey: 'Phone Numbers', href: '/org/lemtel/admin/dids', icon: Phone },
       { nameKey: 'IVR / Auto-Attendant', href: '/org/lemtel/admin/ivr', icon: Voicemail },
       { nameKey: 'Ring Groups', href: '/org/lemtel/admin/ring-groups', icon: Bell },
+      { nameKey: 'Voice Agents', href: '/org/lemtel/admin/agents', icon: Bot },
+      { nameKey: 'Voice-Agent Clients', href: '/org/lemtel/admin/voice-clients', icon: UserPlus },
       { nameKey: 'PBX Settings', href: '/org/lemtel/admin/settings', icon: Settings },
     ],
   },
   {
-    id: 'org-voice-agents', labelKey: '🤖 Voice Agents', icon: Bot, scope: 'org', lemtelOnly: true,
+    id: 'org-ai', labelKey: '🤖 AI Workspace', icon: Brain, scope: 'org', lemtelOnly: true,
     items: [
-      { nameKey: 'Agents', href: '/org/lemtel/admin/agents', icon: Bot },
-      { nameKey: 'Agent Builder', href: '/org/lemtel/admin/agent-builder', icon: Sparkles },
-      { nameKey: 'Conversations', href: '/org/lemtel/admin/va-conversations', icon: MessageSquare },
-      { nameKey: 'Knowledge Base', href: '/org/lemtel/admin/knowledge-base', icon: BookOpen },
-      { nameKey: 'Voice Clients', href: '/org/lemtel/admin/voice-clients', icon: Users },
-      { nameKey: 'VA Reports', href: '/org/lemtel/admin/va-reports', icon: FileQuestion },
+      { nameKey: 'AI Voicemail Inbox', href: '/org/lemtel/admin/ai-voicemail', icon: Voicemail },
+      { nameKey: 'AVA Admin Assistant', href: '/org/lemtel/admin/ava', icon: Sparkles },
     ],
   },
   {

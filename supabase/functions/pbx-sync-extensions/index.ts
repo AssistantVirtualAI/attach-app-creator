@@ -1,43 +1,26 @@
-import { corsHeaders, runSync, resolveOrgIds, fpbxJson, adminClient } from "../_shared/fusionpbx.ts";
+import {
+  callFusionPBX, corsHeaders, getServiceClient, heartbeat, jsonResponse,
+  orgIdsToSync, startSyncJob,
+} from "../_shared/fusionpbx.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  try {
-    const body = await req.json().catch(() => ({}));
-    const orgIds = await resolveOrgIds(body);
-    const results: any[] = [];
-
-    for (const organization_id of orgIds) {
-      const r = await runSync("extensions", organization_id, async () => {
-        // FusionPBX returns extensions for the configured domain
-        const list = await fpbxJson<any[]>("/app/extensions/extension_edit.php?action=json");
-        const supa = adminClient();
-        let rows = 0;
-        for (const ext of (Array.isArray(list) ? list : [])) {
-          const row = {
-            organization_id,
-            extension: String(ext.extension || ext.user || ""),
-            display_name: ext.effective_caller_id_name || ext.description || null,
-            password: undefined, // never sync secrets
-            sip_domain: ext.domain || null,
-            enabled: (ext.enabled ?? "true") !== "false",
-            updated_at: new Date().toISOString(),
-          };
-          if (!row.extension) continue;
-          await supa.from("pbx_extensions").upsert(row, { onConflict: "organization_id,extension" });
-          rows++;
-        }
-        return { rows_synced: rows };
-      });
-      results.push({ organization_id, ...r });
+  const supabase = getServiceClient();
+  const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+  const results: unknown[] = [];
+  for (const orgId of await orgIdsToSync(supabase, body)) {
+    const job = await startSyncJob(supabase, orgId, "fusionpbx", "telecom_extensions");
+    try {
+      const data = await callFusionPBX("list-extensions", { organizationId: orgId });
+      const items = Array.isArray(data?.items) ? data.items : [];
+      await job.finish("success", { rows_in: items.length, rows_out: items.length });
+      await heartbeat(supabase, orgId, "extensions", true, { count: items.length });
+      results.push({ orgId, ok: true, count: items.length });
+    } catch (e) {
+      await job.finish("error", { error: String((e as Error).message).slice(0, 500) });
+      await heartbeat(supabase, orgId, "extensions", false, { error: String((e as Error).message) });
+      results.push({ orgId, ok: false, error: String((e as Error).message) });
     }
-
-    return new Response(JSON.stringify({ ok: true, results }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (e: any) {
-    return new Response(JSON.stringify({ ok: false, error: String(e?.message || e) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   }
+  return jsonResponse(200, { ok: true, results });
 });

@@ -1,112 +1,106 @@
-// Shared FusionPBX helpers for sync edge functions
-import { createClient } from "npm:@supabase/supabase-js@2";
+// Shared FusionPBX helper for telecom sync edge functions.
+// All secrets live server-side. Each call records a row in telecom_sync_jobs.
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-export const FUSIONPBX_API_URL = Deno.env.get("FUSIONPBX_API_URL") || "";
-export const FUSIONPBX_API_KEY = Deno.env.get("FUSIONPBX_API_KEY") || "";
-export const FUSIONPBX_DOMAIN_UUID = Deno.env.get("FUSIONPBX_DOMAIN_UUID") || "";
-export const FUSIONPBX_SIP_DOMAIN = Deno.env.get("FUSIONPBX_SIP_DOMAIN") || "";
-export const FUSIONPBX_USERNAME = Deno.env.get("FUSIONPBX_USERNAME") || "";
+export function jsonResponse(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
-export function adminClient() {
+export function getServiceClient(): SupabaseClient {
   return createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    { auth: { persistSession: false } },
+    { auth: { autoRefreshToken: false, persistSession: false } },
   );
 }
 
-export async function fpbxFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  if (!FUSIONPBX_API_URL || !FUSIONPBX_API_KEY) {
-    throw new Error("FusionPBX credentials not configured");
-  }
-  const url = `${FUSIONPBX_API_URL.replace(/\/$/, "")}${path}`;
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      "Authorization": `Bearer ${FUSIONPBX_API_KEY}`,
-      "X-Domain-Uuid": FUSIONPBX_DOMAIN_UUID,
-      "Accept": "application/json",
-      ...(init.headers || {}),
-    },
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`FusionPBX ${path} -> ${res.status}: ${body.slice(0, 300)}`);
-  }
-  return res;
+export interface SyncJobLogger {
+  jobId: string;
+  finish: (status: "success" | "error", patch?: Record<string, unknown>) => Promise<void>;
 }
 
-export async function fpbxJson<T = any>(path: string): Promise<T> {
-  const res = await fpbxFetch(path);
-  return await res.json() as T;
-}
-
-export type SyncRunResult = {
-  rows_synced: number;
-  ok: boolean;
-  error?: string;
-};
-
-export async function runSync(
+export async function startSyncJob(
+  supabase: SupabaseClient,
+  organizationId: string | null,
   source: string,
-  organization_id: string,
-  worker: () => Promise<{ rows_synced: number }>,
-): Promise<SyncRunResult> {
-  const supa = adminClient();
-  const started = new Date().toISOString();
-  const { data: job } = await supa
+  target: string,
+): Promise<SyncJobLogger> {
+  const { data, error } = await supabase
     .from("telecom_sync_jobs")
-    .insert({ organization_id, source, status: "running", started_at: started })
-    .select("id").single();
-
-  try {
-    const { rows_synced } = await worker();
-    const finished = new Date().toISOString();
-    if (job?.id) {
-      await supa.from("telecom_sync_jobs").update({
-        status: "ok", finished_at: finished, rows_synced,
-      }).eq("id", job.id);
-    }
-    await supa.from("telecom_sync_health").upsert({
-      organization_id, source,
-      status: "ok",
-      last_run_at: finished,
-      last_heartbeat_at: finished,
-      last_error: null,
-      consecutive_failures: 0,
-      rows_synced,
-    }, { onConflict: "organization_id,source" });
-    return { rows_synced, ok: true };
-  } catch (e: any) {
-    const finished = new Date().toISOString();
-    const msg = String(e?.message || e).slice(0, 1000);
-    if (job?.id) {
-      await supa.from("telecom_sync_jobs").update({
-        status: "failed", finished_at: finished, error_message: msg,
-      }).eq("id", job.id);
-    }
-    const { data: prev } = await supa.from("telecom_sync_health")
-      .select("consecutive_failures").eq("organization_id", organization_id).eq("source", source).maybeSingle();
-    await supa.from("telecom_sync_health").upsert({
-      organization_id, source,
-      status: "failed",
-      last_run_at: finished,
-      last_heartbeat_at: finished,
-      last_error: msg,
-      consecutive_failures: (prev?.consecutive_failures || 0) + 1,
-    }, { onConflict: "organization_id,source" });
-    return { rows_synced: 0, ok: false, error: msg };
-  }
+    .insert({ organization_id: organizationId, source, target, status: "running" })
+    .select("id")
+    .single();
+  if (error) throw error;
+  const jobId = data!.id as string;
+  return {
+    jobId,
+    finish: async (status, patch = {}) => {
+      await supabase
+        .from("telecom_sync_jobs")
+        .update({ status, finished_at: new Date().toISOString(), ...patch })
+        .eq("id", jobId);
+    },
+  };
 }
 
-export async function resolveOrgIds(body: any): Promise<string[]> {
-  if (body?.organization_id) return [body.organization_id];
-  const supa = adminClient();
-  const { data } = await supa.from("organizations").select("id").eq("is_active", true);
-  return (data || []).map((o: any) => o.id);
+export async function heartbeat(
+  supabase: SupabaseClient,
+  organizationId: string | null,
+  source: string,
+  ok: boolean,
+  details: Record<string, unknown> = {},
+) {
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = {
+    organization_id: organizationId,
+    source,
+    status: ok ? "healthy" : "degraded",
+    metadata: details,
+  };
+  if (ok) {
+    patch.last_success_at = now;
+    patch.consecutive_failures = 0;
+  } else {
+    patch.last_error_at = now;
+    patch.last_error = String(details.error ?? "unknown");
+  }
+  await supabase.from("telecom_sync_health").upsert(patch, { onConflict: "organization_id,source" });
+}
+
+export async function callFusionPBX(action: string, body: Record<string, unknown> = {}) {
+  const url = Deno.env.get("SUPABASE_URL")! + "/functions/v1/fusionpbx-proxy";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!}`,
+      apikey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    },
+    body: JSON.stringify({ action, ...body }),
+  });
+  if (!res.ok) throw new Error(`fusionpbx-proxy ${action}: ${res.status}`);
+  return await res.json().catch(() => ({}));
+}
+
+const LEMTEL_ORG_ID = "71755d33-ed64-4ad5-a828-61c9d2029eb7";
+
+export async function orgIdsToSync(supabase: SupabaseClient, body: Record<string, unknown>): Promise<string[]> {
+  if (typeof body.organizationId === "string") return [body.organizationId];
+  // default: lemtel + any org with FusionPBX enabled
+  const { data } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("is_active", true)
+    .limit(50);
+  const ids = (data ?? []).map((r: any) => r.id as string);
+  if (!ids.includes(LEMTEL_ORG_ID)) ids.unshift(LEMTEL_ORG_ID);
+  return ids;
 }

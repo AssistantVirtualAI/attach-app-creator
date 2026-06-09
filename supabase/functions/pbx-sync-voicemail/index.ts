@@ -1,57 +1,37 @@
-import { corsHeaders, runSync, resolveOrgIds, fpbxJson, fpbxFetch, adminClient } from "../_shared/fusionpbx.ts";
+import {
+  callFusionPBX, corsHeaders, getServiceClient, heartbeat, jsonResponse,
+  orgIdsToSync, startSyncJob,
+} from "../_shared/fusionpbx.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  try {
-    const body = await req.json().catch(() => ({}));
-    const orgIds = await resolveOrgIds(body);
-    const results: any[] = [];
-
-    for (const organization_id of orgIds) {
-      const r = await runSync("voicemail", organization_id, async () => {
-        const supa = adminClient();
-        const list = await fpbxJson<any[]>("/app/voicemails/voicemail_json.php?limit=200");
-        let rows = 0;
-        for (const vm of (Array.isArray(list) ? list : [])) {
-          const messageId = vm.voicemail_message_uuid || vm.uuid;
-          if (!messageId) continue;
-
-          // Mirror metadata first; audio download is best-effort.
-          const payload: any = {
-            organization_id,
-            message_id: messageId,
-            extension: String(vm.voicemail_id || vm.extension || ""),
-            caller_id_number: vm.caller_id_number || null,
-            caller_id_name: vm.caller_id_name || null,
-            duration_seconds: parseInt(vm.message_length || "0", 10),
-            received_at: vm.created_epoch ? new Date(parseInt(vm.created_epoch, 10) * 1000).toISOString() : new Date().toISOString(),
-            status: vm.message_status || "new",
-          };
-
-          try {
-            const audioRes = await fpbxFetch(`/app/voicemails/voicemail_message_download.php?id=${encodeURIComponent(messageId)}`);
-            const buf = new Uint8Array(await audioRes.arrayBuffer());
-            const path = `${organization_id}/${messageId}.wav`;
-            await supa.storage.from("voicemail-audio").upload(path, buf, {
-              contentType: "audio/wav", upsert: true,
-            });
-            payload.audio_storage_path = path;
-          } catch (_) { /* keep metadata even if audio missed */ }
-
-          await supa.from("pbx_voicemails").upsert(payload, { onConflict: "organization_id,message_id" });
-          rows++;
+  const supabase = getServiceClient();
+  const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+  const results: unknown[] = [];
+  for (const orgId of await orgIdsToSync(supabase, body)) {
+    const job = await startSyncJob(supabase, orgId, "fusionpbx", "telecom_voicemails");
+    try {
+      const data = await callFusionPBX("list-voicemails", { organizationId: orgId, limit: 200 });
+      const items = Array.isArray(data?.items) ? data.items : [];
+      // Queue AI jobs for items missing transcripts
+      let queued = 0;
+      for (const v of items) {
+        if (v?.id && !v?.transcript) {
+          await supabase.from("pbx_ai_jobs").insert({
+            organization_id: orgId, job_type: "voicemail_transcribe",
+            status: "pending", payload: { voicemail_id: v.id },
+          }).select().maybeSingle();
+          queued++;
         }
-        return { rows_synced: rows };
-      });
-      results.push({ organization_id, ...r });
+      }
+      await job.finish("success", { rows_in: items.length, rows_out: items.length, metadata: { queued } });
+      await heartbeat(supabase, orgId, "voicemail", true, { count: items.length, queued });
+      results.push({ orgId, ok: true, count: items.length, queued });
+    } catch (e) {
+      await job.finish("error", { error: String((e as Error).message).slice(0, 500) });
+      await heartbeat(supabase, orgId, "voicemail", false, { error: String((e as Error).message) });
+      results.push({ orgId, ok: false, error: String((e as Error).message) });
     }
-
-    return new Response(JSON.stringify({ ok: true, results }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (e: any) {
-    return new Response(JSON.stringify({ ok: false, error: String(e?.message || e) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   }
+  return jsonResponse(200, { ok: true, results });
 });

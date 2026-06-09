@@ -426,38 +426,12 @@ All colors MUST be HSL.
    ===================================================================== */
 @layer base {
   :root {
-    /* Light cockpit (white-glass) — used when html does NOT have .dark */
-    --cockpit-bg: 220 30% 98%;
-    --cockpit-bg-2: 220 25% 96%;
-    --cockpit-bg-3: 220 25% 92%;
-    --cockpit-surface: 0 0% 100%;
-    --cockpit-surface-strong: 220 25% 97%;
-    --cockpit-border: 220 25% 84%;
-    --cockpit-border-neon: 188 95% 45%;
-    --cockpit-cyan: 188 95% 42%;
-    --cockpit-violet: 262 75% 55%;
-    --cockpit-magenta: 292 75% 55%;
-    --cockpit-state-success: 158 75% 38%;
-    --cockpit-state-warning: 38 95% 50%;
-    --cockpit-state-danger: 350 85% 55%;
-    --cockpit-state-idle: 220 12% 55%;
-
-    --cockpit-shadow-glass: 0 12px 40px -8px hsl(220 40% 50% / 0.18);
-    --cockpit-shadow-glow-cyan: 0 0 24px hsl(188 95% 45% / 0.28);
-    --cockpit-shadow-glow-violet: 0 0 24px hsl(262 75% 55% / 0.28);
-    --cockpit-gradient-shine: linear-gradient(135deg, hsl(188 95% 50%) 0%, hsl(231 95% 60%) 50%, hsl(262 80% 60%) 100%);
-    --cockpit-gradient-bg: radial-gradient(1200px 600px at 10% 0%, hsl(231 95% 90% / 0.55), transparent 60%),
-                            radial-gradient(900px 500px at 90% 100%, hsl(262 90% 92% / 0.55), transparent 60%),
-                            linear-gradient(180deg, hsl(220 30% 99%), hsl(220 25% 96%));
-  }
-
-  .dark {
-    --cockpit-bg: 230 70% 4%;
-    --cockpit-bg-2: 230 60% 7%;
-    --cockpit-bg-3: 228 55% 12%;
-    --cockpit-surface: 222 40% 10%;
-    --cockpit-surface-strong: 222 40% 14%;
-    --cockpit-border: 220 30% 26%;
+    --cockpit-bg: 230 70% 5%;
+    --cockpit-bg-2: 230 60% 9%;
+    --cockpit-bg-3: 228 55% 16%;
+    --cockpit-surface: 220 30% 12%;
+    --cockpit-surface-strong: 220 30% 16%;
+    --cockpit-border: 220 30% 30%;
     --cockpit-border-neon: 188 95% 55%;
     --cockpit-cyan: 188 100% 60%;
     --cockpit-violet: 262 90% 68%;
@@ -474,6 +448,15 @@ All colors MUST be HSL.
     --cockpit-gradient-bg: radial-gradient(1200px 600px at 10% 0%, hsl(231 80% 18% / 0.55), transparent 60%),
                             radial-gradient(900px 500px at 90% 100%, hsl(262 80% 18% / 0.45), transparent 60%),
                             linear-gradient(180deg, hsl(230 70% 5%), hsl(228 55% 10%));
+  }
+
+  .dark {
+    --cockpit-bg: 230 70% 4%;
+    --cockpit-bg-2: 230 60% 7%;
+    --cockpit-bg-3: 228 55% 12%;
+    --cockpit-surface: 222 40% 10%;
+    --cockpit-surface-strong: 222 40% 14%;
+    --cockpit-border: 220 30% 26%;
   }
 }
 
@@ -510,52 +493,6 @@ All colors MUST be HSL.
   }
   .cockpit-shine:active {
     transform: translateY(1px);
-  }
-
-  /* Shiny glass buttons — translucent, gradient sheen, works in both themes */
-  .cockpit-btn-glass {
-    background: linear-gradient(135deg, hsl(var(--cockpit-surface) / 0.65), hsl(var(--cockpit-surface) / 0.35));
-    backdrop-filter: blur(14px) saturate(1.3);
-    -webkit-backdrop-filter: blur(14px) saturate(1.3);
-    border: 1px solid hsl(var(--cockpit-border) / 0.6);
-    box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.18), 0 4px 14px -4px hsl(0 0% 0% / 0.18);
-    transition: all 180ms ease;
-  }
-  .cockpit-btn-glass:hover {
-    border-color: hsl(var(--cockpit-cyan) / 0.55);
-    box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.25), 0 6px 22px -6px hsl(var(--cockpit-cyan) / 0.35);
-  }
-  .cockpit-btn-glass-shiny {
-    position: relative;
-    overflow: hidden;
-    background:
-      linear-gradient(180deg, hsl(0 0% 100% / 0.18) 0%, transparent 50%),
-      linear-gradient(135deg, hsl(var(--cockpit-cyan) / 0.18), hsl(var(--cockpit-violet) / 0.18));
-    backdrop-filter: blur(16px) saturate(1.4);
-    -webkit-backdrop-filter: blur(16px) saturate(1.4);
-    border: 1px solid hsl(var(--cockpit-cyan) / 0.45);
-    box-shadow:
-      inset 0 1px 0 0 hsl(0 0% 100% / 0.35),
-      inset 0 -1px 0 0 hsl(0 0% 0% / 0.1),
-      0 6px 22px -6px hsl(var(--cockpit-cyan) / 0.4);
-    transition: all 200ms ease;
-  }
-  .cockpit-btn-glass-shiny::before {
-    content: "";
-    position: absolute; inset: 0;
-    background: linear-gradient(115deg, transparent 30%, hsl(0 0% 100% / 0.25) 50%, transparent 70%);
-    background-size: 200% 100%;
-    background-position: -100% 0;
-    transition: background-position 600ms ease;
-    pointer-events: none;
-  }
-  .cockpit-btn-glass-shiny:hover::before { background-position: 200% 0; }
-  .cockpit-btn-glass-shiny:hover {
-    border-color: hsl(var(--cockpit-cyan) / 0.75);
-    box-shadow:
-      inset 0 1px 0 0 hsl(0 0% 100% / 0.45),
-      0 8px 30px -6px hsl(var(--cockpit-cyan) / 0.55),
-      0 0 0 1px hsl(var(--cockpit-cyan) / 0.3);
   }
   .cockpit-scan::after {
     content: "";

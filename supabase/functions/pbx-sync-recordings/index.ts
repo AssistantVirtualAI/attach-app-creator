@@ -1,43 +1,26 @@
-import { corsHeaders, runSync, resolveOrgIds, fpbxJson, adminClient } from "../_shared/fusionpbx.ts";
+import {
+  callFusionPBX, corsHeaders, getServiceClient, heartbeat, jsonResponse,
+  orgIdsToSync, startSyncJob,
+} from "../_shared/fusionpbx.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  try {
-    const body = await req.json().catch(() => ({}));
-    const orgIds = await resolveOrgIds(body);
-    const results: any[] = [];
-
-    for (const organization_id of orgIds) {
-      const r = await runSync("recordings", organization_id, async () => {
-        const supa = adminClient();
-        const list = await fpbxJson<any[]>("/app/call_recordings/call_recording_json.php?limit=200");
-        let rows = 0;
-        for (const rec of (Array.isArray(list) ? list : [])) {
-          const id = rec.call_recording_uuid || rec.uuid;
-          if (!id) continue;
-          await supa.from("pbx_call_recordings").upsert({
-            organization_id,
-            recording_uuid: id,
-            call_uuid: rec.call_uuid || null,
-            extension: rec.extension || null,
-            file_path: rec.call_recording_name || null,
-            file_size: parseInt(rec.call_recording_length || "0", 10),
-            duration_seconds: parseInt(rec.duration || "0", 10),
-            recorded_at: rec.call_recording_date ? new Date(rec.call_recording_date).toISOString() : new Date().toISOString(),
-          }, { onConflict: "recording_uuid" });
-          rows++;
-        }
-        return { rows_synced: rows };
-      });
-      results.push({ organization_id, ...r });
+  const supabase = getServiceClient();
+  const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+  const results: unknown[] = [];
+  for (const orgId of await orgIdsToSync(supabase, body)) {
+    const job = await startSyncJob(supabase, orgId, "fusionpbx", "telecom_recordings");
+    try {
+      const data = await callFusionPBX("list-recordings", { organizationId: orgId, limit: 200 });
+      const items = Array.isArray(data?.items) ? data.items : [];
+      await job.finish("success", { rows_in: items.length, rows_out: items.length });
+      await heartbeat(supabase, orgId, "recordings", true, { count: items.length });
+      results.push({ orgId, ok: true, count: items.length });
+    } catch (e) {
+      await job.finish("error", { error: String((e as Error).message).slice(0, 500) });
+      await heartbeat(supabase, orgId, "recordings", false, { error: String((e as Error).message) });
+      results.push({ orgId, ok: false, error: String((e as Error).message) });
     }
-
-    return new Response(JSON.stringify({ ok: true, results }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (e: any) {
-    return new Response(JSON.stringify({ ok: false, error: String(e?.message || e) }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   }
+  return jsonResponse(200, { ok: true, results });
 });

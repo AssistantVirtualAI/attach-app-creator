@@ -2,7 +2,7 @@ import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "ghost" | "outline" | "danger" | "glass" | "glass-shiny";
+type Variant = "primary" | "ghost" | "outline" | "danger";
 type Size = "sm" | "md" | "lg";
 
 const sizeMap: Record<Size, string> = {
@@ -20,10 +20,6 @@ const variantMap: Record<Variant, string> = {
     "bg-transparent text-foreground hover:bg-cockpit-surface/40 transition-colors",
   danger:
     "bg-cockpit-danger/15 text-cockpit-danger border border-cockpit-danger/40 hover:bg-cockpit-danger/25 transition-colors",
-  glass:
-    "cockpit-btn-glass text-foreground",
-  "glass-shiny":
-    "cockpit-btn-glass-shiny text-foreground",
 };
 
 type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {

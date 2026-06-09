@@ -1,166 +1,111 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useOrganization } from '@/context/OrganizationContext';
-import { GlassCard, SectionHeader, NeonButton, GlassTable, StatusChip, EmptyStateBranded } from '@/components/ui-cockpit';
-import { GTHead, GTRow, GTHeadCell, GTCell } from '@/components/ui-cockpit/GlassTable';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Plus, Users2, Mail, Phone, Building2, Loader2, Pencil, Trash2 } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useOrganization } from "@/context/OrganizationContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Trash2, Users } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
-type VAClient = {
+interface VAClient {
   id: string;
-  organization_id: string;
   name: string;
   contact_email: string | null;
   contact_phone: string | null;
   company: string | null;
   notes: string | null;
   status: string;
-  created_at: string;
-};
+}
 
 export default function LemtelVoiceAgentClients() {
   const { selectedOrgId } = useOrganization();
-  const qc = useQueryClient();
+  const [clients, setClients] = useState<VAClient[]>([]);
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<VAClient | null>(null);
-  const [form, setForm] = useState({ name: '', contact_email: '', contact_phone: '', company: '', notes: '' });
+  const [form, setForm] = useState({ name: "", contact_email: "", contact_phone: "", company: "", notes: "" });
 
-  const { data: clients = [], isLoading } = useQuery({
-    queryKey: ['voice_agent_clients', selectedOrgId],
-    queryFn: async () => {
-      if (!selectedOrgId) return [];
-      const { data, error } = await (supabase as any)
-        .from('voice_agent_clients')
-        .select('*')
-        .eq('organization_id', selectedOrgId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return (data || []) as VAClient[];
-    },
-    enabled: !!selectedOrgId,
-  });
+  const load = async () => {
+    if (!selectedOrgId) return;
+    const { data } = await supabase.from("voice_agent_clients").select("*")
+      .eq("organization_id", selectedOrgId).order("created_at", { ascending: false });
+    setClients((data ?? []) as VAClient[]);
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [selectedOrgId]);
 
-  const upsert = useMutation({
-    mutationFn: async () => {
-      if (!selectedOrgId) throw new Error('No organization');
-      const payload = { ...form, organization_id: selectedOrgId };
-      if (editing) {
-        const { error } = await (supabase as any).from('voice_agent_clients').update(payload).eq('id', editing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await (supabase as any).from('voice_agent_clients').insert(payload);
-        if (error) throw error;
-      }
-    },
-    onSuccess: () => {
-      toast({ title: editing ? 'Client updated' : 'Client created' });
-      setOpen(false); setEditing(null); setForm({ name: '', contact_email: '', contact_phone: '', company: '', notes: '' });
-      qc.invalidateQueries({ queryKey: ['voice_agent_clients'] });
-    },
-    onError: (e: any) => toast({ variant: 'destructive', title: 'Error', description: e.message }),
-  });
-
-  const remove = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await (supabase as any).from('voice_agent_clients').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => { toast({ title: 'Client deleted' }); qc.invalidateQueries({ queryKey: ['voice_agent_clients'] }); },
-  });
-
-  const openCreate = () => { setEditing(null); setForm({ name: '', contact_email: '', contact_phone: '', company: '', notes: '' }); setOpen(true); };
-  const openEdit = (c: VAClient) => {
-    setEditing(c);
-    setForm({
-      name: c.name, contact_email: c.contact_email || '', contact_phone: c.contact_phone || '',
-      company: c.company || '', notes: c.notes || '',
+  const submit = async () => {
+    if (!form.name.trim() || !selectedOrgId) return;
+    const { error } = await supabase.from("voice_agent_clients").insert({
+      organization_id: selectedOrgId, ...form,
     });
-    setOpen(true);
+    if (error) {
+      toast({ title: "Failed", description: error.message, variant: "destructive" });
+      return;
+    }
+    setOpen(false);
+    setForm({ name: "", contact_email: "", contact_phone: "", company: "", notes: "" });
+    toast({ title: "Client created" });
+    load();
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm("Delete this client?")) return;
+    await supabase.from("voice_agent_clients").delete().eq("id", id);
+    load();
   };
 
   return (
-    <div className="space-y-6">
-      <SectionHeader
-        icon={<Users2 className="w-5 h-5" />}
-        title="Voice Agent Clients"
-        subtitle="Customers reachable by your AI voice agents — independent from phone-system clients."
-        actions={<NeonButton onClick={openCreate}><Plus className="w-4 h-4" /> New Client</NeonButton>}
-      />
-
-      <GlassCard>
-        <div className="p-4">
-          {isLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="animate-spin text-cockpit-cyan" /></div>
-          ) : clients.length === 0 ? (
-            <EmptyStateBranded
-              icon={<Users2 className="w-8 h-8" />}
-              title="No voice-agent clients yet"
-              description="Add customers your voice agents will speak with. Kept separate from phone-system accounts."
-              action={<NeonButton onClick={openCreate}><Plus className="w-4 h-4" /> Add first client</NeonButton>}
-            />
-          ) : (
-            <GlassTable>
-              <GTHead>
-                <GTRow>
-                  <GTHeadCell>Name</GTHeadCell>
-                  <GTHeadCell>Company</GTHeadCell>
-                  <GTHeadCell>Contact</GTHeadCell>
-                  <GTHeadCell>Status</GTHeadCell>
-                  <GTHeadCell className="text-right"></GTHeadCell>
-                </GTRow>
-              </GTHead>
-              <tbody>
-                {clients.map(c => (
-                  <GTRow key={c.id}>
-                    <GTCell className="font-medium">{c.name}</GTCell>
-                    <GTCell>{c.company ? <span className="inline-flex items-center gap-1.5 text-sm"><Building2 className="w-3.5 h-3.5 text-cockpit-cyan" />{c.company}</span> : <span className="text-muted-foreground">—</span>}</GTCell>
-                    <GTCell>
-                      <div className="text-xs space-y-0.5">
-                        {c.contact_email && <div className="flex items-center gap-1"><Mail className="w-3 h-3" />{c.contact_email}</div>}
-                        {c.contact_phone && <div className="flex items-center gap-1 font-mono"><Phone className="w-3 h-3" />{c.contact_phone}</div>}
-                      </div>
-                    </GTCell>
-                    <GTCell><StatusChip tone={c.status === 'active' ? 'success' : 'idle'}>{c.status}</StatusChip></GTCell>
-                    <GTCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <NeonButton size="sm" variant="ghost" onClick={() => openEdit(c)}><Pencil className="w-3.5 h-3.5" /></NeonButton>
-                        <NeonButton size="sm" variant="danger" onClick={() => confirm(`Delete ${c.name}?`) && remove.mutate(c.id)}><Trash2 className="w-3.5 h-3.5" /></NeonButton>
-                      </div>
-                    </GTCell>
-                  </GTRow>
-                ))}
-              </tbody>
-            </GlassTable>
-          )}
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold flex items-center gap-2">
+            <Users className="h-6 w-6" /> Voice Agent Clients
+          </h1>
+          <p className="text-sm text-muted-foreground">Clients assignable to AI voice agents (separate from phone clients).</p>
         </div>
-      </GlassCard>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>{editing ? 'Edit Voice Agent Client' : 'New Voice Agent Client'}</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
-            <div><Label>Name *</Label><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="John Doe" /></div>
-            <div><Label>Company</Label><Input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} placeholder="Acme Inc." /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label>Email</Label><Input type="email" value={form.contact_email} onChange={e => setForm({ ...form, contact_email: e.target.value })} placeholder="contact@acme.com" /></div>
-              <div><Label>Phone</Label><Input value={form.contact_phone} onChange={e => setForm({ ...form, contact_phone: e.target.value })} placeholder="+1 555 0100" /></div>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button><Plus className="h-4 w-4 mr-2" /> New client</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>New voice-agent client</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <Input placeholder="Name *" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <Input placeholder="Company" value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
+              <Input placeholder="Email" value={form.contact_email} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} />
+              <Input placeholder="Phone" value={form.contact_phone} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} />
+              <Textarea placeholder="Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </div>
-            <div><Label>Notes</Label><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} /></div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button onClick={submit}>Create</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card>
+        <CardHeader><CardTitle>{clients.length} client(s)</CardTitle></CardHeader>
+        <CardContent>
+          {clients.length === 0 && <p className="text-sm text-muted-foreground">No voice-agent clients yet.</p>}
+          <div className="space-y-2">
+            {clients.map((c) => (
+              <div key={c.id} className="flex items-center justify-between border rounded-md p-3">
+                <div>
+                  <div className="font-medium">{c.name} <Badge variant="outline" className="ml-2">{c.status}</Badge></div>
+                  <div className="text-xs text-muted-foreground">
+                    {[c.company, c.contact_email, c.contact_phone].filter(Boolean).join(" · ")}
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => remove(c.id)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
           </div>
-          <DialogFooter>
-            <NeonButton variant="ghost" onClick={() => setOpen(false)}>Cancel</NeonButton>
-            <NeonButton onClick={() => upsert.mutate()} disabled={!form.name || upsert.isPending}>
-              {upsert.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              {editing ? 'Save' : 'Create'}
-            </NeonButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
     </div>
   );
 }
