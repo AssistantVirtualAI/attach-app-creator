@@ -206,6 +206,7 @@ function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boole
 
 /* ─── Compact bottom rail for narrow / minimized windows ─── */
 function CompactRail({ view, onChange, onOpenSettings, items }: { view: ConsoleView; onChange: (v: ConsoleView) => void; onOpenSettings: () => void; items: ConsoleView[] }) {
+  const { t } = useTranslation();
   const all: ConsoleView[] = [...items, 'settings'];
   return (
     <aside style={{
@@ -238,7 +239,7 @@ function CompactRail({ view, onChange, onOpenSettings, items }: { view: ConsoleV
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={active ? accent : 'currentColor'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d={ICON[v]} />
               </svg>
-              <span style={{ letterSpacing: 0.3 }}>{LABEL[v]}</span>
+              <span style={{ letterSpacing: 0.3 }}>{t(NAV_KEY[v])}</span>
             </button>
           );
         })}
