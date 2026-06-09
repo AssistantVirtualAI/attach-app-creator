@@ -1,5 +1,8 @@
 # AVA / Lemtel — Phased Implementation Plan
 
+Progress: ✅ Phase 1 (design tokens + primitives + `/_design` dev route) — done.
+
+
 Goal: ship the "futuristic glass telecom cockpit + real‑time PBX sync" plan **without breaking** anything already in production (auth, RLS, routes, OrganizationContext, LanguageContext, FusionPBX integration, softphone, reports, desktop app).
 
 Strategy: build **additively** — new tokens, new shell components, new tables/views, new sync edge functions — then progressively switch pages to the new shell behind feature flags. No mass rename, no destructive migrations, no behavior change without verification.
