@@ -21,6 +21,12 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Required GitHub secrets for signing:
+#   MAC_CERTS = base64 encoded .p12 certificate
+#   MAC_CERTS_PASSWORD = certificate password
+#   APPLE_ID = mhassoun@assistantvirtualai.com
+#   APPLE_APP_PASSWORD = app-specific password from appleid.apple.com
+
 jobs:
   verify-version:
     runs-on: ubuntu-latest
