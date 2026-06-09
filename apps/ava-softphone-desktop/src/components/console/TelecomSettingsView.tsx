@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabaseClient';
+import { useTranslation, type I18nKey } from '../../lib/i18n';
+import StatusPill from '../ui/StatusPill';
+import StateView from '../ui/StateView';
 
 const { colors: c } = theme;
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_KEYS: I18nKey[] = ['day.sun', 'day.mon', 'day.tue', 'day.wed', 'day.thu', 'day.fri', 'day.sat'];
 type Hour = {
   day_of_week: number;
   is_working_day: boolean;
