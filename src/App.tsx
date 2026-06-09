@@ -169,6 +169,7 @@ const MyOrgChat = lazy(() => import("./pages/my/OrgChat"));
 const MyAIAssistant = lazy(() => import("./pages/my/AIAssistant"));
 const MyVoicemail = lazy(() => import("./pages/my/Voicemail"));
 const CustomerAdminAIChat = lazy(() => import("./pages/customer/AdminAIChat"));
+const CustomerSyncHealth = lazy(() => import("./pages/customer/SyncHealthCenter"));
 import { RolePortalGuard } from "./components/portals/RolePortalGuard";
 import PlatformDashboard from "./pages/portals/PlatformDashboard";
 import PlatformSystemHealth from "./pages/platform/SystemHealth";
