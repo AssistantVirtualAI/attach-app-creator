@@ -71,7 +71,7 @@ jobs:
         working-directory: apps/ava-softphone-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'true'
           WIN_CSC_LINK: ''
           WIN_CSC_KEY_PASSWORD: ''
 
@@ -120,7 +120,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           CSC_LINK: ${{ secrets.MAC_CERTS }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'true'
           APPLE_TEAM_ID: 64XSWWB49N
 
       - name: Notarize macOS DMG
@@ -188,7 +188,7 @@ jobs:
         working-directory: apps/ava-softphone-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'true'
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
