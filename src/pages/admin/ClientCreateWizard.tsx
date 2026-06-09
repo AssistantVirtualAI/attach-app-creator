@@ -61,6 +61,7 @@ export default function ClientCreateWizard() {
   };
 
   return (
+    <div className="cockpit-scope min-h-screen p-6">
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="page-title text-2xl font-semibold">New Client</h1>
@@ -152,6 +153,7 @@ export default function ClientCreateWizard() {
           </Button>
         )}
       </div>
+    </div>
     </div>
   );
 }
