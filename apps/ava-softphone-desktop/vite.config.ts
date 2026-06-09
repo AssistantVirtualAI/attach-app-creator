@@ -16,7 +16,7 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
-      external: ['electron'],
+      external: ['electron', 'zod/v4'],
     },
   },
   base: './',
