@@ -13,6 +13,7 @@ import AdminView from './AdminView';
 import TelecomSettingsView from './TelecomSettingsView';
 import OrgChatView from './OrgChatView';
 import AdminAIChatView from './AdminAIChatView';
+import ReportsView from './ReportsView';
 import SoftphonePane from '../SoftphonePane';
 import SettingsPage from '../SettingsPage';
 import IncomingCallToast from './IncomingCallToast';
@@ -131,6 +132,7 @@ export default function ConsoleLayout({
           {view === 'telecom' && <TelecomSettingsView />}
           {view === 'orgchat' && <OrgChatView />}
           {view === 'aiadmin' && <AdminAIChatView />}
+          {view === 'reports' && <ReportsView />}
           {view === 'settings' && (
             <SettingsPage
               creds={creds}
