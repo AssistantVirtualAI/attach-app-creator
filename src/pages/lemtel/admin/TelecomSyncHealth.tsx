@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { GlassCard, SectionHeader, NeonButton, GlassTable, StatusChip, KpiCard, LiveBadge } from '@/components/ui-cockpit';
+import { GTHead, GTRow, GTHeadCell, GTCell } from '@/components/ui-cockpit/GlassTable';
 import { Activity, RefreshCw, AlertTriangle, CheckCircle2, Loader2, PhoneCall, Voicemail, Disc, ListChecks } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
@@ -66,8 +67,8 @@ export default function TelecomSyncHealth() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KpiCard label="Sources Healthy" value={`${okCount} / ${SOURCES.length}`} icon={<CheckCircle2 className="w-4 h-4" />} accent="cyan" />
-        <KpiCard label="Failing" value={failCount} icon={<AlertTriangle className="w-4 h-4" />} accent={failCount > 0 ? 'magenta' : 'cyan'} />
-        <KpiCard label="Status" value={<LiveBadge active={okCount > 0}>{okCount > 0 ? 'Streaming' : 'Idle'}</LiveBadge>} icon={<Activity className="w-4 h-4" />} accent="violet" />
+        <KpiCard label="Failing" value={failCount} icon={<AlertTriangle className="w-4 h-4" />} accent={failCount > 0 ? 'danger' : 'success'} />
+        <KpiCard label="Status" value={okCount > 0 ? 'Streaming' : 'Idle'} icon={<Activity className="w-4 h-4" />} accent="violet" live={okCount > 0} />
       </div>
 
       <GlassCard>
@@ -75,33 +76,39 @@ export default function TelecomSyncHealth() {
           {isLoading ? (
             <div className="flex justify-center py-8"><Loader2 className="animate-spin text-cockpit-cyan" /></div>
           ) : (
-            <GlassTable
-              columns={[
-                { key: 'source', header: 'Source' },
-                { key: 'status', header: 'Status' },
-                { key: 'last_run', header: 'Last Run' },
-                { key: 'heartbeat', header: 'Heartbeat' },
-                { key: 'rows', header: 'Rows', align: 'right' },
-                { key: 'error', header: 'Last Error' },
-                { key: 'actions', header: '', align: 'right' },
-              ]}
-              rows={SOURCES.map(s => {
-                const h = getHealth(s.id);
-                const Icon = s.icon;
-                return {
-                  id: s.id,
-                  cells: {
-                    source: <span className="inline-flex items-center gap-2 font-medium"><Icon className="w-4 h-4 text-cockpit-cyan" />{s.label}</span>,
-                    status: <StatusChip status={h?.status === 'ok' ? 'success' : h?.status === 'failed' ? 'danger' : 'idle'}>{h?.status || 'never run'}</StatusChip>,
-                    last_run: h?.last_run_at ? <span className="text-xs">{formatDistanceToNow(new Date(h.last_run_at), { addSuffix: true })}</span> : <span className="text-muted-foreground text-xs">—</span>,
-                    heartbeat: h?.last_heartbeat_at ? <LiveBadge active={Date.now() - new Date(h.last_heartbeat_at).getTime() < 120000}>{formatDistanceToNow(new Date(h.last_heartbeat_at), { addSuffix: true })}</LiveBadge> : <span className="text-muted-foreground text-xs">—</span>,
-                    rows: <span className="font-mono text-xs">{h?.rows_synced ?? 0}</span>,
-                    error: h?.last_error ? <span className="text-xs text-cockpit-state-danger truncate block max-w-xs" title={h.last_error}>{h.last_error}</span> : <span className="text-muted-foreground text-xs">—</span>,
-                    actions: <NeonButton size="sm" variant="outline" onClick={() => runNow.mutate(s.fn)} disabled={runNow.isPending}><RefreshCw className={`w-3.5 h-3.5 ${runNow.isPending ? 'animate-spin' : ''}`} /> Run</NeonButton>,
-                  },
-                };
-              })}
-            />
+            <GlassTable>
+              <GTHead>
+                <GTRow>
+                  <GTHeadCell>Source</GTHeadCell>
+                  <GTHeadCell>Status</GTHeadCell>
+                  <GTHeadCell>Last Run</GTHeadCell>
+                  <GTHeadCell>Heartbeat</GTHeadCell>
+                  <GTHeadCell className="text-right">Rows</GTHeadCell>
+                  <GTHeadCell>Last Error</GTHeadCell>
+                  <GTHeadCell className="text-right"></GTHeadCell>
+                </GTRow>
+              </GTHead>
+              <tbody>
+                {SOURCES.map(s => {
+                  const h = getHealth(s.id);
+                  const Icon = s.icon;
+                  const alive = h?.last_heartbeat_at && Date.now() - new Date(h.last_heartbeat_at).getTime() < 120000;
+                  return (
+                    <GTRow key={s.id}>
+                      <GTCell><span className="inline-flex items-center gap-2 font-medium"><Icon className="w-4 h-4 text-cockpit-cyan" />{s.label}</span></GTCell>
+                      <GTCell><StatusChip tone={h?.status === 'ok' ? 'success' : h?.status === 'failed' ? 'danger' : 'idle'}>{h?.status || 'never run'}</StatusChip></GTCell>
+                      <GTCell>{h?.last_run_at ? <span className="text-xs">{formatDistanceToNow(new Date(h.last_run_at), { addSuffix: true })}</span> : <span className="text-muted-foreground text-xs">—</span>}</GTCell>
+                      <GTCell>{h?.last_heartbeat_at ? <span className="inline-flex items-center gap-2"><LiveBadge tone={alive ? 'success' : 'danger'} label={alive ? 'LIVE' : 'STALE'} /><span className="text-xs">{formatDistanceToNow(new Date(h.last_heartbeat_at), { addSuffix: true })}</span></span> : <span className="text-muted-foreground text-xs">—</span>}</GTCell>
+                      <GTCell className="text-right font-mono text-xs">{h?.rows_synced ?? 0}</GTCell>
+                      <GTCell>{h?.last_error ? <span className="text-xs text-cockpit-danger truncate block max-w-xs" title={h.last_error}>{h.last_error}</span> : <span className="text-muted-foreground text-xs">—</span>}</GTCell>
+                      <GTCell className="text-right">
+                        <NeonButton size="sm" variant="outline" onClick={() => runNow.mutate(s.fn)} disabled={runNow.isPending}><RefreshCw className={`w-3.5 h-3.5 ${runNow.isPending ? 'animate-spin' : ''}`} /> Run</NeonButton>
+                      </GTCell>
+                    </GTRow>
+                  );
+                })}
+              </tbody>
+            </GlassTable>
           )}
         </div>
       </GlassCard>

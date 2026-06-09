@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { GlassCard, SectionHeader, NeonButton, GlassTable, StatusChip, EmptyStateBranded } from '@/components/ui-cockpit';
+import { GTHead, GTRow, GTHeadCell, GTCell } from '@/components/ui-cockpit/GlassTable';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -87,7 +88,7 @@ export default function LemtelVoiceAgentClients() {
       <SectionHeader
         icon={<Users2 className="w-5 h-5" />}
         title="Voice Agent Clients"
-        subtitle="Customers whose contacts are reachable by your AI voice agents — independent from phone-system clients."
+        subtitle="Customers reachable by your AI voice agents — independent from phone-system clients."
         actions={<NeonButton onClick={openCreate}><Plus className="w-4 h-4" /> New Client</NeonButton>}
       />
 
@@ -99,39 +100,42 @@ export default function LemtelVoiceAgentClients() {
             <EmptyStateBranded
               icon={<Users2 className="w-8 h-8" />}
               title="No voice-agent clients yet"
-              description="Add customers your voice agents will speak with. These are kept separate from phone-system accounts."
+              description="Add customers your voice agents will speak with. Kept separate from phone-system accounts."
               action={<NeonButton onClick={openCreate}><Plus className="w-4 h-4" /> Add first client</NeonButton>}
             />
           ) : (
-            <GlassTable
-              columns={[
-                { key: 'name', header: 'Name' },
-                { key: 'company', header: 'Company' },
-                { key: 'contact', header: 'Contact' },
-                { key: 'status', header: 'Status' },
-                { key: 'actions', header: '', align: 'right' },
-              ]}
-              rows={clients.map(c => ({
-                id: c.id,
-                cells: {
-                  name: <span className="font-medium">{c.name}</span>,
-                  company: c.company ? <span className="inline-flex items-center gap-1.5 text-sm"><Building2 className="w-3.5 h-3.5 text-cockpit-cyan" />{c.company}</span> : <span className="text-muted-foreground">—</span>,
-                  contact: (
-                    <div className="text-xs space-y-0.5">
-                      {c.contact_email && <div className="flex items-center gap-1"><Mail className="w-3 h-3" />{c.contact_email}</div>}
-                      {c.contact_phone && <div className="flex items-center gap-1 font-mono"><Phone className="w-3 h-3" />{c.contact_phone}</div>}
-                    </div>
-                  ),
-                  status: <StatusChip status={c.status === 'active' ? 'success' : 'idle'}>{c.status}</StatusChip>,
-                  actions: (
-                    <div className="flex justify-end gap-1">
-                      <NeonButton size="sm" variant="ghost" onClick={() => openEdit(c)}><Pencil className="w-3.5 h-3.5" /></NeonButton>
-                      <NeonButton size="sm" variant="danger" onClick={() => confirm(`Delete ${c.name}?`) && remove.mutate(c.id)}><Trash2 className="w-3.5 h-3.5" /></NeonButton>
-                    </div>
-                  ),
-                },
-              }))}
-            />
+            <GlassTable>
+              <GTHead>
+                <GTRow>
+                  <GTHeadCell>Name</GTHeadCell>
+                  <GTHeadCell>Company</GTHeadCell>
+                  <GTHeadCell>Contact</GTHeadCell>
+                  <GTHeadCell>Status</GTHeadCell>
+                  <GTHeadCell className="text-right"></GTHeadCell>
+                </GTRow>
+              </GTHead>
+              <tbody>
+                {clients.map(c => (
+                  <GTRow key={c.id}>
+                    <GTCell className="font-medium">{c.name}</GTCell>
+                    <GTCell>{c.company ? <span className="inline-flex items-center gap-1.5 text-sm"><Building2 className="w-3.5 h-3.5 text-cockpit-cyan" />{c.company}</span> : <span className="text-muted-foreground">—</span>}</GTCell>
+                    <GTCell>
+                      <div className="text-xs space-y-0.5">
+                        {c.contact_email && <div className="flex items-center gap-1"><Mail className="w-3 h-3" />{c.contact_email}</div>}
+                        {c.contact_phone && <div className="flex items-center gap-1 font-mono"><Phone className="w-3 h-3" />{c.contact_phone}</div>}
+                      </div>
+                    </GTCell>
+                    <GTCell><StatusChip tone={c.status === 'active' ? 'success' : 'idle'}>{c.status}</StatusChip></GTCell>
+                    <GTCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <NeonButton size="sm" variant="ghost" onClick={() => openEdit(c)}><Pencil className="w-3.5 h-3.5" /></NeonButton>
+                        <NeonButton size="sm" variant="danger" onClick={() => confirm(`Delete ${c.name}?`) && remove.mutate(c.id)}><Trash2 className="w-3.5 h-3.5" /></NeonButton>
+                      </div>
+                    </GTCell>
+                  </GTRow>
+                ))}
+              </tbody>
+            </GlassTable>
           )}
         </div>
       </GlassCard>

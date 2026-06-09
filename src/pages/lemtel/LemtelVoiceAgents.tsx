@@ -3,8 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOrganization } from '@/context/OrganizationContext';
 import { GlassCard, SectionHeader, NeonButton, GlassTable, KpiCard, StatusChip, EmptyStateBranded } from '@/components/ui-cockpit';
+import { GTHead, GTRow, GTHeadCell, GTCell } from '@/components/ui-cockpit/GlassTable';
 import { Badge } from '@/components/ui/badge';
-import { Bot, Plus, Loader2, Sparkles, Globe, Phone, Link2, Users2 } from 'lucide-react';
+import { Bot, Plus, Loader2, Sparkles, Globe, Phone, Link2 } from 'lucide-react';
 import { usePbxAgents } from '@/hooks/usePbxData';
 import { AssignClientDialog } from '@/components/voice-agents/AssignClientDialog';
 
@@ -49,7 +50,7 @@ export default function LemtelVoiceAgents() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KpiCard label="Total Agents" value={voice.length} icon={<Bot className="w-4 h-4" />} accent="cyan" />
         <KpiCard label="Platforms" value={new Set(voice.map(a => a.platform)).size} icon={<Globe className="w-4 h-4" />} accent="violet" />
-        <KpiCard label="External Numbers" value={voice.filter(a => a.is_external).length} icon={<Phone className="w-4 h-4" />} accent="magenta" />
+        <KpiCard label="External Numbers" value={voice.filter(a => a.is_external).length} icon={<Phone className="w-4 h-4" />} accent="success" />
       </div>
 
       <GlassCard>
@@ -68,53 +69,58 @@ export default function LemtelVoiceAgents() {
               }
             />
           ) : (
-            <GlassTable
-              columns={[
-                { key: 'name', header: 'Agent' },
-                { key: 'platform', header: 'Platform' },
-                { key: 'phone', header: 'Phone' },
-                { key: 'clients', header: 'Assigned Clients' },
-                { key: 'status', header: 'Status' },
-                { key: 'actions', header: '', align: 'right' },
-              ]}
-              rows={voice.map((a: any) => {
-                const assigned = assignmentsFor(a.id);
-                return {
-                  id: a.id,
-                  cells: {
-                    name: (
-                      <div className="flex items-center gap-2">
-                        <div className="rounded-lg bg-cockpit-cyan/15 p-1.5"><Bot className="w-4 h-4 text-cockpit-cyan" /></div>
-                        <div>
-                          <div className="font-medium">{a.name}</div>
-                          {a.description && <div className="text-xs text-muted-foreground truncate max-w-xs">{a.description}</div>}
+            <GlassTable>
+              <GTHead>
+                <GTRow>
+                  <GTHeadCell>Agent</GTHeadCell>
+                  <GTHeadCell>Platform</GTHeadCell>
+                  <GTHeadCell>Phone</GTHeadCell>
+                  <GTHeadCell>Assigned Clients</GTHeadCell>
+                  <GTHeadCell>Status</GTHeadCell>
+                  <GTHeadCell className="text-right"></GTHeadCell>
+                </GTRow>
+              </GTHead>
+              <tbody>
+                {voice.map((a: any) => {
+                  const assigned = assignmentsFor(a.id);
+                  return (
+                    <GTRow key={a.id}>
+                      <GTCell>
+                        <div className="flex items-center gap-2">
+                          <div className="rounded-lg bg-cockpit-cyan/15 p-1.5"><Bot className="w-4 h-4 text-cockpit-cyan" /></div>
+                          <div>
+                            <div className="font-medium">{a.name}</div>
+                            {a.description && <div className="text-xs text-muted-foreground truncate max-w-xs">{a.description}</div>}
+                          </div>
                         </div>
-                      </div>
-                    ),
-                    platform: <Badge variant="outline" className="capitalize">{a.platform}</Badge>,
-                    phone: <span className="font-mono text-xs">{a.twilio_number || '—'}</span>,
-                    clients: assigned.length === 0
-                      ? <span className="text-xs text-muted-foreground">Unassigned</span>
-                      : (
-                        <div className="flex flex-wrap gap-1">
-                          {assigned.slice(0, 3).map((x: any) => (
-                            <Badge key={x.id} variant="secondary" className="text-xs">
-                              {x.voice_agent_clients?.name || x.clients?.name || 'Client'}
-                            </Badge>
-                          ))}
-                          {assigned.length > 3 && <Badge variant="outline" className="text-xs">+{assigned.length - 3}</Badge>}
-                        </div>
-                      ),
-                    status: <StatusChip status={a.is_external ? 'success' : 'idle'}>{a.is_external ? 'live' : 'draft'}</StatusChip>,
-                    actions: (
-                      <NeonButton size="sm" variant="outline" onClick={() => setAssignFor({ id: a.id, name: a.name, source: 'agents' })}>
-                        <Link2 className="w-3.5 h-3.5" /> Assign
-                      </NeonButton>
-                    ),
-                  },
-                };
-              })}
-            />
+                      </GTCell>
+                      <GTCell><Badge variant="outline" className="capitalize">{a.platform}</Badge></GTCell>
+                      <GTCell><span className="font-mono text-xs">{a.twilio_number || '—'}</span></GTCell>
+                      <GTCell>
+                        {assigned.length === 0
+                          ? <span className="text-xs text-muted-foreground">Unassigned</span>
+                          : (
+                            <div className="flex flex-wrap gap-1">
+                              {assigned.slice(0, 3).map((x: any) => (
+                                <Badge key={x.id} variant="secondary" className="text-xs">
+                                  {x.voice_agent_clients?.name || x.clients?.name || 'Client'}
+                                </Badge>
+                              ))}
+                              {assigned.length > 3 && <Badge variant="outline" className="text-xs">+{assigned.length - 3}</Badge>}
+                            </div>
+                          )}
+                      </GTCell>
+                      <GTCell><StatusChip tone={a.is_external ? 'success' : 'idle'}>{a.is_external ? 'live' : 'draft'}</StatusChip></GTCell>
+                      <GTCell className="text-right">
+                        <NeonButton size="sm" variant="outline" onClick={() => setAssignFor({ id: a.id, name: a.name, source: 'agents' })}>
+                          <Link2 className="w-3.5 h-3.5" /> Assign
+                        </NeonButton>
+                      </GTCell>
+                    </GTRow>
+                  );
+                })}
+              </tbody>
+            </GlassTable>
           )}
         </div>
       </GlassCard>
