@@ -14,7 +14,7 @@ interface VM {
   duration_seconds: number | null;
   transcript: string | null;
   ai_summary: string | null;
-  ai_sentiment: string | null;
+  ai_sentiment?: string | null;
   read_at: string | null;
   created_at: string;
 }
@@ -30,7 +30,7 @@ export default function AiVoicemailInbox() {
       .eq("organization_id", selectedOrgId)
       .order("created_at", { ascending: false })
       .limit(50);
-    setItems((data ?? []) as VM[]);
+    setItems((data ?? []) as unknown as VM[]);
   };
   useEffect(() => {
     load();
