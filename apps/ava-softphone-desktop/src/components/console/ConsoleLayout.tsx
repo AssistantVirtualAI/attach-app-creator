@@ -58,6 +58,13 @@ export default function ConsoleLayout({
   const [aiOpen, setAiOpen] = useState(true);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  const { isAdmin } = useDesktopRole();
+
+  // Redirect non-admins away from admin-only views
+  useEffect(() => {
+    const adminOnly: ConsoleView[] = ['admin', 'aiadmin', 'reports'];
+    if (!isAdmin && adminOnly.includes(view)) setView('home');
+  }, [isAdmin, view]);
 
   useCallShortcuts();
 
