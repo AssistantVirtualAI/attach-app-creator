@@ -164,6 +164,7 @@ export default function ConsoleLayout({
           onChange={setView}
           onOpenSettings={() => setView('settings')}
           onOpenSearch={() => setPaletteOpen(true)}
+          isAdmin={isAdmin}
         />
       )}
 
