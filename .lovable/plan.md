@@ -1,6 +1,6 @@
 # AVA / Lemtel — Phased Implementation Plan
 
-Progress: ✅ Phase 1 (tokens + primitives + `/_design`) — done. ✅ Phase 2 (`CockpitShell` opt-in shell, role nav, live badge hook, FR/EN labels) — done.
+Progress: ✅ Phase 1 (tokens + primitives + `/_design`) — done. ✅ Phase 2 (`CockpitShell` opt-in shell, role nav, live badge hook, FR/EN labels) — done. 🟡 Phase 3 — in progress: `AppLayout` sidebar visually upgraded to cockpit glass (neon active indicator, gradient header/footer, cockpit tokens) and `CockpitLayout` wrapper introduced for opt-in dashboards.
 
 
 Goal: ship the "futuristic glass telecom cockpit + real‑time PBX sync" plan **without breaking** anything already in production (auth, RLS, routes, OrganizationContext, LanguageContext, FusionPBX integration, softphone, reports, desktop app).
