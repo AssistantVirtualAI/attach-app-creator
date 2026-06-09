@@ -1,6 +1,6 @@
 # AVA / Lemtel — Phased Implementation Plan
 
-Progress: ✅ Phase 1 — done. ✅ Phase 2 — done. 🟡 Phase 3 — sidebar visually upgraded + `CockpitLayout` wrapper available. ✅ Phase 4 — telecom tables (`telecom_live_calls`, `telecom_sync_jobs`, `telecom_sync_health`, `telecom_audit_logs`) + six `telecom_*_v` views shipped with RLS, GRANTs, realtime publication on live calls / sync jobs.
+Progress: ✅ Phase 1–6 — done. ✅ Phase 7 — sidebar redesigned with proper light/dark glass + shine tokens (`.sidebar-pane`, `.nav-group-trigger`, `.nav-item`); linter + security scan show **no new warnings** introduced (56 linter / 64 security — all pre-existing).
 
 
 Goal: ship the "futuristic glass telecom cockpit + real‑time PBX sync" plan **without breaking** anything already in production (auth, RLS, routes, OrganizationContext, LanguageContext, FusionPBX integration, softphone, reports, desktop app).
