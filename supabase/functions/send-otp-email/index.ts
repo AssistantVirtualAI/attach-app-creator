@@ -88,6 +88,23 @@ serve(async (req) => {
     const otpCode = generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
 
+    // Store hashed OTP server-side so it can be verified later (service role bypasses RLS)
+    const codeHash = await hashOTP(otpCode);
+    const { error: otpInsertErr } = await supabase
+      .from("two_factor_otps")
+      .insert({
+        email: email.toLowerCase(),
+        organization_id: organizationId,
+        code_hash: codeHash,
+        expires_at: expiresAt.toISOString(),
+      });
+    if (otpInsertErr) {
+      console.error("Failed to persist OTP hash:", otpInsertErr);
+      return new Response(JSON.stringify({ error: "otp_store_failed" }), {
+        status: 500, headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
+
     // Get the 2FA email template for the organization
     const { data: template } = await supabase
       .from("email_templates")
