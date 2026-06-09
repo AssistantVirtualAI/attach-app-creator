@@ -2,6 +2,9 @@
 
 Auto-generated from git commits.
 
+- Changes (2026-06-09) — gpt-engineer-app[bot]
+- Changes (2026-06-09) — gpt-engineer-app[bot]
+- docs: update CHANGELOG [skip ci] (2026-06-09) — AVA Bot
 - fix: restore repository field in package.json (2026-06-09) — AssistantVirtualAI
 - docs: update CHANGELOG [skip ci] (2026-06-09) — AVA Bot
 - fix: add vite externals auto-fix to auto-release workflow (2026-06-09) — AssistantVirtualAI
@@ -49,6 +52,3 @@ Auto-generated from git commits.
 - Changes (2026-06-09) — gpt-engineer-app[bot]
 - Changes (2026-06-09) — gpt-engineer-app[bot]
 - docs: update CHANGELOG [skip ci] (2026-06-09) — AVA Bot
-- Changes (2026-06-09) — gpt-engineer-app[bot]
-- docs: update CHANGELOG [skip ci] (2026-06-09) — AVA Bot
-- Changes (2026-06-09) — gpt-engineer-app[bot]
