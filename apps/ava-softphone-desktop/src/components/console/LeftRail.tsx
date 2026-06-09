@@ -2,6 +2,7 @@ import React from 'react';
 import { theme } from '../../lib/theme';
 import LemtelLogo from '../LemtelLogo';
 import { useTranslation, type I18nKey } from '../../lib/i18n';
+import LanguageSwitcher from '../ui/LanguageSwitcher';
 
 const { colors: c } = theme;
 
@@ -142,7 +143,7 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
           display: 'grid', placeItems: 'center',
           color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: 0.5,
         }}>AI</div>
-        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, flex: 1, minWidth: 0 }}>
           <span style={{ fontSize: 10.5, fontWeight: 700, color: c.avaCyan, letterSpacing: 1.2, textTransform: 'uppercase' }}>
             Powered by
           </span>
@@ -150,6 +151,7 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
             AVA AI
           </span>
         </div>
+        <LanguageSwitcher />
       </div>
     </aside>
   );
