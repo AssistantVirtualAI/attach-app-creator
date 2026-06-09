@@ -12,9 +12,17 @@ interface OTPEmailRequest {
   organizationId: string;
 }
 
-// Generate a 6-digit OTP code
+// Generate a cryptographically secure 6-digit OTP code
 function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  return String(100000 + (arr[0] % 900000));
+}
+
+async function hashOTP(code: string): Promise<string> {
+  const data = new TextEncoder().encode(code);
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 serve(async (req) => {
@@ -79,6 +87,23 @@ serve(async (req) => {
     // Generate OTP code
     const otpCode = generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+
+    // Store hashed OTP server-side so it can be verified later (service role bypasses RLS)
+    const codeHash = await hashOTP(otpCode);
+    const { error: otpInsertErr } = await supabase
+      .from("two_factor_otps")
+      .insert({
+        email: email.toLowerCase(),
+        organization_id: organizationId,
+        code_hash: codeHash,
+        expires_at: expiresAt.toISOString(),
+      });
+    if (otpInsertErr) {
+      console.error("Failed to persist OTP hash:", otpInsertErr);
+      return new Response(JSON.stringify({ error: "otp_store_failed" }), {
+        status: 500, headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
 
     // Get the 2FA email template for the organization
     const { data: template } = await supabase
