@@ -671,6 +671,103 @@ All colors MUST be HSL.
     background-size: 200% 100%;
     animation: cockpit-scan 2.8s linear infinite;
   }
+
+  /* === cockpit-scope: opt-in restyle that gives the admin shell the
+        exact look of /_design without touching individual pages ===== */
+  .cockpit-scope {
+    position: relative;
+  }
+  .cockpit-scope::before,
+  .cockpit-scope::after {
+    content: "";
+    position: fixed;
+    pointer-events: none;
+    z-index: 0;
+    width: 38rem;
+    height: 38rem;
+    border-radius: 9999px;
+    filter: blur(120px);
+    opacity: 0.32;
+  }
+  .cockpit-scope::before {
+    top: -10rem;
+    left: -8rem;
+    background: hsl(var(--cockpit-cyan) / 0.55);
+  }
+  .cockpit-scope::after {
+    bottom: -12rem;
+    right: -10rem;
+    background: hsl(var(--cockpit-violet) / 0.5);
+  }
+  .cockpit-scope > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* shadcn Card -> GlassCard */
+  .cockpit-scope [data-slot="card"],
+  .cockpit-scope .card,
+  .cockpit-scope > div > .rounded-lg.border.bg-card,
+  .cockpit-scope div[class*="bg-card"] {
+    background: linear-gradient(135deg, hsl(var(--cockpit-surface) / 0.72), hsl(var(--cockpit-surface) / 0.42)) !important;
+    backdrop-filter: blur(18px) saturate(1.15);
+    -webkit-backdrop-filter: blur(18px) saturate(1.15);
+    border: 1px solid hsl(var(--cockpit-border) / 0.6) !important;
+    box-shadow: var(--cockpit-shadow-glass), inset 0 1px 0 0 hsl(0 0% 100% / 0.06);
+  }
+
+  /* shadcn Table -> GlassTable */
+  .cockpit-scope table thead th,
+  .cockpit-scope [data-slot="table-header"] th {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.7rem;
+    color: hsl(var(--muted-foreground));
+    border-bottom: 1px solid hsl(var(--cockpit-border) / 0.5);
+    background: hsl(var(--cockpit-surface) / 0.4);
+  }
+  .cockpit-scope table tbody tr {
+    border-bottom: 1px solid hsl(var(--cockpit-border) / 0.25);
+    transition: background-color 160ms ease-out;
+  }
+  .cockpit-scope table tbody tr:hover {
+    background: hsl(var(--cockpit-cyan) / 0.06);
+  }
+
+  /* shadcn Button default -> neon shine */
+  .cockpit-scope button[data-slot="button"]:not([data-variant]):not(.cockpit-no-shine),
+  .cockpit-scope .btn-cockpit {
+    transition: background-position 240ms ease-out, box-shadow 180ms ease-out, transform 120ms ease-out;
+  }
+  .cockpit-scope button[data-slot="button"]:not([data-variant]):hover {
+    box-shadow: var(--cockpit-shadow-glow-cyan);
+  }
+
+  /* shadcn Tabs list -> glass pill */
+  .cockpit-scope [data-slot="tabs-list"],
+  .cockpit-scope [role="tablist"] {
+    background: hsl(var(--cockpit-surface) / 0.55) !important;
+    backdrop-filter: blur(14px);
+    border: 1px solid hsl(var(--cockpit-border) / 0.45);
+  }
+
+  /* Page title accent (opt-in via .page-title) */
+  .cockpit-scope h1.page-title,
+  .cockpit-scope h2.page-title {
+    position: relative;
+    padding-bottom: 0.5rem;
+  }
+  .cockpit-scope h1.page-title::after,
+  .cockpit-scope h2.page-title::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 3.5rem;
+    height: 2px;
+    border-radius: 9999px;
+    background: var(--cockpit-gradient-shine);
+  }
 }
 
 @keyframes cockpit-scan {
