@@ -126,6 +126,9 @@ import AdminRecordings from "./pages/lemtel/admin/AdminRecordings";
 import AdminVoicemail from "./pages/lemtel/admin/AdminVoicemail";
 import AdminReports from "./pages/lemtel/admin/AdminReports";
 import MySettings from "./pages/lemtel/my/MySettings";
+import MyForwarding from "./pages/lemtel/my/MyForwarding";
+import MyDevices from "./pages/lemtel/my/MyDevices";
+import MyGreetings from "./pages/lemtel/my/MyGreetings";
 import { DownloadCenter } from "./components/portal/DownloadCenter";
 import { AppLayout } from "./components/layout/AppLayout";
 
@@ -650,6 +653,9 @@ const App = () => (
                 <Route path="/org/lemtel/my/sms" element={<LemtelUserPage><LemtelMessages /></LemtelUserPage>} />
                 <Route path="/org/lemtel/my/settings" element={<LemtelUserPage><MySettings /></LemtelUserPage>} />
                 <Route path="/org/lemtel/my/downloads" element={<LemtelUserPage><DownloadCenter personalize /></LemtelUserPage>} />
+                <Route path="/org/lemtel/my/forwarding" element={<LemtelUserPage><MyForwarding /></LemtelUserPage>} />
+                <Route path="/org/lemtel/my/devices" element={<LemtelUserPage><MyDevices /></LemtelUserPage>} />
+                <Route path="/org/lemtel/my/greetings" element={<LemtelUserPage><MyGreetings /></LemtelUserPage>} />
 
                 {/* /org/lemtel/portal/* customer routes (PortalGuard enforces customer scope) */}
                 <Route path="/org/lemtel/portal" element={<Navigate to="/org/lemtel/portal/dashboard" replace />} />
