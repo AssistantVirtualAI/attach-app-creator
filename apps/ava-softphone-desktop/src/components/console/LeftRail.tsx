@@ -191,8 +191,8 @@ function RailItem({ v, active, onClick }: { v: ConsoleView; active: boolean; onC
 }
 
 /* ─── Compact bottom rail for narrow / minimized windows ─── */
-function CompactRail({ view, onChange, onOpenSettings }: { view: ConsoleView; onChange: (v: ConsoleView) => void; onOpenSettings: () => void }) {
-  const all: ConsoleView[] = [...ITEMS, 'settings'];
+function CompactRail({ view, onChange, onOpenSettings, items }: { view: ConsoleView; onChange: (v: ConsoleView) => void; onOpenSettings: () => void; items: ConsoleView[] }) {
+  const all: ConsoleView[] = [...items, 'settings'];
   return (
     <aside style={{
       position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30,
