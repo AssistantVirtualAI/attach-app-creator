@@ -45,6 +45,9 @@ function Shell({ title, badge, accent, items }: {
             );
           })}
         </nav>
+        <div className="ml-auto flex items-center gap-2">
+          <NotificationCenter />
+        </div>
       </div>
       <main className="flex-1 overflow-x-hidden cockpit-scope">
         <Outlet />
