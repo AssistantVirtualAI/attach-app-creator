@@ -105,7 +105,15 @@ const ORG_GROUPS: NavGroup[] = [
       { nameKey: 'IVR / Auto-Attendant', href: '/org/lemtel/admin/ivr', icon: Voicemail },
       { nameKey: 'Ring Groups', href: '/org/lemtel/admin/ring-groups', icon: Bell },
       { nameKey: 'Voice Agents', href: '/org/lemtel/admin/agents', icon: Bot },
+      { nameKey: 'Voice-Agent Clients', href: '/org/lemtel/admin/voice-clients', icon: UserPlus },
       { nameKey: 'PBX Settings', href: '/org/lemtel/admin/settings', icon: Settings },
+    ],
+  },
+  {
+    id: 'org-ai', labelKey: '🤖 AI Workspace', icon: Brain, scope: 'org', lemtelOnly: true,
+    items: [
+      { nameKey: 'AI Voicemail Inbox', href: '/org/lemtel/admin/ai-voicemail', icon: Voicemail },
+      { nameKey: 'AVA Admin Assistant', href: '/org/lemtel/admin/ava', icon: Sparkles },
     ],
   },
   {
@@ -140,6 +148,7 @@ const ORG_GROUPS: NavGroup[] = [
     id: 'org-admin', labelKey: '⚙️ Administration', icon: Settings, scope: 'org', lemtelOnly: true,
     items: [
       { nameKey: 'Users & Access', href: '/org/lemtel/telephony/users', icon: Users },
+      { nameKey: 'Sync Health', href: '/org/lemtel/admin/sync-health', icon: Activity },
       { nameKey: 'Download Apps', href: '/org/lemtel/admin/downloads', icon: Download },
       { nameKey: 'Settings', href: '/org/lemtel/admin/settings', icon: Settings },
     ],
