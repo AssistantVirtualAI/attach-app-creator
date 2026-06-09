@@ -1,48 +1,57 @@
-# Next Implementation Slice
+# Final Slice — Tracks C, D, E
 
-Picking up from the partially-shipped end-user portal. Two tracks in this slice, in order.
+Closes the original spec. Three tracks shipped in order so the visual sweep (E) lands last and styles everything new.
 
-## 1. Finish Track A — `/me` portal
+## Track C — Desktop Portal tab
 
-Already shipped: `MyForwarding`, `MyDevices`, `MyGreetings` + routes + sidebar entries.
+Goal: from inside the Electron softphone, users can pop the full web portal in a tab without re-authenticating.
 
-Still missing from the spec:
-- `/me` overview page — extension, registration status, presence toggle, today's calls, unread voicemail count. Backed by new RPC `get_my_extension_summary()` (security definer, scoped to `auth.uid()`).
-- `/me/voicemail` — list from `pbx_voicemails` (already RLS-scoped via `can_access_voicemail`), signed-URL playback from `voicemail-audio`, `mark_voicemail_read` RPC, optional AI summary field.
-- `/me/history` — own calls from `pbx_call_records` filtered by extension via `current_user_org_ids()` + extension match.
-- `/me/presence` — wraps existing `upsert_user_presence` RPC; status + emoji + message + DND toggle.
-- Edge function `me-update-forwarding` — enforces an org-level "allow end-user self-service forwarding" flag before letting `MyForwarding` write. Today the page writes directly; this gates it.
-- Sidebar: add the 4 new entries under the existing `my-extension` group.
+- New file `apps/ava-softphone-desktop/src/components/PortalTab.tsx` — wraps a `<webview>` (Electron) / `<iframe>` (web) pointing at `${PORTAL_URL}/org/lemtel/my/dashboard?desktop=1`.
+- New `apps/ava-softphone-desktop/electron/portalBridge.ts` — exposes `ipcMain` handler that mints a short-lived magic link via new edge function `desktop-portal-token` and returns the URL with `#access_token=…&refresh_token=…`.
+- New edge function `desktop-portal-token` — verifies the desktop's existing Supabase JWT, returns a fresh session pair for `auth.setSession()`.
+- Tab added to the desktop sidebar between "Calls" and "Settings".
+- Portal recognises `?desktop=1` to hide its own sidebar branding and collapse to the `/my` scope.
 
-No new tables. One new RPC, one new edge function.
+## Track D — AVA admin chat command pipeline
 
-## 2. Track B — 7-step client creation wizard
+Goal: super_admins type "block extension 1042" / "show outages" / "force re-sync acme" in the existing OrgChat and AVA executes.
 
-Replace the current single-form client create with `/admin/clients/new`.
+- New edge function `ava-admin-command` — Lovable AI Gateway, `streamText` + tools. Tools (all RLS-respecting):
+  - `list_outages()`, `extension_status(ext)`, `block_extension(ext, reason)`,
+  - `force_sync(org_slug, kind)`, `recent_voicemails(org_slug, limit)`,
+  - `verify_isolation(org_slug)`.
+- All tool executions write to existing `telecom_admin_ai_actions` for audit; mutating tools require `needsApproval`.
+- Frontend: extend `src/hooks/useOrgChat.ts` so messages starting with `/ava` route to `ava-admin-command` instead of the normal chat insert. Render assistant replies + tool cards using AI Elements (`Tool`, `ToolHeader`, `ToolOutput`).
+- New component `src/components/lemtel/AvaCommandBubble.tsx` for the tool-result card (status pill + JSON accordion).
+- Gated by `is_super_admin` / `is_lemtel_admin`; non-admins see "Commands disabled".
 
-Steps:
-1. Org profile (name, slug, timezone, locale).
-2. Admins — multi-select existing users or invite by email (reuses existing invite email infra).
-3. PBX mapping — FusionPBX domain UUID + extension range + DID pool.
-4. Default roles — pre-seed `org_role_permissions` for `org_admin / manager / agent / viewer`.
-5. Branding — logo upload to `organization-assets`, primary color, optional subdomain.
-6. First sync — kicks `pbx-sync-extensions` + `pbx-sync-cdr`.
-7. Isolation verification — calls new `verify_tenant_isolation(org_id)` RPC, shows per-table pass/fail.
+## Track E — Full visual sweep
 
-New pieces:
-- Page `src/pages/admin/ClientCreateWizard.tsx` (stepper using cockpit primitives).
-- Edge function `client-provision` — orchestrates org insert, member + role inserts, PBX mapping row, role seeding, branding upsert, kicks first sync. Service-role only; gated by `is_super_admin` or `is_lemtel_admin`.
-- RPC `verify_tenant_isolation(uuid) returns jsonb` — for each business table, counts rows that don't match `organization_id`. Reused later by a super-admin "Isolation Health" card.
+Goal: every portal page matches the cyberpunk glass-morphism cockpit established in `index.css` (no flat white cards left).
 
-## Out of scope this slice
+- Audit pass via `rg "rounded-(md|lg|xl) border bg-card"` and `rg "Card>"` to find legacy surfaces.
+- Replace bare shadcn `<Card>` usages on these page groups with the existing `GlassCard` primitive:
+  - `/platform/**` (super-admin)
+  - `/customer/**` (org admin)
+  - `/org/lemtel/admin/**`
+  - `/org/lemtel/my/**` (incl. the 3 just-shipped pages)
+  - `/admin/clients/new` wizard
+- Apply `bg-grid` + `bg-gradient-cockpit` to each route shell that's still flat.
+- Buttons: swap primary `Button` → `Button variant="shine"` on hero CTAs (Sync, Save, Provision).
+- Sidebar: add the subtle scanline + active-glow already defined in `index.css` (`.sidebar-glow` class) to active `NavLink`.
+- No new colors, no new fonts — only existing tokens.
+- Spot-check French + English labels still fit; truncate where needed.
 
-Track C (desktop Portal tab), Track D (AVA command pipeline), Track E (full visual sweep). Picked up in the next slice once A+B are merged.
+## Out of scope
+
+- New product features beyond C/D.
+- Mobile app (Capacitor) — not in the original spec for this phase.
+- Landing page (locked).
 
 ## Technical appendix
 
-- New RPCs: `get_my_extension_summary`, `verify_tenant_isolation`.
-- New edge functions: `me-update-forwarding`, `client-provision`.
-- New pages: `/me`, `/me/voicemail`, `/me/history`, `/me/presence`, `/admin/clients/new`.
-- Modified: `sidebarConfig.ts`, `App.tsx` routes, existing `MyForwarding.tsx` (switch write path to edge function).
-- Migrations: 1 (two RPCs + optional `organizations.allow_user_self_forwarding boolean default true` flag).
-- No new tables, no new third-party deps.
+- New edge functions: `desktop-portal-token`, `ava-admin-command`.
+- New files: `PortalTab.tsx`, `portalBridge.ts`, `AvaCommandBubble.tsx`.
+- Modified: `useOrgChat.ts`, desktop sidebar, ~25 page files for visual sweep (mechanical Card → GlassCard swap).
+- No new tables. No new migrations. No new third-party deps.
+- AI Elements `tool`, `message`, `conversation`, `prompt-input` installed for the AVA command UI.
