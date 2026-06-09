@@ -51,3 +51,9 @@ This is the last open phase from the desktop telecom plan. Everything else (Phas
 - No hardcoded user-facing strings remain in the touched desktop files.
 - Every list/data view has explicit loading + empty + error variants.
 - `.lovable/plan.md` Phase 9 flips to ✅.
+
+## Progress
+- ✅ StatusPill + StateView components added (`apps/ava-softphone-desktop/src/components/ui/`)
+- ✅ Desktop i18n hook + EN/FR dictionaries (`apps/ava-softphone-desktop/src/lib/i18n.ts`)
+- ✅ LeftRail labels, search, settings, and aria-labels translated; focus ring on rail items
+- ✅ Spin + pulse keyframes appended to `styles/animations.css`
