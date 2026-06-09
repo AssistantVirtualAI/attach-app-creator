@@ -79,6 +79,7 @@ jobs:
       - name: Build Mac
         working-directory: apps/ava-softphone-desktop
         run: |
+          python3 -c "c=open('vite.config.ts').read(); open('vite.config.ts','w').write(c.replace(\"external: ['electron']\",\"external: ['electron','zod','zod/v4','zod/v3','ai','@ai-sdk/provider-utils']\")) if 'zod/v4' not in c else None"
           npx vite build
           npx tsc -p electron/tsconfig.json || true
           npx electron-builder --mac --x64 --arm64
@@ -125,6 +126,7 @@ jobs:
         shell: pwsh
         working-directory: apps/ava-softphone-desktop
         run: |
+          python3 -c "c=open('vite.config.ts').read(); open('vite.config.ts','w').write(c.replace(\"external: ['electron']\",\"external: ['electron','zod','zod/v4','zod/v3','ai','@ai-sdk/provider-utils']\")) if 'zod/v4' not in c else None"
           npx vite build
           npx tsc -p electron/tsconfig.json
           npx electron-builder --win
@@ -172,6 +174,7 @@ jobs:
       - name: Build Linux
         working-directory: apps/ava-softphone-desktop
         run: |
+          python3 -c "c=open('vite.config.ts').read(); open('vite.config.ts','w').write(c.replace(\"external: ['electron']\",\"external: ['electron','zod','zod/v4','zod/v3','ai','@ai-sdk/provider-utils']\")) if 'zod/v4' not in c else None"
           npx vite build
           npx tsc -p electron/tsconfig.json || true
           npx electron-builder --linux
