@@ -425,13 +425,44 @@ All colors MUST be HSL.
    border-cockpit-border, text-cockpit-cyan, shadow-cockpit-glow, etc.
    ===================================================================== */
 @layer base {
+  /* LIGHT theme cockpit tokens (default :root) */
   :root {
-    --cockpit-bg: 230 70% 5%;
-    --cockpit-bg-2: 230 60% 9%;
-    --cockpit-bg-3: 228 55% 16%;
-    --cockpit-surface: 220 30% 12%;
-    --cockpit-surface-strong: 220 30% 16%;
-    --cockpit-border: 220 30% 30%;
+    --cockpit-bg: 220 40% 98%;
+    --cockpit-bg-2: 220 38% 96%;
+    --cockpit-bg-3: 220 35% 92%;
+    --cockpit-surface: 0 0% 100%;
+    --cockpit-surface-strong: 220 35% 98%;
+    --cockpit-border: 220 25% 86%;
+    --cockpit-border-neon: 200 95% 50%;
+    --cockpit-cyan: 200 95% 45%;
+    --cockpit-violet: 262 75% 55%;
+    --cockpit-magenta: 292 75% 55%;
+    --cockpit-state-success: 158 70% 42%;
+    --cockpit-state-warning: 35 95% 50%;
+    --cockpit-state-danger: 350 80% 55%;
+    --cockpit-state-idle: 220 10% 55%;
+
+    --cockpit-shadow-glass: 0 12px 40px -8px hsl(220 40% 30% / 0.18);
+    --cockpit-shadow-glow-cyan: 0 0 24px hsl(200 95% 50% / 0.30);
+    --cockpit-shadow-glow-violet: 0 0 24px hsl(262 75% 55% / 0.30);
+    --cockpit-gradient-shine: linear-gradient(135deg, hsl(200 95% 50%) 0%, hsl(231 100% 60%) 50%, hsl(262 75% 55%) 100%);
+    --cockpit-gradient-bg: radial-gradient(1200px 600px at 10% 0%, hsl(200 90% 70% / 0.18), transparent 60%),
+                            radial-gradient(900px 500px at 90% 100%, hsl(262 80% 70% / 0.15), transparent 60%),
+                            linear-gradient(180deg, hsl(220 40% 98%), hsl(220 35% 94%));
+    --cockpit-sidebar-pane: linear-gradient(180deg, hsl(0 0% 100% / 0.92) 0%, hsl(220 40% 97% / 0.88) 100%);
+    --cockpit-sidebar-edge: linear-gradient(180deg, transparent 0%, hsl(200 95% 50% / 0.55) 30%, hsl(262 75% 55% / 0.55) 70%, transparent 100%);
+    --cockpit-nav-active: linear-gradient(135deg, hsl(200 95% 50% / 0.18) 0%, hsl(262 75% 55% / 0.14) 100%);
+    --cockpit-nav-active-border: hsl(200 95% 50% / 0.45);
+    --cockpit-nav-hover: hsl(220 30% 94% / 0.7);
+  }
+
+  .dark {
+    --cockpit-bg: 230 70% 4%;
+    --cockpit-bg-2: 230 60% 7%;
+    --cockpit-bg-3: 228 55% 12%;
+    --cockpit-surface: 222 40% 10%;
+    --cockpit-surface-strong: 222 40% 14%;
+    --cockpit-border: 220 30% 26%;
     --cockpit-border-neon: 188 95% 55%;
     --cockpit-cyan: 188 100% 60%;
     --cockpit-violet: 262 90% 68%;
@@ -448,15 +479,151 @@ All colors MUST be HSL.
     --cockpit-gradient-bg: radial-gradient(1200px 600px at 10% 0%, hsl(231 80% 18% / 0.55), transparent 60%),
                             radial-gradient(900px 500px at 90% 100%, hsl(262 80% 18% / 0.45), transparent 60%),
                             linear-gradient(180deg, hsl(230 70% 5%), hsl(228 55% 10%));
+    --cockpit-sidebar-pane: linear-gradient(180deg, hsl(230 60% 6% / 0.88) 0%, hsl(228 50% 9% / 0.84) 100%);
+    --cockpit-sidebar-edge: linear-gradient(180deg, transparent 0%, hsl(188 100% 60% / 0.55) 30%, hsl(262 90% 68% / 0.55) 70%, transparent 100%);
+    --cockpit-nav-active: linear-gradient(135deg, hsl(188 100% 60% / 0.22) 0%, hsl(262 90% 68% / 0.18) 100%);
+    --cockpit-nav-active-border: hsl(188 100% 60% / 0.55);
+    --cockpit-nav-hover: hsl(222 40% 14% / 0.6);
+  }
+}
+
+@layer components {
+  /* Sidebar pane: glassy futuristic surface that adapts to theme */
+  .sidebar-pane {
+    background: var(--cockpit-sidebar-pane);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    border-right: 1px solid hsl(var(--cockpit-border) / 0.6);
+    box-shadow: var(--cockpit-shadow-glass);
+    position: relative;
+  }
+  .sidebar-pane::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(600px 240px at 0% 0%, hsl(var(--cockpit-cyan) / 0.10), transparent 60%),
+      radial-gradient(600px 280px at 100% 100%, hsl(var(--cockpit-violet) / 0.10), transparent 60%);
+    z-index: 0;
+  }
+  .sidebar-pane > * { position: relative; z-index: 1; }
+  .sidebar-pane::after {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    right: -1px;
+    width: 1px;
+    background: var(--cockpit-sidebar-edge);
+    pointer-events: none;
   }
 
-  .dark {
-    --cockpit-bg: 230 70% 4%;
-    --cockpit-bg-2: 230 60% 7%;
-    --cockpit-bg-3: 228 55% 12%;
-    --cockpit-surface: 222 40% 10%;
-    --cockpit-surface-strong: 222 40% 14%;
-    --cockpit-border: 220 30% 26%;
+  /* Glass + shine nav group trigger */
+  .nav-group-trigger {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.875rem;
+    border: 1px solid transparent;
+    background: hsl(var(--cockpit-surface) / 0.5);
+    backdrop-filter: blur(8px);
+    transition: all 220ms cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+  }
+  .nav-group-trigger::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 30%, hsl(0 0% 100% / 0.08) 50%, transparent 70%);
+    background-size: 200% 100%;
+    background-position: 200% 0;
+    transition: background-position 600ms ease;
+    pointer-events: none;
+  }
+  .nav-group-trigger:hover {
+    border-color: hsl(var(--cockpit-border) / 0.8);
+    background: var(--cockpit-nav-hover);
+    transform: translateX(2px);
+  }
+  .nav-group-trigger:hover::before { background-position: -200% 0; }
+  .nav-group-trigger.is-active {
+    background: var(--cockpit-nav-active);
+    border-color: var(--cockpit-nav-active-border);
+    box-shadow: 0 0 0 1px hsl(var(--cockpit-cyan) / 0.15), 0 4px 20px -6px hsl(var(--cockpit-cyan) / 0.35);
+  }
+
+  /* Nav item (child link) */
+  .nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    margin-left: 0.5rem;
+    border-radius: 0.625rem;
+    color: hsl(var(--muted-foreground));
+    transition: all 180ms cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+  }
+  .nav-item::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 30%, hsl(0 0% 100% / 0.10) 50%, transparent 70%);
+    background-size: 200% 100%;
+    background-position: 200% 0;
+    transition: background-position 500ms ease;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+  .nav-item:hover {
+    color: hsl(var(--foreground));
+    background: var(--cockpit-nav-hover);
+    transform: translateX(3px);
+  }
+  .nav-item:hover::before { background-position: -200% 0; }
+  .nav-item.is-active {
+    color: hsl(var(--foreground));
+    background: var(--cockpit-nav-active);
+    border: 1px solid var(--cockpit-nav-active-border);
+    font-weight: 600;
+    box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.08);
+  }
+  .nav-item.is-active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 1.25rem;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(180deg, hsl(var(--cockpit-cyan)), hsl(var(--cockpit-violet)));
+    box-shadow: 0 0 8px hsl(var(--cockpit-cyan) / 0.7);
+  }
+
+  .nav-icon-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.375rem;
+    border-radius: 0.5rem;
+    background: hsl(var(--cockpit-surface) / 0.7);
+    border: 1px solid hsl(var(--cockpit-border) / 0.4);
+    transition: all 200ms ease;
+  }
+  .nav-group-trigger.is-active .nav-icon-wrap {
+    background: linear-gradient(135deg, hsl(var(--cockpit-cyan) / 0.25), hsl(var(--cockpit-violet) / 0.20));
+    border-color: hsl(var(--cockpit-cyan) / 0.5);
+    color: hsl(var(--cockpit-cyan));
+    box-shadow: 0 0 12px hsl(var(--cockpit-cyan) / 0.4);
+  }
+  .nav-group-trigger:hover .nav-icon-wrap {
+    border-color: hsl(var(--cockpit-cyan) / 0.4);
+    color: hsl(var(--cockpit-cyan));
   }
 }
 
