@@ -1,160 +1,141 @@
-# AVA / Lemtel — Phased Implementation Plan
 
-Progress: ✅ Phase 1 — done. ✅ Phase 2 — done. 🟡 Phase 3 — sidebar visually upgraded + `CockpitLayout` wrapper available. ✅ Phase 4 — telecom tables (`telecom_live_calls`, `telecom_sync_jobs`, `telecom_sync_health`, `telecom_audit_logs`) + six `telecom_*_v` views shipped with RLS, GRANTs, realtime publication on live calls / sync jobs.
+# Phase 5 + Fixes — Implementation Plan
 
+Five tracks shipped in order. Each track is self-contained and can be verified before moving on.
 
-Goal: ship the "futuristic glass telecom cockpit + real‑time PBX sync" plan **without breaking** anything already in production (auth, RLS, routes, OrganizationContext, LanguageContext, FusionPBX integration, softphone, reports, desktop app).
+## Track A — Fix the cropped Voice Agents page
 
-Strategy: build **additively** — new tokens, new shell components, new tables/views, new sync edge functions — then progressively switch pages to the new shell behind feature flags. No mass rename, no destructive migrations, no behavior change without verification.
+The screenshot shows `Voice Agents` clipped behind the sidebar with a giant empty band. Cause: `LemtelAdminPage` wraps `LemtelVoiceAgents`, but the page itself already assumes a full container. Add a max-width inner wrapper, remove the duplicated outer padding, and let the page header sit inside `CockpitLayout`'s `header` slot using `SectionHeader` so the title is no longer cut.
 
----
+- Refactor `src/pages/lemtel/LemtelVoiceAgents.tsx` to use `SectionHeader` + `GlassCard` primitives.
+- Ensure `LemtelAdminPage` passes a single padding container (`px-6 py-6 max-w-7xl mx-auto`).
+- Visual QA on 1021×660 viewport.
 
-## Ground rules (apply to every phase)
+## Track B — Light theme + shiny glass buttons
 
-- **Landing locked**: never touch `src/pages/Landing.tsx` or `src/components/landing/**`.
-- **No data loss**: every new table is additive. Existing tables (`pbx_*`, `organizations`, `user_roles`, `organization_members`, `_safe` views) stay intact; we extend, never replace.
-- **Frontend reads from `_safe` views**, sensitive writes go through edge functions (rule already in memory).
-- **i18n**: every new string goes through `useTranslation()` (FR/EN) — no hardcoded copy.
-- **Security**: every new `public` table gets `GRANT` + `ENABLE RLS` + policies in the same migration; no `anon` SELECT unless explicitly public.
-- **No regression checkpoint** at the end of every phase: smoke-test login, role redirect, sidebar nav for super_admin / org_admin / agent / customer.
+- Extend `src/index.css` with `:root` (light) tokens mirroring the existing dark cockpit tokens (`--cockpit-bg-1/2/3`, `--cockpit-cyan`, `--cockpit-violet`) tuned for a white base.
+- Add a `--glass-tint` token (white/8% dark, white/65% light) and use it in `GlassCard`, `NeonButton`, `CockpitShell` sidebar surfaces.
+- Add a new `glass` and `glass-shiny` variant to `NeonButton` (gradient sheen + inset highlight + `backdrop-blur-xl`).
+- Update sidebar (`AppLayout`, `SidebarNavGroup`, `SidebarFooter`) to read from semantic tokens only — no hard-coded `bg-cockpit-bg-2`.
+- Verify both themes via `useTheme` toggle on the org dashboard and client portal.
 
----
+## Track C — Restore the Voice Agents section in the sidebar
 
-## Phase 1 — Design System Foundation (glass tokens + primitives)
+The legacy `agents` group still exists, but the org sidebar only shows a single `Voice Agents` row. Add an `org-voice-agents` group right under `Phone System`:
 
-Pure additive UI work. Zero schema changes.
+```text
+🤖 Voice Agents
+  ├─ Agents                 /org/lemtel/admin/agents
+  ├─ Agent Builder          /org/lemtel/admin/agent-builder
+  ├─ Conversations          /org/lemtel/admin/va-conversations
+  ├─ Knowledge Base         /org/lemtel/admin/knowledge-base
+  ├─ Voice Clients          /org/lemtel/admin/voice-clients      (NEW)
+  └─ Voice Agent Reports    /org/lemtel/admin/va-reports
+```
 
-- Extend `src/index.css` + `tailwind.config.ts` with new HSL tokens (no new hex literals in components):
-  - `--bg-cockpit`, `--surface-glass`, `--surface-glass-strong`, `--border-glass`, `--border-neon`, `--accent-cyan`, `--accent-violet`, `--state-success/warning/danger`, `--shadow-glass`, `--shadow-glow-cyan`.
-  - Keep current `--primary` (#0023e6) as semantic primary; cyan/violet are accents only.
-- Add primitives under `src/components/ui-cockpit/`:
-  - `GlassCard`, `KpiCard`, `StatusChip`, `NeonButton`, `GlassTable`, `LiveBadge`, `EmptyStateBranded`, `SectionHeader`.
-  - Each is a thin wrapper over existing shadcn primitives (`Card`, `Button`, `Table`, `Badge`) so we keep one underlying component library.
-- Add motion utilities (120–180ms) and a single shimmer/scan animation reused by every "live" indicator.
-- Storybook-style preview page at `/_design` (dev only, gated by `import.meta.env.DEV`) showing all primitives.
-- Acceptance: pages still render identically; only new components are available for opt-in use.
+Routes already exist for most of these in `src/App.tsx`; wire the missing two (`voice-clients`, `va-conversations`, `va-reports`) to existing components (`Conversations`, `AgentReports`) wrapped in `LemtelAdminPage`.
 
----
+## Track D — `voice_agent_clients` table + assignment UI
 
-## Phase 2 — Cockpit Shell (sidebar, top bar, role groups)
+Separate table (per your answer). Schema:
 
-Wrap, don't replace.
+```sql
+CREATE TABLE public.voice_agent_clients (
+  id uuid PK,
+  organization_id uuid NOT NULL,
+  name text NOT NULL,
+  contact_email text,
+  contact_phone text,
+  company text,
+  notes text,
+  status text DEFAULT 'active',
+  created_at, updated_at
+);
 
-- New `src/components/cockpit/CockpitShell.tsx` built on top of the existing shadcn `Sidebar` (already in `src/components/sidebar/`).
-- Reuse `sidebarConfig.ts` but extend with **groups** (Command Center / Telecom / AI Voice / CRM / Reports / Administration / Support) and per-item `roles[]` + optional `liveBadgeKey`.
-- Live badges fed by a single `useLiveCounters()` hook (active calls, unread voicemail, alerts) backed by realtime subscriptions added in Phase 4 — render `0` / hidden until that phase ships.
-- Org switcher stays as-is (single-workspace memory rule respected: hidden when user belongs to exactly one org).
-- New `AppLayout` variant `CockpitLayout` opt-in via prop on each route; default `AppLayout` keeps current look. Switch routes in batches in Phase 3.
-- Acceptance: any page wrapped in `CockpitLayout` shows the glass shell; non-wrapped pages are untouched.
+CREATE TABLE public.voice_agent_assignments (
+  id uuid PK,
+  organization_id uuid NOT NULL,
+  voice_agent_id uuid NOT NULL,           -- references agents.id OR pbx_softphone_users.id (polymorphic via source)
+  source text NOT NULL CHECK (source IN ('agents','pbx_softphone_users')),
+  client_id uuid,                          -- voice_agent_clients.id
+  phone_client_id uuid,                    -- clients.id (existing phone-system clients)
+  assigned_at timestamptz DEFAULT now(),
+  CHECK ((client_id IS NOT NULL) <> (phone_client_id IS NOT NULL))
+);
+```
 
----
+Both tables: GRANTs + RLS scoped to `current_user_org_ids()` and `is_lemtel_admin()`.
 
-## Phase 3 — Role Dashboards & Page Migration
+UI:
+- New page `src/pages/lemtel/LemtelVoiceAgentClients.tsx` — CRUD list of voice-agent-only clients (GlassTable).
+- Existing voice agent row → "Assign" action opens a dialog with two tabs: *Phone-System Client* (picks from `clients` table) and *Voice-Agent Client* (picks from `voice_agent_clients`).
+- Assigned clients shown as chips on each agent row.
 
-Migrate the 7 highest-impact screens to `CockpitLayout` + new primitives. One PR per screen, each independently revertable.
+## Track E — Phase 5: real FusionPBX sync + live UI
 
-Order (matches the plan's priority table):
-1. `PortalChooser` + `PostLoginRedirect` — confirm role routing still lands on the right home.
-2. `SuperAdminDashboard` → multi-org KPI grid, sync health tile (placeholder until Phase 5), PBX status.
-3. `pages/portals/PlatformDashboard.tsx` (org admin) → extensions / numbers / queues / voicemail KPIs.
-4. `LemtelDashboard` / `TelephonyDashboard` → unified Command Center for telecom.
-5. `pages/portals/MyDashboardLanding.tsx` (agent) → my calls / voicemail / availability toggle.
-6. `pages/portals/CustomerDashboard.tsx` → restricted self‑service view (no cross-tenant data).
-7. `CallCenterWallboard` → live queue tiles (data wiring in Phase 5).
+All edge functions hit FusionPBX directly using the existing secrets (`FUSIONPBX_API_URL`, `FUSIONPBX_API_KEY`, `FUSIONPBX_DOMAIN_UUID`, `FUSIONPBX_USERNAME`, `FUSIONPBX_SIP_DOMAIN`, `FUSIONPBX_WSS_URL`).
 
-Each migration only changes layout + presentation. Data hooks, RLS, and routes stay identical.
+### Edge functions (new)
 
----
+1. `pbx-sync-extensions` — pulls `/app/extensions/extension_edit.php?action=json` (or v_extensions REST), upserts `pbx_extensions`, writes `telecom_sync_jobs` + `telecom_sync_health`.
+2. `pbx-sync-cdr` — pulls CDR since `last_synced_at`, upserts `pbx_call_records`.
+3. `pbx-sync-voicemail` — pulls voicemails + downloads new audio into the `voicemail-audio` bucket, upserts `pbx_voicemails`.
+4. `pbx-sync-recordings` — mirrors recording metadata into `pbx_call_recordings`.
+5. `pbx-live-events` — subscribes to FusionPBX Event Socket (WSS), maintains `telecom_live_calls` in real time (CHANNEL_CREATE / CHANNEL_ANSWER / CHANNEL_HANGUP).
+6. `pbx-reconcile` — nightly job: removes stale `telecom_live_calls` rows, marks missed sync jobs as failed, refreshes `telecom_sync_health.last_heartbeat_at`.
 
-## Phase 4 — Normalized Telecom Data Layer (additive)
+Shared helper `supabase/functions/_shared/fusionpbx.ts` (auth, retries, sync-job logging). All functions log to `telecom_audit_logs` for admin-visible actions.
 
-Reconcile against existing `pbx_*` tables; do **not** drop or rename them. Introduce a thin normalized layer + views that the new UI reads from.
+### Scheduling
 
-New tables (each with `organization_id`, RLS via `current_user_org_ids()` / `has_role()`, GRANTs, `service_role` full access):
-- `telecom_live_calls` — current active calls (one row per channel, upserted by sync).
-- `telecom_sync_jobs` — every sync run: source, target, started_at, finished_at, status, error, rows_in, rows_out, retries.
-- `telecom_sync_health` — latest heartbeat per source (pbx, voicemail, recordings, cdr).
-- `telecom_audit_logs` — admin telecom actions (extension created, routing changed, working hours updated, etc.). Distinct from existing generic `audit_logs`.
+Use Supabase cron (`pg_cron` already enabled). Add via `supabase--insert`:
+- `pbx-sync-extensions`: every 5 min
+- `pbx-sync-cdr`: every 2 min
+- `pbx-sync-voicemail`: every minute
+- `pbx-sync-recordings`: every 5 min
+- `pbx-reconcile`: hourly
 
-New **read-only views** (no new storage) over existing tables, so the UI has one stable contract:
-- `telecom_extensions_v` ← `pbx_extensions` + `pbx_softphone_users` (joined, no credentials).
-- `telecom_cdr_v` ← `pbx_call_records` filtered to the safe column set.
-- `telecom_voicemails_v` ← `pbx_voicemails` + transcript + AI summary status.
-- `telecom_recordings_v` ← `pbx_call_recordings` with signed-url marker only (URLs minted server-side).
-- `telecom_queues_v` ← `pbx_call_queues` + `pbx_queue_agent_state` + `pbx_queue_agents`.
-- `telecom_routing_v` ← `pbx_call_forwarding` + `org_business_hours` + `holiday_schedules`.
+`pbx-live-events` runs as a long-lived function woken by a 1-minute keepalive cron.
 
-Migration rule: every view explicitly excludes credential columns (`password`, `sip_password`, `platform_api_key`, `key_hash`, `voicemail_password`, `wss_url`, `sip_domain`). Existing REVOKEs on those columns stay.
+### Frontend wiring
 
-Acceptance: new tables + views exist, RLS verified by selecting as anon (must return empty/forbidden), as authenticated org member (own org only), as super_admin (all).
+- `useLiveCounters` already reads from `telecom_live_calls`, `pbx_voicemails`, `handoff_requests` — extend with realtime subscriptions on each.
+- New `useSyncHealth` hook reads `telecom_sync_health`, shows last heartbeat + lag.
+- New page `src/pages/lemtel/admin/TelecomSyncHealth.tsx` — health dashboard with per-source `LiveBadge`, last run, error message, "Run now" button (invokes the corresponding edge function).
+- Add sidebar item `Sync Health` under Administration.
 
----
+### Verification
 
-## Phase 5 — PBX Sync Service (hybrid: live + reconciliation)
-
-All sync logic lives in edge functions; secrets stay server-side.
-
-Edge functions (new, under `supabase/functions/`):
-- `pbx-sync-extensions` — pulls FusionPBX extensions/devices, upserts into `pbx_extensions` + `pbx_softphone_users`, logs to `telecom_sync_jobs`.
-- `pbx-sync-cdr` — fetches recent CDRs, dedups by `sip_call_id`, writes to `pbx_call_records`, logs job.
-- `pbx-sync-voicemail` — voicemail metadata + audio object key (no URL); kicks `pbx_ai_jobs` for transcription/summary.
-- `pbx-sync-recordings` — recording metadata only; playback URL is minted per request by `recording-signed-url`.
-- `pbx-live-events` — receives FreeSWITCH/ESL events (or webhook bridge) and upserts `telecom_live_calls` + broadcasts via Supabase Realtime.
-- `pbx-reconcile` — hourly job: compares Supabase vs FusionPBX truth (counts, last 24h CDR diff), writes drift to `telecom_sync_jobs`, raises alerts in `alert_notifications`.
-
-Scheduling: `pg_cron` calls each `pbx-sync-*` (every 1–5 min depending on stream) — installed via `supabase--insert`, NOT a migration (per project rule about user-specific URL + anon key).
-
-Realtime: enable `supabase_realtime` publication on `telecom_live_calls`, `pbx_voicemails`, `alert_notifications`, `telecom_sync_jobs` (RLS already enforced).
-
-Frontend additions:
-- `useLiveCalls(orgId)`, `useSyncHealth()`, `useUnreadVoicemail()` hooks driving the live badges from Phase 2.
-- New page `pages/platform/SyncHealth.tsx` (super_admin + org_admin) showing PBX connection, last successful sync per source, retry queue, error feed.
-
-Acceptance: making a call updates `telecom_live_calls` within a few seconds; hanging up moves it to `pbx_call_records`; Sync Health page reflects heartbeats; no page needs manual refresh.
-
----
-
-## Phase 6 — AI Voicemail + AVA Admin Assistant (extend, don't rebuild)
-
-Both already exist (`pbx_voicemails`, `pbx_ai_jobs`, `telecom_admin_ai_actions`, `generate-voicemail-greeting`, `telecom-admin-ai-agent`). Phase 6 polishes and exposes them in the cockpit.
-
-- AI Voicemail Inbox page: list voicemails with status chip (received → transcribing → summarized), playback (signed URL), AI summary, sentiment, "assign to me / create follow-up task" actions writing to `leads` or `appointments`.
-- Admin AI Chat: extend the existing `AdminAIChatView` pattern (desktop) into the web portal at `/admin/ava` for org_admin/super_admin. Reuse the existing two-step propose → confirm flow already enforced by `telecom-admin-ai-actions` table. Destructive ops (delete extension, change live routing) require explicit re-typed confirmation + audit-log entry in `telecom_audit_logs`.
-- Lovable AI gateway via the existing `LOVABLE_API_KEY` (never exposed client-side).
-
-Acceptance: a new voicemail appears in the inbox without refresh; summary populates when the AI job completes; admin chat refuses destructive actions without confirmation; every confirmed action is in `telecom_audit_logs`.
+- Trigger each edge function once with `supabase--curl_edge_functions`.
+- Check `telecom_sync_jobs` rows + `telecom_sync_health.status='ok'`.
+- Open `/org/lemtel/admin/sync-health` and confirm live badges + heartbeat.
+- Make a test call → row appears in `telecom_live_calls`, sidebar `Live Calls` badge increments in <2s.
 
 ---
 
-## Phase 7 — QA, Security, Performance, Launch
+## Files touched
 
-- Role matrix tests: super_admin / org_admin / manager / agent / customer — verify each role sees only its menus + data on every migrated page.
-- Multi-tenant isolation: scripted check that user from org A receives zero rows from org B via every new view + realtime channel.
-- PBX failure tests: kill sync, verify Sync Health turns red, retries fire, UI shows degraded state instead of empty silence.
-- i18n sweep: every new string in `src/locales/en.json` + `fr.json`.
-- `supabase--linter` clean (no new warnings introduced).
-- `security--run_security_scan` clean for the new tables/views.
-- Lighthouse pass on the new dashboards; tables paginated; realtime channels unsubscribed on unmount.
-- Update `mem://features/*` index entries for the new cockpit + sync layer.
+**New**
+- `supabase/functions/_shared/fusionpbx.ts`
+- `supabase/functions/pbx-sync-{extensions,cdr,voicemail,recordings,reconcile}/index.ts`
+- `supabase/functions/pbx-live-events/index.ts`
+- `src/hooks/useSyncHealth.ts`
+- `src/pages/lemtel/admin/TelecomSyncHealth.tsx`
+- `src/pages/lemtel/LemtelVoiceAgentClients.tsx`
+- `src/components/voice-agents/AssignClientDialog.tsx`
+- 1 migration (voice_agent_clients + voice_agent_assignments + cron jobs)
 
----
+**Edited**
+- `src/index.css`, `tailwind.config.ts` (light tokens, glass tints)
+- `src/components/ui-cockpit/NeonButton.tsx`, `GlassCard.tsx` (glass-shiny variant)
+- `src/components/sidebar/sidebarConfig.ts` (Voice Agents group + Sync Health)
+- `src/components/layout/AppLayout.tsx`, `SidebarNavGroup.tsx`, `SidebarFooter.tsx` (semantic tokens)
+- `src/pages/lemtel/LemtelVoiceAgents.tsx` (layout fix + assign chips)
+- `src/App.tsx` (new routes)
+- `src/hooks/useLiveCounters.ts` (realtime)
+- `.lovable/plan.md` (mark Phase 5 done)
 
-## What this plan deliberately does NOT do
+**Untouched (CI/CD-protected)**
+- All of `.github/workflows/**`, `apps/ava-softphone-desktop/electron-builder.yml`, and `apps/ava-softphone-desktop/package.json` (`repository` field).
 
-- Does not rename or drop any existing table, view, route, hook, or page.
-- Does not replace the current `AppLayout` globally — `CockpitLayout` is opt-in per route.
-- Does not touch landing, marketing pages, or the locked desktop app code already shipped.
-- Does not introduce a second component library — all new primitives wrap existing shadcn.
-- Does not store new secrets in the client — all PBX/FusionPBX/AI calls stay in edge functions.
-
----
-
-## Technical appendix
-
-- New folders: `src/components/ui-cockpit/`, `src/components/cockpit/`, `supabase/functions/pbx-sync-*`, `supabase/functions/pbx-live-events`, `supabase/functions/pbx-reconcile`, `supabase/functions/recording-signed-url`.
-- New tables: `telecom_live_calls`, `telecom_sync_jobs`, `telecom_sync_health`, `telecom_audit_logs`.
-- New views: `telecom_extensions_v`, `telecom_cdr_v`, `telecom_voicemails_v`, `telecom_recordings_v`, `telecom_queues_v`, `telecom_routing_v`.
-- Realtime publication adds: `telecom_live_calls`, `pbx_voicemails`, `alert_notifications`, `telecom_sync_jobs`.
-- New hooks: `useLiveCalls`, `useSyncHealth`, `useUnreadVoicemail`, `useLiveCounters`, `useRoleMenu`.
-- New routes: `/sync-health`, `/admin/ava`, `/_design` (dev only).
-- pg_cron schedule rows installed via `supabase--insert` (not migration), one per sync function.
+Approve to start; I'll ship in the order A → B → C → D → E so the UI is usable before the data layer comes online.
