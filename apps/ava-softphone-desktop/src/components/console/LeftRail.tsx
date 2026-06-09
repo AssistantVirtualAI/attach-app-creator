@@ -1,8 +1,16 @@
 import React from 'react';
 import { theme } from '../../lib/theme';
 import LemtelLogo from '../LemtelLogo';
+import { useTranslation, type I18nKey } from '../../lib/i18n';
 
 const { colors: c } = theme;
+
+const NAV_KEY: Record<string, I18nKey> = {
+  home: 'nav.home', dialer: 'nav.dialer', calls: 'nav.calls', messages: 'nav.messages',
+  voicemail: 'nav.voicemail', recordings: 'nav.recordings', ai: 'nav.ai',
+  contacts: 'nav.contacts', admin: 'nav.admin', settings: 'nav.settings',
+  telecom: 'nav.telecom', orgchat: 'nav.orgchat', aiadmin: 'nav.aiadmin', reports: 'nav.reports',
+};
 
 export type ConsoleView =
   | 'home' | 'dialer' | 'calls' | 'messages' | 'voicemail'
@@ -46,6 +54,7 @@ interface Props {
 }
 
 export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch, compact, isAdmin }: Props) {
+  const { t } = useTranslation();
   const ITEMS: ConsoleView[] = isAdmin ? [...USER_ITEMS, ...ADMIN_ITEMS] : USER_ITEMS;
   if (compact) return <CompactRail view={view} onChange={onChange} onOpenSettings={onOpenSettings} items={ITEMS} />;
 
@@ -91,13 +100,13 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-          Search
+          {t('nav.search')}
         </span>
         <kbd style={{ fontSize: 9, padding: '2px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: c.textSub, fontFamily: 'inherit' }}>⌘K</kbd>
       </button>
 
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, WebkitAppRegion: 'no-drag' as any, overflowY: 'auto' }}>
-        {ITEMS.map((v) => <RailItem key={v} v={v} active={view === v} onClick={() => onChange(v)} />)}
+        {ITEMS.map((v) => <RailItem key={v} v={v} active={view === v} onClick={() => onChange(v)} label={t(NAV_KEY[v])} />)}
       </nav>
 
       <button
@@ -115,7 +124,7 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = c.mutedSilver; }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d={ICON.settings}/></svg>
-        Settings
+        {t('nav.settings')}
       </button>
 
       {/* AVA footer chip */}
@@ -146,12 +155,14 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
   );
 }
 
-function RailItem({ v, active, onClick }: { v: ConsoleView; active: boolean; onClick: () => void }) {
+function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boolean; onClick: () => void; label?: string }) {
   const isAI = v === 'ai';
   const accent = isAI ? c.avaViolet : c.signalGold;
   return (
     <button
       onClick={onClick}
+      aria-label={label ?? LABEL[v]}
+      aria-current={active ? 'page' : undefined}
       style={{
         display: 'flex', alignItems: 'center', gap: 11,
         padding: '9px 11px', borderRadius: 9,
@@ -166,7 +177,10 @@ function RailItem({ v, active, onClick }: { v: ConsoleView; active: boolean; onC
         transition: 'all 180ms cubic-bezier(.2,.7,.2,1)',
         transform: 'translateX(0)',
         position: 'relative',
+        outline: 'none',
       }}
+      onFocus={(e) => { e.currentTarget.style.boxShadow = `0 0 0 2px ${accent}55`; }}
+      onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
       onMouseEnter={(e) => {
         if (!active) {
           e.currentTarget.style.background = 'rgba(140,180,255,0.08)';
@@ -185,7 +199,7 @@ function RailItem({ v, active, onClick }: { v: ConsoleView; active: boolean; onC
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? accent : 'currentColor'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <path d={ICON[v]} />
       </svg>
-      {LABEL[v]}
+      {label ?? LABEL[v]}
     </button>
   );
 }
