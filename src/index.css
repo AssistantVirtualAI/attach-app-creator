@@ -426,12 +426,38 @@ All colors MUST be HSL.
    ===================================================================== */
 @layer base {
   :root {
-    --cockpit-bg: 230 70% 5%;
-    --cockpit-bg-2: 230 60% 9%;
-    --cockpit-bg-3: 228 55% 16%;
-    --cockpit-surface: 220 30% 12%;
-    --cockpit-surface-strong: 220 30% 16%;
-    --cockpit-border: 220 30% 30%;
+    /* Light cockpit (white-glass) — used when html does NOT have .dark */
+    --cockpit-bg: 220 30% 98%;
+    --cockpit-bg-2: 220 25% 96%;
+    --cockpit-bg-3: 220 25% 92%;
+    --cockpit-surface: 0 0% 100%;
+    --cockpit-surface-strong: 220 25% 97%;
+    --cockpit-border: 220 25% 84%;
+    --cockpit-border-neon: 188 95% 45%;
+    --cockpit-cyan: 188 95% 42%;
+    --cockpit-violet: 262 75% 55%;
+    --cockpit-magenta: 292 75% 55%;
+    --cockpit-state-success: 158 75% 38%;
+    --cockpit-state-warning: 38 95% 50%;
+    --cockpit-state-danger: 350 85% 55%;
+    --cockpit-state-idle: 220 12% 55%;
+
+    --cockpit-shadow-glass: 0 12px 40px -8px hsl(220 40% 50% / 0.18);
+    --cockpit-shadow-glow-cyan: 0 0 24px hsl(188 95% 45% / 0.28);
+    --cockpit-shadow-glow-violet: 0 0 24px hsl(262 75% 55% / 0.28);
+    --cockpit-gradient-shine: linear-gradient(135deg, hsl(188 95% 50%) 0%, hsl(231 95% 60%) 50%, hsl(262 80% 60%) 100%);
+    --cockpit-gradient-bg: radial-gradient(1200px 600px at 10% 0%, hsl(231 95% 90% / 0.55), transparent 60%),
+                            radial-gradient(900px 500px at 90% 100%, hsl(262 90% 92% / 0.55), transparent 60%),
+                            linear-gradient(180deg, hsl(220 30% 99%), hsl(220 25% 96%));
+  }
+
+  .dark {
+    --cockpit-bg: 230 70% 4%;
+    --cockpit-bg-2: 230 60% 7%;
+    --cockpit-bg-3: 228 55% 12%;
+    --cockpit-surface: 222 40% 10%;
+    --cockpit-surface-strong: 222 40% 14%;
+    --cockpit-border: 220 30% 26%;
     --cockpit-border-neon: 188 95% 55%;
     --cockpit-cyan: 188 100% 60%;
     --cockpit-violet: 262 90% 68%;
@@ -448,15 +474,6 @@ All colors MUST be HSL.
     --cockpit-gradient-bg: radial-gradient(1200px 600px at 10% 0%, hsl(231 80% 18% / 0.55), transparent 60%),
                             radial-gradient(900px 500px at 90% 100%, hsl(262 80% 18% / 0.45), transparent 60%),
                             linear-gradient(180deg, hsl(230 70% 5%), hsl(228 55% 10%));
-  }
-
-  .dark {
-    --cockpit-bg: 230 70% 4%;
-    --cockpit-bg-2: 230 60% 7%;
-    --cockpit-bg-3: 228 55% 12%;
-    --cockpit-surface: 222 40% 10%;
-    --cockpit-surface-strong: 222 40% 14%;
-    --cockpit-border: 220 30% 26%;
   }
 }
 
