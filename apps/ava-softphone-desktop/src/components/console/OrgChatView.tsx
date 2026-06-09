@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabaseClient';
+import { useTranslation } from '../../lib/i18n';
 
 const { colors: c } = theme;
 
@@ -8,6 +9,7 @@ type Channel = { id: string; name: string; channel_type: string; organization_id
 type Message = { id: string; channel_id: string; sender_id: string; sender_name: string | null; content: string; created_at: string };
 
 export default function OrgChatView() {
+  const { t } = useTranslation();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -112,9 +114,9 @@ export default function OrgChatView() {
       {/* Channel sidebar */}
       <aside style={{ width: 220, borderRight: `1px solid ${c.border}`, background: c.deepPanel, padding: 14, overflowY: 'auto' }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: c.signalGold, textTransform: 'uppercase', marginBottom: 10 }}>
-          Channels
+          {t('orgchat.channels')}
         </div>
-        {channels.length === 0 && <div style={{ fontSize: 12, color: c.mutedSilver }}>No channels yet</div>}
+        {channels.length === 0 && <div style={{ fontSize: 12, color: c.mutedSilver }}>{t('orgchat.noChannels')}</div>}
         {channels.map((ch) => {
           const active = ch.id === activeId;
           const unread = unreadCount(ch.id);
@@ -137,14 +139,14 @@ export default function OrgChatView() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <header style={{ padding: '12px 18px', borderBottom: `1px solid ${c.border}`, display: 'flex', gap: 12, alignItems: 'center' }}>
           <h2 style={{ margin: 0, fontSize: 15, color: c.textIce }}># {channels.find((c) => c.id === activeId)?.name ?? '—'}</h2>
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search messages…"
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('orgchat.searchPlaceholder')}
             style={{ marginLeft: 'auto', padding: '6px 10px', borderRadius: 8, border: `1px solid ${c.border}`, background: 'rgba(140,180,255,0.06)', color: c.textIce, fontSize: 12, minWidth: 200 }} />
         </header>
 
         <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 18 }}>
           {filtered.length === 0 && (
             <div style={{ color: c.mutedSilver, fontSize: 12, textAlign: 'center', marginTop: 40 }}>
-              {messages.length === 0 ? 'No messages yet — say hi 👋' : 'No matches'}
+              {messages.length === 0 ? t('orgchat.sayHi') : t('orgchat.noMatches')}
             </div>
           )}
           {filtered.map((m) => (
@@ -163,14 +165,14 @@ export default function OrgChatView() {
         <div style={{ padding: 12, borderTop: `1px solid ${c.border}`, display: 'flex', gap: 8 }}>
           <input value={input} onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-            placeholder={activeId ? 'Message…' : 'Select a channel'} disabled={!activeId}
+            placeholder={activeId ? t('orgchat.messagePlaceholder') : t('orgchat.selectChannel')} disabled={!activeId}
             style={{ flex: 1, padding: '10px 12px', borderRadius: 9, border: `1px solid ${c.border}`, background: 'rgba(140,180,255,0.06)', color: c.textIce, fontSize: 13 }} />
           <button onClick={send} disabled={!input.trim() || !activeId} style={{
             padding: '10px 18px', borderRadius: 9, border: 'none', cursor: 'pointer',
             background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
             color: '#fff', fontWeight: 700, fontSize: 12,
             opacity: !input.trim() || !activeId ? 0.5 : 1,
-          }}>Send</button>
+          }}>{t('common.send')}</button>
         </div>
       </div>
     </div>
