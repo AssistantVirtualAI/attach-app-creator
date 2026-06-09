@@ -628,6 +628,12 @@ const App = () => (
                 <Route path="/org/lemtel/admin/queues" element={<LemtelAdminPage><LemtelQueues /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/ring-groups" element={<LemtelAdminPage><TelephonyRingGroups /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/agents" element={<LemtelAdminPage><LemtelVoiceAgents /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/agent-builder" element={<LemtelAdminPage><AgentBuilder /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/va-conversations" element={<LemtelAdminPage><Conversations /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/knowledge-base" element={<LemtelAdminPage><KnowledgeBase /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/voice-clients" element={<LemtelAdminPage><LemtelVoiceAgentClients /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/va-reports" element={<LemtelAdminPage><AgentReports /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/sync-health" element={<LemtelAdminPage><TelecomSyncHealth /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/recordings" element={<LemtelAdminPage><AdminRecordings /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/voicemail" element={<LemtelAdminPage><AdminVoicemail /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/reports" element={<LemtelAdminPage><AdminReports /></LemtelAdminPage>} />
