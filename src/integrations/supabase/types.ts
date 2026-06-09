@@ -3680,6 +3680,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pbx_ai_insights_call_record_id_fkey"
+            columns: ["call_record_id"]
+            isOneToOne: false
+            referencedRelation: "telecom_cdr_v"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "pbx_ai_insights_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -3962,6 +3969,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pbx_call_recordings_call_record_id_fkey"
+            columns: ["call_record_id"]
+            isOneToOne: false
+            referencedRelation: "telecom_cdr_v"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "pbx_call_recordings_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -4196,6 +4210,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pbx_call_transcripts_call_record_id_fkey"
+            columns: ["call_record_id"]
+            isOneToOne: false
+            referencedRelation: "telecom_cdr_v"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "pbx_call_transcripts_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
@@ -4221,6 +4242,13 @@ export type Database = {
             columns: ["recording_id"]
             isOneToOne: false
             referencedRelation: "pbx_call_recordings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_call_transcripts_recording_id_fkey"
+            columns: ["recording_id"]
+            isOneToOne: false
+            referencedRelation: "telecom_recordings_v"
             referencedColumns: ["id"]
           },
         ]
@@ -4286,6 +4314,13 @@ export type Database = {
             columns: ["assigned_extension_id"]
             isOneToOne: false
             referencedRelation: "pbx_extensions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_devices_assigned_extension_id_fkey"
+            columns: ["assigned_extension_id"]
+            isOneToOne: false
+            referencedRelation: "telecom_extensions_v"
             referencedColumns: ["id"]
           },
           {
@@ -4996,10 +5031,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pbx_queue_agents_extension_id_fkey"
+            columns: ["extension_id"]
+            isOneToOne: false
+            referencedRelation: "telecom_extensions_v"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "pbx_queue_agents_queue_id_fkey"
             columns: ["queue_id"]
             isOneToOne: false
             referencedRelation: "pbx_call_queues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_queue_agents_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "telecom_queues_v"
             referencedColumns: ["id"]
           },
         ]
@@ -5429,6 +5478,13 @@ export type Database = {
             columns: ["extension_id"]
             isOneToOne: false
             referencedRelation: "pbx_extensions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_softphone_users_extension_id_fkey"
+            columns: ["extension_id"]
+            isOneToOne: false
+            referencedRelation: "telecom_extensions_v"
             referencedColumns: ["id"]
           },
           {
@@ -6042,6 +6098,233 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "telecom_admin_ai_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telecom_audit_logs: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_user_id: string | null
+          after: Json | null
+          before: Json | null
+          created_at: string
+          id: string
+          ip_address: string | null
+          organization_id: string
+          reason: string | null
+          target_id: string | null
+          target_type: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          organization_id: string
+          reason?: string | null
+          target_id?: string | null
+          target_type?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          organization_id?: string
+          reason?: string | null
+          target_id?: string | null
+          target_type?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telecom_audit_logs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telecom_live_calls: {
+        Row: {
+          answered_at: string | null
+          caller_name: string | null
+          caller_number: string | null
+          channel_uuid: string | null
+          created_at: string
+          destination_number: string | null
+          direction: string | null
+          extension: string | null
+          id: string
+          last_event_at: string
+          organization_id: string
+          queue: string | null
+          raw: Json | null
+          sip_call_id: string | null
+          started_at: string
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          answered_at?: string | null
+          caller_name?: string | null
+          caller_number?: string | null
+          channel_uuid?: string | null
+          created_at?: string
+          destination_number?: string | null
+          direction?: string | null
+          extension?: string | null
+          id?: string
+          last_event_at?: string
+          organization_id: string
+          queue?: string | null
+          raw?: Json | null
+          sip_call_id?: string | null
+          started_at?: string
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          answered_at?: string | null
+          caller_name?: string | null
+          caller_number?: string | null
+          channel_uuid?: string | null
+          created_at?: string
+          destination_number?: string | null
+          direction?: string | null
+          extension?: string | null
+          id?: string
+          last_event_at?: string
+          organization_id?: string
+          queue?: string | null
+          raw?: Json | null
+          sip_call_id?: string | null
+          started_at?: string
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telecom_live_calls_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telecom_sync_health: {
+        Row: {
+          consecutive_failures: number | null
+          id: string
+          last_error: string | null
+          last_error_at: string | null
+          last_success_at: string | null
+          metadata: Json | null
+          organization_id: string | null
+          source: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          consecutive_failures?: number | null
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_success_at?: string | null
+          metadata?: Json | null
+          organization_id?: string | null
+          source: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          consecutive_failures?: number | null
+          id?: string
+          last_error?: string | null
+          last_error_at?: string | null
+          last_success_at?: string | null
+          metadata?: Json | null
+          organization_id?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telecom_sync_health_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telecom_sync_jobs: {
+        Row: {
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          metadata: Json | null
+          organization_id: string | null
+          retries: number | null
+          rows_in: number | null
+          rows_out: number | null
+          source: string
+          started_at: string
+          status: string
+          target: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+          retries?: number | null
+          rows_in?: number | null
+          rows_out?: number | null
+          source: string
+          started_at?: string
+          status?: string
+          target: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string | null
+          retries?: number | null
+          rows_in?: number | null
+          rows_out?: number | null
+          source?: string
+          started_at?: string
+          status?: string
+          target?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telecom_sync_jobs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -6922,6 +7205,460 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      telecom_cdr_v: {
+        Row: {
+          ai_processing: boolean | null
+          analyzed: boolean | null
+          answer_at: string | null
+          billsec: number | null
+          call_status: string | null
+          caller_name: string | null
+          caller_number: string | null
+          client_id: string | null
+          created_at: string | null
+          crm_synced: boolean | null
+          destination: string | null
+          destination_number: string | null
+          direction: string | null
+          duration_seconds: number | null
+          end_at: string | null
+          extension: string | null
+          hangup_cause: string | null
+          has_recording: boolean | null
+          id: string | null
+          ivr_menu_uuid: string | null
+          missed_call: boolean | null
+          notes: string | null
+          organization_id: string | null
+          pbx_uuid: string | null
+          ring_group_uuid: string | null
+          sip_call_id: string | null
+          source_number: string | null
+          start_at: string | null
+          tags: string[] | null
+          transcribed: boolean | null
+          waitsec: number | null
+        }
+        Insert: {
+          ai_processing?: boolean | null
+          analyzed?: boolean | null
+          answer_at?: string | null
+          billsec?: number | null
+          call_status?: string | null
+          caller_name?: string | null
+          caller_number?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          crm_synced?: boolean | null
+          destination?: string | null
+          destination_number?: string | null
+          direction?: string | null
+          duration_seconds?: number | null
+          end_at?: string | null
+          extension?: string | null
+          hangup_cause?: string | null
+          has_recording?: boolean | null
+          id?: string | null
+          ivr_menu_uuid?: string | null
+          missed_call?: boolean | null
+          notes?: string | null
+          organization_id?: string | null
+          pbx_uuid?: string | null
+          ring_group_uuid?: string | null
+          sip_call_id?: string | null
+          source_number?: string | null
+          start_at?: string | null
+          tags?: string[] | null
+          transcribed?: boolean | null
+          waitsec?: number | null
+        }
+        Update: {
+          ai_processing?: boolean | null
+          analyzed?: boolean | null
+          answer_at?: string | null
+          billsec?: number | null
+          call_status?: string | null
+          caller_name?: string | null
+          caller_number?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          crm_synced?: boolean | null
+          destination?: string | null
+          destination_number?: string | null
+          direction?: string | null
+          duration_seconds?: number | null
+          end_at?: string | null
+          extension?: string | null
+          hangup_cause?: string | null
+          has_recording?: boolean | null
+          id?: string | null
+          ivr_menu_uuid?: string | null
+          missed_call?: boolean | null
+          notes?: string | null
+          organization_id?: string | null
+          pbx_uuid?: string | null
+          ring_group_uuid?: string | null
+          sip_call_id?: string | null
+          source_number?: string | null
+          start_at?: string | null
+          tags?: string[] | null
+          transcribed?: boolean | null
+          waitsec?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pbx_call_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_call_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_call_records_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telecom_extensions_v: {
+        Row: {
+          call_group: string | null
+          call_recording: string | null
+          call_timeout: number | null
+          client_id: string | null
+          created_at: string | null
+          description: string | null
+          directory_first_name: string | null
+          directory_last_name: string | null
+          directory_visible: boolean | null
+          do_not_disturb: boolean | null
+          effective_cid_name: string | null
+          effective_cid_number: string | null
+          enabled: boolean | null
+          extension: string | null
+          extension_language: string | null
+          extension_type: string | null
+          forward_all_destination: string | null
+          forward_all_enabled: boolean | null
+          forward_busy_enabled: boolean | null
+          forward_no_answer_enabled: boolean | null
+          id: string | null
+          organization_id: string | null
+          outbound_cid_name: string | null
+          outbound_cid_number: string | null
+          pbx_uuid: string | null
+          portal_user_id: string | null
+          softphone_display_name: string | null
+          softphone_last_seen_at: string | null
+          softphone_status: string | null
+          synced_at: string | null
+          updated_at: string | null
+          voicemail_enabled: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pbx_extensions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_extensions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_extensions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telecom_queues_v: {
+        Row: {
+          agent_count: number | null
+          available_agents: number | null
+          client_id: string | null
+          created_at: string | null
+          description: string | null
+          enabled: boolean | null
+          extension: string | null
+          id: string | null
+          max_wait_time: number | null
+          music_on_hold: string | null
+          name: string | null
+          organization_id: string | null
+          pbx_uuid: string | null
+          record_enabled: boolean | null
+          strategy: string | null
+          timeout_action: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          agent_count?: never
+          available_agents?: never
+          client_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          extension?: string | null
+          id?: string | null
+          max_wait_time?: number | null
+          music_on_hold?: string | null
+          name?: string | null
+          organization_id?: string | null
+          pbx_uuid?: string | null
+          record_enabled?: boolean | null
+          strategy?: string | null
+          timeout_action?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          agent_count?: never
+          available_agents?: never
+          client_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          enabled?: boolean | null
+          extension?: string | null
+          id?: string | null
+          max_wait_time?: number | null
+          music_on_hold?: string | null
+          name?: string | null
+          organization_id?: string | null
+          pbx_uuid?: string | null
+          record_enabled?: boolean | null
+          strategy?: string | null
+          timeout_action?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pbx_call_queues_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_call_queues_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_call_queues_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telecom_recordings_v: {
+        Row: {
+          call_record_id: string | null
+          client_id: string | null
+          created_at: string | null
+          direction: string | null
+          duration_seconds: number | null
+          has_audio: boolean | null
+          id: string | null
+          organization_id: string | null
+          pbx_uuid: string | null
+          recorded_at: string | null
+          transcription_status: string | null
+        }
+        Insert: {
+          call_record_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          direction?: string | null
+          duration_seconds?: number | null
+          has_audio?: never
+          id?: string | null
+          organization_id?: string | null
+          pbx_uuid?: string | null
+          recorded_at?: string | null
+          transcription_status?: string | null
+        }
+        Update: {
+          call_record_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          direction?: string | null
+          duration_seconds?: number | null
+          has_audio?: never
+          id?: string | null
+          organization_id?: string | null
+          pbx_uuid?: string | null
+          recorded_at?: string | null
+          transcription_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pbx_call_recordings_call_record_id_fkey"
+            columns: ["call_record_id"]
+            isOneToOne: false
+            referencedRelation: "pbx_call_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_call_recordings_call_record_id_fkey"
+            columns: ["call_record_id"]
+            isOneToOne: false
+            referencedRelation: "telecom_cdr_v"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_call_recordings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_call_recordings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_call_recordings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telecom_routing_v: {
+        Row: {
+          always_enabled: boolean | null
+          always_to: string | null
+          busy_enabled: boolean | null
+          busy_to: string | null
+          dnd_enabled: boolean | null
+          dnd_schedule: Json | null
+          no_answer_enabled: boolean | null
+          no_answer_seconds: number | null
+          no_answer_to: string | null
+          offline_enabled: boolean | null
+          offline_to: string | null
+          organization_id: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          always_enabled?: boolean | null
+          always_to?: string | null
+          busy_enabled?: boolean | null
+          busy_to?: string | null
+          dnd_enabled?: boolean | null
+          dnd_schedule?: Json | null
+          no_answer_enabled?: boolean | null
+          no_answer_seconds?: number | null
+          no_answer_to?: string | null
+          offline_enabled?: boolean | null
+          offline_to?: string | null
+          organization_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          always_enabled?: boolean | null
+          always_to?: string | null
+          busy_enabled?: boolean | null
+          busy_to?: string | null
+          dnd_enabled?: boolean | null
+          dnd_schedule?: Json | null
+          no_answer_enabled?: boolean | null
+          no_answer_seconds?: number | null
+          no_answer_to?: string | null
+          offline_enabled?: boolean | null
+          offline_to?: string | null
+          organization_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      telecom_voicemails_v: {
+        Row: {
+          ai_summary: string | null
+          ai_tags: string[] | null
+          caller_name: string | null
+          caller_number: string | null
+          created_at: string | null
+          deleted_at: string | null
+          duration_seconds: number | null
+          extension: string | null
+          folder: string | null
+          fusionpbx_uuid: string | null
+          has_audio: boolean | null
+          id: string | null
+          mailbox: string | null
+          organization_id: string | null
+          read_at: string | null
+          received_at: string | null
+          transcript: string | null
+        }
+        Insert: {
+          ai_summary?: string | null
+          ai_tags?: string[] | null
+          caller_name?: string | null
+          caller_number?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          duration_seconds?: number | null
+          extension?: string | null
+          folder?: string | null
+          fusionpbx_uuid?: string | null
+          has_audio?: never
+          id?: string | null
+          mailbox?: string | null
+          organization_id?: string | null
+          read_at?: string | null
+          received_at?: string | null
+          transcript?: string | null
+        }
+        Update: {
+          ai_summary?: string | null
+          ai_tags?: string[] | null
+          caller_name?: string | null
+          caller_number?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          duration_seconds?: number | null
+          extension?: string | null
+          folder?: string | null
+          fusionpbx_uuid?: string | null
+          has_audio?: never
+          id?: string | null
+          mailbox?: string | null
+          organization_id?: string | null
+          read_at?: string | null
+          received_at?: string | null
+          transcript?: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
