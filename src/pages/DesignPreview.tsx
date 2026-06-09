@@ -122,6 +122,8 @@ export default function DesignPreview() {
           action={<NeonButton size="sm">Configure greeting</NeonButton>}
         />
       </section>
-    </div>
+      </div>
+    </CockpitShell>
   );
 }
+
