@@ -1,6 +1,6 @@
 appId: com.lemtel.softphone
 productName: Lemtel Telecom
-copyright: "Copyright 2026 Lemtel Communications."
+copyright: "Copyright 2026 Automatisation Assistant Virtuel IA Inc."
 directories:
   output: dist-electron
 icon: assets/icon.png
@@ -11,9 +11,10 @@ files:
   - package.json
 mac:
   category: public.app-category.business
-  identity: null
-  hardenedRuntime: false
+  hardenedRuntime: true
   gatekeeperAssess: false
+  entitlements: assets/entitlements.mac.plist
+  entitlementsInherit: assets/entitlements.mac.plist
   icon: assets/icon.png
   target:
     - target: dmg
@@ -25,7 +26,8 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  publisherName: "Lemtel Communications"
+  signtoolOptions:
+    publisherName: "Automatisation Assistant Virtuel IA Inc."
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
@@ -36,10 +38,4 @@ linux:
   target:
     - AppImage
   category: Office
-  maintainer: "Lemtel Communications <support@assistantvirtualai.com>"
-publish:
-  - provider: github
-    owner: AssistantVirtualAI
-    repo: attach-app-creator
-    private: false
-    releaseType: release
+  maintainer: "Automatisation Assistant Virtuel IA Inc. <support@assistantvirtualai.com>"
