@@ -19,12 +19,14 @@
     "smoke": "node scripts/smoke-electron.mjs"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "jssip": "^3.13.8",
+    "@ai-sdk/react": "^2.0.198",
     "@supabase/supabase-js": "^2.39.0",
+    "ai": "^5.0.196",
+    "electron-store": "^8.1.0",
     "electron-updater": "^6.1.7",
-    "electron-store": "^8.1.0"
+    "jssip": "^3.13.8",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
