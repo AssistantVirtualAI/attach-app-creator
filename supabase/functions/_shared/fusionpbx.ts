@@ -58,16 +58,21 @@ export async function heartbeat(
   ok: boolean,
   details: Record<string, unknown> = {},
 ) {
-  await supabase.from("telecom_sync_health").upsert(
-    {
-      organization_id: organizationId,
-      source,
-      last_heartbeat_at: new Date().toISOString(),
-      status: ok ? "healthy" : "degraded",
-      details,
-    },
-    { onConflict: "organization_id,source" },
-  );
+  const now = new Date().toISOString();
+  const patch: Record<string, unknown> = {
+    organization_id: organizationId,
+    source,
+    status: ok ? "healthy" : "degraded",
+    metadata: details,
+  };
+  if (ok) {
+    patch.last_success_at = now;
+    patch.consecutive_failures = 0;
+  } else {
+    patch.last_error_at = now;
+    patch.last_error = String(details.error ?? "unknown");
+  }
+  await supabase.from("telecom_sync_health").upsert(patch, { onConflict: "organization_id,source" });
 }
 
 export async function callFusionPBX(action: string, body: Record<string, unknown> = {}) {

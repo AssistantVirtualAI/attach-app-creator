@@ -10,8 +10,10 @@ import { toast } from "@/hooks/use-toast";
 interface HealthRow {
   source: string;
   status: string;
-  last_heartbeat_at: string;
-  details: Record<string, unknown> | null;
+  last_success_at: string | null;
+  last_error_at: string | null;
+  last_error: string | null;
+  metadata: unknown;
 }
 
 interface JobRow {
@@ -105,8 +107,9 @@ export default function TelecomSyncHealth() {
               </CardHeader>
               <CardContent className="space-y-2">
                 <p className="text-xs text-muted-foreground">
-                  Last heartbeat: {h?.last_heartbeat_at ? new Date(h.last_heartbeat_at).toLocaleString() : "never"}
+                  Last success: {h?.last_success_at ? new Date(h.last_success_at).toLocaleString() : "never"}
                 </p>
+                {h?.last_error && <p className="text-xs text-destructive truncate">{h.last_error}</p>}
                 <Button size="sm" onClick={() => runNow(sf.fn)} disabled={loading} className="w-full">
                   Run now
                 </Button>
