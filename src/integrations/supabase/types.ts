@@ -6723,6 +6723,100 @@ export type Database = {
         }
         Relationships: []
       }
+      voice_agent_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          client_id: string | null
+          id: string
+          organization_id: string
+          phone_client_id: string | null
+          source: string
+          voice_agent_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          client_id?: string | null
+          id?: string
+          organization_id: string
+          phone_client_id?: string | null
+          source: string
+          voice_agent_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          client_id?: string | null
+          id?: string
+          organization_id?: string
+          phone_client_id?: string | null
+          source?: string
+          voice_agent_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_agent_assignments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "voice_agent_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_agent_assignments_phone_client_id_fkey"
+            columns: ["phone_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_agent_assignments_phone_client_id_fkey"
+            columns: ["phone_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_agent_clients: {
+        Row: {
+          company: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          organization_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          company?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          organization_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          company?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          organization_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       webhook_delivery_logs: {
         Row: {
           attempt_count: number | null
