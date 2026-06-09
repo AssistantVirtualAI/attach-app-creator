@@ -511,6 +511,52 @@ All colors MUST be HSL.
   .cockpit-shine:active {
     transform: translateY(1px);
   }
+
+  /* Shiny glass buttons — translucent, gradient sheen, works in both themes */
+  .cockpit-btn-glass {
+    background: linear-gradient(135deg, hsl(var(--cockpit-surface) / 0.65), hsl(var(--cockpit-surface) / 0.35));
+    backdrop-filter: blur(14px) saturate(1.3);
+    -webkit-backdrop-filter: blur(14px) saturate(1.3);
+    border: 1px solid hsl(var(--cockpit-border) / 0.6);
+    box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.18), 0 4px 14px -4px hsl(0 0% 0% / 0.18);
+    transition: all 180ms ease;
+  }
+  .cockpit-btn-glass:hover {
+    border-color: hsl(var(--cockpit-cyan) / 0.55);
+    box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.25), 0 6px 22px -6px hsl(var(--cockpit-cyan) / 0.35);
+  }
+  .cockpit-btn-glass-shiny {
+    position: relative;
+    overflow: hidden;
+    background:
+      linear-gradient(180deg, hsl(0 0% 100% / 0.18) 0%, transparent 50%),
+      linear-gradient(135deg, hsl(var(--cockpit-cyan) / 0.18), hsl(var(--cockpit-violet) / 0.18));
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    border: 1px solid hsl(var(--cockpit-cyan) / 0.45);
+    box-shadow:
+      inset 0 1px 0 0 hsl(0 0% 100% / 0.35),
+      inset 0 -1px 0 0 hsl(0 0% 0% / 0.1),
+      0 6px 22px -6px hsl(var(--cockpit-cyan) / 0.4);
+    transition: all 200ms ease;
+  }
+  .cockpit-btn-glass-shiny::before {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(115deg, transparent 30%, hsl(0 0% 100% / 0.25) 50%, transparent 70%);
+    background-size: 200% 100%;
+    background-position: -100% 0;
+    transition: background-position 600ms ease;
+    pointer-events: none;
+  }
+  .cockpit-btn-glass-shiny:hover::before { background-position: 200% 0; }
+  .cockpit-btn-glass-shiny:hover {
+    border-color: hsl(var(--cockpit-cyan) / 0.75);
+    box-shadow:
+      inset 0 1px 0 0 hsl(0 0% 100% / 0.45),
+      0 8px 30px -6px hsl(var(--cockpit-cyan) / 0.55),
+      0 0 0 1px hsl(var(--cockpit-cyan) / 0.3);
+  }
   .cockpit-scan::after {
     content: "";
     position: absolute;
