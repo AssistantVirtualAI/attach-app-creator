@@ -154,5 +154,6 @@ export default function ClientCreateWizard() {
         )}
       </div>
     </div>
+    </div>
   );
 }
