@@ -24,6 +24,7 @@ import KnowledgeBase from "./pages/KnowledgeBase";
 import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
 import Clients from "./pages/Clients";
+import ClientCreateWizard from "./pages/admin/ClientCreateWizard";
 import Integrations from "./pages/Integrations";
 import WebhookLogs from "./pages/WebhookLogs";
 import StripeBilling from "./pages/StripeBilling";
