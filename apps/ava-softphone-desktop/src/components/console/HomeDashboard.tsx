@@ -28,12 +28,24 @@ export default function HomeDashboard({
 }: { displayName: string; extension: string; onQuickDial: () => void }) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const { orgId, orgName, extension: tenantExt } = useTenant();
+  const stats = useDashboardStats(orgId, tenantExt || extension);
+  const { pbx, syncConnected, lastEvent, ageMs, healthy } = useSyncStatus();
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto', animation: 'fadeIn .3s ease-out' }}>
       <header style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, color: c.signalGold, textTransform: 'uppercase' }}>
-          Command Center
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, fontWeight: 700, letterSpacing: 2, color: c.signalGold, textTransform: 'uppercase' }}>
+          <span>Command Center</span>
+          {orgName && (
+            <span style={{ padding: '2px 8px', borderRadius: 999, background: 'rgba(35,214,255,0.08)', border: `1px solid ${c.borderAI}`, color: c.avaCyan, fontSize: 9.5, letterSpacing: 1 }}>
+              {orgName}
+            </span>
+          )}
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 9.5, color: c.mutedSilver, letterSpacing: 0.6 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: healthy ? '#23d6ff' : pbx === 'error' ? '#ff5577' : c.mutedSilver, boxShadow: `0 0 6px currentColor` }} />
+            {pbx === 'registered' ? 'PBX Online' : pbx === 'error' ? 'PBX Error' : 'Connecting'} · {syncConnected ? (lastEvent ? `Sync ${formatAge(ageMs)}` : 'Sync Live') : 'Sync Offline'}
+          </span>
         </div>
         <h1 style={{ fontSize: 28, fontWeight: 700, color: c.textIce, margin: '6px 0 4px', letterSpacing: -0.3 }}>
           {greeting}, {displayName.split(' ')[0] || 'there'}
