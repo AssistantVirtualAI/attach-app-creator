@@ -61,6 +61,8 @@ export default function ConsoleLayout({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
   const { isAdmin } = useDesktopRole();
+  const { orgId, orgName } = useTenant();
+  useRealtimeSync(orgId);
 
   // Redirect non-admins away from admin-only views
   useEffect(() => {
