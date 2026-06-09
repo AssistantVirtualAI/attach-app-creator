@@ -327,6 +327,14 @@ const App = () => (
                   }
                 />
                 <Route
+                  path="/clients/new"
+                  element={
+                    <ProtectedRoute>
+                      <ClientCreateWizard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/clients/:clientId"
                   element={
                     <ProtectedRoute>
