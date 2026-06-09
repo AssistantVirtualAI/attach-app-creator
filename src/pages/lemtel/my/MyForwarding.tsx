@@ -52,19 +52,15 @@ export default function MyForwarding() {
   const save = async () => {
     if (!uid || !orgId) return;
     setSaving(true);
-    const payload = {
-      user_id: uid,
-      organization_id: orgId,
-      always_enabled: always.enabled, always_to: always.to || null,
-      busy_enabled: busy.enabled, busy_to: busy.to || null,
-      no_answer_enabled: noAnswer.enabled, no_answer_to: noAnswer.to || null, no_answer_seconds: noAnswer.seconds,
-      offline_enabled: offline.enabled, offline_to: offline.to || null,
-      dnd_enabled: dnd,
-      updated_at: new Date().toISOString(),
-    };
-    const { error } = await (supabase as any)
-      .from('pbx_call_forwarding')
-      .upsert(payload, { onConflict: 'user_id' });
+    const { error } = await supabase.functions.invoke('me-update-forwarding', {
+      body: {
+        always_enabled: always.enabled, always_to: always.to || null,
+        busy_enabled: busy.enabled, busy_to: busy.to || null,
+        no_answer_enabled: noAnswer.enabled, no_answer_to: noAnswer.to || null, no_answer_seconds: noAnswer.seconds,
+        offline_enabled: offline.enabled, offline_to: offline.to || null,
+        dnd_enabled: dnd,
+      },
+    });
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     toast.success('Forwarding updated');
