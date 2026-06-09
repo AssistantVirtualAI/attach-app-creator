@@ -5,6 +5,7 @@ import {
   CreditCard, FileText, Headphones, Voicemail, Download, MessageSquare, Database,
   Server, Activity, Sliders, Sparkles, Bot,
 } from "lucide-react";
+import NotificationCenter from "@/components/notifications/NotificationCenter";
 
 type NavItem = { label: string; to: string; icon: React.ComponentType<{ className?: string }> };
 
