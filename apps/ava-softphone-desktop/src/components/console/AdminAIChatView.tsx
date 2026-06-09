@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabaseClient';
+import { useTranslation } from '../../lib/i18n';
+import StatusPill from '../ui/StatusPill';
 
 const { colors: c } = theme;
 
@@ -24,6 +26,7 @@ async function callAgent(body: any) {
 }
 
 export default function AdminAIChatView() {
+  const { t } = useTranslation();
   const [prompt, setPrompt] = useState('');
   const [actions, setActions] = useState<Action[]>([]);
   const [loading, setLoading] = useState(false);
@@ -70,15 +73,15 @@ export default function AdminAIChatView() {
   };
 
   if (isAdmin === false) {
-    return <div style={{ padding: 32, color: c.mutedSilver, fontSize: 13 }}>Admin-only area.</div>;
+    return <div style={{ padding: 32, color: c.mutedSilver, fontSize: 13 }}>{t('aiadmin.adminOnly')}</div>;
   }
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <header style={{ padding: '18px 28px', borderBottom: `1px solid ${c.border}` }}>
-        <h1 style={{ fontSize: 20, color: c.textIce, margin: 0 }}>AVA AI · Telecom Admin</h1>
+        <h1 style={{ fontSize: 20, color: c.textIce, margin: 0 }}>{t('aiadmin.title')}</h1>
         <div style={{ fontSize: 12, color: c.mutedSilver, marginTop: 4 }}>
-          Ask AVA to manage business hours, holidays, IVRs, users, DIDs, queues. Every change requires explicit confirmation.
+          {t('aiadmin.subtitle')}
         </div>
       </header>
 
@@ -117,8 +120,8 @@ export default function AdminAIChatView() {
             )}
             {a.confirmation_status === 'pending' && (
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                <button onClick={() => confirm(a.id)} disabled={loading} style={primaryBtn}>Confirm & execute</button>
-                <button onClick={() => reject(a.id)} disabled={loading} style={ghostBtn}>Reject</button>
+                <button onClick={() => confirm(a.id)} disabled={loading} style={primaryBtn}>{t('aiadmin.confirmExecute')}</button>
+                <button onClick={() => reject(a.id)} disabled={loading} style={ghostBtn}>{t('common.reject')}</button>
               </div>
             )}
           </article>
@@ -128,28 +131,26 @@ export default function AdminAIChatView() {
       <div style={{ padding: 14, borderTop: `1px solid ${c.border}`, display: 'flex', gap: 8 }}>
         <input value={prompt} onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') propose(); }}
-          placeholder="Tell AVA what to change…"
+          placeholder={t('aiadmin.placeholder')}
           disabled={loading}
           style={{ flex: 1, padding: '10px 12px', borderRadius: 9, border: `1px solid ${c.border}`, background: 'rgba(140,180,255,0.06)', color: c.textIce, fontSize: 13 }} />
         <button onClick={propose} disabled={loading || !prompt.trim()} style={{
           ...primaryBtn, opacity: loading || !prompt.trim() ? 0.5 : 1,
-        }}>{loading ? '…' : 'Propose'}</button>
+        }}>{loading ? '…' : t('aiadmin.propose')}</button>
       </div>
     </div>
   );
 }
 
 function Status({ conf, exec }: { conf: string; exec: string }) {
-  const map: Record<string, [string, string]> = {
-    'pending|pending': ['Awaiting confirm', c.signalGold],
-    'confirmed|pending': ['Executing…', c.signalGold],
-    'confirmed|success': ['Executed ✓', c.success],
-    'confirmed|failed': ['Failed', c.danger],
-    'rejected|pending': ['Rejected', c.mutedSilver],
-  };
+  const { t } = useTranslation();
   const k = `${conf}|${exec}`;
-  const [label, color] = map[k] ?? [`${conf}/${exec}`, c.mutedSilver];
-  return <span style={{ fontSize: 11, fontWeight: 700, color, letterSpacing: 0.6 }}>{label}</span>;
+  if (k === 'pending|pending') return <StatusPill variant="sync-pending" label={t('aiadmin.awaiting')} pulse />;
+  if (k === 'confirmed|pending') return <StatusPill variant="sync-pending" label={t('aiadmin.executing')} pulse />;
+  if (k === 'confirmed|success') return <StatusPill variant="connected" label={t('aiadmin.executed')} />;
+  if (k === 'confirmed|failed') return <StatusPill variant="sync-failed" label={t('aiadmin.failed')} />;
+  if (k === 'rejected|pending') return <StatusPill variant="offline" label={t('aiadmin.rejected')} />;
+  return <StatusPill variant="not-configured" label={`${conf}/${exec}`} />;
 }
 
 const primaryBtn: React.CSSProperties = {
