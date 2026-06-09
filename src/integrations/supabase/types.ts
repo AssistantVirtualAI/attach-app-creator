@@ -1044,6 +1044,53 @@ export type Database = {
         }
         Relationships: []
       }
+      business_hour_schedules: {
+        Row: {
+          assigned_to_id: string | null
+          assigned_to_type: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          organization_id: string
+          schedule_json: Json
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to_id?: string | null
+          assigned_to_type?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          schedule_json?: Json
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to_id?: string | null
+          assigned_to_type?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          schedule_json?: Json
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_hour_schedules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_integrations: {
         Row: {
           access_token: string | null
@@ -1990,6 +2037,62 @@ export type Database = {
           },
         ]
       }
+      holiday_schedules: {
+        Row: {
+          active: boolean
+          audio_url: string | null
+          created_at: string
+          created_by: string | null
+          end_date: string
+          greeting_text: string | null
+          id: string
+          name: string
+          organization_id: string
+          routing_action: string
+          routing_target: string | null
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          audio_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          greeting_text?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          routing_action?: string
+          routing_target?: string | null
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          audio_url?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          greeting_text?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          routing_action?: string
+          routing_target?: string | null
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holiday_schedules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_base: {
         Row: {
           category: string | null
@@ -2801,6 +2904,32 @@ export type Database = {
             columns: ["parent_message_id"]
             isOneToOne: false
             referencedRelation: "org_chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_chat_reads: {
+        Row: {
+          channel_id: string
+          last_read_at: string
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          last_read_at?: string
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          last_read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_chat_reads_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "org_chat_channels"
             referencedColumns: ["id"]
           },
         ]
@@ -5866,6 +5995,59 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      telecom_admin_ai_actions: {
+        Row: {
+          admin_user_id: string
+          confirmation_status: string
+          created_at: string
+          executed_at: string | null
+          execution_result_json: Json | null
+          execution_status: string
+          id: string
+          interpreted_action: string | null
+          organization_id: string
+          prompt: string
+          proposed_changes_json: Json
+          source: string
+        }
+        Insert: {
+          admin_user_id: string
+          confirmation_status?: string
+          created_at?: string
+          executed_at?: string | null
+          execution_result_json?: Json | null
+          execution_status?: string
+          id?: string
+          interpreted_action?: string | null
+          organization_id: string
+          prompt: string
+          proposed_changes_json?: Json
+          source?: string
+        }
+        Update: {
+          admin_user_id?: string
+          confirmation_status?: string
+          created_at?: string
+          executed_at?: string | null
+          execution_result_json?: Json | null
+          execution_status?: string
+          id?: string
+          interpreted_action?: string | null
+          organization_id?: string
+          prompt?: string
+          proposed_changes_json?: Json
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telecom_admin_ai_actions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       topic_aggregates: {
         Row: {
