@@ -178,7 +178,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="portal-shell min-h-screen bg-background">
       {/* Mobile Header with Hamburger */}
       <header className="fixed top-0 left-0 right-0 h-14 bg-card/95 backdrop-blur-xl border-b border-border z-40 flex items-center px-4 md:hidden">
         <button
