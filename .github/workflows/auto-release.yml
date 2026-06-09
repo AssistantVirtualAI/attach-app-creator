@@ -81,7 +81,7 @@ jobs:
         run: |
           npx vite build
           npx tsc -p electron/tsconfig.json || true
-          npx electron-builder --mac --x64 --arm64 -c.publish=never
+          npx electron-builder --mac --x64 --arm64
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - uses: actions/upload-artifact@v4
@@ -127,7 +127,7 @@ jobs:
         run: |
           npx vite build
           npx tsc -p electron/tsconfig.json
-          npx electron-builder --win -c.publish=never
+          npx electron-builder --win
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - uses: actions/upload-artifact@v4
@@ -174,7 +174,7 @@ jobs:
         run: |
           npx vite build
           npx tsc -p electron/tsconfig.json || true
-          npx electron-builder --linux -c.publish=never
+          npx electron-builder --linux
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - uses: actions/upload-artifact@v4
