@@ -831,6 +831,7 @@ const App = () => (
                   <Route path="settings" element={<Settings />} />
                   <Route path="chat" element={<MyOrgChat />} />
                   <Route path="ai-admin" element={<CustomerAdminAIChat />} />
+                  <Route path="sync-health" element={<CustomerSyncHealth />} />
                   <Route path="reports" element={<LemtelAnalytics />} />
                 </Route>
 
