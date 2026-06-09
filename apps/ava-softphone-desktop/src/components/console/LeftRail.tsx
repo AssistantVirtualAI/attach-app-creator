@@ -33,7 +33,8 @@ const LABEL: Record<ConsoleView, string> = {
   telecom: 'Telecom', orgchat: 'Org Chat', aiadmin: 'AI Admin', reports: 'Reports',
 };
 
-const ITEMS: ConsoleView[] = ['home', 'dialer', 'calls', 'messages', 'voicemail', 'recordings', 'orgchat', 'ai', 'telecom', 'contacts', 'reports', 'admin', 'aiadmin'];
+const USER_ITEMS: ConsoleView[] = ['home', 'dialer', 'calls', 'messages', 'voicemail', 'recordings', 'orgchat', 'ai', 'telecom', 'contacts'];
+const ADMIN_ITEMS: ConsoleView[] = ['reports', 'admin', 'aiadmin'];
 
 interface Props {
   view: ConsoleView;
@@ -41,10 +42,12 @@ interface Props {
   onOpenSettings: () => void;
   onOpenSearch: () => void;
   compact?: boolean;
+  isAdmin?: boolean;
 }
 
-export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch, compact }: Props) {
-  if (compact) return <CompactRail view={view} onChange={onChange} onOpenSettings={onOpenSettings} />;
+export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch, compact, isAdmin }: Props) {
+  const ITEMS: ConsoleView[] = isAdmin ? [...USER_ITEMS, ...ADMIN_ITEMS] : USER_ITEMS;
+  if (compact) return <CompactRail view={view} onChange={onChange} onOpenSettings={onOpenSettings} items={ITEMS} />;
 
   return (
     <aside style={{
