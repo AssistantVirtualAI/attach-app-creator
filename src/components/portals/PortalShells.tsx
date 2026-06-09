@@ -17,7 +17,7 @@ function Shell({ title, badge, accent, items }: {
   const { pathname } = useLocation();
   return (
     <div className="flex flex-col min-h-full bg-background">
-      <div className="px-6 py-3 border-b flex items-center gap-3 flex-wrap bg-card/40 sticky top-0 z-30 backdrop-blur">
+      <div className="px-6 py-3 border-b border-cockpit-border/50 flex items-center gap-3 flex-wrap bg-cockpit-surface/60 sticky top-0 z-30 backdrop-blur-xl">
         <div className={`w-2 h-2 rounded-full ${accent}`} />
         <div className="mr-4">
           <div className="text-sm font-semibold leading-tight">{title}</div>
@@ -34,7 +34,7 @@ function Shell({ title, badge, accent, items }: {
                 end={isRoot}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                   active
-                    ? "bg-primary/10 text-primary"
+                    ? "bg-primary/15 text-primary sidebar-glow"
                     : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                 }`}
               >
@@ -45,7 +45,7 @@ function Shell({ title, badge, accent, items }: {
           })}
         </nav>
       </div>
-      <main className="flex-1 overflow-x-hidden">
+      <main className="flex-1 overflow-x-hidden cockpit-scope">
         <Outlet />
       </main>
     </div>
