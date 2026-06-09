@@ -82,12 +82,30 @@ export default {
         "cyber-cyan": "hsl(var(--cyber-cyan))",
         "neon-green": "hsl(var(--neon-green))",
         "sunset-orange": "hsl(var(--sunset-orange))",
+        cockpit: {
+          bg: "hsl(var(--cockpit-bg))",
+          "bg-2": "hsl(var(--cockpit-bg-2))",
+          "bg-3": "hsl(var(--cockpit-bg-3))",
+          surface: "hsl(var(--cockpit-surface))",
+          "surface-strong": "hsl(var(--cockpit-surface-strong))",
+          border: "hsl(var(--cockpit-border))",
+          "border-neon": "hsl(var(--cockpit-border-neon))",
+          cyan: "hsl(var(--cockpit-cyan))",
+          violet: "hsl(var(--cockpit-violet))",
+          magenta: "hsl(var(--cockpit-magenta))",
+          success: "hsl(var(--cockpit-state-success))",
+          warning: "hsl(var(--cockpit-state-warning))",
+          danger: "hsl(var(--cockpit-state-danger))",
+          idle: "hsl(var(--cockpit-state-idle))",
+        },
       },
       backgroundImage: {
         "gradient-primary": "var(--gradient-primary)",
         "gradient-secondary": "var(--gradient-secondary)",
         "gradient-card": "var(--gradient-card)",
         "gradient-hero": "var(--gradient-hero)",
+        "cockpit-shine": "var(--cockpit-gradient-shine)",
+        "cockpit-bg": "var(--cockpit-gradient-bg)",
       },
       boxShadow: {
         sm: "var(--shadow-sm)",
@@ -95,7 +113,11 @@ export default {
         lg: "var(--shadow-lg)",
         glow: "var(--shadow-glow)",
         neon: "var(--shadow-neon)",
+        "cockpit-glass": "var(--cockpit-shadow-glass)",
+        "cockpit-glow-cyan": "var(--cockpit-shadow-glow-cyan)",
+        "cockpit-glow-violet": "var(--cockpit-shadow-glow-violet)",
       },
+
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -118,6 +140,15 @@ export default {
           "0%": { opacity: "1", transform: "translateY(0)" },
           "100%": { opacity: "0", transform: "translateY(10px)" },
         },
+        "cockpit-pulse": {
+          "0%, 100%": { opacity: "1", transform: "scale(1)" },
+          "50%": { opacity: "0.55", transform: "scale(0.92)" },
+        },
+        "cockpit-scan": {
+          "0%": { backgroundPosition: "200% 0" },
+          "100%": { backgroundPosition: "-200% 0" },
+        },
+
         "scale-in": {
           "0%": { transform: "scale(0.95)", opacity: "0" },
           "100%": { transform: "scale(1)", opacity: "1" },
@@ -129,6 +160,9 @@ export default {
         "fade-in": "fade-in 0.3s ease-out",
         "fade-out": "fade-out 0.3s ease-out",
         "scale-in": "scale-in 0.2s ease-out",
+        "cockpit-pulse": "cockpit-pulse 1.6s ease-in-out infinite",
+        "cockpit-scan": "cockpit-scan 2.8s linear infinite",
+
       },
       transitionProperty: {
         smooth: "all",

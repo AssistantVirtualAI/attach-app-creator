@@ -171,6 +171,8 @@ import PlatformSystemHealth from "./pages/platform/SystemHealth";
 import PlatformTelephonyQA from "./pages/platform/TelephonyQA";
 import CustomerDashboard from "./pages/portals/CustomerDashboard";
 import MyDashboardLanding from "./pages/portals/MyDashboardLanding";
+const DesignPreview = lazy(() => import("./pages/DesignPreview"));
+
 
 const queryClient = new QueryClient();
 
@@ -844,7 +846,10 @@ const App = () => (
                 <Route path="/admin/settings" element={<Navigate to="/platform/settings" replace />} />
                 <Route path="/admin/*" element={<Navigate to="/platform" replace />} />
 
+                {import.meta.env.DEV && <Route path="/_design" element={<DesignPreview />} />}
+
                 <Route path="*" element={<NotFound />} />
+
 
 
               </Routes>
