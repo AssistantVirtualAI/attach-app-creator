@@ -99,6 +99,10 @@ export default function ConsoleLayout({
         e.preventDefault();
         callBus.simulateIncoming('+1 514 555 0123', 'Marie Tremblay');
       }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        setAiOpen((v) => !v);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
