@@ -160,6 +160,9 @@ export default {
         "fade-in": "fade-in 0.3s ease-out",
         "fade-out": "fade-out 0.3s ease-out",
         "scale-in": "scale-in 0.2s ease-out",
+        "cockpit-pulse": "cockpit-pulse 1.6s ease-in-out infinite",
+        "cockpit-scan": "cockpit-scan 2.8s linear infinite",
+
       },
       transitionProperty: {
         smooth: "all",
