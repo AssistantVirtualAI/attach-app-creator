@@ -201,11 +201,10 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed left-0 top-0 h-screen w-[18rem] lg:w-80 bg-cockpit-bg-2/85 backdrop-blur-2xl border-r border-cockpit-border/60 shadow-cockpit-glass z-50 transition-transform duration-300 ease-in-out ${
+      <aside className={`sidebar-pane fixed left-0 top-0 h-screen w-[18rem] lg:w-80 z-50 transition-transform duration-300 ease-in-out ${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } md:translate-x-0`}>
-        {/* Neon edge */}
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-cockpit-cyan/40 to-transparent" />
+        {/* Neon edge handled by .sidebar-pane::after */}
         <div className="flex flex-col h-full relative">
           {/* Header: Logo + Org name */}
           <div className="px-4 py-4 border-b border-cockpit-border/40 flex items-center gap-3 bg-gradient-to-r from-cockpit-cyan/[0.06] via-transparent to-cockpit-violet/[0.06]">

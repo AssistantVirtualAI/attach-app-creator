@@ -31,11 +31,7 @@ export function useLiveCounters(): LiveCounters & { isReady: boolean } {
 
     const load = async () => {
       try {
-        const [live, vm, alerts, handoffs] = await Promise.all([
-          supabase
-            .from("telecom_live_calls")
-            .select("id", { count: "exact", head: true })
-            .eq("organization_id", selectedOrgId),
+        const [vm, alerts, handoffs] = await Promise.all([
           supabase
             .from("pbx_voicemails")
             .select("id", { count: "exact", head: true })
@@ -54,7 +50,7 @@ export function useLiveCounters(): LiveCounters & { isReady: boolean } {
         ]);
         if (cancelled) return;
         setCounters({
-          activeCalls: live.count ?? 0,
+          activeCalls: 0, // wired in Phase 5 (telecom_live_calls)
           unreadVoicemail: vm.count ?? 0,
           alerts: alerts.count ?? 0,
           handoffs: handoffs.count ?? 0,
@@ -68,15 +64,9 @@ export function useLiveCounters(): LiveCounters & { isReady: boolean } {
 
     load();
     const t = setInterval(load, 60_000);
-    const ch = supabase
-      .channel(`live-counters-${selectedOrgId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "telecom_live_calls", filter: `organization_id=eq.${selectedOrgId}` }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "pbx_voicemails", filter: `organization_id=eq.${selectedOrgId}` }, load)
-      .subscribe();
     return () => {
       cancelled = true;
       clearInterval(t);
-      supabase.removeChannel(ch);
     };
   }, [selectedOrgId]);
 

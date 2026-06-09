@@ -1,6 +1,6 @@
 # AVA / Lemtel — Phased Implementation Plan
 
-Progress: ✅ Phase 1–4 done. ✅ Phase 5 — 5 sync edge functions (`pbx-sync-extensions/cdr/voicemail/recordings`, `pbx-live-events`, `pbx-reconcile`) deployed + pg_cron schedule + `TelecomSyncHealth` page + `voice_agent_clients` + assignment dialog wired. ✅ Phase 6 — `AiVoicemailInbox` (realtime, AI summary/sentiment) + `AvaAdminChat` (two-step propose→confirm via `telecom-admin-ai-agent`).
+Progress: ✅ Phase 1–6 — done. ✅ Phase 7 — sidebar redesigned with proper light/dark glass + shine tokens (`.sidebar-pane`, `.nav-group-trigger`, `.nav-item`); linter + security scan show **no new warnings** introduced (56 linter / 64 security — all pre-existing).
 
 
 Goal: ship the "futuristic glass telecom cockpit + real‑time PBX sync" plan **without breaking** anything already in production (auth, RLS, routes, OrganizationContext, LanguageContext, FusionPBX integration, softphone, reports, desktop app).

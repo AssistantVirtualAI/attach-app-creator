@@ -61,31 +61,26 @@ export const SidebarNavGroup = ({ group, onNavigate }: SidebarNavGroupProps) => 
 
   return (
     <Collapsible open={isOpen} onOpenChange={handleOpenChange}>
-      <CollapsibleTrigger className={`cockpit-nav-item group flex items-center justify-between w-full px-3 py-2.5 rounded-xl ${
-        isActiveGroup ? 'is-active text-foreground' : 'text-muted-foreground hover:text-foreground'
-      }`}>
-        <div className="flex items-center gap-3 relative z-10">
-          <div className={`p-1.5 rounded-lg transition-all duration-200 ${
-            isActiveGroup
-              ? 'bg-gradient-to-br from-cockpit-cyan/25 to-cockpit-violet/25 text-cockpit-cyan shadow-cockpit-glow-cyan'
-              : 'bg-cockpit-surface/70 group-hover:text-cockpit-cyan'
-          }`}>
+      <CollapsibleTrigger className={`nav-group-trigger ${isActiveGroup ? 'is-active' : ''}`}>
+        <div className="flex items-center gap-3">
+          <div className="nav-icon-wrap text-muted-foreground">
             <Icon className="w-4 h-4" />
           </div>
-          <span className="font-medium text-sm tracking-tight">{t(group.labelKey)}</span>
+          <span className={`font-medium text-sm tracking-tight ${isActiveGroup ? 'text-foreground' : 'text-muted-foreground'}`}>
+            {t(group.labelKey)}
+          </span>
         </div>
         <motion.div
           animate={{ rotate: isOpen ? 180 : 0 }}
           transition={{ duration: 0.18 }}
-          className="relative z-10"
         >
-          <ChevronDown className="w-4 h-4 opacity-70" />
+          <ChevronDown className={`w-4 h-4 ${isActiveGroup ? 'text-cockpit-cyan' : 'opacity-60'}`} />
         </motion.div>
       </CollapsibleTrigger>
 
       <AnimatePresence>
         {isOpen && (
-          <CollapsibleContent className="pl-4 mt-1 space-y-0.5 overflow-hidden">
+          <CollapsibleContent className="pl-4 mt-1.5 space-y-1 overflow-hidden">
             {visibleItems.map((item, index) => {
               const ItemIcon = item.icon;
               const isActive = location.pathname === item.href;
@@ -100,15 +95,10 @@ export const SidebarNavGroup = ({ group, onNavigate }: SidebarNavGroupProps) => 
                   <Link
                     to={item.href}
                     onClick={onNavigate}
-                    className={`cockpit-nav-item relative group/item flex items-center gap-3 px-3 py-2 rounded-lg ml-2 ${
-                      isActive ? 'is-active text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
-                    }`}
+                    className={`nav-item ${isActive ? 'is-active' : ''}`}
                   >
-                    {isActive && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-r bg-gradient-to-b from-cockpit-cyan to-cockpit-violet shadow-cockpit-glow-cyan" />
-                    )}
-                    <ItemIcon className={`relative z-10 w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-cockpit-cyan' : 'group-hover/item:text-cockpit-cyan'}`} />
-                    <span className="relative z-10 text-sm">{t(item.nameKey)}</span>
+                    <ItemIcon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-cockpit-cyan' : ''}`} />
+                    <span className="text-sm">{t(item.nameKey)}</span>
                   </Link>
                 </motion.div>
               );
