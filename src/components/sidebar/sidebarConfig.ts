@@ -150,6 +150,7 @@ const ORG_GROUPS: NavGroup[] = [
     id: 'org-admin', labelKey: '⚙️ Administration', icon: Settings, scope: 'org', lemtelOnly: true,
     items: [
       { nameKey: 'Users & Access', href: '/org/lemtel/telephony/users', icon: Users },
+      { nameKey: 'Sync Health', href: '/org/lemtel/admin/sync-health', icon: Activity },
       { nameKey: 'Download Apps', href: '/org/lemtel/admin/downloads', icon: Download },
       { nameKey: 'Settings', href: '/org/lemtel/admin/settings', icon: Settings },
     ],
