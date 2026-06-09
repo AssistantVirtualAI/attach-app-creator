@@ -417,3 +417,101 @@ All colors MUST be HSL.
   height: 100%;
   display: block;
 }
+
+/* =====================================================================
+   Cockpit design tokens — futuristic glass telecom command center.
+   Additive only: no existing tokens are removed or repurposed.
+   Consume via Tailwind classes: bg-cockpit-bg, bg-cockpit-surface,
+   border-cockpit-border, text-cockpit-cyan, shadow-cockpit-glow, etc.
+   ===================================================================== */
+@layer base {
+  :root {
+    --cockpit-bg: 230 70% 5%;
+    --cockpit-bg-2: 230 60% 9%;
+    --cockpit-bg-3: 228 55% 16%;
+    --cockpit-surface: 220 30% 12%;
+    --cockpit-surface-strong: 220 30% 16%;
+    --cockpit-border: 220 30% 30%;
+    --cockpit-border-neon: 188 95% 55%;
+    --cockpit-cyan: 188 100% 60%;
+    --cockpit-violet: 262 90% 68%;
+    --cockpit-magenta: 292 85% 65%;
+    --cockpit-state-success: 158 85% 56%;
+    --cockpit-state-warning: 38 95% 56%;
+    --cockpit-state-danger: 350 90% 64%;
+    --cockpit-state-idle: 220 12% 60%;
+
+    --cockpit-shadow-glass: 0 12px 40px -8px hsl(230 80% 4% / 0.6);
+    --cockpit-shadow-glow-cyan: 0 0 24px hsl(188 100% 60% / 0.35);
+    --cockpit-shadow-glow-violet: 0 0 24px hsl(262 90% 68% / 0.35);
+    --cockpit-gradient-shine: linear-gradient(135deg, hsl(188 100% 60%) 0%, hsl(231 100% 60%) 50%, hsl(262 90% 68%) 100%);
+    --cockpit-gradient-bg: radial-gradient(1200px 600px at 10% 0%, hsl(231 80% 18% / 0.55), transparent 60%),
+                            radial-gradient(900px 500px at 90% 100%, hsl(262 80% 18% / 0.45), transparent 60%),
+                            linear-gradient(180deg, hsl(230 70% 5%), hsl(228 55% 10%));
+  }
+
+  .dark {
+    --cockpit-bg: 230 70% 4%;
+    --cockpit-bg-2: 230 60% 7%;
+    --cockpit-bg-3: 228 55% 12%;
+    --cockpit-surface: 222 40% 10%;
+    --cockpit-surface-strong: 222 40% 14%;
+    --cockpit-border: 220 30% 26%;
+  }
+}
+
+@layer components {
+  .cockpit-bg {
+    background: var(--cockpit-gradient-bg);
+  }
+  .cockpit-glass {
+    background: linear-gradient(135deg, hsl(var(--cockpit-surface) / 0.7), hsl(var(--cockpit-surface) / 0.4));
+    backdrop-filter: blur(18px) saturate(1.15);
+    -webkit-backdrop-filter: blur(18px) saturate(1.15);
+    border: 1px solid hsl(var(--cockpit-border) / 0.6);
+    box-shadow: var(--cockpit-shadow-glass), inset 0 1px 0 0 hsl(0 0% 100% / 0.06);
+  }
+  .cockpit-glass-strong {
+    background: linear-gradient(135deg, hsl(var(--cockpit-surface-strong) / 0.85), hsl(var(--cockpit-surface) / 0.6));
+    backdrop-filter: blur(22px) saturate(1.2);
+    -webkit-backdrop-filter: blur(22px) saturate(1.2);
+    border: 1px solid hsl(var(--cockpit-border) / 0.8);
+    box-shadow: var(--cockpit-shadow-glass), inset 0 1px 0 0 hsl(0 0% 100% / 0.08);
+  }
+  .cockpit-neon-border {
+    border: 1px solid hsl(var(--cockpit-border-neon) / 0.55);
+    box-shadow: 0 0 0 1px hsl(var(--cockpit-border-neon) / 0.15), var(--cockpit-shadow-glow-cyan);
+  }
+  .cockpit-shine {
+    background-image: var(--cockpit-gradient-shine);
+    background-size: 200% 100%;
+    transition: background-position 240ms ease-out, box-shadow 180ms ease-out, transform 120ms ease-out;
+  }
+  .cockpit-shine:hover {
+    background-position: 100% 0;
+    box-shadow: var(--cockpit-shadow-glow-cyan);
+  }
+  .cockpit-shine:active {
+    transform: translateY(1px);
+  }
+  .cockpit-scan::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 30%, hsl(0 0% 100% / 0.07) 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: cockpit-scan 2.8s linear infinite;
+  }
+}
+
+@keyframes cockpit-scan {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes cockpit-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.92); }
+}
+
