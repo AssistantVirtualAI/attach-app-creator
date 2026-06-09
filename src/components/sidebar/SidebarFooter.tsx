@@ -23,12 +23,12 @@ export const SidebarFooter = () => {
     || 'User';
 
   return (
-    <div className="px-3 py-3 border-t border-sidebar-border bg-sidebar/60 backdrop-blur-sm">
+    <div className="px-3 py-3 border-t border-cockpit-border/40 bg-gradient-to-r from-cockpit-cyan/[0.04] via-transparent to-cockpit-violet/[0.04] backdrop-blur-sm">
       <div className="flex items-center gap-3">
         <UserAvatar />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium text-foreground truncate">{name}</div>
-          <div className="text-[11px] text-muted-foreground truncate">{roleBadge}</div>
+          <div className="text-[10px] uppercase tracking-widest text-cockpit-cyan/90 truncate">{roleBadge}</div>
         </div>
       </div>
     </div>

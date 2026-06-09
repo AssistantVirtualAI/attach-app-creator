@@ -178,12 +178,12 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   };
 
   return (
-    <div className="portal-shell min-h-screen bg-background">
+    <div className="portal-shell min-h-screen bg-background cockpit-bg">
       {/* Mobile Header with Hamburger */}
-      <header className="fixed top-0 left-0 right-0 h-14 bg-card/95 backdrop-blur-xl border-b border-border z-40 flex items-center px-4 md:hidden">
+      <header className="fixed top-0 left-0 right-0 h-14 bg-cockpit-bg-2/85 backdrop-blur-xl border-b border-cockpit-border/50 z-40 flex items-center px-4 md:hidden">
         <button
           onClick={() => setIsSidebarOpen(true)}
-          className="p-2 rounded-lg hover:bg-muted transition-colors"
+          className="p-2 rounded-lg hover:bg-cockpit-surface/60 transition-colors"
         >
           <Menu className="w-6 h-6 text-foreground" />
         </button>
@@ -195,69 +195,72 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed left-0 top-0 h-screen w-[18rem] lg:w-80 bg-sidebar backdrop-blur-xl border-r border-sidebar-border z-50 transition-transform duration-300 ease-in-out ${
+      <aside className={`fixed left-0 top-0 h-screen w-[18rem] lg:w-80 bg-cockpit-bg-2/85 backdrop-blur-2xl border-r border-cockpit-border/60 shadow-cockpit-glass z-50 transition-transform duration-300 ease-in-out ${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } md:translate-x-0`}>
-        <div className="flex flex-col h-full">
+        {/* Neon edge */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-cockpit-cyan/40 to-transparent" />
+        <div className="flex flex-col h-full relative">
           {/* Header: Logo + Org name */}
-          <div className="px-4 py-4 border-b border-sidebar-border flex items-center gap-3">
-            <Link to="/" onClick={() => setIsSidebarOpen(false)} className="shrink-0">
-              <AvaLogo size="md" animated={true} showText={false} className="[&_div:first-child]:w-11 [&_div:first-child]:h-11 [&_img]:w-11 [&_img]:h-11" />
+          <div className="px-4 py-4 border-b border-cockpit-border/40 flex items-center gap-3 bg-gradient-to-r from-cockpit-cyan/[0.06] via-transparent to-cockpit-violet/[0.06]">
+            <Link to="/" onClick={() => setIsSidebarOpen(false)} className="shrink-0 relative">
+              <span className="absolute inset-0 -m-1 rounded-full bg-cockpit-cyan/20 blur-md opacity-60 animate-cockpit-pulse" aria-hidden />
+              <AvaLogo size="md" animated={true} showText={false} className="relative [&_div:first-child]:w-11 [&_div:first-child]:h-11 [&_img]:w-11 [&_img]:h-11" />
             </Link>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-sidebar-foreground truncate leading-tight">
+              <div className="text-sm font-semibold text-foreground truncate leading-tight">
                 {selectedOrg?.name || 'AVA Statistics'}
               </div>
-              <div className="text-[11px] text-sidebar-foreground/60 truncate">
+              <div className="text-[10px] uppercase tracking-widest text-cockpit-cyan/90 truncate font-medium">
                 {userRole?.role || (isSuperAdmin ? 'super_admin' : 'member')}
               </div>
             </div>
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="p-1.5 rounded-md hover:bg-muted transition-colors md:hidden"
+              className="p-1.5 rounded-md hover:bg-cockpit-surface/60 transition-colors md:hidden"
             >
               <X className="w-4 h-4 text-foreground" />
             </button>
           </div>
 
           {/* Compact toolbar: org switcher + actions */}
-          <div className="px-3 py-2 border-b border-sidebar-border flex items-center gap-1.5">
+          <div className="px-3 py-2 border-b border-cockpit-border/40 flex items-center gap-1.5">
             <div className="flex-1 min-w-0">
               <OrgSwitcher />
             </div>
             <NotificationsBell />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted shrink-0">
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-cockpit-surface/60 shrink-0">
                   <Globe className="w-4 h-4 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setLanguage('en')} className={language === 'en' ? 'bg-primary/10' : ''}>
+                <DropdownMenuItem onClick={() => setLanguage('en')} className={language === 'en' ? 'bg-cockpit-cyan/10' : ''}>
                   🇬🇧 English
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setLanguage('fr')} className={language === 'fr' ? 'bg-primary/10' : ''}>
+                <DropdownMenuItem onClick={() => setLanguage('fr')} className={language === 'fr' ? 'bg-cockpit-cyan/10' : ''}>
                   🇫🇷 Français
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8 hover:bg-muted shrink-0">
+            <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8 hover:bg-cockpit-surface/60 shrink-0">
               {theme === 'dark' ? (
-                <Sun className="w-4 h-4 text-warning" />
+                <Sun className="w-4 h-4 text-cockpit-warning" />
               ) : (
-                <Moon className="w-4 h-4 text-primary" />
+                <Moon className="w-4 h-4 text-cockpit-cyan" />
               )}
             </Button>
           </div>
 
           {/* Version + clear cache */}
-          <div className="px-3 py-1.5 border-b border-sidebar-border flex justify-center">
+          <div className="px-3 py-1.5 border-b border-cockpit-border/40 flex justify-center">
             <VersionBadge />
           </div>
 
