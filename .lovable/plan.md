@@ -1,57 +1,34 @@
-# Final Slice — Tracks C, D, E
+## Track E — Full glass/semantic visual sweep
 
-Closes the original spec. Three tracks shipped in order so the visual sweep (E) lands last and styles everything new.
+### Approach
 
-## Track C — Desktop Portal tab
+The codebase already ships a `.cockpit-scope` CSS layer in `src/index.css` (lines 707-760) that auto-styles every shadcn `Card`, `Table`, `Tabs`, and default `Button` inside it — turning them into glass/cockpit primitives with backdrop-blur, gradient borders, neon hover, and uppercase table headers. It also paints two ambient cyan/violet blur orbs as a scope background.
 
-Goal: from inside the Electron softphone, users can pop the full web portal in a tab without re-authenticating.
+Today this scope is applied only by `AppLayout` (which wraps every `/org/lemtel/**` route). Track E = extend the same scope to every other authenticated route shell, instead of rewriting ~80 page files to swap `Card` → `GlassCard`.
 
-- New file `apps/ava-softphone-desktop/src/components/PortalTab.tsx` — wraps a `<webview>` (Electron) / `<iframe>` (web) pointing at `${PORTAL_URL}/org/lemtel/my/dashboard?desktop=1`.
-- New `apps/ava-softphone-desktop/electron/portalBridge.ts` — exposes `ipcMain` handler that mints a short-lived magic link via new edge function `desktop-portal-token` and returns the URL with `#access_token=…&refresh_token=…`.
-- New edge function `desktop-portal-token` — verifies the desktop's existing Supabase JWT, returns a fresh session pair for `auth.setSession()`.
-- Tab added to the desktop sidebar between "Calls" and "Settings".
-- Portal recognises `?desktop=1` to hide its own sidebar branding and collapse to the `/my` scope.
+### Changes
 
-## Track D — AVA admin chat command pipeline
+1. **`src/components/portals/PortalShells.tsx`** — add `cockpit-scope` to the `<main>` element inside `Shell` (single class addition). This instantly glassifies:
+   - `/platform/**` (Platform Admin: dashboard, orgs, users, calls, telephony, QA, health, billing, audit, settings)
+   - `/customer/**` (Customer Admin: dashboard, team, extensions, queues, IVR, numbers, calls, chat, AI admin, reports, analytics, KB, billing, settings)
+   - `/my/**` (My Workspace: home, softphone, calls, voicemail, messages, recordings, chat, telecom, AI, downloads, profile, settings)
 
-Goal: super_admins type "block extension 1042" / "show outages" / "force re-sync acme" in the existing OrgChat and AVA executes.
+2. **`src/components/portals/PortalShells.tsx`** — header polish:
+   - Active `NavLink` gets `sidebar-glow` (existing token) for the neon cyan underline used elsewhere.
+   - Header `bg-card/40` → `cockpit-surface` style so the sticky bar matches the scope.
 
-- New edge function `ava-admin-command` — Lovable AI Gateway, `streamText` + tools. Tools (all RLS-respecting):
-  - `list_outages()`, `extension_status(ext)`, `block_extension(ext, reason)`,
-  - `force_sync(org_slug, kind)`, `recent_voicemails(org_slug, limit)`,
-  - `verify_isolation(org_slug)`.
-- All tool executions write to existing `telecom_admin_ai_actions` for audit; mutating tools require `needsApproval`.
-- Frontend: extend `src/hooks/useOrgChat.ts` so messages starting with `/ava` route to `ava-admin-command` instead of the normal chat insert. Render assistant replies + tool cards using AI Elements (`Tool`, `ToolHeader`, `ToolOutput`).
-- New component `src/components/lemtel/AvaCommandBubble.tsx` for the tool-result card (status pill + JSON accordion).
-- Gated by `is_super_admin` / `is_lemtel_admin`; non-admins see "Commands disabled".
+3. **`src/pages/admin/ClientCreateWizard.tsx`** — wrap the wizard root in `<div className="cockpit-scope min-h-screen">` so the standalone client-provisioning page inherits the same look.
 
-## Track E — Full visual sweep
+4. **`src/index.css`** — minor: ensure `.cockpit-scope` orbs use `position: absolute` inside the shell (not `fixed`) so they don't bleed across other portals when multiple shells mount. One-line CSS adjustment.
 
-Goal: every portal page matches the cyberpunk glass-morphism cockpit established in `index.css` (no flat white cards left).
+### Out of scope
+- No per-page Card→GlassCard swap (the scope handles it).
+- No new color tokens, fonts, or spacing changes.
+- No landing page edits (locked).
+- No changes to `/org/lemtel/**` (already in scope via AppLayout).
+- No business-logic, route, or component-API changes.
 
-- Audit pass via `rg "rounded-(md|lg|xl) border bg-card"` and `rg "Card>"` to find legacy surfaces.
-- Replace bare shadcn `<Card>` usages on these page groups with the existing `GlassCard` primitive:
-  - `/platform/**` (super-admin)
-  - `/customer/**` (org admin)
-  - `/org/lemtel/admin/**`
-  - `/org/lemtel/my/**` (incl. the 3 just-shipped pages)
-  - `/admin/clients/new` wizard
-- Apply `bg-grid` + `bg-gradient-cockpit` to each route shell that's still flat.
-- Buttons: swap primary `Button` → `Button variant="shine"` on hero CTAs (Sync, Save, Provision).
-- Sidebar: add the subtle scanline + active-glow already defined in `index.css` (`.sidebar-glow` class) to active `NavLink`.
-- No new colors, no new fonts — only existing tokens.
-- Spot-check French + English labels still fit; truncate where needed.
-
-## Out of scope
-
-- New product features beyond C/D.
-- Mobile app (Capacitor) — not in the original spec for this phase.
-- Landing page (locked).
-
-## Technical appendix
-
-- New edge functions: `desktop-portal-token`, `ava-admin-command`.
-- New files: `PortalTab.tsx`, `portalBridge.ts`, `AvaCommandBubble.tsx`.
-- Modified: `useOrgChat.ts`, desktop sidebar, ~25 page files for visual sweep (mechanical Card → GlassCard swap).
-- No new tables. No new migrations. No new third-party deps.
-- AI Elements `tool`, `message`, `conversation`, `prompt-input` installed for the AVA command UI.
+### Technical appendix
+- Files modified: 3 (`PortalShells.tsx`, `ClientCreateWizard.tsx`, `index.css`).
+- No new files, no migrations, no edge function changes, no deps.
+- Verification: load `/platform`, `/customer`, `/my`, `/admin/clients/new` in the preview and confirm cards/tables/tabs render with glass styling and ambient orbs, matching `/org/lemtel/admin/dashboard`.
