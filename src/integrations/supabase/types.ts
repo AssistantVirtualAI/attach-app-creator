@@ -7836,6 +7836,7 @@ export type Database = {
         Returns: string
       }
       mark_voicemail_read: { Args: { _id: string }; Returns: undefined }
+      reconcile_pbx_call_records: { Args: { _org_id: string }; Returns: Json }
       run_security_audit: { Args: { _org_id: string }; Returns: Json }
       set_call_notes: {
         Args: { _call_id: string; _notes: string; _tags?: string[] }
