@@ -74,20 +74,21 @@ export default function HomeDashboard({
             AVA Daily Brief
           </div>
           <div style={{ fontSize: 13.5, color: c.textIce, lineHeight: 1.55 }}>
-            You have <strong style={{ color: c.signalGold }}>3 missed calls</strong> and <strong style={{ color: c.signalGold }}>2 unread voicemails</strong> requiring callbacks.
-            One conversation from yesterday flagged a potential renewal opportunity worth following up.
+            {stats.loading ? 'Loading your day…' : (
+              <>You have <strong style={{ color: c.signalGold }}>{stats.missedToday} missed call{stats.missedToday === 1 ? '' : 's'}</strong> and <strong style={{ color: c.signalGold }}>{stats.unreadVoicemail} unread voicemail{stats.unreadVoicemail === 1 ? '' : 's'}</strong> today. {stats.unreadSms > 0 ? `${stats.unreadSms} unread message${stats.unreadSms === 1 ? '' : 's'} waiting.` : 'Inbox is clear on SMS.'}</>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Stat grid */}
+      {/* Stat grid — live from realtime sync */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}>
-        <Stat label="Missed Calls" value={3} accent={c.danger} hint="Today" />
-        <Stat label="Answered" value={12} accent={c.success} hint="Today" />
-        <Stat label="Unread SMS" value={5} accent={c.signalGold} hint="2 threads" />
-        <Stat label="Voicemail" value={2} accent={c.avaCyan} hint="New" />
-        <Stat label="AI Action Items" value={4} accent={c.avaViolet} hint="Open follow-ups" />
-        <Stat label="PBX Health" value="OK" accent={c.success} hint="SIP registered" />
+        <Stat label="Missed Calls" value={stats.missedToday} accent={c.danger} hint="Today" />
+        <Stat label="Answered" value={stats.answeredToday} accent={c.success} hint="Today" />
+        <Stat label="Unread SMS" value={stats.unreadSms} accent={c.signalGold} hint="All threads" />
+        <Stat label="Voicemail" value={stats.unreadVoicemail} accent={c.avaCyan} hint="New" />
+        <Stat label="Sync" value={syncConnected ? 'Live' : 'Off'} accent={syncConnected ? c.avaCyan : c.mutedSilver} hint={lastEvent ? formatAge(ageMs) : 'Idle'} />
+        <Stat label="PBX Health" value={pbx === 'registered' ? 'OK' : pbx === 'error' ? 'Down' : '…'} accent={pbx === 'registered' ? c.success : pbx === 'error' ? c.danger : c.mutedSilver} hint={pbx === 'registered' ? 'SIP registered' : pbx} />
       </div>
 
       {/* Quick actions */}
