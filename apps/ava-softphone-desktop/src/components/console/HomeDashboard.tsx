@@ -1,5 +1,8 @@
 import React from 'react';
 import { theme } from '../../lib/theme';
+import { useTenant } from '../../hooks/useTenant';
+import { useDashboardStats } from '../../hooks/useDashboardStats';
+import { useSyncStatus, formatAge } from '../../hooks/useSyncStatus';
 
 const { colors: c } = theme;
 
