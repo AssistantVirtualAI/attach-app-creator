@@ -116,20 +116,8 @@ export default {
         "cockpit-glass": "var(--cockpit-shadow-glass)",
         "cockpit-glow-cyan": "var(--cockpit-shadow-glow-cyan)",
         "cockpit-glow-violet": "var(--cockpit-shadow-glow-violet)",
+      },
 
-      backgroundImage: {
-        "gradient-primary": "var(--gradient-primary)",
-        "gradient-secondary": "var(--gradient-secondary)",
-        "gradient-card": "var(--gradient-card)",
-        "gradient-hero": "var(--gradient-hero)",
-      },
-      boxShadow: {
-        sm: "var(--shadow-sm)",
-        md: "var(--shadow-md)",
-        lg: "var(--shadow-lg)",
-        glow: "var(--shadow-glow)",
-        neon: "var(--shadow-neon)",
-      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
