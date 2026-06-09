@@ -21,6 +21,8 @@ import ActiveCallDock from './ActiveCallDock';
 import { useCallShortcuts } from '../../hooks/useShortcuts';
 import { callBus } from '../../hooks/useCallBus';
 import { useDesktopRole } from '../../hooks/useDesktopRole';
+import { useTenant } from '../../hooks/useTenant';
+import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { theme } from '../../lib/theme';
 
 const { colors: c } = theme;
