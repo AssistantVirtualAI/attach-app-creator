@@ -27,6 +27,33 @@ export default function Download() {
         <LiveReleaseCard />
         <DesktopDownloadCard />
 
+        <Card className="p-6 border-amber-500/40 bg-amber-500/5">
+          <h2 className="text-lg font-semibold mb-2 flex items-center gap-2">
+            <span aria-hidden>🍎</span> macOS : « Lemtel Telecom est endommagé » ?
+          </h2>
+          <p className="text-sm text-muted-foreground mb-3">
+            macOS bloque les apps non signées par Apple (Gatekeeper). L'app n'est
+            pas endommagée — il suffit de retirer l'attribut de quarantaine.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <div className="text-xs font-semibold mb-1">Option 1 — Terminal (recommandé)</div>
+              <pre className="text-xs bg-background border border-border rounded p-3 overflow-auto">
+{`xattr -cr ~/Downloads/Lemtel.Telecom-arm64.dmg
+open ~/Downloads/Lemtel.Telecom-arm64.dmg`}
+              </pre>
+            </div>
+            <div>
+              <div className="text-xs font-semibold mb-1">Option 2 — Finder</div>
+              <ol className="text-xs text-muted-foreground list-decimal list-inside space-y-1">
+                <li>Clic droit sur le .dmg → <b>Ouvrir</b></li>
+                <li>Si la dialog refuse : <b>Réglages Système → Confidentialité et sécurité</b></li>
+                <li>Tout en bas, cliquer <b>« Ouvrir quand même »</b></li>
+              </ol>
+            </div>
+          </div>
+        </Card>
+
         <Card className="p-6">
           <h2 className="text-lg font-semibold mb-3">System requirements</h2>
           <ul className="text-sm text-muted-foreground space-y-2">
