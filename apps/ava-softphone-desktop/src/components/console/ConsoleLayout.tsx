@@ -128,6 +128,9 @@ export default function ConsoleLayout({
           {view === 'ai' && <AIWorkspace />}
           {view === 'contacts' && <ContactsView />}
           {view === 'admin' && <AdminView />}
+          {view === 'telecom' && <TelecomSettingsView />}
+          {view === 'orgchat' && <OrgChatView />}
+          {view === 'aiadmin' && <AdminAIChatView />}
           {view === 'settings' && (
             <SettingsPage
               creds={creds}
