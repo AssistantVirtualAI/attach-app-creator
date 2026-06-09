@@ -5,6 +5,7 @@ import {
   CreditCard, FileText, Headphones, Voicemail, Download, MessageSquare, Database,
   Server, Activity, Sliders, Sparkles, Bot,
 } from "lucide-react";
+import NotificationCenter from "@/components/notifications/NotificationCenter";
 
 type NavItem = { label: string; to: string; icon: React.ComponentType<{ className?: string }> };
 
@@ -44,6 +45,9 @@ function Shell({ title, badge, accent, items }: {
             );
           })}
         </nav>
+        <div className="ml-auto flex items-center gap-2">
+          <NotificationCenter />
+        </div>
       </div>
       <main className="flex-1 overflow-x-hidden cockpit-scope">
         <Outlet />
@@ -91,6 +95,7 @@ export function CustomerAdminShell({ children }: { children?: ReactNode }) {
         { label: "Calls & Recordings", to: "/customer/calls", icon: FileText },
         { label: "Org Chat", to: "/customer/chat", icon: MessageSquare },
         { label: "AI Admin", to: "/customer/ai-admin", icon: Bot },
+        { label: "Sync Health", to: "/customer/sync-health", icon: Activity },
         { label: "Reports", to: "/customer/reports", icon: BarChart3 },
         { label: "Analytics", to: "/customer/analytics", icon: BarChart3 },
         { label: "Knowledge Base", to: "/customer/knowledge", icon: Database },
