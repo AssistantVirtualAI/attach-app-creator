@@ -95,6 +95,7 @@ export function CustomerAdminShell({ children }: { children?: ReactNode }) {
         { label: "Calls & Recordings", to: "/customer/calls", icon: FileText },
         { label: "Org Chat", to: "/customer/chat", icon: MessageSquare },
         { label: "AI Admin", to: "/customer/ai-admin", icon: Bot },
+        { label: "Sync Health", to: "/customer/sync-health", icon: Activity },
         { label: "Reports", to: "/customer/reports", icon: BarChart3 },
         { label: "Analytics", to: "/customer/analytics", icon: BarChart3 },
         { label: "Knowledge Base", to: "/customer/knowledge", icon: Database },
