@@ -12,9 +12,17 @@ interface OTPEmailRequest {
   organizationId: string;
 }
 
-// Generate a 6-digit OTP code
+// Generate a cryptographically secure 6-digit OTP code
 function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  return String(100000 + (arr[0] % 900000));
+}
+
+async function hashOTP(code: string): Promise<string> {
+  const data = new TextEncoder().encode(code);
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 serve(async (req) => {
