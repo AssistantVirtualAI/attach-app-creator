@@ -6,7 +6,8 @@ const { colors: c } = theme;
 
 export type ConsoleView =
   | 'home' | 'dialer' | 'calls' | 'messages' | 'voicemail'
-  | 'recordings' | 'ai' | 'contacts' | 'admin' | 'settings';
+  | 'recordings' | 'ai' | 'contacts' | 'admin' | 'settings'
+  | 'telecom' | 'orgchat' | 'aiadmin';
 
 const ICON: Record<ConsoleView, string> = {
   home: 'M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1V11z',
@@ -18,6 +19,9 @@ const ICON: Record<ConsoleView, string> = {
   ai: 'M12 2l1.8 4.5L18 8l-4.2 1.5L12 14l-1.8-4.5L6 8l4.2-1.5L12 2zm6 10l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1 1-2.5z',
   contacts: 'M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0zm-8 2a6 6 0 0 0-6 6v2h20v-2a6 6 0 0 0-6-6H8z',
   admin: 'M12 1l9 4v6c0 5-4 9-9 11-5-2-9-6-9-11V5l9-4zm0 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+  telecom: 'M4 4h16v6H4zM4 14h16v6H4z',
+  orgchat: 'M7 8h10M7 12h7M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-6l-5 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+  aiadmin: 'M12 2l1.8 4.5L18 8l-4.2 1.5L12 14l-1.8-4.5L6 8l4.2-1.5L12 2zM5 18h14',
   settings: 'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
 };
 
@@ -25,9 +29,10 @@ const LABEL: Record<ConsoleView, string> = {
   home: 'Home', dialer: 'Dialer', calls: 'Calls', messages: 'Messages',
   voicemail: 'Voicemail', recordings: 'Recordings', ai: 'AVA AI',
   contacts: 'Contacts', admin: 'Admin', settings: 'Settings',
+  telecom: 'Telecom', orgchat: 'Org Chat', aiadmin: 'AI Admin',
 };
 
-const ITEMS: ConsoleView[] = ['home', 'dialer', 'calls', 'messages', 'voicemail', 'recordings', 'ai', 'contacts', 'admin'];
+const ITEMS: ConsoleView[] = ['home', 'dialer', 'calls', 'messages', 'voicemail', 'recordings', 'orgchat', 'ai', 'telecom', 'contacts', 'admin', 'aiadmin'];
 
 interface Props {
   view: ConsoleView;

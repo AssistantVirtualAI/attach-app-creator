@@ -10,6 +10,9 @@ import RecordingsView from './RecordingsView';
 import ContactsView from './ContactsView';
 import AIWorkspace from './AIWorkspace';
 import AdminView from './AdminView';
+import TelecomSettingsView from './TelecomSettingsView';
+import OrgChatView from './OrgChatView';
+import AdminAIChatView from './AdminAIChatView';
 import SoftphonePane from '../SoftphonePane';
 import SettingsPage from '../SettingsPage';
 import IncomingCallToast from './IncomingCallToast';
@@ -125,6 +128,9 @@ export default function ConsoleLayout({
           {view === 'ai' && <AIWorkspace />}
           {view === 'contacts' && <ContactsView />}
           {view === 'admin' && <AdminView />}
+          {view === 'telecom' && <TelecomSettingsView />}
+          {view === 'orgchat' && <OrgChatView />}
+          {view === 'aiadmin' && <AdminAIChatView />}
           {view === 'settings' && (
             <SettingsPage
               creds={creds}
