@@ -98,6 +98,8 @@ import LemtelIVR from "./pages/lemtel/LemtelIVR";
 import BusinessHours from "./pages/lemtel/BusinessHours";
 import CustomerSettings from "./pages/lemtel/CustomerSettings";
 import LemtelVoiceAgents from "./pages/lemtel/LemtelVoiceAgents";
+import LemtelVoiceAgentClients from "./pages/lemtel/LemtelVoiceAgentClients";
+import TelecomSyncHealth from "./pages/lemtel/admin/TelecomSyncHealth";
 import LemtelSoftphoneUsers from "./pages/lemtel/LemtelSoftphoneUsers";
 import LemtelDevices from "./pages/lemtel/LemtelDevices";
 import TelephonyDashboard from "./pages/telephony/TelephonyDashboard";
