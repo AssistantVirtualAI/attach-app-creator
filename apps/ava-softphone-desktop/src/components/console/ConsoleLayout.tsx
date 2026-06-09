@@ -20,6 +20,7 @@ import IncomingCallToast from './IncomingCallToast';
 import ActiveCallDock from './ActiveCallDock';
 import { useCallShortcuts } from '../../hooks/useShortcuts';
 import { callBus } from '../../hooks/useCallBus';
+import { useDesktopRole } from '../../hooks/useDesktopRole';
 import { theme } from '../../lib/theme';
 
 const { colors: c } = theme;
@@ -57,6 +58,13 @@ export default function ConsoleLayout({
   const [aiOpen, setAiOpen] = useState(true);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  const { isAdmin } = useDesktopRole();
+
+  // Redirect non-admins away from admin-only views
+  useEffect(() => {
+    const adminOnly: ConsoleView[] = ['admin', 'aiadmin', 'reports'];
+    if (!isAdmin && adminOnly.includes(view)) setView('home');
+  }, [isAdmin, view]);
 
   useCallShortcuts();
 
@@ -108,6 +116,7 @@ export default function ConsoleLayout({
           onChange={setView}
           onOpenSettings={() => setView('settings')}
           onOpenSearch={() => setPaletteOpen(true)}
+          isAdmin={isAdmin}
         />
       )}
 
@@ -155,6 +164,7 @@ export default function ConsoleLayout({
           onChange={setView}
           onOpenSettings={() => setView('settings')}
           onOpenSearch={() => setPaletteOpen(true)}
+          isAdmin={isAdmin}
         />
       )}
 

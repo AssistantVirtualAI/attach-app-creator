@@ -141,3 +141,14 @@ Every new public table: `CREATE TABLE` → `GRANT SELECT/INSERT/UPDATE/DELETE TO
 ## Acceptance gates
 
 After each phase: deploy edge functions, run `supabase--linter`, smoke test via `supabase--curl_edge_functions`, then verify in desktop dev build (`bun run dev` inside `apps/ava-softphone-desktop`).
+
+## Progress
+- ✅ Phase 1 — TelecomSettings (working hours, presence, call handling)
+- ✅ Phase 2 — AI Voicemail greeting (Gemini + ElevenLabs)
+- ✅ Phase 3 — Org Chat (realtime, channels)
+- ✅ Phase 4 — Role-aware rail; admin tabs hidden for `normal` users
+- ✅ Phase 5 — Admin AI Chat (propose → confirm → execute + audit_logs)
+- ✅ Phase 6 — Reports (KPIs + AI exec summary)
+- ✅ Phase 7 — Migrations (business_hour_schedules, holiday_schedules, telecom_admin_ai_actions, org_chat_reads)
+- ✅ Phase 8 — Audit (all writes via edge fns, audit_logs entry on AI execute)
+- ☐ Phase 9 — UX polish + FR/EN sweep (ongoing)
