@@ -1,6 +1,22 @@
 import * as JsSIP from 'jssip';
 
-// Module load probe — captured at import time so debug report can show it.
+// ============================================================
+// Runtime toggle — persisted across sessions via localStorage.
+// Default ON to keep current FusionPBX 488 mitigation behavior.
+// ============================================================
+const SDP_TOGGLE_KEY = 'lemtel.sdpWorkaround';
+const ATTEMPT_LOG_KEY = 'lemtel.sipAttemptLog';
+const ATTEMPT_LOG_MAX = 20;
+
+export function isSdpWorkaroundEnabled(): boolean {
+  try {
+    const v = localStorage.getItem(SDP_TOGGLE_KEY);
+    return v === null ? true : v === '1';
+  } catch { return true; }
+}
+export function setSdpWorkaroundEnabled(on: boolean) {
+  try { localStorage.setItem(SDP_TOGGLE_KEY, on ? '1' : '0'); } catch { /* noop */ }
+}
 
 // ============================================================
 // SDP rewriter — forces audio-only PCMU/PCMA, plain RTP (no DTLS/SRTP)
@@ -8,44 +24,42 @@ import * as JsSIP from 'jssip';
 // ============================================================
 function rewriteSdpForFusionPBX(sdp: string): string {
   let out = sdp;
-
-  // 1) Strip entire video m-sections
   out = out.replace(/m=video[\s\S]*?(?=\r\nm=|$)/g, '');
-
-  // 2) Force audio m-line to PCMU(0) PCMA(8) telephone-event(101) on plain RTP/AVP
   out = out.replace(/m=audio (\d+) [A-Z\/]+ [^\r\n]+/g, 'm=audio $1 RTP/AVP 0 8 101');
-
-  // 3) Strip DTLS / SRTP / fingerprint lines
   out = out.replace(/^a=fingerprint:.*$/gm, '');
   out = out.replace(/^a=setup:.*$/gm, '');
   out = out.replace(/^a=dtls[-a-z]*:.*$/gm, '');
   out = out.replace(/^a=crypto:.*$/gm, '');
   out = out.replace(/^a=ice-options:.*$/gm, '');
-
-  // 4) Keep only rtpmap/fmtp for PCMU(0), PCMA(8), telephone-event(101)
   out = out.replace(/^a=rtpmap:(\d+) [^\r\n]+$/gm, (line, pt) =>
     (pt === '0' || pt === '8' || pt === '101') ? line : ''
   );
   out = out.replace(/^a=fmtp:(\d+) [^\r\n]+$/gm, (line, pt) =>
     (pt === '0' || pt === '8' || pt === '101') ? line : ''
   );
-
-  // 5) Strip rtcp-fb / extmap noise (WebRTC-isms)
   out = out.replace(/^a=rtcp-fb:.*$/gm, '');
   out = out.replace(/^a=extmap:.*$/gm, '');
-
-  // 6) Collapse blank lines created by removals
   out = out.replace(/\r?\n\r?\n+/g, '\r\n');
-
   return out;
 }
+
+// Track last seen SDP across the modifier (per call attempt).
+let _lastSdpBefore: string | null = null;
+let _lastSdpAfter: string | null = null;
 
 const sdpModifier = (description: any) => {
   if (description?.sdp) {
     try {
+      _lastSdpBefore = description.sdp;
       // eslint-disable-next-line no-console
       console.log('[SIP][SDP][BEFORE]\n' + description.sdp);
-      description.sdp = rewriteSdpForFusionPBX(description.sdp);
+      if (isSdpWorkaroundEnabled()) {
+        description.sdp = rewriteSdpForFusionPBX(description.sdp);
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn('[SIP][SDP] workaround DISABLED — sending native WebRTC SDP');
+      }
+      _lastSdpAfter = description.sdp;
       // eslint-disable-next-line no-console
       console.log('[SIP][SDP][AFTER]\n' + description.sdp);
     } catch (e) {
@@ -55,6 +69,87 @@ const sdpModifier = (description: any) => {
   }
   return Promise.resolve(description);
 };
+
+// ============================================================
+// Failure classification & troubleshooting hints
+// ============================================================
+export type FailureCategory =
+  | 'sdp_488'
+  | 'auth'
+  | 'not_found'
+  | 'busy'
+  | 'timeout'
+  | 'network'
+  | 'rejected'
+  | 'other';
+
+export interface ClassifiedFailure {
+  category: FailureCategory;
+  title: string;
+  hint: string;
+}
+
+export function classifySipFailure(code: number | undefined, reason: string, cause: string): ClassifiedFailure {
+  const r = (reason || '').toLowerCase();
+  const c = (cause || '').toLowerCase();
+  if (code === 488 || /not acceptable/.test(r)) {
+    return {
+      category: 'sdp_488',
+      title: '488 Not Acceptable — codec/SDP rejected by PBX',
+      hint: isSdpWorkaroundEnabled()
+        ? 'The PBX still refused the offer with the PCMU/PCMA workaround. Ask your PBX admin to enable PCMU/PCMA on the internal SIP profile and disable rtp_secure_media for this domain.'
+        : 'Enable the "SDP/codec workaround" in Settings → Diagnostics to force PCMU/PCMA and disable DTLS/SRTP.',
+    };
+  }
+  if (code === 401 || code === 403 || code === 407 || /auth/.test(r) || /unauthor/.test(r)) {
+    return { category: 'auth', title: `${code || ''} Authentication failed`.trim(), hint: 'Check the SIP extension and password. Re-sign-in if the issue persists.' };
+  }
+  if (code === 404 || /not found/.test(r)) {
+    return { category: 'not_found', title: '404 Not Found', hint: 'The dialed number or extension does not exist on this PBX.' };
+  }
+  if (code === 486 || code === 600 || /busy/.test(r)) {
+    return { category: 'busy', title: `${code} Busy here`.trim(), hint: 'The remote party is busy. Try again later.' };
+  }
+  if (code === 408 || /timeout/.test(r) || /timeout/.test(c) || /request timeout/.test(c)) {
+    return { category: 'timeout', title: 'Request timeout', hint: 'No response from PBX. Verify WSS connectivity and that your network is not blocking SIP/RTP.' };
+  }
+  if (/connection|network|transport/.test(c)) {
+    return { category: 'network', title: 'Network / transport error', hint: 'WebSocket lost or unreachable. Click Retry, or run Test WSS in Diagnostics.' };
+  }
+  if (code && code >= 400 && code < 700) {
+    return { category: 'rejected', title: `${code} ${reason || 'Call rejected'}`.trim(), hint: 'The PBX rejected the call. Check dialplan permissions for this extension.' };
+  }
+  return { category: 'other', title: cause || reason || 'Call failed', hint: 'See diagnostics for details. Download the debug report to share with support.' };
+}
+
+// ============================================================
+// Rolling per-attempt debug log (persisted to localStorage)
+// ============================================================
+export interface SipAttempt {
+  id: string;
+  at: number;
+  target: string;
+  direction: 'in' | 'out';
+  sdpBefore: string | null;
+  sdpAfter: string | null;
+  workaroundOn: boolean;
+  responseCode?: number;
+  responseReason?: string;
+  responseBody?: string;
+  category?: FailureCategory;
+  hint?: string;
+  outcome: 'pending' | 'connected' | 'failed' | 'ended';
+}
+
+function loadAttemptLog(): SipAttempt[] {
+  try {
+    const raw = localStorage.getItem(ATTEMPT_LOG_KEY);
+    return raw ? (JSON.parse(raw) as SipAttempt[]) : [];
+  } catch { return []; }
+}
+function saveAttemptLog(log: SipAttempt[]) {
+  try { localStorage.setItem(ATTEMPT_LOG_KEY, JSON.stringify(log.slice(-ATTEMPT_LOG_MAX))); } catch { /* noop */ }
+}
 
 // Activate JsSIP debug logging
 try {
@@ -166,6 +261,30 @@ class JsSipProvider {
   boundInputLabel: string = 'System default';
   private wssAttempted: string[] = [];
   private lastCallError: string | null = null;
+  private currentAttempt: SipAttempt | null = null;
+  private attemptLog: SipAttempt[] = loadAttemptLog();
+  private lastFailure: ClassifiedFailure | null = null;
+
+  getLastFailure() { return this.lastFailure; }
+  getCurrentAttempt() { return this.currentAttempt; }
+  getAttemptLog() { return [...this.attemptLog]; }
+  clearAttemptLog() { this.attemptLog = []; saveAttemptLog(this.attemptLog); }
+  getLastSdp() { return { before: _lastSdpBefore, after: _lastSdpAfter }; }
+
+  private pushAttempt(a: SipAttempt) {
+    this.attemptLog = [...this.attemptLog, a].slice(-ATTEMPT_LOG_MAX);
+    saveAttemptLog(this.attemptLog);
+  }
+  private patchCurrentAttempt(patch: Partial<SipAttempt>) {
+    if (!this.currentAttempt) return;
+    this.currentAttempt = { ...this.currentAttempt, ...patch };
+    // Replace last entry in log if id matches
+    const idx = this.attemptLog.findIndex((x) => x.id === this.currentAttempt!.id);
+    if (idx >= 0) {
+      this.attemptLog[idx] = this.currentAttempt;
+      saveAttemptLog(this.attemptLog);
+    }
+  }
 
   subscribe(fn: Listener) {
     this.listeners.add(fn);
@@ -323,6 +442,24 @@ class JsSipProvider {
     const remoteUri = session.remote_identity?.uri?.user || '';
     const remoteName = session.remote_identity?.display_name || remoteUri;
 
+    // Track this attempt
+    if (!this.currentAttempt || this.currentAttempt.direction !== (incoming ? 'in' : 'out')) {
+      const attempt: SipAttempt = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        at: Date.now(),
+        target: remoteUri || remoteName || (incoming ? 'incoming' : 'outgoing'),
+        direction: incoming ? 'in' : 'out',
+        sdpBefore: _lastSdpBefore,
+        sdpAfter: _lastSdpAfter,
+        workaroundOn: isSdpWorkaroundEnabled(),
+        outcome: 'pending',
+      };
+      this.currentAttempt = attempt;
+      this.pushAttempt(attempt);
+    } else {
+      this.patchCurrentAttempt({ sdpBefore: _lastSdpBefore, sdpAfter: _lastSdpAfter });
+    }
+
     this.update({
       callState: incoming ? 'ringing-in' : 'ringing-out',
       remoteIdentity: remoteName,
@@ -337,34 +474,42 @@ class JsSipProvider {
     });
     session.on('confirmed', () => {
       this.update({ callState: 'active', startedAt: Date.now() });
+      this.patchCurrentAttempt({ outcome: 'connected', sdpAfter: _lastSdpAfter });
+      this.lastFailure = null;
     });
     session.on('failed', (e: any) => {
       const cause = e?.cause || 'unknown';
       const reason = e?.message?.reason_phrase || e?.response?.reason_phrase || '';
-      const code = e?.message?.status_code || e?.response?.status_code;
+      const code: number | undefined = e?.message?.status_code || e?.response?.status_code;
       const detail = [cause, code, reason].filter(Boolean).join(' ');
+      const respBody = e?.response?.body || e?.message?.body || '';
       this.lastCallError = detail;
-      // Verbose logging for 488 / SDP rejection diagnostics
-      try {
-        const respBody = e?.response?.body || e?.message?.body || '';
+      const classified = classifySipFailure(code, reason, cause);
+      this.lastFailure = classified;
+      // eslint-disable-next-line no-console
+      console.error('[SIP][CALL FAILED]', { cause, code, reason, originator: e?.originator, category: classified.category });
+      if (respBody) {
         // eslint-disable-next-line no-console
-        console.error('[SIP][CALL FAILED]', { cause, code, reason, originator: e?.originator });
-        if (code === 488 || /Not Acceptable/i.test(reason)) {
-          // eslint-disable-next-line no-console
-          console.error('[SIP][488 RESPONSE BODY]\n' + respBody);
-          this.logEvent('error', `488 Not Acceptable — PBX rejected SDP offer. See console for response body.`);
-        }
-        if (respBody) {
-          // eslint-disable-next-line no-console
-          console.error('[SIP][RESP BODY]\n' + respBody);
-        }
-      } catch { /* noop */ }
+        console.error('[SIP][RESP BODY]\n' + respBody);
+      }
+      if (classified.category === 'sdp_488') {
+        this.logEvent('error', `488 Not Acceptable — ${classified.hint}`);
+      }
+      this.patchCurrentAttempt({
+        outcome: 'failed',
+        responseCode: code,
+        responseReason: reason,
+        responseBody: respBody ? String(respBody).slice(0, 4000) : undefined,
+        category: classified.category,
+        hint: classified.hint,
+      });
       this.logEvent('error', `Call failed: ${detail}`);
-      this.update({ callState: 'ended', errorCause: detail });
+      this.update({ callState: 'ended', errorCause: `${classified.title} — ${classified.hint}` });
       setTimeout(() => this.resetCall(), 2500);
     });
     session.on('ended', () => {
       this.update({ callState: 'ended' });
+      this.patchCurrentAttempt({ outcome: 'ended' });
       setTimeout(() => this.resetCall(), 2500);
     });
     session.on('hold', () => this.update({ onHold: true, callState: 'held' }));
@@ -484,7 +629,22 @@ class JsSipProvider {
       return 'SIP not initialized';
     }
     const target = `sip:${number}@${this.config.sipDomain}`;
-    this.logEvent('info', `Dialing ${number}`);
+    this.logEvent('info', `Dialing ${number} (workaround=${isSdpWorkaroundEnabled() ? 'on' : 'off'})`);
+    // Reset SDP capture so this attempt only contains its own offer
+    _lastSdpBefore = null;
+    _lastSdpAfter = null;
+    // Pre-register an attempt so we capture target even if attachSession fires after SDP
+    this.currentAttempt = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      at: Date.now(),
+      target: number,
+      direction: 'out',
+      sdpBefore: null,
+      sdpAfter: null,
+      workaroundOn: isSdpWorkaroundEnabled(),
+      outcome: 'pending',
+    };
+    this.pushAttempt(this.currentAttempt);
     try {
       this.ua.call(target, {
         mediaConstraints: { audio: true, video: false },

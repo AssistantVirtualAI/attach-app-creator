@@ -3,13 +3,15 @@ import { WHITELABEL } from '../whitelabel.config';
 import { useTheme } from '../lib/theme';
 import { useBrightness, Brightness } from '../hooks/useBrightness';
 import { useContrast, Contrast } from '../hooks/useContrast';
+import SipDebugView from './SipDebugView';
 
-type Tab = 'account' | 'audio' | 'notifications' | 'general' | 'about';
+type Tab = 'account' | 'audio' | 'notifications' | 'general' | 'diagnostics' | 'about';
 const TABS: { id: Tab; icon: string; label: string }[] = [
   { id: 'account', icon: '👤', label: 'Account' },
   { id: 'audio', icon: '🎧', label: 'Audio' },
   { id: 'notifications', icon: '🔔', label: 'Notifications' },
   { id: 'general', icon: '⚙', label: 'General' },
+  { id: 'diagnostics', icon: '🛠', label: 'Diagnostics' },
   { id: 'about', icon: 'ⓘ', label: 'About' },
 ];
 
@@ -253,6 +255,12 @@ export default function SettingsPage({
             <option>English</option>
             <option>Français</option>
           </SelectField>
+        </section>
+      )}
+
+      {tab === 'diagnostics' && (
+        <section style={section}>
+          <SipDebugView />
         </section>
       )}
 
