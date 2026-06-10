@@ -2,51 +2,59 @@ import * as JsSIP from 'jssip';
 
 // Module load probe — captured at import time so debug report can show it.
 
-// Force PCMU/PCMA only — fixes 488 Not Acceptable Here with FusionPBX
-function stripToAudioOnly(sdp: string): string {
-  const lines = sdp.split('\r\n');
-  const result: string[] = [];
-  let inAudio = false;
-  let inVideo = false;
-  for (const line of lines) {
-    if (line.startsWith('m=audio')) { inAudio = true; inVideo = false; result.push(line); continue; }
-    if (line.startsWith('m=video')) { inAudio = false; inVideo = true; continue; }
-    if (line.startsWith('m=')) { inAudio = false; inVideo = false; }
-    if (!inVideo) result.push(line);
-  }
-  return result.join('\r\n');
+// ============================================================
+// SDP rewriter — forces audio-only PCMU/PCMA, plain RTP (no DTLS/SRTP)
+// to fix FusionPBX 488 Not Acceptable Here on WebRTC offers.
+// ============================================================
+function rewriteSdpForFusionPBX(sdp: string): string {
+  let out = sdp;
+
+  // 1) Strip entire video m-sections
+  out = out.replace(/m=video[\s\S]*?(?=\r\nm=|$)/g, '');
+
+  // 2) Force audio m-line to PCMU(0) PCMA(8) telephone-event(101) on plain RTP/AVP
+  out = out.replace(/m=audio (\d+) [A-Z\/]+ [^\r\n]+/g, 'm=audio $1 RTP/AVP 0 8 101');
+
+  // 3) Strip DTLS / SRTP / fingerprint lines
+  out = out.replace(/^a=fingerprint:.*$/gm, '');
+  out = out.replace(/^a=setup:.*$/gm, '');
+  out = out.replace(/^a=dtls[-a-z]*:.*$/gm, '');
+  out = out.replace(/^a=crypto:.*$/gm, '');
+  out = out.replace(/^a=ice-options:.*$/gm, '');
+
+  // 4) Keep only rtpmap/fmtp for PCMU(0), PCMA(8), telephone-event(101)
+  out = out.replace(/^a=rtpmap:(\d+) [^\r\n]+$/gm, (line, pt) =>
+    (pt === '0' || pt === '8' || pt === '101') ? line : ''
+  );
+  out = out.replace(/^a=fmtp:(\d+) [^\r\n]+$/gm, (line, pt) =>
+    (pt === '0' || pt === '8' || pt === '101') ? line : ''
+  );
+
+  // 5) Strip rtcp-fb / extmap noise (WebRTC-isms)
+  out = out.replace(/^a=rtcp-fb:.*$/gm, '');
+  out = out.replace(/^a=extmap:.*$/gm, '');
+
+  // 6) Collapse blank lines created by removals
+  out = out.replace(/\r?\n\r?\n+/g, '\r\n');
+
+  return out;
 }
 
-function forcePCMU(sdp: string): string {
-  // Keep only PCMU (0) and PCMA (8) in audio m-line
-  const lines = sdp.split('\r\n');
-  const result: string[] = [];
-  let inAudio = false;
-  const keepPayloads = new Set(['0', '8', '101']);
-  for (const line of lines) {
-    if (line.startsWith('m=audio')) {
-      inAudio = true;
-      const parts = line.split(' ');
-      const filtered = parts.slice(0, 3).concat(parts.slice(3).filter(p => keepPayloads.has(p)));
-      result.push(filtered.join(' '));
-      continue;
+const sdpModifier = (description: any) => {
+  if (description?.sdp) {
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[SIP][SDP][BEFORE]\n' + description.sdp);
+      description.sdp = rewriteSdpForFusionPBX(description.sdp);
+      // eslint-disable-next-line no-console
+      console.log('[SIP][SDP][AFTER]\n' + description.sdp);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[SIP][SDP] rewrite error', e);
     }
-    if (line.startsWith('m=')) { inAudio = false; }
-    if (inAudio && line.startsWith('a=rtpmap:')) {
-      const payload = line.split(':')[1]?.split(' ')[0];
-      if (payload && !keepPayloads.has(payload)) continue;
-    }
-    if (inAudio && line.startsWith('a=fmtp:')) {
-      const payload = line.split(':')[1]?.split(' ')[0];
-      if (payload && !keepPayloads.has(payload)) continue;
-    }
-    if (inAudio && line.startsWith('a=rtcp-fb:')) continue;
-    if (line.startsWith('a=extmap:') && inAudio) continue;
-    result.push(line);
   }
-  return result.join('\r\n');
-}
-
+  return Promise.resolve(description);
+};
 
 // Activate JsSIP debug logging
 try {
@@ -70,6 +78,7 @@ const JSSIP_MODULE_INFO = (() => {
 const pcConfig = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
   sdpSemantics: 'unified-plan' as any,
+  iceTransportPolicy: 'all' as RTCIceTransportPolicy,
 };
 
 const sessionDescriptionHandlerOptions = {
@@ -83,6 +92,10 @@ const sessionDescriptionHandlerOptions = {
       autoGainControl: true,
     },
     video: false,
+  },
+  offerOptions: {
+    offerToReceiveAudio: true,
+    offerToReceiveVideo: false,
   },
 };
 
