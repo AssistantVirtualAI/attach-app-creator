@@ -25,32 +25,26 @@ export function useDashboardStats(orgId: string | null, extension: string | null
     const since = startOfDay();
 
     const callsQ = supabase.from('pbx_call_records')
-      .select('id, missed_call, call_status', { count: 'exact', head: false })
+      .select('id, missed_call, call_status, hangup_cause, voicemail_message', { count: 'exact', head: false })
       .eq('organization_id', orgId)
       .gte('start_at', since);
-    if (extension) callsQ.eq('extension', extension);
-
-    const vmQ = supabase.from('pbx_voicemails')
-      .select('id', { count: 'exact', head: true })
-      .eq('organization_id', orgId)
-      .is('read_at', null);
-    if (extension) vmQ.eq('extension', extension);
 
     const smsQ = supabase.from('pbx_sms_threads')
       .select('unread_count')
       .eq('organization_id', orgId);
 
-    const [callsR, vmR, smsR] = await Promise.all([callsQ, vmQ, smsQ]);
+    const [callsR, smsR] = await Promise.all([callsQ, smsQ]);
     const calls = (callsR.data || []) as any[];
-    const missed = calls.filter((r) => r.missed_call || r.call_status === 'missed').length;
+    const missed = calls.filter((r) => r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER').length;
     const answered = calls.length - missed;
+    const unreadVoicemail = calls.filter((r) => r.missed_call || r.hangup_cause === 'NO_ANSWER' || (r.voicemail_message && r.voicemail_message !== 'false')).length;
     const unreadSms = (smsR.data || []).reduce((a: number, t: any) => a + (t.unread_count || 0), 0);
 
     setStats({
       missedToday: missed,
       answeredToday: answered,
       unreadSms,
-      unreadVoicemail: vmR.count || 0,
+      unreadVoicemail,
       pbxHealth: 'ok',
       loading: false,
     });
