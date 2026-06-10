@@ -743,6 +743,17 @@ Deno.serve(async (req) => {
       }
       if (cdrResult?.ok) {
         const rows = cdrResult.records.map(mapCdr).filter((x: any) => x.pbx_uuid);
+        const uuids = [...new Set(rows.map((x: any) => x.extension_uuid).filter(Boolean))];
+        if (uuids.length) {
+          const { data: exts } = await admin.from("pbx_extensions")
+            .select("pbx_uuid, extension, effective_cid_number")
+            .eq("organization_id", organization_id)
+            .in("pbx_uuid", uuids);
+          const byUuid = new Map((exts || []).map((e: any) => [e.pbx_uuid, e.extension || e.effective_cid_number]));
+          rows.forEach((row: any) => {
+            if (!row.extension && row.extension_uuid) row.extension = byUuid.get(row.extension_uuid) || null;
+          });
+        }
         await doUpsert("pbx_call_records", rows, "pbx_uuid", "cdrs");
       } else if (cdrResult) {
         errors.push(`cdrs: no working endpoint (tried ${cdrResult.attempts.length})`);
