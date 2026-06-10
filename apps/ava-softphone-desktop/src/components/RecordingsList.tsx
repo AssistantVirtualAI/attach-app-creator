@@ -29,10 +29,11 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
       .from('pbx_call_records' as any)
       .select('*')
       .eq('organization_id', LEMTEL_ORG)
+      .eq('has_recording', true)
       .order('start_at', { ascending: false })
-      .limit(200);
+      .limit(100);
     if (error) setError(error.message);
-    else setItems(((data || []) as any[]).filter(r => r.has_recording || r.recording_url));
+    else setItems(((data || []) as any[]));
     setLoading(false);
   }, []);
 
