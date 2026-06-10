@@ -42,7 +42,7 @@ export default function VoicemailList({ extension, onCall }: Props) {
     const { data, error } = await supabase
       .from('pbx_call_records')
       .select('id,caller_name,caller_number,destination_number,start_at,duration_seconds,recording_url,recording_path,voicemail_message,missed_call')
-      .or('hangup_cause.eq.NO_ANSWER,voicemail_message.not.is.null,missed_call.eq.true')
+      .or('hangup_cause.eq.NO_ANSWER,missed_call.eq.true')
       .order('start_at', { ascending: false })
       .limit(50);
     if (error) setErr(error.message);
