@@ -126,6 +126,7 @@ export default function App() {
 
     return () => {
       cancelled = true;
+      clearInterval(syncTimer);
       subscription.unsubscribe();
       window.removeEventListener('resize', onResize);
     };
