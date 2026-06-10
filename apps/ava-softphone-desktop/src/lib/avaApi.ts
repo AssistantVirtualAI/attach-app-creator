@@ -194,14 +194,14 @@ const MOCK_RG: RingGroup[] = [
   { id: 'r1', name: 'Management', members: 3, strategy: 'simultaneous' },
 ];
 
-const MOCK_VM: VoicemailItem[] = [
+const SAMPLE_VOICEMAIL_EMPTY: VoicemailItem[] = [
   { id: 'v1', from: '+15145550101', customer: 'Marie Tremblay', receivedAt: new Date(Date.now()-1800e3).toISOString(), durationSec: 42, isNew: true, transcript: 'Hi, this is Marie. Just calling to confirm our meeting on Thursday at 2pm. Please call me back to confirm. Thanks!', summary: 'Marie confirms Thursday 2pm meeting and asks for callback confirmation.', sentiment: 'positive', priority: 'high' },
   { id: 'v2', from: '+14385550199', customer: 'Acme Corp', receivedAt: new Date(Date.now()-7200e3).toISOString(), durationSec: 28, isNew: true, transcript: 'Hello, we need an update on the proposal. Can you call us back today?', summary: 'Acme Corp requesting proposal update, urgent callback today.', sentiment: 'neutral', priority: 'high' },
   { id: 'v3', from: '+15145550141', receivedAt: new Date(Date.now()-86400e3).toISOString(), durationSec: 15, isNew: false, transcript: 'Sorry, wrong number.', summary: 'Wrong number — no action needed.', sentiment: 'neutral', priority: 'low' },
   { id: 'v4', from: '+15145550182', customer: 'Jean-Luc Roy', receivedAt: new Date(Date.now()-172800e3).toISOString(), durationSec: 67, isNew: false, transcript: 'Bonjour, I was disappointed by the last support call. Please contact me to discuss.', summary: 'Customer complaint regarding recent support interaction.', sentiment: 'negative', priority: 'high' },
 ];
 
-const MOCK_RECORDINGS: RecordingItem[] = [
+const SAMPLE_RECORDING_EMPTY: RecordingItem[] = [
   { id: 'rec1', callId: 'c1', from: '+15145550182', to: '301', customer: 'Marie Tremblay', recordedAt: new Date(Date.now()-3600e3).toISOString(), durationSec: 245, sizeKb: 980, qualityScore: 92, sentiment: 'positive', summary: 'Customer confirmed renewal pricing and requested quote by Friday.', topics: ['renewal', 'pricing', 'quote'], tags: ['sales', 'follow-up'] },
   { id: 'rec2', callId: 'c3', from: '301', to: '+15145550141', recordedAt: new Date(Date.now()-10800e3).toISOString(), durationSec: 612, sizeKb: 2450, qualityScore: 78, sentiment: 'neutral', summary: 'Discovery call covering technical requirements for integration.', topics: ['integration', 'API', 'requirements'], tags: ['discovery'] },
   { id: 'rec3', callId: 'c4', from: '+15145550101', to: '301', customer: 'Jean-Luc Roy', recordedAt: new Date(Date.now()-14400e3).toISOString(), durationSec: 38, sizeKb: 150, qualityScore: 41, sentiment: 'negative', summary: 'Customer expressed frustration about support response time.', topics: ['support', 'complaint'], tags: ['escalation'] },
@@ -413,7 +413,7 @@ export const ava = {
     .then((raw: any) => MOCK ? raw as RingGroup[] : asArray(raw).map((r: any) => ({ id: r.id, name: r.name || 'Ring Group', members: 0, strategy: r.strategy || '—' }))),
   /* Phase 3 */
   voicemails: async () => {
-    if (MOCK) return MOCK_VM;
+    if (MOCK) return SAMPLE_VOICEMAIL_EMPTY;
     await bestEffortCdrSync(200);
     try {
       const rows = await readCallRecordRows(200);
@@ -426,7 +426,7 @@ export const ava = {
   markVoicemailRead: (id: string) =>
     call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'voicemail-read', id }) }, { ok: true }).catch(() => ({ ok: true as const })),
   recordings: async () => {
-    if (MOCK) return MOCK_RECORDINGS;
+    if (MOCK) return SAMPLE_RECORDING_EMPTY;
     await bestEffortCdrSync(200);
     try {
       const rows = await readCallRecordRows(200);
