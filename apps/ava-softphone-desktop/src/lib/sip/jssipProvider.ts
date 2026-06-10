@@ -495,7 +495,10 @@ class JsSipProvider {
     if (!this.ua || !this.session || !this.config) return;
     this.session.hold();
     const uri = `sip:${target}@${this.config.sipDomain}`;
-    this.ua.call(uri, { mediaConstraints: { audio: true, video: false } });
+    this.ua.call(uri, {
+      mediaConstraints: { audio: true, video: false },
+      sessionDescriptionHandlerOptions,
+    });
   }
 
   /** After consult is established, transfer original call to the consult party. */
