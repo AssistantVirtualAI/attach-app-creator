@@ -2,51 +2,59 @@ import * as JsSIP from 'jssip';
 
 // Module load probe — captured at import time so debug report can show it.
 
-// Force PCMU/PCMA only — fixes 488 Not Acceptable Here with FusionPBX
-function stripToAudioOnly(sdp: string): string {
-  const lines = sdp.split('\r\n');
-  const result: string[] = [];
-  let inAudio = false;
-  let inVideo = false;
-  for (const line of lines) {
-    if (line.startsWith('m=audio')) { inAudio = true; inVideo = false; result.push(line); continue; }
-    if (line.startsWith('m=video')) { inAudio = false; inVideo = true; continue; }
-    if (line.startsWith('m=')) { inAudio = false; inVideo = false; }
-    if (!inVideo) result.push(line);
-  }
-  return result.join('\r\n');
+// ============================================================
+// SDP rewriter — forces audio-only PCMU/PCMA, plain RTP (no DTLS/SRTP)
+// to fix FusionPBX 488 Not Acceptable Here on WebRTC offers.
+// ============================================================
+function rewriteSdpForFusionPBX(sdp: string): string {
+  let out = sdp;
+
+  // 1) Strip entire video m-sections
+  out = out.replace(/m=video[\s\S]*?(?=\r\nm=|$)/g, '');
+
+  // 2) Force audio m-line to PCMU(0) PCMA(8) telephone-event(101) on plain RTP/AVP
+  out = out.replace(/m=audio (\d+) [A-Z\/]+ [^\r\n]+/g, 'm=audio $1 RTP/AVP 0 8 101');
+
+  // 3) Strip DTLS / SRTP / fingerprint lines
+  out = out.replace(/^a=fingerprint:.*$/gm, '');
+  out = out.replace(/^a=setup:.*$/gm, '');
+  out = out.replace(/^a=dtls[-a-z]*:.*$/gm, '');
+  out = out.replace(/^a=crypto:.*$/gm, '');
+  out = out.replace(/^a=ice-options:.*$/gm, '');
+
+  // 4) Keep only rtpmap/fmtp for PCMU(0), PCMA(8), telephone-event(101)
+  out = out.replace(/^a=rtpmap:(\d+) [^\r\n]+$/gm, (line, pt) =>
+    (pt === '0' || pt === '8' || pt === '101') ? line : ''
+  );
+  out = out.replace(/^a=fmtp:(\d+) [^\r\n]+$/gm, (line, pt) =>
+    (pt === '0' || pt === '8' || pt === '101') ? line : ''
+  );
+
+  // 5) Strip rtcp-fb / extmap noise (WebRTC-isms)
+  out = out.replace(/^a=rtcp-fb:.*$/gm, '');
+  out = out.replace(/^a=extmap:.*$/gm, '');
+
+  // 6) Collapse blank lines created by removals
+  out = out.replace(/\r?\n\r?\n+/g, '\r\n');
+
+  return out;
 }
 
-function forcePCMU(sdp: string): string {
-  // Keep only PCMU (0) and PCMA (8) in audio m-line
-  const lines = sdp.split('\r\n');
-  const result: string[] = [];
-  let inAudio = false;
-  const keepPayloads = new Set(['0', '8', '101']);
-  for (const line of lines) {
-    if (line.startsWith('m=audio')) {
-      inAudio = true;
-      const parts = line.split(' ');
-      const filtered = parts.slice(0, 3).concat(parts.slice(3).filter(p => keepPayloads.has(p)));
-      result.push(filtered.join(' '));
-      continue;
+const sdpModifier = (description: any) => {
+  if (description?.sdp) {
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[SIP][SDP][BEFORE]\n' + description.sdp);
+      description.sdp = rewriteSdpForFusionPBX(description.sdp);
+      // eslint-disable-next-line no-console
+      console.log('[SIP][SDP][AFTER]\n' + description.sdp);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('[SIP][SDP] rewrite error', e);
     }
-    if (line.startsWith('m=')) { inAudio = false; }
-    if (inAudio && line.startsWith('a=rtpmap:')) {
-      const payload = line.split(':')[1]?.split(' ')[0];
-      if (payload && !keepPayloads.has(payload)) continue;
-    }
-    if (inAudio && line.startsWith('a=fmtp:')) {
-      const payload = line.split(':')[1]?.split(' ')[0];
-      if (payload && !keepPayloads.has(payload)) continue;
-    }
-    if (inAudio && line.startsWith('a=rtcp-fb:')) continue;
-    if (line.startsWith('a=extmap:') && inAudio) continue;
-    result.push(line);
   }
-  return result.join('\r\n');
-}
-
+  return Promise.resolve(description);
+};
 
 // Activate JsSIP debug logging
 try {
@@ -70,6 +78,7 @@ const JSSIP_MODULE_INFO = (() => {
 const pcConfig = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
   sdpSemantics: 'unified-plan' as any,
+  iceTransportPolicy: 'all' as RTCIceTransportPolicy,
 };
 
 const sessionDescriptionHandlerOptions = {
@@ -83,6 +92,10 @@ const sessionDescriptionHandlerOptions = {
       autoGainControl: true,
     },
     video: false,
+  },
+  offerOptions: {
+    offerToReceiveAudio: true,
+    offerToReceiveVideo: false,
   },
 };
 
@@ -331,6 +344,21 @@ class JsSipProvider {
       const code = e?.message?.status_code || e?.response?.status_code;
       const detail = [cause, code, reason].filter(Boolean).join(' ');
       this.lastCallError = detail;
+      // Verbose logging for 488 / SDP rejection diagnostics
+      try {
+        const respBody = e?.response?.body || e?.message?.body || '';
+        // eslint-disable-next-line no-console
+        console.error('[SIP][CALL FAILED]', { cause, code, reason, originator: e?.originator });
+        if (code === 488 || /Not Acceptable/i.test(reason)) {
+          // eslint-disable-next-line no-console
+          console.error('[SIP][488 RESPONSE BODY]\n' + respBody);
+          this.logEvent('error', `488 Not Acceptable — PBX rejected SDP offer. See console for response body.`);
+        }
+        if (respBody) {
+          // eslint-disable-next-line no-console
+          console.error('[SIP][RESP BODY]\n' + respBody);
+        }
+      } catch { /* noop */ }
       this.logEvent('error', `Call failed: ${detail}`);
       this.update({ callState: 'ended', errorCause: detail });
       setTimeout(() => this.resetCall(), 2500);
@@ -344,8 +372,24 @@ class JsSipProvider {
     session.on('muted', () => this.update({ muted: true }));
     session.on('unmuted', () => this.update({ muted: false }));
 
+    // Verbose SDP logging — peerconnection offer/answer trace
+    try {
+      const pc = session.connection;
+      if (pc) {
+        pc.addEventListener('iceconnectionstatechange', () => {
+          // eslint-disable-next-line no-console
+          console.log('[SIP][ICE]', pc.iceConnectionState);
+        });
+        pc.addEventListener('connectionstatechange', () => {
+          // eslint-disable-next-line no-console
+          console.log('[SIP][PC]', pc.connectionState);
+        });
+      }
+    } catch { /* noop */ }
+
     this.bindMedia(session);
   }
+
 
   private bindSecondary(session: any) {
     session.on('ended', () => { this.secondSession = null; });
@@ -442,22 +486,11 @@ class JsSipProvider {
     const target = `sip:${number}@${this.config.sipDomain}`;
     this.logEvent('info', `Dialing ${number}`);
     try {
-      // Let JsSIP handle getUserMedia internally. Pre-fetching the stream
-      // causes "Bad Media Description" + unhandled rejections that crash
-      // the Electron renderer (black screen).
       this.ua.call(target, {
         mediaConstraints: { audio: true, video: false },
+        pcConfig,
         sessionDescriptionHandlerOptions,
-        sessionDescriptionHandlerModifiers: [
-          (description: any) => {
-            if (description?.sdp) {
-              console.log('[SDP BEFORE]', description.sdp);
-              description.sdp = forcePCMU(stripToAudioOnly(description.sdp));
-              console.log('[SDP AFTER]', description.sdp);
-            }
-            return Promise.resolve(description);
-          }
-        ],
+        sessionDescriptionHandlerModifiers: [sdpModifier],
       } as any);
       this.lastCallError = null;
       return null;
@@ -530,16 +563,10 @@ class JsSipProvider {
   answer() {
     this.session?.answer({
       mediaConstraints: { audio: true, video: false },
+      pcConfig,
       sessionDescriptionHandlerOptions,
-      sessionDescriptionHandlerModifiers: [
-        (description: any) => {
-          if (description?.sdp) {
-            description.sdp = forcePCMU(stripToAudioOnly(description.sdp));
-          }
-          return Promise.resolve(description);
-        }
-      ],
-    });
+      sessionDescriptionHandlerModifiers: [sdpModifier],
+    } as any);
   }
 
   hangup() {
@@ -568,8 +595,10 @@ class JsSipProvider {
     const uri = `sip:${target}@${this.config.sipDomain}`;
     this.ua.call(uri, {
       mediaConstraints: { audio: true, video: false },
+      pcConfig,
       sessionDescriptionHandlerOptions,
-    });
+      sessionDescriptionHandlerModifiers: [sdpModifier],
+    } as any);
   }
 
   /** After consult is established, transfer original call to the consult party. */
