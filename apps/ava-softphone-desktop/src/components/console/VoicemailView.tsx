@@ -167,6 +167,7 @@ export default function VoicemailView() {
           ))}
         </div>
 
+        {error && <ErrorBanner message={error} onRetry={load} />}
         {loading && <ListSkeleton rows={6} />}
         {!loading && <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
           {filtered.map((v) => (
@@ -186,18 +187,18 @@ export default function VoicemailView() {
               }} />
               <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 <span style={{ fontSize: 13, fontWeight: v.isNew ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {v.customer || v.from}
+                  {v.customer || v.from || 'Unknown caller'}
                   {v.handled && <span style={{ marginLeft: 6, color: c.success, fontSize: 10 }}>✓ handled</span>}
                 </span>
                 <span style={{ fontSize: 10.5, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {v.summary}
+                  {v.summary || 'Message vocal ou appel manqué à traiter.'}
                 </span>
               </span>
               <span style={{ fontSize: 11, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(v.durationSec)}</span>
               <span style={{ fontSize: 11, color: c.mutedSilver }}>{fmtDate(v.receivedAt)}</span>
               <span style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                {v.priority !== 'low' && <span style={tag(priColor(v.priority))}>{v.priority.toUpperCase()}</span>}
-                <span style={dot(sentimentColor(v.sentiment))}>●</span>
+                {(v.priority || 'normal') !== 'low' && <span style={tag(priColor(v.priority || 'normal'))}>{(v.priority || 'normal').toUpperCase()}</span>}
+                <span style={dot(sentimentColor(v.sentiment || 'neutral'))}>●</span>
               </span>
             </button>
           ))}
@@ -225,16 +226,16 @@ export default function VoicemailView() {
         {sel && (
           <>
             <div style={{ fontSize: 11, color: c.signalGold, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>Voicemail</div>
-            <h2 style={{ fontSize: 18, color: c.textIce, margin: '0 0 4px' }}>{sel.customer || sel.from}</h2>
+            <h2 style={{ fontSize: 18, color: c.textIce, margin: '0 0 4px' }}>{sel.customer || sel.from || 'Unknown caller'}</h2>
             <div style={{ fontSize: 11, color: c.mutedSilver, marginBottom: 14 }}>
-              {sel.from} · {fmtDur(sel.durationSec)} · {new Date(sel.receivedAt).toLocaleString()}
+              {sel.from || 'Unknown'} · {fmtDur(sel.durationSec)} · {fmtDate(sel.receivedAt)}
             </div>
 
             {/* Playback */}
             <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12, marginBottom: 14 }}>
               <div style={{ display: 'flex', gap: 2, alignItems: 'center', height: 30, marginBottom: 8 }}>
                 {Array.from({ length: 40 }).map((_, i) => {
-                  const active = (i / 40) <= (pos / Math.max(sel.durationSec, 1));
+                  const active = (i / 40) <= (pos / Math.max(Number(sel.durationSec || 0), 1));
                   return (
                     <span key={i} style={{
                       flex: 1, height: `${20 + Math.abs(Math.sin(i * 0.9)) * 70}%`,
@@ -245,7 +246,7 @@ export default function VoicemailView() {
                 })}
               </div>
               <input
-                type="range" min={0} max={sel.durationSec} step={0.1} value={pos}
+                type="range" min={0} max={Number(sel.durationSec || 0)} step={0.1} value={pos}
                 onChange={(e) => setPos(Number(e.target.value))}
                 style={{ width: '100%', accentColor: c.signalGold }}
               />
@@ -253,14 +254,16 @@ export default function VoicemailView() {
                 <span style={{ fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(pos)}</span>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <button onClick={() => setPos((p) => Math.max(0, p - 5))} style={iconBtn}>«5s</button>
-                  <button onClick={() => setPlaying((p) => !p)} style={{ ...iconBtn, background: c.signalGold, color: c.midnight, fontWeight: 700, padding: '6px 14px' }}>
+                  <button onClick={playSelected} style={{ ...iconBtn, background: c.signalGold, color: c.midnight, fontWeight: 700, padding: '6px 14px' }}>
                     {playing ? '⏸ Pause' : '▶ Play'}
                   </button>
-                  <button onClick={() => setPos((p) => Math.min(sel.durationSec, p + 5))} style={iconBtn}>5s»</button>
+                  <button onClick={() => setPos((p) => Math.min(Number(sel.durationSec || 0), p + 5))} style={iconBtn}>5s»</button>
                   <button onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])} style={iconBtn}>{speed}x</button>
                 </div>
                 <span style={{ fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(sel.durationSec)}</span>
               </div>
+              {audioUrl && <audio src={audioUrl} autoPlay={playing} controls style={{ width: '100%', marginTop: 8, height: 30 }} onEnded={() => setPlaying(false)} />}
+              {playbackError && <div style={{ fontSize: 11, color: c.mutedSilver, marginTop: 8 }}>{playbackError}</div>}
             </div>
 
             {/* Lifecycle */}
@@ -289,7 +292,7 @@ export default function VoicemailView() {
                 </div>
               }
             >
-              <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0 }}>{sel.summary}</p>
+              <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0 }}>{sel.summary || 'Message vocal ou appel manqué à traiter.'}</p>
               {sel.feedback && (
                 <div style={{ fontSize: 10, color: c.mutedSilver, marginTop: 6 }}>
                   Feedback recorded — AVA will adapt future summaries.
@@ -298,7 +301,7 @@ export default function VoicemailView() {
             </Panel>
 
             <Panel title="Transcript" accent={c.avaCyan}>
-              <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0, whiteSpace: 'pre-wrap' }}>{sel.transcript}</p>
+              <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0, whiteSpace: 'pre-wrap' }}>{sel.transcript || 'Transcription non disponible.'}</p>
             </Panel>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
