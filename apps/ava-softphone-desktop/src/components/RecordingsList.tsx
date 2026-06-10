@@ -4,7 +4,6 @@ import { theme } from '../lib/theme';
 import { ava, RecordingItem } from '../lib/avaApi';
 
 const { colors: c, glow } = theme;
-const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 
 function displayError(e: any) {
   const text = String(e?.context?.error || e?.message || e?.details || e?.error || 'Analysis failed');
@@ -44,7 +43,8 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   const analyze = async (r: RecordingItem) => {
     setWorking(r.id); setError(null);
     try {
-      const organization_id = r.organization_id || LEMTEL_ORG;
+      const organization_id = r.organization_id;
+      if (!organization_id) throw new Error('A real organization is required before AI analysis can run.');
       let transcript_text = String(r.transcript_text || '').trim();
       const r1 = await supabase.functions.invoke('ai-transcribe-call', {
         body: { call_record_id: r.callId || r.id, organization_id },
