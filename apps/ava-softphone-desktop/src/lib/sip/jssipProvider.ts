@@ -442,6 +442,24 @@ class JsSipProvider {
     const remoteUri = session.remote_identity?.uri?.user || '';
     const remoteName = session.remote_identity?.display_name || remoteUri;
 
+    // Track this attempt
+    if (!this.currentAttempt || this.currentAttempt.direction !== (incoming ? 'in' : 'out')) {
+      const attempt: SipAttempt = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        at: Date.now(),
+        target: remoteUri || remoteName || (incoming ? 'incoming' : 'outgoing'),
+        direction: incoming ? 'in' : 'out',
+        sdpBefore: _lastSdpBefore,
+        sdpAfter: _lastSdpAfter,
+        workaroundOn: isSdpWorkaroundEnabled(),
+        outcome: 'pending',
+      };
+      this.currentAttempt = attempt;
+      this.pushAttempt(attempt);
+    } else {
+      this.patchCurrentAttempt({ sdpBefore: _lastSdpBefore, sdpAfter: _lastSdpAfter });
+    }
+
     this.update({
       callState: incoming ? 'ringing-in' : 'ringing-out',
       remoteIdentity: remoteName,
@@ -456,34 +474,42 @@ class JsSipProvider {
     });
     session.on('confirmed', () => {
       this.update({ callState: 'active', startedAt: Date.now() });
+      this.patchCurrentAttempt({ outcome: 'connected', sdpAfter: _lastSdpAfter });
+      this.lastFailure = null;
     });
     session.on('failed', (e: any) => {
       const cause = e?.cause || 'unknown';
       const reason = e?.message?.reason_phrase || e?.response?.reason_phrase || '';
-      const code = e?.message?.status_code || e?.response?.status_code;
+      const code: number | undefined = e?.message?.status_code || e?.response?.status_code;
       const detail = [cause, code, reason].filter(Boolean).join(' ');
+      const respBody = e?.response?.body || e?.message?.body || '';
       this.lastCallError = detail;
-      // Verbose logging for 488 / SDP rejection diagnostics
-      try {
-        const respBody = e?.response?.body || e?.message?.body || '';
+      const classified = classifySipFailure(code, reason, cause);
+      this.lastFailure = classified;
+      // eslint-disable-next-line no-console
+      console.error('[SIP][CALL FAILED]', { cause, code, reason, originator: e?.originator, category: classified.category });
+      if (respBody) {
         // eslint-disable-next-line no-console
-        console.error('[SIP][CALL FAILED]', { cause, code, reason, originator: e?.originator });
-        if (code === 488 || /Not Acceptable/i.test(reason)) {
-          // eslint-disable-next-line no-console
-          console.error('[SIP][488 RESPONSE BODY]\n' + respBody);
-          this.logEvent('error', `488 Not Acceptable — PBX rejected SDP offer. See console for response body.`);
-        }
-        if (respBody) {
-          // eslint-disable-next-line no-console
-          console.error('[SIP][RESP BODY]\n' + respBody);
-        }
-      } catch { /* noop */ }
+        console.error('[SIP][RESP BODY]\n' + respBody);
+      }
+      if (classified.category === 'sdp_488') {
+        this.logEvent('error', `488 Not Acceptable — ${classified.hint}`);
+      }
+      this.patchCurrentAttempt({
+        outcome: 'failed',
+        responseCode: code,
+        responseReason: reason,
+        responseBody: respBody ? String(respBody).slice(0, 4000) : undefined,
+        category: classified.category,
+        hint: classified.hint,
+      });
       this.logEvent('error', `Call failed: ${detail}`);
-      this.update({ callState: 'ended', errorCause: detail });
+      this.update({ callState: 'ended', errorCause: `${classified.title} — ${classified.hint}` });
       setTimeout(() => this.resetCall(), 2500);
     });
     session.on('ended', () => {
       this.update({ callState: 'ended' });
+      this.patchCurrentAttempt({ outcome: 'ended' });
       setTimeout(() => this.resetCall(), 2500);
     });
     session.on('hold', () => this.update({ onHold: true, callState: 'held' }));
