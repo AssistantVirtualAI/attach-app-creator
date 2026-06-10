@@ -360,3 +360,12 @@ function Panel({ title, accent, children, right }: { title: string; accent: stri
     </div>
   );
 }
+
+function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div style={{ marginBottom: 12, padding: 12, borderRadius: 10, background: 'rgba(239,68,68,0.10)', border: `1px solid ${c.danger}55`, color: c.textIce, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+      <span style={{ fontSize: 12 }}>{message}</span>
+      <button onClick={onRetry} style={{ ...miniBtn, color: c.danger, borderColor: `${c.danger}66` }}>Retry</button>
+    </div>
+  );
+}
