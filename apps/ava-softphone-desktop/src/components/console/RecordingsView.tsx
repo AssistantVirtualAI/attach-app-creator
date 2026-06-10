@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, RecordingItem, Feedback } from '../../lib/avaApi';
 import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
@@ -10,14 +10,19 @@ type Sent = 'all' | 'positive' | 'neutral' | 'negative';
 type Sort = 'recent' | 'oldest' | 'longest' | 'quality_desc' | 'quality_asc';
 type Range = 'all' | '24h' | '7d' | '30d' | '90d';
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+function fmtDate(iso?: string | null) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 }
-function fmtDur(s: number) {
+function fmtDur(s?: number | null) {
+  s = Number(s || 0);
   const m = Math.floor(s / 60), sec = s % 60;
   return `${m}:${sec.toString().padStart(2, '0')}`;
 }
-function fmtSize(kb: number) {
+function fmtSize(kb?: number | null) {
+  kb = Number(kb || 0);
   return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
 }
 function rangeCutoff(r: Range): number {
@@ -28,6 +33,7 @@ function rangeCutoff(r: Range): number {
 export default function RecordingsView() {
   const [items, setItems] = useState<RecordingItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState<Quality>('all');
   const [s, setS] = useState<Sent>('all');
   const [range, setRange] = useState<Range>('all');
@@ -38,8 +44,30 @@ export default function RecordingsView() {
   const [exporting, setExporting] = useState(false);
   const [exportNote, setExportNote] = useState<string | null>(null);
   const [regenLoading, setRegenLoading] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [playbackLoading, setPlaybackLoading] = useState(false);
 
-  useEffect(() => { ava.recordings().then((d) => { setItems(d); setLoading(false); }); }, []);
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const d = await ava.recordings();
+      setItems(Array.isArray(d) ? d : []);
+    } catch (err: any) {
+      setItems([]);
+      setError(err?.message || 'Unable to load recordings from the phone system.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    setPlaybackError(null);
+    if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl);
+    setAudioUrl(null);
+  }, [sel?.id]);
 
   const filtered = useMemo(() => {
     const cutoff = rangeCutoff(range);
@@ -51,7 +79,7 @@ export default function RecordingsView() {
       if (cutoff && new Date(r.recordedAt).getTime() < cutoff) return false;
       if (search) {
         const t = search.toLowerCase();
-        const hay = `${r.customer || ''} ${r.from} ${r.to} ${r.summary} ${r.topics.join(' ')} ${r.tags.join(' ')}`.toLowerCase();
+        const hay = `${r.customer || ''} ${r.from || ''} ${r.to || ''} ${r.summary || ''} ${(r.topics || []).join(' ')} ${(r.tags || []).join(' ')}`.toLowerCase();
         if (!hay.includes(t)) return false;
       }
       return true;
@@ -59,9 +87,9 @@ export default function RecordingsView() {
     list.sort((a, b) => {
       switch (sort) {
         case 'oldest': return +new Date(a.recordedAt) - +new Date(b.recordedAt);
-        case 'longest': return b.durationSec - a.durationSec;
-        case 'quality_desc': return b.qualityScore - a.qualityScore;
-        case 'quality_asc': return a.qualityScore - b.qualityScore;
+        case 'longest': return (b.durationSec || 0) - (a.durationSec || 0);
+        case 'quality_desc': return (b.qualityScore || 0) - (a.qualityScore || 0);
+        case 'quality_asc': return (a.qualityScore || 0) - (b.qualityScore || 0);
         default: return +new Date(b.recordedAt) - +new Date(a.recordedAt);
       }
     });
@@ -97,7 +125,24 @@ export default function RecordingsView() {
     try {
       const res = await ava.exportRecordings(Array.from(selectedIds));
       setExportNote(`Exported ${res.count} recording${res.count === 1 ? '' : 's'} · ${res.url}`);
+    } catch {
+      setExportNote('Export is unavailable until PBX audio files are downloadable.');
     } finally { setExporting(false); }
+  };
+
+  const playSelected = async () => {
+    if (!sel) return;
+    setPlaybackError(null); setPlaybackLoading(true);
+    try {
+      const url = await ava.getRecordingAudioUrl(sel);
+      if (!url) {
+        setPlaybackError('Recording file not available from PBX yet');
+        return;
+      }
+      setAudioUrl(url);
+    } finally {
+      setPlaybackLoading(false);
+    }
   };
 
   const regen = async () => {
