@@ -167,7 +167,7 @@ function createWindow() {
 
 // Bypass self-signed SSL certificates for FusionPBX WSS
 app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
-  if (url.includes('lemtel.lemtel.tel') || url.includes('pbxnode.lemtel.tel') || url.includes('170.39.199.132')) {
+  if (url.includes('lemtel.lemtel.tel') || url.includes('pbxnode.lemtel.tel') || url.includes('170.39.199.132') || url.includes('lemtelcloud.net')) {
     event.preventDefault();
     callback(true);
   } else {

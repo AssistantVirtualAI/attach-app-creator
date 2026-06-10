@@ -211,6 +211,7 @@ class JsSipProvider {
 
     try {
       const fallbackUrls = Array.from(new Set([
+        'wss://node.lemtelcloud.net:7443',
         cfg.wssUrl,
         ...(cfg.wssUrls || []),
         'wss://lemtel.lemtel.tel:7443',
