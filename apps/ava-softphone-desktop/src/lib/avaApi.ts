@@ -239,7 +239,22 @@ function mapCdrToCall(r: any): CallRecord {
   };
 }
 
+function asArray(raw: any): any[] {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.rows)) return raw.rows;
+  if (Array.isArray(raw?.data)) return raw.data;
+  return [];
+}
+
+function cleanText(value: unknown): string | null {
+  if (value === null || value === undefined || value === false) return null;
+  const text = String(value).trim();
+  if (!text || text.toLowerCase() === 'false' || text.toLowerCase() === 'null') return null;
+  return text;
+}
+
 function mapCdrToVoicemail(r: any): VoicemailItem {
+  const message = cleanText(r.voicemail_message ?? r.raw_data?.voicemail_message);
   return {
     id:          r.id ?? r.pbx_uuid ?? String(Math.random()),
     from:        r.caller_number ?? '',
@@ -247,10 +262,8 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
     receivedAt:  r.start_at ?? new Date().toISOString(),
     durationSec: Number(r.billsec ?? r.duration_seconds ?? 0),
     isNew:       !r.voicemail_read,
-    transcript:  r.voicemail_message ?? 'Transcription non disponible.',
-    summary:     r.voicemail_message
-                   ? r.voicemail_message.slice(0, 120) + (r.voicemail_message.length > 120 ? '…' : '')
-                   : 'Aucun résumé disponible.',
+    transcript:  message ?? 'Transcription non disponible.',
+    summary:     message ? message.slice(0, 120) + (message.length > 120 ? '…' : '') : 'Message vocal ou appel manqué à traiter.',
     sentiment:   'neutral' as const,
     priority:    'normal' as const,
     handled:     false,
@@ -259,21 +272,35 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
 }
 
 function mapCdrToRecording(r: any): RecordingItem {
+  const insight = r.raw_data?.ai ?? r.raw_data ?? {};
   return {
     id:          r.id ?? r.pbx_uuid ?? String(Math.random()),
     callId:      r.id ?? '',
     from:        r.caller_number ?? '',
-    to:          r.destination_number ?? '',
+    to:          r.destination_number ?? r.destination ?? '',
     customer:    r.caller_name ?? undefined,
     recordedAt:  r.start_at ?? new Date().toISOString(),
     durationSec: Number(r.billsec ?? r.duration_seconds ?? 0),
     sizeKb:      0,
-    qualityScore: 0,
-    sentiment:   'neutral' as const,
-    summary:     'Enregistrement disponible.',
-    topics:      [],
-    tags:        [],
+    qualityScore: Number(insight.quality_score ?? insight.qualityScore ?? 0),
+    sentiment:   (cleanText(insight.sentiment) as any) || 'neutral',
+    summary:     cleanText(insight.summary) || 'Enregistrement disponible.',
+    topics:      Array.isArray(insight.topics) ? insight.topics : [],
+    tags:        Array.isArray(insight.tags) ? insight.tags : [],
     feedback:    null,
+  };
+}
+
+function mapInsightRow(id: string, row: any): CallInsight {
+  return {
+    callId: id,
+    summary: cleanText(row?.summary) || 'No AI insight has been generated for this call yet.',
+    sentiment: cleanText(row?.sentiment) || 'neutral',
+    topics: Array.isArray(row?.topics) ? row.topics : [],
+    actionItems: Array.isArray(row?.action_items) ? row.action_items : (Array.isArray(row?.actionItems) ? row.actionItems : []),
+    risks: Array.isArray(row?.risks) ? row.risks : [],
+    opportunities: Array.isArray(row?.sales_opportunities) ? row.sales_opportunities : (Array.isArray(row?.opportunities) ? row.opportunities : []),
+    qualityScore: Number(row?.quality_score ?? row?.qualityScore ?? 0),
   };
 }
 
