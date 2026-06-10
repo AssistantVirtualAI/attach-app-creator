@@ -23,8 +23,8 @@ export default function VoicemailList({ extension, onCall }: Props) {
     setLoading(true);
     setErr(null);
     try {
-      const data = await ava.voicemails();
-      setRows(Array.isArray(data) ? data.slice(0, 50) : []);
+      const data = await ava.voicemails(50);
+      setRows(Array.isArray(data) ? data : []);
     } catch (e: any) {
       setErr(e?.message || 'Unable to load voicemail.');
       setRows([]);
