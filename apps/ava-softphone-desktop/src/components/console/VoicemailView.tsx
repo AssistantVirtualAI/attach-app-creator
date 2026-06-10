@@ -8,8 +8,9 @@ const { colors: c } = theme;
 type Filter = 'all' | 'new' | 'high' | 'negative' | 'handled' | 'open';
 
 function fmtDate(iso?: string | null) {
-  const d = new Date(iso);
   if (!iso || Number.isNaN(d.getTime())) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
   const now = new Date();
   if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
