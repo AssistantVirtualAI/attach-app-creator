@@ -15,6 +15,25 @@ const JSSIP_MODULE_INFO = (() => {
   }
 })();
 
+const pcConfig = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+  sdpSemantics: 'unified-plan' as any,
+};
+
+const sessionDescriptionHandlerOptions = {
+  peerConnectionOptions: {
+    rtcConfiguration: pcConfig,
+  },
+  constraints: {
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+    video: false,
+  },
+};
+
 // JsSIP UA lifecycle manager — desktop softphone.
 // Mirrors the web app provider with extras: attended transfer, audio device pinning.
 
