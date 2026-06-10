@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { ava } from '@/lib/avaApi';
 import { ArrowUpRight, ArrowDownLeft, PhoneMissed, PhoneCall } from './RowIcons';
 
 interface CallRow {
@@ -45,17 +46,28 @@ export default function RecentsList({ extension, onCall }: Props) {
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
-    const { data, error } = await supabase
-      .from('pbx_call_records')
-      .select('id,direction,call_status,caller_number,caller_name,destination_number,destination,start_at,duration_seconds,missed_call')
-      .order('start_at', { ascending: false })
-      .limit(100);
-    if (error) setErr(error.message);
-    else setRows((data as CallRow[]) || []);
-    setLoading(false);
+    try {
+      await ava.calls(100);
+      const { data, error } = await supabase
+        .from('pbx_call_records')
+        .select('id,direction,call_status,caller_number,caller_name,destination_number,destination,start_at,duration_seconds,missed_call')
+        .order('start_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      setRows((data as CallRow[]) || []);
+    } catch (e: any) {
+      setErr(e?.message || 'Unable to load live call records.');
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
   }, [extension]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    window.addEventListener('lemtel:phone-sync-complete', load);
+    return () => window.removeEventListener('lemtel:phone-sync-complete', load);
+  }, [load]);
 
   // Realtime: new CDR rows visible to this signed-in desktop user
   useEffect(() => {
@@ -73,7 +85,7 @@ export default function RecentsList({ extension, onCall }: Props) {
   }, [extension]);
 
   if (loading) return <div style={center}>Loading recents…</div>;
-  if (err) return <div style={{ ...center, color: '#ff8a8a' }}>{err}</div>;
+  if (err) return <div style={{ ...center, color: '#ff8a8a' }}>{err}<br /><button onClick={load} style={refreshBtn}>Retry</button></div>;
   if (rows.length === 0) return <div style={center}>No recent calls</div>;
 
   return (
