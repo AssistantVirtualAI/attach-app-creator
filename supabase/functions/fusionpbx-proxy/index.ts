@@ -234,6 +234,7 @@ Deno.serve(async (req) => {
       direction,
       caller_name: c.caller_id_name ?? null,
       caller_number: c.caller_id_number ?? null,
+      extension: c.extension ?? c.extension_number ?? c.caller_extension ?? null,
       destination: c.caller_destination ?? c.destination_number ?? null,
       source_number: c.source_number ?? null,
       destination_number: c.destination_number ?? null,
@@ -666,6 +667,17 @@ Deno.serve(async (req) => {
       let upserted = 0;
       if (cdrs.length > 0) {
         const rows = cdrs.map(mapCdr).filter((x) => x.pbx_uuid);
+        const uuids = [...new Set(rows.map((x) => x.extension_uuid).filter(Boolean))];
+        if (uuids.length) {
+          const { data: exts } = await admin.from("pbx_extensions")
+            .select("pbx_uuid, extension, effective_cid_number")
+            .eq("organization_id", organization_id)
+            .in("pbx_uuid", uuids);
+          const byUuid = new Map((exts || []).map((e: any) => [e.pbx_uuid, e.extension || e.effective_cid_number]));
+          rows.forEach((row: any) => {
+            if (!row.extension && row.extension_uuid) row.extension = byUuid.get(row.extension_uuid) || null;
+          });
+        }
         const { error, count } = await admin.from("pbx_call_records").upsert(rows, { onConflict: "pbx_uuid", count: "exact" });
         if (!error) upserted = count ?? rows.length;
       }
