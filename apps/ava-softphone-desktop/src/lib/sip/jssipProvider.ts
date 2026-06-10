@@ -261,6 +261,30 @@ class JsSipProvider {
   boundInputLabel: string = 'System default';
   private wssAttempted: string[] = [];
   private lastCallError: string | null = null;
+  private currentAttempt: SipAttempt | null = null;
+  private attemptLog: SipAttempt[] = loadAttemptLog();
+  private lastFailure: ClassifiedFailure | null = null;
+
+  getLastFailure() { return this.lastFailure; }
+  getCurrentAttempt() { return this.currentAttempt; }
+  getAttemptLog() { return [...this.attemptLog]; }
+  clearAttemptLog() { this.attemptLog = []; saveAttemptLog(this.attemptLog); }
+  getLastSdp() { return { before: _lastSdpBefore, after: _lastSdpAfter }; }
+
+  private pushAttempt(a: SipAttempt) {
+    this.attemptLog = [...this.attemptLog, a].slice(-ATTEMPT_LOG_MAX);
+    saveAttemptLog(this.attemptLog);
+  }
+  private patchCurrentAttempt(patch: Partial<SipAttempt>) {
+    if (!this.currentAttempt) return;
+    this.currentAttempt = { ...this.currentAttempt, ...patch };
+    // Replace last entry in log if id matches
+    const idx = this.attemptLog.findIndex((x) => x.id === this.currentAttempt!.id);
+    if (idx >= 0) {
+      this.attemptLog[idx] = this.currentAttempt;
+      saveAttemptLog(this.attemptLog);
+    }
+  }
 
   subscribe(fn: Listener) {
     this.listeners.add(fn);
