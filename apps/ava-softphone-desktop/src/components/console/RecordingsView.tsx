@@ -226,6 +226,7 @@ export default function RecordingsView() {
           </div>
         </div>
 
+        {error && <ErrorBanner message={error} onRetry={load} />}
         {loading && <ListSkeleton rows={7} />}
         {!loading && <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
           {filtered.map((r) => (
@@ -243,17 +244,17 @@ export default function RecordingsView() {
               />
               <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {r.customer || `${r.from} → ${r.to}`}
+                  {r.customer || `${r.from || 'Unknown'} → ${r.to || 'Unknown'}`}
                 </span>
                 <span style={{ fontSize: 10.5, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {r.summary}
+                  {r.summary || 'Enregistrement disponible.'}
                 </span>
               </span>
-              <span style={{ fontSize: 11, color: qualityColor(r.qualityScore), fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{r.qualityScore}</span>
+              <span style={{ fontSize: 11, color: qualityColor(r.qualityScore || 0), fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{r.qualityScore || 0}</span>
               <span style={{ fontSize: 11, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(r.durationSec)}</span>
               <span style={{ fontSize: 11, color: c.mutedSilver }}>{fmtDate(r.recordedAt)}</span>
               <span style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                <span style={dot(sentColor(r.sentiment))}>●</span>
+                <span style={dot(sentColor(r.sentiment || 'neutral'))}>●</span>
               </span>
             </div>
           ))}
@@ -281,7 +282,7 @@ export default function RecordingsView() {
         {sel && (
           <>
             <div style={{ fontSize: 11, color: c.signalGold, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>Recording</div>
-            <h2 style={{ fontSize: 18, color: c.textIce, margin: '0 0 4px' }}>{sel.customer || `${sel.from} → ${sel.to}`}</h2>
+            <h2 style={{ fontSize: 18, color: c.textIce, margin: '0 0 4px' }}>{sel.customer || `${sel.from || 'Unknown'} → ${sel.to || 'Unknown'}`}</h2>
             <div style={{ fontSize: 11, color: c.mutedSilver, marginBottom: 18 }}>
               {fmtDate(sel.recordedAt)} · {fmtDur(sel.durationSec)} · {fmtSize(sel.sizeKb)}
             </div>
@@ -296,8 +297,10 @@ export default function RecordingsView() {
                 ))}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>
-                <span>0:00</span><span>▶ Play</span><span>{fmtDur(sel.durationSec)}</span>
+                <span>0:00</span><button onClick={playSelected} disabled={playbackLoading} style={{ ...miniBtn, padding: '2px 8px' }}>{playbackLoading ? 'Loading…' : '▶ Play'}</button><span>{fmtDur(sel.durationSec)}</span>
               </div>
+              {audioUrl && <audio src={audioUrl} controls autoPlay style={{ width: '100%', marginTop: 8, height: 30 }} />}
+              {playbackError && <div style={{ fontSize: 11, color: c.mutedSilver, marginTop: 8 }}>{playbackError}</div>}
             </div>
 
             <Panel title="Quality Score" accent={c.signalGold}>
@@ -328,12 +331,14 @@ export default function RecordingsView() {
 
             <Panel title="Topics" accent={c.avaCyan}>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {sel.topics.map((t) => <span key={t} style={tag(c.avaCyan)}>{t}</span>)}
+                  {(sel.topics || []).map((t) => <span key={t} style={tag(c.avaCyan)}>{t}</span>)}
+                  {(!sel.topics || sel.topics.length === 0) && <span style={{ fontSize: 11, color: c.mutedSilver }}>No topics yet</span>}
               </div>
             </Panel>
             <Panel title="Tags" accent={c.mutedSilver}>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {sel.tags.map((t) => <span key={t} style={tag(c.signalGold)}>#{t}</span>)}
+                  {(sel.tags || []).map((t) => <span key={t} style={tag(c.signalGold)}>#{t}</span>)}
+                  {(!sel.tags || sel.tags.length === 0) && <span style={{ fontSize: 11, color: c.mutedSilver }}>No tags yet</span>}
               </div>
             </Panel>
 
