@@ -9,7 +9,21 @@ import ResponsiveLab from './components/ResponsiveLab';
 import { useTheme } from './lib/theme';
 import { useContrast } from './hooks/useContrast';
 import { supabase } from './lib/supabaseClient';
+import { setAuthToken } from './lib/avaApi';
 import { sipProvider } from './lib/sip/jssipProvider';
+
+const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+
+async function triggerCdrSync() {
+  try {
+    const { data } = await supabase.functions.invoke('fusionpbx-proxy', {
+      body: { action: 'sync-cdrs', organization_id: LEMTEL_ORG_ID, limit: 200 },
+    });
+    console.log('CDR sync triggered:', data);
+  } catch (err) {
+    console.warn('CDR sync failed:', err);
+  }
+}
 
 const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 const IS_LAB = qs?.get('lab') === 'responsive';
@@ -60,30 +74,38 @@ export default function App() {
       if (!session) {
         // No valid session → force login wizard
         if (saved) await window.electronAPI?.saveCredentials?.(null).catch(() => {});
+        setAuthToken(null);
         setCreds(null);
       } else if (saved) {
         // Refresh stored tokens in case they rotated
+        setAuthToken(session.access_token);
         setCreds({
           ...saved,
           accessToken: session.access_token,
           refreshToken: session.refresh_token,
         });
+        triggerCdrSync();
       } else {
+        setAuthToken(session.access_token);
         setCreds(null);
       }
       setLoading(false);
     };
 
     init();
+    const syncTimer = setInterval(triggerCdrSync, 5 * 60 * 1000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
         try { await sipProvider.stop?.(); } catch { /* noop */ }
         await window.electronAPI?.saveCredentials?.(null).catch(() => {});
+        setAuthToken(null);
         setCreds(null);
         return;
       }
       if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+        setAuthToken(session.access_token);
+        if (event === 'SIGNED_IN') triggerCdrSync();
         setCreds((prev) => prev ? {
           ...prev,
           accessToken: session.access_token,
@@ -104,6 +126,7 @@ export default function App() {
 
     return () => {
       cancelled = true;
+      clearInterval(syncTimer);
       subscription.unsubscribe();
       window.removeEventListener('resize', onResize);
     };

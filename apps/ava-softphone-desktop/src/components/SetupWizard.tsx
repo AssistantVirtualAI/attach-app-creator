@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { theme } from '../lib/theme';
+import { setAuthToken } from '../lib/avaApi';
 import LemtelLogo from './LemtelLogo';
 import BrandTagline from './BrandTagline';
 
@@ -57,6 +58,7 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
         accessToken: authData.session?.access_token,
         refreshToken: authData.session?.refresh_token,
       };
+      if (authData.session?.access_token) setAuthToken(authData.session.access_token);
       await window.electronAPI?.saveCredentials?.(credentials);
       onComplete(credentials);
     } catch (err: any) {
