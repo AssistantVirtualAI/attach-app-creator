@@ -642,6 +642,25 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "sync_status" || action === "sync-status") {
+      const { data: jobs } = await admin.from("pbx_sync_jobs")
+        .select("job_type,status,completed_at,created_at,error,error_message")
+        .eq("organization_id", organization_id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      const latest = (jobs || [])[0];
+      return json({
+        lastSync: latest?.completed_at || latest?.created_at || new Date(0).toISOString(),
+        status: (jobs || []).some((j: any) => j.status === "failed") ? "error" : "ok",
+        jobs: (jobs || []).map((j: any) => ({
+          kind: j.job_type,
+          finishedAt: j.completed_at || j.created_at,
+          ok: j.status !== "failed",
+          error: j.error || j.error_message || null,
+        })),
+      });
+    }
+
     // ---- CDRs (list / sync) ----
     if (action === "list-cdrs" || action === "sync-cdrs" || action === "get-cdrs") {
       const b: any = body;
