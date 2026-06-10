@@ -16,6 +16,7 @@ import AdminAIChatView from './AdminAIChatView';
 import ReportsView from './ReportsView';
 import SoftphonePane from '../SoftphonePane';
 import SettingsPage from '../SettingsPage';
+import { AppErrorBoundary } from '../AppErrorBoundary';
 import IncomingCallToast from './IncomingCallToast';
 import ActiveCallDock from './ActiveCallDock';
 import { useCallShortcuts } from '../../hooks/useShortcuts';
@@ -132,7 +133,8 @@ export default function ConsoleLayout({
         flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', position: 'relative',
         paddingBottom: compact ? 78 : 0, display: 'flex', flexDirection: 'column',
       }}>
-        <div key={view} className="lemtel-page-enter" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <AppErrorBoundary key={view} compact onBack={() => setView('dialer')}>
+        <div className="lemtel-page-enter" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           {view === 'home' && <HomeDashboard displayName={creds.displayName || creds.email} extension={creds.extension} onQuickDial={() => setView('dialer')} />}
           {view === 'dialer' && (
             <div style={{ maxWidth: 460, margin: '0 auto', height: '100%' }}>
@@ -161,6 +163,7 @@ export default function ConsoleLayout({
             />
           )}
         </div>
+        </AppErrorBoundary>
       </main>
 
       {!compact && <AIPanel open={aiOpen} onToggle={() => setAiOpen((v) => !v)} />}
