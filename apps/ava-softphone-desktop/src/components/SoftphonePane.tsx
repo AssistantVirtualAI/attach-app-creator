@@ -474,7 +474,18 @@ export default function SoftphonePane({
             >↻ Retry</button>
           </div>
           {sp.snap.errorCause && (
-            <div style={{ marginTop: 4, opacity: 0.85, fontSize: 11 }}>{sp.snap.errorCause}</div>
+            <div style={{ marginTop: 4, opacity: 0.9, fontSize: 11 }}>
+              {sp.snap.errorCause}
+              {' '}
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'settings' }))}
+                style={{
+                  marginLeft: 6, background: 'transparent', border: '1px solid rgba(255,255,255,0.25)',
+                  color: '#fff', borderRadius: 6, padding: '2px 6px', fontSize: 10, cursor: 'pointer',
+                }}
+                title="Open Diagnostics"
+              >Diagnose ↗</button>
+            </div>
           )}
           {sp.snap.events && sp.snap.events.length > 0 && (
             <details style={{ marginTop: 6 }}>
