@@ -25,7 +25,41 @@ export default function CallsView() {
   const [sel, setSel] = useState<CallRecord | null>(null);
   const [insight, setInsight] = useState<any>(null);
 
-  useEffect(() => { ava.calls().then((d) => { setCalls(d); setLoading(false); }); }, []);
+  useEffect(() => {
+    const mapRow = (r: any): CallRecord => ({
+      id: r.id,
+      direction: r.direction === 'outbound' ? 'out' : 'in',
+      status: r.hangup_cause === 'NO_ANSWER' ? 'missed' : (r.billsec > 0 ? 'answered' : 'missed'),
+      from: r.caller_number || '',
+      to: r.destination_number || '',
+      customer: r.caller_name || null,
+      startedAt: r.start_at,
+      durationSec: r.billsec || r.duration_seconds || 0,
+      hasRecording: r.has_recording || !!r.recording_path,
+      hasTranscript: false,
+      sentiment: null,
+    } as any);
+
+    const load = async () => {
+      const { data, error } = await supabase
+        .from('pbx_call_records')
+        .select('*')
+        .order('start_at', { ascending: false })
+        .limit(100);
+      if (error) console.error('CDR load error:', error);
+      setCalls((data || []).map(mapRow));
+      setLoading(false);
+    };
+    load();
+
+    const channel = supabase
+      .channel('cdr-live')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records' }, (payload) => {
+        setCalls((prev) => [mapRow(payload.new), ...prev]);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
   useEffect(() => {
     if (sel) { setInsight(null); ava.callDetail(sel.id).then(setInsight); }
   }, [sel]);
