@@ -14,7 +14,7 @@
  */
 import { BACKEND, TABLES, FN, fnUrl } from './config';
 
-export const MOCK = true;
+export const MOCK = false;
 
 let authToken: string | null = null;
 export function setAuthToken(token: string | null) { authToken = token; }
