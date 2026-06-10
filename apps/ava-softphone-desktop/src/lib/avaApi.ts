@@ -239,7 +239,22 @@ function mapCdrToCall(r: any): CallRecord {
   };
 }
 
+function asArray(raw: any): any[] {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.rows)) return raw.rows;
+  if (Array.isArray(raw?.data)) return raw.data;
+  return [];
+}
+
+function cleanText(value: unknown): string | null {
+  if (value === null || value === undefined || value === false) return null;
+  const text = String(value).trim();
+  if (!text || text.toLowerCase() === 'false' || text.toLowerCase() === 'null') return null;
+  return text;
+}
+
 function mapCdrToVoicemail(r: any): VoicemailItem {
+  const message = cleanText(r.voicemail_message ?? r.raw_data?.voicemail_message);
   return {
     id:          r.id ?? r.pbx_uuid ?? String(Math.random()),
     from:        r.caller_number ?? '',
@@ -247,10 +262,8 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
     receivedAt:  r.start_at ?? new Date().toISOString(),
     durationSec: Number(r.billsec ?? r.duration_seconds ?? 0),
     isNew:       !r.voicemail_read,
-    transcript:  r.voicemail_message ?? 'Transcription non disponible.',
-    summary:     r.voicemail_message
-                   ? r.voicemail_message.slice(0, 120) + (r.voicemail_message.length > 120 ? '…' : '')
-                   : 'Aucun résumé disponible.',
+    transcript:  message ?? 'Transcription non disponible.',
+    summary:     message ? message.slice(0, 120) + (message.length > 120 ? '…' : '') : 'Message vocal ou appel manqué à traiter.',
     sentiment:   'neutral' as const,
     priority:    'normal' as const,
     handled:     false,
@@ -259,21 +272,35 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
 }
 
 function mapCdrToRecording(r: any): RecordingItem {
+  const insight = r.raw_data?.ai ?? r.raw_data ?? {};
   return {
     id:          r.id ?? r.pbx_uuid ?? String(Math.random()),
     callId:      r.id ?? '',
     from:        r.caller_number ?? '',
-    to:          r.destination_number ?? '',
+    to:          r.destination_number ?? r.destination ?? '',
     customer:    r.caller_name ?? undefined,
     recordedAt:  r.start_at ?? new Date().toISOString(),
     durationSec: Number(r.billsec ?? r.duration_seconds ?? 0),
     sizeKb:      0,
-    qualityScore: 0,
-    sentiment:   'neutral' as const,
-    summary:     'Enregistrement disponible.',
-    topics:      [],
-    tags:        [],
+    qualityScore: Number(insight.quality_score ?? insight.qualityScore ?? 0),
+    sentiment:   (cleanText(insight.sentiment) as any) || 'neutral',
+    summary:     cleanText(insight.summary) || 'Enregistrement disponible.',
+    topics:      Array.isArray(insight.topics) ? insight.topics : [],
+    tags:        Array.isArray(insight.tags) ? insight.tags : [],
     feedback:    null,
+  };
+}
+
+function mapInsightRow(id: string, row: any): CallInsight {
+  return {
+    callId: id,
+    summary: cleanText(row?.summary) || 'No AI insight has been generated for this call yet.',
+    sentiment: cleanText(row?.sentiment) || 'neutral',
+    topics: Array.isArray(row?.topics) ? row.topics : [],
+    actionItems: Array.isArray(row?.action_items) ? row.action_items : (Array.isArray(row?.actionItems) ? row.actionItems : []),
+    risks: Array.isArray(row?.risks) ? row.risks : [],
+    opportunities: Array.isArray(row?.sales_opportunities) ? row.sales_opportunities : (Array.isArray(row?.opportunities) ? row.opportunities : []),
+    qualityScore: Number(row?.quality_score ?? row?.qualityScore ?? 0),
   };
 }
 
@@ -288,17 +315,17 @@ export const ava = {
     { method: 'POST', body: JSON.stringify({ action: 'sync-cdrs', limit }) },
     MOCK_CALLS
   ).then(async (raw: any) => {
-    if (MOCK || !Array.isArray(raw?.rows ?? raw)) return raw as CallRecord[];
-    return (raw?.rows ?? raw).map(mapCdrToCall);
+    if (MOCK) return raw as CallRecord[];
+    return asArray(raw).map(mapCdrToCall);
   }),
-  callDetail: (id: string) => call<CallInsight>(`/db/${TABLES.aiInsights}?call_id=eq.${id}&select=*`, {}, {
+  callDetail: (id: string) => call<any>(`/db/${TABLES.aiInsights}?call_record_id=eq.${id}&select=*&limit=1`, {}, {
     callId: id,
     summary: 'Customer asked about Q4 invoicing. Agent confirmed updated pricing and committed to sending a revised quote by Friday.',
     sentiment: 'positive', topics: ['invoicing', 'pricing', 'renewal'],
     actionItems: ['Send revised quote by Friday', 'Schedule follow-up call next week'],
     risks: [], opportunities: ['Annual renewal mentioned'],
     qualityScore: 87,
-  }),
+  }).then((raw: any) => MOCK ? raw as CallInsight : mapInsightRow(id, asArray(raw)[0])),
   startCall: (to: string) => call<{ callId: string }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'start_call', to }) }, { callId: 'mock' }),
   threads: () => call<SmsThread[]>(`/db/${TABLES.smsThreads}?select=*&order=last_message_at.desc`, {}, MOCK_THREADS),
   sendMessage: (threadId: string, body: string) =>
@@ -315,17 +342,25 @@ export const ava = {
       text: `Thank you for calling Lemtel Communications. ${prompt}. Please hold while we connect you to the right team.`,
     }),
   /* Admin */
-  extensions: () => call<Extension[]>(`/db/${TABLES.extensions}?select=*&order=extension.asc`, {}, MOCK_EXT),
-  devices: () => call<Device[]>(`/fn/${FN.fusionpbxProxy}?op=list_devices`, { method: 'POST', body: JSON.stringify({ op: 'list_devices' }) }, MOCK_DEV),
-  phoneNumbers: () => call<PhoneNumber[]>(`/fn/${FN.fusionpbxProxy}?op=list_numbers`, { method: 'POST', body: JSON.stringify({ op: 'list_numbers' }) }, MOCK_NUM),
-  ivrs: () => call<Ivr[]>(`/fn/${FN.fusionpbxProxy}?op=list_ivrs`, { method: 'POST', body: JSON.stringify({ op: 'list_ivrs' }) }, MOCK_IVR),
-  queues: () => call<CallQueue[]>(`/fn/${FN.fusionpbxProxy}?op=list_queues`, { method: 'POST', body: JSON.stringify({ op: 'list_queues' }) }, MOCK_QUEUES),
-  ringGroups: () => call<RingGroup[]>(`/fn/${FN.fusionpbxProxy}?op=list_ring_groups`, { method: 'POST', body: JSON.stringify({ op: 'list_ring_groups' }) }, MOCK_RG),
+  extensions: () => call<any>(`/db/${TABLES.extensions}?select=*&order=extension.asc`, {}, MOCK_EXT)
+    .then((raw: any) => MOCK ? raw as Extension[] : asArray(raw).map((e: any) => ({ id: e.id, extension: e.extension, displayName: e.effective_cid_name || e.extension, user: e.effective_cid_number || undefined, voicemailEnabled: !!e.voicemail_enabled, enabled: e.enabled !== false }))),
+  devices: () => call<any>(`/db/pbx_devices?select=*&order=label.asc`, {}, MOCK_DEV)
+    .then((raw: any) => MOCK ? raw as Device[] : asArray(raw).map((d: any) => ({ id: d.id, vendor: d.vendor || 'Device', mac: d.mac_address || '—', template: d.template || '—', registered: !!d.enabled, assignedTo: d.label || undefined }))),
+  phoneNumbers: () => call<any>(`/db/pbx_phone_number_assignments?select=*&limit=100`, {}, MOCK_NUM)
+    .then((raw: any) => MOCK ? raw as PhoneNumber[] : asArray(raw).map((n: any) => ({ id: n.id, number: n.phone_number || n.number || '—', assignedTo: n.extension || n.destination || '—', type: n.assignment_type || 'extension' }))),
+  ivrs: () => call<any>(`/db/pbx_ivrs?select=*&order=name.asc`, {}, MOCK_IVR)
+    .then((raw: any) => MOCK ? raw as Ivr[] : asArray(raw).map((i: any) => ({ id: i.id, name: i.name || 'IVR', greeting: i.greet_long || i.greet_short || '—', options: 0 }))),
+  queues: () => call<any>(`/db/pbx_call_queues?select=*&order=name.asc`, {}, MOCK_QUEUES)
+    .then((raw: any) => MOCK ? raw as CallQueue[] : asArray(raw).map((q: any) => ({ id: q.id, name: q.name || 'Queue', strategy: q.strategy || '—', agents: 0, waiting: 0 }))),
+  ringGroups: () => call<any>(`/db/pbx_ring_groups?select=*&order=name.asc`, {}, MOCK_RG)
+    .then((raw: any) => MOCK ? raw as RingGroup[] : asArray(raw).map((r: any) => ({ id: r.id, name: r.name || 'Ring Group', members: 0, strategy: r.strategy || '—' }))),
   /* Phase 3 */
-  voicemails: () => call<VoicemailItem[]>(`/fn/${FN.fusionpbxProxy}?op=list_voicemails`, { method: 'POST', body: JSON.stringify({ op: 'list_voicemails' }) }, MOCK_VM),
+  voicemails: () => call<any>(`/db/${TABLES.callRecords}?select=*&or=(hangup_cause.eq.NO_ANSWER,missed_call.eq.true)&order=start_at.desc&limit=100`, {}, MOCK_VM)
+    .then((raw: any) => MOCK ? raw as VoicemailItem[] : asArray(raw).map(mapCdrToVoicemail)),
   markVoicemailRead: (id: string) =>
     call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'voicemail_read', id }) }, { ok: true }),
-  recordings: () => call<RecordingItem[]>(`/fn/${FN.fusionpbxProxy}?op=list_recordings`, { method: 'POST', body: JSON.stringify({ op: 'list_recordings' }) }, MOCK_RECORDINGS),
+  recordings: () => call<any>(`/db/${TABLES.callRecords}?select=*&has_recording=eq.true&order=start_at.desc&limit=100`, {}, MOCK_RECORDINGS)
+    .then((raw: any) => MOCK ? raw as RecordingItem[] : asArray(raw).map(mapCdrToRecording)),
   contacts: () => call<ContactItem[]>(`/db/${TABLES.softphoneUsers}?select=*&order=last_interaction.desc`, {}, MOCK_CONTACTS),
   /* Phase 3.1 — AI feedback + lifecycle */
   regenerateSummary: (kind: 'voicemail' | 'recording', id: string, sourceText?: string) =>
@@ -346,7 +381,7 @@ export const ava = {
     }),
   updateContact: (id: string, patch: Partial<Pick<ContactItem, 'notes' | 'tags' | 'favorite'>>) =>
     call<{ ok: true }>(`/db/${TABLES.softphoneUsers}?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } }, { ok: true }),
-  syncStatus: () => call<{ lastSync: string; status: 'ok' | 'error'; jobs: { kind: string; finishedAt: string; ok: boolean }[] }>(`/fn/${FN.fusionpbxProxy}?op=sync_status`, { method: 'POST', body: JSON.stringify({ op: 'sync_status' }) }, {
+  syncStatus: () => call<{ lastSync: string; status: 'ok' | 'error'; jobs: { kind: string; finishedAt: string; ok: boolean }[] }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'sync_status' }) }, {
     lastSync: new Date(Date.now() - 600e3).toISOString(),
     status: 'ok',
     jobs: [

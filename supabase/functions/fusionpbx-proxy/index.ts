@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
 
   // Authorization: only Lemtel members/admins can hit the FusionPBX proxy.
   if (!isServiceCall && userId) {
-    const readOnly = new Set(["ping", "list-extensions", "list-domains", "list-cdrs", "get-recording", "list-queues", "list-ivrs", "list-ring-groups", "get-extension"]);
+    const readOnly = new Set(["ping", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "sync-all", "get-recording", "list-queues", "list-ivrs", "list-ring-groups", "get-extension"]);
     const isRead = readOnly.has(_earlyAction);
     const rpcName = isRead ? "is_lemtel_member" : "is_lemtel_admin";
     const { data: allowed, error: roleErr } = await admin.rpc(rpcName, { _user_id: userId });
@@ -234,6 +234,7 @@ Deno.serve(async (req) => {
       direction,
       caller_name: c.caller_id_name ?? null,
       caller_number: c.caller_id_number ?? null,
+      extension: c.extension ?? c.extension_number ?? c.caller_extension ?? null,
       destination: c.caller_destination ?? c.destination_number ?? null,
       source_number: c.source_number ?? null,
       destination_number: c.destination_number ?? null,
@@ -641,6 +642,25 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "sync_status" || action === "sync-status") {
+      const { data: jobs } = await admin.from("pbx_sync_jobs")
+        .select("job_type,status,completed_at,created_at,error,error_message")
+        .eq("organization_id", organization_id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      const latest = (jobs || [])[0];
+      return json({
+        lastSync: latest?.completed_at || latest?.created_at || new Date(0).toISOString(),
+        status: (jobs || []).some((j: any) => j.status === "failed") ? "error" : "ok",
+        jobs: (jobs || []).map((j: any) => ({
+          kind: j.job_type,
+          finishedAt: j.completed_at || j.created_at,
+          ok: j.status !== "failed",
+          error: j.error || j.error_message || null,
+        })),
+      });
+    }
+
     // ---- CDRs (list / sync) ----
     if (action === "list-cdrs" || action === "sync-cdrs" || action === "get-cdrs") {
       const b: any = body;
@@ -666,6 +686,17 @@ Deno.serve(async (req) => {
       let upserted = 0;
       if (cdrs.length > 0) {
         const rows = cdrs.map(mapCdr).filter((x) => x.pbx_uuid);
+        const uuids = [...new Set(rows.map((x) => x.extension_uuid).filter(Boolean))];
+        if (uuids.length) {
+          const { data: exts } = await admin.from("pbx_extensions")
+            .select("pbx_uuid, extension, effective_cid_number")
+            .eq("organization_id", organization_id)
+            .in("pbx_uuid", uuids);
+          const byUuid = new Map((exts || []).map((e: any) => [e.pbx_uuid, e.extension || e.effective_cid_number]));
+          rows.forEach((row: any) => {
+            if (!row.extension && row.extension_uuid) row.extension = byUuid.get(row.extension_uuid) || null;
+          });
+        }
         const { error, count } = await admin.from("pbx_call_records").upsert(rows, { onConflict: "pbx_uuid", count: "exact" });
         if (!error) upserted = count ?? rows.length;
       }
@@ -731,6 +762,17 @@ Deno.serve(async (req) => {
       }
       if (cdrResult?.ok) {
         const rows = cdrResult.records.map(mapCdr).filter((x: any) => x.pbx_uuid);
+        const uuids = [...new Set(rows.map((x: any) => x.extension_uuid).filter(Boolean))];
+        if (uuids.length) {
+          const { data: exts } = await admin.from("pbx_extensions")
+            .select("pbx_uuid, extension, effective_cid_number")
+            .eq("organization_id", organization_id)
+            .in("pbx_uuid", uuids);
+          const byUuid = new Map((exts || []).map((e: any) => [e.pbx_uuid, e.extension || e.effective_cid_number]));
+          rows.forEach((row: any) => {
+            if (!row.extension && row.extension_uuid) row.extension = byUuid.get(row.extension_uuid) || null;
+          });
+        }
         await doUpsert("pbx_call_records", rows, "pbx_uuid", "cdrs");
       } else if (cdrResult) {
         errors.push(`cdrs: no working endpoint (tried ${cdrResult.attempts.length})`);

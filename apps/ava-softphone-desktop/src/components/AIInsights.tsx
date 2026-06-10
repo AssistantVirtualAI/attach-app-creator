@@ -12,7 +12,16 @@ interface CallRec {
   duration_seconds?: number | null;
   transcribed?: boolean | null;
   has_recording?: boolean | null;
+  analyzed?: boolean | null;
   raw_data?: any;
+}
+
+function getAi(r: CallRec) {
+  return r.raw_data?.ai || r.raw_data || {};
+}
+
+function displayError(e: any) {
+  return e?.context?.error || e?.message || e?.details || 'Batch analysis failed';
 }
 
 export default function AIInsights() {
@@ -45,34 +54,36 @@ export default function AIInsights() {
         const t = await supabase.functions.invoke('ai-transcribe-call', {
           body: { call_record_id: r.id, organization_id: LEMTEL_ORG },
         });
-        if (t.error) continue;
-        await supabase.functions.invoke('ai-analyze-call', {
+        if (t.error) throw t.error;
+        const a = await supabase.functions.invoke('ai-analyze-call', {
           body: { call_record_id: r.id, organization_id: LEMTEL_ORG },
         });
+        if (a.error) throw a.error;
       }
       await load();
     } catch (e: any) {
-      setError(e?.message || 'Batch analysis failed');
+      setError(displayError(e));
     } finally {
       setWorking(false);
     }
   };
 
-  const analyzed = items.filter(r => r.transcribed && r.raw_data);
+  const analyzed = items.filter(r => r.analyzed || r.transcribed);
 
   // Aggregate
   const sentiments = { positive: 0, neutral: 0, negative: 0 };
   const topicCounts: Record<string, number> = {};
   const allActions: { id: string; action: string; when?: string }[] = [];
   for (const r of analyzed) {
-    const s = (r.raw_data?.sentiment || '').toLowerCase();
+    const ai = getAi(r);
+    const s = (ai?.sentiment || '').toLowerCase();
     if (s.includes('positive')) sentiments.positive++;
     else if (s.includes('negative')) sentiments.negative++;
     else sentiments.neutral++;
-    (r.raw_data?.topics || []).forEach((t: string) => {
+    (Array.isArray(ai?.topics) ? ai.topics : []).forEach((t: string) => {
       topicCounts[t] = (topicCounts[t] || 0) + 1;
     });
-    (r.raw_data?.action_items || []).forEach((a: string) => {
+    (Array.isArray(ai?.action_items) ? ai.action_items : []).forEach((a: string) => {
       allActions.push({ id: r.id, action: a, when: r.start_at || undefined });
     });
   }

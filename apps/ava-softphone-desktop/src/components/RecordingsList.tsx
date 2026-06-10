@@ -9,12 +9,20 @@ interface CallRec {
   id: string;
   caller_number?: string | null;
   callee_number?: string | null;
+  destination_number?: string | null;
   start_at?: string | null;
   duration_seconds?: number | null;
   recording_url?: string | null;
+  recording_path?: string | null;
+  recording_name?: string | null;
   has_recording?: boolean | null;
   transcribed?: boolean | null;
+  analyzed?: boolean | null;
   raw_data?: any;
+}
+
+function displayError(e: any) {
+  return e?.context?.error || e?.message || e?.details || 'Analysis failed';
 }
 
 export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string) => void }) {
@@ -53,7 +61,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
       onAnalyze?.(id);
       await load();
     } catch (e: any) {
-      setError(e?.message || 'Analysis failed');
+      setError(displayError(e));
     } finally {
       setWorking(null);
     }
@@ -93,7 +101,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: c.text }}>
-                  {r.caller_number || '—'} {r.callee_number ? `→ ${r.callee_number}` : ''}
+                  {r.caller_number || '—'} {(r.callee_number || r.destination_number) ? `→ ${r.callee_number || r.destination_number}` : ''}
                 </div>
                 <div style={{ fontSize: 10, color: c.textSub, marginTop: 2 }}>
                   {r.start_at ? new Date(r.start_at).toLocaleString() : ''} · {r.duration_seconds || 0}s
@@ -111,12 +119,12 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
               <audio controls src={r.recording_url} style={{ width: '100%', marginTop: 8, height: 32 }} />
             ) : (
               <div style={{ fontSize: 10, color: c.textDim, padding: 6, textAlign: 'center' }}>
-                Recording not yet available
+                Recording synced from PBX{r.recording_name ? ` · ${r.recording_name}` : ''}
               </div>
             )}
 
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-              {!r.transcribed ? (
+              {!r.analyzed ? (
                 <button
                   onClick={() => analyze(r.id)}
                   disabled={working === r.id}
