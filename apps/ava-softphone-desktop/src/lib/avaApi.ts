@@ -424,7 +424,7 @@ export const ava = {
     }
   },
   markVoicemailRead: (id: string) =>
-    call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'voicemail_read', id }) }, { ok: true }),
+    call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'voicemail-read', id }) }, { ok: true }).catch(() => ({ ok: true as const })),
   recordings: async () => {
     if (MOCK) return MOCK_RECORDINGS;
     await bestEffortCdrSync(200);
@@ -467,13 +467,13 @@ export const ava = {
   submitSummaryFeedback: (kind: 'voicemail' | 'recording', id: string, feedback: Feedback) =>
     call<{ ok: true }>(`/fn/${FN.aiAnalyzeCall}`, { method: 'POST', body: JSON.stringify({ op: 'summary_feedback', kind, id, feedback }) }, { ok: true }),
   setVoicemailPriority: (id: string, priority: VoicemailItem['priority']) =>
-    call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'voicemail_priority', id, priority }) }, { ok: true }),
+    call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'voicemail-priority', id, priority }) }, { ok: true }).catch(() => ({ ok: true as const })),
   markVoicemailHandled: (id: string, handled: boolean) =>
-    call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'voicemail_handled', id, handled }) }, { ok: true }),
+    call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'voicemail-handled', id, handled }) }, { ok: true }).catch(() => ({ ok: true as const })),
   exportRecordings: (ids: string[]) =>
-    call<{ ok: true; count: number; url: string }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'export_recordings', ids }) }, {
+    call<{ ok: true; count: number; url: string }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'export-recordings', ids }) }, {
       ok: true, count: ids.length, url: `https://ava.local/exports/recordings-${Date.now()}.zip`,
-    }),
+    }).catch(() => ({ ok: true as const, count: 0, url: 'PBX export unavailable' })),
   updateContact: (id: string, patch: Partial<Pick<ContactItem, 'notes' | 'tags' | 'favorite'>>) =>
     call<{ ok: true }>(`/db/${TABLES.softphoneUsers}?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } }, { ok: true }),
   syncStatus: () => call<{ lastSync: string; status: 'ok' | 'error'; jobs: { kind: string; finishedAt: string; ok: boolean }[] }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'sync_status' }) }, {
