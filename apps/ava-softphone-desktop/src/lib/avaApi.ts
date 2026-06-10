@@ -370,14 +370,11 @@ export const ava = {
     missed: 3, answered: 12, unreadSms: 5, voicemail: 2, aiActions: 4, pbxHealth: 'ok',
     brief: 'You have 3 missed calls and 2 unread voicemails requiring callbacks. One conversation flagged a renewal opportunity.',
   }),
-  calls: (limit = 50) => call<CallRecord[]>(
-    `/fn/${FN.fusionpbxProxy}`,
-    { method: 'POST', body: JSON.stringify({ action: 'sync-cdrs', limit }) },
-    MOCK_CALLS
-  ).then(async (raw: any) => {
-    if (MOCK) return raw as CallRecord[];
-    return asArray(raw).map(mapCdrToCall);
-  }),
+  calls: async (limit = 50) => {
+    if (MOCK) return MOCK_CALLS;
+    await bestEffortCdrSync(Math.max(limit, 200));
+    return (await readCallRecordRows(limit)).map(mapCdrToCall);
+  },
   callDetail: (id: string) => call<any>(`/db/${TABLES.aiInsights}?call_record_id=eq.${id}&select=*&limit=1`, {}, {
     callId: id,
     summary: 'Customer asked about Q4 invoicing. Agent confirmed updated pricing and committed to sending a revised quote by Friday.',
@@ -415,12 +412,50 @@ export const ava = {
   ringGroups: () => call<any>(`/db/pbx_ring_groups?select=*&order=name.asc`, {}, MOCK_RG)
     .then((raw: any) => MOCK ? raw as RingGroup[] : asArray(raw).map((r: any) => ({ id: r.id, name: r.name || 'Ring Group', members: 0, strategy: r.strategy || '—' }))),
   /* Phase 3 */
-  voicemails: () => call<any>(`/db/${TABLES.callRecords}?select=*&or=(hangup_cause.eq.NO_ANSWER,missed_call.eq.true)&order=start_at.desc&limit=100`, {}, MOCK_VM)
-    .then((raw: any) => MOCK ? raw as VoicemailItem[] : asArray(raw).map(mapCdrToVoicemail)),
+  voicemails: async () => {
+    if (MOCK) return MOCK_VM;
+    await bestEffortCdrSync(200);
+    try {
+      const rows = await readCallRecordRows(200);
+      return rows.filter(isVoicemailLike).map(mapCdrToVoicemail);
+    } catch (err) {
+      console.warn('[avaApi] voicemail mapping failed:', err);
+      return [] as VoicemailItem[];
+    }
+  },
   markVoicemailRead: (id: string) =>
     call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'voicemail_read', id }) }, { ok: true }),
-  recordings: () => call<any>(`/db/${TABLES.callRecords}?select=*&has_recording=eq.true&order=start_at.desc&limit=100`, {}, MOCK_RECORDINGS)
-    .then((raw: any) => MOCK ? raw as RecordingItem[] : asArray(raw).map(mapCdrToRecording)),
+  recordings: async () => {
+    if (MOCK) return MOCK_RECORDINGS;
+    await bestEffortCdrSync(200);
+    try {
+      const rows = await readCallRecordRows(200);
+      return rows.filter(hasRecordingFile).map(mapCdrToRecording);
+    } catch (err) {
+      console.warn('[avaApi] recording mapping failed:', err);
+      return [] as RecordingItem[];
+    }
+  },
+  getRecordingAudioUrl: async (recording: Partial<RecordingItem & VoicemailItem & CallRecord & { record_path?: string | null; record_name?: string | null }>) => {
+    const direct = cleanText(recording.recording_url);
+    if (direct) return direct;
+    const record_path = cleanText(recording.record_path ?? recording.recording_path);
+    const record_name = cleanText(recording.record_name ?? recording.recording_name);
+    if (!record_path || !record_name) return null;
+    try {
+      const res = await fetch(resolveUrl(`/fn/${FN.fusionpbxProxy}`), {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ action: 'get-recording', params: { record_path, record_name } }),
+      });
+      if (!res.ok) throw new Error(`Recording unavailable (${res.status})`);
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    } catch (err) {
+      console.warn('[avaApi] get-recording failed:', err);
+      return null;
+    }
+  },
   contacts: () => call<ContactItem[]>(`/db/${TABLES.softphoneUsers}?select=*&order=last_interaction.desc`, {}, MOCK_CONTACTS),
   /* Phase 3.1 — AI feedback + lifecycle */
   regenerateSummary: (kind: 'voicemail' | 'recording', id: string, sourceText?: string) =>
@@ -450,6 +485,19 @@ export const ava = {
       { kind: 'devices', finishedAt: new Date(Date.now()-1800e3).toISOString(), ok: true },
     ],
   }),
+  syncPhoneSystemFull: async () => {
+    if (MOCK) return { ok: true, success: true, stats: { cdrs: MOCK_CALLS.length }, errors: [], syncedAt: new Date().toISOString() };
+    try {
+      const data = await call<any>(`/fn/${FN.fusionpbxProxy}`, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'sync-all', resources: ['cdrs', 'extensions', 'queues', 'ivrs', 'ring_groups'] }),
+      });
+      return { ok: data?.success !== false && !data?.error, success: data?.success !== false, stats: data?.stats || {}, errors: data?.errors || (data?.error ? [data.error] : []), syncedAt: new Date().toISOString(), raw: data };
+    } catch (err: any) {
+      console.warn('[avaApi] sync-all failed:', err);
+      return { ok: false, success: false, stats: {}, errors: [err?.message || 'Phone-system sync failed'], syncedAt: new Date().toISOString() };
+    }
+  },
 };
 
 /* ─── Initialisation du token depuis la session Supabase ───── */
