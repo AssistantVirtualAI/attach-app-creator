@@ -1,6 +1,58 @@
 import * as JsSIP from 'jssip';
 
 // Module load probe — captured at import time so debug report can show it.
+
+// Force PCMU/PCMA only — fixes 488 Not Acceptable Here with FusionPBX
+function stripToAudioOnly(sdp: string): string {
+  const lines = sdp.split('\r\n');
+  const result: string[] = [];
+  let inAudio = false;
+  let inVideo = false;
+  for (const line of lines) {
+    if (line.startsWith('m=audio')) { inAudio = true; inVideo = false; result.push(line); continue; }
+    if (line.startsWith('m=video')) { inAudio = false; inVideo = true; continue; }
+    if (line.startsWith('m=')) { inAudio = false; inVideo = false; }
+    if (!inVideo) result.push(line);
+  }
+  return result.join('\r\n');
+}
+
+function forcePCMU(sdp: string): string {
+  // Keep only PCMU (0) and PCMA (8) in audio m-line
+  const lines = sdp.split('\r\n');
+  const result: string[] = [];
+  let inAudio = false;
+  const keepPayloads = new Set(['0', '8', '101']);
+  for (const line of lines) {
+    if (line.startsWith('m=audio')) {
+      inAudio = true;
+      const parts = line.split(' ');
+      const filtered = parts.slice(0, 3).concat(parts.slice(3).filter(p => keepPayloads.has(p)));
+      result.push(filtered.join(' '));
+      continue;
+    }
+    if (line.startsWith('m=')) { inAudio = false; }
+    if (inAudio && line.startsWith('a=rtpmap:')) {
+      const payload = line.split(':')[1]?.split(' ')[0];
+      if (payload && !keepPayloads.has(payload)) continue;
+    }
+    if (inAudio && line.startsWith('a=fmtp:')) {
+      const payload = line.split(':')[1]?.split(' ')[0];
+      if (payload && !keepPayloads.has(payload)) continue;
+    }
+    if (inAudio && line.startsWith('a=rtcp-fb:')) continue;
+    if (line.startsWith('a=extmap:') && inAudio) continue;
+    result.push(line);
+  }
+  return result.join('\r\n');
+}
+
+
+// Activate JsSIP debug logging
+try {
+  (JsSIP as any).debug.enable('JsSIP:*');
+} catch(e) {}
+
 const JSSIP_MODULE_INFO = (() => {
   try {
     const keys = JsSIP ? Object.keys(JsSIP as any) : [];
@@ -395,6 +447,16 @@ class JsSipProvider {
       this.ua.call(target, {
         mediaConstraints: { audio: true, video: false },
         sessionDescriptionHandlerOptions,
+        sessionDescriptionHandlerModifiers: [
+          (description: any) => {
+            if (description?.sdp) {
+              console.log('[SDP BEFORE]', description.sdp);
+              description.sdp = forcePCMU(stripToAudioOnly(description.sdp));
+              console.log('[SDP AFTER]', description.sdp);
+            }
+            return Promise.resolve(description);
+          }
+        ],
       } as any);
       this.lastCallError = null;
       return null;
@@ -468,6 +530,14 @@ class JsSipProvider {
     this.session?.answer({
       mediaConstraints: { audio: true, video: false },
       sessionDescriptionHandlerOptions,
+      sessionDescriptionHandlerModifiers: [
+        (description: any) => {
+          if (description?.sdp) {
+            description.sdp = forcePCMU(stripToAudioOnly(description.sdp));
+          }
+          return Promise.resolve(description);
+        }
+      ],
     });
   }
 

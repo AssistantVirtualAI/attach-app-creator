@@ -124,10 +124,10 @@ export default function CallsView() {
               </span>
               <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {cr.customer || (cr.direction === 'in' ? cr.from : cr.to)}
+                  {cr.customer || (cr.direction === 'in' ? (cr.from || '') : (cr.to || ''))}
                 </span>
                 <span style={{ fontSize: 10.5, color: c.mutedSilver }}>
-                  {cr.direction === 'in' ? cr.from : cr.to}
+                  {cr.direction === 'in' ? (cr.from || '') : (cr.to || '')}
                 </span>
               </span>
               <span style={{ fontSize: 11, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(cr.durationSec)}</span>

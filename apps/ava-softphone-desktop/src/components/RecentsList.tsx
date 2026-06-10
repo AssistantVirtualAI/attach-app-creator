@@ -50,11 +50,11 @@ export default function RecentsList({ extension, onCall }: Props) {
       await ava.calls(100);
       const { data, error } = await supabase
         .from('pbx_call_records')
-        .select('id,direction,call_status,caller_number,caller_name,destination_number,destination,start_at,duration_seconds,missed_call')
+        .select('id,caller_name,caller_number,destination,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause')
         .order('start_at', { ascending: false })
-        .limit(100);
-      if (error) throw error;
-      setRows((data as CallRow[]) || []);
+        .limit(50);
+      if (err) { setLoading(false); return; }
+      setRows((data || []) as any[]);
     } catch (e: any) {
       setErr(e?.message || 'Unable to load live call records.');
       setRows([]);
@@ -130,7 +130,7 @@ export default function RecentsList({ extension, onCall }: Props) {
                 {name || peer}
               </div>
               <div style={{ fontSize: 10.5, opacity: 0.5, marginTop: 2, letterSpacing: 0.2 }}>
-                {fmtTime(r.start_at)}{r.duration_seconds ? ` · ${fmtDur(r.duration_seconds)}` : ''}
+                {fmtTime(r.start_at)}{r.duration_seconds || r.billsec || 0 ? ` · ${fmtDur(r.duration_seconds || r.billsec || 0)}` : ''}
               </div>
             </div>
             <span style={{ color: 'rgba(255,215,0,0.6)', display: 'inline-flex' }}>

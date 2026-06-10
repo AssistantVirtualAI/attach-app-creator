@@ -229,139 +229,98 @@ const MOCK_CONTACTS: ContactItem[] = [
  * Mocks short-circuit when MOCK=true.
  */
 
-/* ─── Mappeurs CDR FusionPBX → UI ─────────────────────────── */
+
+/* ─── Mappeurs CDR FusionPBX → UI (champs réels Supabase) ─── */
 function mapCdrToCall(r: any): CallRecord {
   const billsec = Number(r.billsec ?? r.duration_seconds ?? 0);
-  const missed  = r.missed_call || r.hangup_cause === 'NO_ANSWER' || billsec === 0;
+  const missed  = r.missed_call === true || r.call_status === 'missed' ||
+                  r.hangup_cause === 'NO_ANSWER' || (billsec === 0 && r.direction !== 'outbound');
+  const isVm    = r.voicemail_message && r.voicemail_message !== 'false';
   return {
     id:           r.id ?? r.pbx_uuid ?? String(Math.random()),
     direction:    (r.direction === 'outbound' ? 'out' : 'in') as 'in' | 'out',
-    status:       (r.voicemail_message ? 'voicemail' : missed ? 'missed' : 'answered') as any,
-    from:         r.caller_number ?? '',
-    to:           r.destination_number ?? '',
-    customer:     r.caller_name ?? undefined,
+    status:       (isVm ? 'voicemail' : missed ? 'missed' : 'answered') as any,
+    from:         r.caller_number ?? r.source_number ?? '',
+    to:           r.destination ?? r.destination_number ?? '',
+    customer:     r.caller_name && r.caller_name !== r.caller_number ? r.caller_name : undefined,
     startedAt:    r.start_at ?? new Date().toISOString(),
     durationSec:  billsec,
     hasRecording: !!(r.has_recording || r.recording_path || r.recording_name),
-    hasTranscript: !!(r.transcript_text || r.raw_data?.transcript || r.raw_data?.transcript_text),
-    sentiment:    (cleanText(r.raw_data?.ai?.sentiment ?? r.raw_data?.sentiment) as any) || undefined,
-    organization_id: r.organization_id,
-    transcript_text: cleanText(r.transcript_text ?? r.raw_data?.transcript_text ?? r.raw_data?.transcript) || undefined,
-    recording_path: r.recording_path ?? r.record_path ?? null,
-    recording_name: r.recording_name ?? r.record_name ?? null,
-    record_path: r.record_path ?? r.recording_path ?? null,
-    record_name: r.record_name ?? r.recording_name ?? null,
-    recording_url: r.recording_url ?? null,
+    hasTranscript: !!r.transcribed,
+    sentiment:    undefined,
   };
 }
 
-function asArray(raw: any): any[] {
-  if (Array.isArray(raw)) return raw;
-  if (Array.isArray(raw?.rows)) return raw.rows;
-  if (Array.isArray(raw?.data)) return raw.data;
-  return [];
-}
-
-function cleanText(value: unknown): string | null {
-  if (value === null || value === undefined || value === false) return null;
-  const text = String(value).trim();
-  if (!text || text.toLowerCase() === 'false' || text.toLowerCase() === 'null') return null;
-  return text;
-}
-
 function mapCdrToVoicemail(r: any): VoicemailItem {
-  const message = cleanText(r.voicemail_message ?? r.raw_data?.voicemail_message);
-  const transcript = cleanText(r.transcript_text ?? r.raw_data?.transcript_text ?? r.raw_data?.transcript ?? message);
+  const vm = r.voicemail_message && r.voicemail_message !== 'false' ? r.voicemail_message : null;
   return {
-    id:          r.id ?? r.pbx_uuid ?? String(Math.random()),
-    callId:      r.id ?? r.pbx_uuid ?? '',
-    from:        r.caller_number ?? '',
-    customer:    r.caller_name ?? undefined,
+    id:          r.id ?? String(Math.random()),
+    from:        r.caller_number ?? r.source_number ?? '',
+    customer:    r.caller_name && r.caller_name !== r.caller_number ? r.caller_name : undefined,
     receivedAt:  r.start_at ?? new Date().toISOString(),
     durationSec: Number(r.billsec ?? r.duration_seconds ?? 0),
     isNew:       !r.voicemail_read,
-    transcript:  transcript ?? 'Transcription non disponible.',
-    summary:     transcript ? transcript.slice(0, 120) + (transcript.length > 120 ? '…' : '') : 'Message vocal ou appel manqué à traiter.',
+    transcript:  vm ?? 'Transcription non disponible.',
+    summary:     vm ? vm.slice(0, 120) + (vm.length > 120 ? '…' : '') : 'Aucun résumé disponible.',
     sentiment:   'neutral' as const,
     priority:    'normal' as const,
     handled:     false,
     feedback:    null,
-    organization_id: r.organization_id,
-    recording_path: r.recording_path ?? r.record_path ?? null,
-    recording_name: r.recording_name ?? r.record_name ?? null,
-    record_path: r.record_path ?? r.recording_path ?? null,
-    record_name: r.record_name ?? r.recording_name ?? null,
-    recording_url: r.recording_url ?? null,
   };
 }
 
 function mapCdrToRecording(r: any): RecordingItem {
-  const insight = r.raw_data?.ai ?? r.raw_data ?? {};
+  const url = r.recording_path && r.recording_name
+    ? `https://pbxnode.lemtel.tel/${r.recording_path}/${r.recording_name}`
+    : null;
   return {
-    id:          r.id ?? r.pbx_uuid ?? String(Math.random()),
+    id:          r.id ?? String(Math.random()),
     callId:      r.id ?? '',
-    from:        r.caller_number ?? '',
-    to:          r.destination_number ?? r.destination ?? '',
-    customer:    r.caller_name ?? undefined,
+    from:        r.caller_number ?? r.source_number ?? '',
+    to:          r.destination ?? r.destination_number ?? '',
+    customer:    r.caller_name && r.caller_name !== r.caller_number ? r.caller_name : undefined,
     recordedAt:  r.start_at ?? new Date().toISOString(),
     durationSec: Number(r.billsec ?? r.duration_seconds ?? 0),
     sizeKb:      0,
-    qualityScore: Number(insight.quality_score ?? insight.qualityScore ?? 0),
-    sentiment:   (cleanText(insight.sentiment) as any) || 'neutral',
-    summary:     cleanText(insight.summary) || 'Enregistrement disponible.',
-    topics:      Array.isArray(insight.topics) ? insight.topics : [],
-    tags:        Array.isArray(insight.tags) ? insight.tags : [],
+    qualityScore: Math.round((r.mos ?? 0) * 20),
+    sentiment:   'neutral' as const,
+    summary:     url ? 'Enregistrement disponible.' : 'Chemin enregistrement non disponible.',
+    topics:      [],
+    tags:        [],
     feedback:    null,
-    organization_id: r.organization_id,
-    transcript_text: cleanText(r.transcript_text ?? r.raw_data?.transcript_text ?? r.raw_data?.transcript) || undefined,
-    recording_path: r.recording_path ?? r.record_path ?? null,
-    recording_name: r.recording_name ?? r.record_name ?? null,
-    record_path: r.record_path ?? r.recording_path ?? null,
-    record_name: r.record_name ?? r.recording_name ?? null,
-    recording_url: r.recording_url ?? null,
+    recordingUrl: url,
   };
 }
 
-function isVoicemailLike(r: any): boolean {
-  const msg = cleanText(r.voicemail_message ?? r.raw_data?.voicemail_message);
-  const cause = cleanText(r.hangup_cause ?? r.call_status)?.toUpperCase();
-  return !!msg || !!r.missed_call || cause === 'NO_ANSWER' || cause === 'VOICEMAIL' || String(r.call_status || '').toLowerCase().includes('voicemail');
-}
 
-function hasRecordingFile(r: any): boolean {
-  return !!(r.has_recording || r.recording_url || r.recording_path || r.recording_name || r.record_path || r.record_name);
+
+async function readCallRecordRows(limit = 100): Promise<any[]> {
+  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos&order=start_at.desc&limit=${limit}`;
+  const res = await fetch(url, {
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': BACKEND.anonKey,
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
+  });
+  if (!res.ok) { console.warn('[AVA] readCallRecordRows failed', res.status); return []; }
+  return res.json();
 }
 
 async function bestEffortCdrSync(limit = 200) {
-  if (MOCK) return;
   try {
-    await call<any>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'sync-cdrs', limit }) });
-  } catch (err) {
-    console.warn('[avaApi] sync-cdrs failed:', err);
+    await fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'apikey': BACKEND.anonKey,
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      },
+      body: JSON.stringify({ action: 'sync-cdrs', limit }),
+    });
+  } catch (e) {
+    console.warn('[AVA] CDR sync failed', e);
   }
-}
-
-async function readCallRecordRows(limit = 200): Promise<any[]> {
-  try {
-    const raw = await call<any>(`/db/${TABLES.callRecords}?select=*&order=start_at.desc&limit=${limit}`);
-    return asArray(raw);
-  } catch (err) {
-    console.warn('[avaApi] pbx_call_records read failed:', err);
-    return [];
-  }
-}
-
-function mapInsightRow(id: string, row: any): CallInsight {
-  return {
-    callId: id,
-    summary: cleanText(row?.summary) || 'No AI insight has been generated for this call yet.',
-    sentiment: cleanText(row?.sentiment) || 'neutral',
-    topics: Array.isArray(row?.topics) ? row.topics : [],
-    actionItems: Array.isArray(row?.action_items) ? row.action_items : (Array.isArray(row?.actionItems) ? row.actionItems : []),
-    risks: Array.isArray(row?.risks) ? row.risks : [],
-    opportunities: Array.isArray(row?.sales_opportunities) ? row.sales_opportunities : (Array.isArray(row?.opportunities) ? row.opportunities : []),
-    qualityScore: Number(row?.quality_score ?? row?.qualityScore ?? 0),
-  };
 }
 
 export const ava = {

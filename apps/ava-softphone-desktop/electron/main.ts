@@ -164,6 +164,17 @@ function createWindow() {
   });
 }
 
+
+// Bypass self-signed SSL certificates for FusionPBX WSS
+app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
+  if (url.includes('lemtel.lemtel.tel') || url.includes('pbxnode.lemtel.tel') || url.includes('170.39.199.132')) {
+    event.preventDefault();
+    callback(true);
+  } else {
+    callback(false);
+  }
+});
+
 app.whenReady().then(() => {
   // Grant microphone/media permissions on the default session BEFORE any
   // window is created — required so getUserMedia() does not reject in Electron.
