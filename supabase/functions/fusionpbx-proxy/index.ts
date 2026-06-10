@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
 
   // Authorization: only Lemtel members/admins can hit the FusionPBX proxy.
   if (!isServiceCall && userId) {
-    const readOnly = new Set(["ping", "list-extensions", "list-domains", "list-cdrs", "get-recording", "list-queues", "list-ivrs", "list-ring-groups", "get-extension"]);
+    const readOnly = new Set(["ping", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "sync-all", "get-recording", "list-queues", "list-ivrs", "list-ring-groups", "get-extension"]);
     const isRead = readOnly.has(_earlyAction);
     const rpcName = isRead ? "is_lemtel_member" : "is_lemtel_admin";
     const { data: allowed, error: roleErr } = await admin.rpc(rpcName, { _user_id: userId });
