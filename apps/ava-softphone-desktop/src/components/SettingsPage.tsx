@@ -258,6 +258,12 @@ export default function SettingsPage({
         </section>
       )}
 
+      {tab === 'diagnostics' && (
+        <section style={section}>
+          <SipDebugView />
+        </section>
+      )}
+
       {tab === 'about' && (
         <section style={{ ...section, alignItems: 'center', textAlign: 'center' }}>
           <div style={{
