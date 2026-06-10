@@ -115,7 +115,7 @@ export default function VoicemailView() {
   const cyclePriority = () => {
     if (!sel) return;
     const order: VoicemailItem['priority'][] = ['low', 'normal', 'high'];
-    const next = order[(order.indexOf(sel.priority) + 1) % order.length];
+    const next = order[(order.indexOf(sel.priority || 'normal') + 1) % order.length];
     ava.setVoicemailPriority(sel.id, next);
     updateItem(sel.id, { priority: next });
   };
@@ -268,8 +268,8 @@ export default function VoicemailView() {
 
             {/* Lifecycle */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <button onClick={cyclePriority} style={{ ...iconBtn, flex: 1, color: priColor(sel.priority), borderColor: priColor(sel.priority) + '55' }}>
-                Priority · {sel.priority.toUpperCase()}
+              <button onClick={cyclePriority} style={{ ...iconBtn, flex: 1, color: priColor(sel.priority || 'normal'), borderColor: priColor(sel.priority || 'normal') + '55' }}>
+                Priority · {(sel.priority || 'normal').toUpperCase()}
               </button>
               <button onClick={toggleHandled} style={{
                 ...iconBtn, flex: 1,
