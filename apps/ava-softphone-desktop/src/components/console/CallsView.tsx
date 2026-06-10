@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, CallRecord } from '../../lib/avaApi';
+import { supabase } from '../../lib/supabaseClient';
 import PageHeader, { ListSkeleton, EmptyState } from './PageHeader';
 
 const { colors: c } = theme;
