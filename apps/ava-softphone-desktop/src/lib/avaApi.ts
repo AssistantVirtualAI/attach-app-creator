@@ -315,17 +315,17 @@ export const ava = {
     { method: 'POST', body: JSON.stringify({ action: 'sync-cdrs', limit }) },
     MOCK_CALLS
   ).then(async (raw: any) => {
-    if (MOCK || !Array.isArray(raw?.rows ?? raw)) return raw as CallRecord[];
-    return (raw?.rows ?? raw).map(mapCdrToCall);
+    if (MOCK) return raw as CallRecord[];
+    return asArray(raw).map(mapCdrToCall);
   }),
-  callDetail: (id: string) => call<CallInsight>(`/db/${TABLES.aiInsights}?call_id=eq.${id}&select=*`, {}, {
+  callDetail: (id: string) => call<any>(`/db/${TABLES.aiInsights}?call_record_id=eq.${id}&select=*&limit=1`, {}, {
     callId: id,
     summary: 'Customer asked about Q4 invoicing. Agent confirmed updated pricing and committed to sending a revised quote by Friday.',
     sentiment: 'positive', topics: ['invoicing', 'pricing', 'renewal'],
     actionItems: ['Send revised quote by Friday', 'Schedule follow-up call next week'],
     risks: [], opportunities: ['Annual renewal mentioned'],
     qualityScore: 87,
-  }),
+  }).then((raw: any) => MOCK ? raw as CallInsight : mapInsightRow(id, asArray(raw)[0])),
   startCall: (to: string) => call<{ callId: string }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'start_call', to }) }, { callId: 'mock' }),
   threads: () => call<SmsThread[]>(`/db/${TABLES.smsThreads}?select=*&order=last_message_at.desc`, {}, MOCK_THREADS),
   sendMessage: (threadId: string, body: string) =>
@@ -349,10 +349,12 @@ export const ava = {
   queues: () => call<CallQueue[]>(`/fn/${FN.fusionpbxProxy}?op=list_queues`, { method: 'POST', body: JSON.stringify({ op: 'list_queues' }) }, MOCK_QUEUES),
   ringGroups: () => call<RingGroup[]>(`/fn/${FN.fusionpbxProxy}?op=list_ring_groups`, { method: 'POST', body: JSON.stringify({ op: 'list_ring_groups' }) }, MOCK_RG),
   /* Phase 3 */
-  voicemails: () => call<VoicemailItem[]>(`/fn/${FN.fusionpbxProxy}?op=list_voicemails`, { method: 'POST', body: JSON.stringify({ op: 'list_voicemails' }) }, MOCK_VM),
+  voicemails: () => call<any>(`/db/${TABLES.callRecords}?select=*&or=(hangup_cause.eq.NO_ANSWER,missed_call.eq.true,voicemail_message.not.is.null)&order=start_at.desc&limit=100`, {}, MOCK_VM)
+    .then((raw: any) => MOCK ? raw as VoicemailItem[] : asArray(raw).map(mapCdrToVoicemail)),
   markVoicemailRead: (id: string) =>
     call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'voicemail_read', id }) }, { ok: true }),
-  recordings: () => call<RecordingItem[]>(`/fn/${FN.fusionpbxProxy}?op=list_recordings`, { method: 'POST', body: JSON.stringify({ op: 'list_recordings' }) }, MOCK_RECORDINGS),
+  recordings: () => call<any>(`/db/${TABLES.callRecords}?select=*&has_recording=eq.true&order=start_at.desc&limit=100`, {}, MOCK_RECORDINGS)
+    .then((raw: any) => MOCK ? raw as RecordingItem[] : asArray(raw).map(mapCdrToRecording)),
   contacts: () => call<ContactItem[]>(`/db/${TABLES.softphoneUsers}?select=*&order=last_interaction.desc`, {}, MOCK_CONTACTS),
   /* Phase 3.1 — AI feedback + lifecycle */
   regenerateSummary: (kind: 'voicemail' | 'recording', id: string, sourceText?: string) =>
