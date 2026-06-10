@@ -89,6 +89,9 @@ export interface CallRecord {
   hasRecording: boolean; hasTranscript: boolean;
   sentiment?: 'positive' | 'neutral' | 'negative';
   customer?: string;
+  organization_id?: string; transcript_text?: string;
+  recording_path?: string | null; recording_name?: string | null;
+  record_path?: string | null; record_name?: string | null; recording_url?: string | null;
 }
 
 export interface CallInsight {
@@ -119,12 +122,18 @@ export interface VoicemailItem {
   summary: string; sentiment: 'positive' | 'neutral' | 'negative';
   priority: 'low' | 'normal' | 'high';
   handled?: boolean; feedback?: Feedback;
+  organization_id?: string; callId?: string;
+  recording_path?: string | null; recording_name?: string | null;
+  record_path?: string | null; record_name?: string | null; recording_url?: string | null;
 }
 export interface RecordingItem {
   id: string; callId: string; from: string; to: string; customer?: string;
   recordedAt: string; durationSec: number; sizeKb: number;
   qualityScore: number; sentiment: 'positive' | 'neutral' | 'negative';
   summary: string; topics: string[]; tags: string[]; feedback?: Feedback;
+  organization_id?: string; transcript_text?: string;
+  recording_path?: string | null; recording_name?: string | null;
+  record_path?: string | null; record_name?: string | null; recording_url?: string | null;
 }
 export interface ContactInteraction {
   id: string; kind: 'call' | 'sms' | 'voicemail';
@@ -234,8 +243,15 @@ function mapCdrToCall(r: any): CallRecord {
     startedAt:    r.start_at ?? new Date().toISOString(),
     durationSec:  billsec,
     hasRecording: !!(r.has_recording || r.recording_path || r.recording_name),
-    hasTranscript: false,
-    sentiment:    undefined,
+    hasTranscript: !!(r.transcript_text || r.raw_data?.transcript || r.raw_data?.transcript_text),
+    sentiment:    (cleanText(r.raw_data?.ai?.sentiment ?? r.raw_data?.sentiment) as any) || undefined,
+    organization_id: r.organization_id,
+    transcript_text: cleanText(r.transcript_text ?? r.raw_data?.transcript_text ?? r.raw_data?.transcript) || undefined,
+    recording_path: r.recording_path ?? r.record_path ?? null,
+    recording_name: r.recording_name ?? r.record_name ?? null,
+    record_path: r.record_path ?? r.recording_path ?? null,
+    record_name: r.record_name ?? r.recording_name ?? null,
+    recording_url: r.recording_url ?? null,
   };
 }
 
@@ -255,19 +271,27 @@ function cleanText(value: unknown): string | null {
 
 function mapCdrToVoicemail(r: any): VoicemailItem {
   const message = cleanText(r.voicemail_message ?? r.raw_data?.voicemail_message);
+  const transcript = cleanText(r.transcript_text ?? r.raw_data?.transcript_text ?? r.raw_data?.transcript ?? message);
   return {
     id:          r.id ?? r.pbx_uuid ?? String(Math.random()),
+    callId:      r.id ?? r.pbx_uuid ?? '',
     from:        r.caller_number ?? '',
     customer:    r.caller_name ?? undefined,
     receivedAt:  r.start_at ?? new Date().toISOString(),
     durationSec: Number(r.billsec ?? r.duration_seconds ?? 0),
     isNew:       !r.voicemail_read,
-    transcript:  message ?? 'Transcription non disponible.',
-    summary:     message ? message.slice(0, 120) + (message.length > 120 ? '…' : '') : 'Message vocal ou appel manqué à traiter.',
+    transcript:  transcript ?? 'Transcription non disponible.',
+    summary:     transcript ? transcript.slice(0, 120) + (transcript.length > 120 ? '…' : '') : 'Message vocal ou appel manqué à traiter.',
     sentiment:   'neutral' as const,
     priority:    'normal' as const,
     handled:     false,
     feedback:    null,
+    organization_id: r.organization_id,
+    recording_path: r.recording_path ?? r.record_path ?? null,
+    recording_name: r.recording_name ?? r.record_name ?? null,
+    record_path: r.record_path ?? r.recording_path ?? null,
+    record_name: r.record_name ?? r.recording_name ?? null,
+    recording_url: r.recording_url ?? null,
   };
 }
 
@@ -288,7 +312,43 @@ function mapCdrToRecording(r: any): RecordingItem {
     topics:      Array.isArray(insight.topics) ? insight.topics : [],
     tags:        Array.isArray(insight.tags) ? insight.tags : [],
     feedback:    null,
+    organization_id: r.organization_id,
+    transcript_text: cleanText(r.transcript_text ?? r.raw_data?.transcript_text ?? r.raw_data?.transcript) || undefined,
+    recording_path: r.recording_path ?? r.record_path ?? null,
+    recording_name: r.recording_name ?? r.record_name ?? null,
+    record_path: r.record_path ?? r.recording_path ?? null,
+    record_name: r.record_name ?? r.recording_name ?? null,
+    recording_url: r.recording_url ?? null,
   };
+}
+
+function isVoicemailLike(r: any): boolean {
+  const msg = cleanText(r.voicemail_message ?? r.raw_data?.voicemail_message);
+  const cause = cleanText(r.hangup_cause ?? r.call_status)?.toUpperCase();
+  return !!msg || !!r.missed_call || cause === 'NO_ANSWER' || cause === 'VOICEMAIL' || String(r.call_status || '').toLowerCase().includes('voicemail');
+}
+
+function hasRecordingFile(r: any): boolean {
+  return !!(r.has_recording || r.recording_url || r.recording_path || r.recording_name || r.record_path || r.record_name);
+}
+
+async function bestEffortCdrSync(limit = 200) {
+  if (MOCK) return;
+  try {
+    await call<any>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'sync-cdrs', limit }) });
+  } catch (err) {
+    console.warn('[avaApi] sync-cdrs failed:', err);
+  }
+}
+
+async function readCallRecordRows(limit = 200): Promise<any[]> {
+  try {
+    const raw = await call<any>(`/db/${TABLES.callRecords}?select=*&order=start_at.desc&limit=${limit}`);
+    return asArray(raw);
+  } catch (err) {
+    console.warn('[avaApi] pbx_call_records read failed:', err);
+    return [];
+  }
 }
 
 function mapInsightRow(id: string, row: any): CallInsight {
