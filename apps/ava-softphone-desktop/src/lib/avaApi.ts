@@ -342,12 +342,18 @@ export const ava = {
       text: `Thank you for calling Lemtel Communications. ${prompt}. Please hold while we connect you to the right team.`,
     }),
   /* Admin */
-  extensions: () => call<Extension[]>(`/db/${TABLES.extensions}?select=*&order=extension.asc`, {}, MOCK_EXT),
-  devices: () => call<Device[]>(`/fn/${FN.fusionpbxProxy}?op=list_devices`, { method: 'POST', body: JSON.stringify({ op: 'list_devices' }) }, MOCK_DEV),
-  phoneNumbers: () => call<PhoneNumber[]>(`/fn/${FN.fusionpbxProxy}?op=list_numbers`, { method: 'POST', body: JSON.stringify({ op: 'list_numbers' }) }, MOCK_NUM),
-  ivrs: () => call<Ivr[]>(`/fn/${FN.fusionpbxProxy}?op=list_ivrs`, { method: 'POST', body: JSON.stringify({ op: 'list_ivrs' }) }, MOCK_IVR),
-  queues: () => call<CallQueue[]>(`/fn/${FN.fusionpbxProxy}?op=list_queues`, { method: 'POST', body: JSON.stringify({ op: 'list_queues' }) }, MOCK_QUEUES),
-  ringGroups: () => call<RingGroup[]>(`/fn/${FN.fusionpbxProxy}?op=list_ring_groups`, { method: 'POST', body: JSON.stringify({ op: 'list_ring_groups' }) }, MOCK_RG),
+  extensions: () => call<any>(`/db/${TABLES.extensions}?select=*&order=extension.asc`, {}, MOCK_EXT)
+    .then((raw: any) => MOCK ? raw as Extension[] : asArray(raw).map((e: any) => ({ id: e.id, extension: e.extension, displayName: e.effective_cid_name || e.extension, user: e.effective_cid_number || undefined, voicemailEnabled: !!e.voicemail_enabled, enabled: e.enabled !== false }))),
+  devices: () => call<any>(`/db/pbx_devices?select=*&order=label.asc`, {}, MOCK_DEV)
+    .then((raw: any) => MOCK ? raw as Device[] : asArray(raw).map((d: any) => ({ id: d.id, vendor: d.vendor || 'Device', mac: d.mac_address || '—', template: d.template || '—', registered: !!d.enabled, assignedTo: d.label || undefined }))),
+  phoneNumbers: () => call<any>(`/db/pbx_phone_number_assignments?select=*&limit=100`, {}, MOCK_NUM)
+    .then((raw: any) => MOCK ? raw as PhoneNumber[] : asArray(raw).map((n: any) => ({ id: n.id, number: n.phone_number || n.number || '—', assignedTo: n.extension || n.destination || '—', type: n.assignment_type || 'extension' }))),
+  ivrs: () => call<any>(`/db/pbx_ivrs?select=*&order=name.asc`, {}, MOCK_IVR)
+    .then((raw: any) => MOCK ? raw as Ivr[] : asArray(raw).map((i: any) => ({ id: i.id, name: i.name || 'IVR', greeting: i.greet_long || i.greet_short || '—', options: 0 }))),
+  queues: () => call<any>(`/db/pbx_call_queues?select=*&order=name.asc`, {}, MOCK_QUEUES)
+    .then((raw: any) => MOCK ? raw as CallQueue[] : asArray(raw).map((q: any) => ({ id: q.id, name: q.name || 'Queue', strategy: q.strategy || '—', agents: 0, waiting: 0 }))),
+  ringGroups: () => call<any>(`/db/pbx_ring_groups?select=*&order=name.asc`, {}, MOCK_RG)
+    .then((raw: any) => MOCK ? raw as RingGroup[] : asArray(raw).map((r: any) => ({ id: r.id, name: r.name || 'Ring Group', members: 0, strategy: r.strategy || '—' }))),
   /* Phase 3 */
   voicemails: () => call<any>(`/db/${TABLES.callRecords}?select=*&or=(hangup_cause.eq.NO_ANSWER,missed_call.eq.true)&order=start_at.desc&limit=100`, {}, MOCK_VM)
     .then((raw: any) => MOCK ? raw as VoicemailItem[] : asArray(raw).map(mapCdrToVoicemail)),
@@ -375,7 +381,7 @@ export const ava = {
     }),
   updateContact: (id: string, patch: Partial<Pick<ContactItem, 'notes' | 'tags' | 'favorite'>>) =>
     call<{ ok: true }>(`/db/${TABLES.softphoneUsers}?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } }, { ok: true }),
-  syncStatus: () => call<{ lastSync: string; status: 'ok' | 'error'; jobs: { kind: string; finishedAt: string; ok: boolean }[] }>(`/fn/${FN.fusionpbxProxy}?op=sync_status`, { method: 'POST', body: JSON.stringify({ op: 'sync_status' }) }, {
+  syncStatus: () => call<{ lastSync: string; status: 'ok' | 'error'; jobs: { kind: string; finishedAt: string; ok: boolean }[] }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'sync_status' }) }, {
     lastSync: new Date(Date.now() - 600e3).toISOString(),
     status: 'ok',
     jobs: [
