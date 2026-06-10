@@ -36,8 +36,9 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    window.addEventListener('lemtel:phone-sync-complete', load);
-    return () => window.removeEventListener('lemtel:phone-sync-complete', load);
+    const onSync = () => { void load(); };
+    window.addEventListener('lemtel:phone-sync-complete', onSync);
+    return () => window.removeEventListener('lemtel:phone-sync-complete', onSync);
   }, [load]);
 
   const analyze = async (r: RecordingItem) => {
