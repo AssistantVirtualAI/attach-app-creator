@@ -186,8 +186,11 @@ class JsSipProvider {
         register_expires: 300,
         connection_recovery_min_interval: 2,
         connection_recovery_max_interval: 30,
-        user_agent: 'Lemtel Telecom 1.1',
+        user_agent: 'Lemtel-Softphone/2.3.5',
         hackWssInTransport: true,
+        hackIpInContact: true,
+        hackViaBranch: true,
+        sessionDescriptionHandlerOptions,
       });
 
       ua.on('connecting', () => {
