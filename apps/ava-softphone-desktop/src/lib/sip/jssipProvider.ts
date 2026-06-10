@@ -465,7 +465,10 @@ class JsSipProvider {
 
 
   answer() {
-    this.session?.answer({ mediaConstraints: { audio: true, video: false } });
+    this.session?.answer({
+      mediaConstraints: { audio: true, video: false },
+      sessionDescriptionHandlerOptions,
+    });
   }
 
   hangup() {
