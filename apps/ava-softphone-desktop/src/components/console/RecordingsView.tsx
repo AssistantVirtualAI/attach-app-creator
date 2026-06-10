@@ -149,7 +149,7 @@ export default function RecordingsView() {
     if (!sel) return;
     setRegenLoading(true);
     try {
-      const { summary } = await ava.regenerateSummary('recording', sel.id, sel.summary);
+      const { summary } = await ava.regenerateSummary('recording', sel.id, sel.summary || '');
       updateItem(sel.id, { summary, feedback: null });
     } finally { setRegenLoading(false); }
   };
@@ -305,7 +305,7 @@ export default function RecordingsView() {
 
             <Panel title="Quality Score" accent={c.signalGold}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 26, fontWeight: 700, color: qualityColor(sel.qualityScore), fontFamily: 'JetBrains Mono, monospace' }}>{sel.qualityScore}</span>
+                <span style={{ fontSize: 26, fontWeight: 700, color: qualityColor(sel.qualityScore || 0), fontFamily: 'JetBrains Mono, monospace' }}>{sel.qualityScore || 0}</span>
                 <span style={{ fontSize: 11, color: c.mutedSilver }}>/100</span>
               </div>
             </Panel>
@@ -321,7 +321,7 @@ export default function RecordingsView() {
                 </div>
               }
             >
-              <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0 }}>{sel.summary}</p>
+              <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0 }}>{sel.summary || 'Enregistrement disponible.'}</p>
               {sel.feedback && (
                 <div style={{ fontSize: 10, color: c.mutedSilver, marginTop: 6 }}>
                   Feedback recorded — AVA will adapt future summaries.
