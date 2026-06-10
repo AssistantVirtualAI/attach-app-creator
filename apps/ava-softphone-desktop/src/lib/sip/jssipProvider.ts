@@ -15,6 +15,25 @@ const JSSIP_MODULE_INFO = (() => {
   }
 })();
 
+const pcConfig = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+  sdpSemantics: 'unified-plan' as any,
+};
+
+const sessionDescriptionHandlerOptions = {
+  peerConnectionOptions: {
+    rtcConfiguration: pcConfig,
+  },
+  constraints: {
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+    video: false,
+  },
+};
+
 // JsSIP UA lifecycle manager — desktop softphone.
 // Mirrors the web app provider with extras: attended transfer, audio device pinning.
 
@@ -167,8 +186,11 @@ class JsSipProvider {
         register_expires: 300,
         connection_recovery_min_interval: 2,
         connection_recovery_max_interval: 30,
-        user_agent: 'Lemtel Telecom 1.1',
+        user_agent: 'Lemtel-Softphone/2.3.5',
         hackWssInTransport: true,
+        hackIpInContact: true,
+        hackViaBranch: true,
+        sessionDescriptionHandlerOptions,
       });
 
       ua.on('connecting', () => {
@@ -372,6 +394,7 @@ class JsSipProvider {
       // the Electron renderer (black screen).
       this.ua.call(target, {
         mediaConstraints: { audio: true, video: false },
+        sessionDescriptionHandlerOptions,
       } as any);
       this.lastCallError = null;
       return null;
@@ -442,7 +465,10 @@ class JsSipProvider {
 
 
   answer() {
-    this.session?.answer({ mediaConstraints: { audio: true, video: false } });
+    this.session?.answer({
+      mediaConstraints: { audio: true, video: false },
+      sessionDescriptionHandlerOptions,
+    });
   }
 
   hangup() {
@@ -469,7 +495,10 @@ class JsSipProvider {
     if (!this.ua || !this.session || !this.config) return;
     this.session.hold();
     const uri = `sip:${target}@${this.config.sipDomain}`;
-    this.ua.call(uri, { mediaConstraints: { audio: true, video: false } });
+    this.ua.call(uri, {
+      mediaConstraints: { audio: true, video: false },
+      sessionDescriptionHandlerOptions,
+    });
   }
 
   /** After consult is established, transfer original call to the consult party. */
