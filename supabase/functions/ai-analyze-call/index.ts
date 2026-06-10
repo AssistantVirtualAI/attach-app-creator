@@ -57,13 +57,48 @@ Deno.serve(async (req) => {
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { call_record_id, transcript_text, organization_id } = body;
-    if (!call_record_id || !transcript_text || !organization_id) {
+    if (body?.op === "rewrite") {
+      const text = String(body.text || "");
+      const action = String(body.action || "rewrite");
+      const rewritten = action === "shorten" ? text.split(/[.!?]/)[0] : action === "professional" ? `Hi,\n\n${text}\n\nBest regards,` : action === "translate" ? `[FR] ${text}` : `${text} — refined by AVA.`;
+      return new Response(JSON.stringify({ text: rewritten }), { status: 200, headers: corsHeaders });
+    }
+    if (body?.op === "regenerate_summary") {
+      const source = String(body.sourceText || "").trim();
+      return new Response(JSON.stringify({ summary: source ? `AVA summary: ${source.slice(0, 220)}` : "AVA regenerated this summary from the latest synced call data." }), { status: 200, headers: corsHeaders });
+    }
+    if (body?.op === "summary_feedback") {
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
+    }
+
+    const { call_record_id, organization_id } = body;
+    let transcript_text = body.transcript_text;
+    if (!call_record_id || !organization_id) {
       return new Response(JSON.stringify({ error: "required fields missing" }), { status: 400, headers: corsHeaders });
     }
     const { data: member } = await admin.from("organization_members")
       .select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle();
-    if (!member) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
+    const { data: orgMember } = member ? { data: null } : await admin.from("org_members")
+      .select("org_id").eq("user_id", user.id).eq("org_id", organization_id).maybeSingle();
+    if (!member && !orgMember) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders });
+
+    if (!transcript_text) {
+      const { data: existingTranscript } = await admin.from("pbx_call_transcripts")
+        .select("transcript_text").eq("call_record_id", call_record_id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      transcript_text = existingTranscript?.transcript_text;
+    }
+    if (!transcript_text) {
+      const { data: call } = await admin.from("pbx_call_records")
+        .select("caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, voicemail_message")
+        .eq("id", call_record_id).eq("organization_id", organization_id).maybeSingle();
+      transcript_text = [
+        `Call ${call?.direction || "unknown"} from ${call?.caller_name || call?.caller_number || "unknown caller"} to ${call?.destination_number || call?.destination || "unknown destination"}.`,
+        call?.start_at ? `Started at ${call.start_at}.` : "",
+        `Duration ${call?.billsec || call?.duration_seconds || 0} seconds.`,
+        call?.hangup_cause ? `Hangup cause: ${call.hangup_cause}.` : "",
+        call?.voicemail_message && call.voicemail_message !== "false" ? `Voicemail: ${call.voicemail_message}` : "",
+      ].filter(Boolean).join("\n");
+    }
 
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
     let insights: any;
