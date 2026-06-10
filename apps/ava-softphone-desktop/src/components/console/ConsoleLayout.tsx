@@ -25,6 +25,7 @@ import { useDesktopRole } from '../../hooks/useDesktopRole';
 import { useTenant } from '../../hooks/useTenant';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { theme } from '../../lib/theme';
+import { ava } from '../../lib/avaApi';
 
 const { colors: c } = theme;
 
@@ -60,6 +61,8 @@ export default function ConsoleLayout({
   const [view, setView] = useState<ConsoleView>('home');
   const [aiOpen, setAiOpen] = useState(true);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncNote, setSyncNote] = useState<string | null>(null);
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
   const { isAdmin } = useDesktopRole();
   const { orgId, orgName } = useTenant();
@@ -72,6 +75,20 @@ export default function ConsoleLayout({
   }, [isAdmin, view]);
 
   useCallShortcuts();
+
+  const runFullSync = async () => {
+    setSyncing(true); setSyncNote(null);
+    try {
+      const res = await ava.syncPhoneSystemFull();
+      const stats = res?.stats || {};
+      const count = Object.entries(stats).filter(([k]) => k !== 'duration_ms').map(([k, v]) => `${k}:${v}`).join(' · ');
+      setSyncNote(res.ok ? `Synced ${count || 'phone system'} · ${new Date(res.syncedAt).toLocaleTimeString()}` : (res.errors?.[0] || 'Phone-system sync failed'));
+      window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
+      (window as any).__lemtelRefreshCalls?.();
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     const onResize = () => setCompact(window.innerWidth < 640);
@@ -133,6 +150,14 @@ export default function ConsoleLayout({
         flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', position: 'relative',
         paddingBottom: compact ? 78 : 0, display: 'flex', flexDirection: 'column',
       }}>
+        {!compact && (
+          <div style={{ position: 'absolute', top: 12, right: 16, zIndex: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+            {syncNote && <span style={{ maxWidth: 360, color: c.mutedSilver, fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{syncNote}</span>}
+            <button onClick={runFullSync} disabled={syncing} style={{ padding: '7px 11px', borderRadius: 8, background: syncing ? 'rgba(255,230,0,0.08)' : 'rgba(255,230,0,0.14)', border: `1px solid ${c.borderGold}`, color: c.signalGold, fontSize: 10, fontWeight: 800, letterSpacing: 1, cursor: syncing ? 'wait' : 'pointer' }}>
+              {syncing ? 'SYNCING…' : 'SYNC PHONE SYSTEM'}
+            </button>
+          </div>
+        )}
         <AppErrorBoundary key={view} compact onBack={() => setView('dialer')}>
         <div className="lemtel-page-enter" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           {view === 'home' && <HomeDashboard displayName={creds.displayName || creds.email} extension={creds.extension} onQuickDial={() => setView('dialer')} />}
