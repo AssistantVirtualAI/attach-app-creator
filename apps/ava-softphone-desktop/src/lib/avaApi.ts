@@ -371,12 +371,12 @@ export const ava = {
   ringGroups: () => call<any>(`/db/pbx_ring_groups?select=*&order=name.asc`, {}, MOCK_RG)
     .then((raw: any) => MOCK ? raw as RingGroup[] : asArray(raw).map((r: any) => ({ id: r.id, name: r.name || 'Ring Group', members: 0, strategy: r.strategy || '—' }))),
   /* Phase 3 */
-  voicemails: async () => {
+  voicemails: async (limit = 50) => {
     if (MOCK) return SAMPLE_VOICEMAIL_EMPTY;
-    await bestEffortCdrSync(200);
+    await bestEffortCdrSync(Math.max(limit, 200));
     try {
-      const rows = await readCallRecordRows(200);
-      return rows.filter(isVoicemailLike).map(mapCdrToVoicemail);
+      const rows = await readCallRecordRows(Math.max(limit, 200));
+      return rows.filter(isVoicemailLike).map(mapCdrToVoicemail).slice(0, limit);
     } catch (err) {
       console.warn('[avaApi] voicemail mapping failed:', err);
       return [] as VoicemailItem[];
