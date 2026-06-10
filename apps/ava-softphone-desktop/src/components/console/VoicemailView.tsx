@@ -8,7 +8,7 @@ const { colors: c } = theme;
 type Filter = 'all' | 'new' | 'high' | 'negative' | 'handled' | 'open';
 
 function fmtDate(iso?: string | null) {
-  if (!iso || Number.isNaN(d.getTime())) return '—';
+  if (!iso) return '—';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
   const now = new Date();
