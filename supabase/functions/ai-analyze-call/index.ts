@@ -141,7 +141,13 @@ ${transcript_text}` }],
       prompt_version: "v1", ai_model: "claude-sonnet-4-20250514",
     });
     if (insightError) throw new Error(insightError.message);
-    await admin.from("pbx_call_records").update({ analyzed: true, ai_processing: false }).eq("id", call_record_id);
+    const { data: existingCall } = await admin.from("pbx_call_records")
+      .select("raw_data").eq("id", call_record_id).maybeSingle();
+    await admin.from("pbx_call_records").update({
+      analyzed: true,
+      ai_processing: false,
+      raw_data: { ...((existingCall?.raw_data as Record<string, unknown>) || {}), ai: insights },
+    }).eq("id", call_record_id);
 
     return new Response(JSON.stringify(insights), { headers: corsHeaders });
   } catch (e: any) {
