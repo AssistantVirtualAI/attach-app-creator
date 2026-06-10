@@ -1,20 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { ava } from '@/lib/avaApi';
+import { ava, CallRecord } from '@/lib/avaApi';
 import { ArrowUpRight, ArrowDownLeft, PhoneMissed, PhoneCall } from './RowIcons';
-
-interface CallRow {
-  id: string;
-  direction: string | null;
-  call_status: string | null;
-  caller_number: string | null;
-  caller_name: string | null;
-  destination_number: string | null;
-  destination: string | null;
-  start_at: string | null;
-  duration_seconds: number | null;
-  missed_call: boolean | null;
-}
 
 interface Props {
   extension: string;
@@ -31,7 +18,7 @@ function fmtTime(iso: string | null) {
     : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-function fmtDur(s: number | null) {
+function fmtDur(s: number) {
   if (!s) return '';
   const m = Math.floor(s / 60);
   const sec = s % 60;
@@ -39,7 +26,7 @@ function fmtDur(s: number | null) {
 }
 
 export default function RecentsList({ extension, onCall }: Props) {
-  const [rows, setRows] = useState<CallRow[]>([]);
+  const [rows, setRows] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
@@ -47,14 +34,8 @@ export default function RecentsList({ extension, onCall }: Props) {
     setLoading(true);
     setErr(null);
     try {
-      await ava.calls(100);
-      const { data, error } = await supabase
-        .from('pbx_call_records')
-        .select('id,caller_name,caller_number,destination,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause')
-        .order('start_at', { ascending: false })
-        .limit(50);
-      if (err) { setLoading(false); return; }
-      setRows((data || []) as any[]);
+      const data = await ava.calls(50);
+      setRows(Array.isArray(data) ? data : []);
     } catch (e: any) {
       setErr(e?.message || 'Unable to load live call records.');
       setRows([]);
@@ -70,20 +51,18 @@ export default function RecentsList({ extension, onCall }: Props) {
     return () => window.removeEventListener('lemtel:phone-sync-complete', onSync);
   }, [load]);
 
-  // Realtime: new CDR rows visible to this signed-in desktop user
+  // Realtime: refresh on new CDR rows
   useEffect(() => {
     const ch = supabase
       .channel(`cdr-${extension}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'pbx_call_records' },
-        (payload) => {
-          setRows((prev) => [payload.new as CallRow, ...prev].slice(0, 100));
-        },
+        () => { void load(); },
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [extension]);
+  }, [extension, load]);
 
   if (loading) return <div style={center}>Loading recents…</div>;
   if (err) return <div style={{ ...center, color: '#ff8a8a' }}>{err}<br /><button onClick={load} style={refreshBtn}>Retry</button></div>;
@@ -98,12 +77,10 @@ export default function RecentsList({ extension, onCall }: Props) {
         <button onClick={load} style={refreshBtn} title="Refresh">↻</button>
       </div>
       {rows.map((r) => {
-        const outbound = r.direction === 'outbound' || r.direction === 'local';
-        const peer = outbound
-          ? (r.destination_number || r.destination || '?')
-          : (r.caller_number || '?');
-        const name = !outbound ? r.caller_name : null;
-        const missed = r.missed_call || r.call_status === 'no_answer' || r.call_status === 'missed';
+        const outbound = r.direction === 'out';
+        const peer = outbound ? (r.to || '?') : (r.from || '?');
+        const name = r.customer || (outbound ? null : r.from);
+        const missed = r.status === 'missed';
         const iconColor = missed ? '#EF4444' : outbound ? '#FFD700' : '#10B981';
         const initial = (name || peer || '?').toString().charAt(0).toUpperCase();
         return (
@@ -130,7 +107,7 @@ export default function RecentsList({ extension, onCall }: Props) {
                 {name || peer}
               </div>
               <div style={{ fontSize: 10.5, opacity: 0.5, marginTop: 2, letterSpacing: 0.2 }}>
-                {fmtTime(r.start_at)}{r.duration_seconds || r.billsec || 0 ? ` · ${fmtDur(r.duration_seconds || r.billsec || 0)}` : ''}
+                {fmtTime(r.startedAt)}{r.durationSec ? ` · ${fmtDur(r.durationSec)}` : ''}
               </div>
             </div>
             <span style={{ color: 'rgba(255,215,0,0.6)', display: 'inline-flex' }}>
