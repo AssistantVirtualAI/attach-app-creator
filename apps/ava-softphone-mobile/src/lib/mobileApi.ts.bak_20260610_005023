@@ -153,43 +153,6 @@ const voicemailMock: VoicemailEntry[] = [
 
 /* ─── Public API ──────────────────────────────────────────────── */
 
-
-/* ─── Mappeurs CDR FusionPBX ──────────────────────────────── */
-function mapCdrToCallRecord(r: any): CallRecord {
-  const billsec = Number(r.billsec ?? r.duration_seconds ?? 0);
-  const missed  = r.missed_call || r.hangup_cause === 'NO_ANSWER' || billsec === 0;
-  return {
-    id:           r.id ?? String(Math.random()),
-    direction:    (r.direction === 'outbound' ? 'out' : 'in') as 'in' | 'out',
-    status:       (r.voicemail_message ? 'voicemail' : missed ? 'missed' : 'answered') as any,
-    from:         r.caller_number ?? '',
-    to:           r.destination_number ?? '',
-    customer:     r.caller_name ?? undefined,
-    startedAt:    r.start_at ?? new Date().toISOString(),
-    durationSec:  billsec,
-    hasRecording: !!(r.has_recording || r.recording_path || r.recording_name),
-    hasTranscript: false,
-    sentiment:    undefined,
-  };
-}
-
-function mapCdrToVoicemailEntry(r: any): VoicemailEntry {
-  return {
-    id:          r.id ?? String(Math.random()),
-    from:        r.caller_number ?? '',
-    customer:    r.caller_name ?? undefined,
-    receivedAt:  r.start_at ?? new Date().toISOString(),
-    durationSec: Number(r.billsec ?? r.duration_seconds ?? 0),
-    transcript:  r.voicemail_message ?? 'Transcription non disponible.',
-    summary:     r.voicemail_message
-                   ? r.voicemail_message.slice(0, 120)
-                   : 'Aucun résumé disponible.',
-    priority:    'normal' as const,
-    sentiment:   'neutral' as const,
-    isNew:       !r.voicemail_read,
-  };
-}
-
 export const mobileApi = {
   me:        () => call<MeResponse>('/mobile-me', undefined, meMock),
   dashboard: () => call<DashboardBrief>('/mobile-dashboard', undefined, dashboardMock),
@@ -204,14 +167,7 @@ export const mobileApi = {
     { callId: 'call-' + Date.now(), mode: 'webrtc' },
   ),
 
-  calls: () => call<CallRecord[]>(
-    '/fusionpbx-proxy',
-    { method: 'POST', body: JSON.stringify({ action: 'sync-cdrs', limit: 50 }) },
-    callsMock
-  ).then((raw: any) => {
-    if (!Array.isArray(raw?.rows ?? raw)) return callsMock;
-    return (raw?.rows ?? raw).map(mapCdrToCallRecord);
-  }),
+  calls:      () => call<CallRecord[]>('/mobile-calls', undefined, callsMock),
   callDetail: (id: string) => call<CallDetail>(`/mobile-calls?id=${encodeURIComponent(id)}`, undefined, callDetailMock(id)),
 
   threads:    () => call<SmsThread[]>('/mobile-sms', undefined, threadsMock),
@@ -221,21 +177,9 @@ export const mobileApi = {
     { id: 'm' + Date.now() },
   ),
 
-  voicemails: () => call<VoicemailEntry[]>(
-    '/fusionpbx-proxy',
-    { method: 'POST', body: JSON.stringify({ action: 'sync-cdrs', limit: 50 }) },
-    voicemailMock
-  ).then((raw: any) => {
-    if (!Array.isArray(raw?.rows ?? raw)) return voicemailMock;
-    return (raw?.rows ?? raw)
-      .filter((r: any) => r.voicemail_message || r.missed_call)
-      .map(mapCdrToVoicemailEntry);
-  }),
+  voicemails: () => call<VoicemailEntry[]>('/mobile-voicemails', undefined, voicemailMock),
   voicemailAudio: (id: string) => call<{ url: string; expiresInSec: number }>(
-    `/fusionpbx-proxy?action=get-recording&id=${encodeURIComponent(id)}`,
-    { method: 'POST', body: JSON.stringify({ action: 'get-recording', id }) },
-    { url: '', expiresInSec: 0 }
-  )}`, undefined,
+    `/mobile-voicemail-audio?id=${encodeURIComponent(id)}`, undefined,
     { url: '', expiresInSec: 0 },
   ),
 

@@ -42,6 +42,26 @@ type Creds = {
   userId?: string;
 } | null;
 
+
+// ── CDR sync au démarrage ──────────────────────────────────
+const triggerCdrSync = async () => {
+  try {
+    const { supabase } = await import('./lib/supabaseClient');
+    await supabase.functions.invoke('fusionpbx-proxy', {
+      body: {
+        action: 'sync-cdrs',
+        organization_id: '71755d33-ed64-4ad5-a828-61c9d2029eb7',
+        limit: 200,
+      },
+    });
+    console.log('[AVA] CDR sync triggered');
+  } catch (e) {
+    console.warn('[AVA] CDR sync failed', e);
+  }
+};
+triggerCdrSync();
+const _cdrInterval = setInterval(triggerCdrSync, 5 * 60 * 1000);
+// ────────────────────────────────────────────────────────────
 export default function App() {
   const { t } = useTheme();
   useContrast(); // applies low/med/high contrast preset on mount

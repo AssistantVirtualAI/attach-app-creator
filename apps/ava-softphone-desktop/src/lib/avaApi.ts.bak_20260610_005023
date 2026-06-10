@@ -14,7 +14,7 @@
  */
 import { BACKEND, TABLES, FN, fnUrl } from './config';
 
-export const MOCK: boolean = (import.meta as any).env?.VITE_AVA_MOCK === 'true';
+export const MOCK = true;
 
 let authToken: string | null = null;
 export function setAuthToken(token: string | null) { authToken = token; }
@@ -35,11 +35,7 @@ function authHeaders(): Record<string, string> {
  * Everything else is treated as a relative REST path under PostgREST.
  */
 function resolveUrl(path: string): string {
-  if (path.startsWith('/fn/')) {
-    const [fnPath, qs] = path.slice(4).split('?');
-    const base = fnUrl(fnPath);
-    return qs ? `${base}?${qs}` : base;
-  }
+  if (path.startsWith('/fn/')) return fnUrl(path.slice(4).split('?')[0]);
   if (path.startsWith('/db/')) return `${BACKEND.url}/rest/v1/${path.slice(4)}`;
   return `${BACKEND.url}${path}`;
 }
@@ -219,78 +215,13 @@ const MOCK_CONTACTS: ContactItem[] = [
  *   /fn/<edge-function>    → Supabase Edge Function (POST JSON).
  * Mocks short-circuit when MOCK=true.
  */
-
-/* ─── Mappeurs CDR FusionPBX → UI ─────────────────────────── */
-function mapCdrToCall(r: any): CallRecord {
-  const billsec = Number(r.billsec ?? r.duration_seconds ?? 0);
-  const missed  = r.missed_call || r.hangup_cause === 'NO_ANSWER' || billsec === 0;
-  return {
-    id:           r.id ?? r.pbx_uuid ?? String(Math.random()),
-    direction:    (r.direction === 'outbound' ? 'out' : 'in') as 'in' | 'out',
-    status:       (r.voicemail_message ? 'voicemail' : missed ? 'missed' : 'answered') as any,
-    from:         r.caller_number ?? '',
-    to:           r.destination_number ?? '',
-    customer:     r.caller_name ?? undefined,
-    startedAt:    r.start_at ?? new Date().toISOString(),
-    durationSec:  billsec,
-    hasRecording: !!(r.has_recording || r.recording_path || r.recording_name),
-    hasTranscript: false,
-    sentiment:    undefined,
-  };
-}
-
-function mapCdrToVoicemail(r: any): VoicemailItem {
-  return {
-    id:          r.id ?? r.pbx_uuid ?? String(Math.random()),
-    from:        r.caller_number ?? '',
-    customer:    r.caller_name ?? undefined,
-    receivedAt:  r.start_at ?? new Date().toISOString(),
-    durationSec: Number(r.billsec ?? r.duration_seconds ?? 0),
-    isNew:       !r.voicemail_read,
-    transcript:  r.voicemail_message ?? 'Transcription non disponible.',
-    summary:     r.voicemail_message
-                   ? r.voicemail_message.slice(0, 120) + (r.voicemail_message.length > 120 ? '…' : '')
-                   : 'Aucun résumé disponible.',
-    sentiment:   'neutral' as const,
-    priority:    'normal' as const,
-    handled:     false,
-    feedback:    null,
-  };
-}
-
-function mapCdrToRecording(r: any): RecordingItem {
-  return {
-    id:          r.id ?? r.pbx_uuid ?? String(Math.random()),
-    callId:      r.id ?? '',
-    from:        r.caller_number ?? '',
-    to:          r.destination_number ?? '',
-    customer:    r.caller_name ?? undefined,
-    recordedAt:  r.start_at ?? new Date().toISOString(),
-    durationSec: Number(r.billsec ?? r.duration_seconds ?? 0),
-    sizeKb:      0,
-    qualityScore: 0,
-    sentiment:   'neutral' as const,
-    summary:     'Enregistrement disponible.',
-    topics:      [],
-    tags:        [],
-    feedback:    null,
-  };
-}
-
 export const ava = {
   me: () => call<Me>(`/db/${TABLES.softphoneUsers}?select=*&limit=1`, {}, MOCK_ME),
   dashboard: () => call<DashboardBrief>(`/fn/${FN.aiAnalyzeCall}?view=dashboard`, { method: 'POST', body: JSON.stringify({ view: 'dashboard' }) }, {
     missed: 3, answered: 12, unreadSms: 5, voicemail: 2, aiActions: 4, pbxHealth: 'ok',
     brief: 'You have 3 missed calls and 2 unread voicemails requiring callbacks. One conversation flagged a renewal opportunity.',
   }),
-  calls: (limit = 50) => call<CallRecord[]>(
-    `/fn/${FN.fusionpbxProxy}`,
-    { method: 'POST', body: JSON.stringify({ action: 'sync-cdrs', limit }) },
-    MOCK_CALLS
-  ).then(async (raw: any) => {
-    if (MOCK || !Array.isArray(raw?.rows ?? raw)) return raw as CallRecord[];
-    return (raw?.rows ?? raw).map(mapCdrToCall);
-  }),
+  calls: (limit = 50) => call<CallRecord[]>(`/db/${TABLES.callRecords}?select=*&order=started_at.desc&limit=${limit}`, {}, MOCK_CALLS),
   callDetail: (id: string) => call<CallInsight>(`/db/${TABLES.aiInsights}?call_id=eq.${id}&select=*`, {}, {
     callId: id,
     summary: 'Customer asked about Q4 invoicing. Agent confirmed updated pricing and committed to sending a revised quote by Friday.',
@@ -356,12 +287,3 @@ export const ava = {
     ],
   }),
 };
-
-/* ─── Initialisation du token depuis la session Supabase ───── */
-import { supabase as _sb } from './supabaseClient';
-(async () => {
-  const { data: { session } } = await _sb.auth.getSession();
-  if (session?.access_token) setAuthToken(session.access_token);
-  _sb.auth.onAuthStateChange((_ev, s) => setAuthToken(s?.access_token ?? null));
-})();
-
