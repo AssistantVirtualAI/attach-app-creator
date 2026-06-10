@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { theme } from '../lib/theme';
+import { setAuthToken } from '../lib/avaApi';
 import LemtelLogo from './LemtelLogo';
 import BrandTagline from './BrandTagline';
 
