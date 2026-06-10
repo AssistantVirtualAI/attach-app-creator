@@ -344,6 +344,21 @@ class JsSipProvider {
       const code = e?.message?.status_code || e?.response?.status_code;
       const detail = [cause, code, reason].filter(Boolean).join(' ');
       this.lastCallError = detail;
+      // Verbose logging for 488 / SDP rejection diagnostics
+      try {
+        const respBody = e?.response?.body || e?.message?.body || '';
+        // eslint-disable-next-line no-console
+        console.error('[SIP][CALL FAILED]', { cause, code, reason, originator: e?.originator });
+        if (code === 488 || /Not Acceptable/i.test(reason)) {
+          // eslint-disable-next-line no-console
+          console.error('[SIP][488 RESPONSE BODY]\n' + respBody);
+          this.logEvent('error', `488 Not Acceptable — PBX rejected SDP offer. See console for response body.`);
+        }
+        if (respBody) {
+          // eslint-disable-next-line no-console
+          console.error('[SIP][RESP BODY]\n' + respBody);
+        }
+      } catch { /* noop */ }
       this.logEvent('error', `Call failed: ${detail}`);
       this.update({ callState: 'ended', errorCause: detail });
       setTimeout(() => this.resetCall(), 2500);
@@ -357,8 +372,24 @@ class JsSipProvider {
     session.on('muted', () => this.update({ muted: true }));
     session.on('unmuted', () => this.update({ muted: false }));
 
+    // Verbose SDP logging — peerconnection offer/answer trace
+    try {
+      const pc = session.connection;
+      if (pc) {
+        pc.addEventListener('iceconnectionstatechange', () => {
+          // eslint-disable-next-line no-console
+          console.log('[SIP][ICE]', pc.iceConnectionState);
+        });
+        pc.addEventListener('connectionstatechange', () => {
+          // eslint-disable-next-line no-console
+          console.log('[SIP][PC]', pc.connectionState);
+        });
+      }
+    } catch { /* noop */ }
+
     this.bindMedia(session);
   }
+
 
   private bindSecondary(session: any) {
     session.on('ended', () => { this.secondSession = null; });
