@@ -16,7 +16,7 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
-      external: ['electron', 'zod', 'zod/v4', 'zod/v3', 'ai', '@ai-sdk/provider-utils'],
+      external: ['electron'],
     },
   },
   base: './',
