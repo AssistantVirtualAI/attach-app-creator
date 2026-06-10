@@ -349,7 +349,7 @@ export const ava = {
   queues: () => call<CallQueue[]>(`/fn/${FN.fusionpbxProxy}?op=list_queues`, { method: 'POST', body: JSON.stringify({ op: 'list_queues' }) }, MOCK_QUEUES),
   ringGroups: () => call<RingGroup[]>(`/fn/${FN.fusionpbxProxy}?op=list_ring_groups`, { method: 'POST', body: JSON.stringify({ op: 'list_ring_groups' }) }, MOCK_RG),
   /* Phase 3 */
-  voicemails: () => call<any>(`/db/${TABLES.callRecords}?select=*&or=(hangup_cause.eq.NO_ANSWER,missed_call.eq.true,voicemail_message.not.is.null)&order=start_at.desc&limit=100`, {}, MOCK_VM)
+  voicemails: () => call<any>(`/db/${TABLES.callRecords}?select=*&or=(hangup_cause.eq.NO_ANSWER,missed_call.eq.true)&order=start_at.desc&limit=100`, {}, MOCK_VM)
     .then((raw: any) => MOCK ? raw as VoicemailItem[] : asArray(raw).map(mapCdrToVoicemail)),
   markVoicemailRead: (id: string) =>
     call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'voicemail_read', id }) }, { ok: true }),
