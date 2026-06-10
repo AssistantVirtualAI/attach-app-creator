@@ -486,22 +486,11 @@ class JsSipProvider {
     const target = `sip:${number}@${this.config.sipDomain}`;
     this.logEvent('info', `Dialing ${number}`);
     try {
-      // Let JsSIP handle getUserMedia internally. Pre-fetching the stream
-      // causes "Bad Media Description" + unhandled rejections that crash
-      // the Electron renderer (black screen).
       this.ua.call(target, {
         mediaConstraints: { audio: true, video: false },
+        pcConfig,
         sessionDescriptionHandlerOptions,
-        sessionDescriptionHandlerModifiers: [
-          (description: any) => {
-            if (description?.sdp) {
-              console.log('[SDP BEFORE]', description.sdp);
-              description.sdp = forcePCMU(stripToAudioOnly(description.sdp));
-              console.log('[SDP AFTER]', description.sdp);
-            }
-            return Promise.resolve(description);
-          }
-        ],
+        sessionDescriptionHandlerModifiers: [sdpModifier],
       } as any);
       this.lastCallError = null;
       return null;
