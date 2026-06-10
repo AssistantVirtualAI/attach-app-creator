@@ -5,11 +5,13 @@ interface VmRow {
   id: string;
   caller_name: string | null;
   caller_number: string | null;
+  destination_number?: string | null;
   start_at: string | null;
   duration_seconds: number | null;
   recording_url: string | null;
   recording_path: string | null;
   voicemail_message: string | null;
+  missed_call?: boolean | null;
 }
 
 interface Props {
@@ -23,6 +25,11 @@ function fmtTime(iso: string | null) {
   return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+function hasMessage(r: VmRow) {
+  const msg = String(r.voicemail_message ?? '').trim().toLowerCase();
+  return !!r.recording_url || !!r.recording_path || (!!msg && msg !== 'false' && msg !== 'null') || !!r.missed_call;
+}
+
 export default function VoicemailList({ extension, onCall }: Props) {
   const [rows, setRows] = useState<VmRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,13 +41,12 @@ export default function VoicemailList({ extension, onCall }: Props) {
     setErr(null);
     const { data, error } = await supabase
       .from('pbx_call_records')
-      .select('id,caller_name,caller_number,start_at,duration_seconds,recording_url,recording_path,voicemail_message')
-      .eq('extension', extension)
+      .select('id,caller_name,caller_number,destination_number,start_at,duration_seconds,recording_url,recording_path,voicemail_message,missed_call')
       .or('hangup_cause.eq.NO_ANSWER,voicemail_message.not.is.null,missed_call.eq.true')
       .order('start_at', { ascending: false })
       .limit(50);
     if (error) setErr(error.message);
-    else setRows(((data as VmRow[]) || []).filter((r) => r.recording_url || r.voicemail_message));
+    else setRows(((data as VmRow[]) || []).filter(hasMessage));
     setLoading(false);
   }, [extension]);
 
@@ -51,10 +57,10 @@ export default function VoicemailList({ extension, onCall }: Props) {
       .channel(`vm-${extension}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pbx_call_records', filter: `extension=eq.${extension}` },
+        { event: 'INSERT', schema: 'public', table: 'pbx_call_records' },
         (payload) => {
           const r = payload.new as VmRow & { missed_call?: boolean };
-          if (r.voicemail_message || (r as any).missed_call) {
+          if (hasMessage(r)) {
             setRows((prev) => [r, ...prev].slice(0, 50));
           }
         },
@@ -74,7 +80,7 @@ export default function VoicemailList({ extension, onCall }: Props) {
         <button onClick={load} style={refreshBtn}>↻</button>
       </div>
       {rows.map((r) => {
-        const peer = r.caller_number || '?';
+        const peer = r.caller_number || r.destination_number || '?';
         const name = r.caller_name || peer;
         const expanded = playing === r.id;
         return (
