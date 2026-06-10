@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, CallRecord } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
@@ -8,6 +8,7 @@ const { colors: c } = theme;
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return '—';
   const now = new Date();
   if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
@@ -21,6 +22,8 @@ function fmtDur(s: number) {
 export default function CallsView() {
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [filter, setFilter] = useState<'all' | 'missed' | 'in' | 'out' | 'recorded'>('all');
   const [sel, setSel] = useState<CallRecord | null>(null);
   const [insight, setInsight] = useState<any>(null);
@@ -29,27 +32,40 @@ export default function CallsView() {
     const mapRow = (r: any): CallRecord => ({
       id: r.id,
       direction: r.direction === 'outbound' ? 'out' : 'in',
-      status: r.hangup_cause === 'NO_ANSWER' ? 'missed' : (r.billsec > 0 ? 'answered' : 'missed'),
+      status: r.voicemail_message ? 'voicemail' : r.hangup_cause === 'NO_ANSWER' ? 'missed' : ((r.billsec || r.duration_seconds || 0) > 0 ? 'answered' : 'missed'),
       from: r.caller_number || '',
       to: r.destination_number || '',
-      customer: r.caller_name || null,
-      startedAt: r.start_at,
+      customer: r.caller_name || undefined,
+      startedAt: r.start_at || new Date().toISOString(),
       durationSec: r.billsec || r.duration_seconds || 0,
-      hasRecording: r.has_recording || !!r.recording_path,
-      hasTranscript: false,
-      sentiment: null,
+      hasRecording: !!(r.has_recording || r.recording_path || r.recording_name),
+      hasTranscript: !!(r.transcript_text || r.raw_data?.transcript_text || r.raw_data?.transcript),
+      sentiment: r.raw_data?.ai?.sentiment || r.raw_data?.sentiment || undefined,
+      organization_id: r.organization_id,
+      transcript_text: r.transcript_text || r.raw_data?.transcript_text || r.raw_data?.transcript || undefined,
+      recording_path: r.recording_path || null,
+      recording_name: r.recording_name || null,
     } as any);
 
     const load = async () => {
-      const { data, error } = await supabase
-        .from('pbx_call_records')
-        .select('*')
-        .order('start_at', { ascending: false })
-        .limit(100);
-      if (error) console.error('CDR load error:', error);
-      setCalls((data || []).map(mapRow));
-      setLoading(false);
+      setLoading(true); setError(null); setSyncing(true);
+      try {
+        await ava.calls(100);
+        const { data, error } = await supabase
+          .from('pbx_call_records')
+          .select('*')
+          .order('start_at', { ascending: false })
+          .limit(100);
+        if (error) throw error;
+        setCalls(((data || []) as any[]).map(mapRow));
+      } catch (err: any) {
+        setError(err?.message || 'Unable to load live call records.');
+        setCalls([]);
+      } finally {
+        setLoading(false); setSyncing(false);
+      }
     };
+    (window as any).__lemtelRefreshCalls = load;
     load();
 
     const channel = supabase
@@ -58,11 +74,13 @@ export default function CallsView() {
         setCalls((prev) => [mapRow(payload.new), ...prev]);
       })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { delete (window as any).__lemtelRefreshCalls; supabase.removeChannel(channel); };
   }, []);
   useEffect(() => {
-    if (sel) { setInsight(null); ava.callDetail(sel.id).then(setInsight); }
+    if (sel) { setInsight(null); ava.callDetail(sel.id).then(setInsight).catch(() => setInsight({ summary: 'No AI insight has been generated for this call yet.', topics: [], actionItems: [], qualityScore: 0 })); }
   }, [sel]);
+
+  const retry = useCallback(() => (window as any).__lemtelRefreshCalls?.(), []);
 
   const filtered = calls.filter((cr) =>
     filter === 'all' ? true :
@@ -80,7 +98,10 @@ export default function CallsView() {
           title="Calls & Recordings"
           subtitle="Searchable history with audio, transcripts, and AVA insights."
           icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.8a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.35 1.84.59 2.8.72A2 2 0 0 1 22 16.92z"/></svg>}
+          right={<button onClick={retry} disabled={syncing} style={chip(false)}>{syncing ? 'SYNCING…' : 'SYNC NOW'}</button>}
         />
+
+        {error && <ErrorBanner message={error} onRetry={retry} />}
 
         <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
           {(['all', 'missed', 'in', 'out', 'recorded'] as const).map((f) => (
@@ -142,7 +163,7 @@ export default function CallsView() {
             </div>
             <h2 style={{ fontSize: 18, color: c.textIce, margin: '0 0 4px' }}>{sel.customer || sel.from}</h2>
             <div style={{ fontSize: 11, color: c.mutedSilver, marginBottom: 18 }}>
-              {sel.direction === 'in' ? 'Inbound' : 'Outbound'} · {fmtDur(sel.durationSec)} · {new Date(sel.startedAt).toLocaleString()}
+              {sel.direction === 'in' ? 'Inbound' : 'Outbound'} · {fmtDur(sel.durationSec)} · {fmtDate(sel.startedAt)}
             </div>
 
             {/* Waveform placeholder */}
@@ -209,6 +230,15 @@ function Panel({ title, accent, children }: { title: string; accent: string; chi
     <div style={{ marginBottom: 14 }}>
       <div style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 1.5, color: accent, textTransform: 'uppercase', marginBottom: 6 }}>{title}</div>
       <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, padding: '10px 12px' }}>{children}</div>
+    </div>
+  );
+}
+
+function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div style={{ marginBottom: 12, padding: 12, borderRadius: 10, background: 'rgba(239,68,68,0.10)', border: `1px solid ${c.danger}55`, color: c.textIce, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+      <span style={{ fontSize: 12 }}>{message}</span>
+      <button onClick={onRetry} style={{ ...chip(false), color: c.danger, borderColor: `${c.danger}66` }}>Retry</button>
     </div>
   );
 }

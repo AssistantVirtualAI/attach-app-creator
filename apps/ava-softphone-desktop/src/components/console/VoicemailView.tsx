@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, VoicemailItem, Feedback } from '../../lib/avaApi';
 import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
@@ -7,13 +7,16 @@ const { colors: c } = theme;
 
 type Filter = 'all' | 'new' | 'high' | 'negative' | 'handled' | 'open';
 
-function fmtDate(iso: string) {
+function fmtDate(iso?: string | null) {
+  if (!iso) return '—';
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
   const now = new Date();
   if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
-function fmtDur(s: number) {
+function fmtDur(s?: number | null) {
+  s = Number(s || 0);
   const m = Math.floor(s / 60), sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, '0')}`;
 }
@@ -23,21 +26,39 @@ const SPEEDS = [1, 1.25, 1.5, 2] as const;
 export default function VoicemailView() {
   const [items, setItems] = useState<VoicemailItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [sel, setSel] = useState<VoicemailItem | null>(null);
   const [regenLoading, setRegenLoading] = useState(false);
 
   // Playback
   const [playing, setPlaying] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [pos, setPos] = useState(0);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => { ava.voicemails().then((d) => { setItems(d); setLoading(false); }); }, []);
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const d = await ava.voicemails();
+      setItems(Array.isArray(d) ? d : []);
+    } catch (err: any) {
+      setItems([]);
+      setError(err?.message || 'Unable to load voicemail from the phone system.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   // Reset playback when selection changes
   useEffect(() => {
-    setPlaying(false); setPos(0);
+    setPlaying(false); setPos(0); setPlaybackError(null);
+    if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl);
+    setAudioUrl(null);
     if (tickRef.current) clearInterval(tickRef.current);
   }, [sel?.id]);
 
@@ -48,7 +69,8 @@ export default function VoicemailView() {
       tickRef.current = setInterval(() => {
         setPos((p) => {
           const next = p + 0.2 * speed;
-          if (next >= sel.durationSec) { setPlaying(false); return sel.durationSec; }
+          const dur = Number(sel.durationSec || 0);
+          if (next >= dur) { setPlaying(false); return dur; }
           return next;
         });
       }, 200);
@@ -70,6 +92,21 @@ export default function VoicemailView() {
     if (sel?.id === id) setSel({ ...sel, ...patch });
   };
 
+  const playSelected = async () => {
+    if (!sel) return;
+    setPlaybackError(null);
+    if (!audioUrl) {
+      const url = await ava.getRecordingAudioUrl(sel);
+      if (!url) {
+        setPlaying(false);
+        setPlaybackError('No voicemail audio available yet');
+        return;
+      }
+      setAudioUrl(url);
+    }
+    setPlaying((p) => !p);
+  };
+
   const markRead = (v: VoicemailItem) => {
     if (!v.isNew) return;
     ava.markVoicemailRead(v.id);
@@ -79,7 +116,7 @@ export default function VoicemailView() {
   const cyclePriority = () => {
     if (!sel) return;
     const order: VoicemailItem['priority'][] = ['low', 'normal', 'high'];
-    const next = order[(order.indexOf(sel.priority) + 1) % order.length];
+    const next = order[(order.indexOf(sel.priority || 'normal') + 1) % order.length];
     ava.setVoicemailPriority(sel.id, next);
     updateItem(sel.id, { priority: next });
   };
@@ -131,6 +168,7 @@ export default function VoicemailView() {
           ))}
         </div>
 
+        {error && <ErrorBanner message={error} onRetry={load} />}
         {loading && <ListSkeleton rows={6} />}
         {!loading && <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
           {filtered.map((v) => (
@@ -150,18 +188,18 @@ export default function VoicemailView() {
               }} />
               <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 <span style={{ fontSize: 13, fontWeight: v.isNew ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {v.customer || v.from}
+                  {v.customer || v.from || 'Unknown caller'}
                   {v.handled && <span style={{ marginLeft: 6, color: c.success, fontSize: 10 }}>✓ handled</span>}
                 </span>
                 <span style={{ fontSize: 10.5, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {v.summary}
+                  {v.summary || 'Message vocal ou appel manqué à traiter.'}
                 </span>
               </span>
               <span style={{ fontSize: 11, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(v.durationSec)}</span>
               <span style={{ fontSize: 11, color: c.mutedSilver }}>{fmtDate(v.receivedAt)}</span>
               <span style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                {v.priority !== 'low' && <span style={tag(priColor(v.priority))}>{v.priority.toUpperCase()}</span>}
-                <span style={dot(sentimentColor(v.sentiment))}>●</span>
+                {(v.priority || 'normal') !== 'low' && <span style={tag(priColor(v.priority || 'normal'))}>{(v.priority || 'normal').toUpperCase()}</span>}
+                <span style={dot(sentimentColor(v.sentiment || 'neutral'))}>●</span>
               </span>
             </button>
           ))}
@@ -189,16 +227,16 @@ export default function VoicemailView() {
         {sel && (
           <>
             <div style={{ fontSize: 11, color: c.signalGold, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>Voicemail</div>
-            <h2 style={{ fontSize: 18, color: c.textIce, margin: '0 0 4px' }}>{sel.customer || sel.from}</h2>
+            <h2 style={{ fontSize: 18, color: c.textIce, margin: '0 0 4px' }}>{sel.customer || sel.from || 'Unknown caller'}</h2>
             <div style={{ fontSize: 11, color: c.mutedSilver, marginBottom: 14 }}>
-              {sel.from} · {fmtDur(sel.durationSec)} · {new Date(sel.receivedAt).toLocaleString()}
+              {sel.from || 'Unknown'} · {fmtDur(sel.durationSec)} · {fmtDate(sel.receivedAt)}
             </div>
 
             {/* Playback */}
             <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12, marginBottom: 14 }}>
               <div style={{ display: 'flex', gap: 2, alignItems: 'center', height: 30, marginBottom: 8 }}>
                 {Array.from({ length: 40 }).map((_, i) => {
-                  const active = (i / 40) <= (pos / Math.max(sel.durationSec, 1));
+                  const active = (i / 40) <= (pos / Math.max(Number(sel.durationSec || 0), 1));
                   return (
                     <span key={i} style={{
                       flex: 1, height: `${20 + Math.abs(Math.sin(i * 0.9)) * 70}%`,
@@ -209,7 +247,7 @@ export default function VoicemailView() {
                 })}
               </div>
               <input
-                type="range" min={0} max={sel.durationSec} step={0.1} value={pos}
+                type="range" min={0} max={Number(sel.durationSec || 0)} step={0.1} value={pos}
                 onChange={(e) => setPos(Number(e.target.value))}
                 style={{ width: '100%', accentColor: c.signalGold }}
               />
@@ -217,20 +255,22 @@ export default function VoicemailView() {
                 <span style={{ fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(pos)}</span>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <button onClick={() => setPos((p) => Math.max(0, p - 5))} style={iconBtn}>«5s</button>
-                  <button onClick={() => setPlaying((p) => !p)} style={{ ...iconBtn, background: c.signalGold, color: c.midnight, fontWeight: 700, padding: '6px 14px' }}>
+                  <button onClick={playSelected} style={{ ...iconBtn, background: c.signalGold, color: c.midnight, fontWeight: 700, padding: '6px 14px' }}>
                     {playing ? '⏸ Pause' : '▶ Play'}
                   </button>
-                  <button onClick={() => setPos((p) => Math.min(sel.durationSec, p + 5))} style={iconBtn}>5s»</button>
+                  <button onClick={() => setPos((p) => Math.min(Number(sel.durationSec || 0), p + 5))} style={iconBtn}>5s»</button>
                   <button onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])} style={iconBtn}>{speed}x</button>
                 </div>
                 <span style={{ fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(sel.durationSec)}</span>
               </div>
+              {audioUrl && <audio src={audioUrl} autoPlay={playing} controls style={{ width: '100%', marginTop: 8, height: 30 }} onEnded={() => setPlaying(false)} />}
+              {playbackError && <div style={{ fontSize: 11, color: c.mutedSilver, marginTop: 8 }}>{playbackError}</div>}
             </div>
 
             {/* Lifecycle */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <button onClick={cyclePriority} style={{ ...iconBtn, flex: 1, color: priColor(sel.priority), borderColor: priColor(sel.priority) + '55' }}>
-                Priority · {sel.priority.toUpperCase()}
+              <button onClick={cyclePriority} style={{ ...iconBtn, flex: 1, color: priColor(sel.priority || 'normal'), borderColor: priColor(sel.priority || 'normal') + '55' }}>
+                Priority · {(sel.priority || 'normal').toUpperCase()}
               </button>
               <button onClick={toggleHandled} style={{
                 ...iconBtn, flex: 1,
@@ -253,7 +293,7 @@ export default function VoicemailView() {
                 </div>
               }
             >
-              <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0 }}>{sel.summary}</p>
+              <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0 }}>{sel.summary || 'Message vocal ou appel manqué à traiter.'}</p>
               {sel.feedback && (
                 <div style={{ fontSize: 10, color: c.mutedSilver, marginTop: 6 }}>
                   Feedback recorded — AVA will adapt future summaries.
@@ -262,7 +302,7 @@ export default function VoicemailView() {
             </Panel>
 
             <Panel title="Transcript" accent={c.avaCyan}>
-              <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0, whiteSpace: 'pre-wrap' }}>{sel.transcript}</p>
+              <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0, whiteSpace: 'pre-wrap' }}>{sel.transcript || 'Transcription non disponible.'}</p>
             </Panel>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
@@ -318,6 +358,15 @@ function Panel({ title, accent, children, right }: { title: string; accent: stri
         {right}
       </div>
       <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, padding: '10px 12px' }}>{children}</div>
+    </div>
+  );
+}
+
+function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div style={{ marginBottom: 12, padding: 12, borderRadius: 10, background: 'rgba(239,68,68,0.10)', border: `1px solid ${c.danger}55`, color: c.textIce, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+      <span style={{ fontSize: 12 }}>{message}</span>
+      <button onClick={onRetry} style={{ ...miniBtn, color: c.danger, borderColor: `${c.danger}66` }}>Retry</button>
     </div>
   );
 }

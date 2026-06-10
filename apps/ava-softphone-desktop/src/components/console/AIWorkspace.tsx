@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava } from '../../lib/avaApi';
 import PageHeader from './PageHeader';
+import AIInsights from '../AIInsights';
 
 const { colors: c } = theme;
 
@@ -58,24 +59,7 @@ export default function AIWorkspace() {
 }
 
 function Intelligence() {
-  return (
-    <>
-      <div style={{ fontSize: 11, fontWeight: 700, color: c.avaViolet, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>Latest Calls Analyzed</div>
-      {[
-        { who: 'Marie Tremblay', score: 87, sent: 'Positive', topic: 'Renewal' },
-        { who: 'Acme Corp', score: 64, sent: 'Neutral', topic: 'Reschedule' },
-        { who: 'Unknown caller', score: 41, sent: 'Negative', topic: 'Complaint' },
-      ].map((r, i) => (
-        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${c.border}` }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: c.textIce }}>{r.who}</div>
-            <div style={{ fontSize: 10.5, color: c.mutedSilver }}>{r.topic} · sentiment {r.sent}</div>
-          </div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: r.score > 70 ? c.success : r.score > 50 ? c.warning : c.danger, fontFamily: 'JetBrains Mono, monospace' }}>{r.score}</div>
-        </div>
-      ))}
-    </>
-  );
+  return <AIInsights />;
 }
 
 function Transcripts() {

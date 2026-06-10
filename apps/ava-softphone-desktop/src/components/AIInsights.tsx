@@ -7,12 +7,18 @@ const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 
 interface CallRec {
   id: string;
+  organization_id?: string | null;
   caller_number?: string | null;
+  caller_name?: string | null;
+  destination_number?: string | null;
   start_at?: string | null;
   duration_seconds?: number | null;
+  billsec?: number | null;
   transcribed?: boolean | null;
   has_recording?: boolean | null;
   analyzed?: boolean | null;
+  voicemail_message?: string | null;
+  transcript_text?: string | null;
   raw_data?: any;
 }
 
@@ -21,7 +27,27 @@ function getAi(r: CallRec) {
 }
 
 function displayError(e: any) {
-  return e?.context?.error || e?.message || e?.details || 'Batch analysis failed';
+  const raw = e?.context?.error || e?.message || e?.details || e?.error || 'AI analysis is unavailable right now.';
+  const text = String(raw);
+  if (/MISSING_SECRET/i.test(text)) return 'AI analysis is not configured yet. Test the AI connection or contact an administrator.';
+  if (/Unauthorized|Forbidden/i.test(text)) return 'You do not have permission to run AI analysis for these calls.';
+  if (/required fields missing/i.test(text)) return 'AI analysis needs a call record, organization, and transcript before it can run.';
+  if (/service error/i.test(text)) return 'The AI analysis service did not respond successfully. Try again later.';
+  return text;
+}
+
+function transcriptOf(r: CallRec) {
+  return String(r.transcript_text || r.raw_data?.transcript_text || r.raw_data?.transcript || r.voicemail_message || '').trim();
+}
+
+async function deriveOrgId(r?: CallRec) {
+  if (r?.organization_id) return r.organization_id;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return LEMTEL_ORG;
+  const { data: member } = await supabase.from('organization_members' as any).select('organization_id').eq('user_id', user.id).limit(1).maybeSingle();
+  if ((member as any)?.organization_id) return (member as any).organization_id;
+  const { data: orgMember } = await supabase.from('org_members' as any).select('org_id').eq('user_id', user.id).limit(1).maybeSingle();
+  return (orgMember as any)?.org_id || LEMTEL_ORG;
 }
 
 export default function AIInsights() {
@@ -29,13 +55,13 @@ export default function AIInsights() {
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connectionNote, setConnectionNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     const { data, error } = await supabase
       .from('pbx_call_records' as any)
       .select('*')
-      .eq('organization_id', LEMTEL_ORG)
       .order('start_at', { ascending: false })
       .limit(100);
     if (error) setError(error.message);
@@ -46,17 +72,26 @@ export default function AIInsights() {
   useEffect(() => { load(); }, [load]);
 
   const analyzeAll = async () => {
-    const pending = items.filter(r => (r.has_recording || (r as any).recording_url) && !r.transcribed);
-    if (pending.length === 0) return;
+    const pending = items.filter(r => (r.has_recording || (r as any).recording_url || (r as any).recording_path) && !r.analyzed);
+    if (pending.length === 0) { setError('No transcript available for AI analysis yet'); return; }
     setWorking(true); setError(null);
     try {
       for (const r of pending.slice(0, 10)) {
-        const t = await supabase.functions.invoke('ai-transcribe-call', {
-          body: { call_record_id: r.id, organization_id: LEMTEL_ORG },
-        });
-        if (t.error) throw t.error;
+        const organization_id = await deriveOrgId(r);
+        let transcript_text = transcriptOf(r);
+        if (!transcript_text) {
+          const t = await supabase.functions.invoke('ai-transcribe-call', {
+            body: { call_record_id: r.id, organization_id },
+          });
+          if (t.error) throw t.error;
+          transcript_text = String((t.data as any)?.transcript_text || '').trim();
+        }
+        if (!transcript_text) {
+          setError('No transcript available for AI analysis yet');
+          continue;
+        }
         const a = await supabase.functions.invoke('ai-analyze-call', {
-          body: { call_record_id: r.id, organization_id: LEMTEL_ORG },
+          body: { call_record_id: r.id, transcript_text, organization_id },
         });
         if (a.error) throw a.error;
       }
@@ -65,6 +100,18 @@ export default function AIInsights() {
       setError(displayError(e));
     } finally {
       setWorking(false);
+    }
+  };
+
+  const testConnection = async () => {
+    setConnectionNote('Testing AI connection…'); setError(null);
+    try {
+      const res = await supabase.functions.invoke('ai-analyze-call', { body: { action: 'test' } });
+      const data: any = res.data || {};
+      if (res.error) throw res.error;
+      setConnectionNote(data.status === 'ok' ? `AI connected · ${data.latency_ms ?? 0}ms` : displayError(data));
+    } catch (e: any) {
+      setConnectionNote(displayError(e));
     }
   };
 
@@ -105,20 +152,25 @@ export default function AIInsights() {
               {analyzed.length} analyzed / {items.length} total calls
             </div>
           </div>
-          <button
-            onClick={analyzeAll}
-            disabled={working}
-            style={{
-              padding: '6px 12px', borderRadius: 8,
-              background: working ? 'rgba(124,58,237,0.3)' : c.ai,
-              border: 'none', color: '#fff', fontSize: 11, fontWeight: 600,
-              cursor: working ? 'wait' : 'pointer', boxShadow: glow.ai,
-            }}
-          >
-            {working ? 'Analyzing…' : '✨ Analyze pending'}
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={testConnection} style={{ padding: '6px 12px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.borderAI}`, color: c.aiLight, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Test AI connection</button>
+            <button
+              onClick={analyzeAll}
+              disabled={working}
+              style={{
+                padding: '6px 12px', borderRadius: 8,
+                background: working ? 'rgba(124,58,237,0.3)' : c.ai,
+                border: 'none', color: '#fff', fontSize: 11, fontWeight: 600,
+                cursor: working ? 'wait' : 'pointer', boxShadow: glow.ai,
+              }}
+            >
+              {working ? 'Analyzing…' : '✨ Analyze pending'}
+            </button>
+          </div>
         </div>
       </div>
+
+      {connectionNote && <div style={{ padding: 10, background: 'rgba(124,58,237,0.10)', color: c.aiLight, fontSize: 11, borderRadius: 8 }}>{connectionNote}</div>}
 
       {error && (
         <div style={{ padding: 10, background: 'rgba(239,68,68,0.10)', color: c.red, fontSize: 11, borderRadius: 8 }}>

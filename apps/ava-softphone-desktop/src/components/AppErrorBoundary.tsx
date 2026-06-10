@@ -1,9 +1,10 @@
 import React from 'react';
 
 interface State { hasError: boolean; error: string }
+interface Props { children: React.ReactNode; compact?: boolean; onBack?: () => void }
 
-export class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, State> {
-  constructor(props: { children: React.ReactNode }) {
+export class AppErrorBoundary extends React.Component<Props, State> {
+  constructor(props: Props) {
     super(props);
     this.state = { hasError: false, error: '' };
   }
@@ -18,6 +19,21 @@ export class AppErrorBoundary extends React.Component<{ children: React.ReactNod
 
   render() {
     if (!this.state.hasError) return this.props.children;
+    if (this.props.compact) {
+      return (
+        <div style={{ display: 'grid', placeItems: 'center', height: '100%', padding: 24, background: '#0a0b12', color: '#f5f7fb', fontFamily: 'Inter, -apple-system, sans-serif' }}>
+          <div style={{ maxWidth: 420, textAlign: 'center', padding: 22, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)' }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>This page could not load</div>
+            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 14 }}>{this.state.error || 'A desktop page error was contained.'}</div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <button onClick={() => this.setState({ hasError: false, error: '' })} style={localBtn}>Reload page</button>
+              <button onClick={this.props.onBack} style={{ ...localBtn, background: 'transparent', border: '1px solid rgba(255,255,255,0.18)' }}>Go back to Dialer</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -44,3 +60,8 @@ export class AppErrorBoundary extends React.Component<{ children: React.ReactNod
     );
   }
 }
+
+const localBtn: React.CSSProperties = {
+  background: '#003DA6', border: 'none', borderRadius: 8, color: 'white',
+  padding: '8px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+};

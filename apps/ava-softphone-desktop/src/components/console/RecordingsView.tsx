@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, RecordingItem, Feedback } from '../../lib/avaApi';
 import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
@@ -10,14 +10,19 @@ type Sent = 'all' | 'positive' | 'neutral' | 'negative';
 type Sort = 'recent' | 'oldest' | 'longest' | 'quality_desc' | 'quality_asc';
 type Range = 'all' | '24h' | '7d' | '30d' | '90d';
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+function fmtDate(iso?: string | null) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 }
-function fmtDur(s: number) {
+function fmtDur(s?: number | null) {
+  s = Number(s || 0);
   const m = Math.floor(s / 60), sec = s % 60;
   return `${m}:${sec.toString().padStart(2, '0')}`;
 }
-function fmtSize(kb: number) {
+function fmtSize(kb?: number | null) {
+  kb = Number(kb || 0);
   return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
 }
 function rangeCutoff(r: Range): number {
@@ -28,6 +33,7 @@ function rangeCutoff(r: Range): number {
 export default function RecordingsView() {
   const [items, setItems] = useState<RecordingItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState<Quality>('all');
   const [s, setS] = useState<Sent>('all');
   const [range, setRange] = useState<Range>('all');
@@ -38,8 +44,30 @@ export default function RecordingsView() {
   const [exporting, setExporting] = useState(false);
   const [exportNote, setExportNote] = useState<string | null>(null);
   const [regenLoading, setRegenLoading] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [playbackLoading, setPlaybackLoading] = useState(false);
 
-  useEffect(() => { ava.recordings().then((d) => { setItems(d); setLoading(false); }); }, []);
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const d = await ava.recordings();
+      setItems(Array.isArray(d) ? d : []);
+    } catch (err: any) {
+      setItems([]);
+      setError(err?.message || 'Unable to load recordings from the phone system.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    setPlaybackError(null);
+    if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl);
+    setAudioUrl(null);
+  }, [sel?.id]);
 
   const filtered = useMemo(() => {
     const cutoff = rangeCutoff(range);
@@ -51,7 +79,7 @@ export default function RecordingsView() {
       if (cutoff && new Date(r.recordedAt).getTime() < cutoff) return false;
       if (search) {
         const t = search.toLowerCase();
-        const hay = `${r.customer || ''} ${r.from} ${r.to} ${r.summary} ${r.topics.join(' ')} ${r.tags.join(' ')}`.toLowerCase();
+        const hay = `${r.customer || ''} ${r.from || ''} ${r.to || ''} ${r.summary || ''} ${(r.topics || []).join(' ')} ${(r.tags || []).join(' ')}`.toLowerCase();
         if (!hay.includes(t)) return false;
       }
       return true;
@@ -59,9 +87,9 @@ export default function RecordingsView() {
     list.sort((a, b) => {
       switch (sort) {
         case 'oldest': return +new Date(a.recordedAt) - +new Date(b.recordedAt);
-        case 'longest': return b.durationSec - a.durationSec;
-        case 'quality_desc': return b.qualityScore - a.qualityScore;
-        case 'quality_asc': return a.qualityScore - b.qualityScore;
+        case 'longest': return (b.durationSec || 0) - (a.durationSec || 0);
+        case 'quality_desc': return (b.qualityScore || 0) - (a.qualityScore || 0);
+        case 'quality_asc': return (a.qualityScore || 0) - (b.qualityScore || 0);
         default: return +new Date(b.recordedAt) - +new Date(a.recordedAt);
       }
     });
@@ -97,14 +125,31 @@ export default function RecordingsView() {
     try {
       const res = await ava.exportRecordings(Array.from(selectedIds));
       setExportNote(`Exported ${res.count} recording${res.count === 1 ? '' : 's'} · ${res.url}`);
+    } catch {
+      setExportNote('Export is unavailable until PBX audio files are downloadable.');
     } finally { setExporting(false); }
+  };
+
+  const playSelected = async () => {
+    if (!sel) return;
+    setPlaybackError(null); setPlaybackLoading(true);
+    try {
+      const url = await ava.getRecordingAudioUrl(sel);
+      if (!url) {
+        setPlaybackError('Recording file not available from PBX yet');
+        return;
+      }
+      setAudioUrl(url);
+    } finally {
+      setPlaybackLoading(false);
+    }
   };
 
   const regen = async () => {
     if (!sel) return;
     setRegenLoading(true);
     try {
-      const { summary } = await ava.regenerateSummary('recording', sel.id, sel.summary);
+      const { summary } = await ava.regenerateSummary('recording', sel.id, sel.summary || '');
       updateItem(sel.id, { summary, feedback: null });
     } finally { setRegenLoading(false); }
   };
@@ -181,6 +226,7 @@ export default function RecordingsView() {
           </div>
         </div>
 
+        {error && <ErrorBanner message={error} onRetry={load} />}
         {loading && <ListSkeleton rows={7} />}
         {!loading && <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
           {filtered.map((r) => (
@@ -198,17 +244,17 @@ export default function RecordingsView() {
               />
               <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {r.customer || `${r.from} → ${r.to}`}
+                  {r.customer || `${r.from || 'Unknown'} → ${r.to || 'Unknown'}`}
                 </span>
                 <span style={{ fontSize: 10.5, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {r.summary}
+                  {r.summary || 'Enregistrement disponible.'}
                 </span>
               </span>
-              <span style={{ fontSize: 11, color: qualityColor(r.qualityScore), fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{r.qualityScore}</span>
+              <span style={{ fontSize: 11, color: qualityColor(r.qualityScore || 0), fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{r.qualityScore || 0}</span>
               <span style={{ fontSize: 11, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(r.durationSec)}</span>
               <span style={{ fontSize: 11, color: c.mutedSilver }}>{fmtDate(r.recordedAt)}</span>
               <span style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                <span style={dot(sentColor(r.sentiment))}>●</span>
+                <span style={dot(sentColor(r.sentiment || 'neutral'))}>●</span>
               </span>
             </div>
           ))}
@@ -236,7 +282,7 @@ export default function RecordingsView() {
         {sel && (
           <>
             <div style={{ fontSize: 11, color: c.signalGold, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>Recording</div>
-            <h2 style={{ fontSize: 18, color: c.textIce, margin: '0 0 4px' }}>{sel.customer || `${sel.from} → ${sel.to}`}</h2>
+            <h2 style={{ fontSize: 18, color: c.textIce, margin: '0 0 4px' }}>{sel.customer || `${sel.from || 'Unknown'} → ${sel.to || 'Unknown'}`}</h2>
             <div style={{ fontSize: 11, color: c.mutedSilver, marginBottom: 18 }}>
               {fmtDate(sel.recordedAt)} · {fmtDur(sel.durationSec)} · {fmtSize(sel.sizeKb)}
             </div>
@@ -251,13 +297,15 @@ export default function RecordingsView() {
                 ))}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>
-                <span>0:00</span><span>▶ Play</span><span>{fmtDur(sel.durationSec)}</span>
+                <span>0:00</span><button onClick={playSelected} disabled={playbackLoading} style={{ ...miniBtn, padding: '2px 8px' }}>{playbackLoading ? 'Loading…' : '▶ Play'}</button><span>{fmtDur(sel.durationSec)}</span>
               </div>
+              {audioUrl && <audio src={audioUrl} controls autoPlay style={{ width: '100%', marginTop: 8, height: 30 }} />}
+              {playbackError && <div style={{ fontSize: 11, color: c.mutedSilver, marginTop: 8 }}>{playbackError}</div>}
             </div>
 
             <Panel title="Quality Score" accent={c.signalGold}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 26, fontWeight: 700, color: qualityColor(sel.qualityScore), fontFamily: 'JetBrains Mono, monospace' }}>{sel.qualityScore}</span>
+                <span style={{ fontSize: 26, fontWeight: 700, color: qualityColor(sel.qualityScore || 0), fontFamily: 'JetBrains Mono, monospace' }}>{sel.qualityScore || 0}</span>
                 <span style={{ fontSize: 11, color: c.mutedSilver }}>/100</span>
               </div>
             </Panel>
@@ -273,7 +321,7 @@ export default function RecordingsView() {
                 </div>
               }
             >
-              <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0 }}>{sel.summary}</p>
+              <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0 }}>{sel.summary || 'Enregistrement disponible.'}</p>
               {sel.feedback && (
                 <div style={{ fontSize: 10, color: c.mutedSilver, marginTop: 6 }}>
                   Feedback recorded — AVA will adapt future summaries.
@@ -283,12 +331,14 @@ export default function RecordingsView() {
 
             <Panel title="Topics" accent={c.avaCyan}>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {sel.topics.map((t) => <span key={t} style={tag(c.avaCyan)}>{t}</span>)}
+                  {(sel.topics || []).map((t) => <span key={t} style={tag(c.avaCyan)}>{t}</span>)}
+                  {(!sel.topics || sel.topics.length === 0) && <span style={{ fontSize: 11, color: c.mutedSilver }}>No topics yet</span>}
               </div>
             </Panel>
             <Panel title="Tags" accent={c.mutedSilver}>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {sel.tags.map((t) => <span key={t} style={tag(c.signalGold)}>#{t}</span>)}
+                  {(sel.tags || []).map((t) => <span key={t} style={tag(c.signalGold)}>#{t}</span>)}
+                  {(!sel.tags || sel.tags.length === 0) && <span style={{ fontSize: 11, color: c.mutedSilver }}>No tags yet</span>}
               </div>
             </Panel>
 
@@ -353,6 +403,15 @@ function Panel({ title, accent, children, right }: { title: string; accent: stri
         {right}
       </div>
       <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, padding: '10px 12px' }}>{children}</div>
+    </div>
+  );
+}
+
+function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div style={{ marginBottom: 12, padding: 12, borderRadius: 10, background: 'rgba(239,68,68,0.10)', border: `1px solid ${c.danger}55`, color: c.textIce, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+      <span style={{ fontSize: 12 }}>{message}</span>
+      <button onClick={onRetry} style={{ ...miniBtn, color: c.danger, borderColor: `${c.danger}66` }}>Retry</button>
     </div>
   );
 }

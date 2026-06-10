@@ -1,69 +1,76 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { theme } from '../lib/theme';
+import { ava, RecordingItem } from '../lib/avaApi';
 
 const { colors: c, glow } = theme;
-const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
-
-interface CallRec {
-  id: string;
-  caller_number?: string | null;
-  callee_number?: string | null;
-  destination_number?: string | null;
-  start_at?: string | null;
-  duration_seconds?: number | null;
-  recording_url?: string | null;
-  recording_path?: string | null;
-  recording_name?: string | null;
-  has_recording?: boolean | null;
-  transcribed?: boolean | null;
-  analyzed?: boolean | null;
-  raw_data?: any;
-}
 
 function displayError(e: any) {
-  return e?.context?.error || e?.message || e?.details || 'Analysis failed';
+  const text = String(e?.context?.error || e?.message || e?.details || e?.error || 'Analysis failed');
+  if (/MISSING_SECRET/i.test(text)) return 'AI analysis is not configured yet.';
+  if (/Unauthorized|Forbidden/i.test(text)) return 'You do not have permission to analyze this recording.';
+  if (/required fields missing/i.test(text)) return 'A transcript is required before AI analysis can run.';
+  return text;
 }
 
 export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string) => void }) {
-  const [items, setItems] = useState<CallRec[]>([]);
+  const [items, setItems] = useState<RecordingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [audio, setAudio] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
-    const { data, error } = await supabase
-      .from('pbx_call_records' as any)
-      .select('*')
-      .eq('organization_id', LEMTEL_ORG)
-      .eq('has_recording', true)
-      .order('start_at', { ascending: false })
-      .limit(100);
-    if (error) setError(error.message);
-    else setItems(((data || []) as any[]));
-    setLoading(false);
+    try {
+      const data = await ava.recordings();
+      setItems(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      setError(e?.message || 'Unable to load recordings.');
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const onSync = () => { void load(); };
+    window.addEventListener('lemtel:phone-sync-complete', onSync);
+    return () => window.removeEventListener('lemtel:phone-sync-complete', onSync);
+  }, [load]);
 
-  const analyze = async (id: string) => {
-    setWorking(id);
+  const analyze = async (r: RecordingItem) => {
+    setWorking(r.id); setError(null);
     try {
+      const organization_id = r.organization_id;
+      if (!organization_id) throw new Error('A real organization is required before AI analysis can run.');
+      let transcript_text = String(r.transcript_text || '').trim();
       const r1 = await supabase.functions.invoke('ai-transcribe-call', {
-        body: { call_record_id: id, organization_id: LEMTEL_ORG },
+        body: { call_record_id: r.callId || r.id, organization_id },
       });
       if (r1.error) throw r1.error;
+      transcript_text = transcript_text || String((r1.data as any)?.transcript_text || '').trim();
+      if (!transcript_text) throw new Error('No transcript available for AI analysis yet');
       const r2 = await supabase.functions.invoke('ai-analyze-call', {
-        body: { call_record_id: id, organization_id: LEMTEL_ORG },
+        body: { call_record_id: r.callId || r.id, organization_id, transcript_text },
       });
       if (r2.error) throw r2.error;
-      onAnalyze?.(id);
+      onAnalyze?.(r.id);
       await load();
     } catch (e: any) {
       setError(displayError(e));
     } finally {
       setWorking(null);
+    }
+  };
+
+  const play = async (r: RecordingItem) => {
+    setError(null);
+    if (!audio[r.id]) {
+      const url = await ava.getRecordingAudioUrl(r);
+      if (!url) { setError('Recording file not available from PBX yet'); return; }
+      setAudio((a) => ({ ...a, [r.id]: url }));
     }
   };
 
@@ -92,7 +99,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
           No recordings yet.
         </div>
       ) : items.map(r => {
-        const sentiment = r.raw_data?.sentiment as string | undefined;
+        const sentiment = r.sentiment;
         const sentColor =
           sentiment?.includes('positive') ? c.green :
           sentiment?.includes('negative') ? c.red : c.yellow;
@@ -101,10 +108,10 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: c.text }}>
-                  {r.caller_number || '—'} {(r.callee_number || r.destination_number) ? `→ ${r.callee_number || r.destination_number}` : ''}
+                  {r.from || '—'} {r.to ? `→ ${r.to}` : ''}
                 </div>
                 <div style={{ fontSize: 10, color: c.textSub, marginTop: 2 }}>
-                  {r.start_at ? new Date(r.start_at).toLocaleString() : ''} · {r.duration_seconds || 0}s
+                  {r.recordedAt ? new Date(r.recordedAt).toLocaleString() : ''} · {r.durationSec || 0}s
                 </div>
               </div>
               {sentiment && (
@@ -115,18 +122,16 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
               )}
             </div>
 
-            {r.recording_url ? (
-              <audio controls src={r.recording_url} style={{ width: '100%', marginTop: 8, height: 32 }} />
+            {audio[r.id] ? (
+              <audio controls src={audio[r.id]} style={{ width: '100%', marginTop: 8, height: 32 }} />
             ) : (
-              <div style={{ fontSize: 10, color: c.textDim, padding: 6, textAlign: 'center' }}>
-                Recording synced from PBX{r.recording_name ? ` · ${r.recording_name}` : ''}
-              </div>
+              <button onClick={() => play(r)} style={{ marginTop: 8, width: '100%', padding: 7, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: `1px solid ${c.border}`, color: c.text, fontSize: 11, cursor: 'pointer' }}>▶ Load PBX audio{r.recording_name ? ` · ${r.recording_name}` : ''}</button>
             )}
 
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-              {!r.analyzed ? (
+              {!(r as any).analyzed ? (
                 <button
-                  onClick={() => analyze(r.id)}
+                  onClick={() => analyze(r)}
                   disabled={working === r.id}
                   style={{
                     flex: 1, padding: '6px 10px', borderRadius: 8,
@@ -145,9 +150,9 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
               )}
             </div>
 
-            {r.raw_data?.summary && (
+            {r.summary && (
               <div style={{ marginTop: 8, padding: 8, background: 'rgba(0,0,0,0.25)', borderRadius: 8, fontSize: 11, color: c.textSub, lineHeight: 1.4 }}>
-                {r.raw_data.summary}
+                {r.summary}
               </div>
             )}
           </div>

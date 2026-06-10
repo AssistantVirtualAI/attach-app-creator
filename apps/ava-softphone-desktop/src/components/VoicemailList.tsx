@@ -1,18 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-
-interface VmRow {
-  id: string;
-  caller_name: string | null;
-  caller_number: string | null;
-  destination_number?: string | null;
-  start_at: string | null;
-  duration_seconds: number | null;
-  recording_url: string | null;
-  recording_path: string | null;
-  voicemail_message: string | null;
-  missed_call?: boolean | null;
-}
+import { ava, VoicemailItem } from '@/lib/avaApi';
 
 interface Props {
   extension: string;
@@ -25,52 +12,46 @@ function fmtTime(iso: string | null) {
   return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function hasMessage(r: VmRow) {
-  const msg = String(r.voicemail_message ?? '').trim().toLowerCase();
-  return !!r.recording_url || !!r.recording_path || (!!msg && msg !== 'false' && msg !== 'null') || !!r.missed_call;
-}
-
 export default function VoicemailList({ extension, onCall }: Props) {
-  const [rows, setRows] = useState<VmRow[]>([]);
+  const [rows, setRows] = useState<VoicemailItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
+  const [audio, setAudio] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
-    const { data, error } = await supabase
-      .from('pbx_call_records')
-      .select('id,caller_name,caller_number,destination_number,start_at,duration_seconds,recording_url,recording_path,voicemail_message,missed_call')
-      .or('hangup_cause.eq.NO_ANSWER,missed_call.eq.true')
-      .order('start_at', { ascending: false })
-      .limit(50);
-    if (error) setErr(error.message);
-    else setRows(((data as VmRow[]) || []).filter(hasMessage));
-    setLoading(false);
+    try {
+      const data = await ava.voicemails();
+      setRows(Array.isArray(data) ? data.slice(0, 50) : []);
+    } catch (e: any) {
+      setErr(e?.message || 'Unable to load voicemail.');
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
   }, [extension]);
 
   useEffect(() => { load(); }, [load]);
-
   useEffect(() => {
-    const ch = supabase
-      .channel(`vm-${extension}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pbx_call_records' },
-        (payload) => {
-          const r = payload.new as VmRow & { missed_call?: boolean };
-          if (hasMessage(r)) {
-            setRows((prev) => [r, ...prev].slice(0, 50));
-          }
-        },
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [extension]);
+    const onSync = () => { void load(); };
+    window.addEventListener('lemtel:phone-sync-complete', onSync);
+    return () => window.removeEventListener('lemtel:phone-sync-complete', onSync);
+  }, [load]);
+
+  const togglePlay = async (r: VoicemailItem) => {
+    if (playing === r.id) { setPlaying(null); return; }
+    if (!audio[r.id]) {
+      const url = await ava.getRecordingAudioUrl(r);
+      if (!url) { setErr('No voicemail audio available yet'); return; }
+      setAudio((a) => ({ ...a, [r.id]: url }));
+    }
+    setPlaying(r.id);
+  };
 
   if (loading) return <div style={center}>Loading voicemail…</div>;
-  if (err) return <div style={{ ...center, color: '#ff8a8a' }}>{err}</div>;
+  if (err) return <div style={{ ...center, color: '#ff8a8a' }}>{err}<br /><button onClick={load} style={refreshBtn}>Retry</button></div>;
   if (rows.length === 0) return <div style={center}>No voicemail</div>;
 
   return (
@@ -80,8 +61,8 @@ export default function VoicemailList({ extension, onCall }: Props) {
         <button onClick={load} style={refreshBtn}>↻</button>
       </div>
       {rows.map((r) => {
-        const peer = r.caller_number || r.destination_number || '?';
-        const name = r.caller_name || peer;
+        const peer = r.from || '?';
+        const name = r.customer || peer;
         const expanded = playing === r.id;
         return (
           <div key={r.id} style={rowBox}>
@@ -92,22 +73,18 @@ export default function VoicemailList({ extension, onCall }: Props) {
                   {name}
                 </div>
                 <div style={{ fontSize: 10, opacity: 0.55 }}>
-                  {fmtTime(r.start_at)}{r.duration_seconds ? ` · ${r.duration_seconds}s` : ''}
+                  {fmtTime(r.receivedAt)}{r.durationSec ? ` · ${r.durationSec}s` : ''}
                 </div>
               </div>
-              {r.recording_url && (
-                <button onClick={() => setPlaying(expanded ? null : r.id)} style={iconAct}>
-                  {expanded ? '⏸' : '▶'}
-                </button>
-              )}
+              <button onClick={() => togglePlay(r)} style={iconAct}>{expanded ? '⏸' : '▶'}</button>
               <button onClick={() => onCall(peer)} style={iconAct}>📞</button>
             </div>
-            {expanded && r.recording_url && (
-              <audio src={r.recording_url} controls autoPlay style={{ width: '100%', marginTop: 8, height: 32 }} />
+            {expanded && audio[r.id] && (
+              <audio src={audio[r.id]} controls autoPlay style={{ width: '100%', marginTop: 8, height: 32 }} />
             )}
-            {r.voicemail_message && (
+            {r.transcript && (
               <div style={{ fontSize: 11, opacity: 0.7, marginTop: 6, padding: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 6 }}>
-                {r.voicemail_message}
+                {r.transcript}
               </div>
             )}
           </div>

@@ -9,7 +9,9 @@ import LemtelLogo from './LemtelLogo';
 import BrandTagline from './BrandTagline';
 import RecordingsList from './RecordingsList';
 import AIInsights from './AIInsights';
+import { AppErrorBoundary } from './AppErrorBoundary';
 import { theme } from '../lib/theme';
+import { ava } from '../lib/avaApi';
 import {
   PhoneIcon, ClockIcon, UsersIcon, VoicemailIcon,
   MessageIcon, DiscIcon, SparkleIcon,
@@ -84,6 +86,7 @@ export default function SoftphonePane({
     try { return localStorage.getItem('lemtel.autoResetOutput') === 'true'; } catch { return false; }
   });
   const [micPermission, setMicPermission] = useState<'unknown' | 'granted' | 'denied' | 'prompt'>('unknown');
+  const [syncingPhone, setSyncingPhone] = useState(false);
 
   useEffect(() => {
     const nav: any = navigator;
@@ -252,6 +255,16 @@ export default function SoftphonePane({
     }
   };
 
+  const syncPhoneSystem = async () => {
+    setSyncingPhone(true);
+    try {
+      await ava.syncPhoneSystemFull();
+      window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
+    } finally {
+      setSyncingPhone(false);
+    }
+  };
+
   // Global "dial now" shortcut (⌘/Ctrl + Enter) wires in from useShortcuts.
   useEffect(() => {
     const onDial = () => handleCall();
@@ -371,6 +384,17 @@ export default function SoftphonePane({
             <option value="dnd">DND</option>
             <option value="away">Away</option>
           </select>
+          <button
+            onClick={syncPhoneSystem}
+            disabled={syncingPhone}
+            title="Sync phone system"
+            style={{
+              background: 'rgba(255,215,0,0.08)', border: `1px solid ${c.borderGold}`,
+              color: c.gold, cursor: syncingPhone ? 'wait' : 'pointer',
+              width: compact ? 26 : 30, height: compact ? 24 : 28, borderRadius: 8, fontSize: 12,
+            }}
+            aria-label="Sync phone system"
+          >{syncingPhone ? '…' : '↻'}</button>
           <button
             onClick={onOpenSettings}
             style={{
@@ -563,7 +587,7 @@ export default function SoftphonePane({
 
         {!inCall && !ringing && tab === 'recents' && (
           <div style={{ animation: 'fadeIn .25s ease-out' }}>
-            <RecentsList extension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
+            <AppErrorBoundary compact onBack={() => setTab('dial')}><RecentsList extension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} /></AppErrorBoundary>
           </div>
         )}
         {!inCall && !ringing && tab === 'contacts' && (
@@ -573,7 +597,7 @@ export default function SoftphonePane({
         )}
         {!inCall && !ringing && tab === 'voicemail' && (
           <div style={{ animation: 'fadeIn .25s ease-out' }}>
-            <VoicemailList extension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
+            <AppErrorBoundary compact onBack={() => setTab('dial')}><VoicemailList extension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} /></AppErrorBoundary>
           </div>
         )}
         {!inCall && !ringing && tab === 'sms' && (
@@ -583,12 +607,12 @@ export default function SoftphonePane({
         )}
         {!inCall && !ringing && tab === 'recordings' && (
           <div style={{ animation: 'fadeIn .25s ease-out' }}>
-            <RecordingsList />
+            <AppErrorBoundary compact onBack={() => setTab('dial')}><RecordingsList /></AppErrorBoundary>
           </div>
         )}
         {!inCall && !ringing && tab === 'ai' && (
           <div style={{ animation: 'fadeIn .25s ease-out' }}>
-            <AIInsights />
+            <AppErrorBoundary compact onBack={() => setTab('dial')}><AIInsights /></AppErrorBoundary>
           </div>
         )}
       </div>
