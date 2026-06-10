@@ -35,8 +35,9 @@ export default function VoicemailList({ extension, onCall }: Props) {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    window.addEventListener('lemtel:phone-sync-complete', load);
-    return () => window.removeEventListener('lemtel:phone-sync-complete', load);
+    const onSync = () => { void load(); };
+    window.addEventListener('lemtel:phone-sync-complete', onSync);
+    return () => window.removeEventListener('lemtel:phone-sync-complete', onSync);
   }, [load]);
 
   const togglePlay = async (r: VoicemailItem) => {
