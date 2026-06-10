@@ -9,6 +9,7 @@ import LemtelLogo from './LemtelLogo';
 import BrandTagline from './BrandTagline';
 import RecordingsList from './RecordingsList';
 import AIInsights from './AIInsights';
+import { AppErrorBoundary } from './AppErrorBoundary';
 import { theme } from '../lib/theme';
 import {
   PhoneIcon, ClockIcon, UsersIcon, VoicemailIcon,
@@ -563,7 +564,7 @@ export default function SoftphonePane({
 
         {!inCall && !ringing && tab === 'recents' && (
           <div style={{ animation: 'fadeIn .25s ease-out' }}>
-            <RecentsList extension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
+            <AppErrorBoundary compact onBack={() => setTab('dial')}><RecentsList extension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} /></AppErrorBoundary>
           </div>
         )}
         {!inCall && !ringing && tab === 'contacts' && (
@@ -573,7 +574,7 @@ export default function SoftphonePane({
         )}
         {!inCall && !ringing && tab === 'voicemail' && (
           <div style={{ animation: 'fadeIn .25s ease-out' }}>
-            <VoicemailList extension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} />
+            <AppErrorBoundary compact onBack={() => setTab('dial')}><VoicemailList extension={creds.extension} onCall={(n) => { setDial(n); sp.call(n); }} /></AppErrorBoundary>
           </div>
         )}
         {!inCall && !ringing && tab === 'sms' && (
@@ -583,12 +584,12 @@ export default function SoftphonePane({
         )}
         {!inCall && !ringing && tab === 'recordings' && (
           <div style={{ animation: 'fadeIn .25s ease-out' }}>
-            <RecordingsList />
+            <AppErrorBoundary compact onBack={() => setTab('dial')}><RecordingsList /></AppErrorBoundary>
           </div>
         )}
         {!inCall && !ringing && tab === 'ai' && (
           <div style={{ animation: 'fadeIn .25s ease-out' }}>
-            <AIInsights />
+            <AppErrorBoundary compact onBack={() => setTab('dial')}><AIInsights /></AppErrorBoundary>
           </div>
         )}
       </div>
