@@ -8,6 +8,7 @@ const { colors: c } = theme;
 
 function fmtDate(iso: string) {
   const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return '—';
   const now = new Date();
   if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
@@ -162,7 +163,7 @@ export default function CallsView() {
             </div>
             <h2 style={{ fontSize: 18, color: c.textIce, margin: '0 0 4px' }}>{sel.customer || sel.from}</h2>
             <div style={{ fontSize: 11, color: c.mutedSilver, marginBottom: 18 }}>
-              {sel.direction === 'in' ? 'Inbound' : 'Outbound'} · {fmtDur(sel.durationSec)} · {new Date(sel.startedAt).toLocaleString()}
+              {sel.direction === 'in' ? 'Inbound' : 'Outbound'} · {fmtDur(sel.durationSec)} · {fmtDate(sel.startedAt)}
             </div>
 
             {/* Waveform placeholder */}
