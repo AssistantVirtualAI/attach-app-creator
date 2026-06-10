@@ -48,7 +48,6 @@ export default function RecentsList({ extension, onCall }: Props) {
     const { data, error } = await supabase
       .from('pbx_call_records')
       .select('id,direction,call_status,caller_number,caller_name,destination_number,destination,start_at,duration_seconds,missed_call')
-      .eq('extension', extension)
       .order('start_at', { ascending: false })
       .limit(100);
     if (error) setErr(error.message);
@@ -58,13 +57,13 @@ export default function RecentsList({ extension, onCall }: Props) {
 
   useEffect(() => { load(); }, [load]);
 
-  // Realtime: new CDR rows for this extension
+  // Realtime: new CDR rows visible to this signed-in desktop user
   useEffect(() => {
     const ch = supabase
       .channel(`cdr-${extension}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pbx_call_records', filter: `extension=eq.${extension}` },
+        { event: 'INSERT', schema: 'public', table: 'pbx_call_records' },
         (payload) => {
           setRows((prev) => [payload.new as CallRow, ...prev].slice(0, 100));
         },
