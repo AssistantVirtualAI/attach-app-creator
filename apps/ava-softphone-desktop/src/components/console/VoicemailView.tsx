@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, VoicemailItem, Feedback } from '../../lib/avaApi';
 import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
@@ -7,13 +7,15 @@ const { colors: c } = theme;
 
 type Filter = 'all' | 'new' | 'high' | 'negative' | 'handled' | 'open';
 
-function fmtDate(iso: string) {
+function fmtDate(iso?: string | null) {
   const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return '—';
   const now = new Date();
   if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
-function fmtDur(s: number) {
+function fmtDur(s?: number | null) {
+  s = Number(s || 0);
   const m = Math.floor(s / 60), sec = Math.floor(s % 60);
   return `${m}:${sec.toString().padStart(2, '0')}`;
 }
@@ -23,21 +25,39 @@ const SPEEDS = [1, 1.25, 1.5, 2] as const;
 export default function VoicemailView() {
   const [items, setItems] = useState<VoicemailItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [sel, setSel] = useState<VoicemailItem | null>(null);
   const [regenLoading, setRegenLoading] = useState(false);
 
   // Playback
   const [playing, setPlaying] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [pos, setPos] = useState(0);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => { ava.voicemails().then((d) => { setItems(d); setLoading(false); }); }, []);
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const d = await ava.voicemails();
+      setItems(Array.isArray(d) ? d : []);
+    } catch (err: any) {
+      setItems([]);
+      setError(err?.message || 'Unable to load voicemail from the phone system.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   // Reset playback when selection changes
   useEffect(() => {
-    setPlaying(false); setPos(0);
+    setPlaying(false); setPos(0); setPlaybackError(null);
+    if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl);
+    setAudioUrl(null);
     if (tickRef.current) clearInterval(tickRef.current);
   }, [sel?.id]);
 
@@ -48,7 +68,8 @@ export default function VoicemailView() {
       tickRef.current = setInterval(() => {
         setPos((p) => {
           const next = p + 0.2 * speed;
-          if (next >= sel.durationSec) { setPlaying(false); return sel.durationSec; }
+          const dur = Number(sel.durationSec || 0);
+          if (next >= dur) { setPlaying(false); return dur; }
           return next;
         });
       }, 200);
@@ -68,6 +89,21 @@ export default function VoicemailView() {
   const updateItem = (id: string, patch: Partial<VoicemailItem>) => {
     setItems((all) => all.map((x) => x.id === id ? { ...x, ...patch } : x));
     if (sel?.id === id) setSel({ ...sel, ...patch });
+  };
+
+  const playSelected = async () => {
+    if (!sel) return;
+    setPlaybackError(null);
+    if (!audioUrl) {
+      const url = await ava.getRecordingAudioUrl(sel);
+      if (!url) {
+        setPlaying(false);
+        setPlaybackError('No voicemail audio available yet');
+        return;
+      }
+      setAudioUrl(url);
+    }
+    setPlaying((p) => !p);
   };
 
   const markRead = (v: VoicemailItem) => {
