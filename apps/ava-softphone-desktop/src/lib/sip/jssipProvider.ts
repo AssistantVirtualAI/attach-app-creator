@@ -394,6 +394,7 @@ class JsSipProvider {
       // the Electron renderer (black screen).
       this.ua.call(target, {
         mediaConstraints: { audio: true, video: false },
+        sessionDescriptionHandlerOptions,
       } as any);
       this.lastCallError = null;
       return null;
