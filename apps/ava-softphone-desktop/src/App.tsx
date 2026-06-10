@@ -9,7 +9,21 @@ import ResponsiveLab from './components/ResponsiveLab';
 import { useTheme } from './lib/theme';
 import { useContrast } from './hooks/useContrast';
 import { supabase } from './lib/supabaseClient';
+import { setAuthToken } from './lib/avaApi';
 import { sipProvider } from './lib/sip/jssipProvider';
+
+const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+
+async function triggerCdrSync() {
+  try {
+    const { data } = await supabase.functions.invoke('fusionpbx-proxy', {
+      body: { action: 'sync-cdrs', organization_id: LEMTEL_ORG_ID, limit: 200 },
+    });
+    console.log('CDR sync triggered:', data);
+  } catch (err) {
+    console.warn('CDR sync failed:', err);
+  }
+}
 
 const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 const IS_LAB = qs?.get('lab') === 'responsive';
