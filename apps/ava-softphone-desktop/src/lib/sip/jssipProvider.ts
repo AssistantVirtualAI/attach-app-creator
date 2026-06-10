@@ -629,7 +629,22 @@ class JsSipProvider {
       return 'SIP not initialized';
     }
     const target = `sip:${number}@${this.config.sipDomain}`;
-    this.logEvent('info', `Dialing ${number}`);
+    this.logEvent('info', `Dialing ${number} (workaround=${isSdpWorkaroundEnabled() ? 'on' : 'off'})`);
+    // Reset SDP capture so this attempt only contains its own offer
+    _lastSdpBefore = null;
+    _lastSdpAfter = null;
+    // Pre-register an attempt so we capture target even if attachSession fires after SDP
+    this.currentAttempt = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      at: Date.now(),
+      target: number,
+      direction: 'out',
+      sdpBefore: null,
+      sdpAfter: null,
+      workaroundOn: isSdpWorkaroundEnabled(),
+      outcome: 'pending',
+    };
+    this.pushAttempt(this.currentAttempt);
     try {
       this.ua.call(target, {
         mediaConstraints: { audio: true, video: false },
