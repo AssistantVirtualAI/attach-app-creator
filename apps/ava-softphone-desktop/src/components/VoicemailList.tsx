@@ -36,7 +36,7 @@ export default function VoicemailList({ extension, onCall }: Props) {
       .from('pbx_call_records')
       .select('id,caller_name,caller_number,start_at,duration_seconds,recording_url,recording_path,voicemail_message')
       .eq('extension', extension)
-      .or('voicemail_message.not.is.null,missed_call.eq.true')
+      .or('hangup_cause.eq.NO_ANSWER,voicemail_message.not.is.null,missed_call.eq.true')
       .order('start_at', { ascending: false })
       .limit(50);
     if (error) setErr(error.message);
