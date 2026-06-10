@@ -563,16 +563,10 @@ class JsSipProvider {
   answer() {
     this.session?.answer({
       mediaConstraints: { audio: true, video: false },
+      pcConfig,
       sessionDescriptionHandlerOptions,
-      sessionDescriptionHandlerModifiers: [
-        (description: any) => {
-          if (description?.sdp) {
-            description.sdp = forcePCMU(stripToAudioOnly(description.sdp));
-          }
-          return Promise.resolve(description);
-        }
-      ],
-    });
+      sessionDescriptionHandlerModifiers: [sdpModifier],
+    } as any);
   }
 
   hangup() {
@@ -601,8 +595,10 @@ class JsSipProvider {
     const uri = `sip:${target}@${this.config.sipDomain}`;
     this.ua.call(uri, {
       mediaConstraints: { audio: true, video: false },
+      pcConfig,
       sessionDescriptionHandlerOptions,
-    });
+      sessionDescriptionHandlerModifiers: [sdpModifier],
+    } as any);
   }
 
   /** After consult is established, transfer original call to the consult party. */
