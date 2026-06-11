@@ -575,10 +575,11 @@ Deno.serve(async (req) => {
 
     // ---- Time conditions (stored as dialplans with time_condition app) ----
     if (action === "list-time-conditions") {
-      const r = await pbxRead(
+      const r = await pbxFetch(
         `dialplans?domain_uuid=${FUSIONPBX_DOMAIN_UUID}&dialplan_name=time_condition`,
-      ).catch(() => ({ dialplans: [] }));
-      return json({ ok: true, data: (r as any)?.dialplans || (r as any)?.data || [] });
+      );
+      if (!r.ok) return json(r, r.status || 500);
+      return json({ ok: true, data: collection(r.data, "dialplans") });
     }
     if (action === "upsert-time-condition") {
       const dialplan_uuid = params.dialplan_uuid || crypto.randomUUID();
