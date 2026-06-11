@@ -3,7 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, User, Bot, Plug, Shield, Link, Code, MessageSquare } from 'lucide-react';
+import { ArrowLeft, User, Bot, Plug, Shield, Link, Code, MessageSquare, Phone } from 'lucide-react';
 import { useClientDetail } from '@/hooks/useClientDetail';
 import { ClientOverviewTab } from '@/components/clients/ClientOverviewTab';
 import { ClientAgentsTab } from '@/components/clients/ClientAgentsTab';
@@ -12,6 +12,7 @@ import { ClientAccessTab } from '@/components/clients/ClientAccessTab';
 import { ClientUrlTab } from '@/components/clients/ClientUrlTab';
 import { ClientCssTab } from '@/components/clients/ClientCssTab';
 import { ClientConversationsTab } from '@/components/clients/ClientConversationsTab';
+import { ClientTelephonyTab } from '@/components/clients/ClientTelephonyTab';
 
 const ClientDetail = () => {
   const { clientId } = useParams<{ clientId: string }>();
@@ -67,7 +68,7 @@ const ClientDetail = () => {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">Aperçu</span>
@@ -79,6 +80,10 @@ const ClientDetail = () => {
             <TabsTrigger value="agents" className="flex items-center gap-2">
               <Bot className="h-4 w-4" />
               <span className="hidden sm:inline">Agents</span>
+            </TabsTrigger>
+            <TabsTrigger value="telephony" className="flex items-center gap-2">
+              <Phone className="h-4 w-4" />
+              <span className="hidden sm:inline">Téléphonie</span>
             </TabsTrigger>
             <TabsTrigger value="solutions" className="flex items-center gap-2">
               <Plug className="h-4 w-4" />
@@ -120,6 +125,15 @@ const ClientDetail = () => {
               onUnassign={unassignAgent}
             />
           </TabsContent>
+
+          <TabsContent value="telephony">
+            <ClientTelephonyTab
+              clientId={clientId!}
+              organizationId={(client as any).organization_id}
+            />
+          </TabsContent>
+
+
 
           <TabsContent value="solutions">
             <ClientSolutionsTab
