@@ -115,6 +115,7 @@ import CallCenterAgent from "./pages/callcenter/CallCenterAgent";
 import CallCenterWallboard from "./pages/callcenter/CallCenterWallboard";
 import CallCenterAdmin from "./pages/callcenter/CallCenterAdmin";
 import TelephonyDiagnostics from "./pages/telephony/TelephonyDiagnostics";
+import TelephonyAdvanced from "./pages/telephony/TelephonyAdvanced";
 import TelephonyChecklist from "./pages/telephony/TelephonyChecklist";
 import TelephonyPortalMappings from "./pages/telephony/TelephonyPortalMappings";
 import TelephonyUsers from "./pages/telephony/TelephonyUsers";
