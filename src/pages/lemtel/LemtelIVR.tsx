@@ -61,6 +61,7 @@ export default function LemtelIVR() {
   const { selectedOrgId } = useOrganization();
   const queryClient = useQueryClient();
   const { data: ivrs = [], isLoading } = usePbxIvrs();
+  usePbxRealtime(['pbx_ivrs', 'pbx_ivr_options', 'pbx_ivr_audio']);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = (ivrs as any[]).find(i => i.id === selectedId) || null;
   const { data: options = [] } = usePbxIvrOptions(selectedId);
