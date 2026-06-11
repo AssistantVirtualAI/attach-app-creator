@@ -23,6 +23,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallCenterRole } from '@/hooks/useCallCenterRole';
 import { formatDistanceToNow } from 'date-fns';
 import { useLanguage } from '@/context/LanguageContext';
+import { usePbxRealtime } from '@/hooks/usePbxRealtime';
 
 const STRATEGIES = ['ring-all', 'longest-idle-agent', 'round-robin', 'top-down', 'agent-with-least-talk-time', 'agent-with-fewest-calls', 'sequentially-by-agent-order', 'random'];
 const qCopy = {
