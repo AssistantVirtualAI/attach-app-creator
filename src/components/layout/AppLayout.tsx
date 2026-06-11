@@ -201,7 +201,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       )}
 
       {/* Sidebar */}
-      <aside className={`sidebar-pane fixed left-0 top-0 h-screen w-[18rem] lg:w-80 z-50 transition-transform duration-300 ease-in-out ${
+      <aside className={`sidebar-pane fixed left-0 top-0 h-screen w-64 xl:w-72 z-50 transition-transform duration-300 ease-in-out ${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } md:translate-x-0`}>
         {/* Neon edge handled by .sidebar-pane::after */}
