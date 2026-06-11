@@ -104,6 +104,7 @@ import LemtelDevices from "./pages/lemtel/LemtelDevices";
 import TelephonyDashboard from "./pages/telephony/TelephonyDashboard";
 import TelephonySettings from "./pages/telephony/TelephonySettings";
 import TelephonyRecordings from "./pages/telephony/TelephonyRecordings";
+import TelephonyMediaCenter from "./pages/telephony/TelephonyMediaCenter";
 import TelephonyRingGroups from "./pages/telephony/TelephonyRingGroups";
 import TelephonyAI from "./pages/telephony/TelephonyAI";
 import TelephonyWebphone from "./pages/telephony/TelephonyWebphone";
