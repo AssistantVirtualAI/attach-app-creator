@@ -572,6 +572,67 @@ Deno.serve(async (req) => {
       return json(await pbxWrite(`destinations/${id}`, "DELETE"));
     }
 
+
+    // ---- Time conditions (stored as dialplans with time_condition app) ----
+    if (action === "list-time-conditions") {
+      const r = await pbxRead(
+        `dialplans?domain_uuid=${FUSIONPBX_DOMAIN_UUID}&dialplan_name=time_condition`,
+      ).catch(() => ({ dialplans: [] }));
+      return json({ ok: true, data: (r as any)?.dialplans || (r as any)?.data || [] });
+    }
+    if (action === "upsert-time-condition") {
+      const dialplan_uuid = params.dialplan_uuid || crypto.randomUUID();
+      const details: any[] = [];
+      const sched = Array.isArray(params.schedule) ? params.schedule : [];
+      sched.forEach((s: any, idx: number) => {
+        details.push({
+          dialplan_detail_tag: "condition",
+          dialplan_detail_type: "wday",
+          dialplan_detail_data: String((s.day ?? 1) + 1),
+          dialplan_detail_break: "on-false",
+          dialplan_detail_order: String(idx * 10 + 10),
+        });
+        details.push({
+          dialplan_detail_tag: "condition",
+          dialplan_detail_type: "time-of-day",
+          dialplan_detail_data: `${s.start || "09:00"}-${s.end || "17:00"}`,
+          dialplan_detail_break: "on-false",
+          dialplan_detail_order: String(idx * 10 + 11),
+        });
+        details.push({
+          dialplan_detail_tag: "action",
+          dialplan_detail_type: "transfer",
+          dialplan_detail_data: params.open_destination || "",
+          dialplan_detail_order: String(idx * 10 + 12),
+        });
+      });
+      details.push({
+        dialplan_detail_tag: "action",
+        dialplan_detail_type: "transfer",
+        dialplan_detail_data: params.closed_destination || "",
+        dialplan_detail_order: "9999",
+      });
+      const row = {
+        dialplan_uuid,
+        domain_uuid: FUSIONPBX_DOMAIN_UUID,
+        dialplan_name: params.name || "time_condition",
+        dialplan_number: params.extension || null,
+        dialplan_context: "public",
+        dialplan_continue: "false",
+        dialplan_order: "100",
+        dialplan_enabled: params.enabled === false ? "false" : "true",
+        dialplan_description: params.description || `Time condition ${params.name || ""}`,
+        dialplan_details: details,
+      };
+      const r = await pbxWrite("dialplans", "POST", { dialplans: [row] });
+      return json({ ok: true, dialplan_uuid, data: r });
+    }
+    if (action === "delete-time-condition") {
+      const id = params.dialplan_uuid;
+      if (!id) return json({ error: "dialplan_uuid required" }, 400);
+      return json(await pbxWrite(`dialplans/${id}`, "DELETE"));
+    }
+
     // ---- CDR endpoint fallback helper ----
     const CDR_ENDPOINTS = [
       "/app/api/7/xml_cdr",
