@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { usePbxRealtime } from '@/hooks/usePbxRealtime';
 
 // Curated ElevenLabs voices (multilingual v2 compatible)
 const VOICES = [
