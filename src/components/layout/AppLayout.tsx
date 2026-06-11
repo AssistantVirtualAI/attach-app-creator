@@ -201,7 +201,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       )}
 
       {/* Sidebar */}
-      <aside className={`sidebar-pane fixed left-0 top-0 h-screen w-[18rem] lg:w-80 z-50 transition-transform duration-300 ease-in-out ${
+      <aside className={`sidebar-pane fixed left-0 top-0 h-screen w-64 xl:w-72 z-50 transition-transform duration-300 ease-in-out ${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } md:translate-x-0`}>
         {/* Neon edge handled by .sidebar-pane::after */}
@@ -320,9 +320,9 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       </aside>
 
       {/* Main content */}
-      <main className="pt-14 md:pt-0 md:ml-[18rem] lg:ml-80 min-h-screen flex flex-col cockpit-scope">
+      <main className="pt-14 md:pt-0 md:ml-64 xl:ml-72 min-h-screen flex flex-col cockpit-scope">
 
-        <div className="p-4 lg:p-6 flex-1">
+        <div className="p-4 lg:p-6 flex-1 w-full max-w-full">
           {children}
         </div>
         <AvaFooter />
