@@ -97,6 +97,7 @@ import LemtelDIDs from "./pages/lemtel/LemtelDIDs";
 import LemtelQueues from "./pages/lemtel/LemtelQueues";
 import LemtelIVR from "./pages/lemtel/LemtelIVR";
 import BusinessHours from "./pages/lemtel/BusinessHours";
+import LemtelTimeConditions from "./pages/lemtel/LemtelTimeConditions";
 import CustomerSettings from "./pages/lemtel/CustomerSettings";
 import LemtelVoiceAgents from "./pages/lemtel/LemtelVoiceAgents";
 import LemtelSoftphoneUsers from "./pages/lemtel/LemtelSoftphoneUsers";
@@ -615,6 +616,8 @@ const App = () => (
                 <Route path="/org/lemtel/telephony/ivr" element={<LemtelTelephonyPage><LemtelIVR /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/queues" element={<LemtelTelephonyPage><LemtelQueues /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/ring-groups" element={<LemtelTelephonyPage><TelephonyRingGroups /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/time-conditions" element={<LemtelTelephonyPage><LemtelTimeConditions /></LemtelTelephonyPage>} />
+                <Route path="/lemtel/time-conditions" element={<ProtectedRoute><LemtelGuard><LemtelTimeConditions /></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/telephony/messages" element={<LemtelTelephonyPage><LemtelMessages /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/agents" element={<LemtelTelephonyPage><LemtelVoiceAgents /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/ai" element={<LemtelTelephonyPage><TelephonyAI /></LemtelTelephonyPage>} />
