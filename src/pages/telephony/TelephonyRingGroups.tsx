@@ -34,6 +34,7 @@ const copy = {
 export default function TelephonyRingGroups() {
   const { data: groups = [], isLoading } = usePbxRingGroups();
   const { data: extensions = [] } = usePbxExtensions();
+  usePbxRealtime(['pbx_ring_groups', 'pbx_extensions']);
   const { language } = useLanguage();
   const txt = copy[language];
   return (
