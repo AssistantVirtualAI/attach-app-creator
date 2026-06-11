@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Clock, Plus, Trash2, Loader2, Save, Pencil } from 'lucide-react';
 import { LEMTEL_ORG } from '@/hooks/usePbxData';
 import { usePbxWrite } from '@/hooks/usePbxWrite';
@@ -20,14 +20,13 @@ interface Slot { day: number; start: string; end: string }
 interface TimeCondition {
   id: string;
   organization_id: string;
-  fusionpbx_dialplan_uuid: string | null;
+  pbx_uuid: string | null;
   name: string;
-  timezone: string | null;
-  enabled: boolean;
-  schedule: Slot[];
-  open_destination: string | null;
-  closed_destination: string | null;
   description: string | null;
+  rules: Slot[];
+  match_destination: string | null;
+  nomatch_destination: string | null;
+  enabled: boolean;
   updated_at: string;
 }
 
@@ -69,13 +68,15 @@ export default function LemtelTimeConditions() {
 
   const remove = async (tc: TimeCondition) => {
     if (!confirm(`Delete "${tc.name}"?`)) return;
-    await write.mutateAsync({
-      organizationId: orgId,
-      action: 'delete-time-condition',
-      params: { dialplan_uuid: tc.fusionpbx_dialplan_uuid },
-      objectType: 'time_condition',
-      objectPbxUuid: tc.fusionpbx_dialplan_uuid || undefined,
-    });
+    if (tc.pbx_uuid) {
+      await write.mutateAsync({
+        organizationId: orgId,
+        action: 'delete-time-condition',
+        params: { dialplan_uuid: tc.pbx_uuid },
+        objectType: 'time_condition',
+        objectPbxUuid: tc.pbx_uuid,
+      });
+    }
     await supabase.from('pbx_time_conditions' as any).delete().eq('id', tc.id);
     qc.invalidateQueries({ queryKey: ['pbx', 'time_conditions', orgId] });
   };
@@ -88,7 +89,7 @@ export default function LemtelTimeConditions() {
             <Clock className="w-7 h-7" /> Time Conditions
           </h1>
           <p className="text-muted-foreground">
-            Route inbound calls differently based on day-of-week / time-of-day. Synced to FusionPBX dialplans.
+            Route inbound calls by day-of-week and time-of-day. Each rule is deployed as a FusionPBX dialplan.
           </p>
         </div>
         <div className="flex gap-2">
@@ -102,7 +103,7 @@ export default function LemtelTimeConditions() {
       <Card>
         <CardHeader>
           <CardTitle>{items.length} time conditions</CardTitle>
-          <CardDescription>Each rule generates a FusionPBX dialplan entry on save.</CardDescription>
+          <CardDescription>Each save pushes to FusionPBX and mirrors locally for instant UI updates.</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -116,8 +117,8 @@ export default function LemtelTimeConditions() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Schedule</TableHead>
-                  <TableHead>Open → Closed</TableHead>
+                  <TableHead>Slots</TableHead>
+                  <TableHead>Match → No-match</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -127,11 +128,10 @@ export default function LemtelTimeConditions() {
                   <TableRow key={tc.id}>
                     <TableCell className="font-medium">{tc.name}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {(tc.schedule || []).length} slot{(tc.schedule || []).length !== 1 ? 's' : ''}
-                      {tc.timezone ? ` · ${tc.timezone}` : ''}
+                      {(tc.rules || []).length} slot{(tc.rules || []).length !== 1 ? 's' : ''}
                     </TableCell>
                     <TableCell className="font-mono text-xs">
-                      {tc.open_destination || '—'} → {tc.closed_destination || '—'}
+                      {tc.match_destination || '—'} → {tc.nomatch_destination || '—'}
                     </TableCell>
                     <TableCell>
                       {tc.enabled ? <Badge>Enabled</Badge> : <Badge variant="outline">Disabled</Badge>}
@@ -173,21 +173,19 @@ function TimeConditionDialog({
   write: ReturnType<typeof usePbxWrite>;
 }) {
   const [name, setName] = useState('');
-  const [tz, setTz] = useState('America/Toronto');
   const [enabled, setEnabled] = useState(true);
   const [slots, setSlots] = useState<Slot[]>([{ day: 1, start: '09:00', end: '17:00' }]);
-  const [openDest, setOpenDest] = useState('');
-  const [closedDest, setClosedDest] = useState('');
+  const [matchDest, setMatchDest] = useState('');
+  const [nomatchDest, setNomatchDest] = useState('');
   const [description, setDescription] = useState('');
 
   useEffect(() => {
     if (open) {
       setName(initial?.name || '');
-      setTz(initial?.timezone || 'America/Toronto');
       setEnabled(initial?.enabled ?? true);
-      setSlots(initial?.schedule?.length ? initial.schedule : [{ day: 1, start: '09:00', end: '17:00' }]);
-      setOpenDest(initial?.open_destination || '');
-      setClosedDest(initial?.closed_destination || '');
+      setSlots(initial?.rules?.length ? initial.rules : [{ day: 1, start: '09:00', end: '17:00' }]);
+      setMatchDest(initial?.match_destination || '');
+      setNomatchDest(initial?.nomatch_destination || '');
       setDescription(initial?.description || '');
     }
   }, [open, initial]);
@@ -201,29 +199,27 @@ function TimeConditionDialog({
       organizationId: orgId,
       action: 'upsert-time-condition',
       params: {
-        dialplan_uuid: initial?.fusionpbx_dialplan_uuid || undefined,
+        dialplan_uuid: initial?.pbx_uuid || undefined,
         name,
         schedule: slots,
-        open_destination: openDest,
-        closed_destination: closedDest,
-        timezone: tz,
+        open_destination: matchDest,
+        closed_destination: nomatchDest,
         description,
         enabled,
       },
       objectType: 'time_condition',
-      objectPbxUuid: initial?.fusionpbx_dialplan_uuid || undefined,
+      objectPbxUuid: initial?.pbx_uuid || undefined,
     });
-    const dpUuid = (result?.proxy as any)?.dialplan_uuid || initial?.fusionpbx_dialplan_uuid;
+    const dpUuid = (result?.proxy as any)?.dialplan_uuid || initial?.pbx_uuid;
     const row = {
       organization_id: orgId,
       name,
-      timezone: tz,
       enabled,
-      schedule: slots,
-      open_destination: openDest,
-      closed_destination: closedDest,
+      rules: slots,
+      match_destination: matchDest,
+      nomatch_destination: nomatchDest,
       description,
-      fusionpbx_dialplan_uuid: dpUuid,
+      pbx_uuid: dpUuid,
       last_synced_at: new Date().toISOString(),
     } as any;
     if (initial?.id) {
@@ -239,16 +235,15 @@ function TimeConditionDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{initial ? 'Edit' : 'New'} time condition</DialogTitle>
-          <DialogDescription>Defines when calls follow the open vs. closed destination.</DialogDescription>
+          <DialogDescription>Defines when calls follow the match vs. no-match destination.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Office hours" /></div>
-            <div><Label>Timezone</Label><Input value={tz} onChange={(e) => setTz(e.target.value)} /></div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch checked={enabled} onCheckedChange={setEnabled} />
-            <Label>Enabled</Label>
+            <div className="flex items-end gap-2">
+              <Switch checked={enabled} onCheckedChange={setEnabled} />
+              <Label>Enabled</Label>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -282,12 +277,12 @@ function TimeConditionDialog({
 
           <div className="grid grid-cols-2 gap-3 pt-3 border-t">
             <div>
-              <Label>Open destination</Label>
-              <Input value={openDest} onChange={(e) => setOpenDest(e.target.value)} placeholder="100 XML public" />
+              <Label>Match destination (open)</Label>
+              <Input value={matchDest} onChange={(e) => setMatchDest(e.target.value)} placeholder="100 XML public" />
             </div>
             <div>
-              <Label>Closed destination</Label>
-              <Input value={closedDest} onChange={(e) => setClosedDest(e.target.value)} placeholder="*99100 XML public" />
+              <Label>No-match destination (closed)</Label>
+              <Input value={nomatchDest} onChange={(e) => setNomatchDest(e.target.value)} placeholder="*99100 XML public" />
             </div>
           </div>
 
