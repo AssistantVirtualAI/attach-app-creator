@@ -342,13 +342,10 @@ class JsSipProvider {
       : 'Running in browser — WSS may be blocked by CORS/mixed-content');
 
     try {
-      const fallbackUrls = Array.from(new Set([
+            const fallbackUrls = Array.from(new Set([
         'wss://node.lemtelcloud.net:7449',
-        cfg.wssUrl,
-        ...(cfg.wssUrls || []),
         'wss://lemtel.lemtel.tel:7449',
         'wss://pbxnode.lemtel.tel:7449',
-        'wss://170.39.199.132:7449',
       ].filter(Boolean)));
       this.wssAttempted = fallbackUrls;
 
