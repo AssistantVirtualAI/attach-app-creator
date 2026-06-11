@@ -626,6 +626,7 @@ const App = () => (
                 <Route path="/org/lemtel/telephony/voicemail" element={<LemtelTelephonyPage><TelephonyVoicemail /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/team" element={<LemtelTelephonyPage><TelephonyTeam /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/preferences" element={<LemtelTelephonyPage><TelephonyUserPreferences /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/advanced" element={<LemtelTelephonyPage><TelephonyAdvanced /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/callcenter/agent" element={<LemtelTelephonyPage><CallCenterAgent /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/callcenter/wallboard" element={<LemtelTelephonyPage><CallCenterWallboard /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/callcenter/admin" element={<LemtelTelephonyPage><CallCenterAdmin /></LemtelTelephonyPage>} />
