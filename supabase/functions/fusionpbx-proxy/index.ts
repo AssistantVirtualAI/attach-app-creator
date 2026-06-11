@@ -572,68 +572,6 @@ Deno.serve(async (req) => {
       return json(await pbxWrite(`destinations/${id}`, "DELETE"));
     }
 
-
-    // ---- Time conditions (stored as dialplans with time_condition app) ----
-    if (action === "list-time-conditions") {
-      const r = await pbxFetch(
-        `dialplans?domain_uuid=${FUSIONPBX_DOMAIN_UUID}&dialplan_name=time_condition`,
-      );
-      if (!r.ok) return json(r, r.status || 500);
-      return json({ ok: true, data: collection(r.data, "dialplans") });
-    }
-    if (action === "upsert-time-condition") {
-      const dialplan_uuid = params.dialplan_uuid || crypto.randomUUID();
-      const details: any[] = [];
-      const sched = Array.isArray(params.schedule) ? params.schedule : [];
-      sched.forEach((s: any, idx: number) => {
-        details.push({
-          dialplan_detail_tag: "condition",
-          dialplan_detail_type: "wday",
-          dialplan_detail_data: String((s.day ?? 1) + 1),
-          dialplan_detail_break: "on-false",
-          dialplan_detail_order: String(idx * 10 + 10),
-        });
-        details.push({
-          dialplan_detail_tag: "condition",
-          dialplan_detail_type: "time-of-day",
-          dialplan_detail_data: `${s.start || "09:00"}-${s.end || "17:00"}`,
-          dialplan_detail_break: "on-false",
-          dialplan_detail_order: String(idx * 10 + 11),
-        });
-        details.push({
-          dialplan_detail_tag: "action",
-          dialplan_detail_type: "transfer",
-          dialplan_detail_data: params.open_destination || "",
-          dialplan_detail_order: String(idx * 10 + 12),
-        });
-      });
-      details.push({
-        dialplan_detail_tag: "action",
-        dialplan_detail_type: "transfer",
-        dialplan_detail_data: params.closed_destination || "",
-        dialplan_detail_order: "9999",
-      });
-      const row = {
-        dialplan_uuid,
-        domain_uuid: FUSIONPBX_DOMAIN_UUID,
-        dialplan_name: params.name || "time_condition",
-        dialplan_number: params.extension || null,
-        dialplan_context: "public",
-        dialplan_continue: "false",
-        dialplan_order: "100",
-        dialplan_enabled: params.enabled === false ? "false" : "true",
-        dialplan_description: params.description || `Time condition ${params.name || ""}`,
-        dialplan_details: details,
-      };
-      const r = await pbxWrite("dialplans", "POST", { dialplans: [row] });
-      return json({ ok: true, dialplan_uuid, data: r });
-    }
-    if (action === "delete-time-condition") {
-      const id = params.dialplan_uuid;
-      if (!id) return json({ error: "dialplan_uuid required" }, 400);
-      return json(await pbxWrite(`dialplans/${id}`, "DELETE"));
-    }
-
     // ---- CDR endpoint fallback helper ----
     const CDR_ENDPOINTS = [
       "/app/api/7/xml_cdr",
@@ -868,6 +806,40 @@ Deno.serve(async (req) => {
       if (!r.ok) return json({ error: "FETCH_FAILED", status: r.status }, r.status);
       const ct = record_name.toLowerCase().endsWith(".mp3") ? "audio/mpeg" : "audio/wav";
       return new Response(r.body, { headers: { ...corsHeaders, "Content-Type": ct, "Cache-Control": "private, max-age=300" } });
+    }
+
+    // ---- Voicemail CRUD ----
+    if (action === "delete-voicemail") {
+      const id = params.voicemail_uuid || params.voicemail_message_uuid;
+      if (!id) return json({ error: "voicemail_uuid required" }, 400);
+      const path = params.voicemail_message_uuid ? `voicemail_messages/${id}` : `voicemails/${id}`;
+      return json(await pbxWrite(path, "DELETE"));
+    }
+    if (action === "update-voicemail") {
+      const id = params.voicemail_uuid;
+      if (!id) return json({ error: "voicemail_uuid required" }, 400);
+      return json(await pbxWrite(`voicemails/${id}`, "PUT", { voicemails: [{ ...params, voicemail_uuid: id }] }));
+    }
+    if (action === "list-voicemail-messages") {
+      const ext = params.extension ? `&voicemail_id=${encodeURIComponent(String(params.extension))}` : "";
+      const r = await pbxFetch(`voicemail_messages?${domainQ}${ext}`);
+      if (!r.ok) return json(r, r.status || 500);
+      return json({ ok: true, data: collection(r.data, "voicemail_messages"), latency_ms: r.latency_ms });
+    }
+
+    // ---- CDR / Recording CRUD ----
+    if (action === "delete-cdr") {
+      const id = params.xml_cdr_uuid;
+      if (!id) return json({ error: "xml_cdr_uuid required" }, 400);
+      return json(await pbxWrite(`xml_cdr/${id}`, "DELETE"));
+    }
+    if (action === "delete-recording") {
+      const id = params.call_recording_uuid;
+      if (id) return json(await pbxWrite(`call_recordings/${id}`, "DELETE"));
+      // Fallback: delete file via filesystem endpoint if exposed
+      const { record_path, record_name } = params as any;
+      if (!record_path || !record_name) return json({ error: "call_recording_uuid or (record_path, record_name) required" }, 400);
+      return json(await pbxWrite(`recordings?path=${encodeURIComponent(record_path)}&name=${encodeURIComponent(record_name)}`, "DELETE"));
     }
 
     return json({ error: "UNKNOWN_ACTION", action }, 400);

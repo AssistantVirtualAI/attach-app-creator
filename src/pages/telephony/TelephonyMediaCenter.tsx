@@ -1,0 +1,323 @@
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Disc, Voicemail as VmIcon, PhoneCall, Trash2, RefreshCw, Download, Share2, Sparkles, Loader2, Play, Pause } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { LEMTEL_ORG } from "@/hooks/usePbxData";
+import { usePbxWrite } from "@/hooks/usePbxWrite";
+import { RecordingWavePlayer } from "@/components/portal/RecordingWavePlayer";
+import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
+
+type Scope = "org" | "mine";
+
+export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope }) {
+  const qc = useQueryClient();
+  const [tab, setTab] = useState("cdr");
+  const [q, setQ] = useState("");
+
+  // -------- Realtime invalidation --------
+  useEffect(() => {
+    const ch = supabase
+      .channel("media-center")
+      .on("postgres_changes", { event: "*", schema: "public", table: "pbx_call_records" }, () => qc.invalidateQueries({ queryKey: ["media", "cdr"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "pbx_voicemails" }, () => qc.invalidateQueries({ queryKey: ["media", "vm"] }))
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [qc]);
+
+  // -------- Caller extension (when scope=mine) --------
+  const { data: myExt } = useQuery({
+    queryKey: ["media", "my-ext"],
+    enabled: scope === "mine",
+    queryFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return null;
+      const { data } = await (supabase as any).from("pbx_softphone_users")
+        .select("extension,organization_id").eq("portal_user_id", auth.user.id).maybeSingle();
+      return data;
+    },
+  });
+
+  const orgId = (myExt as any)?.organization_id ?? LEMTEL_ORG;
+  const filterExt: string | null = scope === "mine" ? (myExt as any)?.extension ?? null : null;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Disc className="h-6 w-6" /> Media Center
+          </h1>
+          <p className="text-sm text-muted-foreground">{scope === "mine" ? "Vos appels, enregistrements et messagerie" : "CDR, enregistrements et messagerie unifiés"}</p>
+        </div>
+        <div className="flex gap-2 items-center">
+          <Input placeholder="Rechercher numéro, nom, transcription…" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-sm" />
+          <Button variant="outline" size="sm" onClick={async () => {
+            toast.info("Synchronisation en cours…");
+            await supabase.functions.invoke("fusionpbx-sync-cdr", { body: { organization_id: orgId } }).catch(() => {});
+            await supabase.functions.invoke("voicemail-sync", { body: { organization_id: orgId } }).catch(() => {});
+            qc.invalidateQueries({ queryKey: ["media"] });
+            toast.success("Synchronisé");
+          }}>
+            <RefreshCw className="h-4 w-4 mr-1" /> Sync
+          </Button>
+        </div>
+      </div>
+
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="cdr"><PhoneCall className="h-4 w-4 mr-1" /> CDR</TabsTrigger>
+          <TabsTrigger value="recordings"><Disc className="h-4 w-4 mr-1" /> Enregistrements</TabsTrigger>
+          <TabsTrigger value="voicemail"><VmIcon className="h-4 w-4 mr-1" /> Messagerie</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="cdr" className="mt-4">
+          <CdrTab orgId={orgId} extension={filterExt} search={q} />
+        </TabsContent>
+        <TabsContent value="recordings" className="mt-4">
+          <RecordingsTab orgId={orgId} extension={filterExt} search={q} />
+        </TabsContent>
+        <TabsContent value="voicemail" className="mt-4">
+          <VoicemailTab orgId={orgId} extension={filterExt} search={q} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+/* ---------------- CDR TAB ---------------- */
+function CdrTab({ orgId, extension, search }: { orgId: string; extension: string | null; search: string }) {
+  const write = usePbxWrite();
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["media", "cdr", orgId, extension],
+    queryFn: async () => {
+      let q = (supabase as any).from("pbx_call_records")
+        .select("id,start_at,duration_seconds,direction,caller_number,destination_number,extension,call_status,hangup_cause,recording_path,has_recording,pbx_uuid")
+        .eq("organization_id", orgId).order("start_at", { ascending: false }).limit(300);
+      if (extension) q = q.eq("extension", extension);
+      const { data } = await q;
+      return (data || []) as any[];
+    },
+  });
+
+  const filtered = rows.filter((r) => !search || `${r.caller_number ?? ""} ${r.destination_number ?? ""} ${r.extension ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+
+  const remove = async (r: any) => {
+    if (!confirm("Supprimer ce CDR ?")) return;
+    await write.mutateAsync({
+      organizationId: orgId,
+      action: "delete-cdr",
+      params: { xml_cdr_uuid: r.pbx_uuid },
+    }).catch(() => {});
+    await (supabase as any).from("pbx_call_records").delete().eq("id", r.id);
+    toast.success("CDR supprimé");
+  };
+
+  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>{filtered.length} appels</CardTitle></CardHeader>
+      <CardContent className="space-y-2">
+        {filtered.length === 0 && <p className="text-sm text-muted-foreground">Aucun appel.</p>}
+        {filtered.map((r) => (
+          <div key={r.id} className="flex items-center justify-between border rounded p-2 text-sm flex-wrap gap-2">
+            <div className="font-mono">
+              <Badge variant="outline" className="mr-2">{r.direction || "—"}</Badge>
+              {r.caller_number || "—"} → {r.destination_number || "—"}
+              <span className="text-muted-foreground ml-2">ext {r.extension ?? "—"} · {r.duration_seconds ?? 0}s · {r.start_at ? formatDistanceToNow(new Date(r.start_at), { addSuffix: true }) : ""}</span>
+            </div>
+            <div className="flex gap-1">
+              <Badge variant={r.call_status === "answered" ? "default" : "secondary"}>{r.call_status || "—"}</Badge>
+              {r.has_recording && <Badge variant="outline">REC</Badge>}
+              <Button size="icon" variant="ghost" onClick={() => remove(r)} disabled={write.isPending}><Trash2 className="h-4 w-4" /></Button>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ---------------- RECORDINGS TAB ---------------- */
+function RecordingsTab({ orgId, extension, search }: { orgId: string; extension: string | null; search: string }) {
+  const write = usePbxWrite();
+  const qc = useQueryClient();
+  const [signed, setSigned] = useState<Record<string, string>>({});
+  const [working, setWorking] = useState<string | null>(null);
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["media", "recordings", orgId, extension],
+    queryFn: async () => {
+      let q = (supabase as any).from("pbx_call_records")
+        .select("id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,recording_url,transcript,ai_summary,ai_sentiment,transcribed,pbx_uuid")
+        .eq("organization_id", orgId).not("recording_path", "is", null).order("start_at", { ascending: false }).limit(150);
+      if (extension) q = q.eq("extension", extension);
+      const { data } = await q;
+      return (data || []) as any[];
+    },
+  });
+
+  const sign = async (path: string) => {
+    if (signed[path]) return signed[path];
+    const { data } = await supabase.storage.from("lemtel-recordings").createSignedUrl(path, 3600);
+    if (data?.signedUrl) { setSigned((s) => ({ ...s, [path]: data.signedUrl })); return data.signedUrl; }
+  };
+  const share = async (path: string) => {
+    const { data } = await supabase.storage.from("lemtel-recordings").createSignedUrl(path, 7 * 24 * 3600);
+    if (data?.signedUrl) { await navigator.clipboard.writeText(data.signedUrl); toast.success("Lien copié (7 jours)"); }
+  };
+  const transcribe = async (id: string) => {
+    setWorking(id);
+    try {
+      await supabase.functions.invoke("ai-transcribe-call", { body: { call_record_id: id, organization_id: orgId } });
+      await supabase.functions.invoke("ai-analyze-call", { body: { call_record_id: id, organization_id: orgId } });
+      toast.success("Transcription terminée");
+      qc.invalidateQueries({ queryKey: ["media", "recordings"] });
+    } catch (e: any) { toast.error(e?.message || "Échec"); }
+    finally { setWorking(null); }
+  };
+  const remove = async (r: any) => {
+    if (!confirm("Supprimer cet enregistrement ?")) return;
+    await write.mutateAsync({
+      organizationId: orgId,
+      action: "delete-recording",
+      params: { call_recording_uuid: r.pbx_uuid, record_path: r.recording_path },
+    }).catch(() => {});
+    await (supabase as any).from("pbx_call_records").update({ recording_path: null, has_recording: false }).eq("id", r.id);
+    toast.success("Enregistrement supprimé");
+  };
+
+  const filtered = rows.filter((r) => !search || `${r.caller_number ?? ""} ${r.destination_number ?? ""} ${r.transcript ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>{filtered.length} enregistrements</CardTitle></CardHeader>
+      <CardContent className="space-y-3">
+        {filtered.length === 0 && <p className="text-sm text-muted-foreground">Aucun enregistrement.</p>}
+        {filtered.map((r) => {
+          const url = r.recording_path ? signed[r.recording_path] : r.recording_url;
+          return (
+            <div key={r.id} className="border rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2 text-sm">
+                <div>
+                  <span className="font-mono">{r.caller_number ?? "—"} → {r.destination_number ?? "—"}</span>
+                  <span className="text-muted-foreground ml-2">ext {r.extension ?? "—"} · {r.duration_seconds ?? 0}s · {r.start_at ? formatDistanceToNow(new Date(r.start_at), { addSuffix: true }) : ""}</span>
+                </div>
+                <div className="flex gap-1">
+                  {r.ai_sentiment && <Badge variant="outline">{r.ai_sentiment}</Badge>}
+                  {!r.transcribed && (
+                    <Button size="sm" variant="outline" onClick={() => transcribe(r.id)} disabled={working === r.id}>
+                      {working === r.id ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                      Transcrire
+                    </Button>
+                  )}
+                  {r.recording_path && (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => sign(r.recording_path)}>Charger</Button>
+                      <Button size="icon" variant="ghost" onClick={() => share(r.recording_path)}><Share2 className="h-4 w-4" /></Button>
+                      {url && <Button size="icon" variant="ghost" asChild><a href={url} download><Download className="h-4 w-4" /></a></Button>}
+                    </>
+                  )}
+                  <Button size="icon" variant="ghost" onClick={() => remove(r)}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+              </div>
+              {url && <RecordingWavePlayer url={url} />}
+              {r.transcript && <p className="text-xs text-muted-foreground italic bg-muted/30 rounded p-2">"{r.transcript}"</p>}
+              {r.ai_summary && <p className="text-xs"><strong>Résumé IA:</strong> {r.ai_summary}</p>}
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ---------------- VOICEMAIL TAB ---------------- */
+function VoicemailTab({ orgId, extension, search }: { orgId: string; extension: string | null; search: string }) {
+  const write = usePbxWrite();
+  const [urls, setUrls] = useState<Record<string, string>>({});
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["media", "vm", orgId, extension],
+    queryFn: async () => {
+      let q = (supabase as any).from("pbx_voicemails")
+        .select("id,extension,caller_number,duration_seconds,transcript,read_at,received_at,created_at,storage_path,audio_storage_path,pbx_uuid,folder")
+        .eq("organization_id", orgId).neq("folder", "trash")
+        .order("received_at", { ascending: false }).limit(200);
+      if (extension) q = q.eq("extension", extension);
+      const { data } = await q;
+      return (data || []) as any[];
+    },
+  });
+
+  const sign = async (path: string) => {
+    if (urls[path]) return urls[path];
+    const { data } = await supabase.storage.from("voicemail-audio").createSignedUrl(path, 3600);
+    if (data?.signedUrl) setUrls((u) => ({ ...u, [path]: data.signedUrl }));
+    return data?.signedUrl;
+  };
+  const markRead = async (id: string) => { await supabase.rpc("mark_voicemail_read", { _id: id } as any); };
+  const remove = async (v: any) => {
+    if (!confirm("Supprimer ce message vocal ?")) return;
+    await write.mutateAsync({
+      organizationId: orgId,
+      action: "delete-voicemail",
+      params: { voicemail_message_uuid: v.pbx_uuid },
+    }).catch(() => {});
+    await (supabase as any).from("pbx_voicemails").update({ folder: "trash", deleted_at: new Date().toISOString() }).eq("id", v.id);
+    toast.success("Message supprimé");
+  };
+
+  const filtered = rows.filter((r) => !search || `${r.caller_number ?? ""} ${r.extension ?? ""} ${r.transcript ?? ""}`.toLowerCase().includes(search.toLowerCase()));
+
+  const grouped = useMemo(() => filtered.reduce<Record<string, any[]>>((acc, r) => {
+    const k = r.extension ?? "—"; (acc[k] ||= []).push(r); return acc;
+  }, {}), [filtered]);
+
+  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
+
+  return (
+    <div className="space-y-3">
+      {Object.keys(grouped).length === 0 && <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Aucun message vocal.</CardContent></Card>}
+      {Object.entries(grouped).map(([ext, items]) => (
+        <Card key={ext}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              Extension {ext} <Badge variant="outline">{items.filter((v) => !v.read_at).length} non lus</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {items.map((v) => {
+              const path = v.audio_storage_path || v.storage_path;
+              const url = path ? urls[path] : null;
+              return (
+                <div key={v.id} className={`border rounded p-3 space-y-2 ${!v.read_at ? "bg-muted/40" : ""}`}>
+                  <div className="flex items-center justify-between flex-wrap gap-2 text-sm">
+                    <div>
+                      <strong>{v.caller_number ?? "Inconnu"}</strong>
+                      <span className="text-muted-foreground ml-2">{Math.round(v.duration_seconds ?? 0)}s · {formatDistanceToNow(new Date(v.received_at || v.created_at), { addSuffix: true })}</span>
+                    </div>
+                    <div className="flex gap-1">
+                      {path && <Button size="sm" variant="outline" onClick={async () => { await sign(path); await markRead(v.id); }}>Charger</Button>}
+                      {!v.read_at && <Button size="sm" variant="ghost" onClick={() => markRead(v.id)}>Marquer lu</Button>}
+                      <Button size="icon" variant="ghost" onClick={() => remove(v)}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                  </div>
+                  {url && <audio controls src={url} className="w-full h-10" />}
+                  {v.transcript && <p className="text-xs text-muted-foreground italic">"{v.transcript}"</p>}
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
