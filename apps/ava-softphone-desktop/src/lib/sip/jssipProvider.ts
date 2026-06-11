@@ -343,12 +343,12 @@ class JsSipProvider {
 
     try {
       const fallbackUrls = Array.from(new Set([
-        'wss://node.lemtelcloud.net:7443',
+        'wss://node.lemtelcloud.net:7449',
         cfg.wssUrl,
         ...(cfg.wssUrls || []),
-        'wss://lemtel.lemtel.tel:7443',
-        'wss://pbxnode.lemtel.tel:7443',
-        'wss://170.39.199.132:7443',
+        'wss://lemtel.lemtel.tel:7449',
+        'wss://pbxnode.lemtel.tel:7449',
+        'wss://170.39.199.132:7449',
       ].filter(Boolean)));
       this.wssAttempted = fallbackUrls;
 
