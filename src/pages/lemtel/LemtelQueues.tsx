@@ -45,6 +45,7 @@ function usePerms(): Perms {
 
 export default function LemtelQueues() {
   const { data: queues = [], isLoading } = usePbxQueues();
+  usePbxRealtime(['pbx_call_queues', 'pbx_queue_agents', 'pbx_queue_agent_state']);
   const { language } = useLanguage();
   const txt = qCopy[language];
   const [selectedId, setSelectedId] = useState<string | null>(null);
