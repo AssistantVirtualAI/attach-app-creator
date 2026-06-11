@@ -68,7 +68,7 @@ const ClientDetail = () => {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               <span className="hidden sm:inline">Aperçu</span>
@@ -80,6 +80,10 @@ const ClientDetail = () => {
             <TabsTrigger value="agents" className="flex items-center gap-2">
               <Bot className="h-4 w-4" />
               <span className="hidden sm:inline">Agents</span>
+            </TabsTrigger>
+            <TabsTrigger value="telephony" className="flex items-center gap-2">
+              <Phone className="h-4 w-4" />
+              <span className="hidden sm:inline">Téléphonie</span>
             </TabsTrigger>
             <TabsTrigger value="solutions" className="flex items-center gap-2">
               <Plug className="h-4 w-4" />
