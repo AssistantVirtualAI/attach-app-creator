@@ -4516,6 +4516,7 @@ export type Database = {
       }
       pbx_domains: {
         Row: {
+          client_id: string | null
           created_at: string
           description: string | null
           enabled: boolean
@@ -4528,6 +4529,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          client_id?: string | null
           created_at?: string
           description?: string | null
           enabled?: boolean
@@ -4540,6 +4542,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          client_id?: string | null
           created_at?: string
           description?: string | null
           enabled?: boolean
@@ -4551,7 +4554,22 @@ export type Database = {
           pbx_uuid?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pbx_domains_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_domains_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pbx_extensions: {
         Row: {
