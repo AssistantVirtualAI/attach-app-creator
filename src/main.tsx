@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import "./lib/devPreviewGuard";
 import "./lib/styleHealthGuard";
+import "./lib/buildVersionPoller";
 import App from "./App.tsx";
 import { initSentry } from "./lib/sentry";
 
