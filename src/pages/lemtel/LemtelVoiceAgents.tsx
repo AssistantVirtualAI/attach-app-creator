@@ -148,12 +148,12 @@ export default function LemtelVoiceAgents() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2"><Bot className="w-7 h-7" /> Voice AI Agents</h1>
-          <p className="text-muted-foreground">Program per-customer AI receptionists and route DIDs to them. Synced live with PBX.</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-3xl font-bold flex items-center gap-2"><Bot className="w-7 h-7 shrink-0" /> <span>Voice AI Agents</span></h1>
+          <p className="text-muted-foreground mt-1">Program per-customer AI receptionists and route DIDs to them. Synced live with PBX.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 shrink-0">
           <Button variant="outline" onClick={() => { setEditing(null); setForm({ name:'',platform:'elevenlabs',description:'',platform_agent_id:'',client_id:'',phone_number_id:'' }); setOpen(true); }}>
             <Phone className="w-4 h-4 mr-2" /> Lier un agent existant
           </Button>
