@@ -9,11 +9,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Bot, Plus, Loader2, Pencil, Trash2, Phone, Users } from 'lucide-react';
+import { Bot, Plus, Loader2, Pencil, Trash2, Phone, Users, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { usePbxAgents, usePbxClients, usePbxPhoneNumbers, LEMTEL_ORG } from '@/hooks/usePbxData';
 import { usePbxRealtime } from '@/hooks/usePbxRealtime';
+import { CreateAgentWizard } from '@/components/agents/CreateAgentWizard';
 
 type Agent = any;
 
@@ -44,17 +45,17 @@ export default function LemtelVoiceAgents() {
   );
 
   const [open, setOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [editing, setEditing] = useState<Agent | null>(null);
   const [form, setForm] = useState<any>({
     name: '', platform: 'elevenlabs', description: '',
     platform_agent_id: '', client_id: '', phone_number_id: '',
   });
 
-  function openCreate() {
-    setEditing(null);
-    setForm({ name: '', platform: 'elevenlabs', description: '', platform_agent_id: '', client_id: '', phone_number_id: '' });
-    setOpen(true);
-  }
+  const hasElevenLabs = useMemo(
+    () => (voice as any[]).some(a => a.platform === 'elevenlabs' && a.platform_api_key),
+    [voice],
+  );
   function openEdit(a: Agent) {
     const pnAssign = (assignments as any[]).find(x => x.voice_agent_id === a.id);
     setEditing(a);
@@ -152,8 +153,33 @@ export default function LemtelVoiceAgents() {
           <h1 className="text-3xl font-bold flex items-center gap-2"><Bot className="w-7 h-7" /> Voice AI Agents</h1>
           <p className="text-muted-foreground">Program per-customer AI receptionists and route DIDs to them. Synced live with PBX.</p>
         </div>
-        <Button onClick={openCreate}><Plus className="w-4 h-4 mr-2" /> New Voice Agent</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { setEditing(null); setForm({ name:'',platform:'elevenlabs',description:'',platform_agent_id:'',client_id:'',phone_number_id:'' }); setOpen(true); }}>
+            <Phone className="w-4 h-4 mr-2" /> Lier un agent existant
+          </Button>
+          <Button onClick={() => setWizardOpen(true)}>
+            <Sparkles className="w-4 h-4 mr-2" /> Nouvel agent (étape par étape)
+          </Button>
+        </div>
       </div>
+
+      {/* ElevenLabs connection status */}
+      <Card className={hasElevenLabs ? 'border-green-500/30' : 'border-amber-500/30'}>
+        <CardContent className="flex items-center justify-between py-4">
+          <div className="flex items-center gap-3">
+            {hasElevenLabs ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <AlertCircle className="w-5 h-5 text-amber-500" />}
+            <div>
+              <div className="font-medium">Système téléphonique ↔ ElevenLabs</div>
+              <div className="text-sm text-muted-foreground">
+                {hasElevenLabs
+                  ? 'Connecté — vous pouvez router des DID vers vos agents ElevenLabs.'
+                  : 'Aucun agent ElevenLabs avec clé API détecté. Créez un agent avec l’assistant pour connecter ElevenLabs au PBX.'}
+              </div>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setWizardOpen(true)}>Configurer</Button>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Agents</CardTitle></CardHeader><CardContent><div className="text-3xl font-bold">{voice.length}</div></CardContent></Card>
@@ -256,6 +282,14 @@ export default function LemtelVoiceAgents() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CreateAgentWizard
+        open={wizardOpen}
+        onOpenChange={(o) => {
+          setWizardOpen(o);
+          if (!o) qc.invalidateQueries({ queryKey: ['pbx'] });
+        }}
+      />
     </div>
   );
 }
