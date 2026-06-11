@@ -4256,6 +4256,117 @@ export type Database = {
           },
         ]
       }
+      pbx_conferences: {
+        Row: {
+          created_at: string
+          description: string | null
+          enabled: boolean
+          extension: string | null
+          id: string
+          last_synced_at: string | null
+          max_members: number | null
+          moderator_pin: string | null
+          name: string
+          organization_id: string
+          pbx_etag: string | null
+          pbx_uuid: string | null
+          pin: string | null
+          record: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          extension?: string | null
+          id?: string
+          last_synced_at?: string | null
+          max_members?: number | null
+          moderator_pin?: string | null
+          name: string
+          organization_id: string
+          pbx_etag?: string | null
+          pbx_uuid?: string | null
+          pin?: string | null
+          record?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          extension?: string | null
+          id?: string
+          last_synced_at?: string | null
+          max_members?: number | null
+          moderator_pin?: string | null
+          name?: string
+          organization_id?: string
+          pbx_etag?: string | null
+          pbx_uuid?: string | null
+          pin?: string | null
+          record?: boolean | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pbx_destinations: {
+        Row: {
+          caller_id_name: string | null
+          caller_id_number: string | null
+          created_at: string
+          description: string | null
+          destination_action: string | null
+          destination_app: string | null
+          destination_number: string
+          destination_prefix: string | null
+          destination_type: string
+          enabled: boolean
+          id: string
+          last_synced_at: string | null
+          organization_id: string
+          pbx_etag: string | null
+          pbx_uuid: string | null
+          updated_at: string
+        }
+        Insert: {
+          caller_id_name?: string | null
+          caller_id_number?: string | null
+          created_at?: string
+          description?: string | null
+          destination_action?: string | null
+          destination_app?: string | null
+          destination_number: string
+          destination_prefix?: string | null
+          destination_type?: string
+          enabled?: boolean
+          id?: string
+          last_synced_at?: string | null
+          organization_id: string
+          pbx_etag?: string | null
+          pbx_uuid?: string | null
+          updated_at?: string
+        }
+        Update: {
+          caller_id_name?: string | null
+          caller_id_number?: string | null
+          created_at?: string
+          description?: string | null
+          destination_action?: string | null
+          destination_app?: string | null
+          destination_number?: string
+          destination_prefix?: string | null
+          destination_type?: string
+          enabled?: boolean
+          id?: string
+          last_synced_at?: string | null
+          organization_id?: string
+          pbx_etag?: string | null
+          pbx_uuid?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pbx_devices: {
         Row: {
           assigned_extension_id: string | null
@@ -4348,6 +4459,99 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pbx_dialplans: {
+        Row: {
+          category: string | null
+          context: string
+          continue_flag: boolean
+          created_at: string
+          enabled: boolean
+          id: string
+          last_synced_at: string | null
+          name: string
+          number: string | null
+          organization_id: string
+          pbx_etag: string | null
+          pbx_uuid: string | null
+          sequence: number
+          updated_at: string
+          xml_definition: string | null
+        }
+        Insert: {
+          category?: string | null
+          context?: string
+          continue_flag?: boolean
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_synced_at?: string | null
+          name: string
+          number?: string | null
+          organization_id: string
+          pbx_etag?: string | null
+          pbx_uuid?: string | null
+          sequence?: number
+          updated_at?: string
+          xml_definition?: string | null
+        }
+        Update: {
+          category?: string | null
+          context?: string
+          continue_flag?: boolean
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_synced_at?: string | null
+          name?: string
+          number?: string | null
+          organization_id?: string
+          pbx_etag?: string | null
+          pbx_uuid?: string | null
+          sequence?: number
+          updated_at?: string
+          xml_definition?: string | null
+        }
+        Relationships: []
+      }
+      pbx_domains: {
+        Row: {
+          created_at: string
+          description: string | null
+          enabled: boolean
+          id: string
+          last_synced_at: string | null
+          name: string
+          organization_id: string
+          pbx_etag: string | null
+          pbx_uuid: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          last_synced_at?: string | null
+          name: string
+          organization_id: string
+          pbx_etag?: string | null
+          pbx_uuid?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          last_synced_at?: string | null
+          name?: string
+          organization_id?: string
+          pbx_etag?: string | null
+          pbx_uuid?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       pbx_extensions: {
         Row: {
@@ -4626,6 +4830,123 @@ export type Database = {
           },
         ]
       }
+      pbx_gateways: {
+        Row: {
+          config: Json | null
+          context: string | null
+          created_at: string
+          enabled: boolean
+          expire_seconds: number | null
+          from_domain: string | null
+          from_user: string | null
+          id: string
+          last_synced_at: string | null
+          name: string
+          organization_id: string
+          pbx_etag: string | null
+          pbx_uuid: string | null
+          profile: string | null
+          proxy: string | null
+          realm: string | null
+          register: boolean | null
+          status: string | null
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          config?: Json | null
+          context?: string | null
+          created_at?: string
+          enabled?: boolean
+          expire_seconds?: number | null
+          from_domain?: string | null
+          from_user?: string | null
+          id?: string
+          last_synced_at?: string | null
+          name: string
+          organization_id: string
+          pbx_etag?: string | null
+          pbx_uuid?: string | null
+          profile?: string | null
+          proxy?: string | null
+          realm?: string | null
+          register?: boolean | null
+          status?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          config?: Json | null
+          context?: string | null
+          created_at?: string
+          enabled?: boolean
+          expire_seconds?: number | null
+          from_domain?: string | null
+          from_user?: string | null
+          id?: string
+          last_synced_at?: string | null
+          name?: string
+          organization_id?: string
+          pbx_etag?: string | null
+          pbx_uuid?: string | null
+          profile?: string | null
+          proxy?: string | null
+          realm?: string | null
+          register?: boolean | null
+          status?: string | null
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
+      pbx_hold_music: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          last_synced_at: string | null
+          name: string
+          organization_id: string
+          path: string | null
+          pbx_etag: string | null
+          pbx_uuid: string | null
+          rate: number | null
+          shuffle: boolean | null
+          storage_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_synced_at?: string | null
+          name: string
+          organization_id: string
+          path?: string | null
+          pbx_etag?: string | null
+          pbx_uuid?: string | null
+          rate?: number | null
+          shuffle?: boolean | null
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_synced_at?: string | null
+          name?: string
+          organization_id?: string
+          path?: string | null
+          pbx_etag?: string | null
+          pbx_uuid?: string | null
+          rate?: number | null
+          shuffle?: boolean | null
+          storage_path?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pbx_integrations: {
         Row: {
           base_url: string | null
@@ -4863,6 +5184,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pbx_object_owner: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          object_local_id: string | null
+          object_pbx_uuid: string
+          object_type: string
+          organization_id: string
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          object_local_id?: string | null
+          object_pbx_uuid: string
+          object_type: string
+          organization_id: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          object_local_id?: string | null
+          object_pbx_uuid?: string
+          object_type?: string
+          organization_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       pbx_phone_number_assignments: {
         Row: {
@@ -5125,6 +5482,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pbx_sip_profiles: {
+        Row: {
+          bindings: Json | null
+          codecs: string | null
+          created_at: string
+          enabled: boolean
+          id: string
+          last_synced_at: string | null
+          name: string
+          nat_settings: Json | null
+          organization_id: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          bindings?: Json | null
+          codecs?: string | null
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_synced_at?: string | null
+          name: string
+          nat_settings?: Json | null
+          organization_id?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bindings?: Json | null
+          codecs?: string | null
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_synced_at?: string | null
+          name?: string
+          nat_settings?: Json | null
+          organization_id?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       pbx_sms_messages: {
         Row: {
@@ -5542,6 +5941,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pbx_time_conditions: {
+        Row: {
+          created_at: string
+          description: string | null
+          enabled: boolean
+          id: string
+          last_synced_at: string | null
+          match_destination: string | null
+          name: string
+          nomatch_destination: string | null
+          organization_id: string
+          pbx_etag: string | null
+          pbx_uuid: string | null
+          rules: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          last_synced_at?: string | null
+          match_destination?: string | null
+          name: string
+          nomatch_destination?: string | null
+          organization_id: string
+          pbx_etag?: string | null
+          pbx_uuid?: string | null
+          rules?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          id?: string
+          last_synced_at?: string | null
+          match_destination?: string | null
+          name?: string
+          nomatch_destination?: string | null
+          organization_id?: string
+          pbx_etag?: string | null
+          pbx_uuid?: string | null
+          rules?: Json
+          updated_at?: string
+        }
+        Relationships: []
       }
       pbx_user_devices: {
         Row: {
@@ -6781,6 +7228,60 @@ export type Database = {
           },
         ]
       }
+      voice_agent_bindings: {
+        Row: {
+          active: boolean
+          after_hours_only: boolean
+          binding_type: Database["public"]["Enums"]["voice_agent_binding_type"]
+          business_hours_id: string | null
+          client_id: string | null
+          config: Json | null
+          created_at: string
+          id: string
+          last_synced_at: string | null
+          organization_id: string
+          pbx_dialplan_uuid: string | null
+          priority: number
+          target_ref: string
+          updated_at: string
+          voice_agent_id: string
+        }
+        Insert: {
+          active?: boolean
+          after_hours_only?: boolean
+          binding_type: Database["public"]["Enums"]["voice_agent_binding_type"]
+          business_hours_id?: string | null
+          client_id?: string | null
+          config?: Json | null
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          organization_id: string
+          pbx_dialplan_uuid?: string | null
+          priority?: number
+          target_ref: string
+          updated_at?: string
+          voice_agent_id: string
+        }
+        Update: {
+          active?: boolean
+          after_hours_only?: boolean
+          binding_type?: Database["public"]["Enums"]["voice_agent_binding_type"]
+          business_hours_id?: string | null
+          client_id?: string | null
+          config?: Json | null
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          organization_id?: string
+          pbx_dialplan_uuid?: string | null
+          priority?: number
+          target_ref?: string
+          updated_at?: string
+          voice_agent_id?: string
+        }
+        Relationships: []
+      }
       voice_agent_clients: {
         Row: {
           company: string | null
@@ -7281,6 +7782,66 @@ export type Database = {
           },
         ]
       }
+      pbx_gateways_safe: {
+        Row: {
+          context: string | null
+          created_at: string | null
+          enabled: boolean | null
+          expire_seconds: number | null
+          from_domain: string | null
+          from_user: string | null
+          id: string | null
+          last_synced_at: string | null
+          name: string | null
+          organization_id: string | null
+          pbx_uuid: string | null
+          profile: string | null
+          proxy: string | null
+          realm: string | null
+          register: boolean | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          context?: string | null
+          created_at?: string | null
+          enabled?: boolean | null
+          expire_seconds?: number | null
+          from_domain?: string | null
+          from_user?: string | null
+          id?: string | null
+          last_synced_at?: string | null
+          name?: string | null
+          organization_id?: string | null
+          pbx_uuid?: string | null
+          profile?: string | null
+          proxy?: string | null
+          realm?: string | null
+          register?: boolean | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          context?: string | null
+          created_at?: string | null
+          enabled?: boolean | null
+          expire_seconds?: number | null
+          from_domain?: string | null
+          from_user?: string | null
+          id?: string | null
+          last_synced_at?: string | null
+          name?: string | null
+          organization_id?: string | null
+          pbx_uuid?: string | null
+          profile?: string | null
+          proxy?: string | null
+          realm?: string | null
+          register?: boolean | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       pbx_softphone_link_status: {
         Row: {
           display_name: string | null
@@ -7757,6 +8318,60 @@ export type Database = {
         }
         Relationships: []
       }
+      voice_agent_bindings_safe: {
+        Row: {
+          active: boolean | null
+          after_hours_only: boolean | null
+          binding_type:
+            | Database["public"]["Enums"]["voice_agent_binding_type"]
+            | null
+          business_hours_id: string | null
+          client_id: string | null
+          created_at: string | null
+          id: string | null
+          last_synced_at: string | null
+          organization_id: string | null
+          priority: number | null
+          target_ref: string | null
+          updated_at: string | null
+          voice_agent_id: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          after_hours_only?: boolean | null
+          binding_type?:
+            | Database["public"]["Enums"]["voice_agent_binding_type"]
+            | null
+          business_hours_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          last_synced_at?: string | null
+          organization_id?: string | null
+          priority?: number | null
+          target_ref?: string | null
+          updated_at?: string | null
+          voice_agent_id?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          after_hours_only?: boolean | null
+          binding_type?:
+            | Database["public"]["Enums"]["voice_agent_binding_type"]
+            | null
+          business_hours_id?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          last_synced_at?: string | null
+          organization_id?: string | null
+          priority?: number | null
+          target_ref?: string | null
+          updated_at?: string | null
+          voice_agent_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       admin_link_softphone_by_email: {
@@ -7777,6 +8392,10 @@ export type Database = {
       }
       can_manage_org_members: {
         Args: { _org_id: string; _user_id: string }
+        Returns: boolean
+      }
+      can_manage_pbx_for_client: {
+        Args: { _client_id: string; _user_id: string }
         Returns: boolean
       }
       can_view_org: {
@@ -7872,6 +8491,11 @@ export type Database = {
       app_role: "super_admin" | "org_admin" | "manager" | "agent" | "viewer"
       telecom_sync_status: "pending" | "synced" | "failed"
       user_availability: "available" | "busy" | "dnd" | "away" | "vacation"
+      voice_agent_binding_type:
+        | "did"
+        | "extension"
+        | "ivr_option"
+        | "queue_overflow"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -8008,6 +8632,12 @@ export const Constants = {
       app_role: ["super_admin", "org_admin", "manager", "agent", "viewer"],
       telecom_sync_status: ["pending", "synced", "failed"],
       user_availability: ["available", "busy", "dnd", "away", "vacation"],
+      voice_agent_binding_type: [
+        "did",
+        "extension",
+        "ivr_option",
+        "queue_overflow",
+      ],
     },
   },
 } as const
