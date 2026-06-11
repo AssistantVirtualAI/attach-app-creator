@@ -126,6 +126,15 @@ const ClientDetail = () => {
             />
           </TabsContent>
 
+          <TabsContent value="telephony">
+            <ClientTelephonyTab
+              clientId={clientId!}
+              organizationId={(client as any).organization_id}
+            />
+          </TabsContent>
+
+
+
           <TabsContent value="solutions">
             <ClientSolutionsTab
               clientId={clientId!}
