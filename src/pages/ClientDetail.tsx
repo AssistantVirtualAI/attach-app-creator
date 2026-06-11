@@ -3,7 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, User, Bot, Plug, Shield, Link, Code, MessageSquare } from 'lucide-react';
+import { ArrowLeft, User, Bot, Plug, Shield, Link, Code, MessageSquare, Phone } from 'lucide-react';
 import { useClientDetail } from '@/hooks/useClientDetail';
 import { ClientOverviewTab } from '@/components/clients/ClientOverviewTab';
 import { ClientAgentsTab } from '@/components/clients/ClientAgentsTab';
@@ -12,6 +12,7 @@ import { ClientAccessTab } from '@/components/clients/ClientAccessTab';
 import { ClientUrlTab } from '@/components/clients/ClientUrlTab';
 import { ClientCssTab } from '@/components/clients/ClientCssTab';
 import { ClientConversationsTab } from '@/components/clients/ClientConversationsTab';
+import { ClientTelephonyTab } from '@/components/clients/ClientTelephonyTab';
 
 const ClientDetail = () => {
   const { clientId } = useParams<{ clientId: string }>();
