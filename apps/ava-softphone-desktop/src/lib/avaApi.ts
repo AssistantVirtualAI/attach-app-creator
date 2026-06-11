@@ -134,6 +134,7 @@ export interface RecordingItem {
   organization_id?: string; transcript_text?: string;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
+  recordingUrl?: string | null;
 }
 export interface ContactInteraction {
   id: string; kind: 'call' | 'sms' | 'voicemail';
@@ -384,12 +385,21 @@ export const ava = {
   },
   markVoicemailRead: (id: string) =>
     call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'voicemail-read', id }) }, { ok: true }).catch(() => ({ ok: true as const })),
-  recordings: async () => {
+  recordings: async (limit = 100) => {
     if (MOCK) return SAMPLE_RECORDING_EMPTY;
-    await bestEffortCdrSync(200);
+    await bestEffortCdrSync(Math.max(limit, 200));
     try {
-      const rows = await readCallRecordRows(200);
-      return rows.filter(hasRecordingFile).map(mapCdrToRecording);
+      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true&order=start_at.desc&limit=${limit}`;
+      const res = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: BACKEND.anonKey,
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+      });
+      if (!res.ok) { console.warn('[AVA] recordings query failed', res.status); return [] as RecordingItem[]; }
+      const rows = await res.json();
+      return (Array.isArray(rows) ? rows : []).map(mapCdrToRecording);
     } catch (err) {
       console.warn('[avaApi] recording mapping failed:', err);
       return [] as RecordingItem[];
