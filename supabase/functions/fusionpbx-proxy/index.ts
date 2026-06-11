@@ -842,6 +842,54 @@ Deno.serve(async (req) => {
       return json(await pbxWrite(`recordings?path=${encodeURIComponent(record_path)}&name=${encodeURIComponent(record_name)}`, "DELETE"));
     }
 
+    // ---- Advanced (super_admin): generic CRUD for FusionPBX collections ----
+    // Used for Gateways, SIP Profiles, Conferences, Hold Music, Dialplans, Time Conditions.
+    const ADV: Record<string, { path: string; key: string; uuidField: string }> = {
+      gateways:        { path: "gateways",        key: "gateways",        uuidField: "gateway_uuid" },
+      "sip-profiles":  { path: "sip_profiles",    key: "sip_profiles",    uuidField: "sip_profile_uuid" },
+      conferences:     { path: "conference_rooms",key: "conference_rooms",uuidField: "conference_room_uuid" },
+      "hold-music":    { path: "music_on_hold",   key: "music_on_hold",   uuidField: "music_on_hold_uuid" },
+      dialplans:       { path: "dialplans",       key: "dialplans",       uuidField: "dialplan_uuid" },
+      "time-conditions":{path: "dialplans",       key: "dialplans",       uuidField: "dialplan_uuid" },
+    };
+    for (const [kind, def] of Object.entries(ADV)) {
+      if (action === `list-${kind}`) {
+        const r = await pbxFetch(`${def.path}?${domainQ}`);
+        if (!r.ok) return json(r, r.status || 500);
+        return json({ ok: true, data: collection(r.data, def.key), latency_ms: r.latency_ms });
+      }
+      if (action === `get-${kind}`) {
+        const id = params[def.uuidField] || params.uuid;
+        if (!id) return json({ error: `${def.uuidField} required` }, 400);
+        const r = await pbxFetch(`${def.path}/${id}`);
+        if (!r.ok) return json(r, r.status || 500);
+        return json({ ok: true, data: r.data, latency_ms: r.latency_ms });
+      }
+      if (action === `create-${kind}` || action === `update-${kind}`) {
+        return json(await writeCollection(def.path, def.key, params));
+      }
+      if (action === `delete-${kind}`) {
+        const id = params[def.uuidField] || params.uuid;
+        if (!id) return json({ error: `${def.uuidField} required` }, 400);
+        return json(await pbxWrite(`${def.path}/${id}`, "DELETE"));
+      }
+    }
+
+    // ---- Gateway restart (FreeSWITCH command via API) ----
+    if (action === "restart-gateway") {
+      const name = params.gateway_name;
+      if (!name) return json({ error: "gateway_name required" }, 400);
+      return json(await pbxWrite(`commands`, "POST", {
+        commands: [{ command: "sofia", arguments: `profile external killgw ${name}` }],
+      }));
+    }
+    if (action === "restart-sip-profile") {
+      const name = params.profile_name || "external";
+      return json(await pbxWrite(`commands`, "POST", {
+        commands: [{ command: "sofia", arguments: `profile ${name} restart` }],
+      }));
+    }
+
     return json({ error: "UNKNOWN_ACTION", action }, 400);
   } catch (e: any) {
     if (organization_id) {
