@@ -134,6 +134,7 @@ export interface RecordingItem {
   organization_id?: string; transcript_text?: string;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
+  recordingUrl?: string | null;
 }
 export interface ContactInteraction {
   id: string; kind: 'call' | 'sms' | 'voicemail';
