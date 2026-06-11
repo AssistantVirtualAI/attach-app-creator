@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '@/context/LanguageContext';
+import { usePbxRealtime } from '@/hooks/usePbxRealtime';
 
 const STRATEGIES = ['simultaneous', 'sequence', 'enterprise', 'rollover', 'random'];
 
