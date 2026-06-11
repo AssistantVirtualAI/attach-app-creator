@@ -808,6 +808,40 @@ Deno.serve(async (req) => {
       return new Response(r.body, { headers: { ...corsHeaders, "Content-Type": ct, "Cache-Control": "private, max-age=300" } });
     }
 
+    // ---- Voicemail CRUD ----
+    if (action === "delete-voicemail") {
+      const id = params.voicemail_uuid || params.voicemail_message_uuid;
+      if (!id) return json({ error: "voicemail_uuid required" }, 400);
+      const path = params.voicemail_message_uuid ? `voicemail_messages/${id}` : `voicemails/${id}`;
+      return json(await pbxWrite(path, "DELETE"));
+    }
+    if (action === "update-voicemail") {
+      const id = params.voicemail_uuid;
+      if (!id) return json({ error: "voicemail_uuid required" }, 400);
+      return json(await pbxWrite(`voicemails/${id}`, "PUT", { voicemails: [{ ...params, voicemail_uuid: id }] }));
+    }
+    if (action === "list-voicemail-messages") {
+      const ext = params.extension ? `&voicemail_id=${encodeURIComponent(String(params.extension))}` : "";
+      const r = await pbxFetch(`voicemail_messages?${domainQ}${ext}`);
+      if (!r.ok) return json(r, r.status || 500);
+      return json({ ok: true, data: collection(r.data, "voicemail_messages"), latency_ms: r.latency_ms });
+    }
+
+    // ---- CDR / Recording CRUD ----
+    if (action === "delete-cdr") {
+      const id = params.xml_cdr_uuid;
+      if (!id) return json({ error: "xml_cdr_uuid required" }, 400);
+      return json(await pbxWrite(`xml_cdr/${id}`, "DELETE"));
+    }
+    if (action === "delete-recording") {
+      const id = params.call_recording_uuid;
+      if (id) return json(await pbxWrite(`call_recordings/${id}`, "DELETE"));
+      // Fallback: delete file via filesystem endpoint if exposed
+      const { record_path, record_name } = params as any;
+      if (!record_path || !record_name) return json({ error: "call_recording_uuid or (record_path, record_name) required" }, 400);
+      return json(await pbxWrite(`recordings?path=${encodeURIComponent(record_path)}&name=${encodeURIComponent(record_name)}`, "DELETE"));
+    }
+
     return json({ error: "UNKNOWN_ACTION", action }, 400);
   } catch (e: any) {
     if (organization_id) {
