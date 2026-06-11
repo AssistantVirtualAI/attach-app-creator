@@ -23,6 +23,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallCenterRole } from '@/hooks/useCallCenterRole';
 import { formatDistanceToNow } from 'date-fns';
 import { useLanguage } from '@/context/LanguageContext';
+import { usePbxRealtime } from '@/hooks/usePbxRealtime';
 
 const STRATEGIES = ['ring-all', 'longest-idle-agent', 'round-robin', 'top-down', 'agent-with-least-talk-time', 'agent-with-fewest-calls', 'sequentially-by-agent-order', 'random'];
 const qCopy = {
@@ -44,6 +45,7 @@ function usePerms(): Perms {
 
 export default function LemtelQueues() {
   const { data: queues = [], isLoading } = usePbxQueues();
+  usePbxRealtime(['pbx_call_queues', 'pbx_queue_agents', 'pbx_queue_agent_state']);
   const { language } = useLanguage();
   const txt = qCopy[language];
   const [selectedId, setSelectedId] = useState<string | null>(null);

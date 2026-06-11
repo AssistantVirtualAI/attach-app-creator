@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLanguage } from '@/context/LanguageContext';
+import { usePbxRealtime } from '@/hooks/usePbxRealtime';
 
 const STRATEGIES = ['simultaneous', 'sequence', 'enterprise', 'rollover', 'random'];
 
@@ -33,6 +34,7 @@ const copy = {
 export default function TelephonyRingGroups() {
   const { data: groups = [], isLoading } = usePbxRingGroups();
   const { data: extensions = [] } = usePbxExtensions();
+  usePbxRealtime(['pbx_ring_groups', 'pbx_extensions']);
   const { language } = useLanguage();
   const txt = copy[language];
   return (
