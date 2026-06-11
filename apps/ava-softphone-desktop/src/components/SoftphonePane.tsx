@@ -985,12 +985,12 @@ function IncomingCall({ who, number, onAnswer, onDecline }: { who: string; numbe
 }
 
 function ActiveCall({
-  sp, timer, showDTMF, toggleDTMF, dialKeys, onTransfer, compact = false, audioEl = null,
+  sp, timer, showDTMF, toggleDTMF, dialKeys, onTransfer, compact = false, ultraCompact = false, audioEl = null,
   activeOutputLabel, autoResetOutput, onAutoResetChange, onActiveOutputLabel,
 }: {
   sp: any; timer: string; showDTMF: boolean; toggleDTMF: () => void;
   dialKeys: [string, string][]; onTransfer: (m: 'blind' | 'attended') => void;
-  compact?: boolean; audioEl?: HTMLAudioElement | null;
+  compact?: boolean; ultraCompact?: boolean; audioEl?: HTMLAudioElement | null;
   activeOutputLabel: string; autoResetOutput: boolean;
   onAutoResetChange: (v: boolean) => void;
   onActiveOutputLabel: (label: string) => void;
