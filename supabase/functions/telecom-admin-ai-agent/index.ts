@@ -128,13 +128,19 @@ Deno.serve(async (req) => {
         `Voicemails (${(vmRes.data ?? []).length}, unread=${(vmRes.data ?? []).filter((v:any)=>!v.read_at).length})`,
         `SMS threads (${(smsRes.data ?? []).length})`,
       ].join("\n\n");
+      const flatMessages = messages.map((m: any) => ({
+        role: m.role,
+        content: typeof m.content === "string"
+          ? m.content
+          : (Array.isArray(m.parts) ? m.parts.map((p: any) => p?.text ?? "").join("") : ""),
+      }));
       const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
           messages: [
-            { role: "system", content: `You are AVA, a helpful telecom assistant for the AVA Statistic platform. Answer concisely in the user's language about their phone system. Recent 50 calls for this organization:\n${ctx || "(no calls found)"}` },
+            { role: "system", content: `You are AVA, a helpful telecom assistant for the AVA Statistic platform. Answer concisely in the user's language. You have full read access to this organization's phone system data below. Use it to answer questions about users, extensions, queues, IVRs, voicemails, SMS, and call history. If asked to change settings (voicemail greetings, routing, etc.), explain what you can see and direct them to the Admin tab — you can read but not yet write changes.\n\n${sysContext}` },
             ...flatMessages,
           ],
         }),
