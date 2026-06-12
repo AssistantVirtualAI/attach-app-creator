@@ -28,6 +28,38 @@ function asArray<T = any>(raw: any): T[] {
   return [];
 }
 
+/** Trim/normalize a possibly-null text value; returns empty string if not usable. */
+function cleanText(v: any): string {
+  if (v == null) return '';
+  const s = String(v).trim();
+  return s && s.toLowerCase() !== 'null' && s.toLowerCase() !== 'undefined' ? s : '';
+}
+
+/** A CDR row counts as a voicemail when the PBX attached a voicemail message or marked it as such. */
+function isVoicemailLike(r: any): boolean {
+  if (!r) return false;
+  const vm = r.voicemail_message;
+  if (vm && vm !== 'false' && vm !== false) return true;
+  if (r.call_status === 'voicemail') return true;
+  if (r.has_voicemail === true) return true;
+  return false;
+}
+
+/** Map a pbx_ai_insights row (or undefined) into the CallInsight UI shape. */
+function mapInsightRow(callId: string, row: any): CallInsight {
+  const r = row || {};
+  return {
+    callId,
+    summary: cleanText(r.summary) || 'No AI summary available yet.',
+    sentiment: cleanText(r.sentiment) || 'neutral',
+    topics: Array.isArray(r.topics) ? r.topics : [],
+    actionItems: Array.isArray(r.action_items) ? r.action_items : (Array.isArray(r.actionItems) ? r.actionItems : []),
+    risks: Array.isArray(r.risks) ? r.risks : [],
+    opportunities: Array.isArray(r.opportunities) ? r.opportunities : [],
+    qualityScore: Number(r.quality_score ?? r.qualityScore ?? 0) || 0,
+  };
+}
+
 let authToken: string | null = null;
 export function setAuthToken(token: string | null) {
   authToken = token;
