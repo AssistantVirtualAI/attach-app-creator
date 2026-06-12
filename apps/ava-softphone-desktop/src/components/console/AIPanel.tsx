@@ -208,7 +208,14 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
           </div>
         )}
         {error && (
-          <Bubble role="system"><span style={{ color: c.danger }}>Erreur: {error}</span></Bubble>
+          <Bubble role="system">
+            <div style={{ color: c.danger, marginBottom: 6 }}>Erreur: {error}</div>
+            <button onClick={retry} disabled={busy} style={{
+              padding: '6px 12px', borderRadius: 8, border: `1px solid ${c.avaCyan}`,
+              background: 'transparent', color: c.avaCyan, fontSize: 11, fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer',
+              opacity: busy ? 0.5 : 1,
+            }}>↻ Try again</button>
+          </Bubble>
         )}
       </div>
 
