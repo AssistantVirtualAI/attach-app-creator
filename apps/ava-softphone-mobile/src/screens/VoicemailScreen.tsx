@@ -192,13 +192,38 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
                 )}
 
                 <AIPanel title="AVA summary" accent={colors.avaViolet} style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: font.sm, color: colors.textIce, lineHeight: 1.5 }}>{v.summary}</div>
-                  <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}` }}>
-                    <div style={{ fontSize: 10, color: colors.avaCyan, fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>
-                      Transcript {transcribing === v.id && '· transcribing…'}
+                  <div style={{ fontSize: font.sm, color: colors.textIce, lineHeight: 1.5 }}>{analyses[v.id]?.summary || v.summary}</div>
+                  {analyses[v.id]?.sentiment && (
+                    <div style={{ marginTop: 6, fontSize: 11, color: colors.mutedSilver }}>Sentiment: <span style={{ color: colors.avaCyan }}>{analyses[v.id]!.sentiment}</span></div>
+                  )}
+                  {analyses[v.id]?.topics?.length ? (
+                    <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {analyses[v.id]!.topics!.map((t, i) => <Chip key={i} tone="violet" size="xs">{t}</Chip>)}
                     </div>
+                  ) : null}
+                  {analyses[v.id]?.action_items?.length ? (
+                    <div style={{ marginTop: 8, fontSize: 11, color: colors.textSub }}>
+                      <div style={{ fontWeight: 700, color: colors.signalGold, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Action items</div>
+                      {analyses[v.id]!.action_items!.map((a, i) => <div key={i}>• {a}</div>)}
+                    </div>
+                  ) : null}
+                  <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <div style={{ fontSize: 10, color: colors.avaCyan, fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+                        Transcript {transcribing === v.id && '· transcribing…'}
+                      </div>
+                      {(transcribeError[v.id] || (!liveTranscript && !v.transcript)) && transcribing !== v.id && (
+                        <button onClick={() => transcribe(v, true)} style={{
+                          padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+                          background: 'transparent', border: `1px solid ${colors.avaCyan}`, color: colors.avaCyan,
+                        }}>↻ Retry transcription</button>
+                      )}
+                    </div>
+                    {transcribeError[v.id] && (
+                      <div style={{ fontSize: 11, color: colors.danger, marginBottom: 6 }}>⚠ {transcribeError[v.id]}</div>
+                    )}
                     <div style={{ fontSize: font.sm, color: colors.textSub, lineHeight: 1.5 }}>
-                      {liveTranscript || v.transcript}
+                      {liveTranscript || v.transcript || (transcribing === v.id ? '…' : '(no transcript yet)')}
                     </div>
                   </div>
                 </AIPanel>
