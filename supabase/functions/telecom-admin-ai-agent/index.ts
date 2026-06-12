@@ -80,21 +80,27 @@ Deno.serve(async (req) => {
     let orgId: string | null = body?.organization_id ?? null;
     const { data: isSuperData } = await admin.rpc("is_super_admin", { _user_id: userId });
     const isSuper = !!isSuperData;
-    if (!isSuper) {
+    if (!orgId) {
+      // Try roles / memberships for any user (including super_admin) before failing
       const { data: roles } = await admin.from("user_roles")
-        .select("organization_id").eq("user_id", userId);
-      const roleOrgs = (roles ?? []).map((r: any) => r.organization_id);
-      if (orgId && !roleOrgs.includes(orgId)) {
+        .select("organization_id").eq("user_id", userId).limit(1);
+      orgId = roles?.[0]?.organization_id ?? null;
+      if (!orgId) {
+        const { data: mem } = await admin.from("organization_members")
+          .select("organization_id").eq("user_id", userId).limit(1);
+        orgId = mem?.[0]?.organization_id ?? null;
+      }
+      if (!orgId && isSuper) {
+        // super_admin fallback: Lemtel default org
+        orgId = "71755d33-ed64-4ad5-a828-61c9d2029eb7";
+      }
+    } else if (!isSuper) {
+      const { data: roles } = await admin.from("user_roles")
+        .select("organization_id").eq("user_id", userId).eq("organization_id", orgId).limit(1);
+      if (!roles?.length) {
         const { data: mem } = await admin.from("organization_members")
           .select("organization_id").eq("user_id", userId).eq("organization_id", orgId).limit(1);
-        if (!mem?.length) orgId = roleOrgs[0] ?? null;
-      } else if (!orgId) {
-        orgId = roleOrgs[0] ?? null;
-        if (!orgId) {
-          const { data: mem } = await admin.from("organization_members")
-            .select("organization_id").eq("user_id", userId).limit(1);
-          orgId = mem?.[0]?.organization_id ?? null;
-        }
+        if (!mem?.length) orgId = null;
       }
     }
     if (!orgId) return json({ error: "no_org_access" }, 403);
