@@ -967,7 +967,9 @@ Deno.serve(async (req) => {
     if (organization_id) {
       await admin.from("pbx_sync_jobs").insert({
         organization_id, job_type: action, status: "failed",
-        error_message: e?.message || String(e),
+        started_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+        error: e?.message || String(e),
       });
     }
     return json({ error: "INTERNAL", message: e?.message || String(e) }, 500);
