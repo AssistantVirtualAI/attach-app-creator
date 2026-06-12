@@ -1,7 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, RecordingItem, Feedback } from '../../lib/avaApi';
+import { supabase } from '../../lib/supabaseClient';
 import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
+
+const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+
+function aiErr(e: any) {
+  const t = String(e?.context?.error || e?.message || e?.details || e?.error || 'AI analysis failed');
+  if (/MISSING_SECRET/i.test(t)) return 'AI is not configured yet — contact an admin.';
+  if (/Unauthorized|Forbidden/i.test(t)) return 'You do not have permission to run AI here.';
+  if (/required fields missing|No transcript/i.test(t)) return 'No transcript available yet — try playing the recording first or retry.';
+  return t;
+}
 
 const { colors: c } = theme;
 
