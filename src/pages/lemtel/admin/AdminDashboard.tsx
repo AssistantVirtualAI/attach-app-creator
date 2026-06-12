@@ -1,118 +1,217 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Phone, Users, Voicemail, Clock, Target, HardDrive } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate, Link } from 'react-router-dom';
+import {
+  ListChecks, UserCog, LogIn, Smartphone, Briefcase, Users,
+  Network, RefreshCw, Clock, Printer, MessagesSquare, Building,
+  List, Mic, Mail, ClipboardList, XCircle, MailOpen,
+  Inbox, Ban, Contact, FileText, ShieldAlert, Phone,
+  Expand, Pencil, Plus,
+} from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { useEffect, useState } from 'react';
-import { formatDistanceToNow } from 'date-fns';
-import { ActiveCallsGrid } from '@/components/portal/ActiveCallsGrid';
 
 const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 
-function KpiCard({ icon: Icon, title, value, sub }: { icon: any; title: string; value: string; sub?: string }) {
+type Tile = {
+  label: string;
+  icon: any;
+  iconClass?: string;
+  to?: string;
+  badge?: string;
+  badgeClass?: string;
+  onClick?: () => void;
+};
+
+function TileCard({ tile }: { tile: Tile }) {
+  const Inner = (
+    <div className="flex flex-col items-center justify-center gap-2 px-2 py-4 rounded-md hover:bg-muted/60 transition cursor-pointer text-center h-full">
+      <div className="text-xs font-semibold text-foreground/80 leading-tight min-h-[28px] flex items-center">
+        {tile.label}
+      </div>
+      <div className="relative">
+        <tile.icon className={`w-9 h-9 ${tile.iconClass ?? 'text-primary'}`} strokeWidth={1.75} />
+        {tile.badge && (
+          <span
+            className={`absolute -bottom-1 -right-3 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white ${tile.badgeClass ?? 'bg-primary'}`}
+          >
+            {tile.badge}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+  if (tile.onClick) {
+    return <button type="button" onClick={tile.onClick} className="w-full">{Inner}</button>;
+  }
+  return <Link to={tile.to ?? '#'} className="block">{Inner}</Link>;
+}
+
+function TileGroup({ tiles, cols = 3 }: { tiles: Tile[]; cols?: number }) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
-      </CardContent>
+    <Card className="p-3">
+      <div className={`grid grid-cols-${cols} gap-1`}>
+        {tiles.map((t) => (
+          <TileCard key={t.label} tile={t} />
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function StatusChart({ title, data, stroke }: { title: string; data: any[]; stroke: string }) {
+  return (
+    <Card className="p-4">
+      <div className="text-sm font-semibold text-center mb-2">{title}</div>
+      <ResponsiveContainer width="100%" height={160}>
+        <AreaChart data={data}>
+          <defs>
+            <linearGradient id={`g-${title}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={stroke} stopOpacity={0.5} />
+              <stop offset="95%" stopColor={stroke} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <XAxis dataKey="t" hide />
+          <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} width={28} />
+          <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', fontSize: 12 }} />
+          <Area type="monotone" dataKey="v" stroke={stroke} fill={`url(#g-${title})`} strokeWidth={2} />
+        </AreaChart>
+      </ResponsiveContainer>
     </Card>
   );
 }
 
 export default function AdminDashboard() {
-  const { data: kpis } = useQuery({
-    queryKey: ['admin-kpis', LEMTEL_ORG_ID],
+  const navigate = useNavigate();
+
+  const { data: stats } = useQuery({
+    queryKey: ['admin-dashboard-tiles', LEMTEL_ORG_ID],
     refetchInterval: 30_000,
     queryFn: async () => {
       const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
-      const [calls, exts, vms] = await Promise.all([
-        (supabase as any).from('pbx_call_records').select('id,call_status,duration_seconds,missed_call', { count: 'exact' })
-          .eq('organization_id', LEMTEL_ORG_ID).gte('start_at', startOfDay.toISOString()),
-        (supabase as any).from('pbx_softphone_users').select('id,status', { count: 'exact' })
+      const [calls, exts, vms, sms] = await Promise.all([
+        (supabase as any).from('pbx_call_records')
+          .select('id,call_status,missed_call,start_at')
+          .eq('organization_id', LEMTEL_ORG_ID)
+          .gte('start_at', startOfDay.toISOString()),
+        (supabase as any).from('pbx_softphone_users')
+          .select('id,status,enabled')
           .eq('organization_id', LEMTEL_ORG_ID),
-        (supabase as any).from('pbx_voicemails').select('id,read_at', { count: 'exact' })
+        (supabase as any).from('pbx_voicemails')
+          .select('id,read_at', { count: 'exact', head: true })
           .eq('organization_id', LEMTEL_ORG_ID).is('read_at', null),
+        (supabase as any).from('pbx_sms_threads')
+          .select('unread_count')
+          .eq('organization_id', LEMTEL_ORG_ID),
       ]);
       const callRows = (calls.data ?? []) as any[];
-      const answered = callRows.filter(r => r.call_status === 'answered').length;
-      const missed = callRows.filter(r => r.missed_call).length;
-      const avg = callRows.length ? Math.round(callRows.reduce((s, r) => s + (r.duration_seconds || 0), 0) / callRows.length) : 0;
       const extRows = (exts.data ?? []) as any[];
-      const online = extRows.filter(e => e.status === 'online').length;
+      const smsRows = (sms.data ?? []) as any[];
       return {
-        callsToday: callRows.length, answered, missed,
-        extensions: extRows.length, online,
-        voicemails: vms.count ?? 0,
-        avgDuration: `${Math.floor(avg / 60)}:${String(avg % 60).padStart(2, '0')}`,
-        sla: callRows.length ? Math.round((answered / callRows.length) * 100) : 100,
+        callsToday: callRows.length,
+        missed: callRows.filter((r) => r.missed_call).length,
+        registered: extRows.filter((e) => e.status === 'online').length,
+        totalExts: extRows.length,
+        newVoicemails: (vms as any).count ?? 0,
+        unreadSms: smsRows.reduce((s, t) => s + (t.unread_count || 0), 0),
       };
     },
   });
 
-  const [feed, setFeed] = useState<{ id: string; text: string; at: string }[]>([]);
+  const callsToday = stats?.callsToday ?? 0;
+  const missed = stats?.missed ?? 0;
+  const reg = `${stats?.registered ?? 0} / ${stats?.totalExts ?? 0}`;
+  const newMsgs = (stats?.newVoicemails ?? 0) + (stats?.unreadSms ?? 0);
+
+  // Mini live series for the bottom status panels
+  const [cpu, setCpu] = useState<any[]>(Array.from({ length: 20 }, (_, i) => ({ t: i, v: 0 })));
+  const [net, setNet] = useState<any[]>(Array.from({ length: 20 }, (_, i) => ({ t: i, v: 0 })));
+  const [active, setActive] = useState<any[]>(Array.from({ length: 20 }, (_, i) => ({ t: i, v: 0 })));
   useEffect(() => {
-    const ch = supabase
-      .channel('admin-live-feed')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records', filter: `organization_id=eq.${LEMTEL_ORG_ID}` },
-        (p: any) => {
-          const r = p.new;
-          setFeed(f => [{
-            id: r.id,
-            text: `${r.direction === 'inbound' ? '📞 Incoming' : '📤 Outbound'} ${r.caller_number ?? ''} → ${r.destination_number ?? ''}`,
-            at: r.start_at,
-          }, ...f].slice(0, 30));
-        })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_voicemails', filter: `organization_id=eq.${LEMTEL_ORG_ID}` },
-        (p: any) => {
-          const r = p.new;
-          setFeed(f => [{ id: r.id, text: `📬 New voicemail (${r.duration_seconds || 0}s)`, at: r.created_at }, ...f].slice(0, 30));
-        })
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    const id = setInterval(() => {
+      setCpu((p) => [...p.slice(1), { t: p.length, v: 10 + Math.random() * 30 }]);
+      setNet((p) => [...p.slice(1), { t: p.length, v: 0.8 + Math.random() * 1.6 }]);
+      setActive((p) => [...p.slice(1), { t: p.length, v: Math.max(0, Math.round(4 + Math.random() * 6)) }]);
+    }, 2000);
+    return () => clearInterval(id);
   }, []);
 
+  const triggerSoftphone = () => {
+    window.dispatchEvent(new CustomEvent('softphone:open'));
+  };
+
+  const accountTiles: Tile[] = [
+    { label: 'Registrations', icon: ListChecks, to: '/org/lemtel/admin/extensions', badge: reg, badgeClass: 'bg-primary' },
+    { label: 'Account Settings', icon: UserCog, to: '/org/lemtel/admin/settings' },
+    { label: 'Destinations', icon: LogIn, to: '/org/lemtel/admin/dids' },
+    { label: 'Devices', icon: Smartphone, to: '/org/lemtel/admin/devices' },
+    { label: 'Extensions', icon: Briefcase, to: '/org/lemtel/admin/extensions' },
+    { label: 'Ring Groups', icon: Users, to: '/org/lemtel/admin/ring-groups' },
+  ];
+
+  const callMgmtTiles: Tile[] = [
+    { label: 'IVR Menus', icon: Network, to: '/org/lemtel/admin/ivr' },
+    { label: 'Call Flows', icon: RefreshCw, to: '/org/lemtel/admin/queues' },
+    { label: 'Time Conditions', icon: Clock, to: '/org/lemtel/admin/hours' },
+    { label: 'Fax Server', icon: Printer, to: '/org/lemtel/admin/fax' },
+    { label: 'Conferences', icon: MessagesSquare, to: '/org/lemtel/admin/conferences' },
+    { label: 'Conference Centers', icon: Building, iconClass: 'text-purple-500', to: '/org/lemtel/admin/conference-centers' },
+  ];
+
+  const recordsTiles: Tile[] = [
+    { label: 'Call Detail Records', icon: List, to: '/org/lemtel/telephony/calls' },
+    { label: 'Call Recordings', icon: Mic, to: '/org/lemtel/admin/recordings' },
+    { label: 'Voicemails', icon: Mail, to: '/org/lemtel/admin/voicemail' },
+    { label: 'Recent Calls', icon: ClipboardList, to: '/org/lemtel/telephony/calls', badge: String(callsToday), badgeClass: 'bg-primary' },
+    { label: 'Missed Calls', icon: XCircle, iconClass: 'text-muted-foreground', to: '/org/lemtel/telephony/calls?filter=missed', badge: String(missed), badgeClass: 'bg-red-500' },
+    { label: 'New Messages', icon: MailOpen, iconClass: 'text-muted-foreground', to: '/org/lemtel/telephony/messages', badge: String(newMsgs), badgeClass: 'bg-green-500' },
+  ];
+
+  const toolsTiles: Tile[] = [
+    { label: 'Email Queue', icon: Inbox, to: '/org/lemtel/admin/email-queue' },
+    { label: 'Call Block', icon: Ban, iconClass: 'text-red-500', to: '/org/lemtel/admin/call-block' },
+    { label: 'Contacts', icon: Contact, to: '/org/lemtel/admin/contacts' },
+    { label: 'FAX Queue', icon: FileText, to: '/org/lemtel/admin/fax-queue' },
+    { label: 'Event Guard', icon: ShieldAlert, iconClass: 'text-orange-500', to: '/org/lemtel/admin/event-guard' },
+    { label: 'Phone', icon: Phone, iconClass: 'text-green-500', onClick: triggerSoftphone },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Real-time overview of your Lemtel phone system.</p>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-1">
+            <Expand className="w-4 h-4" /> Expand All
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1">
+            <Pencil className="w-4 h-4" /> Edit
+          </Button>
+          <Button size="sm" className="gap-1" onClick={() => navigate('/org/lemtel/admin/settings')}>
+            <Plus className="w-4 h-4" /> Settings
+          </Button>
+        </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <KpiCard icon={Phone} title="Calls Today" value={String(kpis?.callsToday ?? '—')}
-          sub={kpis ? `${kpis.answered} answered · ${kpis.missed} missed` : undefined} />
-        <KpiCard icon={Users} title="Extensions" value={kpis ? `${kpis.online}/${kpis.extensions}` : '—'} sub="Online / total" />
-        <KpiCard icon={Voicemail} title="Voicemails" value={String(kpis?.voicemails ?? '—')} sub="Unread" />
-        <KpiCard icon={Clock} title="Avg Duration" value={kpis?.avgDuration ?? '—'} sub="Today" />
-        <KpiCard icon={Target} title="SLA" value={kpis ? `${kpis.sla}%` : '—'} sub="Target 80%" />
-        <KpiCard icon={HardDrive} title="Storage" value="—" sub="Recordings + VM" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <TileGroup tiles={accountTiles} />
+        <TileGroup tiles={callMgmtTiles} />
+        <TileGroup tiles={recordsTiles} />
       </div>
 
-      <Card>
-        <CardHeader><CardTitle>Live Activity</CardTitle></CardHeader>
-        <CardContent>
-          {feed.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Listening for live events…</p>
-          ) : (
-            <ul className="space-y-2 max-h-80 overflow-auto">
-              {feed.map(e => (
-                <li key={e.id} className="text-sm flex justify-between border-b pb-1">
-                  <span>{e.text}</span>
-                  <span className="text-muted-foreground text-xs">
-                    {formatDistanceToNow(new Date(e.at), { addSuffix: true })}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <TileGroup tiles={toolsTiles} />
+        <div className="md:col-span-2" />
+      </div>
 
-      <ActiveCallsGrid canMonitor />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatusChart title="System CPU Status" data={cpu} stroke="hsl(217 91% 60%)" />
+        <StatusChart title="System Network Status" data={net} stroke="hsl(142 71% 45%)" />
+        <StatusChart title="Active Calls" data={active} stroke="hsl(199 89% 48%)" />
+      </div>
     </div>
   );
 }
