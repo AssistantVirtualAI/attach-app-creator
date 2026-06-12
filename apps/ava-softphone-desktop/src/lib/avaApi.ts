@@ -95,7 +95,18 @@ export async function getMeContext(): Promise<MeContext> {
       const r = await fetch(url, { headers: authHeaders() });
       if (!r.ok) return EMPTY_ME;
       const rows = await r.json();
-      const row = Array.isArray(rows) && rows[0] ? rows[0] : {};
+      let row = Array.isArray(rows) && rows[0] ? rows[0] : {};
+      // Fallback: admin users may not have a softphone — resolve org via membership tables
+      if (!row.organization_id && uid) {
+        try {
+          const memUrl = `${BACKEND.url}/rest/v1/organization_members?select=organization_id&user_id=eq.${uid}&limit=1`;
+          const m = await fetch(memUrl, { headers: authHeaders() });
+          if (m.ok) {
+            const mrows = await m.json();
+            if (Array.isArray(mrows) && mrows[0]?.organization_id) row = { ...row, organization_id: mrows[0].organization_id };
+          }
+        } catch { /* noop */ }
+      }
       _meCache = {
         organization_id: row.organization_id ?? null,
         extension: row.extension ?? null,

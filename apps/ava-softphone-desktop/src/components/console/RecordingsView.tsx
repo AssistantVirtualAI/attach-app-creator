@@ -1,7 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, RecordingItem, Feedback } from '../../lib/avaApi';
+import { supabase } from '../../lib/supabaseClient';
 import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
+
+const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+
+function aiErr(e: any) {
+  const t = String(e?.context?.error || e?.message || e?.details || e?.error || 'AI analysis failed');
+  if (/MISSING_SECRET/i.test(t)) return 'AI is not configured yet — contact an admin.';
+  if (/Unauthorized|Forbidden/i.test(t)) return 'You do not have permission to run AI here.';
+  if (/required fields missing|No transcript/i.test(t)) return 'No transcript available yet — try playing the recording first or retry.';
+  return t;
+}
 
 const { colors: c } = theme;
 
@@ -47,6 +58,10 @@ export default function RecordingsView() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [playbackLoading, setPlaybackLoading] = useState(false);
+  const [transcript, setTranscript] = useState<string>('');
+  const [analysis, setAnalysis] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -67,6 +82,9 @@ export default function RecordingsView() {
     setPlaybackError(null);
     if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
+    setTranscript(String((sel as any)?.transcript_text || (sel as any)?.raw_data?.transcript_text || ''));
+    setAnalysis((sel as any)?.raw_data?.ai || null);
+    setAiError(null);
   }, [sel?.id]);
 
   const filtered = useMemo(() => {
@@ -142,6 +160,38 @@ export default function RecordingsView() {
       setAudioUrl(url);
     } finally {
       setPlaybackLoading(false);
+    }
+  };
+
+  const runTranscribeAnalyze = async () => {
+    if (!sel) return;
+    setAiLoading(true); setAiError(null);
+    try {
+      const organization_id = (sel as any).organization_id || LEMTEL_ORG;
+      const callId = (sel as any).callId || sel.id;
+      let txt = transcript;
+      if (!txt) {
+        const r1 = await supabase.functions.invoke('ai-transcribe-call', {
+          body: { callId, call_record_id: callId, organization_id,
+                  recording_path: (sel as any).recording_path, recording_name: (sel as any).recording_name },
+        });
+        if (r1.error) throw r1.error;
+        txt = String((r1.data as any)?.transcript_text || '').trim();
+        if (txt) setTranscript(txt);
+      }
+      if (!txt) throw new Error('No transcript available for AI analysis yet');
+      const r2 = await supabase.functions.invoke('ai-analyze-call', {
+        body: { callId, call_record_id: callId, organization_id, transcript_text: txt,
+                recording_path: (sel as any).recording_path, recording_name: (sel as any).recording_name },
+      });
+      if (r2.error) throw r2.error;
+      const ai = (r2.data as any)?.analysis || (r2.data as any) || null;
+      setAnalysis(ai);
+      if (ai?.summary) updateItem(sel.id, { summary: ai.summary, topics: ai.topics || sel.topics, sentiment: ai.sentiment || sel.sentiment });
+    } catch (e: any) {
+      setAiError(aiErr(e));
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -313,6 +363,36 @@ export default function RecordingsView() {
               )}
               {playbackError && <div style={{ fontSize: 11, color: c.mutedSilver, marginTop: 8 }}>{playbackError}</div>}
             </div>
+
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              <button onClick={runTranscribeAnalyze} disabled={aiLoading} style={{ ...miniBtn, flex: 1, padding: '8px 10px', background: aiLoading ? 'transparent' : 'rgba(35,214,255,0.10)', color: c.avaCyan, borderColor: `${c.avaCyan}55`, fontWeight: 700 }}>
+                {aiLoading ? 'Running AI…' : (transcript ? '↻ Re-analyze' : '✨ Transcribe & Analyze')}
+              </button>
+            </div>
+            {aiError && (
+              <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: 'rgba(239,68,68,0.10)', border: `1px solid ${c.danger}55`, color: c.textIce, fontSize: 11, display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                <span>{aiError}</span>
+                <button onClick={runTranscribeAnalyze} style={{ ...miniBtn, color: c.danger, borderColor: `${c.danger}66` }}>↻ Retry</button>
+              </div>
+            )}
+            {transcript && (
+              <Panel title="Transcript" accent={c.avaCyan}>
+                <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0, whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto' }}>{transcript}</p>
+              </Panel>
+            )}
+            {analysis && (
+              <Panel title="AI Analysis" accent={c.avaViolet}>
+                <div style={{ fontSize: 12, color: c.textIce, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {analysis.sentiment && <div><span style={{ color: c.mutedSilver }}>Sentiment:</span> {analysis.sentiment}</div>}
+                  {analysis.summary && <div>{analysis.summary}</div>}
+                  {Array.isArray(analysis.action_items) && analysis.action_items.length > 0 && (
+                    <ul style={{ margin: '4px 0 0 14px', padding: 0 }}>
+                      {analysis.action_items.map((a: string, i: number) => <li key={i} style={{ fontSize: 11.5 }}>{a}</li>)}
+                    </ul>
+                  )}
+                </div>
+              </Panel>
+            )}
 
             <Panel title="Quality Score" accent={c.signalGold}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
