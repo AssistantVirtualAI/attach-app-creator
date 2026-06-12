@@ -426,7 +426,12 @@ export const ava = {
     if (MOCK) return SAMPLE_RECORDING_EMPTY;
     await bestEffortCdrSync(Math.max(limit, 200));
     try {
-      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true&order=start_at.desc&limit=${limit}`;
+      const me = await getMeContext();
+      const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
+      const extFilter = me.extension
+        ? `&or=(extension.eq.${me.extension},caller_number.eq.${me.extension},destination_number.eq.${me.extension},source_number.eq.${me.extension})`
+        : '';
+      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
@@ -442,6 +447,7 @@ export const ava = {
       return [] as RecordingItem[];
     }
   },
+
   getRecordingAudioUrl: async (recording: Partial<RecordingItem & VoicemailItem & CallRecord & { record_path?: string | null; record_name?: string | null }>) => {
     const direct = cleanText(recording.recording_url);
     if (direct) return direct;
