@@ -191,23 +191,23 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(text); } }}
-          placeholder={eligible === false ? 'Admin access required' : 'Ask AVA anything…'}
-          disabled={!eligible || isBusy}
+          placeholder={authed === false ? 'Sign in required' : 'Ask AVA anything…'}
+          disabled={!authed || isBusy}
           style={{
             flex: 1, boxSizing: 'border-box',
             padding: '10px 12px', borderRadius: 10,
             background: c.bgCard, border: `1px solid ${c.borderAI}`,
             color: c.textIce, fontSize: 12.5, outline: 'none',
-            opacity: !eligible ? 0.5 : 1,
+            opacity: !authed ? 0.5 : 1,
           }}
         />
         {isBusy ? (
           <button onClick={() => stop()} style={btnStyle(c.danger)}>Stop</button>
         ) : (
-          <button onClick={() => send(text)} disabled={!eligible || !text.trim()} style={{
+          <button onClick={() => send(text)} disabled={!authed || !text.trim()} style={{
             ...btnStyle(c.avaViolet),
-            opacity: (!eligible || !text.trim()) ? 0.5 : 1,
-            cursor: (!eligible || !text.trim()) ? 'not-allowed' : 'pointer',
+            opacity: (!authed || !text.trim()) ? 0.5 : 1,
+            cursor: (!authed || !text.trim()) ? 'not-allowed' : 'pointer',
           }}>Send</button>
         )}
       </div>
