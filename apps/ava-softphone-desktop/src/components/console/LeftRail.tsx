@@ -197,12 +197,13 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
         display: 'flex', alignItems: 'center', gap: 10,
         WebkitAppRegion: 'no-drag' as any,
       }}>
-        <div style={{
-          width: 26, height: 26, borderRadius: 8, flexShrink: 0,
-          background: `linear-gradient(135deg, ${c.avaViolet}, ${c.avaCyan})`,
-          display: 'grid', placeItems: 'center',
-          color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: 0.5,
-        }}>AI</div>
+        <img
+          src="/ava-logo.png"
+          alt="AVA AI"
+          width={26}
+          height={26}
+          style={{ borderRadius: 8, flexShrink: 0, objectFit: 'cover', boxShadow: `0 4px 14px -6px ${c.avaViolet}` }}
+        />
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, flex: 1, minWidth: 0 }}>
           <span style={{ fontSize: 10.5, fontWeight: 700, color: c.avaCyan, letterSpacing: 1.2, textTransform: 'uppercase' }}>
             Powered by

@@ -1,18 +1,20 @@
 import React from 'react';
 import { colors, gradients } from '../lib/theme';
 
-/** Lemtel mark — luminous rounded square with "L". Pure SVG so it scales crisply. */
+/** AVA mark — uses the official AVA logo asset. */
 export function LemtelMark({ size = 32 }: { size?: number }) {
   return (
-    <span style={{
-      width: size, height: size, display: 'grid', placeItems: 'center',
-      borderRadius: size * 0.28,
-      background: `linear-gradient(135deg, ${colors.lemtelBlue}, ${colors.blueGlow})`,
-      border: `1px solid ${colors.signalGold}66`,
-      boxShadow: `0 8px 22px -10px ${colors.lemtelBlue}, inset 0 1px 0 rgba(255,255,255,0.18)`,
-      color: '#fff', fontSize: size * 0.5, fontWeight: 900, letterSpacing: -0.5,
-      lineHeight: 1,
-    }}>L</span>
+    <img
+      src="/ava-logo.png"
+      alt="AVA"
+      width={size}
+      height={size}
+      style={{
+        width: size, height: size, display: 'block',
+        borderRadius: size * 0.22,
+        boxShadow: `0 8px 22px -10px ${colors.lemtelBlue}`,
+      }}
+    />
   );
 }
 
@@ -33,7 +35,7 @@ export function AvaBadge({ compact = false }: { compact?: boolean }) {
         background: `radial-gradient(circle at 30% 30%, #fff, ${colors.avaViolet} 70%)`,
         boxShadow: `0 0 8px ${colors.avaViolet}`,
       }} />
-      Powered by AVA
+      Powered by AVA AI
     </span>
   );
 }

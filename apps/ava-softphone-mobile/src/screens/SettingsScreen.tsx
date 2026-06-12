@@ -113,7 +113,7 @@ export default function SettingsScreen({
       </button>
 
       <div style={{ textAlign: 'center', marginTop: 18, fontSize: 10, color: colors.mutedSilver, letterSpacing: 0.4 }}>
-        Lemtel AI Phone · Powered by AVA
+        AVA Softphone · Powered by AVA AI
       </div>
       <div style={{ height: 80 }} />
     </div>
