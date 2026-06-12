@@ -104,12 +104,30 @@ Deno.serve(async (req) => {
     if (!mode && Array.isArray(messages) && messages.length) {
       const apiKey = Deno.env.get("LOVABLE_API_KEY");
       if (!apiKey) return json({ error: "ai_not_configured" }, 500);
-      const { data: calls } = await admin.from("pbx_call_records")
-        .select("start_at,direction,caller_number,destination_number,duration_seconds,call_status,missed_call")
-        .eq("organization_id", orgId).order("start_at", { ascending: false }).limit(50);
-      const ctx = (calls ?? []).map((c: any) =>
+      const [callsRes, extRes, queuesRes, ivrsRes, vmRes, smsRes, usersRes] = await Promise.all([
+        admin.from("pbx_call_records")
+          .select("start_at,direction,caller_number,destination_number,duration_seconds,call_status,missed_call,extension")
+          .eq("organization_id", orgId).order("start_at", { ascending: false }).limit(100),
+        admin.from("pbx_extensions").select("extension,effective_cid_name,enabled,voicemail_enabled").eq("organization_id", orgId),
+        admin.from("pbx_call_queues").select("name,strategy,extension").eq("organization_id", orgId),
+        admin.from("pbx_ivrs").select("name,extension").eq("organization_id", orgId),
+        admin.from("pbx_voicemails").select("extension,read_at,created_at").eq("organization_id", orgId).order("created_at", { ascending: false }).limit(50),
+        admin.from("pbx_sms_threads").select("id,last_message_at,unread_count").eq("organization_id", orgId).order("last_message_at", { ascending: false }).limit(20),
+        admin.from("pbx_softphone_users").select("extension,display_name,status,cc_role").eq("organization_id", orgId),
+      ]);
+      const calls = callsRes.data ?? [];
+      const ctx = calls.map((c: any) =>
         `${c.start_at} ${c.direction} ${c.caller_number ?? "?"}->${c.destination_number ?? "?"} ${c.duration_seconds ?? 0}s ${c.call_status ?? ""}${c.missed_call ? " MISSED" : ""}`
       ).join("\n");
+      const sysContext = [
+        `Recent 100 calls:\n${ctx || "(none)"}`,
+        `Users (${(usersRes.data ?? []).length}): ${JSON.stringify(usersRes.data ?? [])}`,
+        `Extensions (${(extRes.data ?? []).length}): ${JSON.stringify(extRes.data ?? [])}`,
+        `Call Queues (${(queuesRes.data ?? []).length}): ${JSON.stringify(queuesRes.data ?? [])}`,
+        `IVRs (${(ivrsRes.data ?? []).length}): ${JSON.stringify(ivrsRes.data ?? [])}`,
+        `Voicemails (${(vmRes.data ?? []).length}, unread=${(vmRes.data ?? []).filter((v:any)=>!v.read_at).length})`,
+        `SMS threads (${(smsRes.data ?? []).length})`,
+      ].join("\n\n");
       const flatMessages = messages.map((m: any) => ({
         role: m.role,
         content: typeof m.content === "string"
@@ -122,7 +140,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
           messages: [
-            { role: "system", content: `You are AVA, a helpful telecom assistant for the AVA Statistic platform. Answer concisely in the user's language about their phone system. Recent 50 calls for this organization:\n${ctx || "(no calls found)"}` },
+            { role: "system", content: `You are AVA, a helpful telecom assistant for the AVA Statistic platform. Answer concisely in the user's language. You have full read access to this organization's phone system data below. Use it to answer questions about users, extensions, queues, IVRs, voicemails, SMS, and call history. If asked to change settings (voicemail greetings, routing, etc.), explain what you can see and direct them to the Admin tab — you can read but not yet write changes.\n\n${sysContext}` },
             ...flatMessages,
           ],
         }),
