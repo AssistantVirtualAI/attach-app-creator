@@ -191,15 +191,31 @@ Deno.serve(async (req) => {
       let execStatus: "success" | "failed" = "success";
 
       try {
-        const allowed = new Set(["business_hour_schedules", "holiday_schedules"]);
+        const allowed = new Set([
+          "business_hour_schedules",
+          "holiday_schedules",
+          "pbx_extensions",
+          "pbx_call_queues",
+          "pbx_ivrs",
+          "pbx_ring_groups",
+          "pbx_call_forwarding",
+          "pbx_voicemail_settings",
+        ]);
         if (ch.operation === "insert" && allowed.has(ch.table)) {
-          const row = { ...ch.row, organization_id: orgId, created_by: userId };
+          const row = { ...ch.row, organization_id: orgId };
           const { data, error } = await admin.from(ch.table).insert(row).select("*").single();
           if (error) throw error;
           result = data;
         } else if (ch.operation === "update" && allowed.has(ch.table)) {
           const where = { ...ch.where, organization_id: orgId };
           let q = admin.from(ch.table).update(ch.row);
+          for (const [k, v] of Object.entries(where)) q = q.eq(k, v as any);
+          const { data, error } = await q.select("*");
+          if (error) throw error;
+          result = data;
+        } else if (ch.operation === "delete" && allowed.has(ch.table)) {
+          const where = { ...ch.where, organization_id: orgId };
+          let q = admin.from(ch.table).delete();
           for (const [k, v] of Object.entries(where)) q = q.eq(k, v as any);
           const { data, error } = await q.select("*");
           if (error) throw error;
