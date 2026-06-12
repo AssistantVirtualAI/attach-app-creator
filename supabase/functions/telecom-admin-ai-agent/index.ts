@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
           messages: [
-            { role: "system", content: `You are AVA, a helpful telecom assistant for the AVA Statistic platform. Answer concisely in the user's language. You have full read access to this organization's phone system data below. Use it to answer questions about users, extensions, queues, IVRs, voicemails, SMS, and call history. If asked to change settings (voicemail greetings, routing, etc.), explain what you can see and direct them to the Admin tab — you can read but not yet write changes.\n\n${sysContext}` },
+            { role: "system", content: `You are AVA, a helpful telecom assistant for the AVA Statistic platform. Answer concisely in the user's language. You have full read access to this organization's phone system data below, and you can PROPOSE changes (extensions, queues, IVRs, ring groups, business hours, holidays) which an admin then confirms in the Admin tab. Use the data below to answer questions about users, extensions, queues, IVRs, voicemails, SMS, and call history.\n\n${sysContext}` },
             ...flatMessages,
           ],
         }),
