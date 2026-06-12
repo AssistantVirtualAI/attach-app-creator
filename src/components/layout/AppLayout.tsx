@@ -338,7 +338,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       )}
 
       {/* Lemtel Softphone (only visible to Lemtel members) */}
-      <SoftphoneWidget />
+      <AppAccessGate><SoftphoneWidget /></AppAccessGate>
     </div>
   );
 };
