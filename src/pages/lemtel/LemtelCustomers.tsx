@@ -233,7 +233,7 @@ export default function LemtelCustomers() {
                 ) : filtered.map((d) => {
                   const org = orgByDomain.get(d.domain_uuid);
                   const exts = extsByDomain.get(d.domain_uuid) || [];
-                  const isOpen = expanded.has(d.domain_uuid);
+                  const enabled_unused = expanded; void enabled_unused; // keep state import in use
                   const enabled = d.domain_enabled === true || d.domain_enabled === 'true';
                   return (
                     <TableRow
