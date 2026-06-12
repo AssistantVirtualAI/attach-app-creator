@@ -5,7 +5,7 @@
  * Falls back to mock data only when no portal URL / access token is configured.
  */
 
-export const MOBILE_DEFAULT_PORTAL = 'https://avastatistic.ca';
+export const MOBILE_DEFAULT_PORTAL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
 
 let portalUrl: string = MOBILE_DEFAULT_PORTAL;
 let authToken: string | null = null;
