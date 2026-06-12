@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
-import { ava } from '../../lib/avaApi';
+import { ava, getMeContext } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
 
 const { colors: c } = theme;
-
-const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 
 function ExtensionsTable() {
   const [data, setData] = useState<any[]>([]);
@@ -13,11 +11,10 @@ function ExtensionsTable() {
   const [error, setError] = useState<string | null>(null);
   const reload = useCallback(async () => {
     setLoading(true); setError(null);
-    const { data: rows, error: err } = await supabase
-      .from('pbx_softphone_users')
-      .select('*')
-      .eq('organization_id', LEMTEL_ORG_ID)
-      .order('extension');
+    const me = await getMeContext();
+    let q = supabase.from('pbx_softphone_users').select('*').order('extension');
+    if (me.organization_id) q = q.eq('organization_id', me.organization_id);
+    const { data: rows, error: err } = await q;
     if (err) setError(err.message); else setData(rows || []);
     setLoading(false);
   }, []);
