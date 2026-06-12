@@ -1,0 +1,258 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { theme } from '../../../lib/theme';
+import { supabase } from '../../../lib/supabaseClient';
+import { getMeContext } from '../../../lib/avaApi';
+
+const { colors: c } = theme;
+const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+const LEMTEL_DOMAIN = '2936594e-17b7-42a9-9165-95be48627923';
+
+export interface ColDef {
+  key: string;
+  label: string;
+  render?: (v: any, row: any) => React.ReactNode;
+}
+
+export interface FieldDef {
+  key: string;
+  label: string;
+  type?: 'text' | 'number' | 'textarea' | 'select' | 'checkbox';
+  options?: string[];
+  placeholder?: string;
+}
+
+interface Props {
+  /** kind matches fusionpbx-proxy ADV map: gateways, sip-profiles, conferences, hold-music, dialplans, time-conditions */
+  kind: string;
+  title: string;
+  /** primary key field name returned by FusionPBX (e.g. gateway_uuid) */
+  uuidField: string;
+  cols: ColDef[];
+  fields?: FieldDef[];
+  /** Action verb to extract or augment row (extra reads, transforms). */
+  transform?: (rows: any[]) => any[];
+  /** Custom row actions besides edit/delete (e.g. restart) */
+  rowActions?: { label: string; run: (row: any, helpers: { reload: () => void; orgId: string }) => Promise<void> | void }[];
+  /** Whether resource is global (no domain_uuid) — informs new-record defaults only. */
+  global?: boolean;
+  /** Allow create button. */
+  canCreate?: boolean;
+}
+
+const btnPrimary: React.CSSProperties = {
+  padding: '8px 14px', borderRadius: 10,
+  background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
+  border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+  letterSpacing: 0.4,
+};
+const btnGhost: React.CSSProperties = {
+  padding: '8px 12px', borderRadius: 10, background: 'transparent',
+  border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+};
+const btnDanger: React.CSSProperties = {
+  padding: '6px 10px', borderRadius: 8, background: 'transparent',
+  border: `1px solid rgba(220,38,38,0.45)`, color: c.danger, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+};
+
+export default function PbxResourceSection({
+  kind, title, uuidField, cols, fields = [], transform, rowActions = [], canCreate = true,
+}: Props) {
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [orgId, setOrgId] = useState<string>(LEMTEL_ORG);
+  const [search, setSearch] = useState('');
+
+  const reload = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const me = await getMeContext().catch(() => null);
+      const oid = me?.organization_id || LEMTEL_ORG;
+      setOrgId(oid);
+      const { data, error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: `list-${kind}`, organization_id: oid, params: { domain_uuid: LEMTEL_DOMAIN } },
+      });
+      if (err) throw err;
+      const list = Array.isArray((data as any)?.data) ? (data as any).data : [];
+      setRows(transform ? transform(list) : list);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load');
+    } finally { setLoading(false); }
+  }, [kind, transform]);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  const save = async (record: any) => {
+    setSaving(true);
+    try {
+      const isUpdate = !!record[uuidField];
+      const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: {
+          action: isUpdate ? `update-${kind}` : `create-${kind}`,
+          organization_id: orgId,
+          params: { domain_uuid: LEMTEL_DOMAIN, ...record },
+        },
+      });
+      if (err) throw err;
+      setEditing(null); setCreating(false);
+      await reload();
+    } catch (e: any) {
+      alert(`Save failed: ${e?.message || 'unknown'}`);
+    } finally { setSaving(false); }
+  };
+
+  const remove = async (row: any) => {
+    if (!confirm(`Delete this ${title.toLowerCase().slice(0, -1) || 'record'}?`)) return;
+    try {
+      const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: {
+          action: `delete-${kind}`,
+          organization_id: orgId,
+          params: { [uuidField]: row[uuidField], domain_uuid: LEMTEL_DOMAIN },
+        },
+      });
+      if (err) throw err;
+      await reload();
+    } catch (e: any) {
+      alert(`Delete failed: ${e?.message || 'unknown'}`);
+    }
+  };
+
+  const filtered = useMemo(() => {
+    if (!search) return rows;
+    const q = search.toLowerCase();
+    return rows.filter((r) => JSON.stringify(r).toLowerCase().includes(q));
+  }, [rows, search]);
+
+  return (
+    <>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, gap: 12, flexWrap: 'wrap' }}>
+        <h1 style={{ fontSize: 22, color: c.textIce, margin: 0, fontWeight: 700 }}>
+          {title} <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500, marginLeft: 6 }}>({rows.length})</span>
+        </h1>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…"
+            style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, minWidth: 200, outline: 'none' }}
+          />
+          <button onClick={reload} style={btnGhost}>↻ Refresh</button>
+          {canCreate && fields.length > 0 && (
+            <button onClick={() => setCreating(true)} style={btnPrimary}>＋ New</button>
+          )}
+        </div>
+      </header>
+
+      <div style={{
+        ...theme.glass.card, padding: 0, overflow: 'hidden',
+        background: 'rgba(255,255,255,0.04)', borderColor: c.border,
+      }}>
+        {loading ? (
+          <div style={{ padding: 32, textAlign: 'center', color: c.mutedSilver, fontSize: 13 }}>Loading…</div>
+        ) : error ? (
+          <div style={{ padding: 24, color: c.danger, fontSize: 13 }}>{error}</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: 32, textAlign: 'center', color: c.mutedSilver, fontSize: 13 }}>No records.</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+              <thead>
+                <tr style={{ background: 'rgba(255,255,255,0.025)' }}>
+                  {cols.map((col) => (
+                    <th key={col.key} style={{ textAlign: 'left', padding: '12px 14px', color: c.mutedSilver, fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', borderBottom: `1px solid ${c.border}` }}>{col.label}</th>
+                  ))}
+                  <th style={{ padding: '12px 14px', borderBottom: `1px solid ${c.border}` }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((row, i) => (
+                  <tr key={row[uuidField] || i} style={{ borderBottom: `1px solid ${c.border}` }}>
+                    {cols.map((col) => (
+                      <td key={col.key} style={{ padding: '11px 14px', color: c.textIce }}>
+                        {col.render ? col.render(row[col.key], row) : (row[col.key] ?? '—')}
+                      </td>
+                    ))}
+                    <td style={{ padding: '8px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      {rowActions.map((a) => (
+                        <button key={a.label} onClick={async () => { await a.run(row, { reload, orgId }); }}
+                          style={{ ...btnGhost, padding: '6px 10px', fontSize: 11, marginRight: 6 }}>{a.label}</button>
+                      ))}
+                      {fields.length > 0 && (
+                        <button onClick={() => setEditing(row)} style={{ ...btnGhost, padding: '6px 10px', fontSize: 11, marginRight: 6 }}>Edit</button>
+                      )}
+                      <button onClick={() => remove(row)} style={btnDanger}>Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {(editing || creating) && (
+        <EditDrawer
+          title={creating ? `New ${title.slice(0, -1)}` : `Edit ${title.slice(0, -1)}`}
+          fields={fields}
+          initial={editing || {}}
+          saving={saving}
+          onCancel={() => { setEditing(null); setCreating(false); }}
+          onSave={save}
+        />
+      )}
+    </>
+  );
+}
+
+function EditDrawer({
+  title, fields, initial, saving, onCancel, onSave,
+}: { title: string; fields: FieldDef[]; initial: any; saving: boolean; onCancel: () => void; onSave: (r: any) => void }) {
+  const [form, setForm] = useState<any>(initial);
+  return (
+    <div onClick={onCancel} style={{
+      position: 'fixed', inset: 0, background: 'rgba(5,6,13,0.66)', backdropFilter: 'blur(6px)',
+      zIndex: 200, display: 'flex', justifyContent: 'flex-end',
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width: 'min(520px, 100%)', height: '100%', background: c.deepPanel,
+        borderLeft: `1px solid ${c.border}`, padding: 28, overflowY: 'auto',
+        boxShadow: '-20px 0 60px rgba(0,0,0,0.5)',
+      }}>
+        <h2 style={{ fontSize: 18, color: c.textIce, margin: '0 0 18px' }}>{title}</h2>
+        {fields.map((f) => (
+          <div key={f.key} style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 6 }}>{f.label}</div>
+            {f.type === 'textarea' ? (
+              <textarea value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                placeholder={f.placeholder}
+                style={{ width: '100%', minHeight: 90, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }} />
+            ) : f.type === 'select' ? (
+              <select value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                style={{ width: '100%', padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 13 }}>
+                <option value="">—</option>
+                {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            ) : f.type === 'checkbox' ? (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: c.textIce, fontSize: 13 }}>
+                <input type="checkbox" checked={!!form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} />
+                Enabled
+              </label>
+            ) : (
+              <input type={f.type === 'number' ? 'number' : 'text'} value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                placeholder={f.placeholder}
+                style={{ width: '100%', padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 13 }} />
+            )}
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+          <button onClick={onCancel} style={btnGhost}>Cancel</button>
+          <button onClick={() => onSave(form)} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.7 : 1, flex: 1 }}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
