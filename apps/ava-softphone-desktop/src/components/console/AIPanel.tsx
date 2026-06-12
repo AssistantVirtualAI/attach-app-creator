@@ -62,39 +62,57 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, busy]);
 
+  
+
+  const runAttempt = async (history: ChatMessage[]) => {
+    const me = await getMeContext();
+    const orgId = me.organization_id ?? '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+    const { data, error: invokeErr } = await supabase.functions.invoke('telecom-admin-ai-agent', {
+      body: {
+        organization_id: orgId,
+        messages: history.map((m) => ({ role: m.role, content: m.content })),
+      },
+    });
+    const bodyMsg = (data as any)?.error || (data as any)?.message;
+    if (invokeErr) throw new Error(bodyMsg || invokeErr.message || 'AI service unavailable');
+    return String((data as any)?.response ?? (data as any)?.message ?? '').trim() || '(no response)';
+  };
+
+  const runWithBackoff = async (history: ChatMessage[]) => {
+    setBusy(true); setError(null);
+    const delays = [0, 800, 2000, 4000]; // exponential backoff
+    let lastErr: any = null;
+    for (let i = 0; i < delays.length; i++) {
+      if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));
+      try {
+        const response = await runAttempt(history);
+        setMessages((cur) => [...cur, { id: crypto.randomUUID(), role: 'assistant', content: response }]);
+        setBusy(false);
+        return;
+      } catch (e: any) {
+        lastErr = e;
+        console.warn(`AI attempt ${i + 1} failed:`, e?.message);
+      }
+    }
+    setError(lastErr?.message || 'AI service unavailable');
+    setBusy(false);
+  };
+
   const send = async (v: string) => {
     const t = v.trim();
     if (!t || busy || !authed) return;
-    setError(null);
     const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: t };
     const next = [...messages, userMsg];
     setMessages(next);
     setText('');
-    setBusy(true);
-    const attempt = async () => {
-      const me = await getMeContext();
-      const orgId = me.organization_id ?? '71755d33-ed64-4ad5-a828-61c9d2029eb7';
-      const { data, error: invokeErr } = await supabase.functions.invoke('telecom-admin-ai-agent', {
-        body: {
-          organization_id: orgId,
-          messages: next.map((m) => ({ role: m.role, content: m.content })),
-        },
-      });
-      const bodyMsg = (data as any)?.error || (data as any)?.message;
-      if (invokeErr) throw new Error(bodyMsg || invokeErr.message || 'AI service unavailable');
-      return String((data as any)?.response ?? (data as any)?.message ?? '').trim() || '(no response)';
-    };
-    try {
-      let response: string;
-      try { response = await attempt(); }
-      catch { await new Promise((r) => setTimeout(r, 800)); response = await attempt(); }
-      setMessages((cur) => [...cur, { id: crypto.randomUUID(), role: 'assistant', content: response }]);
-    } catch (e: any) {
-      console.error('AI error:', e);
-      setError(e?.message || 'AI service unavailable');
-    } finally {
-      setBusy(false);
-    }
+    
+    await runWithBackoff(next);
+  };
+
+  const retry = async () => {
+    if (busy || !messages.length) return;
+    // Use existing history (last user message already in messages)
+    await runWithBackoff(messages);
   };
 
   const suggestions = useMemo(() => (isAdmin ? SUGGESTIONS : USER_SUGGESTIONS), [isAdmin]);
@@ -190,7 +208,14 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
           </div>
         )}
         {error && (
-          <Bubble role="system"><span style={{ color: c.danger }}>Erreur: {error}</span></Bubble>
+          <Bubble role="system">
+            <div style={{ color: c.danger, marginBottom: 6 }}>Erreur: {error}</div>
+            <button onClick={retry} disabled={busy} style={{
+              padding: '6px 12px', borderRadius: 8, border: `1px solid ${c.avaCyan}`,
+              background: 'transparent', color: c.avaCyan, fontSize: 11, fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer',
+              opacity: busy ? 0.5 : 1,
+            }}>↻ Try again</button>
+          </Bubble>
         )}
       </div>
 

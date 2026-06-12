@@ -14,7 +14,9 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
   const [errorId, setErrorId] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ id: string; cur: number; dur: number } | null>(null);
   const [transcripts, setTranscripts] = useState<Record<string, string>>({});
+  const [analyses, setAnalyses] = useState<Record<string, { summary?: string; sentiment?: string; topics?: string[]; action_items?: string[] }>>({});
   const [transcribing, setTranscribing] = useState<string | null>(null);
+  const [transcribeError, setTranscribeError] = useState<Record<string, string>>({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlCache = useRef<Map<string, string>>(new Map());
 
@@ -27,13 +29,18 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
     return `${m}:${String(sec).padStart(2, '0')}`;
   };
 
-  const transcribe = async (v: VoicemailEntry) => {
-    if (transcripts[v.id] || transcribing === v.id) return;
+  const transcribe = async (v: VoicemailEntry, force = false) => {
+    if (!force && (transcripts[v.id] || transcribing === v.id)) return;
     setTranscribing(v.id);
+    setTranscribeError((p) => { const n = { ...p }; delete n[v.id]; return n; });
     try {
-      const { data } = await mobileApi.analyzeCall(v.id).then((d) => ({ data: d as any })).catch(() => ({ data: null }));
-      // Fallback to ai-transcribe-call directly:
-      let txt: string | null = data?.transcript || null;
+      let txt: string | null = null;
+      let analysis: any = null;
+      try {
+        const d: any = await mobileApi.analyzeCall(v.id);
+        txt = d?.transcript || d?.transcript_text || null;
+        analysis = d?.analysis || d?.summary ? { summary: d?.summary, sentiment: d?.sentiment, topics: d?.topics, action_items: d?.action_items, ...(d?.analysis || {}) } : null;
+      } catch {}
       if (!txt) {
         try {
           const res = await fetch(`https://gejxisrqtvxavbrfcoxz.supabase.co/functions/v1/ai-transcribe-call`, {
@@ -42,10 +49,16 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
             body: JSON.stringify({ call_record_id: v.id, organization_id: LEMTEL_ORG }),
           });
           const j = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
           txt = j?.transcript_text || j?.transcript || null;
-        } catch {}
+          if (j?.analysis || j?.summary) analysis = { summary: j?.summary, sentiment: j?.sentiment, topics: j?.topics, action_items: j?.action_items, ...(j?.analysis || {}) };
+        } catch (e: any) {
+          setTranscribeError((p) => ({ ...p, [v.id]: e?.message || 'Transcription failed' }));
+        }
       }
       if (txt) setTranscripts((p) => ({ ...p, [v.id]: txt! }));
+      else if (!transcribeError[v.id]) setTranscribeError((p) => ({ ...p, [v.id]: 'No transcript returned' }));
+      if (analysis) setAnalyses((p) => ({ ...p, [v.id]: analysis }));
     } finally {
       setTranscribing(null);
     }
@@ -179,13 +192,38 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
                 )}
 
                 <AIPanel title="AVA summary" accent={colors.avaViolet} style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: font.sm, color: colors.textIce, lineHeight: 1.5 }}>{v.summary}</div>
-                  <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}` }}>
-                    <div style={{ fontSize: 10, color: colors.avaCyan, fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>
-                      Transcript {transcribing === v.id && '· transcribing…'}
+                  <div style={{ fontSize: font.sm, color: colors.textIce, lineHeight: 1.5 }}>{analyses[v.id]?.summary || v.summary}</div>
+                  {analyses[v.id]?.sentiment && (
+                    <div style={{ marginTop: 6, fontSize: 11, color: colors.mutedSilver }}>Sentiment: <span style={{ color: colors.avaCyan }}>{analyses[v.id]!.sentiment}</span></div>
+                  )}
+                  {analyses[v.id]?.topics?.length ? (
+                    <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {analyses[v.id]!.topics!.map((t, i) => <Chip key={i} tone="violet" size="xs">{t}</Chip>)}
                     </div>
+                  ) : null}
+                  {analyses[v.id]?.action_items?.length ? (
+                    <div style={{ marginTop: 8, fontSize: 11, color: colors.textSub }}>
+                      <div style={{ fontWeight: 700, color: colors.signalGold, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Action items</div>
+                      {analyses[v.id]!.action_items!.map((a, i) => <div key={i}>• {a}</div>)}
+                    </div>
+                  ) : null}
+                  <div style={{ marginTop: 10, padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: `1px solid ${colors.border}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <div style={{ fontSize: 10, color: colors.avaCyan, fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+                        Transcript {transcribing === v.id && '· transcribing…'}
+                      </div>
+                      {(transcribeError[v.id] || (!liveTranscript && !v.transcript)) && transcribing !== v.id && (
+                        <button onClick={() => transcribe(v, true)} style={{
+                          padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer',
+                          background: 'transparent', border: `1px solid ${colors.avaCyan}`, color: colors.avaCyan,
+                        }}>↻ Retry transcription</button>
+                      )}
+                    </div>
+                    {transcribeError[v.id] && (
+                      <div style={{ fontSize: 11, color: colors.danger, marginBottom: 6 }}>⚠ {transcribeError[v.id]}</div>
+                    )}
                     <div style={{ fontSize: font.sm, color: colors.textSub, lineHeight: 1.5 }}>
-                      {liveTranscript || v.transcript}
+                      {liveTranscript || v.transcript || (transcribing === v.id ? '…' : '(no transcript yet)')}
                     </div>
                   </div>
                 </AIPanel>
