@@ -29,13 +29,18 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
     return `${m}:${String(sec).padStart(2, '0')}`;
   };
 
-  const transcribe = async (v: VoicemailEntry) => {
-    if (transcripts[v.id] || transcribing === v.id) return;
+  const transcribe = async (v: VoicemailEntry, force = false) => {
+    if (!force && (transcripts[v.id] || transcribing === v.id)) return;
     setTranscribing(v.id);
+    setTranscribeError((p) => { const n = { ...p }; delete n[v.id]; return n; });
     try {
-      const { data } = await mobileApi.analyzeCall(v.id).then((d) => ({ data: d as any })).catch(() => ({ data: null }));
-      // Fallback to ai-transcribe-call directly:
-      let txt: string | null = data?.transcript || null;
+      let txt: string | null = null;
+      let analysis: any = null;
+      try {
+        const d: any = await mobileApi.analyzeCall(v.id);
+        txt = d?.transcript || d?.transcript_text || null;
+        analysis = d?.analysis || d?.summary ? { summary: d?.summary, sentiment: d?.sentiment, topics: d?.topics, action_items: d?.action_items, ...(d?.analysis || {}) } : null;
+      } catch {}
       if (!txt) {
         try {
           const res = await fetch(`https://gejxisrqtvxavbrfcoxz.supabase.co/functions/v1/ai-transcribe-call`, {
@@ -44,10 +49,16 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
             body: JSON.stringify({ call_record_id: v.id, organization_id: LEMTEL_ORG }),
           });
           const j = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
           txt = j?.transcript_text || j?.transcript || null;
-        } catch {}
+          if (j?.analysis || j?.summary) analysis = { summary: j?.summary, sentiment: j?.sentiment, topics: j?.topics, action_items: j?.action_items, ...(j?.analysis || {}) };
+        } catch (e: any) {
+          setTranscribeError((p) => ({ ...p, [v.id]: e?.message || 'Transcription failed' }));
+        }
       }
       if (txt) setTranscripts((p) => ({ ...p, [v.id]: txt! }));
+      else if (!transcribeError[v.id]) setTranscribeError((p) => ({ ...p, [v.id]: 'No transcript returned' }));
+      if (analysis) setAnalyses((p) => ({ ...p, [v.id]: analysis }));
     } finally {
       setTranscribing(null);
     }
