@@ -5764,6 +5764,7 @@ export type Database = {
         Row: {
           account_status: string
           active_platforms: string[]
+          app_access_enabled: boolean
           cc_avg_handle_time: number | null
           cc_calls_today: number | null
           cc_logged_in_at: string | null
@@ -5804,6 +5805,7 @@ export type Database = {
         Insert: {
           account_status?: string
           active_platforms?: string[]
+          app_access_enabled?: boolean
           cc_avg_handle_time?: number | null
           cc_calls_today?: number | null
           cc_logged_in_at?: string | null
@@ -5844,6 +5846,7 @@ export type Database = {
         Update: {
           account_status?: string
           active_platforms?: string[]
+          app_access_enabled?: boolean
           cc_avg_handle_time?: number | null
           cc_calls_today?: number | null
           cc_logged_in_at?: string | null
@@ -8476,11 +8479,16 @@ export type Database = {
         Returns: string
       }
       mark_voicemail_read: { Args: { _id: string }; Returns: undefined }
+      my_app_access_allowed: { Args: never; Returns: boolean }
       reconcile_pbx_call_records: { Args: { _org_id: string }; Returns: Json }
       run_security_audit: { Args: { _org_id: string }; Returns: Json }
       set_call_notes: {
         Args: { _call_id: string; _notes: string; _tags?: string[] }
         Returns: undefined
+      }
+      set_softphone_app_access: {
+        Args: { _enabled: boolean; _softphone_id: string }
+        Returns: Json
       }
       setup_new_user_organization: {
         Args: { _full_name?: string; _user_email: string; _user_id: string }

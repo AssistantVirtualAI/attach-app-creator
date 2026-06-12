@@ -1,48 +1,102 @@
-# Fix layout spacing + load real Customers from FusionPBX
+# Make Customers a real PBX-management hub + fix Recordings + per-user app access
 
-Two unrelated issues affect the web admin portal at `/org/lemtel/admin/*`:
+The user wants four things on the web admin portal — and equivalents in the desktop app:
 
-## 1. The empty space between sidebar and main content
+1. **Recordings page** is empty even though there are 237 CDRs (only 3 have a `recording_path`, and those paths point at FusionPBX disk, not Supabase storage). It must show every CDR with `has_recording = true` for the working domain and play audio through the `fusionpbx-proxy` `get-recording` stream that already supports range/CORS.
+2. **Customers page** must be drill-down: clicking a domain opens a per-customer "Manage Phone System" workspace with tabs for Users / Extensions / IVR / Recordings / Music on Hold / Call Queues / Ring Groups, all scoped to that domain.
+3. **Per-user App access toggle**: each PBX user can be granted or revoked access to the desktop + mobile softphone apps.
+4. **Domain admins** (org_admin of a customer org) can manage their own phone system from the desktop app.
 
-The previous fix only touched `src/App.css` (removed `#root` max-width) — but the actual offset comes from the admin shell. In `src/components/portal/LemtelPortalShells.tsx`, `AdminPortalLayout` and `UserPortalLayout` only wrap children with `<div className="space-y-5">` — fine — but `AppLayout` main uses `p-4 lg:p-6` while the Customers page itself adds its own padding-less container. The visible gap in the screenshot is the **gradient cockpit background showing through** because the page content is not stretched to `w-full`.
+## 1 — Backend
 
-Fixes:
-- `src/components/portal/LemtelPortalShells.tsx` → wrap children in `<div className="space-y-5 w-full max-w-none">` and make the shell header full-width.
-- `src/components/layout/AppLayout.tsx` → change `<main>` content wrapper from `p-4 lg:p-6 flex-1 w-full max-w-full` to `px-4 lg:px-6 py-4 flex-1 w-full min-w-0` and remove the `space-y` ancestors that compress children.
-- `src/pages/lemtel/LemtelCustomers.tsx` → ensure top container is `space-y-6 w-full` (and any sibling admin pages that use `<div className="space-y-6">` get the same `w-full`). This single change in `AdminPortalLayout` will cascade to every admin page since they all render through `LemtelAdminPage`.
+### Migration (one)
 
-No other admin pages need per-file edits — the shell change covers them all.
+```sql
+-- App access flag on softphone users (default: keep current behaviour = allowed)
+ALTER TABLE public.pbx_softphone_users
+  ADD COLUMN IF NOT EXISTS app_access_enabled boolean NOT NULL DEFAULT true;
 
-## 2. Customers page must list every FusionPBX domain + its PBX users
+-- SECURITY DEFINER helpers --------------------------------------------------
+CREATE OR REPLACE FUNCTION public.set_softphone_app_access(_softphone_id uuid, _enabled boolean)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE _row public.pbx_softphone_users%ROWTYPE; BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'not authenticated'; END IF;
+  SELECT * INTO _row FROM public.pbx_softphone_users WHERE id=_softphone_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'softphone user not found'; END IF;
+  IF NOT (public.is_super_admin(auth.uid())
+       OR public.is_lemtel_admin(auth.uid())
+       OR public.has_role(auth.uid(), _row.organization_id, 'org_admin'::app_role)) THEN
+    RAISE EXCEPTION 'forbidden';
+  END IF;
+  UPDATE public.pbx_softphone_users
+     SET app_access_enabled=_enabled, updated_at=now()
+   WHERE id=_softphone_id;
+  RETURN jsonb_build_object('ok', true, 'app_access_enabled', _enabled);
+END $$;
 
-Today `src/pages/lemtel/LemtelCustomers.tsx` uses `usePbxClients()` which reads the local `clients` table — that's why the page shows "0 customers" even though FusionPBX has many domains. Replace with a real PBX-backed fetch.
-
-Data flow:
-
-```text
-LemtelCustomers
-   │
-   ├── supabase.functions.invoke('fusionpbx-proxy', { action: 'list-domains' })
-   │        → returns [{ domain_uuid, domain_name, domain_description, domain_enabled }]
-   │
-   ├── supabase.from('pbx_extensions').select('domain_uuid, extension, effective_caller_id_name, user_record')
-   │        → grouped by domain_uuid for the expand-row "users" view
-   │
-   └── supabase.from('organizations').select('id,name,fusionpbx_domain_uuid')
-            → optional join so we can show the linked tenant name
+-- Is the current user (or a given email) allowed into the apps?
+CREATE OR REPLACE FUNCTION public.my_app_access_allowed()
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$
+  SELECT COALESCE(bool_or(app_access_enabled), true)
+  FROM public.pbx_softphone_users
+  WHERE portal_user_id = auth.uid();
+$$;
 ```
 
-UI changes in `LemtelCustomers.tsx`:
-- Remove `usePbxClients` and the local-clients dialog/delete logic; keep "New Customer" but route it through the existing `pbx-write / create-domain` edge function so creating a customer provisions a domain on FusionPBX directly (already implemented earlier).
-- Table columns: Domain · Tenant · Extensions (count) · Numbers (count) · Status · Created · Actions.
-- Add an expandable row per domain that lists the PBX extensions/users (extension number, caller id name, enabled). Reuse `pbx_extensions` rows already in the local cache; if none for a domain, call `fusionpbx-proxy` `list-extensions` lazily with `{ domain_uuid }`.
-- Add a "Sync" per-row button → invokes `fusionpbx-proxy` `sync-all` with that domain's UUID so the local cache refreshes.
+### Edge function: `supabase/functions/fusionpbx-proxy/index.ts`
 
-## Files touched
+- Make every `list-*` action accept an optional `body.domain_uuid` override so the same proxy works for any tenant domain (default keeps current `FUSIONPBX_DOMAIN_UUID`). Build `domainQ` dynamically per request.
+- Add `org_admin` of the target tenant org to the authorization gate (lookup organization by `fusionpbx_domain_uuid` and allow `has_role(uid, that_org, 'org_admin')` in addition to Lemtel admins).
+- Add `list-moh` → `music_on_hold?domain_uuid=…` (key `music_on_hold`) and `list-recordings` → `recordings?domain_uuid=…` (key `recordings`).
 
-- `src/components/portal/LemtelPortalShells.tsx` — full-width wrapper
-- `src/components/layout/AppLayout.tsx` — main padding/width tweak
-- `src/pages/lemtel/LemtelCustomers.tsx` — rewrite data source to FusionPBX domains + expandable users
-- (optional) `supabase/functions/fusionpbx-proxy/index.ts` — already supports `list-domains` and `list-extensions`; no edge function changes needed.
+## 2 — Web (LemtelCustomers + new CustomerDetail page)
 
-No DB migrations, no new edge functions, no new secrets.
+### `src/pages/lemtel/LemtelCustomers.tsx`
+
+- Keep the table from the previous change, but the entire row becomes a `Link` to `/org/lemtel/admin/customers/:domain_uuid`. Remove the inline expand; the dedicated page replaces it.
+
+### New `src/pages/lemtel/CustomerDetail.tsx` (route added in `src/App.tsx`)
+
+```text
+Tabs: [ Users · Extensions · IVR · Recordings · Music on Hold · Queues · Ring Groups ]
+Top: domain name, tenant org link, total counts, "Sync now" + "Impersonate" buttons
+```
+
+- **Users tab** — `pbx_softphone_users` filtered by `sip_domain LIKE '%<domain_name>%'`. Columns: extension · display_name · linked portal email · App access (Switch wired to `set_softphone_app_access` RPC) · Status pill.
+- **Extensions / IVR / Queues / Ring Groups / MoH** — `fusionpbx-proxy` list-* with `domain_uuid` override.
+- **Recordings tab** — `pbx_call_records.select(…).eq('domain_uuid', d).eq('has_recording', true)`. Each row renders the existing `RecordingWavePlayer` fed by an object URL built from the `fusionpbx-proxy` `get-recording` stream (already fixed for playback).
+- **Impersonate button** — for super_admin / lemtel_admin: sets a `LemtelActiveDomainContext` (sessionStorage `lemtel.activeDomain={uuid,name}`) and navigates to `/org/lemtel/admin/dashboard`; existing admin pages read that context to filter every PBX call by the active domain UUID.
+
+### `src/pages/lemtel/admin/AdminRecordings.tsx`
+
+- Change filter from `.not('recording_path','is',null)` to `.eq('has_recording', true)`.
+- Replace Supabase storage `createSignedUrl` with a call to `fusionpbx-proxy / get-recording` for each row to build an object URL (already streams audio with `Accept-Ranges`).
+- Respect the active-domain context (if super admin impersonating, filter `domain_uuid = activeDomain`).
+
+## 3 — Per-user app access enforcement
+
+- `src/components/auth/AppAccessGate.tsx` (new) — wraps softphone widget + desktop/mobile apps. Queries `my_app_access_allowed()`; if `false`, hides the SoftphoneWidget and shows a small banner "Phone app access disabled by your admin".
+- Mount it inside `src/components/layout/AppLayout.tsx` around `<SoftphoneWidget />` and at the root of `apps/ava-softphone-desktop` / `apps/ava-softphone-mobile` shells.
+
+## 4 — Desktop app
+
+- `apps/ava-softphone-desktop/src/components/console/CustomersView.tsx`: make each row navigate to a new `/desktop/customers/:domain_uuid` route rendering a `CustomerConsoleView.tsx` with the same Users/Extensions/IVR/Recordings/MoH/Queues tabs (reusing the `ava.*` helpers + the proxy with `domain_uuid`).
+- Add the App-access toggle column in the Users tab (calls `set_softphone_app_access`).
+- `LeftRail.tsx`: when the desktop user is a tenant org_admin (not super), default to their own domain — the existing `useActiveDomain` hook already supports this; just remove the hard-coded `LEMTEL_DOMAIN` fallback for non-super users.
+
+## Files
+
+- `supabase/migrations/<new>.sql` — column + 2 RPCs
+- `supabase/functions/fusionpbx-proxy/index.ts` — per-domain lists + auth widening + list-moh / list-recordings
+- `src/pages/lemtel/LemtelCustomers.tsx` — row → Link
+- `src/pages/lemtel/CustomerDetail.tsx` — **new**
+- `src/pages/lemtel/admin/AdminRecordings.tsx` — has_recording filter + proxy URL
+- `src/components/auth/AppAccessGate.tsx` — **new**
+- `src/components/layout/AppLayout.tsx` — wrap SoftphoneWidget
+- `src/App.tsx` — `/org/lemtel/admin/customers/:domain` route
+- `apps/ava-softphone-desktop/src/components/console/CustomerConsoleView.tsx` — **new** (drill-down)
+- `apps/ava-softphone-desktop/src/components/console/CustomersView.tsx` — row navigation + Users toggle
+- `apps/ava-softphone-desktop/src/components/console/LeftRail.tsx` — drop hard-coded domain for non-super
+- `apps/ava-softphone-desktop/src/lib/avaApi.ts` — `listExtensions/Queues/Ivrs/MoH/Recordings(domainUuid)` helpers + `setAppAccess`
+
+No new secrets, no new buckets. Existing `lemtel-recordings` bucket stays untouched.
