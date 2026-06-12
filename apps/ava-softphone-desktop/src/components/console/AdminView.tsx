@@ -12,10 +12,25 @@ function ExtensionsTable() {
   const reload = useCallback(async () => {
     setLoading(true); setError(null);
     const me = await getMeContext();
-    let q = supabase.from('pbx_softphone_users').select('*').order('extension');
-    if (me.organization_id) q = q.eq('organization_id', me.organization_id);
-    const { data: rows, error: err } = await q;
-    if (err) setError(err.message); else setData(rows || []);
+    // Join pbx_extensions (full PBX list) with pbx_softphone_users (portal accounts)
+    let extQ = supabase.from('pbx_extensions').select('extension, effective_cid_name, enabled, voicemail_enabled').order('extension');
+    if (me.organization_id) extQ = extQ.eq('organization_id', me.organization_id);
+    let spuQ = supabase.from('pbx_softphone_users').select('extension, display_name, portal_user_id, status');
+    if (me.organization_id) spuQ = spuQ.eq('organization_id', me.organization_id);
+    const [{ data: exts, error: e1 }, { data: spus, error: e2 }] = await Promise.all([extQ, spuQ]);
+    if (e1 || e2) { setError((e1 || e2)!.message); setLoading(false); return; }
+    const spuMap = new Map<string, any>((spus || []).map((s: any) => [String(s.extension), s]));
+    const merged = (exts || []).map((e: any) => {
+      const s = spuMap.get(String(e.extension));
+      return {
+        extension: e.extension,
+        display_name: s?.display_name || e.effective_cid_name || '—',
+        portal_user_id: s?.portal_user_id || null,
+        voicemail_enabled: e.voicemail_enabled,
+        status: s?.status || (e.enabled === false ? 'Disabled' : 'Active'),
+      };
+    });
+    setData(merged);
     setLoading(false);
   }, []);
   useEffect(() => { reload(); }, [reload]);
@@ -23,7 +38,7 @@ function ExtensionsTable() {
   return (
     <>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Extensions</h1>
+        <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Extensions <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500 }}>({data.length})</span></h1>
         <button onClick={reload} style={{
           padding: '8px 14px', borderRadius: 9, background: 'transparent',
           border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer',
@@ -39,7 +54,7 @@ function ExtensionsTable() {
             <span>{e.display_name || '—'}</span>
             <span>{e.portal_user_id ? '✓' : '—'}</span>
             <span>{e.voicemail_enabled ? 'On' : 'Off'}</span>
-            <span>{e.status || (e.enabled === false ? 'Disabled' : 'Active')}</span>
+            <span>{e.status}</span>
           </div>
         ))}
         {loading && <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>Loading…</div>}
