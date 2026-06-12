@@ -34,30 +34,46 @@ export function setAuthToken(token: string | null) {
   _meCache = null;
 }
 
-type MeContext = { organization_id: string | null; extension: string | null };
+type MeContext = {
+  organization_id: string | null;
+  extension: string | null;
+  extension_uuid: string | null;
+  display_name: string | null;
+  user_id: string | null;
+};
 let _meCache: MeContext | null = null;
 let _meInflight: Promise<MeContext> | null = null;
+
+const EMPTY_ME: MeContext = { organization_id: null, extension: null, extension_uuid: null, display_name: null, user_id: null };
 
 export async function getMeContext(): Promise<MeContext> {
   if (_meCache) return _meCache;
   if (_meInflight) return _meInflight;
   _meInflight = (async () => {
     try {
-      if (!authToken) return { organization_id: null, extension: null };
-      const res = await fetch(
-        `${BACKEND.url}/rest/v1/pbx_softphone_users?select=organization_id,extension&portal_user_id=eq.${'me'.replace('me','')}` ,
-        { headers: authHeaders() }
-      );
-      // Use RPC-free path: rely on RLS + auth.uid() filter via PostgREST `select=*` and a portal_user_id eq filter using JWT
-      const url = `${BACKEND.url}/rest/v1/pbx_softphone_users?select=organization_id,extension&limit=1`;
+      if (!authToken) return EMPTY_ME;
+      // Decode current auth user id from JWT payload (no network round-trip).
+      let uid: string | null = null;
+      try {
+        const payload = JSON.parse(atob(authToken.split('.')[1] || '')) as any;
+        uid = payload?.sub ?? null;
+      } catch {}
+      const filter = uid ? `portal_user_id=eq.${uid}` : `limit=1`;
+      const url = `${BACKEND.url}/rest/v1/pbx_softphone_users?select=organization_id,extension,extension_uuid,display_name,portal_user_id&${filter}&limit=1`;
       const r = await fetch(url, { headers: authHeaders() });
-      if (!r.ok) return { organization_id: null, extension: null };
+      if (!r.ok) return EMPTY_ME;
       const rows = await r.json();
       const row = Array.isArray(rows) && rows[0] ? rows[0] : {};
-      _meCache = { organization_id: row.organization_id ?? null, extension: row.extension ?? null };
+      _meCache = {
+        organization_id: row.organization_id ?? null,
+        extension: row.extension ?? null,
+        extension_uuid: row.extension_uuid ?? null,
+        display_name: row.display_name ?? null,
+        user_id: row.portal_user_id ?? uid,
+      };
       return _meCache;
     } catch {
-      return { organization_id: null, extension: null };
+      return EMPTY_ME;
     } finally {
       _meInflight = null;
     }
@@ -318,9 +334,9 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
 }
 
 function mapCdrToRecording(r: any): RecordingItem {
-  const directUrl = r.recording_name
-    ? `https://pbxnode.lemtel.tel/app/recordings/${r.recording_name}?key=1fzetTwb0VC1BiHjUgWfHE7y78THXTNX&username=mhassoun`
-    : null;
+  // Audio is fetched on demand via the fusionpbx-proxy edge function
+  // (keeps the PBX API key server-side). See getRecordingAudioUrl().
+  const directUrl: string | null = null;
 
   return {
     id:          r.id ?? String(Math.random()),
@@ -349,8 +365,10 @@ function mapCdrToRecording(r: any): RecordingItem {
 async function readCallRecordRows(limit = 100): Promise<any[]> {
   const me = await getMeContext();
   const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-  const extUuidFilter = `&extension_uuid=eq.4b0efc15-d23d-426c-9285-b2c236254668`;
-  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos${orgFilter}${extUuidFilter}&order=start_at.desc&limit=${limit}`;
+  const extFilter = me.extension_uuid
+    ? `&extension_uuid=eq.${me.extension_uuid}`
+    : (me.extension ? `&extension=eq.${me.extension}` : '');
+  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
 
   const res = await fetch(url, {
     headers: {
@@ -446,8 +464,10 @@ export const ava = {
     try {
       const me = await getMeContext();
       const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-      const extUuidFilter = `&extension_uuid=eq.4b0efc15-d23d-426c-9285-b2c236254668`;
-      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extUuidFilter}&order=start_at.desc&limit=${limit}`;
+      const extFilter = me.extension_uuid
+        ? `&extension_uuid=eq.${me.extension_uuid}`
+        : (me.extension ? `&extension=eq.${me.extension}` : '');
+      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',

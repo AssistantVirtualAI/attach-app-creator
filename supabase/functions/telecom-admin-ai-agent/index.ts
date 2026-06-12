@@ -36,7 +36,7 @@ async function llmPropose(prompt: string): Promise<any> {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
+      model: "google/gemini-2.5-flash",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: prompt },
@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
           messages: [
-            { role: "system", content: `You are AVA, a helpful telecom assistant for the AVA Statistic platform. Answer concisely in the user's language. You have full read access to this organization's phone system data below. Use it to answer questions about users, extensions, queues, IVRs, voicemails, SMS, and call history. If asked to change settings (voicemail greetings, routing, etc.), explain what you can see and direct them to the Admin tab — you can read but not yet write changes.\n\n${sysContext}` },
+            { role: "system", content: `You are AVA, a helpful telecom assistant for the AVA Statistic platform. Answer concisely in the user's language. You have full read access to this organization's phone system data below, and you can PROPOSE changes (extensions, queues, IVRs, ring groups, business hours, holidays) which an admin then confirms in the Admin tab. Use the data below to answer questions about users, extensions, queues, IVRs, voicemails, SMS, and call history.\n\n${sysContext}` },
             ...flatMessages,
           ],
         }),
@@ -191,15 +191,31 @@ Deno.serve(async (req) => {
       let execStatus: "success" | "failed" = "success";
 
       try {
-        const allowed = new Set(["business_hour_schedules", "holiday_schedules"]);
+        const allowed = new Set([
+          "business_hour_schedules",
+          "holiday_schedules",
+          "pbx_extensions",
+          "pbx_call_queues",
+          "pbx_ivrs",
+          "pbx_ring_groups",
+          "pbx_call_forwarding",
+          "pbx_voicemail_settings",
+        ]);
         if (ch.operation === "insert" && allowed.has(ch.table)) {
-          const row = { ...ch.row, organization_id: orgId, created_by: userId };
+          const row = { ...ch.row, organization_id: orgId };
           const { data, error } = await admin.from(ch.table).insert(row).select("*").single();
           if (error) throw error;
           result = data;
         } else if (ch.operation === "update" && allowed.has(ch.table)) {
           const where = { ...ch.where, organization_id: orgId };
           let q = admin.from(ch.table).update(ch.row);
+          for (const [k, v] of Object.entries(where)) q = q.eq(k, v as any);
+          const { data, error } = await q.select("*");
+          if (error) throw error;
+          result = data;
+        } else if (ch.operation === "delete" && allowed.has(ch.table)) {
+          const where = { ...ch.where, organization_id: orgId };
+          let q = admin.from(ch.table).delete();
           for (const [k, v] of Object.entries(where)) q = q.eq(k, v as any);
           const { data, error } = await q.select("*");
           if (error) throw error;

@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabaseClient';
+import { getMeContext } from '../../lib/avaApi';
 
 const { colors: c } = theme;
 
-const FN_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co/functions/v1/telecom-admin-ai-agent';
-const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 const LS_KEY = 'ava-desk-chat-v1';
 
 type ChatMessage = { id: string; role: 'user' | 'assistant' | 'system'; content: string };
@@ -65,7 +64,7 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
 
   const send = async (v: string) => {
     const t = v.trim();
-    if (!t || busy || !token || !authed) return;
+    if (!t || busy || !authed) return;
     setError(null);
     const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: t };
     const next = [...messages, userMsg];
@@ -73,17 +72,15 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
     setText('');
     setBusy(true);
     try {
-      const r = await fetch(FN_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          organization_id: LEMTEL_ORG_ID,
+      const me = await getMeContext();
+      const { data, error: invokeErr } = await supabase.functions.invoke('telecom-admin-ai-agent', {
+        body: {
+          organization_id: me.organization_id ?? undefined,
           messages: next.map((m) => ({ role: m.role, content: m.content })),
-        }),
+        },
       });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data?.error || data?.detail || `HTTP ${r.status}`);
-      const response = String(data?.response ?? '').trim() || '(no response)';
+      if (invokeErr) throw new Error(invokeErr.message || 'Request failed');
+      const response = String((data as any)?.response ?? '').trim() || '(no response)';
       setMessages((cur) => [...cur, { id: crypto.randomUUID(), role: 'assistant', content: response }]);
     } catch (e: any) {
       setError(e?.message || 'Request failed');
