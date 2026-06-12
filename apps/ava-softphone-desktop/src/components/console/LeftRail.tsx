@@ -12,12 +12,14 @@ const NAV_KEY: Record<string, I18nKey> = {
   voicemail: 'nav.voicemail', recordings: 'nav.recordings', ai: 'nav.ai',
   contacts: 'nav.contacts', admin: 'nav.admin', settings: 'nav.settings',
   telecom: 'nav.telecom', orgchat: 'nav.orgchat', aiadmin: 'nav.aiadmin', reports: 'nav.reports',
+  customers: 'nav.admin', voiceagents: 'nav.ai',
 };
 
 export type ConsoleView =
   | 'home' | 'dialer' | 'calls' | 'messages' | 'voicemail'
   | 'recordings' | 'ai' | 'contacts' | 'admin' | 'settings'
-  | 'telecom' | 'orgchat' | 'aiadmin' | 'reports';
+  | 'telecom' | 'orgchat' | 'aiadmin' | 'reports'
+  | 'customers' | 'voiceagents';
 
 const ICON: Record<ConsoleView, string> = {
   home: 'M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1V11z',
@@ -33,6 +35,8 @@ const ICON: Record<ConsoleView, string> = {
   orgchat: 'M7 8h10M7 12h7M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-6l-5 4v-4H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
   aiadmin: 'M12 2l1.8 4.5L18 8l-4.2 1.5L12 14l-1.8-4.5L6 8l4.2-1.5L12 2zM5 18h14',
   reports: 'M3 3v18h18M7 14l3-3 3 3 5-5',
+  customers: 'M3 7h18M3 12h18M3 17h18M7 3v18',
+  voiceagents: 'M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4zM5 11a7 7 0 0 0 14 0M12 18v4',
   settings: 'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
 };
 
@@ -41,10 +45,11 @@ const LABEL: Record<ConsoleView, string> = {
   voicemail: 'Voicemail', recordings: 'Recordings', ai: 'AVA AI',
   contacts: 'Contacts', admin: 'Admin', settings: 'Settings',
   telecom: 'Telecom', orgchat: 'Org Chat', aiadmin: 'AI Admin', reports: 'Reports',
+  customers: 'Customers', voiceagents: 'Voice Agents',
 };
 
 const USER_ITEMS: ConsoleView[] = ['home', 'dialer', 'calls', 'messages', 'voicemail', 'recordings', 'orgchat', 'ai', 'telecom', 'contacts'];
-const ADMIN_ITEMS: ConsoleView[] = ['reports', 'admin', 'aiadmin'];
+const ADMIN_ITEMS: ConsoleView[] = ['customers', 'voiceagents', 'reports', 'admin', 'aiadmin'];
 
 interface Props {
   view: ConsoleView;
