@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabaseClient';
+import { getMeContext } from '../../lib/avaApi';
 
 const { colors: c } = theme;
 
-const FN_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co/functions/v1/telecom-admin-ai-agent';
-const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 const LS_KEY = 'ava-desk-chat-v1';
 
 type ChatMessage = { id: string; role: 'user' | 'assistant' | 'system'; content: string };
