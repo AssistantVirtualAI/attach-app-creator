@@ -179,6 +179,8 @@ export default function ConsoleLayout({
           {view === 'orgchat' && <OrgChatView />}
           {view === 'aiadmin' && <AdminAIChatView />}
           {view === 'reports' && <ReportsView />}
+          {view === 'customers' && <CustomersView />}
+          {view === 'voiceagents' && <VoiceAgentsView />}
           {view === 'settings' && (
             <SettingsPage
               creds={creds}
