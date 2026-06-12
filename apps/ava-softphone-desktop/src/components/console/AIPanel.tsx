@@ -105,7 +105,7 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
     const next = [...messages, userMsg];
     setMessages(next);
     setText('');
-    setLastPrompt(t);
+    
     await runWithBackoff(next);
   };
 
