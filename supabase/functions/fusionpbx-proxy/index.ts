@@ -697,6 +697,8 @@ Deno.serve(async (req) => {
       if (!r.ok) {
         await admin.from("pbx_sync_jobs").insert({
           organization_id, job_type: action, status: "failed",
+          started_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
           error: `No working CDR endpoint. Attempts: ${JSON.stringify(r.attempts).slice(0, 1500)}`,
           stats: {},
         });
