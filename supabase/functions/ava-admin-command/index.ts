@@ -35,10 +35,22 @@ Deno.serve(async (req) => {
       admin.rpc("is_super_admin", { _user_id: auth.user.id }),
       admin.rpc("is_lemtel_admin", { _user_id: auth.user.id }),
     ]);
-    if (!isSuper && !isLemtel) {
-      log(rid, "warn", "forbidden", { uid: auth.user.id });
-      return jsonResponse(403, { error: "AVA commands restricted to admins" });
+    const isAdmin = !!isSuper || !!isLemtel;
+
+    // Resolve caller's softphone org/extension (used for read-only scoping)
+    const { data: spu } = await admin
+      .from("pbx_softphone_users")
+      .select("organization_id, extension, display_name")
+      .eq("portal_user_id", auth.user.id)
+      .maybeSingle();
+
+    if (!isAdmin && !spu) {
+      log(rid, "warn", "forbidden_no_softphone", { uid: auth.user.id });
+      return jsonResponse(403, { error: "No softphone account linked to this user" });
     }
+    const callerOrgId: string | null = spu?.organization_id ?? null;
+    const callerExt: string | null = spu?.extension ?? null;
+
 
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) { log(rid, "error", "missing_api_key"); return jsonResponse(500, { error: "Missing LOVABLE_API_KEY" }); }
