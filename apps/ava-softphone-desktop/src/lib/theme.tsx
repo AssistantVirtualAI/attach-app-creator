@@ -96,8 +96,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
       if (saved === 'dark' || saved === 'light') return saved;
     } catch {}
-    return 'light';
+    return 'dark';
   });
+
 
   const t = mode === 'dark' ? dark : light;
 
