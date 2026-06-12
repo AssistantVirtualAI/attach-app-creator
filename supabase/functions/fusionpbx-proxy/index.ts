@@ -740,7 +740,8 @@ Deno.serve(async (req) => {
     // ---- Full sync ----
     if (action === "sync-all") {
       const t0 = Date.now();
-      // Optional resources filter: ['extensions','devices','ivrs','queues','ring_groups','destinations','cdrs']
+      const startedIso = new Date().toISOString();
+      // Optional resources filter: ['extensions','devices','ivrs','queues','ring_groups','gateways','destinations','cdrs']
       const requested: string[] | null = Array.isArray((body as any).resources)
         ? (body as any).resources
         : Array.isArray(params.resources)
@@ -753,6 +754,8 @@ Deno.serve(async (req) => {
       if (want("ivrs"))         tasks.push(pbxFetch(`ivr_menus?${domainQ}`).then((r) => ({ k: "ivr_menus", r })));
       if (want("queues"))       tasks.push(pbxFetch(`call_center_queues?${domainQ}`).then((r) => ({ k: "call_center_queues", r })));
       if (want("ring_groups"))  tasks.push(pbxFetch(`ring_groups?${domainQ}`).then((r) => ({ k: "ring_groups", r })));
+      // Gateways are global in FusionPBX (no domain filter) — query without domain_uuid.
+      if (want("gateways"))     tasks.push(pbxFetch(`gateways`).then((r) => ({ k: "gateways", r })));
       const results = await Promise.all(tasks);
       const cdrResult = want("cdrs") ? await fetchCdrsWithFallback({ limit: "200" }) : null;
       const stats: Record<string, number> = {};
