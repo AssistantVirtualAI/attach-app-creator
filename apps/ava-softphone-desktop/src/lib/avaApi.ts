@@ -464,8 +464,10 @@ export const ava = {
     try {
       const me = await getMeContext();
       const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-      const extUuidFilter = `&extension_uuid=eq.4b0efc15-d23d-426c-9285-b2c236254668`;
-      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extUuidFilter}&order=start_at.desc&limit=${limit}`;
+      const extFilter = me.extension_uuid
+        ? `&extension_uuid=eq.${me.extension_uuid}`
+        : (me.extension ? `&extension=eq.${me.extension}` : '');
+      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
