@@ -48,16 +48,31 @@ export default function AdminView() {
 
 function Table({ title, cols, load, row }: { title: string; cols: string[]; load: () => Promise<any[]>; row: (item: any) => (string | number)[] }) {
   const [data, setData] = useState<any[]>([]);
-  useEffect(() => { load().then(setData); }, [load]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const reload = React.useCallback(() => {
+    setLoading(true); setError(null);
+    load()
+      .then((d) => setData(Array.isArray(d) ? d : []))
+      .catch((e) => setError(e?.message || 'Failed to load'))
+      .finally(() => setLoading(false));
+  }, [load]);
+  useEffect(() => { reload(); }, [reload]);
   return (
     <>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>{title}</h1>
-        <button style={{
-          padding: '8px 14px', borderRadius: 9,
-          background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
-          border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-        }}>+ New</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={reload} style={{
+            padding: '8px 14px', borderRadius: 9, background: 'transparent',
+            border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          }}>↻ Refresh</button>
+          <button style={{
+            padding: '8px 14px', borderRadius: 9,
+            background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
+            border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          }}>+ New</button>
+        </div>
       </header>
       <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols.length}, 1fr)`, padding: '10px 14px', borderBottom: `1px solid ${c.border}`, background: c.deepPanel }}>
@@ -68,7 +83,9 @@ function Table({ title, cols, load, row }: { title: string; cols: string[]; load
             {row(item).map((v, j) => <span key={j} style={{ fontFamily: typeof v === 'number' ? 'JetBrains Mono, monospace' : 'inherit' }}>{v}</span>)}
           </div>
         ))}
-        {data.length === 0 && <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>Loading…</div>}
+        {loading && <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>Loading…</div>}
+        {!loading && !error && data.length === 0 && <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>No records yet. Click Refresh after syncing from the phone system.</div>}
+        {!loading && error && <div style={{ padding: 28, textAlign: 'center', color: c.danger, fontSize: 12 }}>{error}</div>}
       </div>
     </>
   );
