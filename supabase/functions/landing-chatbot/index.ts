@@ -98,7 +98,7 @@ async function sendConversationEmail(messages: any[], language: string) {
         <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
             <h2 style="margin: 0;">💬 Chatbot Conversation Summary</h2>
-            <p style="margin: 5px 0 0 0; opacity: 0.9;">Language: ${language.toUpperCase()} | ${new Date().toLocaleString()}</p>
+            <p style="margin: 5px 0 0 0; opacity: 0.9;">Language: ${escapeHtml(language).toUpperCase()} | ${new Date().toLocaleString()}</p>
           </div>
           <div style="background: #f9fafb; padding: 20px; border-radius: 0 0 10px 10px;">
             ${conversationHtml}
