@@ -139,18 +139,20 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
       </header>
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {eligible === false && (
+        {authed === false && (
           <Bubble role="system">
-            AVA admin commands are restricted to platform & Lemtel admins. You can still browse your softphone, voicemails and SMS.
+            Sign in to chat with AVA about your calls, voicemails, and recordings.
           </Bubble>
         )}
-        {eligible && messages.length === 0 && (
+        {authed && messages.length === 0 && (
           <>
             <Bubble role="assistant">
-              Bonjour. Je peux analyser les outages, voicemails, isolation tenant et exécuter des actions admin sécurisées. Demande-moi quoi que ce soit.
+              {isAdmin
+                ? 'Bonjour. Je peux analyser les outages, voicemails, isolation tenant et exécuter des actions admin sécurisées.'
+                : 'Bonjour. Demande-moi combien d\'appels manqués, mes derniers appels, ou un résumé de la journée.'}
             </Bubble>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-              {SUGGESTIONS.map((s) => (
+              {(isAdmin ? SUGGESTIONS : USER_SUGGESTIONS).map((s) => (
                 <button key={s} onClick={() => send(s)} style={{
                   textAlign: 'left', padding: '8px 10px',
                   background: 'rgba(124,58,237,0.06)',
