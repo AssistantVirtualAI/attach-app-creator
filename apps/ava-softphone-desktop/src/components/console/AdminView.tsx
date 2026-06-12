@@ -192,33 +192,72 @@ function Label({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 4 }}>{children}</div>;
 }
 
-type Section = 'extensions' | 'devices' | 'numbers' | 'ivrs' | 'queues' | 'ringgroups' | 'sync';
+type Section =
+  | 'extensions' | 'devices' | 'numbers' | 'ivrs' | 'queues' | 'ringgroups'
+  | 'gateways' | 'sip-profiles' | 'conferences' | 'hold-music' | 'dialplans'
+  | 'time-conditions' | 'registrations' | 'voicemails' | 'recordings' | 'feature-codes'
+  | 'sync';
 
-const NAV: { id: Section; label: string }[] = [
-  { id: 'extensions', label: 'Extensions' },
-  { id: 'devices', label: 'Devices' },
-  { id: 'numbers', label: 'Phone Numbers' },
-  { id: 'ivrs', label: 'Auto-Attendants' },
-  { id: 'queues', label: 'Call Queues' },
-  { id: 'ringgroups', label: 'Ring Groups' },
-  { id: 'sync', label: 'Sync Status' },
+const NAV_GROUPS: { label: string; items: { id: Section; label: string }[] }[] = [
+  {
+    label: 'Telephony',
+    items: [
+      { id: 'extensions', label: 'Extensions' },
+      { id: 'devices', label: 'Devices' },
+      { id: 'numbers', label: 'Phone Numbers' },
+      { id: 'registrations', label: 'Live Registrations' },
+    ],
+  },
+  {
+    label: 'Routing',
+    items: [
+      { id: 'ivrs', label: 'Auto-Attendants' },
+      { id: 'queues', label: 'Call Queues' },
+      { id: 'ringgroups', label: 'Ring Groups' },
+      { id: 'time-conditions', label: 'Time Conditions' },
+      { id: 'dialplans', label: 'Dialplans' },
+    ],
+  },
+  {
+    label: 'Media',
+    items: [
+      { id: 'voicemails', label: 'Voicemails' },
+      { id: 'recordings', label: 'Recording Rules' },
+      { id: 'hold-music', label: 'Hold Music' },
+      { id: 'conferences', label: 'Conferences' },
+      { id: 'feature-codes', label: 'Feature Codes' },
+    ],
+  },
+  {
+    label: 'Infrastructure',
+    items: [
+      { id: 'gateways', label: 'Gateways' },
+      { id: 'sip-profiles', label: 'SIP Profiles' },
+      { id: 'sync', label: 'Sync Status' },
+    ],
+  },
 ];
 
 export default function AdminView() {
   const [sec, setSec] = useState<Section>('extensions');
   return (
     <div style={{ display: 'flex', height: '100%' }}>
-      <aside style={{ width: 200, flexShrink: 0, borderRight: `1px solid ${c.border}`, background: c.deepPanel, padding: 16 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: c.signalGold, textTransform: 'uppercase', marginBottom: 10 }}>Admin</div>
-        {NAV.map((n) => (
-          <button key={n.id} onClick={() => setSec(n.id)} style={{
-            display: 'block', width: '100%', textAlign: 'left',
-            padding: '8px 10px', borderRadius: 8,
-            background: sec === n.id ? 'rgba(255,230,0,0.10)' : 'transparent',
-            border: 'none', color: sec === n.id ? c.signalGold : c.mutedSilver,
-            fontSize: 12, fontWeight: sec === n.id ? 700 : 500, cursor: 'pointer',
-            marginBottom: 2,
-          }}>{n.label}</button>
+      <aside style={{ width: 220, flexShrink: 0, borderRight: `1px solid ${c.border}`, background: c.deepPanel, padding: '18px 14px', overflowY: 'auto' }}>
+        {NAV_GROUPS.map((g) => (
+          <div key={g.label} style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.5, color: c.signalGold, textTransform: 'uppercase', marginBottom: 6, paddingLeft: 6 }}>{g.label}</div>
+            {g.items.map((n) => (
+              <button key={n.id} onClick={() => setSec(n.id)} style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '7px 10px', borderRadius: 8,
+                background: sec === n.id ? 'rgba(11,181,214,0.14)' : 'transparent',
+                border: 'none', color: sec === n.id ? c.avaCyan : c.mutedSilver,
+                fontSize: 12, fontWeight: sec === n.id ? 700 : 500, cursor: 'pointer',
+                marginBottom: 1,
+                transition: 'all 160ms ease',
+              }}>{n.label}</button>
+            ))}
+          </div>
         ))}
       </aside>
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px' }}>
@@ -228,11 +267,136 @@ export default function AdminView() {
         {sec === 'ivrs' && <IvrsTable />}
         {sec === 'queues' && <QueuesTable />}
         {sec === 'ringgroups' && <Table title="Ring Groups" cols={['Name', 'Members', 'Strategy']} load={ava.ringGroups} row={(r: any) => [r.name, r.members, r.strategy]} />}
+        {sec === 'gateways' && (
+          <PbxResourceSection
+            kind="gateways" title="Gateways" uuidField="gateway_uuid" global
+            cols={[
+              { key: 'gateway', label: 'Name' },
+              { key: 'proxy', label: 'Proxy' },
+              { key: 'username', label: 'Username' },
+              { key: 'enabled', label: 'Enabled', render: (v) => (String(v) === 'true' ? '✓' : '—') },
+              { key: 'register', label: 'Register' },
+            ]}
+            fields={[
+              { key: 'gateway', label: 'Name' },
+              { key: 'username', label: 'Username' },
+              { key: 'password', label: 'Password' },
+              { key: 'proxy', label: 'Proxy (host[:port])' },
+              { key: 'realm', label: 'Realm' },
+              { key: 'register', label: 'Register', type: 'select', options: ['true', 'false'] },
+              { key: 'enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
+            ]}
+            rowActions={[{
+              label: 'Restart',
+              run: async (row, { orgId }) => {
+                await supabase.functions.invoke('fusionpbx-proxy', {
+                  body: { action: 'restart-gateway', organization_id: orgId, params: { gateway_name: row.gateway } },
+                });
+              },
+            }]}
+          />
+        )}
+        {sec === 'sip-profiles' && (
+          <PbxResourceSection
+            kind="sip-profiles" title="SIP Profiles" uuidField="sip_profile_uuid" global canCreate={false}
+            cols={[
+              { key: 'sip_profile_name', label: 'Name' },
+              { key: 'sip_profile_description', label: 'Description' },
+              { key: 'sip_profile_enabled', label: 'Enabled' },
+            ]}
+            rowActions={[{
+              label: 'Restart',
+              run: async (row, { orgId }) => {
+                await supabase.functions.invoke('fusionpbx-proxy', {
+                  body: { action: 'restart-sip-profile', organization_id: orgId, params: { profile_name: row.sip_profile_name } },
+                });
+              },
+            }]}
+          />
+        )}
+        {sec === 'conferences' && (
+          <PbxResourceSection
+            kind="conferences" title="Conferences" uuidField="conference_room_uuid"
+            cols={[
+              { key: 'conference_room_name', label: 'Name' },
+              { key: 'conference_room_extension', label: 'Extension' },
+              { key: 'conference_room_pin', label: 'PIN' },
+              { key: 'conference_room_enabled', label: 'Enabled' },
+            ]}
+            fields={[
+              { key: 'conference_room_name', label: 'Name' },
+              { key: 'conference_room_extension', label: 'Extension' },
+              { key: 'conference_room_pin', label: 'PIN' },
+              { key: 'conference_room_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
+              { key: 'conference_room_description', label: 'Description', type: 'textarea' },
+            ]}
+          />
+        )}
+        {sec === 'hold-music' && (
+          <PbxResourceSection
+            kind="hold-music" title="Hold Music" uuidField="music_on_hold_uuid"
+            cols={[
+              { key: 'music_on_hold_name', label: 'Name' },
+              { key: 'music_on_hold_path', label: 'Path' },
+              { key: 'music_on_hold_rate', label: 'Rate' },
+              { key: 'music_on_hold_enabled', label: 'Enabled' },
+            ]}
+            fields={[
+              { key: 'music_on_hold_name', label: 'Name' },
+              { key: 'music_on_hold_path', label: 'Path' },
+              { key: 'music_on_hold_rate', label: 'Rate', type: 'select', options: ['8000', '16000', '32000', '48000'] },
+              { key: 'music_on_hold_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
+            ]}
+          />
+        )}
+        {sec === 'dialplans' && (
+          <PbxResourceSection
+            kind="dialplans" title="Dialplans" uuidField="dialplan_uuid"
+            cols={[
+              { key: 'dialplan_name', label: 'Name' },
+              { key: 'dialplan_number', label: 'Number' },
+              { key: 'dialplan_context', label: 'Context' },
+              { key: 'dialplan_continue', label: 'Continue' },
+              { key: 'dialplan_enabled', label: 'Enabled' },
+            ]}
+            fields={[
+              { key: 'dialplan_name', label: 'Name' },
+              { key: 'dialplan_number', label: 'Number' },
+              { key: 'dialplan_context', label: 'Context' },
+              { key: 'dialplan_order', label: 'Order', type: 'number' },
+              { key: 'dialplan_continue', label: 'Continue', type: 'select', options: ['true', 'false'] },
+              { key: 'dialplan_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
+              { key: 'dialplan_xml', label: 'XML', type: 'textarea' },
+              { key: 'dialplan_description', label: 'Description' },
+            ]}
+          />
+        )}
+        {sec === 'time-conditions' && (
+          <PbxResourceSection
+            kind="time-conditions" title="Time Conditions" uuidField="dialplan_uuid"
+            cols={[
+              { key: 'dialplan_name', label: 'Name' },
+              { key: 'dialplan_number', label: 'Match' },
+              { key: 'dialplan_enabled', label: 'Enabled' },
+            ]}
+            fields={[
+              { key: 'dialplan_name', label: 'Name' },
+              { key: 'dialplan_number', label: 'Match expression' },
+              { key: 'dialplan_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
+              { key: 'dialplan_description', label: 'Description' },
+            ]}
+          />
+        )}
+        {sec === 'feature-codes' && <FeatureCodesTable />}
+        {sec === 'voicemails' && <VoicemailsTable />}
+        {sec === 'recordings' && <RecordingRulesTable />}
+        {sec === 'registrations' && <LiveRegistrationsTable />}
         {sec === 'sync' && <SyncStatus />}
       </div>
     </div>
   );
 }
+
 
 function Table({ title, cols, load, row }: { title: string; cols: string[]; load: () => Promise<any[]>; row: (item: any) => (string | number)[] }) {
   const [data, setData] = useState<any[]>([]);
