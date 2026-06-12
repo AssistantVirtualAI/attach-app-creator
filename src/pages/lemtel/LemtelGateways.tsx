@@ -114,7 +114,9 @@ export default function LemtelGateways() {
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No gateways returned.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    No gateways returned. If FusionPBX shows gateways in its admin UI but this list is empty, the API user needs the <code className="px-1 rounded bg-muted">gateway_view</code> permission enabled.
+                  </TableCell></TableRow>
                 ) : filtered.map(g => {
                   const enabled = g.enabled === true || g.enabled === 'true';
                   const register = g.register === true || g.register === 'true';
