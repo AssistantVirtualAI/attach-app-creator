@@ -376,6 +376,10 @@ const tag = (col: string): React.CSSProperties => ({
   background: 'rgba(255,255,255,0.04)', color: col,
   border: `1px solid ${col}33`, fontWeight: 600,
 });
+const inputMini: React.CSSProperties = {
+  padding: '8px 10px', borderRadius: 8, background: 'rgba(140,180,255,0.06)',
+  border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, outline: 'none',
+};
 const miniBtn: React.CSSProperties = {
   padding: '4px 9px', borderRadius: 6,
   background: 'transparent', border: `1px solid ${c.border}`,
