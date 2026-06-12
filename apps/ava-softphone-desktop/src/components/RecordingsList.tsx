@@ -77,19 +77,14 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
     }
   };
 
-  const play = async (r: RecordingItem) => {
+  const play = (r: RecordingItem) => {
     setError(null);
     if (audio[r.id]) return;
-    // Try direct FusionPBX URL first (works in Electron without CORS)
-    if (r.recording_path && r.recording_name) {
-      const direct = `https://pbxnode.lemtel.tel/app/api/7/recordings/${r.recording_name}?key=1fzetTwb0VC1BiHjUgWfHE7y78THXTNX&username=mhassoun&path=${encodeURIComponent(r.recording_path)}`;
-      setAudio((a) => ({ ...a, [r.id]: direct }));
-      return;
-    }
-    const url = await ava.getRecordingAudioUrl(r);
-    if (!url) { setError('Recording file not available from PBX yet'); return; }
+    if (!r.recording_name) { setError('Recording file not available from PBX yet'); return; }
+    const url = `https://pbxnode.lemtel.tel/app/recordings/${r.recording_name}?key=1fzetTwb0VC1BiHjUgWfHE7y78THXTNX&username=mhassoun`;
     setAudio((a) => ({ ...a, [r.id]: url }));
   };
+
 
   if (loading) return <div style={{ textAlign: 'center', padding: 40, color: c.textSub }}>Loading recordings…</div>;
 
