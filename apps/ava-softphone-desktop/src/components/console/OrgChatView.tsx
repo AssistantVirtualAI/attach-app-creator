@@ -18,41 +18,59 @@ export default function OrgChatView() {
   const [me, setMe] = useState<{ id: string; name: string } | null>(null);
   const [reads, setReads] = useState<Record<string, string>>({});
   const [orgId, setOrgId] = useState<string | null>(null);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Load me + org + channels
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
-      const name = (u.user.user_metadata as any)?.full_name ?? u.user.email ?? 'You';
-      setMe({ id: u.user.id, name });
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        if (!u.user) { setErrMsg('Sign in required to use Team Chat.'); return; }
+        const name = (u.user.user_metadata as any)?.full_name ?? u.user.email ?? 'You';
+        setMe({ id: u.user.id, name });
 
-      const { data: spu } = await supabase.from('pbx_softphone_users')
-        .select('organization_id').eq('portal_user_id', u.user.id).maybeSingle();
-      let org = spu?.organization_id ?? null;
-      if (!org) {
-        const { data: om } = await supabase.from('organization_members')
-          .select('organization_id').eq('user_id', u.user.id).limit(1).maybeSingle();
-        org = om?.organization_id ?? null;
+        // Try multiple sources to resolve the user's organization.
+        let org: string | null = null;
+        const { data: spu } = await supabase.from('pbx_softphone_users')
+          .select('organization_id').eq('portal_user_id', u.user.id).maybeSingle();
+        org = spu?.organization_id ?? null;
+        if (!org) {
+          const { data: om } = await supabase.from('organization_members')
+            .select('organization_id').eq('user_id', u.user.id).limit(1).maybeSingle();
+          org = om?.organization_id ?? null;
+        }
+        if (!org) {
+          const { data: om2 } = await supabase.from('org_members')
+            .select('org_id').eq('user_id', u.user.id).limit(1).maybeSingle();
+          org = (om2 as any)?.org_id ?? null;
+        }
+        if (!org) {
+          const { data: ur } = await supabase.from('user_roles')
+            .select('organization_id').eq('user_id', u.user.id).limit(1).maybeSingle();
+          org = ur?.organization_id ?? null;
+        }
+        if (!org) { setErrMsg('No organization linked to your account yet — ask an admin to add you.'); return; }
+        setOrgId(org);
+
+        await supabase.rpc('ensure_general_channel', { _org_id: org, _user_id: u.user.id });
+
+        const { data: chs, error: chErr } = await supabase.from('org_chat_channels')
+          .select('id,name,channel_type,organization_id,archived_at')
+          .eq('organization_id', org).is('archived_at', null)
+          .order('name');
+        if (chErr) { setErrMsg(`Channels error: ${chErr.message}`); return; }
+        setChannels(chs ?? []);
+        if (chs?.length) setActiveId(chs[0].id);
+
+        const { data: r } = await supabase.from('org_chat_reads')
+          .select('channel_id,last_read_at').eq('user_id', u.user.id);
+        const map: Record<string, string> = {};
+        (r ?? []).forEach((x: any) => { map[x.channel_id] = x.last_read_at; });
+        setReads(map);
+      } catch (e: any) {
+        setErrMsg(e?.message || 'Failed to load team chat.');
       }
-      if (!org) return;
-      setOrgId(org);
-
-      await supabase.rpc('ensure_general_channel', { _org_id: org, _user_id: u.user.id });
-
-      const { data: chs } = await supabase.from('org_chat_channels')
-        .select('id,name,channel_type,organization_id,archived_at')
-        .eq('organization_id', org).is('archived_at', null)
-        .order('name');
-      setChannels(chs ?? []);
-      if (chs?.length) setActiveId(chs[0].id);
-
-      const { data: r } = await supabase.from('org_chat_reads')
-        .select('channel_id,last_read_at').eq('user_id', u.user.id);
-      const map: Record<string, string> = {};
-      (r ?? []).forEach((x: any) => { map[x.channel_id] = x.last_read_at; });
-      setReads(map);
     })();
   }, []);
 
