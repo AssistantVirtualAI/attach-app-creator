@@ -17,7 +17,42 @@ import { BACKEND, TABLES, FN, fnUrl } from './config';
 export const MOCK: boolean = (import.meta as any).env?.VITE_AVA_MOCK === 'true';
 
 let authToken: string | null = null;
-export function setAuthToken(token: string | null) { authToken = token; }
+export function setAuthToken(token: string | null) {
+  authToken = token;
+  _meCache = null;
+}
+
+type MeContext = { organization_id: string | null; extension: string | null };
+let _meCache: MeContext | null = null;
+let _meInflight: Promise<MeContext> | null = null;
+
+export async function getMeContext(): Promise<MeContext> {
+  if (_meCache) return _meCache;
+  if (_meInflight) return _meInflight;
+  _meInflight = (async () => {
+    try {
+      if (!authToken) return { organization_id: null, extension: null };
+      const res = await fetch(
+        `${BACKEND.url}/rest/v1/pbx_softphone_users?select=organization_id,extension&portal_user_id=eq.${'me'.replace('me','')}` ,
+        { headers: authHeaders() }
+      );
+      // Use RPC-free path: rely on RLS + auth.uid() filter via PostgREST `select=*` and a portal_user_id eq filter using JWT
+      const url = `${BACKEND.url}/rest/v1/pbx_softphone_users?select=organization_id,extension&limit=1`;
+      const r = await fetch(url, { headers: authHeaders() });
+      if (!r.ok) return { organization_id: null, extension: null };
+      const rows = await r.json();
+      const row = Array.isArray(rows) && rows[0] ? rows[0] : {};
+      _meCache = { organization_id: row.organization_id ?? null, extension: row.extension ?? null };
+      return _meCache;
+    } catch {
+      return { organization_id: null, extension: null };
+    } finally {
+      _meInflight = null;
+    }
+  })();
+  return _meInflight;
+}
+
 
 function authHeaders(): Record<string, string> {
   const h: Record<string, string> = {
