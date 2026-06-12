@@ -768,3 +768,114 @@ function EditQueueModal({ queue, saving, onClose, onSave }: { queue: any; saving
     </div>
   );
 }
+
+/* ============= New section tables (Supabase-backed reads) ============= */
+
+function SimpleSection({ title, headers, rows, loading, error, onRefresh, extra }: {
+  title: string; headers: string[]; rows: any[][]; loading: boolean; error: string | null; onRefresh: () => void; extra?: React.ReactNode;
+}) {
+  return (
+    <>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+        <h1 style={{ fontSize: 22, color: c.textIce, margin: 0, fontWeight: 700 }}>
+          {title} <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500, marginLeft: 6 }}>({rows.length})</span>
+        </h1>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {extra}
+          <button onClick={onRefresh} style={{ padding: '8px 12px', borderRadius: 10, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>↻ Refresh</button>
+        </div>
+      </header>
+      <div style={{ ...theme.glass.card, padding: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', borderColor: c.border }}>
+        {loading ? <div style={{ padding: 32, textAlign: 'center', color: c.mutedSilver }}>Loading…</div>
+          : error ? <div style={{ padding: 24, color: c.danger }}>{error}</div>
+          : rows.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: c.mutedSilver }}>No records.</div>
+          : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <thead><tr style={{ background: 'rgba(255,255,255,0.025)' }}>
+                  {headers.map((h) => (
+                    <th key={h} style={{ textAlign: 'left', padding: '12px 14px', color: c.mutedSilver, fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', borderBottom: `1px solid ${c.border}` }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>{rows.map((r, i) => (
+                  <tr key={i} style={{ borderBottom: `1px solid ${c.border}` }}>
+                    {r.map((cell, j) => <td key={j} style={{ padding: '11px 14px', color: c.textIce }}>{cell ?? '—'}</td>)}
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+      </div>
+    </>
+  );
+}
+
+function useTableLoader(loader: () => Promise<any[]>) {
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const reload = useCallback(() => {
+    setLoading(true); setError(null);
+    loader().then(setRows).catch((e) => setError(e?.message || 'Failed to load')).finally(() => setLoading(false));
+  }, [loader]);
+  useEffect(() => { reload(); }, [reload]);
+  return { rows, loading, error, reload };
+}
+
+function VoicemailsTable() {
+  const loader = useCallback(async () => {
+    const me = await getMeContext().catch(() => null);
+    const orgId = me?.organization_id || LEMTEL_ORG;
+    const { data, error } = await supabase.from('pbx_voicemail_settings').select('*').eq('organization_id', orgId).order('extension');
+    if (error) throw error;
+    return data || [];
+  }, []);
+  const { rows, loading, error, reload } = useTableLoader(loader);
+  return <SimpleSection title="Voicemail Boxes" headers={['Ext', 'Email', 'PIN', 'Greeting', 'Attach', 'Delete after']}
+    rows={rows.map((v) => [v.extension, v.email || '—', v.voicemail_password ? '••••' : '—', v.greeting_id || '—', v.attach_file ? '✓' : '—', v.local_after_email ? 'Delete' : 'Keep'])}
+    loading={loading} error={error} onRefresh={reload} />;
+}
+
+function RecordingRulesTable() {
+  const loader = useCallback(async () => {
+    const me = await getMeContext().catch(() => null);
+    const orgId = me?.organization_id || LEMTEL_ORG;
+    const { data, error } = await supabase.from('pbx_call_recording_rules').select('*').eq('organization_id', orgId);
+    if (error) throw error;
+    return data || [];
+  }, []);
+  const { rows, loading, error, reload } = useTableLoader(loader);
+  return <SimpleSection title="Recording Rules" headers={['Scope', 'Target', 'Mode', 'Retention (days)']}
+    rows={rows.map((r) => [r.scope || 'global', r.target || '—', r.mode || 'on', r.retention_days ?? '—'])}
+    loading={loading} error={error} onRefresh={reload} />;
+}
+
+function FeatureCodesTable() {
+  const loader = useCallback(async () => {
+    const me = await getMeContext().catch(() => null);
+    const orgId = me?.organization_id || LEMTEL_ORG;
+    const { data, error } = await supabase.from('pbx_feature_codes').select('*').eq('organization_id', orgId).order('code');
+    if (error) throw error;
+    return data || [];
+  }, []);
+  const { rows, loading, error, reload } = useTableLoader(loader);
+  return <SimpleSection title="Feature Codes" headers={['Code', 'Name', 'Description', 'Enabled']}
+    rows={rows.map((f) => [f.code, f.name || '—', f.description || '—', f.enabled ? '✓' : '—'])}
+    loading={loading} error={error} onRefresh={reload} />;
+}
+
+function LiveRegistrationsTable() {
+  const loader = useCallback(async () => {
+    const me = await getMeContext().catch(() => null);
+    const orgId = me?.organization_id || LEMTEL_ORG;
+    const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+      body: { action: 'get-registrations', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN } },
+    });
+    if (error) throw error;
+    return (data as any)?.data || (data as any)?.registrations || [];
+  }, []);
+  const { rows, loading, error, reload } = useTableLoader(loader);
+  return <SimpleSection title="Live Registrations" headers={['User', 'Contact', 'Agent', 'Status', 'Expires']}
+    rows={rows.map((r: any) => [r.user || r.aor || '—', r.contact || '—', r.agent || '—', r.status || 'registered', r.expires || '—'])}
+    loading={loading} error={error} onRefresh={reload} />;
+}
