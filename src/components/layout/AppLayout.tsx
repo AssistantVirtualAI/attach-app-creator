@@ -320,9 +320,9 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
       </aside>
 
       {/* Main content */}
-      <main className="pt-14 md:pt-0 md:ml-64 xl:ml-72 min-h-screen flex flex-col cockpit-scope">
+      <main className="pt-14 md:pt-0 md:ml-64 xl:ml-72 min-h-screen flex flex-col cockpit-scope min-w-0">
 
-        <div className="p-4 lg:p-6 flex-1 w-full max-w-full">
+        <div className="px-4 lg:px-6 py-4 flex-1 w-full min-w-0">
           {children}
         </div>
         <AvaFooter />
