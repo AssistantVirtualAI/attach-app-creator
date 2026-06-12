@@ -1,71 +1,90 @@
-# Live PBX Sync, Gateways & Full Remote Management
+# Desktop App: Full PBX Management + Futuristic Redesign
 
-## Root causes found
+Two parallel tracks: (1) reach full feature parity with the web portal so every PBX-side action is editable from the desktop app, (2) restyle the entire console UI to a futuristic, elegant, modern look that scales from narrow (compact rail) to wide (full console) gracefully.
 
-1. **"Last sync 7 days ago"** — sync jobs are written with the wrong columns. `fusionpbx-proxy` writes `error_message` but the table column is `error`, and never sets `started_at`. `realtime-sync` writes `kind` / `finished_at` while the table uses `job_type` / `completed_at`. Result: every "completed" row has `started_at = NULL`, so the UI falls back to the last row that *did* set it (7 days old).
-2. **Gateways page empty** — `list-gateways` is routed through the generic ADV map which appends `?domain_uuid=<lemtel-domain>`. In FusionPBX, **gateways are global** (`domain_uuid` is usually NULL or belongs to the system domain), so the filter returns 0 rows.
-3. **No live sync loop** — there is no scheduled job. `realtime-sync` only runs when the user clicks "Sync Everything", and even then most kinds return `fetched: 0` because the proxy actions aren't wired to upserts (only `sync-cdrs` and `sync-config` actually write rows).
-4. **Remote management gaps** — the admin UI reads from local `pbx_*` tables, but writes (extensions, IVRs, ring groups, queues, gateways, time conditions) are not all routed through `fusionpbx-proxy` create/update/delete actions, so the portal/desktop can view but not always change the live PBX.
+## Track 1 — Full PBX management parity
 
-## Plan
+Current `AdminView.tsx` only ships 6 sections (Extensions, Devices, Numbers, IVRs, Queues, Ring Groups) and most are read-only `Table` wrappers. Web portal has a much wider surface. Bring all of it into the desktop app, all wired through `fusionpbx-proxy` so edits hit the live PBX.
 
-### 1. Fix sync-job logging (foundation for "live" status)
-- `fusionpbx-proxy/index.ts`: every insert/update to `pbx_sync_jobs` uses `job_type`, `status`, `started_at = now()`, `completed_at`, `error` (drop `error_message`), `stats`.
-- `realtime-sync/index.ts`: same column rename (`kind`→`job_type`, `finished_at`→`completed_at`).
-- One-time cleanup: backfill `started_at = created_at` for existing NULL rows so the dashboard stops showing "7 days ago".
+### Sections to add / upgrade
 
-### 2. Make Gateways page work
-- In `fusionpbx-proxy`, special-case `list-gateways` / `get-gateways` / `create-gateways` etc. to **omit** the `domain_uuid` filter (and accept an optional `domain_uuid` param when the caller wants per-tenant gateways).
-- `LemtelGateways.tsx`: keep existing UI; add an inline edit drawer (proxy → host, proxy, username, password, register, expire-seconds, caller-id-in-from, enabled) and a "Create gateway" button calling `create-gateways`. Add Enable/Disable toggle and Delete with confirmation.
-- Mirror the same page into the desktop app under "Admin → Gateways" (read + restart only on desktop).
+| Section | Current | Target |
+|---|---|---|
+| Extensions | Edit modal exists | Add create / delete / bulk-enable, register status badge |
+| Devices | Read-only | Create / edit / delete, assign extension, reboot, provisioning URL |
+| Phone Numbers (DIDs) | Read-only | Edit destination, IVR/queue/ext routing, CNAM, fax toggle |
+| IVRs | Edit modal | Add option editor (digit → action), greeting upload, timeout/invalid actions |
+| Call Queues | Edit modal | Add agent membership editor (add/remove/penalty), MOH picker, wrap-up timer |
+| Ring Groups | Read-only | Member editor with order, strategy, no-answer destination |
+| **Gateways** (NEW) | — | List, enable/disable, restart, edit credentials, view registration |
+| **Time Conditions** (NEW) | — | Schedule editor with multiple match conditions and true/false destinations |
+| **Dialplans** (NEW) | — | List + edit XML/conditions, enable/disable |
+| **Hold Music** (NEW) | — | Upload, preview, assign to queues |
+| **Voicemail Boxes** (NEW) | — | List per extension, edit PIN/email/greeting, view voicemails |
+| **Call Recordings Rules** (NEW) | — | Per-extension/queue recording on/off, retention |
+| **Conferences** (NEW) | — | List rooms, edit PIN, kick participants |
+| **Feature Codes** (NEW) | — | List/enable/disable, edit code |
+| **Live Registrations** (NEW) | — | Real-time SIP registration status per extension, force unregister |
+| **SIP Profiles** (NEW) | — | List, restart, view status (read-only for non-superadmin) |
+| Sync | Status panel | Show last successful per-resource sync + retry button per resource |
 
-### 3. True live sync (cron + realtime)
-- Add a Postgres cron job (`pg_cron`) that calls `realtime-sync` every 2 minutes for the Lemtel org.
-- Extend `realtime-sync` so each `kind` actually upserts into the corresponding `pbx_*` table:
-  extensions, devices, ivr_menus, call_center_queues, ring_groups, gateways, phone_numbers (DIDs), cdrs, recordings, voicemails, registrations.
-- Already-present `pbx_call_records` realtime publication powers the desktop `useRealtimeSync`; add `pbx_gateways`, `pbx_extensions`, `pbx_ivrs`, `pbx_call_queues`, `pbx_ring_groups`, `pbx_devices`, `pbx_phone_number_assignments`, `pbx_sync_jobs` to the same publication so both portal and desktop refresh instantly.
-- Sidebar/topbar "Last sync" pill: derive from `max(completed_at)` across all kinds; show green dot when newest completed within 5 min, amber within 1 h, red otherwise.
+### Wiring
 
-### 4. Full remote management (portal + desktop)
-For each resource below the portal/desktop will use `fusionpbx-proxy` for live writes and the local `pbx_*` tables as the cache that `realtime-sync` keeps fresh:
+- All writes go through `supabase.functions.invoke('fusionpbx-proxy', { action: '<verb>-<resource>', ... })`. Add any missing actions in `fusionpbx-proxy/index.ts` (create/update/delete for the new resources, plus `restart-gateway`, `reboot-device`, `force-unregister`, `upload-moh`, `upload-greeting`).
+- Reads go through Supabase tables (`pbx_gateways`, `pbx_time_conditions`, `pbx_dialplans`, `pbx_hold_music`, `pbx_voicemails`, `pbx_voicemail_settings`, `pbx_call_recording_rules`, `pbx_conferences`, `pbx_feature_codes`, `pbx_sip_profiles`, `pbx_devices`, `pbx_ring_groups`, `pbx_phone_number_assignments`) — all already exist per the supabase-tables list.
+- Live registration view subscribes to `pbx_extensions` Realtime updates of the `registered` / `last_register` columns.
+- Tenant scoping: every query/mutation passes `organization_id` from `getMeContext()` and `domain_uuid` from the resolved org → no Lemtel-only hardcodes for multi-tenant flows (keep current Lemtel constants only as fallback).
 
-| Resource | List | Create | Update | Delete | Extra |
-|---|---|---|---|---|---|
-| Extensions | ✓ | ✓ | ✓ | ✓ | Reset password, toggle voicemail |
-| Devices | ✓ | ✓ | ✓ | ✓ | Reboot (`commands` API) |
-| Ring groups | ✓ | ✓ | ✓ | ✓ | Manage members |
-| Call-center queues | ✓ | ✓ | ✓ | ✓ | Add/remove agents, pause |
-| IVR menus | ✓ | ✓ | ✓ | ✓ | Upload audio to `lemtel-ivr-audio`, set options |
-| Time conditions | ✓ | ✓ | ✓ | ✓ | Business-hour presets |
-| Destinations / DIDs | ✓ | ✓ | ✓ | ✓ | Route to ext/IVR/RG/queue |
-| Gateways | ✓ | ✓ | ✓ | ✓ | Restart, enable/disable |
-| SIP profiles | ✓ | ✓ | ✓ | – | Restart |
-| Hold music | ✓ | ✓ | ✓ | ✓ | Upload audio |
-| Voicemails | ✓ | – | mark read/delete | ✓ | Play recording |
-| Recordings | ✓ | – | – | ✓ | Play, download |
-| Live registrations | ✓ | – | – | – | Surfaced on dashboard |
+### Refactor
 
-All write actions go through the existing `restart-gateway` / `pbxWrite` pattern; no direct DB writes from the client.
+Split monolithic `AdminView.tsx` (~600 lines) into one file per section under `components/console/admin/` (`ExtensionsSection.tsx`, `GatewaysSection.tsx`, …). Shared `<ResourceTable />`, `<EditDrawer />`, `<ConfirmDelete />` primitives in `components/console/admin/_shared/`.
 
-### 5. End-to-end test pass after deployment
-- Run `realtime-sync { kind: 'all' }` once; verify each kind returns `fetched > 0` and a fresh `pbx_sync_jobs` row with `completed_at` set.
-- Open Gateways page → confirm carrier rows appear (Telnyx/whatever is configured).
-- From portal: create a test extension, edit, delete; verify it round-trips on the real PBX (call `list-extensions` and confirm).
-- From desktop: confirm sync pill turns green, gateway list mirrors portal.
-- Record a 15-second call → verify recording appears and plays in both portal and desktop within 2 min (cron tick).
+## Track 2 — Futuristic redesign (responsive)
 
-## Technical notes (for review)
+### Visual direction
 
-- The proxy already supports the ADV CRUD map; only the `domain_uuid` filter on gateway endpoints and the sync-job column names need to change.
-- `pg_cron` is already used by the project for other jobs; we add one entry: `select cron.schedule('lemtel-live-sync','*/2 * * * *', $$ select net.http_post(...realtime-sync...) $$);`
-- No new tables required; only column-name fixes and publication additions (migration).
+- **Aesthetic**: dark cyberpunk-glass — deep midnight base (`#05060d`), translucent panels with backdrop-blur, hairline borders in cool ice-blue, single saturated accent (`#23d6ff`) plus warning amber (`#ffb84a`).
+- **Typography**: keep Inter for body, introduce **Space Grotesk** for headings/numerals (extension numbers, call durations, KPI counters); JetBrains Mono for SIP/log data.
+- **Surfaces**: layered glass cards with subtle gradient borders (`linear-gradient(135deg, rgba(35,214,255,.4), transparent 60%)` via mask), soft inner glow on focus, depth via 3-stop shadow.
+- **Motion**: 180ms ease-out transitions on hover, view transitions between sections (slide+fade 120ms), pulsing register dot, animated waveform on active calls.
+- **Iconography**: stroke-based 1.5px line icons (replace current path icons with a consistent Lucide set in `RowIcons`/`TabIcons`).
 
-## Files to touch
+### Components to restyle
 
-- `supabase/functions/fusionpbx-proxy/index.ts` (job-log columns, gateway filter bypass, missing write actions)
-- `supabase/functions/realtime-sync/index.ts` (column rename + per-kind upserts)
-- `src/pages/lemtel/LemtelGateways.tsx` (CRUD UI)
-- `src/pages/lemtel/admin/*` (wire CRUD buttons where missing)
-- `src/hooks/useSyncStatus.ts` / `src/components/lemtel/SyncEverythingButton.tsx` (status pill from `completed_at`)
-- `apps/ava-softphone-desktop/src/...` (Gateways viewer + sync pill parity)
-- One migration: backfill `started_at`, add tables to `supabase_realtime` publication, schedule cron.
+- `ConsoleLayout`, `LeftRail`, `PageHeader`, `ActiveCallDock`, `CommandPalette`, `IncomingCallToast`, `HomeDashboard`, all `*View.tsx`, admin tables, dialer in `SoftphonePane`, `SettingsPage`, `SetupWizard`, `TitleBar`, `UpdateBanner`, status pills.
+- Replace inline `style={{}}` color literals with semantic tokens in `lib/theme.ts` (`surface.glass`, `surface.glassHover`, `border.hairline`, `accent.cyan`, `accent.amber`, `text.ice`, `text.muted`).
+
+### Responsive behavior
+
+- Breakpoints: `compact` <820px (current `CompactRail`), `standard` 820–1280px (rail + single content pane), `wide` ≥1280px (rail + content + contextual right pane: active call dock / AI panel / details drawer).
+- Admin tables: cards on compact, dense rows on standard, multi-column with inline edit on wide.
+- Dialer collapses into a floating launcher button on compact, persistent right pane on wide.
+- All edit modals become bottom sheets on compact, side drawers on standard, centered modals on wide.
+
+### Theme migration
+
+Extend `lib/theme.ts` with the new token set, write a small CSS-in-JS helper `glass(level)` for panel backgrounds, and refactor existing components to consume tokens instead of literals. No hardcoded `#fff` / `#000`.
+
+## Technical details
+
+- New edge function actions in `supabase/functions/fusionpbx-proxy/index.ts`: `list-gateways` (no `domain_uuid` filter), `create-gateway`, `update-gateway`, `delete-gateway`, `restart-gateway`, `reboot-device`, `force-unregister`, `crud-time-condition`, `crud-dialplan`, `upload-moh`, `upload-greeting`, `crud-conference`, `crud-feature-code`, voicemail PIN/email update.
+- Add Realtime publication for `pbx_extensions` register columns and `pbx_sync_jobs` so the desktop UI live-updates without polling.
+- Type-safe wrappers in `apps/ava-softphone-desktop/src/lib/avaApi.ts` for every new action.
+- Build verification: `apps/ava-softphone-desktop` Vite build must succeed and Electron packaging (`@electron/packager`) must produce a working bundle (test the existing `electron/main.cjs` path).
+
+## Files touched (estimate)
+
+- New: `components/console/admin/{Extensions,Devices,Numbers,Ivrs,Queues,RingGroups,Gateways,TimeConditions,Dialplans,HoldMusic,Voicemails,Recordings,Conferences,FeatureCodes,Registrations,SipProfiles,Sync}Section.tsx`, `_shared/{ResourceTable,EditDrawer,ConfirmDelete,FieldRow}.tsx`
+- Edited: `AdminView.tsx` (becomes router), `LeftRail.tsx`, `ConsoleLayout.tsx`, `PageHeader.tsx`, all `*View.tsx`, `SoftphonePane.tsx`, `SettingsPage.tsx`, `TitleBar.tsx`, `lib/theme.ts`, `lib/avaApi.ts`, `index.tsx` global CSS
+- Backend: `supabase/functions/fusionpbx-proxy/index.ts`, 1 migration (Realtime publication additions, no schema changes)
+
+## Out of scope
+
+- Web portal changes (only desktop app).
+- Schema changes — all target tables already exist.
+- Touching landing pages (locked per memory).
+
+## Open questions before I build
+
+1. Should the new sections appear for **all tenants' admins**, or only for super-admins / Lemtel staff initially?
+2. For the redesign, do you want me to first show 3 rendered design directions to pick from, or trust the cyberpunk-glass direction above and ship it directly?
