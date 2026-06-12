@@ -663,6 +663,15 @@ const App = () => (
                 <Route path="/org/:slug/admin/hours" element={<ProtectedRoute><AdminPortalLayout><BusinessHours /></AdminPortalLayout></ProtectedRoute>} />
                 <Route path="/org/:slug/admin/settings" element={<ProtectedRoute><AdminPortalLayout><CustomerSettings /></AdminPortalLayout></ProtectedRoute>} />
                 <Route path="/org/lemtel/admin/downloads" element={<LemtelAdminPage><DownloadCenter /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/fax" element={<LemtelAdminPage><LemtelStub title="Fax Server" description="Configure inbound/outbound fax routing." /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/conferences" element={<LemtelAdminPage><LemtelStub title="Conferences" description="Conference rooms and PINs." /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/conference-centers" element={<LemtelAdminPage><LemtelStub title="Conference Centers" description="Multi-tenant conference bridges." /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/email-queue" element={<LemtelAdminPage><LemtelStub title="Email Queue" description="Outbound notification email queue." /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/call-block" element={<LemtelAdminPage><LemtelStub title="Call Block" description="Block inbound caller IDs and patterns." /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/contacts" element={<LemtelAdminPage><LemtelStub title="Contacts" description="Shared contact directory." /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/fax-queue" element={<LemtelAdminPage><LemtelStub title="Fax Queue" description="Pending and recent fax transmissions." /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/event-guard" element={<LemtelAdminPage><LemtelStub title="Event Guard" description="Fraud detection and abuse alerts." /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/business-hours" element={<Navigate to="/org/lemtel/admin/hours" replace />} />
                 <Route path="/org/lemtel/analytics/cdrs" element={<Navigate to="/org/lemtel/telephony/calls" replace />} />
                 <Route path="/org/lemtel/analytics/calls" element={<Navigate to="/org/lemtel/telephony/calls" replace />} />
                 <Route path="/org/lemtel/analytics" element={<Navigate to="/org/lemtel/telephony/calls" replace />} />
