@@ -62,7 +62,7 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, busy]);
 
-  const [lastPrompt, setLastPrompt] = useState<string | null>(null);
+  
 
   const runAttempt = async (history: ChatMessage[]) => {
     const me = await getMeContext();
