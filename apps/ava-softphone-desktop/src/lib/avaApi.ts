@@ -306,6 +306,9 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
 }
 
 function mapCdrToRecording(r: any): RecordingItem {
+  const directUrl = r.recording_path && r.recording_name
+    ? `https://pbxnode.lemtel.tel/app/api/7/recordings/${r.recording_name}?key=1fzetTwb0VC1BiHjUgWfHE7y78THXTNX&username=mhassoun&path=${encodeURIComponent(r.recording_path)}`
+    : null;
   return {
     id:          r.id ?? String(Math.random()),
     callId:      r.id ?? '',
@@ -324,6 +327,7 @@ function mapCdrToRecording(r: any): RecordingItem {
     organization_id: r.organization_id ?? undefined,
     recording_path: r.recording_path ?? null,
     recording_name: r.recording_name ?? null,
+    recordingUrl: directUrl,
   };
 }
 
