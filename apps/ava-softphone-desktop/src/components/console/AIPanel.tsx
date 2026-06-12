@@ -80,7 +80,7 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
 
   const send = (v: string) => {
     const t = v.trim();
-    if (!t || isBusy || !token || !eligible) return;
+    if (!t || isBusy || !token || !authed) return;
     sendMessage({ text: t });
     setText('');
   };
