@@ -73,15 +73,71 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Find admin's org
-    const { data: roles } = await admin.from("user_roles")
-      .select("organization_id, role").eq("user_id", userId)
-      .in("role", ["org_admin", "super_admin"]);
-    if (!roles?.length) return json({ error: "forbidden_not_admin" }, 403);
-    const orgId = roles[0].organization_id;
-
     const body = await req.json().catch(() => ({}));
     const mode = body?.mode;
+
+    // Resolve org: prefer body.organization_id if user has access; else first role/membership
+    let orgId: string | null = body?.organization_id ?? null;
+    const { data: isSuperData } = await admin.rpc("is_super_admin", { _user_id: userId });
+    const isSuper = !!isSuperData;
+    if (!isSuper) {
+      const { data: roles } = await admin.from("user_roles")
+        .select("organization_id").eq("user_id", userId);
+      const roleOrgs = (roles ?? []).map((r: any) => r.organization_id);
+      if (orgId && !roleOrgs.includes(orgId)) {
+        const { data: mem } = await admin.from("organization_members")
+          .select("organization_id").eq("user_id", userId).eq("organization_id", orgId).limit(1);
+        if (!mem?.length) orgId = roleOrgs[0] ?? null;
+      } else if (!orgId) {
+        orgId = roleOrgs[0] ?? null;
+        if (!orgId) {
+          const { data: mem } = await admin.from("organization_members")
+            .select("organization_id").eq("user_id", userId).limit(1);
+          orgId = mem?.[0]?.organization_id ?? null;
+        }
+      }
+    }
+    if (!orgId) return json({ error: "no_org_access" }, 403);
+
+    // Chat mode (default when messages array present without explicit mode)
+    const messages = body?.messages;
+    if (!mode && Array.isArray(messages) && messages.length) {
+      const apiKey = Deno.env.get("LOVABLE_API_KEY");
+      if (!apiKey) return json({ error: "ai_not_configured" }, 500);
+      const { data: calls } = await admin.from("pbx_call_records")
+        .select("start_at,direction,caller_number,destination_number,duration_seconds,call_status,missed_call")
+        .eq("organization_id", orgId).order("start_at", { ascending: false }).limit(50);
+      const ctx = (calls ?? []).map((c: any) =>
+        `${c.start_at} ${c.direction} ${c.caller_number ?? "?"}->${c.destination_number ?? "?"} ${c.duration_seconds ?? 0}s ${c.call_status ?? ""}${c.missed_call ? " MISSED" : ""}`
+      ).join("\n");
+      const flatMessages = messages.map((m: any) => ({
+        role: m.role,
+        content: typeof m.content === "string"
+          ? m.content
+          : (Array.isArray(m.parts) ? m.parts.map((p: any) => p?.text ?? "").join("") : ""),
+      }));
+      const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            { role: "system", content: `You are AVA, a helpful telecom assistant for the AVA Statistic platform. Answer concisely in the user's language about their phone system. Recent 50 calls for this organization:\n${ctx || "(no calls found)"}` },
+            ...flatMessages,
+          ],
+        }),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        if (r.status === 429) return json({ response: "AI rate limit exceeded. Please retry shortly." });
+        if (r.status === 402) return json({ response: "AI credits exhausted. Please add credits to continue." });
+        return json({ error: "ai_failed", detail: t.slice(0, 300) }, 500);
+      }
+      const j = await r.json();
+      return json({ response: j.choices?.[0]?.message?.content ?? "" });
+    }
+
+
 
     if (mode === "propose") {
       const prompt = (body?.prompt as string ?? "").trim();

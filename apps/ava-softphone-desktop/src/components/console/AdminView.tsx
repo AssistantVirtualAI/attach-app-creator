@@ -1,8 +1,57 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava } from '../../lib/avaApi';
+import { supabase } from '../../lib/supabaseClient';
 
 const { colors: c } = theme;
+
+const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+
+function ExtensionsTable() {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const reload = useCallback(async () => {
+    setLoading(true); setError(null);
+    const { data: rows, error: err } = await supabase
+      .from('pbx_softphone_users')
+      .select('*')
+      .eq('organization_id', LEMTEL_ORG_ID)
+      .order('extension');
+    if (err) setError(err.message); else setData(rows || []);
+    setLoading(false);
+  }, []);
+  useEffect(() => { reload(); }, [reload]);
+  const cols = ['Ext', 'Display Name', 'User', 'Voicemail', 'Status'];
+  return (
+    <>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Extensions</h1>
+        <button onClick={reload} style={{
+          padding: '8px 14px', borderRadius: 9, background: 'transparent',
+          border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+        }}>↻ Refresh</button>
+      </header>
+      <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols.length}, 1fr)`, padding: '10px 14px', borderBottom: `1px solid ${c.border}`, background: c.deepPanel }}>
+          {cols.map((col) => <span key={col} style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: c.mutedSilver }}>{col}</span>)}
+        </div>
+        {data.map((e, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: `repeat(${cols.length}, 1fr)`, padding: '11px 14px', borderBottom: `1px solid ${c.border}`, fontSize: 12.5, color: c.textIce }}>
+            <span>{e.extension}</span>
+            <span>{e.display_name || '—'}</span>
+            <span>{e.portal_user_id ? '✓' : '—'}</span>
+            <span>{e.voicemail_enabled ? 'On' : 'Off'}</span>
+            <span>{e.status || (e.enabled === false ? 'Disabled' : 'Active')}</span>
+          </div>
+        ))}
+        {loading && <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>Loading…</div>}
+        {!loading && !error && data.length === 0 && <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>No extensions yet.</div>}
+        {!loading && error && <div style={{ padding: 28, textAlign: 'center', color: c.danger, fontSize: 12 }}>{error}</div>}
+      </div>
+    </>
+  );
+}
 
 type Section = 'extensions' | 'devices' | 'numbers' | 'ivrs' | 'queues' | 'ringgroups' | 'sync';
 
@@ -34,7 +83,7 @@ export default function AdminView() {
         ))}
       </aside>
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px' }}>
-        {sec === 'extensions' && <Table title="Extensions" cols={['Ext', 'Display Name', 'User', 'Voicemail', 'Status']} load={ava.extensions} row={(e: any) => [e.extension, e.displayName, e.user || '—', e.voicemailEnabled ? 'On' : 'Off', e.enabled ? 'Active' : 'Disabled']} />}
+        {sec === 'extensions' && <ExtensionsTable />}
         {sec === 'devices' && <Table title="Devices" cols={['Vendor', 'MAC', 'Template', 'Assigned', 'Registered']} load={ava.devices} row={(d: any) => [d.vendor, d.mac, d.template, d.assignedTo || '—', d.registered ? 'Yes' : 'No']} />}
         {sec === 'numbers' && <Table title="Phone Numbers" cols={['Number', 'Assigned To', 'Type']} load={ava.phoneNumbers} row={(n: any) => [n.number, n.assignedTo, n.type]} />}
         {sec === 'ivrs' && <Table title="Auto-Attendants (IVR)" cols={['Name', 'Greeting', 'Options']} load={ava.ivrs} row={(i: any) => [i.name, i.greeting.slice(0, 60) + '…', i.options]} />}

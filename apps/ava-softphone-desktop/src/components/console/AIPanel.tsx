@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabaseClient';
 
 const { colors: c } = theme;
 
-const FN_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co/functions/v1/ava-admin-command';
+const FN_URL = 'https://gejxisrqtvxavbrfcoxz.supabase.co/functions/v1/telecom-admin-ai-agent';
+const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 const LS_KEY = 'ava-desk-chat-v1';
+
+type ChatMessage = { id: string; role: 'user' | 'assistant' | 'system'; content: string };
 
 const SUGGESTIONS = [
   'List active outages',
@@ -27,10 +28,16 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
   const [token, setToken] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try { const raw = localStorage.getItem(LS_KEY); if (raw) return JSON.parse(raw); } catch {}
+    return [];
+  });
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Load token + role
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -48,49 +55,44 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
     return () => { mounted = false; };
   }, []);
 
-  // Persisted initial messages
-  const initial = useMemo(() => {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return [];
-  }, []);
-
-  const transport = useMemo(() => new DefaultChatTransport({
-    api: FN_URL,
-    headers: () => ({
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    }),
-  }), [token]);
-
-  const { messages, sendMessage, status, error, stop } = useChat({
-    id: 'ava-desk',
-    messages: initial,
-    transport,
-  });
-
-  // Persist
   useEffect(() => {
-    if (!messages?.length) return;
     try { localStorage.setItem(LS_KEY, JSON.stringify(messages.slice(-50))); } catch {}
   }, [messages]);
 
-  // Autoscroll
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, status]);
+  }, [messages, busy]);
 
-  const [text, setText] = useState('');
-  const isBusy = status === 'submitted' || status === 'streaming';
-
-  const send = (v: string) => {
+  const send = async (v: string) => {
     const t = v.trim();
-    if (!t || isBusy || !token || !authed) return;
-    sendMessage({ text: t });
+    if (!t || busy || !token || !authed) return;
+    setError(null);
+    const userMsg: ChatMessage = { id: crypto.randomUUID(), role: 'user', content: t };
+    const next = [...messages, userMsg];
+    setMessages(next);
     setText('');
+    setBusy(true);
+    try {
+      const r = await fetch(FN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          organization_id: LEMTEL_ORG_ID,
+          messages: next.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || data?.detail || `HTTP ${r.status}`);
+      const response = String(data?.response ?? '').trim() || '(no response)';
+      setMessages((cur) => [...cur, { id: crypto.randomUUID(), role: 'assistant', content: response }]);
+    } catch (e: any) {
+      setError(e?.message || 'Request failed');
+    } finally {
+      setBusy(false);
+    }
   };
+
+  const suggestions = useMemo(() => (isAdmin ? SUGGESTIONS : USER_SUGGESTIONS), [isAdmin]);
 
   if (!open) {
     return (
@@ -113,14 +115,12 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
   return (
     <aside style={{
       width: 360, flexShrink: 0, height: '100%',
-      background: c.deepPanel,
-      borderLeft: `1px solid ${c.border}`,
+      background: c.deepPanel, borderLeft: `1px solid ${c.border}`,
       display: 'flex', flexDirection: 'column',
       backdropFilter: 'blur(18px) saturate(160%)',
     }}>
       <header style={{
-        padding: '14px 16px',
-        borderBottom: `1px solid ${c.border}`,
+        padding: '14px 16px', borderBottom: `1px solid ${c.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         background: `linear-gradient(135deg, rgba(122,76,255,0.10), rgba(35,214,255,0.05))`,
       }}>
@@ -139,27 +139,33 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
             </div>
           </div>
         </div>
-        <button onClick={onToggle} style={{
-          background: 'transparent', border: 'none', color: c.mutedSilver,
-          fontSize: 18, cursor: 'pointer', padding: 4, lineHeight: 1,
-        }}>×</button>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {messages.length > 0 && (
+            <button onClick={() => { setMessages([]); setError(null); }} title="Clear" style={{
+              background: 'transparent', border: 'none', color: c.mutedSilver,
+              fontSize: 12, cursor: 'pointer', padding: 4,
+            }}>Clear</button>
+          )}
+          <button onClick={onToggle} style={{
+            background: 'transparent', border: 'none', color: c.mutedSilver,
+            fontSize: 18, cursor: 'pointer', padding: 4, lineHeight: 1,
+          }}>×</button>
+        </div>
       </header>
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {authed === false && (
-          <Bubble role="system">
-            Sign in to chat with AVA about your calls, voicemails, and recordings.
-          </Bubble>
+          <Bubble role="system">Sign in to chat with AVA about your calls, voicemails, and recordings.</Bubble>
         )}
         {authed && messages.length === 0 && (
           <>
             <Bubble role="assistant">
               {isAdmin
-                ? 'Bonjour. Je peux analyser les outages, voicemails, isolation tenant et exécuter des actions admin sécurisées.'
+                ? 'Bonjour. Je peux analyser vos appels, voicemails, et données telecom.'
                 : 'Bonjour. Demande-moi combien d\'appels manqués, mes derniers appels, ou un résumé de la journée.'}
             </Bubble>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-              {(isAdmin ? SUGGESTIONS : USER_SUGGESTIONS).map((s) => (
+              {suggestions.map((s) => (
                 <button key={s} onClick={() => send(s)} style={{
                   textAlign: 'left', padding: '8px 10px',
                   background: 'rgba(124,58,237,0.06)',
@@ -171,17 +177,15 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
           </>
         )}
 
-        {messages.map((m) => <MessageView key={m.id} msg={m} />)}
+        {messages.map((m) => <Bubble key={m.id} role={m.role}>{m.content}</Bubble>)}
 
-        {isBusy && (
+        {busy && (
           <div style={{ fontSize: 11, color: c.mutedSilver, fontStyle: 'italic', padding: '4px 8px' }}>
             AVA réfléchit…
           </div>
         )}
         {error && (
-          <Bubble role="system">
-            <span style={{ color: c.danger }}>Erreur: {error.message}</span>
-          </Bubble>
+          <Bubble role="system"><span style={{ color: c.danger }}>Erreur: {error}</span></Bubble>
         )}
       </div>
 
@@ -192,7 +196,7 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(text); } }}
           placeholder={authed === false ? 'Sign in required' : 'Ask AVA anything…'}
-          disabled={!authed || isBusy}
+          disabled={!authed || busy}
           style={{
             flex: 1, boxSizing: 'border-box',
             padding: '10px 12px', borderRadius: 10,
@@ -201,27 +205,17 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
             opacity: !authed ? 0.5 : 1,
           }}
         />
-        {isBusy ? (
-          <button onClick={() => stop()} style={btnStyle(c.danger)}>Stop</button>
-        ) : (
-          <button onClick={() => send(text)} disabled={!authed || !text.trim()} style={{
-            ...btnStyle(c.avaViolet),
-            opacity: (!authed || !text.trim()) ? 0.5 : 1,
-            cursor: (!authed || !text.trim()) ? 'not-allowed' : 'pointer',
-          }}>Send</button>
-        )}
+        <button onClick={() => send(text)} disabled={!authed || !text.trim() || busy} style={{
+          padding: '0 14px', borderRadius: 10,
+          background: `linear-gradient(135deg, ${c.avaViolet}, ${c.avaCyan})`,
+          color: '#fff', border: 'none', fontWeight: 700, fontSize: 12,
+          cursor: (!authed || !text.trim() || busy) ? 'not-allowed' : 'pointer',
+          boxShadow: '0 4px 14px -4px rgba(124,58,237,0.45)',
+          opacity: (!authed || !text.trim() || busy) ? 0.5 : 1,
+        }}>Send</button>
       </div>
     </aside>
   );
-}
-
-function btnStyle(bg: string): React.CSSProperties {
-  return {
-    padding: '0 14px', borderRadius: 10,
-    background: `linear-gradient(135deg, ${bg}, ${theme.colors.avaCyan})`,
-    color: '#fff', border: 'none', fontWeight: 700, fontSize: 12,
-    cursor: 'pointer', boxShadow: '0 4px 14px -4px rgba(124,58,237,0.45)',
-  };
 }
 
 function Bubble({ role, children }: { role: 'user' | 'assistant' | 'system'; children: React.ReactNode }) {
@@ -245,45 +239,6 @@ function Bubble({ role, children }: { role: 'user' | 'assistant' | 'system'; chi
       boxShadow: isUser ? '0 4px 14px -4px rgba(124,58,237,0.45)' : 'none',
     }}>
       {children}
-    </div>
-  );
-}
-
-function MessageView({ msg }: { msg: any }) {
-  const role = msg.role as 'user' | 'assistant';
-  const parts: any[] = msg.parts ?? (msg.content ? [{ type: 'text', text: msg.content }] : []);
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {parts.map((p, i) => {
-        if (p.type === 'text') {
-          return <Bubble key={i} role={role}>{p.text}</Bubble>;
-        }
-        // tool-* parts (AI SDK v5 emits tool-{name})
-        if (typeof p.type === 'string' && p.type.startsWith('tool-')) {
-          const name = p.type.replace(/^tool-/, '');
-          const state = p.state || 'output-available';
-          return (
-            <div key={i} style={{
-              alignSelf: 'flex-start', maxWidth: '95%',
-              padding: '8px 10px', borderRadius: 10,
-              background: 'rgba(11,181,214,0.08)',
-              border: `1px solid ${c.borderAI}`,
-              fontSize: 11.5, color: c.textIce,
-            }}>
-              <div style={{ fontSize: 9.5, letterSpacing: 1, fontWeight: 700, color: c.avaViolet, textTransform: 'uppercase', marginBottom: 4 }}>
-                Tool · {name} · {state}
-              </div>
-              {p.output != null && (
-                <pre style={{ margin: 0, fontSize: 10.5, maxHeight: 180, overflow: 'auto', fontFamily: 'ui-monospace,monospace' }}>
-                  {typeof p.output === 'string' ? p.output : JSON.stringify(p.output, null, 2)}
-                </pre>
-              )}
-              {p.errorText && <div style={{ color: c.danger, fontSize: 11 }}>{p.errorText}</div>}
-            </div>
-          );
-        }
-        return null;
-      })}
     </div>
   );
 }
