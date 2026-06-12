@@ -71,19 +71,27 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
     setMessages(next);
     setText('');
     setBusy(true);
-    try {
+    const attempt = async () => {
       const me = await getMeContext();
+      const orgId = me.organization_id ?? '71755d33-ed64-4ad5-a828-61c9d2029eb7';
       const { data, error: invokeErr } = await supabase.functions.invoke('telecom-admin-ai-agent', {
         body: {
-          organization_id: me.organization_id ?? undefined,
+          organization_id: orgId,
           messages: next.map((m) => ({ role: m.role, content: m.content })),
         },
       });
-      if (invokeErr) throw new Error(invokeErr.message || 'Request failed');
-      const response = String((data as any)?.response ?? '').trim() || '(no response)';
+      const bodyMsg = (data as any)?.error || (data as any)?.message;
+      if (invokeErr) throw new Error(bodyMsg || invokeErr.message || 'AI service unavailable');
+      return String((data as any)?.response ?? (data as any)?.message ?? '').trim() || '(no response)';
+    };
+    try {
+      let response: string;
+      try { response = await attempt(); }
+      catch { await new Promise((r) => setTimeout(r, 800)); response = await attempt(); }
       setMessages((cur) => [...cur, { id: crypto.randomUUID(), role: 'assistant', content: response }]);
     } catch (e: any) {
-      setError(e?.message || 'Request failed');
+      console.error('AI error:', e);
+      setError(e?.message || 'AI service unavailable');
     } finally {
       setBusy(false);
     }

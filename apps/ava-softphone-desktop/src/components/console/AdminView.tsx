@@ -5,64 +5,190 @@ import { supabase } from '../../lib/supabaseClient';
 
 const { colors: c } = theme;
 
+const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
+const LEMTEL_DOMAIN = '2936594e-17b7-42a9-9165-95be48627923';
+
 function ExtensionsTable() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const reload = useCallback(async () => {
-    setLoading(true); setError(null);
-    const me = await getMeContext();
-    // Join pbx_extensions (full PBX list) with pbx_softphone_users (portal accounts)
-    let extQ = supabase.from('pbx_extensions').select('extension, effective_cid_name, enabled, voicemail_enabled').order('extension');
-    if (me.organization_id) extQ = extQ.eq('organization_id', me.organization_id);
+  const [syncing, setSyncing] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const loadFromDb = useCallback(async (orgId: string | null) => {
+    let extQ = supabase
+      .from('pbx_extensions')
+      .select('id, pbx_uuid, extension, effective_cid_name, enabled, voicemail_enabled')
+      .order('extension');
+    if (orgId) extQ = extQ.eq('organization_id', orgId);
     let spuQ = supabase.from('pbx_softphone_users').select('extension, display_name, portal_user_id, status');
-    if (me.organization_id) spuQ = spuQ.eq('organization_id', me.organization_id);
+    if (orgId) spuQ = spuQ.eq('organization_id', orgId);
     const [{ data: exts, error: e1 }, { data: spus, error: e2 }] = await Promise.all([extQ, spuQ]);
-    if (e1 || e2) { setError((e1 || e2)!.message); setLoading(false); return; }
+    if (e1 || e2) throw (e1 || e2);
     const spuMap = new Map<string, any>((spus || []).map((s: any) => [String(s.extension), s]));
-    const merged = (exts || []).map((e: any) => {
+    return (exts || []).map((e: any) => {
       const s = spuMap.get(String(e.extension));
       return {
+        id: e.id,
+        extension_uuid: e.pbx_uuid,
         extension: e.extension,
         display_name: s?.display_name || e.effective_cid_name || '—',
         portal_user_id: s?.portal_user_id || null,
         voicemail_enabled: e.voicemail_enabled,
+        enabled: e.enabled !== false,
         status: s?.status || (e.enabled === false ? 'Disabled' : 'Active'),
       };
     });
-    setData(merged);
-    setLoading(false);
   }, []);
-  useEffect(() => { reload(); }, [reload]);
-  const cols = ['Ext', 'Display Name', 'User', 'Voicemail', 'Status'];
+
+  const reload = useCallback(async (forceSync = false) => {
+    setLoading(true); setError(null);
+    try {
+      const me = await getMeContext();
+      const orgId = me.organization_id || LEMTEL_ORG;
+      // Trigger FusionPBX sync so all PBX extensions (not just registered softphones) land in the table.
+      if (forceSync) {
+        setSyncing(true);
+        const { error: syncErr } = await supabase.functions.invoke('fusionpbx-proxy', {
+          body: { action: 'sync-all', resources: ['extensions'], organization_id: orgId, domain_uuid: LEMTEL_DOMAIN },
+        });
+        if (syncErr) console.warn('sync-extensions failed:', syncErr.message);
+        setSyncing(false);
+      }
+      setData(await loadFromDb(orgId));
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load extensions');
+    } finally {
+      setLoading(false);
+    }
+  }, [loadFromDb]);
+
+  useEffect(() => {
+    // First mount: load DB, then auto-sync if list looks incomplete.
+    (async () => {
+      await reload(false);
+    })();
+  }, [reload]);
+
+  const updateExtension = async (ext: any, changes: any) => {
+    setSaving(true);
+    try {
+      const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: {
+          action: 'update-extension',
+          organization_id: LEMTEL_ORG,
+          params: { extension_uuid: ext.extension_uuid, domain_uuid: LEMTEL_DOMAIN, ...changes },
+        },
+      });
+      if (err) throw err;
+      setData((prev) => prev.map((e) => (e.id === ext.id ? { ...e, ...changes } : e)));
+      setEditing(null);
+    } catch (e: any) {
+      alert('Update failed: ' + (e?.message || 'unknown'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cols = ['Ext', 'Display Name', 'User', 'Voicemail', 'Status', ''];
   return (
     <>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Extensions <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500 }}>({data.length})</span></h1>
-        <button onClick={reload} style={{
-          padding: '8px 14px', borderRadius: 9, background: 'transparent',
-          border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-        }}>↻ Refresh</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => reload(true)} disabled={syncing} style={{
+            padding: '8px 14px', borderRadius: 9, background: 'transparent',
+            border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            opacity: syncing ? 0.6 : 1,
+          }}>{syncing ? 'Syncing…' : '↻ Sync from PBX'}</button>
+          <button onClick={() => reload(false)} style={{
+            padding: '8px 14px', borderRadius: 9, background: 'transparent',
+            border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+          }}>Reload</button>
+        </div>
       </header>
       <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 12, overflow: 'hidden' }}>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols.length}, 1fr)`, padding: '10px 14px', borderBottom: `1px solid ${c.border}`, background: c.deepPanel }}>
-          {cols.map((col) => <span key={col} style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: c.mutedSilver }}>{col}</span>)}
+          {cols.map((col, i) => <span key={i} style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: 'uppercase', color: c.mutedSilver }}>{col}</span>)}
         </div>
         {data.map((e, i) => (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: `repeat(${cols.length}, 1fr)`, padding: '11px 14px', borderBottom: `1px solid ${c.border}`, fontSize: 12.5, color: c.textIce }}>
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: `repeat(${cols.length}, 1fr)`, padding: '11px 14px', borderBottom: `1px solid ${c.border}`, fontSize: 12.5, color: c.textIce, alignItems: 'center' }}>
             <span>{e.extension}</span>
             <span>{e.display_name || '—'}</span>
             <span>{e.portal_user_id ? '✓' : '—'}</span>
             <span>{e.voicemail_enabled ? 'On' : 'Off'}</span>
             <span>{e.status}</span>
+            <span>
+              <button onClick={() => setEditing(e)} style={{
+                padding: '4px 10px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce,
+              }}>Edit</button>
+            </span>
           </div>
         ))}
         {loading && <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>Loading…</div>}
-        {!loading && !error && data.length === 0 && <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>No extensions yet.</div>}
+        {!loading && !error && data.length === 0 && <div style={{ padding: 28, textAlign: 'center', color: c.mutedSilver, fontSize: 12 }}>No extensions. Click “Sync from PBX”.</div>}
         {!loading && error && <div style={{ padding: 28, textAlign: 'center', color: c.danger, fontSize: 12 }}>{error}</div>}
       </div>
+
+      {editing && (
+        <EditExtensionModal
+          ext={editing}
+          saving={saving}
+          onClose={() => setEditing(null)}
+          onSave={(changes) => updateExtension(editing, changes)}
+        />
+      )}
     </>
   );
+}
+
+function EditExtensionModal({ ext, saving, onClose, onSave }: { ext: any; saving: boolean; onClose: () => void; onSave: (changes: any) => void }) {
+  const [displayName, setDisplayName] = useState(ext.display_name === '—' ? '' : ext.display_name || '');
+  const [voicemail, setVoicemail] = useState(!!ext.voicemail_enabled);
+  const [enabled, setEnabled] = useState(ext.enabled !== false);
+  return (
+    <div onClick={onClose} style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50,
+      display: 'grid', placeItems: 'center',
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        width: 380, background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 14, padding: 20,
+      }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: c.textIce, marginBottom: 12 }}>Edit Extension {ext.extension}</div>
+        <Label>Display name</Label>
+        <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={inputStyle} />
+        <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12 }}>
+            <input type="checkbox" checked={voicemail} onChange={(e) => setVoicemail(e.target.checked)} /> Voicemail
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12 }}>
+            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
+          </label>
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+          <button onClick={() => onSave({
+            effective_caller_id_name: displayName,
+            voicemail_enabled: voicemail ? 'true' : 'false',
+            enabled: enabled ? 'true' : 'false',
+          })} disabled={saving} style={{
+            padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer',
+            background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1,
+          }}>{saving ? 'Saving…' : 'Save'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 8,
+  background: c.deepPanel, border: `1px solid ${c.border}`, color: c.textIce, fontSize: 13, outline: 'none',
+};
+function Label({ children }: { children: React.ReactNode }) {
+  return <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 4 }}>{children}</div>;
 }
 
 type Section = 'extensions' | 'devices' | 'numbers' | 'ivrs' | 'queues' | 'ringgroups' | 'sync';
