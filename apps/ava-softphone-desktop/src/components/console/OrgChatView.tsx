@@ -156,6 +156,7 @@ export default function OrgChatView() {
             </button>
           );
         })}
+        {errMsg && <div style={{ fontSize: 11, color: c.danger, marginTop: 8 }}>{errMsg}</div>}
       </aside>
 
       {/* Messages */}
