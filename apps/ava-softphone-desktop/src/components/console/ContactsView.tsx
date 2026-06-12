@@ -22,18 +22,64 @@ function fmtRel(iso: string) {
   return `${d}d ago`;
 }
 
+const LS_MANUAL = 'ava-manual-contacts-v1';
+
 export default function ContactsView() {
   const [items, setItems] = useState<ContactItem[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const [sel, setSel] = useState<ContactItem | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [draft, setDraft] = useState({ name: '', phone: '', company: '', email: '' });
 
   // Edit state for the detail panel
   const [notes, setNotes] = useState('');
   const [tagDraft, setTagDraft] = useState('');
   const [savedFlash, setSavedFlash] = useState(false);
 
-  useEffect(() => { ava.contacts().then(setItems); }, []);
+  const loadAll = React.useCallback(async () => {
+    const [contacts, exts] = await Promise.all([
+      ava.contacts().catch(() => [] as ContactItem[]),
+      ava.extensions().catch(() => [] as any[]),
+    ]);
+    const internal: ContactItem[] = (Array.isArray(exts) ? exts : []).map((e: any) => ({
+      id: `ext-${e.id}`,
+      name: e.displayName || `Ext ${e.extension}`,
+      company: 'Internal · Extension',
+      phone: e.extension,
+      email: e.user,
+      lastInteraction: new Date().toISOString(),
+      totalCalls: 0, totalMessages: 0,
+      sentiment: 'neutral',
+      aiNote: e.enabled ? 'Active extension' : 'Disabled extension',
+      tags: ['internal'], favorite: false, interactions: [],
+    }));
+    let manual: ContactItem[] = [];
+    try { manual = JSON.parse(localStorage.getItem(LS_MANUAL) || '[]'); } catch {}
+    setItems([...(Array.isArray(contacts) ? contacts : []), ...internal, ...manual]);
+  }, []);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  const addManualContact = () => {
+    if (!draft.name.trim() || !draft.phone.trim()) return;
+    const next: ContactItem = {
+      id: `m-${Date.now()}`,
+      name: draft.name.trim(), phone: draft.phone.trim(),
+      company: draft.company.trim() || undefined,
+      email: draft.email.trim() || undefined,
+      lastInteraction: new Date().toISOString(),
+      totalCalls: 0, totalMessages: 0,
+      sentiment: 'neutral', aiNote: 'Manually added.',
+      tags: ['manual'], favorite: false, interactions: [],
+    };
+    const manual = items.filter((x) => x.id.startsWith('m-'));
+    const updated = [...manual, next];
+    try { localStorage.setItem(LS_MANUAL, JSON.stringify(updated)); } catch {}
+    setItems((all) => [...all, next]);
+    setDraft({ name: '', phone: '', company: '', email: '' });
+    setShowAdd(false);
+  };
 
   // Sync editable state when selection changes
   useEffect(() => {
