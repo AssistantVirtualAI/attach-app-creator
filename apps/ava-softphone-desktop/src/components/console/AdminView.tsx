@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava } from '../../lib/avaApi';
 
