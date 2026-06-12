@@ -1,70 +1,48 @@
-## Goal
+# Fix layout spacing + load real Customers from FusionPBX
 
-Make the desktop app a true admin console for the FusionPBX system: pull every PBX domain as a "Customer", play recordings reliably, and surface the full Extensions / Call Queues / IVR (with ElevenLabs) / Voice Agents management UIs.
+Two unrelated issues affect the web admin portal at `/org/lemtel/admin/*`:
 
-## 1. Customers (PBX domains) page
+## 1. The empty space between sidebar and main content
 
-- Add `get-domains` (and ensure `list-domains` returns full payload: `domain_uuid`, `domain_name`, `domain_description`, `domain_enabled`) in `supabase/functions/fusionpbx-proxy/index.ts`.
-- Add desktop sidebar entry `customers` in `LeftRail.tsx` (ADMIN_ITEMS only).
-- New `CustomersView.tsx` (`apps/ava-softphone-desktop/src/components/console/`):
-  - Calls `fusionpbx-proxy` → `list-domains`, joins each domain with local `organizations` (by `pbx_domain_uuid`), and the count of extensions / numbers / queues per domain (from `pbx_extensions`, `pbx_phone_number_assignments`, `pbx_call_queues`).
-  - Columns: Domain, Customer name (org link), Status, Extensions, Numbers, Last activity, Actions (Sync, Open).
-  - "Open" sets the working domain in a small context (`useActiveDomain`) so Admin tabs filter by that domain instead of the hard-coded `LEMTEL_DOMAIN`.
-- Wire `App.tsx` route case for `'customers'`.
+The previous fix only touched `src/App.css` (removed `#root` max-width) — but the actual offset comes from the admin shell. In `src/components/portal/LemtelPortalShells.tsx`, `AdminPortalLayout` and `UserPortalLayout` only wrap children with `<div className="space-y-5">` — fine — but `AppLayout` main uses `p-4 lg:p-6` while the Customers page itself adds its own padding-less container. The visible gap in the screenshot is the **gradient cockpit background showing through** because the page content is not stretched to `w-full`.
 
-## 2. Recording playback (works in desktop)
+Fixes:
+- `src/components/portal/LemtelPortalShells.tsx` → wrap children in `<div className="space-y-5 w-full max-w-none">` and make the shell header full-width.
+- `src/components/layout/AppLayout.tsx` → change `<main>` content wrapper from `p-4 lg:p-6 flex-1 w-full max-w-full` to `px-4 lg:px-6 py-4 flex-1 w-full min-w-0` and remove the `space-y` ancestors that compress children.
+- `src/pages/lemtel/LemtelCustomers.tsx` → ensure top container is `space-y-6 w-full` (and any sibling admin pages that use `<div className="space-y-6">` get the same `w-full`). This single change in `AdminPortalLayout` will cascade to every admin page since they all render through `LemtelAdminPage`.
 
-Root cause: `getRecordingAudioUrl` fetches the file via `fusionpbx-proxy` `get-recording`, which returns the binary stream. That works in browsers but Electron's `fetch` + the proxy currently returns a non-CORS-friendly stream with no `Content-Length` and sometimes a 401 because the proxy strips auth on streaming responses. The `<audio>` element then can't play the resulting blob URL.
+No other admin pages need per-file edits — the shell change covers them all.
 
-Fix:
-- In `fusionpbx-proxy/index.ts` `get-recording` branch:
-  - Buffer the response (`await r.arrayBuffer()`), forward `Content-Length`, `Accept-Ranges: bytes`, and proper `Content-Type` (`audio/wav`, `audio/mpeg`, `audio/ogg` based on extension).
-  - Return 404 JSON when PBX gives 404 instead of streaming empty body.
-- Add an alternative path: if `record_path`/`record_name` missing, try `xml_cdr_uuid` → fetch `xml_cdr/{uuid}/recording` from FusionPBX.
-- In `avaApi.getRecordingAudioUrl`:
-  - Convert returned blob to an object URL with explicit MIME (`new Blob([buf], { type })`).
-  - Revoke previous URL on new selection (already partially done in `RecordingsView`).
-  - Fallback: if blob is empty or fetch fails, call a new `pbx-recording-signed-url` helper that uploads the blob to the `lemtel-recordings` Storage bucket and returns a signed URL (works in any audio element, including the small softphone window).
-- Persist `recording_url` back to `pbx_call_records` after first successful fetch so subsequent plays are instant.
+## 2. Customers page must list every FusionPBX domain + its PBX users
 
-## 3. Full PBX management — make every feature usable
+Today `src/pages/lemtel/LemtelCustomers.tsx` uses `usePbxClients()` which reads the local `clients` table — that's why the page shows "0 customers" even though FusionPBX has many domains. Replace with a real PBX-backed fetch.
 
-Extensions / Queues / IVRs already exist but lack key actions. Add the missing CRUD and bind them to the active domain (from §1) instead of the hard-coded one.
+Data flow:
 
-### Extensions
-- "+ New" button → modal posting `create-extension` to fusionpbx-proxy (already implemented backend-side).
-- Add Delete, Reset password (`extension_password`), Assign to portal user (uses existing `admin_link_softphone_by_email` RPC).
-- Show registration state from `pbx_softphone_users.status` + last seen.
+```text
+LemtelCustomers
+   │
+   ├── supabase.functions.invoke('fusionpbx-proxy', { action: 'list-domains' })
+   │        → returns [{ domain_uuid, domain_name, domain_description, domain_enabled }]
+   │
+   ├── supabase.from('pbx_extensions').select('domain_uuid, extension, effective_caller_id_name, user_record')
+   │        → grouped by domain_uuid for the expand-row "users" view
+   │
+   └── supabase.from('organizations').select('id,name,fusionpbx_domain_uuid')
+            → optional join so we can show the linked tenant name
+```
 
-### Call Queues
-- "+ New" creates queue + auto-create matching extension.
-- Edit modal: add agents table with add/remove (already loads agents). New `add-queue-agent` / `remove-queue-agent` actions in proxy (POST `call_center_tiers`).
-- Show real-time SLA / waiting from `cc_queue_stats` like in web portal.
+UI changes in `LemtelCustomers.tsx`:
+- Remove `usePbxClients` and the local-clients dialog/delete logic; keep "New Customer" but route it through the existing `pbx-write / create-domain` edge function so creating a customer provisions a domain on FusionPBX directly (already implemented earlier).
+- Table columns: Domain · Tenant · Extensions (count) · Numbers (count) · Status · Created · Actions.
+- Add an expandable row per domain that lists the PBX extensions/users (extension number, caller id name, enabled). Reuse `pbx_extensions` rows already in the local cache; if none for a domain, call `fusionpbx-proxy` `list-extensions` lazily with `{ domain_uuid }`.
+- Add a "Sync" per-row button → invokes `fusionpbx-proxy` `sync-all` with that domain's UUID so the local cache refreshes.
 
-### IVRs + ElevenLabs
-- Edit modal: add "Options" tab listing `pbx_ivr_options` (digit → action). CRUD via `update-ivr-option` / `delete-ivr-option`.
-- "Generate with ElevenLabs" button next to Greeting:
-  - Calls existing `elevenlabs-generate-greeting` edge function (voice picker pulled from `elevenlabs-api-proxy` → `list-voices`).
-  - Uploads MP3 to `lemtel-ivr-audio` bucket, then PUTs `ivr_menu_greet_long` = `recording::<filename>` on FusionPBX.
-- "Test playback" plays the generated audio inside the modal.
+## Files touched
 
-### Voice Agents (new desktop page)
-- Add `voice-agents` admin entry in `LeftRail.tsx`.
-- New `VoiceAgentsView.tsx`:
-  - Reads `lemtel_voice_agents` + `voice_agent_bindings` (already populated).
-  - Lists ElevenLabs agents (via `elevenlabs-convai-agent-config` proxy) and shows binding (`extension`, `did`, `ivr_option`).
-  - Bind/Unbind UI writes to `voice_agent_bindings` and the matching FusionPBX dialplan via `pbx-write` edge function.
-  - Status pills: voice, language, model, last call timestamp from `pbx_call_records.raw_data->agent_id`.
+- `src/components/portal/LemtelPortalShells.tsx` — full-width wrapper
+- `src/components/layout/AppLayout.tsx` — main padding/width tweak
+- `src/pages/lemtel/LemtelCustomers.tsx` — rewrite data source to FusionPBX domains + expandable users
+- (optional) `supabase/functions/fusionpbx-proxy/index.ts` — already supports `list-domains` and `list-extensions`; no edge function changes needed.
 
-## Technical notes
-
-- All edge-function changes stay in `fusionpbx-proxy` and `elevenlabs-*` proxies — no new edge functions needed.
-- All DB reads go through existing tables (`pbx_extensions`, `pbx_call_queues`, `pbx_ivrs`, `pbx_ivr_options`, `lemtel_voice_agents`, `voice_agent_bindings`, `organizations`) — no migration required.
-- Domain switching is local state (no schema change). When user opens a Customer, AdminView replaces `LEMTEL_DOMAIN` constant with the active domain id.
-- Recording fix is backwards compatible — old rows with `recording_url` keep working; new rows get cached URLs after first play.
-
-## Files
-
-- New: `apps/ava-softphone-desktop/src/components/console/CustomersView.tsx`, `VoiceAgentsView.tsx`, `hooks/useActiveDomain.ts`.
-- Edited: `LeftRail.tsx`, `App.tsx` (routing), `AdminView.tsx` (use active domain + new CRUD), `lib/avaApi.ts` (recording url improvements + domains list).
-- Edited edge: `supabase/functions/fusionpbx-proxy/index.ts` (recording stream fix, get-domains, queue-agent CRUD, ivr-option CRUD).
+No DB migrations, no new edge functions, no new secrets.

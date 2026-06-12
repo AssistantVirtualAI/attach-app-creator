@@ -20,9 +20,9 @@ export function AdminPortalLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <ImpersonationBanner />
-      <div className="space-y-5">
+      <div className="space-y-5 w-full max-w-none min-w-0">
         <ShellHeader label="Lemtel Communications · Admin Portal" />
-        {children}
+        <div className="w-full min-w-0">{children}</div>
       </div>
     </>
   );
@@ -32,9 +32,9 @@ export function UserPortalLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <ImpersonationBanner />
-      <div className="space-y-5">
+      <div className="space-y-5 w-full max-w-none min-w-0">
         <ShellHeader label="My Workspace" />
-        {children}
+        <div className="w-full min-w-0">{children}</div>
       </div>
     </>
   );
