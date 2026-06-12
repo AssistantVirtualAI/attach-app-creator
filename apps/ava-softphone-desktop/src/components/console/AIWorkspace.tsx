@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava } from '../../lib/avaApi';
+import { supabase } from '../../lib/supabaseClient';
 import PageHeader from './PageHeader';
 import AIInsights from '../AIInsights';
 
