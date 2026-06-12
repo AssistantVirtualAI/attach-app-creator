@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { RecordingWavePlayer } from '@/components/portal/RecordingWavePlayer';
-import { Download, Share2 } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -15,24 +15,25 @@ type Rec = {
   id: string; start_at: string; duration_seconds: number | null;
   caller_number: string | null; destination_number: string | null;
   extension: string | null; recording_path: string | null;
-  transcript: string | null; ai_summary: string | null;
-  ai_sentiment: string | null;
+  recording_name: string | null; has_recording: boolean | null;
+  transcript?: string | null;
 };
 
 export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
   const [rows, setRows] = useState<Rec[]>([]);
   const [q, setQ] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       let query = (supabase as any).from('pbx_call_records')
-        .select('id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,transcript,ai_summary,ai_sentiment')
+        .select('id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,recording_name,has_recording')
         .eq('organization_id', LEMTEL_ORG_ID)
-        .not('recording_path', 'is', null)
+        .eq('has_recording', true)
         .order('start_at', { ascending: false })
-        .limit(100);
+        .limit(200);
       if (scope === 'mine') {
         const { data: auth } = await supabase.auth.getUser();
         const { data: spu } = await (supabase as any).from('pbx_softphone_users')
@@ -44,32 +45,40 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
     })();
   }, [scope]);
 
-  const sign = async (path: string) => {
-    if (signedUrls[path]) return signedUrls[path];
-    const { data } = await supabase.storage.from('lemtel-recordings').createSignedUrl(path, 3600);
-    if (data?.signedUrl) {
-      setSignedUrls(s => ({ ...s, [path]: data.signedUrl }));
-      return data.signedUrl;
+  const fetchRecording = async (r: Rec): Promise<string | null> => {
+    if (urls[r.id]) return urls[r.id];
+    if (!r.recording_path || !r.recording_name) {
+      toast.error('Missing recording metadata');
+      return null;
     }
-  };
-
-  const share = async (path: string) => {
-    const { data } = await supabase.storage.from('lemtel-recordings').createSignedUrl(path, 7 * 24 * 3600);
-    if (data?.signedUrl) {
-      await navigator.clipboard.writeText(data.signedUrl);
-      toast.success('Share link copied (valid 7 days)');
+    setLoading(r.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'get-recording', params: { record_path: r.recording_path, record_name: r.recording_name } },
+      });
+      if (error) throw error;
+      // invoke returns Blob for binary
+      const blob = data instanceof Blob ? data : new Blob([data as any], { type: 'audio/wav' });
+      const url = URL.createObjectURL(blob);
+      setUrls(s => ({ ...s, [r.id]: url }));
+      return url;
+    } catch (e: any) {
+      toast.error('Could not load recording: ' + (e?.message || 'unknown'));
+      return null;
+    } finally {
+      setLoading(null);
     }
   };
 
   const filtered = rows.filter(r =>
-    !q || `${r.caller_number ?? ''} ${r.destination_number ?? ''} ${r.transcript ?? ''}`.toLowerCase().includes(q.toLowerCase())
+    !q || `${r.caller_number ?? ''} ${r.destination_number ?? ''} ${r.extension ?? ''}`.toLowerCase().includes(q.toLowerCase())
   );
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 w-full min-w-0">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold">{scope === 'mine' ? 'My Recordings' : 'Call Recordings'}</h1>
-        <Input placeholder="Search number, name, transcript…" value={q} onChange={e => setQ(e.target.value)} className="max-w-sm" />
+        <Input placeholder="Search number, extension…" value={q} onChange={e => setQ(e.target.value)} className="max-w-sm" />
       </div>
 
       <Card>
@@ -84,36 +93,21 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
                   <span className="text-muted-foreground ml-2">Ext {r.extension ?? '—'} · {Math.round((r.duration_seconds ?? 0))}s · {formatDistanceToNow(new Date(r.start_at), { addSuffix: true })}</span>
                 </div>
                 <div className="flex gap-2">
-                  {r.ai_sentiment && <Badge variant="outline">{r.ai_sentiment}</Badge>}
-                  <Button size="sm" variant="outline" onClick={async () => {
-                    if (r.recording_path) {
-                      await sign(r.recording_path);
-                      setExpandedId(expandedId === r.id ? null : r.id);
-                    }
-                  }}>{expandedId === r.id ? 'Hide' : 'Open'}</Button>
-                  {r.recording_path && <Button size="icon" variant="outline" onClick={() => share(r.recording_path!)}><Share2 className="h-4 w-4" /></Button>}
-                  {r.recording_path && signedUrls[r.recording_path] && (
-                    <Button size="icon" variant="outline" asChild><a href={signedUrls[r.recording_path]} download><Download className="h-4 w-4" /></a></Button>
+                  <Badge variant="outline">{r.recording_name?.split('.').pop() ?? 'wav'}</Badge>
+                  <Button size="sm" variant="outline" disabled={loading === r.id} onClick={async () => {
+                    const u = await fetchRecording(r);
+                    if (u) setExpandedId(expandedId === r.id ? null : r.id);
+                  }}>{loading === r.id ? 'Loading…' : expandedId === r.id ? 'Hide' : 'Play'}</Button>
+                  {urls[r.id] && (
+                    <Button size="icon" variant="outline" asChild>
+                      <a href={urls[r.id]} download={r.recording_name ?? `${r.id}.wav`}><Download className="h-4 w-4" /></a>
+                    </Button>
                   )}
                 </div>
               </div>
 
-              {expandedId === r.id && r.recording_path && signedUrls[r.recording_path] && (
-                <div className="space-y-3">
-                  <RecordingWavePlayer url={signedUrls[r.recording_path]} />
-                  {r.transcript && (
-                    <div className="rounded-md bg-muted/30 p-3 text-sm whitespace-pre-wrap max-h-48 overflow-auto">
-                      <strong>Transcript:</strong>
-                      <p className="mt-1">{r.transcript}</p>
-                    </div>
-                  )}
-                  {r.ai_summary && (
-                    <div className="rounded-md bg-muted/30 p-3 text-sm">
-                      <strong>AI summary:</strong>
-                      <p className="mt-1">{r.ai_summary}</p>
-                    </div>
-                  )}
-                </div>
+              {expandedId === r.id && urls[r.id] && (
+                <RecordingWavePlayer url={urls[r.id]} />
               )}
             </div>
           ))}
