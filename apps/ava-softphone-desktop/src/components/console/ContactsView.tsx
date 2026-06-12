@@ -22,18 +22,64 @@ function fmtRel(iso: string) {
   return `${d}d ago`;
 }
 
+const LS_MANUAL = 'ava-manual-contacts-v1';
+
 export default function ContactsView() {
   const [items, setItems] = useState<ContactItem[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const [sel, setSel] = useState<ContactItem | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [draft, setDraft] = useState({ name: '', phone: '', company: '', email: '' });
 
   // Edit state for the detail panel
   const [notes, setNotes] = useState('');
   const [tagDraft, setTagDraft] = useState('');
   const [savedFlash, setSavedFlash] = useState(false);
 
-  useEffect(() => { ava.contacts().then(setItems); }, []);
+  const loadAll = React.useCallback(async () => {
+    const [contacts, exts] = await Promise.all([
+      ava.contacts().catch(() => [] as ContactItem[]),
+      ava.extensions().catch(() => [] as any[]),
+    ]);
+    const internal: ContactItem[] = (Array.isArray(exts) ? exts : []).map((e: any) => ({
+      id: `ext-${e.id}`,
+      name: e.displayName || `Ext ${e.extension}`,
+      company: 'Internal · Extension',
+      phone: e.extension,
+      email: e.user,
+      lastInteraction: new Date().toISOString(),
+      totalCalls: 0, totalMessages: 0,
+      sentiment: 'neutral',
+      aiNote: e.enabled ? 'Active extension' : 'Disabled extension',
+      tags: ['internal'], favorite: false, interactions: [],
+    }));
+    let manual: ContactItem[] = [];
+    try { manual = JSON.parse(localStorage.getItem(LS_MANUAL) || '[]'); } catch {}
+    setItems([...(Array.isArray(contacts) ? contacts : []), ...internal, ...manual]);
+  }, []);
+
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  const addManualContact = () => {
+    if (!draft.name.trim() || !draft.phone.trim()) return;
+    const next: ContactItem = {
+      id: `m-${Date.now()}`,
+      name: draft.name.trim(), phone: draft.phone.trim(),
+      company: draft.company.trim() || undefined,
+      email: draft.email.trim() || undefined,
+      lastInteraction: new Date().toISOString(),
+      totalCalls: 0, totalMessages: 0,
+      sentiment: 'neutral', aiNote: 'Manually added.',
+      tags: ['manual'], favorite: false, interactions: [],
+    };
+    const manual = items.filter((x) => x.id.startsWith('m-'));
+    const updated = [...manual, next];
+    try { localStorage.setItem(LS_MANUAL, JSON.stringify(updated)); } catch {}
+    setItems((all) => [...all, next]);
+    setDraft({ name: '', phone: '', company: '', email: '' });
+    setShowAdd(false);
+  };
 
   // Sync editable state when selection changes
   useEffect(() => {
@@ -92,12 +138,29 @@ export default function ContactsView() {
   return (
     <div style={{ display: 'flex', height: '100%' }}>
       <div style={{ flex: 1, minWidth: 0, padding: '24px 28px', overflowY: 'auto' }}>
-        <header style={{ marginBottom: 14 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: c.textIce, margin: '0 0 4px' }}>Contacts</h1>
-          <p style={{ fontSize: 12, color: c.mutedSilver, margin: 0 }}>
-            Unified directory · fast search · AVA notes & recent interactions.
-          </p>
+        <header style={{ marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <div>
+            <h1 style={{ fontSize: 24, fontWeight: 700, color: c.textIce, margin: '0 0 4px' }}>Contacts</h1>
+            <p style={{ fontSize: 12, color: c.mutedSilver, margin: 0 }}>
+              Internal extensions + external contacts · AVA notes & history.
+            </p>
+          </div>
+          <button onClick={() => setShowAdd((v) => !v)} style={{
+            padding: '8px 14px', borderRadius: 9, border: 'none', cursor: 'pointer',
+            background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
+            color: '#fff', fontSize: 12, fontWeight: 700,
+          }}>{showAdd ? 'Close' : '+ New Contact'}</button>
         </header>
+
+        {showAdd && (
+          <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12, marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+            <input placeholder="Name *" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} style={inputMini} />
+            <input placeholder="Phone *" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} style={inputMini} />
+            <input placeholder="Company" value={draft.company} onChange={(e) => setDraft({ ...draft, company: e.target.value })} style={inputMini} />
+            <input placeholder="Email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} style={inputMini} />
+            <button onClick={addManualContact} style={{ gridColumn: '1 / -1', padding: '8px 14px', borderRadius: 9, border: 'none', cursor: 'pointer', background: c.signalGold, color: c.midnight, fontWeight: 700, fontSize: 12 }}>Save contact</button>
+          </div>
+        )}
 
         <input
           autoFocus
@@ -313,6 +376,10 @@ const tag = (col: string): React.CSSProperties => ({
   background: 'rgba(255,255,255,0.04)', color: col,
   border: `1px solid ${col}33`, fontWeight: 600,
 });
+const inputMini: React.CSSProperties = {
+  padding: '8px 10px', borderRadius: 8, background: 'rgba(140,180,255,0.06)',
+  border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, outline: 'none',
+};
 const miniBtn: React.CSSProperties = {
   padding: '4px 9px', borderRadius: 6,
   background: 'transparent', border: `1px solid ${c.border}`,

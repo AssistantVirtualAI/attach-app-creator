@@ -288,18 +288,29 @@ export default function RecordingsView() {
             </div>
 
             <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12, marginBottom: 14 }}>
-              <div style={{ display: 'flex', gap: 2, alignItems: 'center', height: 36 }}>
-                {Array.from({ length: 60 }).map((_, i) => (
-                  <span key={i} style={{
-                    flex: 1, height: `${15 + Math.abs(Math.sin(i * 0.5)) * 80}%`,
-                    background: c.signalGold, opacity: 0.6, borderRadius: 1,
-                  }} />
-                ))}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>
-                <span>0:00</span><button onClick={playSelected} disabled={playbackLoading} style={{ ...miniBtn, padding: '2px 8px' }}>{playbackLoading ? 'Loading…' : '▶ Play'}</button><span>{fmtDur(sel.durationSec)}</span>
-              </div>
-              {audioUrl && <audio src={audioUrl} controls autoPlay style={{ width: '100%', marginTop: 8, height: 30 }} />}
+              {(audioUrl || sel.recordingUrl) ? (
+                <audio
+                  controls
+                  autoPlay={!!audioUrl}
+                  src={audioUrl || sel.recordingUrl || undefined}
+                  style={{ width: '100%', height: 36 }}
+                  onError={() => setPlaybackError('Audio failed to load from PBX')}
+                />
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: 2, alignItems: 'center', height: 36 }}>
+                    {Array.from({ length: 60 }).map((_, i) => (
+                      <span key={i} style={{
+                        flex: 1, height: `${15 + Math.abs(Math.sin(i * 0.5)) * 80}%`,
+                        background: c.signalGold, opacity: 0.6, borderRadius: 1,
+                      }} />
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>
+                    <span>0:00</span><button onClick={playSelected} disabled={playbackLoading} style={{ ...miniBtn, padding: '2px 8px' }}>{playbackLoading ? 'Loading…' : '▶ Play'}</button><span>{fmtDur(sel.durationSec)}</span>
+                  </div>
+                </>
+              )}
               {playbackError && <div style={{ fontSize: 11, color: c.mutedSilver, marginTop: 8 }}>{playbackError}</div>}
             </div>
 

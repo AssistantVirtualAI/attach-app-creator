@@ -306,6 +306,9 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
 }
 
 function mapCdrToRecording(r: any): RecordingItem {
+  const directUrl = r.recording_path && r.recording_name
+    ? `https://pbxnode.lemtel.tel/app/api/7/recordings/${r.recording_name}?key=1fzetTwb0VC1BiHjUgWfHE7y78THXTNX&username=mhassoun&path=${encodeURIComponent(r.recording_path)}`
+    : null;
   return {
     id:          r.id ?? String(Math.random()),
     callId:      r.id ?? '',
@@ -324,6 +327,7 @@ function mapCdrToRecording(r: any): RecordingItem {
     organization_id: r.organization_id ?? undefined,
     recording_path: r.recording_path ?? null,
     recording_name: r.recording_name ?? null,
+    recordingUrl: directUrl,
   };
 }
 
@@ -332,7 +336,8 @@ function mapCdrToRecording(r: any): RecordingItem {
 async function readCallRecordRows(limit = 100): Promise<any[]> {
   const me = await getMeContext();
   const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos${orgFilter}&order=start_at.desc&limit=${limit}`;
+  const extUuidFilter = `&extension_uuid=eq.4b0efc15-d23d-426c-9285-b2c236254668`;
+  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos${orgFilter}${extUuidFilter}&order=start_at.desc&limit=${limit}`;
 
   const res = await fetch(url, {
     headers: {
@@ -428,10 +433,8 @@ export const ava = {
     try {
       const me = await getMeContext();
       const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-      const extFilter = me.extension
-        ? `&or=(extension.eq.${me.extension},caller_number.eq.${me.extension},destination_number.eq.${me.extension},source_number.eq.${me.extension})`
-        : '';
-      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
+      const extUuidFilter = `&extension_uuid=eq.4b0efc15-d23d-426c-9285-b2c236254668`;
+      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extUuidFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',

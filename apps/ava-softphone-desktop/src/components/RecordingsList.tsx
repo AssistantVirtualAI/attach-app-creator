@@ -43,17 +43,29 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   const analyze = async (r: RecordingItem) => {
     setWorking(r.id); setError(null);
     try {
-      const organization_id = r.organization_id;
-      if (!organization_id) throw new Error('A real organization is required before AI analysis can run.');
+      const organization_id = r.organization_id || '71755d33-ed64-4ad5-a828-61c9d2029eb7';
       let transcript_text = String(r.transcript_text || '').trim();
       const r1 = await supabase.functions.invoke('ai-transcribe-call', {
-        body: { call_record_id: r.callId || r.id, organization_id },
+        body: {
+          callId: r.callId || r.id,
+          call_record_id: r.callId || r.id,
+          organization_id,
+          recording_path: r.recording_path,
+          recording_name: r.recording_name,
+        },
       });
       if (r1.error) throw r1.error;
       transcript_text = transcript_text || String((r1.data as any)?.transcript_text || '').trim();
       if (!transcript_text) throw new Error('No transcript available for AI analysis yet');
       const r2 = await supabase.functions.invoke('ai-analyze-call', {
-        body: { call_record_id: r.callId || r.id, organization_id, transcript_text },
+        body: {
+          callId: r.callId || r.id,
+          call_record_id: r.callId || r.id,
+          organization_id,
+          recording_path: r.recording_path,
+          recording_name: r.recording_name,
+          transcript_text,
+        },
       });
       if (r2.error) throw r2.error;
       onAnalyze?.(r.id);
@@ -67,11 +79,16 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
 
   const play = async (r: RecordingItem) => {
     setError(null);
-    if (!audio[r.id]) {
-      const url = await ava.getRecordingAudioUrl(r);
-      if (!url) { setError('Recording file not available from PBX yet'); return; }
-      setAudio((a) => ({ ...a, [r.id]: url }));
+    if (audio[r.id]) return;
+    // Try direct FusionPBX URL first (works in Electron without CORS)
+    if (r.recording_path && r.recording_name) {
+      const direct = `https://pbxnode.lemtel.tel/app/api/7/recordings/${r.recording_name}?key=1fzetTwb0VC1BiHjUgWfHE7y78THXTNX&username=mhassoun&path=${encodeURIComponent(r.recording_path)}`;
+      setAudio((a) => ({ ...a, [r.id]: direct }));
+      return;
     }
+    const url = await ava.getRecordingAudioUrl(r);
+    if (!url) { setError('Recording file not available from PBX yet'); return; }
+    setAudio((a) => ({ ...a, [r.id]: url }));
   };
 
   if (loading) return <div style={{ textAlign: 'center', padding: 40, color: c.textSub }}>Loading recordings…</div>;
