@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, getMeContext } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
+import PbxResourceSection from './admin/PbxResourceSection';
 
 const { colors: c } = theme;
 
@@ -191,33 +192,72 @@ function Label({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 4 }}>{children}</div>;
 }
 
-type Section = 'extensions' | 'devices' | 'numbers' | 'ivrs' | 'queues' | 'ringgroups' | 'sync';
+type Section =
+  | 'extensions' | 'devices' | 'numbers' | 'ivrs' | 'queues' | 'ringgroups'
+  | 'gateways' | 'sip-profiles' | 'conferences' | 'hold-music' | 'dialplans'
+  | 'time-conditions' | 'registrations' | 'voicemails' | 'recordings' | 'feature-codes'
+  | 'sync';
 
-const NAV: { id: Section; label: string }[] = [
-  { id: 'extensions', label: 'Extensions' },
-  { id: 'devices', label: 'Devices' },
-  { id: 'numbers', label: 'Phone Numbers' },
-  { id: 'ivrs', label: 'Auto-Attendants' },
-  { id: 'queues', label: 'Call Queues' },
-  { id: 'ringgroups', label: 'Ring Groups' },
-  { id: 'sync', label: 'Sync Status' },
+const NAV_GROUPS: { label: string; items: { id: Section; label: string }[] }[] = [
+  {
+    label: 'Telephony',
+    items: [
+      { id: 'extensions', label: 'Extensions' },
+      { id: 'devices', label: 'Devices' },
+      { id: 'numbers', label: 'Phone Numbers' },
+      { id: 'registrations', label: 'Live Registrations' },
+    ],
+  },
+  {
+    label: 'Routing',
+    items: [
+      { id: 'ivrs', label: 'Auto-Attendants' },
+      { id: 'queues', label: 'Call Queues' },
+      { id: 'ringgroups', label: 'Ring Groups' },
+      { id: 'time-conditions', label: 'Time Conditions' },
+      { id: 'dialplans', label: 'Dialplans' },
+    ],
+  },
+  {
+    label: 'Media',
+    items: [
+      { id: 'voicemails', label: 'Voicemails' },
+      { id: 'recordings', label: 'Recording Rules' },
+      { id: 'hold-music', label: 'Hold Music' },
+      { id: 'conferences', label: 'Conferences' },
+      { id: 'feature-codes', label: 'Feature Codes' },
+    ],
+  },
+  {
+    label: 'Infrastructure',
+    items: [
+      { id: 'gateways', label: 'Gateways' },
+      { id: 'sip-profiles', label: 'SIP Profiles' },
+      { id: 'sync', label: 'Sync Status' },
+    ],
+  },
 ];
 
 export default function AdminView() {
   const [sec, setSec] = useState<Section>('extensions');
   return (
     <div style={{ display: 'flex', height: '100%' }}>
-      <aside style={{ width: 200, flexShrink: 0, borderRight: `1px solid ${c.border}`, background: c.deepPanel, padding: 16 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: c.signalGold, textTransform: 'uppercase', marginBottom: 10 }}>Admin</div>
-        {NAV.map((n) => (
-          <button key={n.id} onClick={() => setSec(n.id)} style={{
-            display: 'block', width: '100%', textAlign: 'left',
-            padding: '8px 10px', borderRadius: 8,
-            background: sec === n.id ? 'rgba(255,230,0,0.10)' : 'transparent',
-            border: 'none', color: sec === n.id ? c.signalGold : c.mutedSilver,
-            fontSize: 12, fontWeight: sec === n.id ? 700 : 500, cursor: 'pointer',
-            marginBottom: 2,
-          }}>{n.label}</button>
+      <aside style={{ width: 220, flexShrink: 0, borderRight: `1px solid ${c.border}`, background: c.deepPanel, padding: '18px 14px', overflowY: 'auto' }}>
+        {NAV_GROUPS.map((g) => (
+          <div key={g.label} style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: 1.5, color: c.signalGold, textTransform: 'uppercase', marginBottom: 6, paddingLeft: 6 }}>{g.label}</div>
+            {g.items.map((n) => (
+              <button key={n.id} onClick={() => setSec(n.id)} style={{
+                display: 'block', width: '100%', textAlign: 'left',
+                padding: '7px 10px', borderRadius: 8,
+                background: sec === n.id ? 'rgba(11,181,214,0.14)' : 'transparent',
+                border: 'none', color: sec === n.id ? c.avaCyan : c.mutedSilver,
+                fontSize: 12, fontWeight: sec === n.id ? 700 : 500, cursor: 'pointer',
+                marginBottom: 1,
+                transition: 'all 160ms ease',
+              }}>{n.label}</button>
+            ))}
+          </div>
         ))}
       </aside>
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px' }}>
@@ -227,11 +267,136 @@ export default function AdminView() {
         {sec === 'ivrs' && <IvrsTable />}
         {sec === 'queues' && <QueuesTable />}
         {sec === 'ringgroups' && <Table title="Ring Groups" cols={['Name', 'Members', 'Strategy']} load={ava.ringGroups} row={(r: any) => [r.name, r.members, r.strategy]} />}
+        {sec === 'gateways' && (
+          <PbxResourceSection
+            kind="gateways" title="Gateways" uuidField="gateway_uuid" global
+            cols={[
+              { key: 'gateway', label: 'Name' },
+              { key: 'proxy', label: 'Proxy' },
+              { key: 'username', label: 'Username' },
+              { key: 'enabled', label: 'Enabled', render: (v) => (String(v) === 'true' ? '✓' : '—') },
+              { key: 'register', label: 'Register' },
+            ]}
+            fields={[
+              { key: 'gateway', label: 'Name' },
+              { key: 'username', label: 'Username' },
+              { key: 'password', label: 'Password' },
+              { key: 'proxy', label: 'Proxy (host[:port])' },
+              { key: 'realm', label: 'Realm' },
+              { key: 'register', label: 'Register', type: 'select', options: ['true', 'false'] },
+              { key: 'enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
+            ]}
+            rowActions={[{
+              label: 'Restart',
+              run: async (row, { orgId }) => {
+                await supabase.functions.invoke('fusionpbx-proxy', {
+                  body: { action: 'restart-gateway', organization_id: orgId, params: { gateway_name: row.gateway } },
+                });
+              },
+            }]}
+          />
+        )}
+        {sec === 'sip-profiles' && (
+          <PbxResourceSection
+            kind="sip-profiles" title="SIP Profiles" uuidField="sip_profile_uuid" global canCreate={false}
+            cols={[
+              { key: 'sip_profile_name', label: 'Name' },
+              { key: 'sip_profile_description', label: 'Description' },
+              { key: 'sip_profile_enabled', label: 'Enabled' },
+            ]}
+            rowActions={[{
+              label: 'Restart',
+              run: async (row, { orgId }) => {
+                await supabase.functions.invoke('fusionpbx-proxy', {
+                  body: { action: 'restart-sip-profile', organization_id: orgId, params: { profile_name: row.sip_profile_name } },
+                });
+              },
+            }]}
+          />
+        )}
+        {sec === 'conferences' && (
+          <PbxResourceSection
+            kind="conferences" title="Conferences" uuidField="conference_room_uuid"
+            cols={[
+              { key: 'conference_room_name', label: 'Name' },
+              { key: 'conference_room_extension', label: 'Extension' },
+              { key: 'conference_room_pin', label: 'PIN' },
+              { key: 'conference_room_enabled', label: 'Enabled' },
+            ]}
+            fields={[
+              { key: 'conference_room_name', label: 'Name' },
+              { key: 'conference_room_extension', label: 'Extension' },
+              { key: 'conference_room_pin', label: 'PIN' },
+              { key: 'conference_room_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
+              { key: 'conference_room_description', label: 'Description', type: 'textarea' },
+            ]}
+          />
+        )}
+        {sec === 'hold-music' && (
+          <PbxResourceSection
+            kind="hold-music" title="Hold Music" uuidField="music_on_hold_uuid"
+            cols={[
+              { key: 'music_on_hold_name', label: 'Name' },
+              { key: 'music_on_hold_path', label: 'Path' },
+              { key: 'music_on_hold_rate', label: 'Rate' },
+              { key: 'music_on_hold_enabled', label: 'Enabled' },
+            ]}
+            fields={[
+              { key: 'music_on_hold_name', label: 'Name' },
+              { key: 'music_on_hold_path', label: 'Path' },
+              { key: 'music_on_hold_rate', label: 'Rate', type: 'select', options: ['8000', '16000', '32000', '48000'] },
+              { key: 'music_on_hold_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
+            ]}
+          />
+        )}
+        {sec === 'dialplans' && (
+          <PbxResourceSection
+            kind="dialplans" title="Dialplans" uuidField="dialplan_uuid"
+            cols={[
+              { key: 'dialplan_name', label: 'Name' },
+              { key: 'dialplan_number', label: 'Number' },
+              { key: 'dialplan_context', label: 'Context' },
+              { key: 'dialplan_continue', label: 'Continue' },
+              { key: 'dialplan_enabled', label: 'Enabled' },
+            ]}
+            fields={[
+              { key: 'dialplan_name', label: 'Name' },
+              { key: 'dialplan_number', label: 'Number' },
+              { key: 'dialplan_context', label: 'Context' },
+              { key: 'dialplan_order', label: 'Order', type: 'number' },
+              { key: 'dialplan_continue', label: 'Continue', type: 'select', options: ['true', 'false'] },
+              { key: 'dialplan_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
+              { key: 'dialplan_xml', label: 'XML', type: 'textarea' },
+              { key: 'dialplan_description', label: 'Description' },
+            ]}
+          />
+        )}
+        {sec === 'time-conditions' && (
+          <PbxResourceSection
+            kind="time-conditions" title="Time Conditions" uuidField="dialplan_uuid"
+            cols={[
+              { key: 'dialplan_name', label: 'Name' },
+              { key: 'dialplan_number', label: 'Match' },
+              { key: 'dialplan_enabled', label: 'Enabled' },
+            ]}
+            fields={[
+              { key: 'dialplan_name', label: 'Name' },
+              { key: 'dialplan_number', label: 'Match expression' },
+              { key: 'dialplan_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
+              { key: 'dialplan_description', label: 'Description' },
+            ]}
+          />
+        )}
+        {sec === 'feature-codes' && <FeatureCodesTable />}
+        {sec === 'voicemails' && <VoicemailsTable />}
+        {sec === 'recordings' && <RecordingRulesTable />}
+        {sec === 'registrations' && <LiveRegistrationsTable />}
         {sec === 'sync' && <SyncStatus />}
       </div>
     </div>
   );
 }
+
 
 function Table({ title, cols, load, row }: { title: string; cols: string[]; load: () => Promise<any[]>; row: (item: any) => (string | number)[] }) {
   const [data, setData] = useState<any[]>([]);
@@ -602,4 +767,115 @@ function EditQueueModal({ queue, saving, onClose, onSave }: { queue: any; saving
       </div>
     </div>
   );
+}
+
+/* ============= New section tables (Supabase-backed reads) ============= */
+
+function SimpleSection({ title, headers, rows, loading, error, onRefresh, extra }: {
+  title: string; headers: string[]; rows: any[][]; loading: boolean; error: string | null; onRefresh: () => void; extra?: React.ReactNode;
+}) {
+  return (
+    <>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+        <h1 style={{ fontSize: 22, color: c.textIce, margin: 0, fontWeight: 700 }}>
+          {title} <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500, marginLeft: 6 }}>({rows.length})</span>
+        </h1>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {extra}
+          <button onClick={onRefresh} style={{ padding: '8px 12px', borderRadius: 10, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>↻ Refresh</button>
+        </div>
+      </header>
+      <div style={{ ...theme.glass.card, padding: 0, overflow: 'hidden', background: 'rgba(255,255,255,0.04)', borderColor: c.border }}>
+        {loading ? <div style={{ padding: 32, textAlign: 'center', color: c.mutedSilver }}>Loading…</div>
+          : error ? <div style={{ padding: 24, color: c.danger }}>{error}</div>
+          : rows.length === 0 ? <div style={{ padding: 32, textAlign: 'center', color: c.mutedSilver }}>No records.</div>
+          : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <thead><tr style={{ background: 'rgba(255,255,255,0.025)' }}>
+                  {headers.map((h) => (
+                    <th key={h} style={{ textAlign: 'left', padding: '12px 14px', color: c.mutedSilver, fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', borderBottom: `1px solid ${c.border}` }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>{rows.map((r, i) => (
+                  <tr key={i} style={{ borderBottom: `1px solid ${c.border}` }}>
+                    {r.map((cell, j) => <td key={j} style={{ padding: '11px 14px', color: c.textIce }}>{cell ?? '—'}</td>)}
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+      </div>
+    </>
+  );
+}
+
+function useTableLoader(loader: () => Promise<any[]>) {
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const reload = useCallback(() => {
+    setLoading(true); setError(null);
+    loader().then(setRows).catch((e) => setError(e?.message || 'Failed to load')).finally(() => setLoading(false));
+  }, [loader]);
+  useEffect(() => { reload(); }, [reload]);
+  return { rows, loading, error, reload };
+}
+
+function VoicemailsTable() {
+  const loader = useCallback(async () => {
+    const me = await getMeContext().catch(() => null);
+    const orgId = me?.organization_id || LEMTEL_ORG;
+    const { data, error } = await supabase.from('pbx_voicemail_settings').select('*').eq('organization_id', orgId).order('extension');
+    if (error) throw error;
+    return data || [];
+  }, []);
+  const { rows, loading, error, reload } = useTableLoader(loader);
+  return <SimpleSection title="Voicemail Boxes" headers={['Ext', 'Email', 'PIN', 'Greeting', 'Attach', 'Delete after']}
+    rows={rows.map((v) => [v.extension, v.email || '—', v.voicemail_password ? '••••' : '—', v.greeting_id || '—', v.attach_file ? '✓' : '—', v.local_after_email ? 'Delete' : 'Keep'])}
+    loading={loading} error={error} onRefresh={reload} />;
+}
+
+function RecordingRulesTable() {
+  const loader = useCallback(async () => {
+    const me = await getMeContext().catch(() => null);
+    const orgId = me?.organization_id || LEMTEL_ORG;
+    const { data, error } = await supabase.from('pbx_call_recording_rules').select('*').eq('organization_id', orgId);
+    if (error) throw error;
+    return data || [];
+  }, []);
+  const { rows, loading, error, reload } = useTableLoader(loader);
+  return <SimpleSection title="Recording Rules" headers={['Scope', 'Target', 'Mode', 'Retention (days)']}
+    rows={rows.map((r) => [r.scope || 'global', r.target || '—', r.mode || 'on', r.retention_days ?? '—'])}
+    loading={loading} error={error} onRefresh={reload} />;
+}
+
+function FeatureCodesTable() {
+  const loader = useCallback(async () => {
+    const me = await getMeContext().catch(() => null);
+    const orgId = me?.organization_id || LEMTEL_ORG;
+    const { data, error } = await supabase.from('pbx_feature_codes').select('*').eq('organization_id', orgId).order('code');
+    if (error) throw error;
+    return data || [];
+  }, []);
+  const { rows, loading, error, reload } = useTableLoader(loader);
+  return <SimpleSection title="Feature Codes" headers={['Code', 'Name', 'Description', 'Enabled']}
+    rows={rows.map((f) => [f.code, f.name || '—', f.description || '—', f.enabled ? '✓' : '—'])}
+    loading={loading} error={error} onRefresh={reload} />;
+}
+
+function LiveRegistrationsTable() {
+  const loader = useCallback(async () => {
+    const me = await getMeContext().catch(() => null);
+    const orgId = me?.organization_id || LEMTEL_ORG;
+    const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+      body: { action: 'get-registrations', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN } },
+    });
+    if (error) throw error;
+    return (data as any)?.data || (data as any)?.registrations || [];
+  }, []);
+  const { rows, loading, error, reload } = useTableLoader(loader);
+  return <SimpleSection title="Live Registrations" headers={['User', 'Contact', 'Agent', 'Status', 'Expires']}
+    rows={rows.map((r: any) => [r.user || r.aor || '—', r.contact || '—', r.agent || '—', r.status || 'registered', r.expires || '—'])}
+    loading={loading} error={error} onRefresh={reload} />;
 }
