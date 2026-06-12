@@ -784,6 +784,26 @@ Deno.serve(async (req) => {
         } else if (k === "ring_groups") {
           const rows = list.map(mapRingGroup).filter((x) => x.pbx_uuid);
           await doUpsert("pbx_ring_groups", rows, "organization_id,pbx_uuid", "ring_groups");
+        } else if (k === "gateways") {
+          const rows = list.map((g: any) => ({
+            organization_id,
+            pbx_uuid: g.gateway_uuid,
+            name: g.gateway || g.name || "unnamed",
+            proxy: g.proxy ?? null,
+            realm: g.realm ?? null,
+            username: g.username ?? null,
+            from_user: g.from_user ?? null,
+            from_domain: g.from_domain ?? null,
+            expire_seconds: g.expire_seconds ? parseInt(g.expire_seconds) : 800,
+            register: g.register === "true" || g.register === true,
+            context: g.context ?? "public",
+            profile: g.profile ?? "external",
+            status: g.gateway_status ?? null,
+            enabled: !(g.enabled === "false" || g.enabled === false),
+            config: g,
+            last_synced_at: new Date().toISOString(),
+          })).filter((x: any) => x.pbx_uuid);
+          await doUpsert("pbx_gateways", rows, "pbx_uuid", "gateways");
         }
       }
       if (cdrResult?.ok) {
