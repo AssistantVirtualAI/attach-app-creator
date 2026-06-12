@@ -72,7 +72,7 @@ export default function ConsoleLayout({
 
   // Redirect non-admins away from admin-only views
   useEffect(() => {
-    const adminOnly: ConsoleView[] = ['admin', 'aiadmin', 'reports'];
+    const adminOnly: ConsoleView[] = ['admin', 'aiadmin', 'reports', 'customers', 'voiceagents'];
     if (!isAdmin && adminOnly.includes(view)) setView('home');
   }, [isAdmin, view]);
 
