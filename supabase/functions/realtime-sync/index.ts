@@ -113,10 +113,8 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
 
-    const kinds: SyncKind[] = requested === 'all'
-      ? ['extensions', 'devices', 'dids', 'ivr', 'queues', 'ring-groups', 'cdrs', 'recordings', 'voicemails']
-      : [requested];
-
+    // 'all' triggers a single sync-all proxy call; specific kinds run as targeted jobs.
+    const kinds: SyncKind[] = requested === 'all' ? ['all'] : [requested];
     const results = [] as unknown[];
     for (const k of kinds) results.push(await runOne(supabase, k, orgId));
 
