@@ -182,13 +182,13 @@ const AuthPage = () => {
             <div className="inline-flex items-center gap-3 mb-8">
               <motion.div
                 whileHover={{ rotate: 6, scale: 1.06 }}
-                className="w-14 h-14 rounded-2xl overflow-hidden shadow-xl shadow-primary/30 ring-1 ring-white/20"
+                className="w-16 h-16 rounded-2xl overflow-hidden shadow-xl shadow-primary/30 ring-1 ring-white/20"
               >
-                <img src="/favicon.png?v=4" alt="Lemtel" className="w-full h-full object-cover" />
+                <img src="/ava-logo.png" alt="AVA Statistics" className="w-full h-full object-cover" />
               </motion.div>
               <div className="flex flex-col items-start leading-tight">
                 <span className="text-2xl font-bold">AVA Statistics</span>
-                <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Powered by Lemtel</span>
+                <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Powered by AVA AI</span>
               </div>
             </div>
             <h1 className="text-3xl font-bold mb-2">{getTitle()}</h1>
