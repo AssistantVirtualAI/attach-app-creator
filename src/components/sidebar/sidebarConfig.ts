@@ -3,7 +3,7 @@ import {
   Bot, Sparkles, FileQuestion, Users, UserPlus, Calendar,
   Phone, MessageCircle, GitBranch, Sliders, Webhook,
   CreditCard, Settings, Tag, Headphones, LayoutDashboard, Globe,
-  Shield, PhoneCall, Voicemail, Smartphone, Disc, Bell, Brain, Router, Activity, Home, Download, Inbox, Server, Building2
+  Shield, PhoneCall, Voicemail, Smartphone, Disc, Bell, Brain, Router, Activity, Home, Download, Inbox, Server, Building2, Network
 } from 'lucide-react';
 
 export interface NavItem {
