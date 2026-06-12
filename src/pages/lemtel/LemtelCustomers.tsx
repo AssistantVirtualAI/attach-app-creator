@@ -236,61 +236,37 @@ export default function LemtelCustomers() {
                   const isOpen = expanded.has(d.domain_uuid);
                   const enabled = d.domain_enabled === true || d.domain_enabled === 'true';
                   return (
-                    <>
-                      <TableRow key={d.domain_uuid} className="cursor-pointer" onClick={() => toggleExpand(d.domain_uuid)}>
-                        <TableCell>{isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</TableCell>
-                        <TableCell className="font-mono text-sm">
-                          <div className="flex items-center gap-2"><Globe className="w-3.5 h-3.5 text-muted-foreground" />{d.domain_name}</div>
-                          {d.domain_description && <div className="text-xs text-muted-foreground mt-0.5">{d.domain_description}</div>}
-                        </TableCell>
-                        <TableCell>
-                          {org ? <span className="font-medium">{org.name}</span> : <span className="text-xs text-muted-foreground">— not linked —</span>}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">{exts.length}</TableCell>
-                        <TableCell>
-                          <Badge variant={enabled ? 'default' : 'secondary'}>{enabled ? 'Enabled' : 'Disabled'}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost" size="sm"
-                            onClick={(e) => { e.stopPropagation(); syncDomain(d); }}
-                            disabled={syncing === d.domain_uuid}
-                          >
-                            {syncing === d.domain_uuid ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
-                            Sync
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                      {isOpen && (
-                        <TableRow key={d.domain_uuid + '-exp'} className="bg-muted/20 hover:bg-muted/20">
-                          <TableCell />
-                          <TableCell colSpan={5} className="py-3">
-                            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-2">
-                              <Users className="w-3.5 h-3.5" /> Extensions / Users ({exts.length})
-                            </div>
-                            {exts.length === 0 ? (
-                              <div className="text-sm text-muted-foreground">No cached extensions. Click <strong>Sync</strong> above to pull from FusionPBX.</div>
-                            ) : (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                                {exts.map((e) => (
-                                  <div key={e.extension} className="rounded-md border bg-card/60 px-3 py-2 text-sm">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="font-mono font-semibold">{e.extension}</span>
-                                      <Badge variant={e.enabled === false ? 'secondary' : 'outline'} className="text-[10px]">
-                                        {e.enabled === false ? 'off' : 'on'}
-                                      </Badge>
-                                    </div>
-                                    <div className="text-xs text-muted-foreground truncate">
-                                      {e.effective_cid_name || e.description || '—'}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </>
+                    <TableRow
+                      key={d.domain_uuid}
+                      className="cursor-pointer hover:bg-muted/40"
+                      onClick={() => (window.location.href = `/org/lemtel/admin/customers/${d.domain_uuid}`)}
+                    >
+                      <TableCell><ChevronRight className="w-4 h-4 text-muted-foreground" /></TableCell>
+                      <TableCell className="font-mono text-sm">
+                        <div className="flex items-center gap-2"><Globe className="w-3.5 h-3.5 text-muted-foreground" />{d.domain_name}</div>
+                        {d.domain_description && <div className="text-xs text-muted-foreground mt-0.5">{d.domain_description}</div>}
+                      </TableCell>
+                      <TableCell>
+                        {org ? <span className="font-medium">{org.name}</span> : <span className="text-xs text-muted-foreground">— not linked —</span>}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">{exts.length}</TableCell>
+                      <TableCell>
+                        <Badge variant={enabled ? 'default' : 'secondary'}>{enabled ? 'Enabled' : 'Disabled'}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost" size="sm"
+                          onClick={(e) => { e.stopPropagation(); syncDomain(d); }}
+                          disabled={syncing === d.domain_uuid}
+                        >
+                          {syncing === d.domain_uuid ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+                          Sync
+                        </Button>
+                        <Button asChild variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                          <Link to={`/org/lemtel/admin/customers/${d.domain_uuid}`}>Manage</Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
               </TableBody>
