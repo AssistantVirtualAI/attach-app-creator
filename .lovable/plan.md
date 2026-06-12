@@ -1,76 +1,58 @@
-# Plan: FusionPBX-Style Dashboard
+# Plan: Fix Call Recording Playback
 
-Replace `src/pages/lemtel/LemtelDashboard.tsx` with a tile-grid layout that mirrors the FusionPBX reference, with every tile linking to its existing page and live counts pulled from the proxy.
+The current `get-recording` action in `fusionpbx-proxy` builds a URL like `${FUSIONPBX_API_URL}/var/lib/freeswitch/recordings/...` — a literal filesystem path appended to the API base. FusionPBX has no such HTTP route, so every fetch returns 404 and the UI shows "Could not load recording." The web UI itself downloads recordings via `/app/xml_cdr/xml_cdr_audio.php?id=<xml_cdr_uuid>&t=bin&ext=mp3`, which works for both live and archived recordings because FusionPBX resolves the on-disk path from the CDR row.
 
-## Layout
+Additionally, `supabase.functions.invoke` returns JSON-decoded data for `application/json` and a `Blob` only when the SDK sees a non-JSON content-type; relying on that is brittle for audio. We'll fetch the proxy via plain `fetch` so we always get a real `Blob`.
 
-Top bar: `Dashboard` title + `Expand All`, `Edit`, `Settings` buttons (Settings → `/lemtel/settings`).
+## Changes
 
-Three tile groups (cards) on the first row:
+### 1) `supabase/functions/fusionpbx-proxy/index.ts` — rewrite `get-recording`
 
-1. **Account** — Registrations (count `1055/1314` from `list-registrations`), Account Settings, Destinations, Devices, Extensions, Ring Groups
-2. **Call Management** — IVR Menus, Call Flows, Time Conditions, Fax Server, Conferences, Conference Centers
-3. **Records** — Call Detail Records, Call Recordings, Voicemails, Recent Calls (badge=count), Missed Calls (red badge), New Messages (green badge)
+Accept `{ xml_cdr_uuid?, record_path?, record_name?, domain_name?, domain_uuid? }` and try, in order:
 
-Second row card:
-4. **Tools** — Email Queue, Call Block, Contacts, FAX Queue, Event Guard, Phone
+1. **CDR audio endpoint** (preferred — matches FusionPBX web UI):
+   `GET ${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_audio.php?id=<xml_cdr_uuid>&t=bin&ext=mp3`
+2. Fallback to the alt name: `xml_cdr_download.php?id=<xml_cdr_uuid>&t=bin&ext=mp3`
+3. **Recordings download endpoint** (when only path+name are known):
+   `GET ${FUSIONPBX_API_URL}/app/recordings/recording_download.php?path=<record_path>&filename=<record_name>` with `domain_uuid` cookie/header
+4. **REST API**: `GET /app/api/7/recordings/download?domain_uuid=...&path=...&name=...` (some installs expose this)
 
-Bottom row: three charts — System CPU Status, System Network Status, Active Calls (recharts, 7-point live series from existing CDR/registration data; CPU/Network use placeholders since no metrics endpoint exists).
+Send `Authorization: Basic ...` on every attempt. Return the first 2xx response as the audio stream with `Content-Type` inferred from extension and `Accept-Ranges: bytes`. If all fail, return `{ error, attempts: [{url, status}] }` with status 502 so the UI can show a useful message.
 
-## Tile routing
+Also extend the schema check — when neither `xml_cdr_uuid` nor (`record_path` + `record_name`) is supplied, return 400.
 
-| Tile | Route |
-|---|---|
-| Registrations | `/lemtel/softphone-users` |
-| Account Settings | `/lemtel/settings` |
-| Destinations | `/lemtel/dids` |
-| Devices | `/lemtel/devices` |
-| Extensions | `/lemtel/extensions` |
-| Ring Groups | `/lemtel/queues` |
-| IVR Menus | `/lemtel/ivr` |
-| Call Flows | `/lemtel/portal/calls` |
-| Time Conditions | new `/lemtel/business-hours` (already `BusinessHours.tsx`) |
-| Fax Server | new stub `/lemtel/fax` |
-| Conferences | new stub `/lemtel/conferences` |
-| Conference Centers | new stub `/lemtel/conference-centers` |
-| Call Detail Records | `/lemtel/portal/calls` |
-| Call Recordings | `/lemtel/admin/recordings` |
-| Voicemails | `/lemtel/admin/voicemail` |
-| Recent Calls | `/lemtel/portal/calls` |
-| Missed Calls | `/lemtel/portal/calls?filter=missed` |
-| New Messages | `/lemtel/messages` |
-| Email Queue | new stub `/lemtel/email-queue` |
-| Call Block | new stub `/lemtel/call-block` |
-| Contacts | new stub `/lemtel/contacts` |
-| FAX Queue | new stub `/lemtel/fax-queue` |
-| Event Guard | new stub `/lemtel/event-guard` |
-| Phone | opens the floating softphone widget |
+### 2) `src/pages/lemtel/admin/AdminRecordings.tsx`
 
-## Data sources
+- Add `pbx_uuid` and `domain_name`/`domain_uuid` to the `select(...)` and the `Rec` type.
+- Replace the `supabase.functions.invoke` call with a direct `fetch` to the function URL so the body is always a `Blob`:
+  ```ts
+  const { data: { session } } = await supabase.auth.getSession();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: PUBLISHABLE_KEY, Authorization: `Bearer ${session?.access_token ?? PUBLISHABLE_KEY}` },
+    body: JSON.stringify({ action: 'get-recording', params: { xml_cdr_uuid: r.pbx_uuid, record_path: r.recording_path, record_name: r.recording_name, domain_uuid: r.domain_uuid, domain_name: r.domain_name } }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const blob = await res.blob();
+  ```
+- Infer mime from `recording_name` extension to avoid the `audio/wav` default for `.mp3` files.
 
-Use existing hooks: `usePbxExtensions`, `usePbxIvrs`, `usePbxQueues`, `usePbxCallRecords`, `usePbxSmsThreads`. Add lightweight proxy calls (`list-registrations`, `list-voicemails`, `list-devices`) cached via React Query — proxy already supports them.
+### 3) `src/pages/lemtel/CustomerDetail.tsx` Recordings tab
 
-Badges:
-- Registrations: `registered / total`
-- Recent Calls: today's CDR count
-- Missed Calls: CDRs with `hangup_cause` in missed set
-- New Messages: unread SMS + new voicemails
+Apply the same `pbx_uuid`/`domain_uuid` select + direct-fetch change so per-customer recording playback works too.
 
-## Files
+### 4) `src/components/portal/RecordingWavePlayer.tsx`
 
-**Edited**
-- `src/pages/lemtel/LemtelDashboard.tsx` — full rewrite to tile grid
-- `src/App.tsx` — add routes for new stubs + `/lemtel/business-hours`
-- `src/components/sidebar/sidebarConfig.ts` — add nav entries for the new pages
+No changes — it already accepts a blob URL.
 
-**Created** (each is a minimal `LemtelStub`-style placeholder marked "Coming soon")
-- `src/pages/lemtel/LemtelFax.tsx`
-- `src/pages/lemtel/LemtelConferences.tsx`
-- `src/pages/lemtel/LemtelConferenceCenters.tsx`
-- `src/pages/lemtel/LemtelEmailQueue.tsx`
-- `src/pages/lemtel/LemtelCallBlock.tsx`
-- `src/pages/lemtel/LemtelContacts.tsx`
-- `src/pages/lemtel/LemtelFaxQueue.tsx`
-- `src/pages/lemtel/LemtelEventGuard.tsx`
+## Out of scope
 
-No database or edge function changes. The reference screenshot's `Edit` and `Expand All` controls are cosmetic in this pass; `Edit` toggles a "reorder hint" (no persistence) and `Expand All` is a no-op placeholder so the visual matches.
+- No schema changes — `pbx_uuid`, `recording_path`, `recording_name`, `domain_uuid`, `domain_name` are already populated by the CDR sync.
+- No edits to landing pages, sidebar, or unrelated routes.
+- Transcripts, MOS panel, and the rich call-details view in the screenshot are a follow-up; this plan focuses strictly on getting the audio to play.
+
+## Verification
+
+1. Open `/org/lemtel/admin/recordings`, click Play on a recent recording — audio loads and plays.
+2. Open a customer drill-down → Recordings tab → Play works for that tenant's records.
+3. If FusionPBX returns 404 on all attempts for a row, the UI toast shows the attempted URLs so we can adjust the endpoint list for this install.

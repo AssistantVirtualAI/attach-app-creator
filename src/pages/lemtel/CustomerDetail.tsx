@@ -92,7 +92,7 @@ export default function CustomerDetail() {
     queryKey: ['cdr', 'recordings', domainUuid],
     queryFn: async () => {
       const { data } = await (supabase as any).from('pbx_call_records')
-        .select('id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,recording_name')
+        .select('id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,recording_name,pbx_uuid,domain_uuid,domain_name')
         .eq('domain_uuid', domainUuid)
         .eq('has_recording', true)
         .order('start_at', { ascending: false })
@@ -129,13 +129,38 @@ export default function CustomerDetail() {
 
   const fetchRecording = async (r: any) => {
     if (recUrls[r.id]) return recUrls[r.id];
+    if (!r.pbx_uuid && !(r.recording_path && r.recording_name)) {
+      toast.error('Missing recording metadata');
+      return;
+    }
     setRecLoading(r.id);
     try {
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'get-recording', params: { record_path: r.recording_path, record_name: r.recording_name } },
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${session?.access_token ?? SUPABASE_KEY}`,
+        },
+        body: JSON.stringify({
+          action: 'get-recording',
+          params: {
+            xml_cdr_uuid: r.pbx_uuid,
+            record_path: r.recording_path,
+            record_name: r.recording_name,
+            domain_uuid: r.domain_uuid,
+            domain_name: r.domain_name,
+          },
+        }),
       });
-      if (error) throw error;
-      const blob = data instanceof Blob ? data : new Blob([data as any], { type: 'audio/wav' });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt.slice(0, 200));
+      }
+      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       setRecUrls(s => ({ ...s, [r.id]: url }));
       return url;
