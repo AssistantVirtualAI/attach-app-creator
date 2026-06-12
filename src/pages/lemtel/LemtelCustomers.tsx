@@ -6,50 +6,105 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Plus, Search, Building2, Loader2, Globe, Trash2 } from 'lucide-react';
+import { Plus, Search, Building2, Loader2, Globe, RefreshCw, ChevronDown, ChevronRight, Users } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { usePbxClients, LEMTEL_ORG } from '@/hooks/usePbxData';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { LEMTEL_ORG } from '@/hooks/usePbxData';
 
 const BASE_DOMAIN = 'lemtel.tel';
+const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
-const slugify = (s: string) =>
-  s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+type Domain = {
+  domain_uuid: string;
+  domain_name: string;
+  domain_description?: string;
+  domain_enabled?: string | boolean;
+};
+
+type Ext = {
+  extension: string;
+  effective_cid_name: string | null;
+  effective_cid_number: string | null;
+  enabled: boolean | null;
+  description: string | null;
+  domain_uuid: string | null;
+};
 
 export default function LemtelCustomers() {
-  const { data: customers = [], isLoading } = usePbxClients();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', domain: '' });
+  const [form, setForm] = useState({ name: '', domain: '' });
   const [domainTouched, setDomainTouched] = useState(false);
-  const [createDomain, setCreateDomain] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [syncing, setSyncing] = useState<string | null>(null);
 
-  const { data: domains = [] } = useQuery({
-    queryKey: ['pbx', 'pbx_domains'],
+  // 1) FusionPBX domains (live, via proxy)
+  const { data: domains = [], isLoading: loadingDomains, refetch: refetchDomains } = useQuery({
+    queryKey: ['fusionpbx', 'list-domains'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('pbx_domains' as any)
-        .select('*').eq('organization_id', LEMTEL_ORG);
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'list-domains' },
+      });
       if (error) throw error;
-      return (data || []) as any[];
+      const arr = (data?.domains || data?.data?.domains || data?.data || []) as Domain[];
+      return Array.isArray(arr) ? arr : [];
     },
   });
 
-  const domainByClient = useMemo(() => {
-    const m = new Map<string, any>();
-    for (const d of domains) if (d.client_id) m.set(d.client_id, d);
+  // 2) Local extension cache (for counts + expand)
+  const { data: extensions = [] } = useQuery({
+    queryKey: ['pbx_extensions', 'all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pbx_extensions')
+        .select('extension,effective_cid_name,effective_cid_number,enabled,description,domain_uuid')
+        .order('extension');
+      if (error) throw error;
+      return (data || []) as Ext[];
+    },
+  });
+
+  // 3) Org map (link domain -> tenant)
+  const { data: orgs = [] } = useQuery({
+    queryKey: ['organizations', 'fpbx-map'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('id,name,fusionpbx_domain_uuid');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const orgByDomain = useMemo(() => {
+    const m = new Map<string, { id: string; name: string }>();
+    for (const o of orgs as any[]) {
+      if (o.fusionpbx_domain_uuid) m.set(o.fusionpbx_domain_uuid, { id: o.id, name: o.name });
+    }
     return m;
-  }, [domains]);
+  }, [orgs]);
+
+  const extsByDomain = useMemo(() => {
+    const m = new Map<string, Ext[]>();
+    for (const e of extensions) {
+      const k = e.domain_uuid || '';
+      if (!m.has(k)) m.set(k, []);
+      m.get(k)!.push(e);
+    }
+    return m;
+  }, [extensions]);
 
   const filtered = useMemo(() => {
     const s = search.toLowerCase();
-    return (customers as any[]).filter(c =>
-      (c.name || '').toLowerCase().includes(s) || (c.email || '').toLowerCase().includes(s)
+    return (domains as Domain[]).filter(d =>
+      (d.domain_name || '').toLowerCase().includes(s) ||
+      (d.domain_description || '').toLowerCase().includes(s) ||
+      (orgByDomain.get(d.domain_uuid)?.name || '').toLowerCase().includes(s)
     );
-  }, [customers, search]);
+  }, [domains, search, orgByDomain]);
 
   const onNameChange = (name: string) => {
     setForm(f => ({
@@ -60,92 +115,73 @@ export default function LemtelCustomers() {
   };
 
   const handleCreate = async () => {
-    if (!form.name) return toast.error('Name required');
-    if (createDomain && !form.domain) return toast.error('Domain required');
+    if (!form.name || !form.domain) return toast.error('Name and domain required');
     setSaving(true);
     try {
-      // 1) Create the customer
-      const { data: client, error } = await supabase.from('clients').insert({
-        organization_id: LEMTEL_ORG, name: form.name, email: form.email || null, status: 'active',
-      }).select().single();
-      if (error) throw error;
-
-      // 2) Create the dedicated PBX domain
-      if (createDomain) {
-        const { error: dErr } = await supabase.from('pbx_domains' as any).insert({
-          organization_id: LEMTEL_ORG,
-          name: form.domain,
-          description: `Customer: ${form.name}`,
-          enabled: true,
-          client_id: client.id,
-        } as any);
-        if (dErr) toast.error(`Domain saved failed: ${dErr.message}`);
-
-        // 3) Sync domain to FusionPBX (non-fatal)
-        try {
-          const { data: res, error: fnErr } = await supabase.functions.invoke('pbx-write', {
-            body: {
-              organizationId: LEMTEL_ORG,
-              clientId: client.id,
-              action: 'create-domain',
-              params: { domain_name: form.domain, domain_enabled: true, domain_description: `Customer: ${form.name}` },
-            },
-          });
-          if (fnErr || (res as any)?.error) {
-            toast.warning('Customer created, but PBX domain sync failed — check Sync Health.');
-          } else {
-            toast.success(`Domain ${form.domain} created on PBX`);
-          }
-        } catch {
-          toast.warning('Customer created, but PBX domain sync failed.');
-        }
-      }
-
-      setForm({ name: '', email: '', domain: '' });
+      const { data: res, error: fnErr } = await supabase.functions.invoke('pbx-write', {
+        body: {
+          organizationId: LEMTEL_ORG,
+          action: 'create-domain',
+          params: { domain_name: form.domain, domain_enabled: true, domain_description: `Customer: ${form.name}` },
+        },
+      });
+      if (fnErr || (res as any)?.error) throw new Error((fnErr as any)?.message || (res as any)?.error || 'create-domain failed');
+      toast.success(`Domain ${form.domain} created on FusionPBX`);
+      setForm({ name: '', domain: '' });
       setDomainTouched(false);
       setOpen(false);
-      qc.invalidateQueries({ queryKey: ['pbx', 'clients'] });
-      qc.invalidateQueries({ queryKey: ['pbx', 'pbx_domains'] });
-      toast.success('Customer added');
+      qc.invalidateQueries({ queryKey: ['fusionpbx', 'list-domains'] });
     } catch (e: any) {
-      toast.error(e.message || 'Failed to create customer');
-    } finally {
-      setSaving(false);
-    }
+      toast.error(e.message || 'Failed to create domain');
+    } finally { setSaving(false); }
   };
 
-  const handleDelete = async (c: any) => {
-    if (!confirm(`Delete customer "${c.name}"?`)) return;
-    const { error } = await supabase.from('clients').delete().eq('id', c.id);
-    if (error) return toast.error(error.message);
-    qc.invalidateQueries({ queryKey: ['pbx', 'clients'] });
-    toast.success('Customer deleted');
+  const toggleExpand = (uuid: string) => {
+    setExpanded(prev => {
+      const n = new Set(prev);
+      n.has(uuid) ? n.delete(uuid) : n.add(uuid);
+      return n;
+    });
+  };
+
+  const syncDomain = async (d: Domain) => {
+    setSyncing(d.domain_uuid);
+    try {
+      const org = orgByDomain.get(d.domain_uuid);
+      await supabase.functions.invoke('fusionpbx-proxy', {
+        body: {
+          action: 'sync-all',
+          resources: ['extensions', 'queues', 'ivrs', 'ring_groups'],
+          organization_id: org?.id || LEMTEL_ORG,
+          domain_uuid: d.domain_uuid,
+        },
+      });
+      toast.success(`Synced ${d.domain_name}`);
+      qc.invalidateQueries({ queryKey: ['pbx_extensions', 'all'] });
+    } catch (e: any) {
+      toast.error('Sync failed: ' + (e?.message || 'unknown'));
+    } finally { setSyncing(null); }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 w-full min-w-0">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2"><Building2 className="w-7 h-7" /> Customers</h1>
-          <p className="text-muted-foreground">End-clients hosted on the Lemtel platform — each with their own PBX domain</p>
+          <p className="text-muted-foreground">Every FusionPBX domain on this server — each is a tenant with its own extensions</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="w-4 h-4 mr-2" /> New Customer</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Add Customer</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div><Label>Business Name</Label><Input value={form.name} onChange={e => onNameChange(e.target.value)} /></div>
-              <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
-              <div className="flex items-center justify-between rounded-lg border p-3">
-                <div>
-                  <p className="text-sm font-medium">Create dedicated PBX domain</p>
-                  <p className="text-xs text-muted-foreground">Provisions the domain on the phone system</p>
-                </div>
-                <Switch checked={createDomain} onCheckedChange={setCreateDomain} />
-              </div>
-              {createDomain && (
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => refetchDomains()}>
+            <RefreshCw className="w-4 h-4 mr-2" /> Refresh
+          </Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="w-4 h-4 mr-2" /> New Customer</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Add Customer (provisions FusionPBX domain)</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div><Label>Business Name</Label><Input value={form.name} onChange={e => onNameChange(e.target.value)} /></div>
                 <div>
                   <Label className="flex items-center gap-1"><Globe className="w-3.5 h-3.5" /> SIP Domain</Label>
                   <Input
@@ -154,64 +190,106 @@ export default function LemtelCustomers() {
                     onChange={e => { setDomainTouched(true); setForm({ ...form, domain: e.target.value.trim().toLowerCase() }); }}
                   />
                 </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button onClick={handleCreate} disabled={saving}>
-                {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Create
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleCreate} disabled={saving}>
+                  {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Create on PBX
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      <Card>
+      <Card className="w-full">
         <CardHeader>
-          <div className="flex items-center justify-between gap-4">
-            <CardTitle>{filtered.length} customers</CardTitle>
-            <div className="relative w-72">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <CardTitle>{filtered.length} domain{filtered.length === 1 ? '' : 's'}</CardTitle>
+            <div className="relative w-72 max-w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+              <Input placeholder="Search domains, tenants…" value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {loadingDomains ? (
             <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead className="w-8" />
                   <TableHead>PBX Domain</TableHead>
+                  <TableHead>Tenant</TableHead>
+                  <TableHead className="text-right">Extensions</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="w-10" />
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No customers.</TableCell></TableRow>
-                ) : filtered.map((c: any) => {
-                  const dom = domainByClient.get(c.id);
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No PBX domains returned. Check FusionPBX credentials.</TableCell></TableRow>
+                ) : filtered.map((d) => {
+                  const org = orgByDomain.get(d.domain_uuid);
+                  const exts = extsByDomain.get(d.domain_uuid) || [];
+                  const isOpen = expanded.has(d.domain_uuid);
+                  const enabled = d.domain_enabled === true || d.domain_enabled === 'true';
                   return (
-                    <TableRow key={c.id}>
-                      <TableCell className="font-medium">{c.name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{c.email || '—'}</TableCell>
-                      <TableCell>
-                        {dom ? (
-                          <Badge variant="outline" className="font-mono text-xs"><Globe className="w-3 h-3 mr-1" />{dom.name}</Badge>
-                        ) : <span className="text-xs text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell><Badge variant={c.status === 'active' ? 'default' : 'secondary'}>{c.status || 'active'}</Badge></TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(c)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                    <>
+                      <TableRow key={d.domain_uuid} className="cursor-pointer" onClick={() => toggleExpand(d.domain_uuid)}>
+                        <TableCell>{isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</TableCell>
+                        <TableCell className="font-mono text-sm">
+                          <div className="flex items-center gap-2"><Globe className="w-3.5 h-3.5 text-muted-foreground" />{d.domain_name}</div>
+                          {d.domain_description && <div className="text-xs text-muted-foreground mt-0.5">{d.domain_description}</div>}
+                        </TableCell>
+                        <TableCell>
+                          {org ? <span className="font-medium">{org.name}</span> : <span className="text-xs text-muted-foreground">— not linked —</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">{exts.length}</TableCell>
+                        <TableCell>
+                          <Badge variant={enabled ? 'default' : 'secondary'}>{enabled ? 'Enabled' : 'Disabled'}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost" size="sm"
+                            onClick={(e) => { e.stopPropagation(); syncDomain(d); }}
+                            disabled={syncing === d.domain_uuid}
+                          >
+                            {syncing === d.domain_uuid ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+                            Sync
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      {isOpen && (
+                        <TableRow key={d.domain_uuid + '-exp'} className="bg-muted/20 hover:bg-muted/20">
+                          <TableCell />
+                          <TableCell colSpan={5} className="py-3">
+                            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-2">
+                              <Users className="w-3.5 h-3.5" /> Extensions / Users ({exts.length})
+                            </div>
+                            {exts.length === 0 ? (
+                              <div className="text-sm text-muted-foreground">No cached extensions. Click <strong>Sync</strong> above to pull from FusionPBX.</div>
+                            ) : (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                {exts.map((e) => (
+                                  <div key={e.extension} className="rounded-md border bg-card/60 px-3 py-2 text-sm">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="font-mono font-semibold">{e.extension}</span>
+                                      <Badge variant={e.enabled === false ? 'secondary' : 'outline'} className="text-[10px]">
+                                        {e.enabled === false ? 'off' : 'on'}
+                                      </Badge>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate">
+                                      {e.effective_cid_name || e.description || '—'}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
                   );
                 })}
               </TableBody>
