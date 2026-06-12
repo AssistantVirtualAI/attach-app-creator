@@ -306,9 +306,10 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
 }
 
 function mapCdrToRecording(r: any): RecordingItem {
-  const directUrl = r.recording_path && r.recording_name
-    ? `https://pbxnode.lemtel.tel/app/api/7/recordings/${r.recording_name}?key=1fzetTwb0VC1BiHjUgWfHE7y78THXTNX&username=mhassoun&path=${encodeURIComponent(r.recording_path)}`
+  const directUrl = r.recording_name
+    ? `https://pbxnode.lemtel.tel/app/recordings/${r.recording_name}?key=1fzetTwb0VC1BiHjUgWfHE7y78THXTNX&username=mhassoun`
     : null;
+
   return {
     id:          r.id ?? String(Math.random()),
     callId:      r.id ?? '',
