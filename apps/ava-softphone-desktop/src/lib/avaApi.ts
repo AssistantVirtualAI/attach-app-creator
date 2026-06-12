@@ -16,6 +16,18 @@ import { BACKEND, TABLES, FN, fnUrl } from './config';
 
 export const MOCK: boolean = (import.meta as any).env?.VITE_AVA_MOCK === 'true';
 
+/** Normalize any PostgREST/Edge response shape into an array (handles {data:[]}, {rows:[]}, null, single object). */
+function asArray<T = any>(raw: any): T[] {
+  if (Array.isArray(raw)) return raw as T[];
+  if (raw == null) return [];
+  if (Array.isArray(raw?.data)) return raw.data as T[];
+  if (Array.isArray(raw?.rows)) return raw.rows as T[];
+  if (Array.isArray(raw?.items)) return raw.items as T[];
+  if (Array.isArray(raw?.result)) return raw.result as T[];
+  if (typeof raw === 'object') return [raw as T];
+  return [];
+}
+
 let authToken: string | null = null;
 export function setAuthToken(token: string | null) {
   authToken = token;
