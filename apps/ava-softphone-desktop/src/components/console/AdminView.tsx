@@ -83,7 +83,7 @@ export default function AdminView() {
         ))}
       </aside>
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px' }}>
-        {sec === 'extensions' && <Table title="Extensions" cols={['Ext', 'Display Name', 'User', 'Voicemail', 'Status']} load={ava.extensions} row={(e: any) => [e.extension, e.displayName, e.user || '—', e.voicemailEnabled ? 'On' : 'Off', e.enabled ? 'Active' : 'Disabled']} />}
+        {sec === 'extensions' && <ExtensionsTable />}
         {sec === 'devices' && <Table title="Devices" cols={['Vendor', 'MAC', 'Template', 'Assigned', 'Registered']} load={ava.devices} row={(d: any) => [d.vendor, d.mac, d.template, d.assignedTo || '—', d.registered ? 'Yes' : 'No']} />}
         {sec === 'numbers' && <Table title="Phone Numbers" cols={['Number', 'Assigned To', 'Type']} load={ava.phoneNumbers} row={(n: any) => [n.number, n.assignedTo, n.type]} />}
         {sec === 'ivrs' && <Table title="Auto-Attendants (IVR)" cols={['Name', 'Greeting', 'Options']} load={ava.ivrs} row={(i: any) => [i.name, i.greeting.slice(0, 60) + '…', i.options]} />}
