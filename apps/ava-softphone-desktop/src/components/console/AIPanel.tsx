@@ -18,23 +18,25 @@ const SUGGESTIONS = [
 
 export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const [token, setToken] = useState<string | null>(null);
-  const [eligible, setEligible] = useState<boolean | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [authed, setAuthed] = useState<boolean | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Load token + eligibility check
+  // Load token + role
   useEffect(() => {
     let mounted = true;
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
       setToken(session?.access_token ?? null);
-      if (!session?.user) { setEligible(false); return; }
+      if (!session?.user) { setAuthed(false); return; }
+      setAuthed(true);
       const [{ data: isSuper }, { data: isLemtel }] = await Promise.all([
         supabase.rpc('is_super_admin', { _user_id: session.user.id }),
         supabase.rpc('is_lemtel_admin', { _user_id: session.user.id }),
       ]);
-      if (mounted) setEligible(Boolean(isSuper || isLemtel));
+      if (mounted) setIsAdmin(Boolean(isSuper || isLemtel));
     })();
     return () => { mounted = false; };
   }, []);
