@@ -295,6 +295,8 @@ Deno.serve(async (req) => {
       "list-destinations":  { path: `destinations?${domainQ}`,        key: "destinations" },
       "list-voicemails":    { path: `voicemails?${domainQ}`,          key: "voicemails" },
       "list-registrations": { path: `registrations?${domainQ}`,       key: "registrations" },
+      "list-moh":           { path: `music_on_hold?${domainQ}`,       key: "music_on_hold" },
+      "list-recordings":    { path: `recordings?${domainQ}`,          key: "recordings" },
       "list-domains":       { path: `domains`,                        key: "domains" },
     };
     if (listMap[action]) {
