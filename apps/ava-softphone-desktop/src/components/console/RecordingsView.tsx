@@ -82,6 +82,9 @@ export default function RecordingsView() {
     setPlaybackError(null);
     if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
+    setTranscript(String((sel as any)?.transcript_text || (sel as any)?.raw_data?.transcript_text || ''));
+    setAnalysis((sel as any)?.raw_data?.ai || null);
+    setAiError(null);
   }, [sel?.id]);
 
   const filtered = useMemo(() => {
