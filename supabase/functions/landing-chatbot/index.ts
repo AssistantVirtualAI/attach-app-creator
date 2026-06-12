@@ -66,6 +66,15 @@ AVA is an all-in-one platform that offers:
 - If someone has complex questions, suggest /contact
 - Don't fabricate information you don't know`;
 
+function escapeHtml(s: string): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 async function sendConversationEmail(messages: any[], language: string) {
   if (!RESEND_API_KEY || !ADMIN_EMAIL) return;
 
@@ -76,7 +85,7 @@ async function sendConversationEmail(messages: any[], language: string) {
         const isUser = m.role === "user";
         return `<div style="margin-bottom: 12px; padding: 10px; border-radius: 8px; background: ${isUser ? '#e0e7ff' : '#f3f4f6'}; border-left: 3px solid ${isUser ? '#6366f1' : '#9ca3af'};">
           <strong style="color: ${isUser ? '#4338ca' : '#374151'};">${isUser ? '👤 Visitor' : '🤖 AVA Bot'}</strong>
-          <p style="margin: 5px 0 0 0;">${m.content}</p>
+          <p style="margin: 5px 0 0 0;">${escapeHtml(m.content)}</p>
         </div>`;
       })
       .join("");

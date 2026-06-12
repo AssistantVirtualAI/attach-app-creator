@@ -158,11 +158,15 @@ Deno.serve(async (req) => {
           },
         }),
         block_extension: tool({
-          description: "Disable an extension. Requires reason. Destructive.",
+          description: "Disable an extension in the caller's organization. Requires reason. Destructive.",
           inputSchema: z.object({ extension: z.string().min(1).max(20), reason: z.string().min(3).max(500) }),
           execute: async ({ extension, reason }) => {
-            const { error } = await admin.from("pbx_extensions").update({ enabled: false }).eq("extension", extension);
-            await audit("block_extension", { extension, reason }, { ok: !error, error: error?.message }, !error);
+            if (!callerOrgId) return { error: "No organization" };
+            const { error } = await admin.from("pbx_extensions")
+              .update({ enabled: false })
+              .eq("extension", extension)
+              .eq("organization_id", callerOrgId);
+            await audit("block_extension", { extension, reason, organization_id: callerOrgId }, { ok: !error, error: error?.message }, !error);
             return { ok: !error, error: error?.message };
           },
         }),
