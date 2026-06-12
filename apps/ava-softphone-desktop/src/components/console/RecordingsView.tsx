@@ -364,6 +364,36 @@ export default function RecordingsView() {
               {playbackError && <div style={{ fontSize: 11, color: c.mutedSilver, marginTop: 8 }}>{playbackError}</div>}
             </div>
 
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              <button onClick={runTranscribeAnalyze} disabled={aiLoading} style={{ ...miniBtn, flex: 1, padding: '8px 10px', background: aiLoading ? 'transparent' : 'rgba(35,214,255,0.10)', color: c.avaCyan, borderColor: `${c.avaCyan}55`, fontWeight: 700 }}>
+                {aiLoading ? 'Running AI…' : (transcript ? '↻ Re-analyze' : '✨ Transcribe & Analyze')}
+              </button>
+            </div>
+            {aiError && (
+              <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: 'rgba(239,68,68,0.10)', border: `1px solid ${c.danger}55`, color: c.textIce, fontSize: 11, display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                <span>{aiError}</span>
+                <button onClick={runTranscribeAnalyze} style={{ ...miniBtn, color: c.danger, borderColor: `${c.danger}66` }}>↻ Retry</button>
+              </div>
+            )}
+            {transcript && (
+              <Panel title="Transcript" accent={c.avaCyan}>
+                <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0, whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto' }}>{transcript}</p>
+              </Panel>
+            )}
+            {analysis && (
+              <Panel title="AI Analysis" accent={c.avaViolet}>
+                <div style={{ fontSize: 12, color: c.textIce, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {analysis.sentiment && <div><span style={{ color: c.mutedSilver }}>Sentiment:</span> {analysis.sentiment}</div>}
+                  {analysis.summary && <div>{analysis.summary}</div>}
+                  {Array.isArray(analysis.action_items) && analysis.action_items.length > 0 && (
+                    <ul style={{ margin: '4px 0 0 14px', padding: 0 }}>
+                      {analysis.action_items.map((a: string, i: number) => <li key={i} style={{ fontSize: 11.5 }}>{a}</li>)}
+                    </ul>
+                  )}
+                </div>
+              </Panel>
+            )}
+
             <Panel title="Quality Score" accent={c.signalGold}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                 <span style={{ fontSize: 26, fontWeight: 700, color: qualityColor(sel.qualityScore || 0), fontFamily: 'JetBrains Mono, monospace' }}>{sel.qualityScore || 0}</span>
