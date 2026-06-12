@@ -14,6 +14,8 @@ import TelecomSettingsView from './TelecomSettingsView';
 import OrgChatView from './OrgChatView';
 import AdminAIChatView from './AdminAIChatView';
 import ReportsView from './ReportsView';
+import CustomersView from './CustomersView';
+import VoiceAgentsView from './VoiceAgentsView';
 import SoftphonePane from '../SoftphonePane';
 import SettingsPage from '../SettingsPage';
 import { AppErrorBoundary } from '../AppErrorBoundary';
@@ -70,7 +72,7 @@ export default function ConsoleLayout({
 
   // Redirect non-admins away from admin-only views
   useEffect(() => {
-    const adminOnly: ConsoleView[] = ['admin', 'aiadmin', 'reports'];
+    const adminOnly: ConsoleView[] = ['admin', 'aiadmin', 'reports', 'customers', 'voiceagents'];
     if (!isAdmin && adminOnly.includes(view)) setView('home');
   }, [isAdmin, view]);
 
@@ -177,6 +179,8 @@ export default function ConsoleLayout({
           {view === 'orgchat' && <OrgChatView />}
           {view === 'aiadmin' && <AdminAIChatView />}
           {view === 'reports' && <ReportsView />}
+          {view === 'customers' && <CustomersView />}
+          {view === 'voiceagents' && <VoiceAgentsView />}
           {view === 'settings' && (
             <SettingsPage
               creds={creds}

@@ -279,6 +279,7 @@ Deno.serve(async (req) => {
       "list-destinations":  { path: `destinations?${domainQ}`,        key: "destinations" },
       "list-voicemails":    { path: `voicemails?${domainQ}`,          key: "voicemails" },
       "list-registrations": { path: `registrations?${domainQ}`,       key: "registrations" },
+      "list-domains":       { path: `domains`,                        key: "domains" },
     };
     if (listMap[action]) {
       const m = listMap[action];
@@ -803,9 +804,22 @@ Deno.serve(async (req) => {
       const cleanPath = String(record_path).replace(/^\/+/, "");
       const url = `${FUSIONPBX_API_URL}/${cleanPath}/${encodeURIComponent(record_name)}`;
       const r = await fetch(url, { headers: { Authorization: basicHeader } });
-      if (!r.ok) return json({ error: "FETCH_FAILED", status: r.status }, r.status);
-      const ct = record_name.toLowerCase().endsWith(".mp3") ? "audio/mpeg" : "audio/wav";
-      return new Response(r.body, { headers: { ...corsHeaders, "Content-Type": ct, "Cache-Control": "private, max-age=300" } });
+      if (!r.ok) return json({ error: "FETCH_FAILED", status: r.status, url }, r.status);
+      const buf = await r.arrayBuffer();
+      const lower = String(record_name).toLowerCase();
+      const ct = lower.endsWith(".mp3") ? "audio/mpeg"
+              : lower.endsWith(".ogg") ? "audio/ogg"
+              : lower.endsWith(".m4a") ? "audio/mp4"
+              : "audio/wav";
+      return new Response(buf, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": ct,
+          "Content-Length": String(buf.byteLength),
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "private, max-age=300",
+        },
+      });
     }
 
     // ---- Voicemail CRUD ----
