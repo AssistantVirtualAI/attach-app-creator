@@ -27,43 +27,41 @@ async function callProxy(action: string, body: Record<string, unknown> = {}) {
 }
 
 async function runOne(supabase: ReturnType<typeof createClient>, kind: SyncKind, orgId: string) {
+  const startedIso = new Date().toISOString();
   const { data: job } = await supabase
     .from('pbx_sync_jobs')
-    .insert({ organization_id: orgId, kind, status: 'running' })
+    .insert({ organization_id: orgId, job_type: kind, status: 'running', started_at: startedIso })
     .select('id')
     .single();
   const jobId = job?.id;
-  const stats: Record<string, number> = {};
+  let stats: Record<string, unknown> = {};
   try {
-    // Best-effort calls — fusionpbx-proxy may not implement all actions; record what succeeded.
-    const actionMap: Record<string, string> = {
-      extensions: 'list-extensions',
-      devices: 'list-devices',
-      dids: 'list-dids',
-      ivr: 'list-ivr',
-      queues: 'list-queues',
-      'ring-groups': 'list-ring-groups',
-      cdrs: 'list-cdrs',
-      recordings: 'list-recordings',
-      voicemails: 'list-voicemails',
+    // Delegate to fusionpbx-proxy sync-all which already upserts each resource into pbx_* tables.
+    const resourceMap: Record<string, string[]> = {
+      extensions: ['extensions'],
+      devices: ['devices'],
+      ivr: ['ivrs'],
+      queues: ['queues'],
+      'ring-groups': ['ring_groups'],
+      gateways: ['gateways'],
+      cdrs: ['cdrs'],
+      dids: ['destinations'],
+      recordings: ['cdrs'], // recordings come with CDRs
+      voicemails: ['cdrs'], // voicemails synced via voicemail-sync; CDRs cover the timeline
+      all: ['extensions', 'devices', 'ivrs', 'queues', 'ring_groups', 'gateways', 'cdrs'],
     };
-    const action = actionMap[kind];
-    if (action) {
-      try {
-        const data = await callProxy(action, { organizationId: orgId });
-        stats.fetched = Array.isArray(data?.items) ? data.items.length : 0;
-      } catch (e) {
-        stats.fetch_error = 1;
-        stats.fetch_message = String((e as Error).message).slice(0, 200) as unknown as number;
-      }
-    }
+    const resources = resourceMap[kind] || ['cdrs'];
+    const data = await callProxy('sync-all', { organizationId: orgId, resources });
+    stats = (data?.stats || {}) as Record<string, unknown>;
     await supabase.from('pbx_sync_jobs').update({
-      status: 'success', finished_at: new Date().toISOString(), stats,
+      status: data?.success === false ? 'completed_with_errors' : 'completed',
+      completed_at: new Date().toISOString(), stats,
+      error: Array.isArray(data?.errors) && data.errors.length ? data.errors.join('; ').slice(0, 2000) : null,
     }).eq('id', jobId);
     return { kind, ok: true, stats };
   } catch (e) {
     await supabase.from('pbx_sync_jobs').update({
-      status: 'error', finished_at: new Date().toISOString(),
+      status: 'failed', completed_at: new Date().toISOString(),
       error: String((e as Error).message).slice(0, 500), stats,
     }).eq('id', jobId);
     return { kind, ok: false, error: String((e as Error).message) };
@@ -115,10 +113,8 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
 
-    const kinds: SyncKind[] = requested === 'all'
-      ? ['extensions', 'devices', 'dids', 'ivr', 'queues', 'ring-groups', 'cdrs', 'recordings', 'voicemails']
-      : [requested];
-
+    // 'all' triggers a single sync-all proxy call; specific kinds run as targeted jobs.
+    const kinds: SyncKind[] = requested === 'all' ? ['all'] : [requested];
     const results = [] as unknown[];
     for (const k of kinds) results.push(await runOne(supabase, k, orgId));
 

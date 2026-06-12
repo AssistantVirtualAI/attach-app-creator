@@ -663,7 +663,7 @@ Deno.serve(async (req) => {
 
     if (action === "sync_status" || action === "sync-status") {
       const { data: jobs } = await admin.from("pbx_sync_jobs")
-        .select("job_type,status,completed_at,created_at,error,error_message")
+        .select("job_type,status,started_at,completed_at,created_at,error")
         .eq("organization_id", organization_id)
         .order("created_at", { ascending: false })
         .limit(10);
@@ -673,9 +673,10 @@ Deno.serve(async (req) => {
         status: (jobs || []).some((j: any) => j.status === "failed") ? "error" : "ok",
         jobs: (jobs || []).map((j: any) => ({
           kind: j.job_type,
+          startedAt: j.started_at || j.created_at,
           finishedAt: j.completed_at || j.created_at,
           ok: j.status !== "failed",
-          error: j.error || j.error_message || null,
+          error: j.error || null,
         })),
       });
     }
@@ -696,6 +697,8 @@ Deno.serve(async (req) => {
       if (!r.ok) {
         await admin.from("pbx_sync_jobs").insert({
           organization_id, job_type: action, status: "failed",
+          started_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
           error: `No working CDR endpoint. Attempts: ${JSON.stringify(r.attempts).slice(0, 1500)}`,
           stats: {},
         });
@@ -721,6 +724,7 @@ Deno.serve(async (req) => {
       }
       await admin.from("pbx_sync_jobs").insert({
         organization_id, job_type: action, status: "completed",
+        started_at: new Date(Date.now() - (r.latency_ms || 0)).toISOString(),
         completed_at: new Date().toISOString(),
         stats: { cdrs: upserted, fetched: cdrs.length, endpoint: r.endpoint, duration_ms: r.latency_ms },
       });
@@ -736,7 +740,8 @@ Deno.serve(async (req) => {
     // ---- Full sync ----
     if (action === "sync-all") {
       const t0 = Date.now();
-      // Optional resources filter: ['extensions','devices','ivrs','queues','ring_groups','destinations','cdrs']
+      const startedIso = new Date().toISOString();
+      // Optional resources filter: ['extensions','devices','ivrs','queues','ring_groups','gateways','destinations','cdrs']
       const requested: string[] | null = Array.isArray((body as any).resources)
         ? (body as any).resources
         : Array.isArray(params.resources)
@@ -749,6 +754,8 @@ Deno.serve(async (req) => {
       if (want("ivrs"))         tasks.push(pbxFetch(`ivr_menus?${domainQ}`).then((r) => ({ k: "ivr_menus", r })));
       if (want("queues"))       tasks.push(pbxFetch(`call_center_queues?${domainQ}`).then((r) => ({ k: "call_center_queues", r })));
       if (want("ring_groups"))  tasks.push(pbxFetch(`ring_groups?${domainQ}`).then((r) => ({ k: "ring_groups", r })));
+      // Gateways are global in FusionPBX (no domain filter) — query without domain_uuid.
+      if (want("gateways"))     tasks.push(pbxFetch(`gateways`).then((r) => ({ k: "gateways", r })));
       const results = await Promise.all(tasks);
       const cdrResult = want("cdrs") ? await fetchCdrsWithFallback({ limit: "200" }) : null;
       const stats: Record<string, number> = {};
@@ -777,6 +784,26 @@ Deno.serve(async (req) => {
         } else if (k === "ring_groups") {
           const rows = list.map(mapRingGroup).filter((x) => x.pbx_uuid);
           await doUpsert("pbx_ring_groups", rows, "organization_id,pbx_uuid", "ring_groups");
+        } else if (k === "gateways") {
+          const rows = list.map((g: any) => ({
+            organization_id,
+            pbx_uuid: g.gateway_uuid,
+            name: g.gateway || g.name || "unnamed",
+            proxy: g.proxy ?? null,
+            realm: g.realm ?? null,
+            username: g.username ?? null,
+            from_user: g.from_user ?? null,
+            from_domain: g.from_domain ?? null,
+            expire_seconds: g.expire_seconds ? parseInt(g.expire_seconds) : 800,
+            register: g.register === "true" || g.register === true,
+            context: g.context ?? "public",
+            profile: g.profile ?? "external",
+            status: g.gateway_status ?? null,
+            enabled: !(g.enabled === "false" || g.enabled === false),
+            config: g,
+            last_synced_at: new Date().toISOString(),
+          })).filter((x: any) => x.pbx_uuid);
+          await doUpsert("pbx_gateways", rows, "pbx_uuid", "gateways");
         }
       }
       if (cdrResult?.ok) {
@@ -801,6 +828,7 @@ Deno.serve(async (req) => {
       await admin.from("pbx_sync_jobs").insert({
         organization_id, job_type: "sync-all",
         status: errors.length ? "completed_with_errors" : "completed",
+        started_at: startedIso,
         completed_at: new Date().toISOString(),
         stats: { ...stats, duration_ms },
         error: errors.length ? errors.join("; ").slice(0, 2000) : null,
@@ -915,9 +943,10 @@ Deno.serve(async (req) => {
 
     // ---- Advanced (super_admin): generic CRUD for FusionPBX collections ----
     // Used for Gateways, SIP Profiles, Conferences, Hold Music, Dialplans, Time Conditions.
-    const ADV: Record<string, { path: string; key: string; uuidField: string }> = {
-      gateways:        { path: "gateways",        key: "gateways",        uuidField: "gateway_uuid" },
-      "sip-profiles":  { path: "sip_profiles",    key: "sip_profiles",    uuidField: "sip_profile_uuid" },
+    // `global` resources (gateways, sip_profiles) live outside any single tenant domain.
+    const ADV: Record<string, { path: string; key: string; uuidField: string; global?: boolean }> = {
+      gateways:        { path: "gateways",        key: "gateways",        uuidField: "gateway_uuid", global: true },
+      "sip-profiles":  { path: "sip_profiles",    key: "sip_profiles",    uuidField: "sip_profile_uuid", global: true },
       conferences:     { path: "conference_rooms",key: "conference_rooms",uuidField: "conference_room_uuid" },
       "hold-music":    { path: "music_on_hold",   key: "music_on_hold",   uuidField: "music_on_hold_uuid" },
       dialplans:       { path: "dialplans",       key: "dialplans",       uuidField: "dialplan_uuid" },
@@ -925,7 +954,7 @@ Deno.serve(async (req) => {
     };
     for (const [kind, def] of Object.entries(ADV)) {
       if (action === `list-${kind}`) {
-        const r = await pbxFetch(`${def.path}?${domainQ}`);
+        const r = await pbxFetch(def.global ? def.path : `${def.path}?${domainQ}`);
         if (!r.ok) return json(r, r.status || 500);
         return json({ ok: true, data: collection(r.data, def.key), latency_ms: r.latency_ms });
       }
@@ -966,7 +995,9 @@ Deno.serve(async (req) => {
     if (organization_id) {
       await admin.from("pbx_sync_jobs").insert({
         organization_id, job_type: action, status: "failed",
-        error_message: e?.message || String(e),
+        started_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+        error: e?.message || String(e),
       });
     }
     return json({ error: "INTERNAL", message: e?.message || String(e) }, 500);

@@ -27,11 +27,32 @@ export default function LemtelGateways() {
   const { data: rows = [], isLoading, refetch } = useQuery({
     queryKey: ['fpbx', 'gateways'],
     queryFn: async () => {
+      // Primary: live FusionPBX call (no domain filter — gateways are global)
       const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: { action: 'list-gateways' },
       });
-      if (error) throw error;
-      const arr = (data?.data || data?.gateways || []) as Gateway[];
+      let arr: Gateway[] = [];
+      if (!error) {
+        arr = (data?.data || data?.gateways || []) as Gateway[];
+      }
+      // Fallback: cached pbx_gateways rows synced by cron (covers periods when
+      // the FusionPBX REST API user lacks gateway_view permission).
+      if (!Array.isArray(arr) || arr.length === 0) {
+        const { data: cached } = await (supabase as any)
+          .from('pbx_gateways')
+          .select('pbx_uuid,name,proxy,realm,username,context,profile,status,enabled,register,config')
+          .order('name', { ascending: true });
+        arr = (cached || []).map((g: any) => ({
+          gateway_uuid: g.pbx_uuid,
+          gateway: g.name,
+          proxy: g.proxy,
+          context: g.context,
+          register: g.register,
+          enabled: g.enabled,
+          hostname: g.realm,
+          description: g.config?.description || null,
+        }));
+      }
       return Array.isArray(arr) ? arr : [];
     },
   });
@@ -93,7 +114,9 @@ export default function LemtelGateways() {
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No gateways returned.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    No gateways returned. If FusionPBX shows gateways in its admin UI but this list is empty, the API user needs the <code className="px-1 rounded bg-muted">gateway_view</code> permission enabled.
+                  </TableCell></TableRow>
                 ) : filtered.map(g => {
                   const enabled = g.enabled === true || g.enabled === 'true';
                   const register = g.register === true || g.register === 'true';
