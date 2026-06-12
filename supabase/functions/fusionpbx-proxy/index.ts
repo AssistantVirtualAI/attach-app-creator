@@ -663,7 +663,7 @@ Deno.serve(async (req) => {
 
     if (action === "sync_status" || action === "sync-status") {
       const { data: jobs } = await admin.from("pbx_sync_jobs")
-        .select("job_type,status,completed_at,created_at,error,error_message")
+        .select("job_type,status,started_at,completed_at,created_at,error")
         .eq("organization_id", organization_id)
         .order("created_at", { ascending: false })
         .limit(10);
@@ -673,9 +673,10 @@ Deno.serve(async (req) => {
         status: (jobs || []).some((j: any) => j.status === "failed") ? "error" : "ok",
         jobs: (jobs || []).map((j: any) => ({
           kind: j.job_type,
+          startedAt: j.started_at || j.created_at,
           finishedAt: j.completed_at || j.created_at,
           ok: j.status !== "failed",
-          error: j.error || j.error_message || null,
+          error: j.error || null,
         })),
       });
     }
