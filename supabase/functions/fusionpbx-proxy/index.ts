@@ -817,27 +817,66 @@ Deno.serve(async (req) => {
 
     // ---- Recording proxy ----
     if (action === "get-recording") {
-      const { record_path, record_name } = params;
-      if (!record_path || !record_name) return json({ error: "record_path and record_name required" }, 400);
-      const cleanPath = String(record_path).replace(/^\/+/, "");
-      const url = `${FUSIONPBX_API_URL}/${cleanPath}/${encodeURIComponent(record_name)}`;
-      const r = await fetch(url, { headers: { Authorization: basicHeader } });
-      if (!r.ok) return json({ error: "FETCH_FAILED", status: r.status, url }, r.status);
-      const buf = await r.arrayBuffer();
-      const lower = String(record_name).toLowerCase();
-      const ct = lower.endsWith(".mp3") ? "audio/mpeg"
-              : lower.endsWith(".ogg") ? "audio/ogg"
-              : lower.endsWith(".m4a") ? "audio/mp4"
-              : "audio/wav";
-      return new Response(buf, {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": ct,
-          "Content-Length": String(buf.byteLength),
-          "Accept-Ranges": "bytes",
-          "Cache-Control": "private, max-age=300",
-        },
-      });
+      const { record_path, record_name, xml_cdr_uuid, domain_uuid, domain_name } = params as any;
+      if (!xml_cdr_uuid && !(record_path && record_name)) {
+        return json({ error: "xml_cdr_uuid or (record_path, record_name) required" }, 400);
+      }
+      const lower = String(record_name || "").toLowerCase();
+      const ext = lower.endsWith(".mp3") ? "mp3"
+                : lower.endsWith(".ogg") ? "ogg"
+                : lower.endsWith(".m4a") ? "m4a"
+                : "wav";
+      const ct = ext === "mp3" ? "audio/mpeg"
+               : ext === "ogg" ? "audio/ogg"
+               : ext === "m4a" ? "audio/mp4"
+               : "audio/wav";
+
+      const attempts: { url: string; status: number }[] = [];
+      const tryUrls: string[] = [];
+      if (xml_cdr_uuid) {
+        tryUrls.push(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin&ext=${ext}`);
+        tryUrls.push(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin&ext=${ext}`);
+        tryUrls.push(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}`);
+      }
+      if (record_path && record_name) {
+        const p = encodeURIComponent(String(record_path));
+        const n = encodeURIComponent(String(record_name));
+        const du = encodeURIComponent(String(domain_uuid || FUSIONPBX_DOMAIN_UUID || ""));
+        tryUrls.push(`${FUSIONPBX_API_URL}/app/recordings/recording_download.php?path=${p}&filename=${n}`);
+        tryUrls.push(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?a=download&path=${p}&filename=${n}`);
+        tryUrls.push(`${FUSIONPBX_API_URL}/app/api/7/recordings/download?domain_uuid=${du}&path=${p}&name=${n}`);
+        // last resort: filesystem path appended to base (legacy behaviour)
+        const cleanPath = String(record_path).replace(/^\/+/, "");
+        tryUrls.push(`${FUSIONPBX_API_URL}/${cleanPath}/${n}`);
+      }
+
+      for (const url of tryUrls) {
+        try {
+          const r = await fetch(url, { headers: { Authorization: basicHeader, Accept: "*/*" }, redirect: "follow" });
+          if (r.ok) {
+            const buf = await r.arrayBuffer();
+            const rct = r.headers.get("content-type") || "";
+            // Reject HTML login pages masquerading as 200
+            if (rct.includes("text/html") || buf.byteLength < 200) {
+              attempts.push({ url, status: r.status });
+              continue;
+            }
+            return new Response(buf, {
+              headers: {
+                ...corsHeaders,
+                "Content-Type": rct.startsWith("audio/") ? rct : ct,
+                "Content-Length": String(buf.byteLength),
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "private, max-age=300",
+              },
+            });
+          }
+          attempts.push({ url, status: r.status });
+        } catch (e: any) {
+          attempts.push({ url, status: 0 });
+        }
+      }
+      return json({ error: "RECORDING_NOT_FOUND", attempts }, 502);
     }
 
     // ---- Voicemail CRUD ----
