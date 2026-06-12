@@ -2790,6 +2790,7 @@ export type Database = {
       }
       org_chat_channels: {
         Row: {
+          archived_at: string | null
           channel_type: string
           created_at: string
           created_by: string | null
@@ -2802,6 +2803,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           channel_type?: string
           created_at?: string
           created_by?: string | null
@@ -2814,6 +2816,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           channel_type?: string
           created_at?: string
           created_by?: string | null
