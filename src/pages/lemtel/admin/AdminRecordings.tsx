@@ -16,8 +16,12 @@ type Rec = {
   caller_number: string | null; destination_number: string | null;
   extension: string | null; recording_path: string | null;
   recording_name: string | null; has_recording: boolean | null;
+  pbx_uuid: string | null; domain_uuid: string | null; domain_name: string | null;
   transcript?: string | null;
 };
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
 export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
   const [rows, setRows] = useState<Rec[]>([]);
@@ -29,7 +33,7 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
   useEffect(() => {
     (async () => {
       let query = (supabase as any).from('pbx_call_records')
-        .select('id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,recording_name,has_recording')
+        .select('id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,recording_name,has_recording,pbx_uuid,domain_uuid,domain_name')
         .eq('organization_id', LEMTEL_ORG_ID)
         .eq('has_recording', true)
         .order('start_at', { ascending: false })
@@ -47,18 +51,36 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
 
   const fetchRecording = async (r: Rec): Promise<string | null> => {
     if (urls[r.id]) return urls[r.id];
-    if (!r.recording_path || !r.recording_name) {
+    if (!r.pbx_uuid && !(r.recording_path && r.recording_name)) {
       toast.error('Missing recording metadata');
       return null;
     }
     setLoading(r.id);
     try {
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'get-recording', params: { record_path: r.recording_path, record_name: r.recording_name } },
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${session?.access_token ?? SUPABASE_KEY}`,
+        },
+        body: JSON.stringify({
+          action: 'get-recording',
+          params: {
+            xml_cdr_uuid: r.pbx_uuid,
+            record_path: r.recording_path,
+            record_name: r.recording_name,
+            domain_uuid: r.domain_uuid,
+            domain_name: r.domain_name,
+          },
+        }),
       });
-      if (error) throw error;
-      // invoke returns Blob for binary
-      const blob = data instanceof Blob ? data : new Blob([data as any], { type: 'audio/wav' });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt.slice(0, 200));
+      }
+      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       setUrls(s => ({ ...s, [r.id]: url }));
       return url;
