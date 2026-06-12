@@ -1,65 +1,70 @@
-# Desktop App Full Audit & Fix Plan
+## Goal
 
-Goal: Verify every view of the desktop app works end-to-end with real data, on both wide (ConsoleLayout) and compact (SoftphonePane) layouts. Fix gaps as found, in a single coordinated pass.
+Make the desktop app a true admin console for the FusionPBX system: pull every PBX domain as a "Customer", play recordings reliably, and surface the full Extensions / Call Queues / IVR (with ElevenLabs) / Voice Agents management UIs.
 
-## Phase 1 — Audit (read-only, per view)
+## 1. Customers (PBX domains) page
 
-For each view I'll check: (a) data source wired to real Supabase tables / `fusionpbx-proxy`, (b) loading + empty + error states, (c) admin actions actually hit edge functions, (d) RLS lets the current user read it, (e) renders correctly in compact mode.
+- Add `get-domains` (and ensure `list-domains` returns full payload: `domain_uuid`, `domain_name`, `domain_description`, `domain_enabled`) in `supabase/functions/fusionpbx-proxy/index.ts`.
+- Add desktop sidebar entry `customers` in `LeftRail.tsx` (ADMIN_ITEMS only).
+- New `CustomersView.tsx` (`apps/ava-softphone-desktop/src/components/console/`):
+  - Calls `fusionpbx-proxy` → `list-domains`, joins each domain with local `organizations` (by `pbx_domain_uuid`), and the count of extensions / numbers / queues per domain (from `pbx_extensions`, `pbx_phone_number_assignments`, `pbx_call_queues`).
+  - Columns: Domain, Customer name (org link), Status, Extensions, Numbers, Last activity, Actions (Sync, Open).
+  - "Open" sets the working domain in a small context (`useActiveDomain`) so Admin tabs filter by that domain instead of the hard-coded `LEMTEL_DOMAIN`.
+- Wire `App.tsx` route case for `'customers'`.
 
-Wide layout — `ConsoleLayout`:
-1. **HomeDashboard** — KPIs, today's calls, voicemail counters via `useDashboardStats` / `get_my_extension_summary`.
-2. **Dialer (SoftphonePane)** — SIP registration, JsSIP provider, mic permissions, DTMF.
-3. **CallsView** — `pbx_call_records` list, filters, click → details, notes/tags via `set_call_notes`.
-4. **MessagesView / SmsThreads** — `pbx_sms_threads` + `pbx_sms_messages`, send via Telnyx/Twilio edge fn.
-5. **VoicemailView** — `pbx_voicemails`, audio playback from `voicemail-audio` bucket, mark read, AI transcription.
-6. **RecordingsView** — `pbx_call_recordings`, signed URLs via `fusionpbx-proxy` `get-recording`, **playback controls + AI transcribe**.
-7. **AIWorkspace / AIInsights** — pull `pbx_ai_insights` / `agent_insights` with real aggregates (no mocks).
-8. **ContactsView** — `pbx_softphone_users` (org-scoped) + presence join.
-9. **OrgChatView** — channels, DMs, group create, presence dots (just rebuilt).
-10. **AdminView** — extensions, IVRs, queues, ring groups, devices via `fusionpbx-proxy`. Verify 20 extensions sync, edit/create/delete works.
-11. **TelecomSettingsView** — gateways, SIP profiles, dialplan, business hours.
-12. **AdminAIChatView + AIPanel** — `telecom-admin-ai-agent`, retry/backoff, tool execution against PBX.
-13. **ReportsView** — call analytics, queue stats from `cc_queue_stats`, agent activity.
-14. **SettingsPage** — profile, devices, sign-out.
+## 2. Recording playback (works in desktop)
 
-Compact layout — `SoftphonePane`:
-15. Tab parity: Dialer, Recents, Voicemail, Recordings, Messages, Contacts, AIInsights, Portal, Settings — confirm each tab loads same data as wide.
+Root cause: `getRecordingAudioUrl` fetches the file via `fusionpbx-proxy` `get-recording`, which returns the binary stream. That works in browsers but Electron's `fetch` + the proxy currently returns a non-CORS-friendly stream with no `Content-Length` and sometimes a 401 because the proxy strips auth on streaming responses. The `<audio>` element then can't play the resulting blob URL.
 
-## Phase 2 — Fix categories (applied as discovered)
+Fix:
+- In `fusionpbx-proxy/index.ts` `get-recording` branch:
+  - Buffer the response (`await r.arrayBuffer()`), forward `Content-Length`, `Accept-Ranges: bytes`, and proper `Content-Type` (`audio/wav`, `audio/mpeg`, `audio/ogg` based on extension).
+  - Return 404 JSON when PBX gives 404 instead of streaming empty body.
+- Add an alternative path: if `record_path`/`record_name` missing, try `xml_cdr_uuid` → fetch `xml_cdr/{uuid}/recording` from FusionPBX.
+- In `avaApi.getRecordingAudioUrl`:
+  - Convert returned blob to an object URL with explicit MIME (`new Blob([buf], { type })`).
+  - Revoke previous URL on new selection (already partially done in `RecordingsView`).
+  - Fallback: if blob is empty or fetch fails, call a new `pbx-recording-signed-url` helper that uploads the blob to the `lemtel-recordings` Storage bucket and returns a signed URL (works in any audio element, including the small softphone window).
+- Persist `recording_url` back to `pbx_call_records` after first successful fetch so subsequent plays are instant.
 
-- **Missing/mock data → real queries**: replace any placeholder list with Supabase query scoped by `current_user_org_ids()`.
-- **Admin PBX endpoints**: ensure every Admin CRUD calls `fusionpbx-proxy` actions (`list-extensions`, `create-extension`, `update-extension`, `delete-extension`, same for `ivr`, `queue`, `ring-group`, `device`, `gateway`, `dialplan`). Add missing actions to the edge function if any UI button has no backend.
-- **Extensions discrepancy (20 vs 3)**: trigger a `sync-extensions` against FusionPBX domain UUID, then read from `pbx_extensions`. Check if the proxy is filtering by wrong domain or if RLS hides rows.
-- **Recording playback**: unify into a reusable `<AudioPlayer>` with progress/duration, used by Voicemail + Recordings (wide + compact).
-- **AI transcription**: after playback success OR on-demand button → call `ai-transcribe-call` → store + display transcript and analysis inline. Retry on failure.
-- **AI chatbot (admin)**: confirm `telecom-admin-ai-agent` tools cover read+write for extensions, IVR, queues, users, ring groups; surface errors with retry button (already added) and exponential backoff (already added).
-- **AI Insights real data**: replace any hard-coded numbers with aggregates from `pbx_call_records`, `cc_queue_stats`, `pbx_ai_insights`.
-- **Compact parity**: each mobile-side tab uses the same hooks/queries as the wide view (DRY into `hooks/`).
+## 3. Full PBX management — make every feature usable
 
-## Phase 3 — Verification checklist
+Extensions / Queues / IVRs already exist but lack key actions. Add the missing CRUD and bind them to the active domain (from §1) instead of the hard-coded one.
 
-For each view I'll verify in the running preview:
-- Loads with real org data (not empty / not mock).
-- Admin actions round-trip (create → list shows new row → edit → delete).
-- Audio plays with progress bar and duration.
-- Transcription + AI summary appear after playback.
-- Chatbot answers org questions ("how many users", "list IVRs", "pause queue X") without non-2xx.
-- Works at <640px (compact) and ≥980px (wide).
+### Extensions
+- "+ New" button → modal posting `create-extension` to fusionpbx-proxy (already implemented backend-side).
+- Add Delete, Reset password (`extension_password`), Assign to portal user (uses existing `admin_link_softphone_by_email` RPC).
+- Show registration state from `pbx_softphone_users.status` + last seen.
+
+### Call Queues
+- "+ New" creates queue + auto-create matching extension.
+- Edit modal: add agents table with add/remove (already loads agents). New `add-queue-agent` / `remove-queue-agent` actions in proxy (POST `call_center_tiers`).
+- Show real-time SLA / waiting from `cc_queue_stats` like in web portal.
+
+### IVRs + ElevenLabs
+- Edit modal: add "Options" tab listing `pbx_ivr_options` (digit → action). CRUD via `update-ivr-option` / `delete-ivr-option`.
+- "Generate with ElevenLabs" button next to Greeting:
+  - Calls existing `elevenlabs-generate-greeting` edge function (voice picker pulled from `elevenlabs-api-proxy` → `list-voices`).
+  - Uploads MP3 to `lemtel-ivr-audio` bucket, then PUTs `ivr_menu_greet_long` = `recording::<filename>` on FusionPBX.
+- "Test playback" plays the generated audio inside the modal.
+
+### Voice Agents (new desktop page)
+- Add `voice-agents` admin entry in `LeftRail.tsx`.
+- New `VoiceAgentsView.tsx`:
+  - Reads `lemtel_voice_agents` + `voice_agent_bindings` (already populated).
+  - Lists ElevenLabs agents (via `elevenlabs-convai-agent-config` proxy) and shows binding (`extension`, `did`, `ivr_option`).
+  - Bind/Unbind UI writes to `voice_agent_bindings` and the matching FusionPBX dialplan via `pbx-write` edge function.
+  - Status pills: voice, language, model, last call timestamp from `pbx_call_records.raw_data->agent_id`.
 
 ## Technical notes
 
-- Read-only first; queue findings; then apply edits in one batch per view to minimize churn.
-- Will not touch `vite.config.ts`, `electron-builder.yml`, `.github/workflows/**`, `package.json` repository field.
-- No auto-push to GitHub.
-- Branding stays "AVA Statistic"; never mention Lovable.
-- Use existing security-definer functions (`current_user_org_ids`, `has_role`, `can_access_org`) — do not weaken RLS.
+- All edge-function changes stay in `fusionpbx-proxy` and `elevenlabs-*` proxies — no new edge functions needed.
+- All DB reads go through existing tables (`pbx_extensions`, `pbx_call_queues`, `pbx_ivrs`, `pbx_ivr_options`, `lemtel_voice_agents`, `voice_agent_bindings`, `organizations`) — no migration required.
+- Domain switching is local state (no schema change). When user opens a Customer, AdminView replaces `LEMTEL_DOMAIN` constant with the active domain id.
+- Recording fix is backwards compatible — old rows with `recording_url` keep working; new rows get cached URLs after first play.
 
-## Out of scope
+## Files
 
-- New marketing/landing changes.
-- Schema migrations beyond what's strictly required to back a missing UI (will ask before adding any).
-- Mobile app (`ava-softphone-mobile`) — only touched if a shared hook is refactored.
-
-## Deliverable
-
-A working desktop app where every left-rail view shows real, current data; admin can fully manage the PBX; recordings/voicemails play with transcripts; AI chatbot answers reliably — verified in both wide and compact layouts.
+- New: `apps/ava-softphone-desktop/src/components/console/CustomersView.tsx`, `VoiceAgentsView.tsx`, `hooks/useActiveDomain.ts`.
+- Edited: `LeftRail.tsx`, `App.tsx` (routing), `AdminView.tsx` (use active domain + new CRUD), `lib/avaApi.ts` (recording url improvements + domains list).
+- Edited edge: `supabase/functions/fusionpbx-proxy/index.ts` (recording stream fix, get-domains, queue-agent CRUD, ivr-option CRUD).
