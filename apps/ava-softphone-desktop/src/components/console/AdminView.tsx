@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, getMeContext } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
+import PbxResourceSection from './admin/PbxResourceSection';
 
 const { colors: c } = theme;
 
