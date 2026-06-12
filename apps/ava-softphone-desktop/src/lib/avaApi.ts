@@ -334,9 +334,9 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
 }
 
 function mapCdrToRecording(r: any): RecordingItem {
-  const directUrl = r.recording_name
-    ? `https://pbxnode.lemtel.tel/app/recordings/${r.recording_name}?key=1fzetTwb0VC1BiHjUgWfHE7y78THXTNX&username=mhassoun`
-    : null;
+  // Audio is fetched on demand via the fusionpbx-proxy edge function
+  // (keeps the PBX API key server-side). See getRecordingAudioUrl().
+  const directUrl: string | null = null;
 
   return {
     id:          r.id ?? String(Math.random()),
