@@ -103,7 +103,9 @@ Deno.serve(async (req) => {
   // confirmed-working pattern: Basic <FUSIONPBX_API_KEY>.
   const basicHeader = `Basic ${FUSIONPBX_API_KEY}`;
 
-  const domainQ = `domain_uuid=${FUSIONPBX_DOMAIN_UUID}`;
+  // Per-request domain override (each list/action can target any tenant domain)
+  const requestedDomain: string = body.domain_uuid || params.domain_uuid || FUSIONPBX_DOMAIN_UUID;
+  const domainQ = `domain_uuid=${requestedDomain}`;
 
   async function pbxFetch(path: string, init: RequestInit = {}) {
     const url = `${FUSIONPBX_API_URL}/app/api/7/${path}`;
