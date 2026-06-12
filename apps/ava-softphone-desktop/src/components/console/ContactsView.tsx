@@ -138,12 +138,29 @@ export default function ContactsView() {
   return (
     <div style={{ display: 'flex', height: '100%' }}>
       <div style={{ flex: 1, minWidth: 0, padding: '24px 28px', overflowY: 'auto' }}>
-        <header style={{ marginBottom: 14 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: c.textIce, margin: '0 0 4px' }}>Contacts</h1>
-          <p style={{ fontSize: 12, color: c.mutedSilver, margin: 0 }}>
-            Unified directory · fast search · AVA notes & recent interactions.
-          </p>
+        <header style={{ marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+          <div>
+            <h1 style={{ fontSize: 24, fontWeight: 700, color: c.textIce, margin: '0 0 4px' }}>Contacts</h1>
+            <p style={{ fontSize: 12, color: c.mutedSilver, margin: 0 }}>
+              Internal extensions + external contacts · AVA notes & history.
+            </p>
+          </div>
+          <button onClick={() => setShowAdd((v) => !v)} style={{
+            padding: '8px 14px', borderRadius: 9, border: 'none', cursor: 'pointer',
+            background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
+            color: '#fff', fontSize: 12, fontWeight: 700,
+          }}>{showAdd ? 'Close' : '+ New Contact'}</button>
         </header>
+
+        {showAdd && (
+          <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12, marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+            <input placeholder="Name *" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} style={inputMini} />
+            <input placeholder="Phone *" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} style={inputMini} />
+            <input placeholder="Company" value={draft.company} onChange={(e) => setDraft({ ...draft, company: e.target.value })} style={inputMini} />
+            <input placeholder="Email" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} style={inputMini} />
+            <button onClick={addManualContact} style={{ gridColumn: '1 / -1', padding: '8px 14px', borderRadius: 9, border: 'none', cursor: 'pointer', background: c.signalGold, color: c.midnight, fontWeight: 700, fontSize: 12 }}>Save contact</button>
+          </div>
+        )}
 
         <input
           autoFocus
