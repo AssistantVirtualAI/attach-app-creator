@@ -828,6 +828,7 @@ Deno.serve(async (req) => {
       await admin.from("pbx_sync_jobs").insert({
         organization_id, job_type: "sync-all",
         status: errors.length ? "completed_with_errors" : "completed",
+        started_at: startedIso,
         completed_at: new Date().toISOString(),
         stats: { ...stats, duration_ms },
         error: errors.length ? errors.join("; ").slice(0, 2000) : null,
