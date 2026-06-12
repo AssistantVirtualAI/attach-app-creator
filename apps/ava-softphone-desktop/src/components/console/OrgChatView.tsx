@@ -30,7 +30,12 @@ export default function OrgChatView() {
 
       const { data: spu } = await supabase.from('pbx_softphone_users')
         .select('organization_id').eq('portal_user_id', u.user.id).maybeSingle();
-      const org = spu?.organization_id;
+      let org = spu?.organization_id ?? null;
+      if (!org) {
+        const { data: om } = await supabase.from('organization_members')
+          .select('organization_id').eq('user_id', u.user.id).limit(1).maybeSingle();
+        org = om?.organization_id ?? null;
+      }
       if (!org) return;
       setOrgId(org);
 

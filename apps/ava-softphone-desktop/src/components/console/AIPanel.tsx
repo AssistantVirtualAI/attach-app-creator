@@ -16,25 +16,34 @@ const SUGGESTIONS = [
   'Why are calls being missed today?',
 ];
 
+const USER_SUGGESTIONS = [
+  'How many calls did I miss yesterday?',
+  'Show my last 5 calls',
+  'Summarize my day',
+  'Any new voicemails for me?',
+];
+
 export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const [token, setToken] = useState<string | null>(null);
-  const [eligible, setEligible] = useState<boolean | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [authed, setAuthed] = useState<boolean | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Load token + eligibility check
+  // Load token + role
   useEffect(() => {
     let mounted = true;
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!mounted) return;
       setToken(session?.access_token ?? null);
-      if (!session?.user) { setEligible(false); return; }
+      if (!session?.user) { setAuthed(false); return; }
+      setAuthed(true);
       const [{ data: isSuper }, { data: isLemtel }] = await Promise.all([
         supabase.rpc('is_super_admin', { _user_id: session.user.id }),
         supabase.rpc('is_lemtel_admin', { _user_id: session.user.id }),
       ]);
-      if (mounted) setEligible(Boolean(isSuper || isLemtel));
+      if (mounted) setIsAdmin(Boolean(isSuper || isLemtel));
     })();
     return () => { mounted = false; };
   }, []);
@@ -78,7 +87,7 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
 
   const send = (v: string) => {
     const t = v.trim();
-    if (!t || isBusy || !token || !eligible) return;
+    if (!t || isBusy || !token || !authed) return;
     sendMessage({ text: t });
     setText('');
   };
@@ -125,8 +134,8 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
           }}>AI</div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: c.textIce }}>AVA Assistant</div>
-            <div style={{ fontSize: 9.5, color: eligible === false ? c.warning : c.avaCyan, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700 }}>
-              {eligible === null ? 'Connecting…' : eligible ? 'Admin · Live' : 'Read-only'}
+            <div style={{ fontSize: 9.5, color: authed === false ? c.warning : c.avaCyan, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700 }}>
+              {authed === null ? 'Connecting…' : !authed ? 'Sign in required' : isAdmin ? 'Admin · Live' : 'My calls'}
             </div>
           </div>
         </div>
@@ -137,18 +146,20 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
       </header>
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {eligible === false && (
+        {authed === false && (
           <Bubble role="system">
-            AVA admin commands are restricted to platform & Lemtel admins. You can still browse your softphone, voicemails and SMS.
+            Sign in to chat with AVA about your calls, voicemails, and recordings.
           </Bubble>
         )}
-        {eligible && messages.length === 0 && (
+        {authed && messages.length === 0 && (
           <>
             <Bubble role="assistant">
-              Bonjour. Je peux analyser les outages, voicemails, isolation tenant et exécuter des actions admin sécurisées. Demande-moi quoi que ce soit.
+              {isAdmin
+                ? 'Bonjour. Je peux analyser les outages, voicemails, isolation tenant et exécuter des actions admin sécurisées.'
+                : 'Bonjour. Demande-moi combien d\'appels manqués, mes derniers appels, ou un résumé de la journée.'}
             </Bubble>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-              {SUGGESTIONS.map((s) => (
+              {(isAdmin ? SUGGESTIONS : USER_SUGGESTIONS).map((s) => (
                 <button key={s} onClick={() => send(s)} style={{
                   textAlign: 'left', padding: '8px 10px',
                   background: 'rgba(124,58,237,0.06)',
@@ -180,23 +191,23 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(text); } }}
-          placeholder={eligible === false ? 'Admin access required' : 'Ask AVA anything…'}
-          disabled={!eligible || isBusy}
+          placeholder={authed === false ? 'Sign in required' : 'Ask AVA anything…'}
+          disabled={!authed || isBusy}
           style={{
             flex: 1, boxSizing: 'border-box',
             padding: '10px 12px', borderRadius: 10,
             background: c.bgCard, border: `1px solid ${c.borderAI}`,
             color: c.textIce, fontSize: 12.5, outline: 'none',
-            opacity: !eligible ? 0.5 : 1,
+            opacity: !authed ? 0.5 : 1,
           }}
         />
         {isBusy ? (
           <button onClick={() => stop()} style={btnStyle(c.danger)}>Stop</button>
         ) : (
-          <button onClick={() => send(text)} disabled={!eligible || !text.trim()} style={{
+          <button onClick={() => send(text)} disabled={!authed || !text.trim()} style={{
             ...btnStyle(c.avaViolet),
-            opacity: (!eligible || !text.trim()) ? 0.5 : 1,
-            cursor: (!eligible || !text.trim()) ? 'not-allowed' : 'pointer',
+            opacity: (!authed || !text.trim()) ? 0.5 : 1,
+            cursor: (!authed || !text.trim()) ? 'not-allowed' : 'pointer',
           }}>Send</button>
         )}
       </div>
