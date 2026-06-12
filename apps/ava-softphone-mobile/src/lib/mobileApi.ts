@@ -5,7 +5,7 @@
  * Falls back to mock data only when no portal URL / access token is configured.
  */
 
-export const MOBILE_DEFAULT_PORTAL = 'https://avastatistic.ca';
+export const MOBILE_DEFAULT_PORTAL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
 
 let portalUrl: string = MOBILE_DEFAULT_PORTAL;
 let authToken: string | null = null;
@@ -232,10 +232,8 @@ export const mobileApi = {
       .map(mapCdrToVoicemailEntry);
   }),
   voicemailAudio: (id: string) => call<{ url: string; expiresInSec: number }>(
-    `/fusionpbx-proxy?action=get-recording&id=${encodeURIComponent(id)}`,
+    '/fusionpbx-proxy',
     { method: 'POST', body: JSON.stringify({ action: 'get-recording', id }) },
-    { url: '', expiresInSec: 0 }
-  )}`, undefined,
     { url: '', expiresInSec: 0 },
   ),
 
