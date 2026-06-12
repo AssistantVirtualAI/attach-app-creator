@@ -8498,7 +8498,6 @@ export type Database = {
         Args: { _paused: boolean; _queue_id: string }
         Returns: undefined
       }
-      trigger_pbx_sync: { Args: { _org_id?: string }; Returns: number }
       update_platform_seen: { Args: { p_platform: string }; Returns: undefined }
       upsert_user_presence: {
         Args: {
