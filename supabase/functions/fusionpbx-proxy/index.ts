@@ -943,9 +943,10 @@ Deno.serve(async (req) => {
 
     // ---- Advanced (super_admin): generic CRUD for FusionPBX collections ----
     // Used for Gateways, SIP Profiles, Conferences, Hold Music, Dialplans, Time Conditions.
-    const ADV: Record<string, { path: string; key: string; uuidField: string }> = {
-      gateways:        { path: "gateways",        key: "gateways",        uuidField: "gateway_uuid" },
-      "sip-profiles":  { path: "sip_profiles",    key: "sip_profiles",    uuidField: "sip_profile_uuid" },
+    // `global` resources (gateways, sip_profiles) live outside any single tenant domain.
+    const ADV: Record<string, { path: string; key: string; uuidField: string; global?: boolean }> = {
+      gateways:        { path: "gateways",        key: "gateways",        uuidField: "gateway_uuid", global: true },
+      "sip-profiles":  { path: "sip_profiles",    key: "sip_profiles",    uuidField: "sip_profile_uuid", global: true },
       conferences:     { path: "conference_rooms",key: "conference_rooms",uuidField: "conference_room_uuid" },
       "hold-music":    { path: "music_on_hold",   key: "music_on_hold",   uuidField: "music_on_hold_uuid" },
       dialplans:       { path: "dialplans",       key: "dialplans",       uuidField: "dialplan_uuid" },
@@ -953,7 +954,7 @@ Deno.serve(async (req) => {
     };
     for (const [kind, def] of Object.entries(ADV)) {
       if (action === `list-${kind}`) {
-        const r = await pbxFetch(`${def.path}?${domainQ}`);
+        const r = await pbxFetch(def.global ? def.path : `${def.path}?${domainQ}`);
         if (!r.ok) return json(r, r.status || 500);
         return json({ ok: true, data: collection(r.data, def.key), latency_ms: r.latency_ms });
       }
