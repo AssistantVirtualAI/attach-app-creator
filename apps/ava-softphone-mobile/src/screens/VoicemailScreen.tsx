@@ -104,15 +104,19 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
                   padding: 10, borderRadius: radius.md,
                   background: colors.midnight2, border: `1px solid ${colors.border}`,
                 }}>
-                  <button onClick={() => { haptic?.(ImpactStyle.Medium); setPlaying(isPlaying ? null : v.id); }} style={{
+                  <button onClick={() => { haptic?.(ImpactStyle.Medium); togglePlay(v.id); }} disabled={loadingId === v.id} style={{
                     width: 38, height: 38, borderRadius: '50%', border: 'none',
                     background: gradients.call, color: '#fff', fontSize: 16, cursor: 'pointer',
-                  }}>{isPlaying ? '⏸' : '▶'}</button>
+                    opacity: loadingId === v.id ? 0.6 : 1,
+                  }}>{loadingId === v.id ? '…' : isPlaying ? '⏸' : '▶'}</button>
                   <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', position: 'relative', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', inset: 0, width: isPlaying ? '60%' : '0%', background: gradients.call, transition: 'width 0.4s ease' }} />
                   </div>
                   <span style={{ fontSize: 11, color: colors.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmt(v.durationSec)}</span>
                 </div>
+                {errorId === v.id && (
+                  <div style={{ fontSize: 11, color: colors.danger, marginTop: 6 }}>Audio unavailable for this voicemail.</div>
+                )}
 
                 <AIPanel title="AVA summary" accent={colors.avaViolet} style={{ marginTop: 10 }}>
                   <div style={{ fontSize: font.sm, color: colors.textIce, lineHeight: 1.5 }}>{v.summary}</div>
