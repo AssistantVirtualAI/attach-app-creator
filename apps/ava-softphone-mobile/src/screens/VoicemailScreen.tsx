@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, VoicemailEntry } from '../lib/mobileApi';
@@ -8,8 +8,45 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
   const [items, setItems] = useState<VoicemailEntry[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [errorId, setErrorId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const urlCache = useRef<Map<string, string>>(new Map());
 
   useEffect(() => { mobileApi.voicemails().then(setItems); }, []);
+  useEffect(() => () => { audioRef.current?.pause(); audioRef.current = null; }, []);
+
+  const togglePlay = async (id: string) => {
+    setErrorId(null);
+    // Pause current
+    if (playing === id) {
+      audioRef.current?.pause();
+      setPlaying(null);
+      return;
+    }
+    audioRef.current?.pause();
+
+    let url = urlCache.current.get(id) || '';
+    if (!url) {
+      setLoadingId(id);
+      try {
+        const res = await mobileApi.voicemailAudio(id);
+        url = res?.url || '';
+        if (url) urlCache.current.set(id, url);
+      } catch (e) {
+        console.warn('[voicemail] audio fetch failed', e);
+      } finally {
+        setLoadingId(null);
+      }
+    }
+    if (!url) { setErrorId(id); return; }
+    const audio = new Audio(url);
+    audio.onended = () => setPlaying(null);
+    audio.onerror = () => { setErrorId(id); setPlaying(null); };
+    audioRef.current = audio;
+    setPlaying(id);
+    audio.play().catch(() => { setErrorId(id); setPlaying(null); });
+  };
 
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   const open = items?.find((v) => v.id === openId);
@@ -67,15 +104,19 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
                   padding: 10, borderRadius: radius.md,
                   background: colors.midnight2, border: `1px solid ${colors.border}`,
                 }}>
-                  <button onClick={() => { haptic?.(ImpactStyle.Medium); setPlaying(isPlaying ? null : v.id); }} style={{
+                  <button onClick={() => { haptic?.(ImpactStyle.Medium); togglePlay(v.id); }} disabled={loadingId === v.id} style={{
                     width: 38, height: 38, borderRadius: '50%', border: 'none',
                     background: gradients.call, color: '#fff', fontSize: 16, cursor: 'pointer',
-                  }}>{isPlaying ? '⏸' : '▶'}</button>
+                    opacity: loadingId === v.id ? 0.6 : 1,
+                  }}>{loadingId === v.id ? '…' : isPlaying ? '⏸' : '▶'}</button>
                   <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', position: 'relative', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', inset: 0, width: isPlaying ? '60%' : '0%', background: gradients.call, transition: 'width 0.4s ease' }} />
                   </div>
                   <span style={{ fontSize: 11, color: colors.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmt(v.durationSec)}</span>
                 </div>
+                {errorId === v.id && (
+                  <div style={{ fontSize: 11, color: colors.danger, marginTop: 6 }}>Audio unavailable for this voicemail.</div>
+                )}
 
                 <AIPanel title="AVA summary" accent={colors.avaViolet} style={{ marginTop: 10 }}>
                   <div style={{ fontSize: font.sm, color: colors.textIce, lineHeight: 1.5 }}>{v.summary}</div>
