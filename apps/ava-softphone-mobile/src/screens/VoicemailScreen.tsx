@@ -14,7 +14,9 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
   const [errorId, setErrorId] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ id: string; cur: number; dur: number } | null>(null);
   const [transcripts, setTranscripts] = useState<Record<string, string>>({});
+  const [analyses, setAnalyses] = useState<Record<string, { summary?: string; sentiment?: string; topics?: string[]; action_items?: string[] }>>({});
   const [transcribing, setTranscribing] = useState<string | null>(null);
+  const [transcribeError, setTranscribeError] = useState<Record<string, string>>({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlCache = useRef<Map<string, string>>(new Map());
 
