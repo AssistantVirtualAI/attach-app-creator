@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava } from '../../lib/avaApi';
+import { supabase } from '../../lib/supabaseClient';
 import PageHeader from './PageHeader';
 import AIInsights from '../AIInsights';
 
@@ -64,17 +65,49 @@ function Intelligence() {
 
 function Transcripts() {
   const [q, setQ] = useState('');
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      const query = q.trim();
+      if (!query) { setRows([]); return; }
+      setLoading(true);
+      const { data } = await supabase
+        .from('pbx_call_records' as any)
+        .select('id, caller_number, destination_number, start_at, transcript_text, raw_data')
+        .or(`transcript_text.ilike.%${query}%,caller_number.ilike.%${query}%,destination_number.ilike.%${query}%`)
+        .order('start_at', { ascending: false })
+        .limit(30);
+      setRows((data as any[]) || []);
+      setLoading(false);
+    }, 280);
+    return () => clearTimeout(t);
+  }, [q]);
   return (
     <>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search transcripts by intent, topic, customer…" style={{
         width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10,
         background: c.midnight, border: `1px solid ${c.borderAI}`, color: c.textIce, fontSize: 13, outline: 'none', marginBottom: 14,
       }} />
-      {q.trim() ? (
-        <div style={{ fontSize: 12, color: c.mutedSilver }}>3 matches for "{q}" — connect AVA backend to enable semantic search.</div>
-      ) : (
-        <div style={{ fontSize: 12, color: c.mutedSilver }}>Type a query to search across all call transcripts and messages.</div>
-      )}
+      {!q.trim() && <div style={{ fontSize: 12, color: c.mutedSilver }}>Type a query to search across all call transcripts.</div>}
+      {loading && <div style={{ fontSize: 12, color: c.mutedSilver }}>Searching…</div>}
+      {!loading && q.trim() && rows.length === 0 && <div style={{ fontSize: 12, color: c.mutedSilver }}>No matches.</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {rows.map((r) => {
+          const txt = String(r.transcript_text || r.raw_data?.transcript_text || '').trim();
+          const idx = txt.toLowerCase().indexOf(q.toLowerCase());
+          const snippet = idx >= 0 ? '…' + txt.slice(Math.max(0, idx - 40), idx + 120) + '…' : txt.slice(0, 160);
+          return (
+            <div key={r.id} style={{ padding: 10, borderRadius: 10, background: c.midnight, border: `1px solid ${c.border}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: c.mutedSilver }}>
+                <span>{r.caller_number} → {r.destination_number}</span>
+                <span>{r.start_at ? new Date(r.start_at).toLocaleString() : ''}</span>
+              </div>
+              <div style={{ fontSize: 12, color: c.textIce, marginTop: 4, lineHeight: 1.5 }}>{snippet || '(no transcript)'}</div>
+            </div>
+          );
+        })}
+      </div>
     </>
   );
 }
@@ -105,29 +138,63 @@ function Greetings() {
         <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: c.midnight, border: `1px solid ${c.borderAI}` }}>
           <div style={{ fontSize: 10, color: c.avaCyan, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 6 }}>Generated Script</div>
           <p style={{ fontSize: 13, color: c.textIce, lineHeight: 1.6, margin: 0 }}>{out}</p>
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button style={{ padding: '6px 12px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.signalGold}`, color: c.signalGold, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>🎙 Synthesize voice</button>
-            <button style={{ padding: '6px 12px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 11, cursor: 'pointer' }}>Save as IVR greeting</button>
-          </div>
         </div>
       )}
     </>
   );
 }
 
+function fmtDur(sec: number) {
+  if (!sec || sec < 60) return `${Math.round(sec || 0)}s`;
+  const m = Math.floor(sec / 60); const s = Math.round(sec % 60);
+  return `${m}m ${s.toString().padStart(2, '0')}s`;
+}
+
 function QueueOptimizer() {
-  const rows = [
-    { q: 'Sales', wait: '42s', sla: 88, rec: 'Add 1 agent 13:00–15:00 — abandonment +12%' },
-    { q: 'Support', wait: '1m 18s', sla: 71, rec: 'Switch to longest-idle routing — reduces wait ~22%' },
-    { q: 'After-hours', wait: '—', sla: 0, rec: 'Enable AVA voice agent for callback capture' },
-  ];
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const [{ data: queues }, { data: stats }] = await Promise.all([
+        supabase.from('pbx_call_queues' as any).select('id, queue_name, strategy, extension').limit(50),
+        supabase.from('cc_queue_stats' as any).select('*').gte('stat_date', since).limit(500),
+      ]);
+      const byQueue: Record<string, any> = {};
+      for (const s of (stats as any[]) || []) {
+        const k = s.queue_id || s.queue_name || 'unknown';
+        if (!byQueue[k]) byQueue[k] = { wait: 0, n: 0, sla: 0, abandon: 0, calls: 0 };
+        byQueue[k].wait += Number(s.avg_wait_seconds || s.average_wait_time || 0);
+        byQueue[k].sla += Number(s.sla_percentage || s.service_level || 0);
+        byQueue[k].abandon += Number(s.abandoned_calls || 0);
+        byQueue[k].calls += Number(s.total_calls || s.calls_offered || 0);
+        byQueue[k].n += 1;
+      }
+      const out = ((queues as any[]) || []).map((q) => {
+        const k = q.id || q.queue_name;
+        const a = byQueue[k] || { wait: 0, n: 1, sla: 0, abandon: 0, calls: 0 };
+        const avgWait = a.wait / Math.max(a.n, 1);
+        const sla = Math.round(a.sla / Math.max(a.n, 1));
+        let rec = 'Performance within target.';
+        if (avgWait > 60) rec = `Wait > ${fmtDur(avgWait)} — add an agent or enable overflow.`;
+        else if (sla > 0 && sla < 80) rec = `SLA ${sla}% under target — review routing strategy (${q.strategy || 'n/a'}).`;
+        else if (a.abandon > a.calls * 0.15 && a.calls > 0) rec = `Abandonment ${Math.round((a.abandon / a.calls) * 100)}% — enable callback option.`;
+        return { name: q.queue_name || q.extension, wait: fmtDur(avgWait), sla, rec };
+      });
+      setRows(out);
+      setLoading(false);
+    })();
+  }, []);
   return (
     <>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#28E6A5', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>Last 30 days</div>
+      {loading && <div style={{ fontSize: 12, color: c.mutedSilver }}>Loading queue stats…</div>}
+      {!loading && rows.length === 0 && <div style={{ fontSize: 12, color: c.mutedSilver }}>No queues found.</div>}
       {rows.map((r, i) => (
         <div key={i} style={{ padding: '12px 0', borderBottom: `1px solid ${c.border}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: c.textIce }}>{r.q}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: c.textIce }}>{r.name}</div>
             <div style={{ fontSize: 11, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>avg wait {r.wait} · SLA {r.sla}%</div>
           </div>
           <div style={{ fontSize: 12, color: '#28E6A5', marginTop: 4 }}>↳ {r.rec}</div>
@@ -138,25 +205,45 @@ function QueueOptimizer() {
 }
 
 function VoiceAgentManager() {
-  const agents = [
-    { name: 'AVA Reception', voice: 'ElevenLabs · Rachel', assigned: ['+1 514 555 0100', 'IVR → Press 0'] },
-    { name: 'After-hours fallback', voice: 'ElevenLabs · Adam', assigned: ['Queue overflow > 60s'] },
-    { name: 'Spanish line', voice: 'ElevenLabs · Mateo', assigned: ['+1 514 555 0144'] },
-  ];
+  const [agents, setAgents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const { data } = await supabase
+        .from('voice_agent_bindings' as any)
+        .select('id, agent_name, voice_name, bound_to_type, bound_to_value, is_active')
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (data && data.length) { setAgents(data as any[]); setLoading(false); return; }
+      const { data: la } = await supabase
+        .from('lemtel_voice_agents' as any)
+        .select('id, name, voice_id, phone_numbers, is_active')
+        .limit(30);
+      setAgents(((la as any[]) || []).map((a) => ({
+        id: a.id, agent_name: a.name, voice_name: a.voice_id,
+        bound_to_value: Array.isArray(a.phone_numbers) ? a.phone_numbers.join(', ') : '',
+        is_active: a.is_active,
+      })));
+      setLoading(false);
+    })();
+  }, []);
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#FF4D67', letterSpacing: 1.5, textTransform: 'uppercase' }}>Active voice agents</div>
-        <button style={{ padding: '6px 12px', borderRadius: 8, background: 'transparent', border: `1px solid #FF4D6770`, color: '#FF4D67', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>+ New agent</button>
       </div>
-      {agents.map((a, i) => (
-        <div key={i} style={{ padding: 12, marginBottom: 8, borderRadius: 10, background: c.midnight, border: `1px solid ${c.border}` }}>
+      {loading && <div style={{ fontSize: 12, color: c.mutedSilver }}>Loading voice agents…</div>}
+      {!loading && agents.length === 0 && <div style={{ fontSize: 12, color: c.mutedSilver }}>No voice agents configured yet.</div>}
+      {agents.map((a) => (
+        <div key={a.id} style={{ padding: 12, marginBottom: 8, borderRadius: 10, background: c.midnight, border: `1px solid ${c.border}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: c.textIce }}>{a.name}</div>
-            <div style={{ fontSize: 10.5, color: c.mutedSilver }}>{a.voice}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: c.textIce }}>{a.agent_name}</div>
+            <div style={{ fontSize: 10.5, color: c.mutedSilver }}>{a.voice_name || '—'}</div>
           </div>
           <div style={{ fontSize: 11, color: c.avaCyan, marginTop: 6, fontFamily: 'JetBrains Mono, monospace' }}>
-            {a.assigned.join(' · ')}
+            {a.bound_to_type ? `${a.bound_to_type} → ${a.bound_to_value}` : (a.bound_to_value || '—')}
+            {!a.is_active && <span style={{ color: c.mutedSilver, marginLeft: 8 }}>(inactive)</span>}
           </div>
         </div>
       ))}
@@ -165,26 +252,41 @@ function VoiceAgentManager() {
 }
 
 function CoachingInsights() {
-  const items = [
-    { agent: 'Sarah L.', kind: 'Opportunity', detail: '3 missed upsell cues on renewal calls this week.', tone: '#FFCC33' },
-    { agent: 'Mohamed K.', kind: 'Escalation', detail: 'Hold time avg 1m 48s vs team 38s — review call #4821.', tone: '#FF4D67' },
-    { agent: 'Team', kind: 'Objection', detail: '"Price too high" raised in 27% of demos — playbook missing.', tone: '#23D6FF' },
-  ];
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data } = await supabase
+        .from('pbx_ai_insights' as any)
+        .select('id, insight_type, title, description, severity, created_at')
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      setItems((data as any[]) || []);
+      setLoading(false);
+    })();
+  }, []);
+  const tone = (sev?: string) => sev === 'high' ? '#FF4D67' : sev === 'medium' ? '#FFCC33' : '#23D6FF';
   return (
     <>
       <div style={{ fontSize: 11, fontWeight: 700, color: '#FFCC33', letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>This week</div>
-      {items.map((r, i) => (
-        <div key={i} style={{ padding: '12px 0', borderBottom: `1px solid ${c.border}`, display: 'flex', gap: 14 }}>
-          <span style={{ fontSize: 10, fontWeight: 800, color: r.tone, letterSpacing: 1.5, minWidth: 90, paddingTop: 2 }}>{r.kind.toUpperCase()}</span>
+      {loading && <div style={{ fontSize: 12, color: c.mutedSilver }}>Loading insights…</div>}
+      {!loading && items.length === 0 && <div style={{ fontSize: 12, color: c.mutedSilver }}>No AI insights generated this week. Analyze more calls to surface coaching opportunities.</div>}
+      {items.map((r) => (
+        <div key={r.id} style={{ padding: '12px 0', borderBottom: `1px solid ${c.border}`, display: 'flex', gap: 14 }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: tone(r.severity), letterSpacing: 1.5, minWidth: 90, paddingTop: 2 }}>{(r.insight_type || 'INSIGHT').toUpperCase()}</span>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 12.5, color: c.textIce }}>{r.agent}</div>
-            <div style={{ fontSize: 12, color: c.mutedSilver, marginTop: 2 }}>{r.detail}</div>
+            <div style={{ fontSize: 12.5, color: c.textIce }}>{r.title}</div>
+            <div style={{ fontSize: 12, color: c.mutedSilver, marginTop: 2 }}>{r.description}</div>
           </div>
         </div>
       ))}
     </>
   );
 }
+
 
 function PlaceholderModule({ title, hint }: { title: string; hint: string }) {
   return (
