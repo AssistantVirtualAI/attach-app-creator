@@ -127,8 +127,8 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
           }}>AI</div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: c.textIce }}>AVA Assistant</div>
-            <div style={{ fontSize: 9.5, color: eligible === false ? c.warning : c.avaCyan, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700 }}>
-              {eligible === null ? 'Connecting…' : eligible ? 'Admin · Live' : 'Read-only'}
+            <div style={{ fontSize: 9.5, color: authed === false ? c.warning : c.avaCyan, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700 }}>
+              {authed === null ? 'Connecting…' : !authed ? 'Sign in required' : isAdmin ? 'Admin · Live' : 'My calls'}
             </div>
           </div>
         </div>
