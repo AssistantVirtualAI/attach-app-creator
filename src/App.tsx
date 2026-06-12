@@ -207,15 +207,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const LemtelAdminPage = ({ children }: { children: React.ReactNode }) => (
-  <ProtectedRoute><LemtelGuard><AppLayout><AdminPortalLayout>{children}</AdminPortalLayout></AppLayout></LemtelGuard></ProtectedRoute>
+  <ProtectedRoute><LemtelGuard><AdminPortalLayout>{children}</AdminPortalLayout></LemtelGuard></ProtectedRoute>
 );
 
 const LemtelUserPage = ({ children }: { children: React.ReactNode }) => (
-  <ProtectedRoute><LemtelGuard><AppLayout><UserPortalLayout>{children}</UserPortalLayout></AppLayout></LemtelGuard></ProtectedRoute>
+  <ProtectedRoute><LemtelGuard><UserPortalLayout>{children}</UserPortalLayout></LemtelGuard></ProtectedRoute>
 );
 
 const LemtelTelephonyPage = ({ children }: { children: React.ReactNode }) => (
-  <ProtectedRoute><LemtelGuard><AppLayout><TelephonyLayout>{children}</TelephonyLayout></AppLayout></LemtelGuard></ProtectedRoute>
+  <ProtectedRoute><LemtelGuard><TelephonyLayout>{children}</TelephonyLayout></LemtelGuard></ProtectedRoute>
 );
 
 const App = () => (
