@@ -163,6 +163,38 @@ export default function RecordingsView() {
     }
   };
 
+  const runTranscribeAnalyze = async () => {
+    if (!sel) return;
+    setAiLoading(true); setAiError(null);
+    try {
+      const organization_id = (sel as any).organization_id || LEMTEL_ORG;
+      const callId = (sel as any).callId || sel.id;
+      let txt = transcript;
+      if (!txt) {
+        const r1 = await supabase.functions.invoke('ai-transcribe-call', {
+          body: { callId, call_record_id: callId, organization_id,
+                  recording_path: (sel as any).recording_path, recording_name: (sel as any).recording_name },
+        });
+        if (r1.error) throw r1.error;
+        txt = String((r1.data as any)?.transcript_text || '').trim();
+        if (txt) setTranscript(txt);
+      }
+      if (!txt) throw new Error('No transcript available for AI analysis yet');
+      const r2 = await supabase.functions.invoke('ai-analyze-call', {
+        body: { callId, call_record_id: callId, organization_id, transcript_text: txt,
+                recording_path: (sel as any).recording_path, recording_name: (sel as any).recording_name },
+      });
+      if (r2.error) throw r2.error;
+      const ai = (r2.data as any)?.analysis || (r2.data as any) || null;
+      setAnalysis(ai);
+      if (ai?.summary) updateItem(sel.id, { summary: ai.summary, topics: ai.topics || sel.topics, sentiment: ai.sentiment || sel.sentiment });
+    } catch (e: any) {
+      setAiError(aiErr(e));
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   const regen = async () => {
     if (!sel) return;
     setRegenLoading(true);
