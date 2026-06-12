@@ -66,6 +66,15 @@ AVA is an all-in-one platform that offers:
 - If someone has complex questions, suggest /contact
 - Don't fabricate information you don't know`;
 
+function escapeHtml(s: string): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 async function sendConversationEmail(messages: any[], language: string) {
   if (!RESEND_API_KEY || !ADMIN_EMAIL) return;
 
@@ -76,7 +85,7 @@ async function sendConversationEmail(messages: any[], language: string) {
         const isUser = m.role === "user";
         return `<div style="margin-bottom: 12px; padding: 10px; border-radius: 8px; background: ${isUser ? '#e0e7ff' : '#f3f4f6'}; border-left: 3px solid ${isUser ? '#6366f1' : '#9ca3af'};">
           <strong style="color: ${isUser ? '#4338ca' : '#374151'};">${isUser ? '👤 Visitor' : '🤖 AVA Bot'}</strong>
-          <p style="margin: 5px 0 0 0;">${m.content}</p>
+          <p style="margin: 5px 0 0 0;">${escapeHtml(m.content)}</p>
         </div>`;
       })
       .join("");
@@ -89,7 +98,7 @@ async function sendConversationEmail(messages: any[], language: string) {
         <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
             <h2 style="margin: 0;">💬 Chatbot Conversation Summary</h2>
-            <p style="margin: 5px 0 0 0; opacity: 0.9;">Language: ${language.toUpperCase()} | ${new Date().toLocaleString()}</p>
+            <p style="margin: 5px 0 0 0; opacity: 0.9;">Language: ${escapeHtml(language).toUpperCase()} | ${new Date().toLocaleString()}</p>
           </div>
           <div style="background: #f9fafb; padding: 20px; border-radius: 0 0 10px 10px;">
             ${conversationHtml}
