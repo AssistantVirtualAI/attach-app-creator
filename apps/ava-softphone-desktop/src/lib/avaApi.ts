@@ -306,9 +306,6 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
 }
 
 function mapCdrToRecording(r: any): RecordingItem {
-  const url = r.recording_path && r.recording_name
-    ? `https://pbxnode.lemtel.tel/${r.recording_path}/${r.recording_name}`
-    : null;
   return {
     id:          r.id ?? String(Math.random()),
     callId:      r.id ?? '',
@@ -320,18 +317,23 @@ function mapCdrToRecording(r: any): RecordingItem {
     sizeKb:      0,
     qualityScore: Math.round((r.mos ?? 0) * 20),
     sentiment:   'neutral' as const,
-    summary:     url ? 'Enregistrement disponible.' : 'Chemin enregistrement non disponible.',
+    summary:     r.recording_path && r.recording_name ? 'Enregistrement disponible.' : 'Chemin enregistrement non disponible.',
     topics:      [],
     tags:        [],
     feedback:    null,
-    recordingUrl: url,
+    organization_id: r.organization_id ?? undefined,
+    recording_path: r.recording_path ?? null,
+    recording_name: r.recording_name ?? null,
   };
 }
 
 
 
 async function readCallRecordRows(limit = 100): Promise<any[]> {
-  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos&order=start_at.desc&limit=${limit}`;
+  const me = await getMeContext();
+  const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
+  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos${orgFilter}&order=start_at.desc&limit=${limit}`;
+
   const res = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
