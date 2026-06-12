@@ -540,11 +540,34 @@ export const ava = {
         body: JSON.stringify({ action: 'get-recording', params: { record_path, record_name } }),
       });
       if (!res.ok) throw new Error(`Recording unavailable (${res.status})`);
-      const blob = await res.blob();
+      const buf = await res.arrayBuffer();
+      if (!buf.byteLength) throw new Error('Empty recording');
+      const lower = record_name.toLowerCase();
+      const fallbackMime = lower.endsWith('.mp3') ? 'audio/mpeg'
+        : lower.endsWith('.ogg') ? 'audio/ogg'
+        : lower.endsWith('.m4a') ? 'audio/mp4'
+        : 'audio/wav';
+      const ct = res.headers.get('content-type') || fallbackMime;
+      const blob = new Blob([buf], { type: ct.split(';')[0].trim() || fallbackMime });
       return URL.createObjectURL(blob);
     } catch (err) {
       console.warn('[avaApi] get-recording failed:', err);
       return null;
+    }
+  },
+  domains: async (): Promise<any[]> => {
+    try {
+      const res = await fetch(resolveUrl(`/fn/${FN.fusionpbxProxy}`), {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ action: 'list-domains' }),
+      });
+      if (!res.ok) throw new Error(`list-domains failed (${res.status})`);
+      const data = await res.json();
+      return Array.isArray(data?.data) ? data.data : [];
+    } catch (err) {
+      console.warn('[avaApi] domains failed:', err);
+      return [];
     }
   },
   contacts: async (): Promise<ContactItem[]> => {
