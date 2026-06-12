@@ -28,6 +28,38 @@ function asArray<T = any>(raw: any): T[] {
   return [];
 }
 
+/** Trim/normalize a possibly-null text value; returns empty string if not usable. */
+function cleanText(v: any): string {
+  if (v == null) return '';
+  const s = String(v).trim();
+  return s && s.toLowerCase() !== 'null' && s.toLowerCase() !== 'undefined' ? s : '';
+}
+
+/** A CDR row counts as a voicemail when the PBX attached a voicemail message or marked it as such. */
+function isVoicemailLike(r: any): boolean {
+  if (!r) return false;
+  const vm = r.voicemail_message;
+  if (vm && vm !== 'false' && vm !== false) return true;
+  if (r.call_status === 'voicemail') return true;
+  if (r.has_voicemail === true) return true;
+  return false;
+}
+
+/** Map a pbx_ai_insights row (or undefined) into the CallInsight UI shape. */
+function mapInsightRow(callId: string, row: any): CallInsight {
+  const r = row || {};
+  return {
+    callId,
+    summary: cleanText(r.summary) || 'No AI summary available yet.',
+    sentiment: cleanText(r.sentiment) || 'neutral',
+    topics: Array.isArray(r.topics) ? r.topics : [],
+    actionItems: Array.isArray(r.action_items) ? r.action_items : (Array.isArray(r.actionItems) ? r.actionItems : []),
+    risks: Array.isArray(r.risks) ? r.risks : [],
+    opportunities: Array.isArray(r.opportunities) ? r.opportunities : [],
+    qualityScore: Number(r.quality_score ?? r.qualityScore ?? 0) || 0,
+  };
+}
+
 let authToken: string | null = null;
 export function setAuthToken(token: string | null) {
   authToken = token;
@@ -504,7 +536,53 @@ export const ava = {
       return null;
     }
   },
-  contacts: () => call<ContactItem[]>(`/db/${TABLES.softphoneUsers}?select=*&order=last_interaction.desc`, {}, MOCK_CONTACTS),
+  contacts: async (): Promise<ContactItem[]> => {
+    if (MOCK) return MOCK_CONTACTS;
+    try {
+      const rows = await readCallRecordRows(500);
+      const me = await getMeContext();
+      const myExt = me.extension || '';
+      const byPhone = new Map<string, ContactItem>();
+      for (const r of rows) {
+        const inbound = r.direction !== 'outbound';
+        const remoteRaw = inbound
+          ? (r.caller_number ?? r.source_number ?? '')
+          : (r.destination ?? r.destination_number ?? '');
+        const remote = String(remoteRaw || '').trim();
+        if (!remote || remote === myExt) continue;
+        const name = (r.caller_name && r.caller_name !== r.caller_number) ? r.caller_name : remote;
+        const at = r.start_at ?? new Date().toISOString();
+        const existing = byPhone.get(remote);
+        if (existing) {
+          existing.totalCalls += 1;
+          if (new Date(at) > new Date(existing.lastInteraction)) {
+            existing.lastInteraction = at;
+            if (name && name !== remote) existing.name = name;
+          }
+        } else {
+          byPhone.set(remote, {
+            id: `cdr-${remote}`,
+            name,
+            phone: remote,
+            lastInteraction: at,
+            totalCalls: 1,
+            totalMessages: 0,
+            sentiment: 'neutral',
+            aiNote: 'Auto-derived from call history.',
+            tags: [],
+            favorite: false,
+            interactions: [],
+          });
+        }
+      }
+      return Array.from(byPhone.values()).sort(
+        (a, b) => +new Date(b.lastInteraction) - +new Date(a.lastInteraction),
+      );
+    } catch (err) {
+      console.warn('[avaApi] contacts derivation failed:', err);
+      return [];
+    }
+  },
   /* Phase 3.1 — AI feedback + lifecycle */
   regenerateSummary: (kind: 'voicemail' | 'recording', id: string, sourceText?: string) =>
     call<{ summary: string }>(`/fn/${FN.aiAnalyzeCall}`, { method: 'POST', body: JSON.stringify({ op: 'regenerate_summary', kind, id, sourceText }) }, {
@@ -522,8 +600,12 @@ export const ava = {
     call<{ ok: true; count: number; url: string }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'export-recordings', ids }) }, {
       ok: true, count: ids.length, url: `https://ava.local/exports/recordings-${Date.now()}.zip`,
     }).catch(() => ({ ok: true as const, count: 0, url: 'PBX export unavailable' })),
-  updateContact: (id: string, patch: Partial<Pick<ContactItem, 'notes' | 'tags' | 'favorite'>>) =>
-    call<{ ok: true }>(`/db/${TABLES.softphoneUsers}?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } }, { ok: true }),
+  updateContact: (id: string, patch: Partial<Pick<ContactItem, 'notes' | 'tags' | 'favorite'>>) => {
+    // Only persist if id looks like a real softphone-user UUID (derived/manual ids stay local).
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (!isUuid) return Promise.resolve({ ok: true as const });
+    return call<{ ok: true }>(`/db/${TABLES.softphoneUsers}?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(patch), headers: { Prefer: 'return=minimal' } }, { ok: true });
+  },
   syncStatus: () => call<{ lastSync: string; status: 'ok' | 'error'; jobs: { kind: string; finishedAt: string; ok: boolean }[] }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'sync-status' }) }, {
     lastSync: new Date(Date.now() - 600e3).toISOString(),
     status: 'ok',
