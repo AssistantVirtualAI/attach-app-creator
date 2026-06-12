@@ -94,6 +94,7 @@ import LemtelPortalCalls from "./pages/lemtel/LemtelPortalCalls";
 import LemtelStub from "./pages/lemtel/LemtelStub";
 import LemtelCustomers from "./pages/lemtel/LemtelCustomers";
 import CustomerDetail from "./pages/lemtel/CustomerDetail";
+import LemtelGateways from "./pages/lemtel/LemtelGateways";
 import LemtelExtensions from "./pages/lemtel/LemtelExtensions";
 import LemtelDIDs from "./pages/lemtel/LemtelDIDs";
 import LemtelQueues from "./pages/lemtel/LemtelQueues";
@@ -207,15 +208,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const LemtelAdminPage = ({ children }: { children: React.ReactNode }) => (
-  <ProtectedRoute><LemtelGuard><AppLayout><AdminPortalLayout>{children}</AdminPortalLayout></AppLayout></LemtelGuard></ProtectedRoute>
+  <ProtectedRoute><LemtelGuard><AdminPortalLayout>{children}</AdminPortalLayout></LemtelGuard></ProtectedRoute>
 );
 
 const LemtelUserPage = ({ children }: { children: React.ReactNode }) => (
-  <ProtectedRoute><LemtelGuard><AppLayout><UserPortalLayout>{children}</UserPortalLayout></AppLayout></LemtelGuard></ProtectedRoute>
+  <ProtectedRoute><LemtelGuard><UserPortalLayout>{children}</UserPortalLayout></LemtelGuard></ProtectedRoute>
 );
 
 const LemtelTelephonyPage = ({ children }: { children: React.ReactNode }) => (
-  <ProtectedRoute><LemtelGuard><AppLayout><TelephonyLayout>{children}</TelephonyLayout></AppLayout></LemtelGuard></ProtectedRoute>
+  <ProtectedRoute><LemtelGuard><TelephonyLayout>{children}</TelephonyLayout></LemtelGuard></ProtectedRoute>
 );
 
 const App = () => (
@@ -653,6 +654,7 @@ const App = () => (
                 <Route path="/org/lemtel/admin/conversations" element={<LemtelAdminPage><Conversations /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/customers" element={<LemtelAdminPage><LemtelCustomers /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/customers/:domainUuid" element={<LemtelAdminPage><CustomerDetail /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/gateways" element={<LemtelAdminPage><LemtelGateways /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/recordings" element={<LemtelAdminPage><AdminRecordings /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/voicemail" element={<LemtelAdminPage><AdminVoicemail /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/reports" element={<LemtelAdminPage><AdminReports /></LemtelAdminPage>} />
