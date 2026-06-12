@@ -724,6 +724,7 @@ Deno.serve(async (req) => {
       }
       await admin.from("pbx_sync_jobs").insert({
         organization_id, job_type: action, status: "completed",
+        started_at: new Date(Date.now() - (r.latency_ms || 0)).toISOString(),
         completed_at: new Date().toISOString(),
         stats: { cdrs: upserted, fetched: cdrs.length, endpoint: r.endpoint, duration_ms: r.latency_ms },
       });
