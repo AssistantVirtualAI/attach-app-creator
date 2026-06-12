@@ -6,7 +6,7 @@ const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 export type SyncJob = {
   id: string;
   job_type: string;
-  status: 'running' | 'success' | 'completed' | 'error';
+  status: 'running' | 'success' | 'completed' | 'completed_with_errors' | 'failed' | 'error';
   started_at: string;
   completed_at: string | null;
   error: string | null;
