@@ -14,6 +14,8 @@ import TelecomSettingsView from './TelecomSettingsView';
 import OrgChatView from './OrgChatView';
 import AdminAIChatView from './AdminAIChatView';
 import ReportsView from './ReportsView';
+import CustomersView from './CustomersView';
+import VoiceAgentsView from './VoiceAgentsView';
 import SoftphonePane from '../SoftphonePane';
 import SettingsPage from '../SettingsPage';
 import { AppErrorBoundary } from '../AppErrorBoundary';
