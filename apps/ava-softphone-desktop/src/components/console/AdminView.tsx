@@ -224,8 +224,8 @@ export default function AdminView() {
         {sec === 'extensions' && <ExtensionsTable />}
         {sec === 'devices' && <Table title="Devices" cols={['Vendor', 'MAC', 'Template', 'Assigned', 'Registered']} load={ava.devices} row={(d: any) => [d.vendor, d.mac, d.template, d.assignedTo || '—', d.registered ? 'Yes' : 'No']} />}
         {sec === 'numbers' && <Table title="Phone Numbers" cols={['Number', 'Assigned To', 'Type']} load={ava.phoneNumbers} row={(n: any) => [n.number, n.assignedTo, n.type]} />}
-        {sec === 'ivrs' && <Table title="Auto-Attendants (IVR)" cols={['Name', 'Greeting', 'Options']} load={ava.ivrs} row={(i: any) => [i.name, i.greeting.slice(0, 60) + '…', i.options]} />}
-        {sec === 'queues' && <Table title="Call Queues" cols={['Name', 'Strategy', 'Agents', 'Waiting']} load={ava.queues} row={(q: any) => [q.name, q.strategy, q.agents, q.waiting]} />}
+        {sec === 'ivrs' && <IvrsTable />}
+        {sec === 'queues' && <QueuesTable />}
         {sec === 'ringgroups' && <Table title="Ring Groups" cols={['Name', 'Members', 'Strategy']} load={ava.ringGroups} row={(r: any) => [r.name, r.members, r.strategy]} />}
         {sec === 'sync' && <SyncStatus />}
       </div>
