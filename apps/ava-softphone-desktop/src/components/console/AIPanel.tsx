@@ -16,6 +16,13 @@ const SUGGESTIONS = [
   'Why are calls being missed today?',
 ];
 
+const USER_SUGGESTIONS = [
+  'How many calls did I miss yesterday?',
+  'Show my last 5 calls',
+  'Summarize my day',
+  'Any new voicemails for me?',
+];
+
 export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const [token, setToken] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
