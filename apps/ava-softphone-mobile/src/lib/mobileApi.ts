@@ -232,10 +232,8 @@ export const mobileApi = {
       .map(mapCdrToVoicemailEntry);
   }),
   voicemailAudio: (id: string) => call<{ url: string; expiresInSec: number }>(
-    `/fusionpbx-proxy?action=get-recording&id=${encodeURIComponent(id)}`,
+    '/fusionpbx-proxy',
     { method: 'POST', body: JSON.stringify({ action: 'get-recording', id }) },
-    { url: '', expiresInSec: 0 }
-  )}`, undefined,
     { url: '', expiresInSec: 0 },
   ),
 
