@@ -49,13 +49,27 @@ Deno.serve(async (req) => {
   try { _bodyEarly = await req.clone().json(); } catch { /* allow empty */ }
   const _earlyAction: string = _bodyEarly.action || "ping";
 
-  // Authorization: only Lemtel members/admins can hit the FusionPBX proxy.
+  // Authorization: Lemtel members/admins, OR org_admin of the tenant whose
+  // domain_uuid is being acted upon. This lets each customer's admin manage
+  // their own phone system through the proxy.
   if (!isServiceCall && userId) {
-    const readOnly = new Set(["ping", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "sync-all", "get-recording", "list-queues", "list-ivrs", "list-ring-groups", "get-extension"]);
+    const readOnly = new Set(["ping", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "sync-all", "get-recording", "list-queues", "list-ivrs", "list-ring-groups", "list-moh", "list-recordings", "list-devices", "list-destinations", "list-voicemails", "list-registrations", "get-extension"]);
     const isRead = readOnly.has(_earlyAction);
     const rpcName = isRead ? "is_lemtel_member" : "is_lemtel_admin";
-    const { data: allowed, error: roleErr } = await admin.rpc(rpcName, { _user_id: userId });
-    if (roleErr || !allowed) {
+    const { data: allowed } = await admin.rpc(rpcName, { _user_id: userId });
+    let permitted = !!allowed;
+    if (!permitted) {
+      // Fallback: is caller an org_admin of the tenant tied to the requested domain?
+      const targetDomain = _bodyEarly?.domain_uuid || _bodyEarly?.params?.domain_uuid;
+      if (targetDomain) {
+        const { data: org } = await admin.from("organizations").select("id").eq("fusionpbx_domain_uuid", targetDomain).maybeSingle();
+        if (org?.id) {
+          const { data: isAdmin } = await admin.rpc("has_role", { _user_id: userId, _org_id: org.id, _role: "org_admin" });
+          if (isAdmin) permitted = true;
+        }
+      }
+    }
+    if (!permitted) {
       return json({ error: "Forbidden", action: _earlyAction, required: rpcName }, 403);
     }
   }
@@ -89,7 +103,9 @@ Deno.serve(async (req) => {
   // confirmed-working pattern: Basic <FUSIONPBX_API_KEY>.
   const basicHeader = `Basic ${FUSIONPBX_API_KEY}`;
 
-  const domainQ = `domain_uuid=${FUSIONPBX_DOMAIN_UUID}`;
+  // Per-request domain override (each list/action can target any tenant domain)
+  const requestedDomain: string = body.domain_uuid || params.domain_uuid || FUSIONPBX_DOMAIN_UUID;
+  const domainQ = `domain_uuid=${requestedDomain}`;
 
   async function pbxFetch(path: string, init: RequestInit = {}) {
     const url = `${FUSIONPBX_API_URL}/app/api/7/${path}`;
@@ -279,6 +295,8 @@ Deno.serve(async (req) => {
       "list-destinations":  { path: `destinations?${domainQ}`,        key: "destinations" },
       "list-voicemails":    { path: `voicemails?${domainQ}`,          key: "voicemails" },
       "list-registrations": { path: `registrations?${domainQ}`,       key: "registrations" },
+      "list-moh":           { path: `music_on_hold?${domainQ}`,       key: "music_on_hold" },
+      "list-recordings":    { path: `recordings?${domainQ}`,          key: "recordings" },
       "list-domains":       { path: `domains`,                        key: "domains" },
     };
     if (listMap[action]) {
