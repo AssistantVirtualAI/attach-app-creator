@@ -136,6 +136,8 @@ import AdminVoicemail from "./pages/lemtel/admin/AdminVoicemail";
 import AdminReports from "./pages/lemtel/admin/AdminReports";
 import AdminDestinations from "./pages/lemtel/admin/AdminDestinations";
 import AdminTimeConditions from "./pages/lemtel/admin/AdminTimeConditions";
+import AdminConferences from "./pages/lemtel/admin/AdminConferences";
+import AdminHoldMusic from "./pages/lemtel/admin/AdminHoldMusic";
 import MySettings from "./pages/lemtel/my/MySettings";
 import MyForwarding from "./pages/lemtel/my/MyForwarding";
 import MyDevices from "./pages/lemtel/my/MyDevices";
