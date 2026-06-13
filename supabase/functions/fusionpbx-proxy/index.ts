@@ -894,7 +894,7 @@ Deno.serve(async (req) => {
 
     // ---- Recording proxy ----
     if (action === "get-recording") {
-      const { record_path, record_name, xml_cdr_uuid, domain_uuid, domain_name } = params as any;
+      const { record_path, record_name, xml_cdr_uuid, domain_uuid, domain_name, local_recording_url } = params as any;
       if (!xml_cdr_uuid && !(record_path && record_name)) {
         return json({ error: "xml_cdr_uuid or (record_path, record_name) required" }, 400);
       }
@@ -972,6 +972,9 @@ Deno.serve(async (req) => {
       const attempts: { url: string; status: number; content_type?: string }[] = [];
       const tryUrls: string[] = [];
       const fileBases = [FUSIONPBX_API_URL];
+      if (local_recording_url && String(local_recording_url).startsWith("http")) {
+        tryUrls.push(String(local_recording_url));
+      }
       try {
         const base = new URL(FUSIONPBX_API_URL);
         if (base.hostname === "portal.lemtel.tel") fileBases.push("https://pbxnode.lemtel.tel");
