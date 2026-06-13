@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Disc, Voicemail as VmIcon, PhoneCall, Trash2, RefreshCw, Download, Sparkles, Loader2, Play, Pause } from "lucide-react";
+import { Disc, Voicemail as VmIcon, PhoneCall, Trash2, RefreshCw, Download, Sparkles, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { LEMTEL_ORG } from "@/hooks/usePbxData";
 import { usePbxWrite } from "@/hooks/usePbxWrite";
