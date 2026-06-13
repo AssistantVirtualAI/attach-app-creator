@@ -4,6 +4,8 @@ import LemtelLogo from '../LemtelLogo';
 import { useTranslation, type I18nKey } from '../../lib/i18n';
 import LanguageSwitcher from '../ui/LanguageSwitcher';
 import { useSyncStatus, formatAge } from '../../hooks/useSyncStatus';
+import avaStatisticLogo from '../../assets/ava-statistic-logo.png';
+
 
 const { colors: c } = theme;
 
@@ -239,7 +241,7 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
         WebkitAppRegion: 'no-drag' as any,
       }}>
         <img
-          src="/ava-statistic-logo.png"
+          src={avaStatisticLogo}
           alt="AVA Statistic"
           width={28}
           height={28}
