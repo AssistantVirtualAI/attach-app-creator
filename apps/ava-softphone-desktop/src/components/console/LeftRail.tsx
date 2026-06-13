@@ -67,8 +67,9 @@ const SUPER_ADMIN_EXTRAS: ConsoleView[] = ['customers', 'voiceagents', 'reports'
 export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch, compact, isAdmin, isSuperAdmin, onStartTour }: Props) {
   const { t } = useTranslation();
   const { pbx, syncConnected, lastEvent, ageMs, healthy } = useSyncStatus();
-  const ITEMS: ConsoleView[] = isAdmin ? [...USER_ITEMS, ...ADMIN_ITEMS] : USER_ITEMS;
-  if (compact) return <CompactRail view={view} onChange={onChange} onOpenSettings={onOpenSettings} items={ITEMS} />;
+  // Super admins see admin items in the Platform group below, not duplicated above
+  const ITEMS: ConsoleView[] = isSuperAdmin ? USER_ITEMS : isAdmin ? [...USER_ITEMS, ...ADMIN_ITEMS] : USER_ITEMS;
+  if (compact) return <CompactRail view={view} onChange={onChange} onOpenSettings={onOpenSettings} items={isSuperAdmin ? [...USER_ITEMS, ...ADMIN_ITEMS] : ITEMS} />;
 
   const glowColor = pbx === 'error'
     ? '#ff5577'
