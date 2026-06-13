@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Search, Building2, Loader2, Globe, RefreshCw, ChevronRight, Users } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Plus, Search, Building2, Loader2, Globe, RefreshCw, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,6 +42,11 @@ export default function LemtelCustomers() {
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [editDomain, setEditDomain] = useState<Domain | null>(null);
+  const [editDesc, setEditDesc] = useState('');
+  const [editEnabled, setEditEnabled] = useState(true);
+  const [editSaving, setEditSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   // 1) FusionPBX domains (live, via proxy)
   const { data: domains = [], isLoading: loadingDomains, refetch: refetchDomains } = useQuery({
@@ -164,6 +170,55 @@ export default function LemtelCustomers() {
     } finally { setSyncing(null); }
   };
 
+  const openEdit = (d: Domain) => {
+    setEditDomain(d);
+    setEditDesc(d.domain_description || '');
+    setEditEnabled(d.domain_enabled === true || d.domain_enabled === 'true');
+  };
+
+  const saveEdit = async () => {
+    if (!editDomain) return;
+    setEditSaving(true);
+    try {
+      const { error } = await supabase.functions.invoke('pbx-write', {
+        body: {
+          organizationId: LEMTEL_ORG,
+          action: 'update-domain',
+          params: {
+            domain_uuid: editDomain.domain_uuid,
+            domain_description: editDesc,
+            domain_enabled: editEnabled,
+          },
+        },
+      });
+      if (error) throw error;
+      toast.success('Domain updated');
+      setEditDomain(null);
+      qc.invalidateQueries({ queryKey: ['fusionpbx', 'list-domains'] });
+    } catch (e: any) {
+      toast.error(e?.message || 'Update failed');
+    } finally { setEditSaving(false); }
+  };
+
+  const deleteDomain = async (d: Domain) => {
+    if (!confirm(`Delete domain ${d.domain_name}? This removes all extensions on the PBX.`)) return;
+    setDeleting(d.domain_uuid);
+    try {
+      const { error } = await supabase.functions.invoke('pbx-write', {
+        body: {
+          organizationId: LEMTEL_ORG,
+          action: 'delete-domain',
+          params: { domain_uuid: d.domain_uuid },
+        },
+      });
+      if (error) throw error;
+      toast.success(`Deleted ${d.domain_name}`);
+      qc.invalidateQueries({ queryKey: ['fusionpbx', 'list-domains'] });
+    } catch (e: any) {
+      toast.error(e?.message || 'Delete failed');
+    } finally { setDeleting(null); }
+  };
+
   return (
     <div className="space-y-6 w-full min-w-0">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -262,6 +317,16 @@ export default function LemtelCustomers() {
                           {syncing === d.domain_uuid ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
                           Sync
                         </Button>
+                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(d); }}>
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="sm"
+                          onClick={(e) => { e.stopPropagation(); deleteDomain(d); }}
+                          disabled={deleting === d.domain_uuid}
+                        >
+                          {deleting === d.domain_uuid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 text-destructive" />}
+                        </Button>
                         <Button asChild variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
                           <Link to={`/org/lemtel/admin/customers/${d.domain_uuid}`}>Manage</Link>
                         </Button>
@@ -274,6 +339,31 @@ export default function LemtelCustomers() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!editDomain} onOpenChange={(o) => !o && setEditDomain(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit {editDomain?.domain_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Description</Label>
+              <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label>Enabled</Label>
+              <Switch checked={editEnabled} onCheckedChange={setEditEnabled} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDomain(null)}>Cancel</Button>
+            <Button onClick={saveEdit} disabled={editSaving}>
+              {editSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
   // domain_uuid is being acted upon. This lets each customer's admin manage
   // their own phone system through the proxy.
   if (!isServiceCall && userId) {
-    const readOnly = new Set(["ping", "debug-raw", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "backfill-cdrs", "sync-domains", "sync-voicemail-messages", "sync-all", "get-recording", "list-queues", "list-ivrs", "list-ring-groups", "list-moh", "list-recordings", "list-devices", "list-destinations", "list-voicemails", "list-voicemail-messages", "list-registrations", "list-gateways", "list-gateways-all-domains", "list-gateways-merged", "get-gateways", "list-sip-profiles", "list-conferences", "list-hold-music", "list-dialplans", "get-extension", "sync_status", "sync-status"]);
+    const readOnly = new Set(["ping", "debug-raw", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "backfill-cdrs", "sync-domains", "sync-voicemail-messages", "sync-ivr-options", "sync-all", "get-recording", "list-queues", "list-ivrs", "list-ring-groups", "list-moh", "list-recordings", "list-devices", "list-destinations", "list-voicemails", "list-voicemail-messages", "list-registrations", "list-gateways", "list-gateways-all-domains", "list-gateways-merged", "get-gateways", "list-sip-profiles", "list-conferences", "list-hold-music", "list-dialplans", "get-extension", "sync_status", "sync-status"]);
     const isRead = readOnly.has(_earlyAction);
     const rpcName = isRead ? "is_lemtel_member" : "is_lemtel_admin";
     const { data: allowed } = await admin.rpc(rpcName, { _user_id: userId });
@@ -409,6 +409,16 @@ Deno.serve(async (req) => {
       return json(await pbxWrite(`domains/${id}`, "DELETE"));
     }
 
+    if (action === "update-domain") {
+      const id = body.domain_uuid || params.domain_uuid;
+      if (!id) return json({ ok: false, error: "domain_uuid required" }, 400);
+      const patch: Record<string, unknown> = { domain_uuid: id };
+      if ("domain_description" in params) patch.domain_description = (params as any).domain_description;
+      if ("domain_enabled" in params) patch.domain_enabled = String((params as any).domain_enabled);
+      if ("domain_name" in params) patch.domain_name = (params as any).domain_name;
+      return json(await pbxWrite(`domains/${id}`, "PUT", { domains: [patch] }));
+    }
+
     if (action === "get-registrations") {
       const r = await pbxFetch(`registrations?${domainQ}`);
       if (!r.ok) return json(r, r.status || 500);
@@ -588,6 +598,20 @@ Deno.serve(async (req) => {
       const id = params.ivr_menu_uuid;
       if (!id) return json({ error: "ivr_menu_uuid required" }, 400);
       return json(await pbxWrite(`ivr_menus/${id}`, "DELETE"));
+    }
+    if (action === "create-ivr-option") {
+      const payload = { ...params, domain_uuid: FUSIONPBX_DOMAIN_UUID };
+      return json(await pbxWrite("ivr_menu_options", "POST", { ivr_menu_options: [payload] }));
+    }
+    if (action === "update-ivr-option") {
+      const id = params.ivr_menu_option_uuid;
+      if (!id) return json({ error: "ivr_menu_option_uuid required" }, 400);
+      return json(await pbxWrite(`ivr_menu_options/${id}`, "PUT", { ivr_menu_options: [{ ...params, ivr_menu_option_uuid: id }] }));
+    }
+    if (action === "delete-ivr-option") {
+      const id = params.ivr_menu_option_uuid;
+      if (!id) return json({ error: "ivr_menu_option_uuid required" }, 400);
+      return json(await pbxWrite(`ivr_menu_options/${id}`, "DELETE"));
     }
     if (action === "create-queue") return json(await writeCollection("call_center_queues", "call_center_queues", params));
     if (action === "update-queue") return json(await writeCollection("call_center_queues", "call_center_queues", params));
@@ -861,6 +885,43 @@ Deno.serve(async (req) => {
       }
       return json({ ok: true, voicemails: totalUpserted, fetched: totalFetched });
     }
+
+    // ---- IVR menu options mirror ----
+    if (action === "sync-ivr-options") {
+      const r = await pbxFetch(`ivr_menu_options?${domainQ}&limit=2000`);
+      if (!r.ok) return json(r, r.status || 500);
+      const opts = collection(r.data, "ivr_menu_options");
+      // Map ivr_menu_uuid -> local ivr_id
+      const { data: ivrRows } = await admin
+        .from("pbx_ivrs")
+        .select("id,pbx_uuid")
+        .eq("organization_id", organization_id);
+      const localByPbx = new Map<string, string>();
+      (ivrRows ?? []).forEach((row: any) => { if (row.pbx_uuid) localByPbx.set(row.pbx_uuid, row.id); });
+      const rows = opts.map((o: any) => {
+        const ivrId = localByPbx.get(o.ivr_menu_uuid);
+        if (!ivrId) return null;
+        return {
+          ivr_id: ivrId,
+          pbx_uuid: o.ivr_menu_option_uuid,
+          digit: String(o.ivr_menu_option_digits ?? o.option_digits ?? ""),
+          destination_type: o.ivr_menu_option_action ?? null,
+          destination_id: o.ivr_menu_option_param ?? null,
+          description: o.ivr_menu_option_description ?? null,
+          sort_order: o.ivr_menu_option_order ? parseInt(o.ivr_menu_option_order) : 0,
+        };
+      }).filter(Boolean) as any[];
+      let upserted = 0;
+      if (rows.length) {
+        const { error, count } = await admin
+          .from("pbx_ivr_options")
+          .upsert(rows, { onConflict: "ivr_id,pbx_uuid", count: "exact" });
+        if (error) return json({ ok: false, error: error.message }, 500);
+        upserted = count ?? rows.length;
+      }
+      return json({ ok: true, options: upserted, fetched: opts.length });
+    }
+
 
     // ---- Full sync ----
     if (action === "sync-all") {

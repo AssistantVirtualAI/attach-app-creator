@@ -70,10 +70,78 @@ export default function LemtelIVR() {
   const [optDestType, setOptDestType] = useState<string>('extension');
   const [optDestId, setOptDestId] = useState('');
   const [optDesc, setOptDesc] = useState('');
+  const [newIvrOpen, setNewIvrOpen] = useState(false);
+  const [newIvrName, setNewIvrName] = useState('');
+  const [newIvrExt, setNewIvrExt] = useState('');
+  const [newIvrSaving, setNewIvrSaving] = useState(false);
+  const [syncingPbx, setSyncingPbx] = useState(false);
 
   useEffect(() => {
     if (!selectedId && ivrs.length > 0) setSelectedId((ivrs as any[])[0].id);
   }, [ivrs, selectedId]);
+
+  const syncFromPbx = async () => {
+    setSyncingPbx(true);
+    try {
+      await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'sync-all', resources: ['ivrs'], organization_id: selectedOrgId },
+      });
+      await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'sync-ivr-options', organization_id: selectedOrgId },
+      });
+      queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivrs'] });
+      queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivr_options'] });
+      toast.success('IVR menus & options synced');
+    } catch (e: any) {
+      toast.error(e?.message || 'Sync failed');
+    } finally { setSyncingPbx(false); }
+  };
+
+  const createIvr = async () => {
+    if (!newIvrName.trim() || !newIvrExt.trim()) return toast.error('Name & extension required');
+    setNewIvrSaving(true);
+    try {
+      const { error } = await supabase.functions.invoke('pbx-write', {
+        body: {
+          organizationId: selectedOrgId,
+          action: 'create-ivr',
+          params: {
+            ivr_menu_name: newIvrName,
+            ivr_menu_extension: newIvrExt,
+            ivr_menu_enabled: 'true',
+            ivr_menu_description: newIvrName,
+          },
+        },
+      });
+      if (error) throw error;
+      toast.success('IVR created on PBX');
+      setNewIvrOpen(false); setNewIvrName(''); setNewIvrExt('');
+      await syncFromPbx();
+    } catch (e: any) {
+      toast.error(e?.message || 'Create failed');
+    } finally { setNewIvrSaving(false); }
+  };
+
+  const deleteIvr = async () => {
+    if (!selected || !selected.pbx_uuid) return;
+    if (!confirm(`Delete IVR "${selected.name}"?`)) return;
+    try {
+      await supabase.functions.invoke('pbx-write', {
+        body: {
+          organizationId: selectedOrgId,
+          action: 'delete-ivr',
+          params: { ivr_menu_uuid: selected.pbx_uuid },
+        },
+      });
+      await supabase.from('pbx_ivrs').delete().eq('id', selected.id);
+      toast.success('IVR deleted');
+      setSelectedId(null);
+      queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivrs'] });
+    } catch (e: any) {
+      toast.error(e?.message || 'Delete failed');
+    }
+  };
+
 
   // ===== AI script generator =====
   const [aiOpen, setAiOpen] = useState(false);
@@ -259,7 +327,11 @@ export default function LemtelIVR() {
           <p className="text-muted-foreground">Menus IVR synchronisés depuis FusionPBX · Voix générées avec ElevenLabs</p>
         </div>
         <div className="flex gap-2">
-          <PbxRefreshButton kind="ivr-queues" />
+          <Button variant="outline" onClick={syncFromPbx} disabled={syncingPbx}>
+            <Loader2 className={`w-4 h-4 mr-2 ${syncingPbx ? 'animate-spin' : 'hidden'}`} />
+            {!syncingPbx && <RotateCcw className="w-4 h-4 mr-2" />}
+            Sync from PBX
+          </Button>
           <Dialog open={aiOpen} onOpenChange={setAiOpen}>
             <DialogTrigger asChild>
               <Button variant="outline"><Sparkles className="w-4 h-4 mr-2" /> AI Script</Button>
@@ -286,7 +358,25 @@ export default function LemtelIVR() {
               <DialogFooter><Button onClick={generateScript} disabled={generating}>{generating ? 'Génération…' : 'Générer'}</Button></DialogFooter>
             </DialogContent>
           </Dialog>
-          <Button><Plus className="w-4 h-4 mr-2" /> Nouvel IVR</Button>
+          <Dialog open={newIvrOpen} onOpenChange={setNewIvrOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="w-4 h-4 mr-2" /> Nouvel IVR</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Créer un nouvel IVR</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div><Label>Nom</Label><input className="w-full mt-1 px-3 py-2 rounded-md border bg-background" value={newIvrName} onChange={e => setNewIvrName(e.target.value)} /></div>
+                <div><Label>Extension</Label><input className="w-full mt-1 px-3 py-2 rounded-md border bg-background" value={newIvrExt} onChange={e => setNewIvrExt(e.target.value)} placeholder="ex. 5000" /></div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setNewIvrOpen(false)}>Annuler</Button>
+                <Button onClick={createIvr} disabled={newIvrSaving}>
+                  {newIvrSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Créer sur PBX
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -318,6 +408,9 @@ export default function LemtelIVR() {
                     <CardTitle>{selected.name}</CardTitle>
                     <p className="text-sm text-muted-foreground mt-1">Extension {selected.extension || '—'}</p>
                   </div>
+                  <Button variant="ghost" size="sm" onClick={deleteIvr} className="text-destructive">
+                    Supprimer
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -431,9 +524,21 @@ export default function LemtelIVR() {
                           <div className="text-xs text-muted-foreground">→ {opt.destination_id || opt.description || '—'}</div>
                         </div>
                         <Button size="sm" variant="ghost" onClick={async () => {
-                          const { error } = await supabase.from('pbx_ivr_options').delete().eq('id', opt.id);
-                          if (error) toast.error(error.message);
-                          else { toast.success('Option supprimée'); queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivr_options', selectedId] }); }
+                          try {
+                            if (opt.pbx_uuid) {
+                              await supabase.functions.invoke('pbx-write', {
+                                body: {
+                                  organizationId: selectedOrgId,
+                                  action: 'delete-ivr-option',
+                                  params: { ivr_menu_option_uuid: opt.pbx_uuid },
+                                },
+                              });
+                            }
+                            const { error } = await supabase.from('pbx_ivr_options').delete().eq('id', opt.id);
+                            if (error) throw error;
+                            toast.success('Option supprimée');
+                            queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivr_options', selectedId] });
+                          } catch (e: any) { toast.error(e?.message || 'Suppression échouée'); }
                         }}>×</Button>
                       </div>
                     ))}
@@ -466,17 +571,32 @@ export default function LemtelIVR() {
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setOptDialogOpen(false)}>Annuler</Button>
                       <Button onClick={async () => {
-                        if (!selectedId || !optDigit) return;
-                        const { error } = await supabase.from('pbx_ivr_options').insert({
-                          ivr_id: selectedId, digit: optDigit, destination_type: optDestType,
-                          destination_id: optDestId || null, description: optDesc || null,
-                        });
-                        if (error) toast.error(error.message);
-                        else {
+                        if (!selectedId || !optDigit || !selected?.pbx_uuid) return toast.error('IVR not synced with PBX');
+                        try {
+                          const res: any = await supabase.functions.invoke('pbx-write', {
+                            body: {
+                              organizationId: selectedOrgId,
+                              action: 'create-ivr-option',
+                              params: {
+                                ivr_menu_uuid: selected.pbx_uuid,
+                                ivr_menu_option_digits: optDigit,
+                                ivr_menu_option_action: optDestType,
+                                ivr_menu_option_param: optDestId || '',
+                                ivr_menu_option_description: optDesc || '',
+                                ivr_menu_option_enabled: 'true',
+                              },
+                            },
+                          });
+                          if (res?.error) throw res.error;
+                          const pbxUuid: string | null = res?.data?.proxy?.data?.[0]?.ivr_menu_option_uuid ?? null;
+                          await supabase.from('pbx_ivr_options').insert({
+                            ivr_id: selectedId, digit: optDigit, destination_type: optDestType,
+                            destination_id: optDestId || null, description: optDesc || null, pbx_uuid: pbxUuid,
+                          });
                           toast.success('Option ajoutée');
                           setOptDialogOpen(false);
                           queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivr_options', selectedId] });
-                        }
+                        } catch (e: any) { toast.error(e?.message || 'Échec ajout'); }
                       }}>Ajouter</Button>
                     </DialogFooter>
                   </DialogContent>
