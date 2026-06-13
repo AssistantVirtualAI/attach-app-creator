@@ -7345,6 +7345,73 @@ export type Database = {
         }
         Relationships: []
       }
+      voice_agent_gateway_routes: {
+        Row: {
+          agent_id: string | null
+          auto_bound: boolean
+          created_at: string
+          did_e164: string
+          direction: string
+          elevenlabs_phone_id: string | null
+          id: string
+          manual_override: boolean
+          metadata: Json
+          organization_id: string
+          pbx_gateway_uuid: string | null
+          updated_at: string
+        }
+        Insert: {
+          agent_id?: string | null
+          auto_bound?: boolean
+          created_at?: string
+          did_e164: string
+          direction?: string
+          elevenlabs_phone_id?: string | null
+          id?: string
+          manual_override?: boolean
+          metadata?: Json
+          organization_id: string
+          pbx_gateway_uuid?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agent_id?: string | null
+          auto_bound?: boolean
+          created_at?: string
+          did_e164?: string
+          direction?: string
+          elevenlabs_phone_id?: string | null
+          id?: string
+          manual_override?: boolean
+          metadata?: Json
+          organization_id?: string
+          pbx_gateway_uuid?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_agent_gateway_routes_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_agent_gateway_routes_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_agent_gateway_routes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhook_delivery_logs: {
         Row: {
           attempt_count: number | null
