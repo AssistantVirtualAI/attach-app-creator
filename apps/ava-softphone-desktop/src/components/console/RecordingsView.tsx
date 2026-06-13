@@ -82,14 +82,54 @@ export default function RecordingsView() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Helper: fetch (or reuse cached) blob URL for a recording, deduping concurrent calls.
+  const fetchAudio = useCallback(async (rec: RecordingItem): Promise<string | null> => {
+    const cached = audioBlobCache.get(rec.id);
+    if (cached) return cached;
+    const pending = audioInFlight.get(rec.id);
+    if (pending) return pending;
+    const p = (async () => {
+      const url = await ava.getRecordingAudioUrl(rec);
+      if (url) audioBlobCache.set(rec.id, url);
+      return url;
+    })().finally(() => audioInFlight.delete(rec.id));
+    audioInFlight.set(rec.id, p);
+    return p;
+  }, []);
+
+  // When selection changes: show cached blob immediately, otherwise fetch silently in background.
   useEffect(() => {
     setPlaybackError(null);
-    if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
     setTranscript(String((sel as any)?.transcript_text || (sel as any)?.raw_data?.transcript_text || ''));
     setAnalysis((sel as any)?.raw_data?.ai || null);
     setAiError(null);
-  }, [sel?.id]);
+    if (!sel) return;
+    const cached = audioBlobCache.get(sel.id);
+    if (cached) { setAudioUrl(cached); return; }
+    let cancelled = false;
+    setPlaybackLoading(true);
+    fetchAudio(sel)
+      .then((u) => { if (!cancelled) { if (u) setAudioUrl(u); else setPlaybackError('Recording file not available from PBX yet'); } })
+      .finally(() => { if (!cancelled) setPlaybackLoading(false); });
+    return () => { cancelled = true; };
+  }, [sel?.id, fetchAudio]);
+
+  // Background prefetch: download the first 25 recordings (concurrency 2) so playback is instant.
+  useEffect(() => {
+    if (!items.length) return;
+    const queue = items.slice(0, 25).filter((r) => !audioBlobCache.get(r.id));
+    let cancelled = false;
+    const worker = async () => {
+      while (!cancelled && queue.length) {
+        const next = queue.shift();
+        if (!next) break;
+        try { await fetchAudio(next); } catch { /* ignore */ }
+      }
+    };
+    worker(); worker();
+    return () => { cancelled = true; };
+  }, [items, fetchAudio]);
 
   const filtered = useMemo(() => {
     const cutoff = rangeCutoff(range);
