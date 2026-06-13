@@ -21,6 +21,7 @@ import SettingsPage from '../SettingsPage';
 import { AppErrorBoundary } from '../AppErrorBoundary';
 import IncomingCallToast from './IncomingCallToast';
 import ActiveCallDock from './ActiveCallDock';
+import DesktopTour from './DesktopTour';
 import { useCallShortcuts } from '../../hooks/useShortcuts';
 import { callBus } from '../../hooks/useCallBus';
 import { useDesktopRole } from '../../hooks/useDesktopRole';
@@ -66,7 +67,8 @@ export default function ConsoleLayout({
   const [syncing, setSyncing] = useState(false);
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
-  const { isAdmin } = useDesktopRole();
+  const [tourOpen, setTourOpen] = useState(false);
+  const { isAdmin, isSuperAdmin } = useDesktopRole();
   const { orgId, orgName } = useTenant();
   useRealtimeSync(orgId);
 
@@ -145,6 +147,8 @@ export default function ConsoleLayout({
           onOpenSettings={() => setView('settings')}
           onOpenSearch={() => setPaletteOpen(true)}
           isAdmin={isAdmin}
+          isSuperAdmin={isSuperAdmin}
+          onStartTour={() => setTourOpen(true)}
         />
       )}
 
@@ -205,6 +209,8 @@ export default function ConsoleLayout({
           onOpenSettings={() => setView('settings')}
           onOpenSearch={() => setPaletteOpen(true)}
           isAdmin={isAdmin}
+          isSuperAdmin={isSuperAdmin}
+          onStartTour={() => setTourOpen(true)}
         />
       )}
 
@@ -212,6 +218,12 @@ export default function ConsoleLayout({
 
       <IncomingCallToast />
       <ActiveCallDock />
+      <DesktopTour
+        isAdmin={isAdmin}
+        isSuperAdmin={isSuperAdmin}
+        forceOpen={tourOpen}
+        onClose={() => setTourOpen(false)}
+      />
     </div>
   );
 }
