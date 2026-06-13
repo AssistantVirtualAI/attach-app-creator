@@ -886,6 +886,43 @@ Deno.serve(async (req) => {
       return json({ ok: true, voicemails: totalUpserted, fetched: totalFetched });
     }
 
+    // ---- IVR menu options mirror ----
+    if (action === "sync-ivr-options") {
+      const r = await pbxFetch(`ivr_menu_options?${domainQ}&limit=2000`);
+      if (!r.ok) return json(r, r.status || 500);
+      const opts = collection(r.data, "ivr_menu_options");
+      // Map ivr_menu_uuid -> local ivr_id
+      const { data: ivrRows } = await admin
+        .from("pbx_ivrs")
+        .select("id,pbx_uuid")
+        .eq("organization_id", organization_id);
+      const localByPbx = new Map<string, string>();
+      (ivrRows ?? []).forEach((row: any) => { if (row.pbx_uuid) localByPbx.set(row.pbx_uuid, row.id); });
+      const rows = opts.map((o: any) => {
+        const ivrId = localByPbx.get(o.ivr_menu_uuid);
+        if (!ivrId) return null;
+        return {
+          ivr_id: ivrId,
+          pbx_uuid: o.ivr_menu_option_uuid,
+          digit: String(o.ivr_menu_option_digits ?? o.option_digits ?? ""),
+          destination_type: o.ivr_menu_option_action ?? null,
+          destination_id: o.ivr_menu_option_param ?? null,
+          description: o.ivr_menu_option_description ?? null,
+          sort_order: o.ivr_menu_option_order ? parseInt(o.ivr_menu_option_order) : 0,
+        };
+      }).filter(Boolean) as any[];
+      let upserted = 0;
+      if (rows.length) {
+        const { error, count } = await admin
+          .from("pbx_ivr_options")
+          .upsert(rows, { onConflict: "ivr_id,pbx_uuid", count: "exact" });
+        if (error) return json({ ok: false, error: error.message }, 500);
+        upserted = count ?? rows.length;
+      }
+      return json({ ok: true, options: upserted, fetched: opts.length });
+    }
+
+
     // ---- Full sync ----
     if (action === "sync-all") {
       const t0 = Date.now();
