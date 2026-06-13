@@ -17,6 +17,9 @@ import {
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { KeyRound } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
 const SuperAdminDashboard = () => {
@@ -24,6 +27,23 @@ const SuperAdminDashboard = () => {
   const { language } = useLanguage();
   const { stats, organizations, isLoading, refetch } = useSuperAdminStats();
   const [searchQuery, setSearchQuery] = useState('');
+  const [unifying, setUnifying] = useState(false);
+
+  const handleUnifyPasswords = async () => {
+    if (!confirm('This will overwrite the portal login password of every activated user with their current phone (SIP) password, so the same password works on portal, desktop, mobile and the phone. Continue?')) return;
+    setUnifying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('unify-passwords-backfill', { body: {} });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).message || (data as any).error);
+      const d: any = data;
+      toast.success(`Unified ${d.updated}/${d.total} users (${d.skipped} skipped, ${d.errors?.length || 0} errors)`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to unify passwords');
+    } finally {
+      setUnifying(false);
+    }
+  };
 
   const texts = {
     title: language === 'fr' ? 'Tableau de bord Super Admin' : 'Super Admin Dashboard',
@@ -167,10 +187,16 @@ const SuperAdminDashboard = () => {
             </div>
           </div>
           
-          <Button onClick={() => refetch()} variant="outline" className="gap-2">
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            {texts.refresh}
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleUnifyPasswords} disabled={unifying} variant="outline" className="gap-2">
+              <KeyRound className={`w-4 h-4 ${unifying ? 'animate-pulse' : ''}`} />
+              {unifying ? 'Unifying…' : 'Unify Passwords'}
+            </Button>
+            <Button onClick={() => refetch()} variant="outline" className="gap-2">
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              {texts.refresh}
+            </Button>
+          </div>
         </motion.div>
 
         {/* Stats Cards */}
