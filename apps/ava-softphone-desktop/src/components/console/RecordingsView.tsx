@@ -196,11 +196,8 @@ export default function RecordingsView() {
     if (!sel) return;
     setPlaybackError(null); setPlaybackLoading(true);
     try {
-      const url = await ava.getRecordingAudioUrl(sel);
-      if (!url) {
-        setPlaybackError('Recording file not available from PBX yet');
-        return;
-      }
+      const url = await fetchAudio(sel);
+      if (!url) { setPlaybackError('Recording file not available from PBX yet'); return; }
       setAudioUrl(url);
     } finally {
       setPlaybackLoading(false);
