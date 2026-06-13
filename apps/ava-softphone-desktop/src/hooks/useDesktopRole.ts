@@ -23,8 +23,10 @@ export function useDesktopRole() {
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id);
+        const isSuper = (roles || []).some((r: any) => r.role === 'super_admin');
+        if (isSuper) { if (!cancelled) { setRole('super_admin'); setLoading(false); } return; }
         const admin = (roles || []).some((r: any) =>
-          r.role === 'org_admin' || r.role === 'reseller_admin' || r.role === 'manager' || r.role === 'super_admin'
+          r.role === 'org_admin' || r.role === 'reseller_admin' || r.role === 'manager'
         );
         if (!cancelled) { setRole(admin ? 'org_admin' : 'normal'); setLoading(false); }
       } catch {
@@ -34,5 +36,10 @@ export function useDesktopRole() {
     return () => { cancelled = true; };
   }, []);
 
-  return { role, isAdmin: role === 'org_admin' || role === 'super_admin', loading };
+  return {
+    role,
+    isAdmin: role === 'org_admin' || role === 'super_admin',
+    isSuperAdmin: role === 'super_admin',
+    loading,
+  };
 }

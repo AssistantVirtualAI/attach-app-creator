@@ -1,64 +1,49 @@
-# Polish pass: edit dialogs, recordings, desktop super-admin, white theme, logo & mascot
+## Plan
 
-## 1. Edit sheets/dialogs render properly
+### 1. Replace the mascot with a cute 3D robot
+- Rework `MascotRobot` from boxy/industrial into a small chibi-style robot:
+  - round oversized head
+  - rounded body
+  - big expressive glowing eyes
+  - visible full body
+  - funny antenna/ears
+  - waving/bouncing idle animation
+  - mouth/talking animation when assistant replies
+- Reduce the launcher size so it does not dominate the screen.
+- Keep it top-right above the softphone, but make it cleaner and less intrusive.
 
-All Lemtel edit sheets (Extension, Gateway, IVR, Queue, Ring Group) use shadcn `Sheet`/`Dialog` which on small viewports clip and lose their footer button.
+### 2. Fix desktop portal access by role
+- Make the desktop app role logic match the main portal role rules:
+  - `super_admin`: access to platform portal and all organizations/domains/features
+  - `org_admin` / `reseller_admin` / `manager`: access only to their customer/org portal and data
+  - normal user: access only to personal workspace features
+- Update desktop navigation so every available portal feature can be opened from inside the desktop app.
+- Ensure super admin sees global management options; regular admins do not.
 
-- Apply a shared pattern to every edit surface:
-  - `SheetContent`: `flex flex-col h-full max-h-screen w-full sm:max-w-xl`
-  - Wrap body fields in a scrollable middle: `flex-1 overflow-y-auto px-1 space-y-3`
-  - Pin footer (Save / Cancel) in a `flex-shrink-0 border-t pt-3` block so it's always visible
-- Make form labels and helper text use semantic tokens (`text-foreground` / `text-muted-foreground`) so they remain legible in white theme.
-- Files: `LemtelGateways.tsx`, `LemtelExtensions.tsx`, `LemtelIvrs.tsx`, `LemtelQueues.tsx`, `LemtelRingGroups.tsx`, plus the matching `*EditSheet` / `*Dialog` components.
+### 3. Unify portal entry points in the desktop app
+- Add clear desktop sections for:
+  - Platform Admin
+  - Customer/Admin Portal
+  - My Workspace
+  - Phone System
+  - Recordings / Calls
+  - Users / Extensions / Gateways / IVR / Queues / Ring Groups
+  - Reports / Billing / Settings / Sync Health
+- Route each item to the existing working portal pages instead of placeholder/stub pages where a real page already exists.
 
-## 2. Recording playback
+### 4. Add a new desktop guided tour
+- Add a desktop-only tour that explains:
+  - role-based portal switcher
+  - super admin global access
+  - customer/org admin scoped access
+  - softphone
+  - recordings/calls
+  - phone system management
+  - settings and theme toggle
+- Include a “Start tour” button in desktop settings/help and auto-show once for first desktop login.
 
-Rows load but Play does nothing — `fetchRecording()` resolves a URL but `RecordingWavePlayer` never starts. Fix:
-
-- In `CustomerDetail.tsx` (and the global `RecordingsPage`), after `recUrls[r.id]` is set, mount `RecordingWavePlayer` with `autoPlay` and a fresh `key={r.id}`.
-- In `RecordingWavePlayer.tsx`: support `autoPlay` prop, recreate the WaveSurfer instance on URL change, add an `<audio>` fallback when WaveSurfer fails to decode (current symptom), and surface load/play errors via toast.
-- Edge function `fusionpbx-proxy` `get-recording` already returns a signed URL; add a small `Content-Type: audio/wav` enforcement and CORS `Range` header so seeking works.
-
-## 3. Super-admin sees everything in desktop app, regular admin only their org
-
-Console shows `Role: super_admin isSuperAdmin: false` — `useDesktopRole` is reading `role` but not flipping the `isSuperAdmin` flag. Fix:
-
-- `useDesktopRole.ts`: compute `isSuperAdmin = userRole?.role === 'super_admin'` and export it.
-- Wire the desktop sidebar/route guards to `isSuperAdmin`: when true, show **all** Lemtel domains + global admin nav (Users, Domains, Gateways, Billing, Webhooks, System). When false, scope queries by `organization_id` and hide global admin entries.
-- For data queries used by desktop pages, branch the Supabase calls: super_admin → no `organization_id` filter; otherwise → `.eq('organization_id', currentOrgId)`. Touch points: extensions, recordings, voicemails, queues, IVRs, gateways, sms, conversations.
-
-## 4. White theme for desktop app + light/dark toggle
-
-- Extend `index.css` with a `:root[data-theme="light"]` block: white background, near-black foreground, soft gray muted, keep `--primary` at #0023e6 (already AA on white). Map card / popover / sidebar tokens accordingly so existing components recolor automatically — no per-component hex.
-- Add `useDesktopTheme()` hook persisting `light | dark | system` in `localStorage` and applying `data-theme` on `<html>`. Default = `light` for Electron, `dark` for web (detect via `window.electronAPI` flag already set by `electron/main.cjs`).
-- Add a Theme toggle in Desktop Settings (`/desktop/settings`) with three options.
-- Audit hard-coded `text-white` / `bg-black` in desktop pages and replace with `text-foreground` / `bg-background`.
-
-## 5. AVA logo + favicon consistency
-
-- Replace every `<img src="/ava-logo.png">` / hard-coded logo path in desktop with a shared `<AvaLogo />` component that swaps to a white-theme-aware variant (`/lemtel-icon.png` for the "L" mark in tight spots, full `/ava-logo.png` for headers).
-- Update `electron/main.cjs` `icon:` and `BrowserWindow.setIcon()` to `public/lemtel-icon.png`.
-- Update desktop Auth screen (`/desktop/auth`) to use the same `<AvaLogo />` + the L favicon as the window icon.
-- Copy `public/lemtel-icon.png` → `public/favicon.png` and ensure `index.html` references `/favicon.png`. Update `manifest.webmanifest` icons too.
-
-## 6. Mascot — full body, funny 3D robot, repositioned
-
-- Move launcher to **top-right**, above the softphone: `fixed top-6 right-6 z-[60]`. Softphone (`fixed bottom-6 right-6 z-[55]`) stays unobstructed.
-- Replace the cropped `MascotFox` with a new `MascotRobot.tsx` (React Three Fiber): chunky boxy body, oversized round head, dish-antenna, glowing cyan eyes, jointed arms doing idle wave, breathing bob, blinking, mouth opens during streaming tokens. Camera framed so the **whole body** is visible — adjust `fov`, camera Z, and `<group position-y={-0.4}>` to fit.
-- Launcher avatar shows the same robot but framed full-body in a 96×96 capsule (not cropped to a circle that hides legs).
-- Expanded `MascotPanel`: dock as a 360×520 floating card to the **left** of the launcher so it doesn't cover the softphone.
-- Keep the existing tool-calling agent and gather→propose→confirm flow untouched.
-
-## Out of scope
-
-- New backend tables or RLS changes.
-- Voice TTS for the mascot.
-- Mobile / public landing page edits.
-
-## Validation
-
-- Open each edit sheet → footer button visible, fields scroll.
-- Recordings → click play → audio plays, seek bar works.
-- Log in as super_admin → all 137 domains visible; demote and verify org-scoping.
-- Toggle theme in Desktop Settings → instant white/dark swap, text remains readable everywhere.
-- Mascot visible in full, doesn't overlap softphone; opening the panel doesn't cover incoming-call UI.
+### 5. Verification
+- Check the desktop portal in preview/Electron routes where possible.
+- Verify mascot size/placement visually.
+- Verify super-admin/admin/user navigation rules from the code paths.
+- Check console errors after changes.
