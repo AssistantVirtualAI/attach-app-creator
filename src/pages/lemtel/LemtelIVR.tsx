@@ -70,10 +70,78 @@ export default function LemtelIVR() {
   const [optDestType, setOptDestType] = useState<string>('extension');
   const [optDestId, setOptDestId] = useState('');
   const [optDesc, setOptDesc] = useState('');
+  const [newIvrOpen, setNewIvrOpen] = useState(false);
+  const [newIvrName, setNewIvrName] = useState('');
+  const [newIvrExt, setNewIvrExt] = useState('');
+  const [newIvrSaving, setNewIvrSaving] = useState(false);
+  const [syncingPbx, setSyncingPbx] = useState(false);
 
   useEffect(() => {
     if (!selectedId && ivrs.length > 0) setSelectedId((ivrs as any[])[0].id);
   }, [ivrs, selectedId]);
+
+  const syncFromPbx = async () => {
+    setSyncingPbx(true);
+    try {
+      await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'sync-all', resources: ['ivrs'], organization_id: selectedOrgId },
+      });
+      await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'sync-ivr-options', organization_id: selectedOrgId },
+      });
+      queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivrs'] });
+      queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivr_options'] });
+      toast.success('IVR menus & options synced');
+    } catch (e: any) {
+      toast.error(e?.message || 'Sync failed');
+    } finally { setSyncingPbx(false); }
+  };
+
+  const createIvr = async () => {
+    if (!newIvrName.trim() || !newIvrExt.trim()) return toast.error('Name & extension required');
+    setNewIvrSaving(true);
+    try {
+      const { error } = await supabase.functions.invoke('pbx-write', {
+        body: {
+          organizationId: selectedOrgId,
+          action: 'create-ivr',
+          params: {
+            ivr_menu_name: newIvrName,
+            ivr_menu_extension: newIvrExt,
+            ivr_menu_enabled: 'true',
+            ivr_menu_description: newIvrName,
+          },
+        },
+      });
+      if (error) throw error;
+      toast.success('IVR created on PBX');
+      setNewIvrOpen(false); setNewIvrName(''); setNewIvrExt('');
+      await syncFromPbx();
+    } catch (e: any) {
+      toast.error(e?.message || 'Create failed');
+    } finally { setNewIvrSaving(false); }
+  };
+
+  const deleteIvr = async () => {
+    if (!selected || !selected.pbx_uuid) return;
+    if (!confirm(`Delete IVR "${selected.name}"?`)) return;
+    try {
+      await supabase.functions.invoke('pbx-write', {
+        body: {
+          organizationId: selectedOrgId,
+          action: 'delete-ivr',
+          params: { ivr_menu_uuid: selected.pbx_uuid },
+        },
+      });
+      await supabase.from('pbx_ivrs').delete().eq('id', selected.id);
+      toast.success('IVR deleted');
+      setSelectedId(null);
+      queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivrs'] });
+    } catch (e: any) {
+      toast.error(e?.message || 'Delete failed');
+    }
+  };
+
 
   // ===== AI script generator =====
   const [aiOpen, setAiOpen] = useState(false);
