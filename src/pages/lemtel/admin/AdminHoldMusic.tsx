@@ -75,7 +75,7 @@ const [q, setQ] = useState('');
         music_on_hold_enabled: form.music_on_hold_enabled ? 'true' : 'false',
       };
       if (!form.music_on_hold_uuid) delete params.music_on_hold_uuid;
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action, params } });
+      const { data, error } = await pbxInvoke(action, params, { organizationId: selectedOrgId });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success(form.music_on_hold_uuid ? 'Updated' : 'Created');
@@ -88,9 +88,7 @@ const [q, setQ] = useState('');
   const remove = async (m: MoH) => {
     if (!confirm(`Delete "${m.music_on_hold_name}"?`)) return;
     try {
-      const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'delete-hold-music', params: { music_on_hold_uuid: m.music_on_hold_uuid } },
-      });
+      const { error } = await pbxInvoke('delete-hold-music', { music_on_hold_uuid: m.music_on_hold_uuid }, { organizationId: selectedOrgId });
       if (error) throw error;
       toast.success('Deleted');
       refetch();

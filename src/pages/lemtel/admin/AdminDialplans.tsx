@@ -57,7 +57,7 @@ const [q, setQ] = useState('');
       const action = form.dialplan_uuid ? 'update-dialplans' : 'create-dialplans';
       const params: any = { ...form, dialplan_enabled: form.dialplan_enabled ? 'true' : 'false' };
       if (!form.dialplan_uuid) delete params.dialplan_uuid;
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action, params } });
+      const { data, error } = await pbxInvoke(action, params, { organizationId: selectedOrgId });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success(form.dialplan_uuid ? 'Updated' : 'Created');
@@ -69,7 +69,7 @@ const [q, setQ] = useState('');
   const remove = async (d: DP) => {
     if (!confirm(`Delete dialplan "${d.dialplan_name}"?`)) return;
     try {
-      const { error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action: 'delete-dialplans', params: { dialplan_uuid: d.dialplan_uuid } } });
+      const { error } = await pbxInvoke('delete-dialplans', { dialplan_uuid: d.dialplan_uuid }, { organizationId: selectedOrgId });
       if (error) throw error;
       toast.success('Deleted'); refetch();
     } catch (e: any) { toast.error(e?.message || 'Delete failed'); }

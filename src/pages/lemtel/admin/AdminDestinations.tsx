@@ -81,7 +81,7 @@ const [q, setQ] = useState('');
         destination_description: form.destination_description,
       };
       if (form.destination_uuid) params.destination_uuid = form.destination_uuid;
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action, params } });
+      const { data, error } = await pbxInvoke(action, params, { organizationId: selectedOrgId });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success(form.destination_uuid ? 'Updated' : 'Created');
@@ -95,9 +95,7 @@ const [q, setQ] = useState('');
   const remove = async (d: Dest) => {
     if (!confirm(`Delete inbound route ${d.destination_number}?`)) return;
     try {
-      const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'delete-destination', params: { destination_uuid: d.destination_uuid } },
-      });
+      const { error } = await pbxInvoke('delete-destination', { destination_uuid: d.destination_uuid }, { organizationId: selectedOrgId });
       if (error) throw error;
       toast.success('Deleted');
       refetch();

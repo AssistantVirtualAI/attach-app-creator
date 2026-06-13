@@ -69,7 +69,7 @@ const [q, setQ] = useState('');
       const action = form.conference_room_uuid ? 'update-conferences' : 'create-conferences';
       const params: any = { ...form, conference_room_enabled: form.conference_room_enabled ? 'true' : 'false' };
       if (!form.conference_room_uuid) delete params.conference_room_uuid;
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action, params } });
+      const { data, error } = await pbxInvoke(action, params, { organizationId: selectedOrgId });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success(form.conference_room_uuid ? 'Updated' : 'Created');
@@ -82,9 +82,7 @@ const [q, setQ] = useState('');
   const remove = async (c: Conf) => {
     if (!confirm(`Delete conference "${c.conference_room_name}"?`)) return;
     try {
-      const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'delete-conferences', params: { conference_room_uuid: c.conference_room_uuid } },
-      });
+      const { error } = await pbxInvoke('delete-conferences', { conference_room_uuid: c.conference_room_uuid }, { organizationId: selectedOrgId });
       if (error) throw error;
       toast.success('Deleted');
       refetch();
