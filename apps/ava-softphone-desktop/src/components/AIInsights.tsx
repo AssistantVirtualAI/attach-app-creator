@@ -56,6 +56,10 @@ export default function AIInsights() {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connectionNote, setConnectionNote] = useState<string | null>(null);
+  const [periodDays, setPeriodDays] = useState<number>(7);
+  const [narrative, setNarrative] = useState<string | null>(null);
+  const [aggregate, setAggregate] = useState<any | null>(null);
+  const [narrativeBusy, setNarrativeBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -70,6 +74,24 @@ export default function AIInsights() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const generateNarrative = useCallback(async () => {
+    setNarrativeBusy(true); setError(null); setNarrative(null); setAggregate(null);
+    try {
+      const organizationId = await deriveOrgId(items[0]);
+      const { data, error } = await supabase.functions.invoke('ai-period-insights', {
+        body: { organizationId, days: periodDays },
+      });
+      if (error) throw error;
+      setNarrative(String((data as any)?.narrative || '').trim());
+      setAggregate((data as any)?.aggregate || null);
+    } catch (e: any) {
+      setError(displayError(e));
+    } finally {
+      setNarrativeBusy(false);
+    }
+  }, [items, periodDays]);
+
 
   const analyzeAll = async () => {
     const pending = items.filter(r => (r.has_recording || (r as any).recording_url || (r as any).recording_path) && !r.analyzed);
