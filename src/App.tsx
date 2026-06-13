@@ -682,6 +682,13 @@ const App = () => (
                 <Route path="/org/lemtel/admin/fax" element={<LemtelAdminPage><LemtelStub title="Fax Server" description="Configure inbound/outbound fax routing." /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/conferences" element={<LemtelAdminPage><AdminConferences /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/hold-music" element={<LemtelAdminPage><AdminHoldMusic /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/sync-health" element={<LemtelAdminPage><AdminSyncHealth /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/sip-profiles" element={<LemtelAdminPage><AdminSipProfiles /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/dialplans" element={<LemtelAdminPage><AdminDialplans /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/feature-codes" element={<LemtelAdminPage><AdminFeatureCodes /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/call-forwarding" element={<LemtelAdminPage><AdminCallForwarding /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/recording-rules" element={<LemtelAdminPage><AdminRecordingRules /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/voicemail-settings" element={<LemtelAdminPage><AdminVoicemailSettings /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/conference-centers" element={<LemtelAdminPage><LemtelStub title="Conference Centers" description="Multi-tenant conference bridges." /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/email-queue" element={<LemtelAdminPage><LemtelStub title="Email Queue" description="Outbound notification email queue." /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/call-block" element={<LemtelAdminPage><LemtelStub title="Call Block" description="Block inbound caller IDs and patterns." /></LemtelAdminPage>} />
