@@ -285,6 +285,24 @@ Deno.serve(async (req) => {
       return json({ status: "ok", latency_ms: r.latency_ms, extensions_count: exts.length });
     }
 
+    if (action === "debug-raw") {
+      const p = params.path || "gateways";
+      const r = await pbxFetch(p);
+      return json({ ok: r.ok, status: r.status, raw: r.data, latency_ms: r.latency_ms });
+    }
+
+    if (action === "list-gateways-all-domains") {
+      const d = await pbxFetch("domains");
+      const domains = collection(d.data, "domains");
+      const results = await Promise.all(domains.map(async (dom: any) => {
+        const r = await pbxFetch(`gateways?domain_uuid=${dom.domain_uuid}`);
+        const rows = collection(r.data, "gateways");
+        return rows.map((g: any) => ({ ...g, _domain_name: dom.domain_name, _domain_uuid: dom.domain_uuid }));
+      }));
+      const all = results.flat();
+      return json({ ok: true, data: all, total_domains: domains.length, total_gateways: all.length });
+    }
+
     // ---- LIST actions ----
     const listMap: Record<string, { path: string; key: string }> = {
       "list-extensions":    { path: `extensions?${domainQ}`,          key: "extensions" },

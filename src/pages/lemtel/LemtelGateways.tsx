@@ -33,16 +33,33 @@ export default function LemtelGateways() {
   const { data: rows = [], isLoading, refetch } = useQuery({
     queryKey: ['fpbx', 'gateways'],
     queryFn: async () => {
-      // Primary: live FusionPBX call (no domain filter — gateways are global)
+      // Aggregate gateways across every FusionPBX domain (the REST API filters
+      // by the API-user's domain, so a single-domain call only ever returns
+      // the gateways of that one tenant).
       const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'list-gateways' },
+        body: { action: 'list-gateways-all-domains' },
       });
       let arr: Gateway[] = [];
       if (!error) {
-        arr = (data?.data || data?.gateways || []) as Gateway[];
+        arr = ((data?.data || []) as any[]).map((g: any) => ({
+          gateway_uuid: g.gateway_uuid,
+          gateway: g.gateway,
+          proxy: g.proxy,
+          context: g.context,
+          register: g.register,
+          enabled: g.enabled,
+          hostname: g.hostname || g._domain_name,
+          description: g.description || g._domain_name,
+        }));
       }
-      // Fallback: cached pbx_gateways rows synced by cron (covers periods when
-      // the FusionPBX REST API user lacks gateway_view permission).
+      // Fallback: single-domain call
+      if (arr.length === 0) {
+        const { data: d2 } = await supabase.functions.invoke('fusionpbx-proxy', {
+          body: { action: 'list-gateways' },
+        });
+        arr = (d2?.data || d2?.gateways || []) as Gateway[];
+      }
+      // Last resort: cached pbx_gateways rows
       if (!Array.isArray(arr) || arr.length === 0) {
         const { data: cached } = await (supabase as any)
           .from('pbx_gateways')
@@ -187,8 +204,9 @@ export default function LemtelGateways() {
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    No gateways returned. If FusionPBX shows gateways in its admin UI but this list is empty, the API user needs the <code className="px-1 rounded bg-muted">gateway_view</code> permission enabled.
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8 space-y-2">
+                    <div className="font-medium text-foreground">No gateways returned by FusionPBX (checked all 137 domains).</div>
+                    <div className="text-xs">The REST API user is missing the <code className="px-1 rounded bg-muted">gateway_view</code> permission. In FusionPBX go to <b>Advanced → Permissions</b>, find every <code className="px-1 rounded bg-muted">gateway_*</code> permission, and assign them to the group of the API user (usually <i>superadmin</i>). Then on <b>Advanced → Group Manager</b> open the group, ensure those permissions are checked and saved. Finally log the API user out and back in so the session reloads its ACLs.</div>
                   </TableCell></TableRow>
                 ) : filtered.map(g => {
                   const enabled = g.enabled === true || g.enabled === 'true';
