@@ -327,7 +327,11 @@ export default function LemtelIVR() {
           <p className="text-muted-foreground">Menus IVR synchronisés depuis FusionPBX · Voix générées avec ElevenLabs</p>
         </div>
         <div className="flex gap-2">
-          <PbxRefreshButton kind="ivr-queues" />
+          <Button variant="outline" onClick={syncFromPbx} disabled={syncingPbx}>
+            <Loader2 className={`w-4 h-4 mr-2 ${syncingPbx ? 'animate-spin' : 'hidden'}`} />
+            {!syncingPbx && <RotateCcw className="w-4 h-4 mr-2" />}
+            Sync from PBX
+          </Button>
           <Dialog open={aiOpen} onOpenChange={setAiOpen}>
             <DialogTrigger asChild>
               <Button variant="outline"><Sparkles className="w-4 h-4 mr-2" /> AI Script</Button>
@@ -354,7 +358,25 @@ export default function LemtelIVR() {
               <DialogFooter><Button onClick={generateScript} disabled={generating}>{generating ? 'Génération…' : 'Générer'}</Button></DialogFooter>
             </DialogContent>
           </Dialog>
-          <Button><Plus className="w-4 h-4 mr-2" /> Nouvel IVR</Button>
+          <Dialog open={newIvrOpen} onOpenChange={setNewIvrOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="w-4 h-4 mr-2" /> Nouvel IVR</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Créer un nouvel IVR</DialogTitle></DialogHeader>
+              <div className="space-y-3">
+                <div><Label>Nom</Label><input className="w-full mt-1 px-3 py-2 rounded-md border bg-background" value={newIvrName} onChange={e => setNewIvrName(e.target.value)} /></div>
+                <div><Label>Extension</Label><input className="w-full mt-1 px-3 py-2 rounded-md border bg-background" value={newIvrExt} onChange={e => setNewIvrExt(e.target.value)} placeholder="ex. 5000" /></div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setNewIvrOpen(false)}>Annuler</Button>
+                <Button onClick={createIvr} disabled={newIvrSaving}>
+                  {newIvrSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Créer sur PBX
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
