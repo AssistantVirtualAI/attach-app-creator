@@ -187,10 +187,16 @@ const SuperAdminDashboard = () => {
             </div>
           </div>
           
-          <Button onClick={() => refetch()} variant="outline" className="gap-2">
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            {texts.refresh}
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleUnifyPasswords} disabled={unifying} variant="outline" className="gap-2">
+              <KeyRound className={`w-4 h-4 ${unifying ? 'animate-pulse' : ''}`} />
+              {unifying ? 'Unifying…' : 'Unify Passwords'}
+            </Button>
+            <Button onClick={() => refetch()} variant="outline" className="gap-2">
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              {texts.refresh}
+            </Button>
+          </div>
         </motion.div>
 
         {/* Stats Cards */}
