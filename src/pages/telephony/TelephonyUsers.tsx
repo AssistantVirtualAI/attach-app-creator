@@ -188,9 +188,20 @@ export default function TelephonyUsers() {
           <h1 className="text-3xl font-bold flex items-center gap-2"><Users className="w-7 h-7" /> Team Members</h1>
           <p className="text-muted-foreground">Manage softphone users across all platforms</p>
         </div>
-        <Button onClick={() => setOpen(true)} disabled={!isAdmin}>
-          <Plus className="w-4 h-4 mr-2" /> Add User
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" disabled={!isAdmin} onClick={async () => {
+            if (!confirm('Push every PBX SIP password into portal/desktop/mobile auth?')) return;
+            toast.loading('Unifying passwords…', { id: 'backfill' });
+            const { data, error } = await supabase.functions.invoke('unify-passwords-backfill', { body: {} });
+            if (error || (data as any)?.error) toast.error((data as any)?.message || error?.message || 'Failed', { id: 'backfill' });
+            else toast.success(`Unified ${(data as any)?.updated ?? 0} users`, { id: 'backfill' });
+          }}>
+            <KeyRound className="w-4 h-4 mr-2" /> Sync all passwords
+          </Button>
+          <Button onClick={() => setOpen(true)} disabled={!isAdmin}>
+            <Plus className="w-4 h-4 mr-2" /> Add User
+          </Button>
+        </div>
       </div>
 
       {!isAdmin && (
