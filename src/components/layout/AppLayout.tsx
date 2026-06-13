@@ -95,8 +95,7 @@ export const AppLayout = ({ children }: AppLayoutProps) => {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Debug: log sidebar visibility info
-  console.log('[Sidebar Debug] Role:', role, 'isSuperAdmin:', isSuperAdmin, 'isLoading:', isLoading, 'userRole:', userRole);
+  // (debug logging removed)
 
   // Filter groups based on route scope, role and Lemtel org membership
   const isLemtelMember = isSuperAdmin || organizationMemberships.some(m => m.organization.id === '71755d33-ed64-4ad5-a828-61c9d2029eb7');
