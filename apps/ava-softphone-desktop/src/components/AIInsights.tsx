@@ -56,6 +56,10 @@ export default function AIInsights() {
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connectionNote, setConnectionNote] = useState<string | null>(null);
+  const [periodDays, setPeriodDays] = useState<number>(7);
+  const [narrative, setNarrative] = useState<string | null>(null);
+  const [aggregate, setAggregate] = useState<any | null>(null);
+  const [narrativeBusy, setNarrativeBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -70,6 +74,24 @@ export default function AIInsights() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const generateNarrative = useCallback(async () => {
+    setNarrativeBusy(true); setError(null); setNarrative(null); setAggregate(null);
+    try {
+      const organizationId = await deriveOrgId(items[0]);
+      const { data, error } = await supabase.functions.invoke('ai-period-insights', {
+        body: { organizationId, days: periodDays },
+      });
+      if (error) throw error;
+      setNarrative(String((data as any)?.narrative || '').trim());
+      setAggregate((data as any)?.aggregate || null);
+    } catch (e: any) {
+      setError(displayError(e));
+    } finally {
+      setNarrativeBusy(false);
+    }
+  }, [items, periodDays]);
+
 
   const analyzeAll = async () => {
     const pending = items.filter(r => (r.has_recording || (r as any).recording_url || (r as any).recording_path) && !r.analyzed);
@@ -177,6 +199,54 @@ export default function AIInsights() {
           {error}
         </div>
       )}
+
+      {/* AI-generated period narrative */}
+      <div style={{ ...theme.glass.cardAI, padding: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 11, color: c.aiLight, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>
+              ✨ Executive narrative
+            </div>
+            <div style={{ fontSize: 10, color: c.textSub, marginTop: 2 }}>
+              AI-written summary of the last {periodDays} days · real call data
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <select value={periodDays} onChange={(e) => setPeriodDays(Number(e.target.value))} style={{
+              padding: '6px 8px', borderRadius: 8, background: c.bgCard, border: `1px solid ${c.borderAI}`,
+              color: c.textIce, fontSize: 11, outline: 'none',
+            }}>
+              <option value={1}>24 h</option>
+              <option value={7}>7 days</option>
+              <option value={30}>30 days</option>
+              <option value={90}>90 days</option>
+            </select>
+            <button onClick={generateNarrative} disabled={narrativeBusy} style={{
+              padding: '6px 12px', borderRadius: 8,
+              background: narrativeBusy ? 'rgba(124,58,237,0.3)' : c.ai,
+              border: 'none', color: '#fff', fontSize: 11, fontWeight: 700,
+              cursor: narrativeBusy ? 'wait' : 'pointer', boxShadow: glow.ai,
+            }}>{narrativeBusy ? 'Generating…' : 'Generate'}</button>
+          </div>
+        </div>
+        {aggregate && (
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 10.5, color: c.textSub, marginBottom: 8 }}>
+            <span>📞 {aggregate.totalCalls} calls</span>
+            <span>↘️ {aggregate.inbound} in</span>
+            <span>↗️ {aggregate.outbound} out</span>
+            <span style={{ color: c.red }}>✕ {aggregate.missed} missed</span>
+            <span>⏱ avg {Math.round((aggregate.avgDurSec || 0))}s</span>
+          </div>
+        )}
+        {narrative ? (
+          <div style={{ fontSize: 12.5, color: c.textIce, whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{narrative}</div>
+        ) : (
+          <div style={{ fontSize: 11.5, color: c.textSub, fontStyle: 'italic' }}>
+            Click <strong style={{ color: c.aiLight }}>Generate</strong> to produce an AI narrative from your real call data.
+          </div>
+        )}
+      </div>
+
 
       {analyzed.length === 0 ? (
         <div style={{ ...theme.glass.card, padding: 30, textAlign: 'center', color: c.textSub, fontSize: 12 }}>
