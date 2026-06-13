@@ -1,94 +1,111 @@
-## Goal
-1. Show every FusionPBX SIP gateway live (web + desktop) with create/edit/restart.
-2. Provision an ElevenLabs SIP-trunk phone number that routes through a FusionPBX gateway, and bind it to a voice agent (auto + manual override).
-3. Route all ElevenLabs server-side calls through the Lovable Connector Gateway.
+## Lemtel Mascot — AI Agent Assistant
+
+A persistent 3D mascot chatbot anchored to every page in the Lemtel org admin. It understands the platform, asks clarifying questions, and executes real writes (create users, customers, IVRs, queues, voice agents, reports…) step-by-step with confirmation.
 
 ---
 
-## Phase 1 — FusionPBX gateways: live read + write
+### 1. Mascot character
 
-**Backend (`supabase/functions/fusionpbx-proxy/index.ts`)**
-- Verify `list-gateways` now returns rows (permission was enabled server-side). Drop the cached-fallback noise message in `LemtelGateways.tsx` once live data flows.
-- Add/finish actions: `create-gateway`, `update-gateway`, `delete-gateway`, `restart-gateway`, `start-gateway`, `stop-gateway` (all hit `/app/gateways/gateway_edit.php` or `fs_cli` REST equivalents already used for other PBX objects).
-- On every write, mirror the row into `pbx_gateways` so the desktop reads stay instant.
+A small **friendly cyber-fox** — round head, big glowing cyan eyes, two antenna-ears, soft glass-morphism body matching the AVA Statistic primary `#0023e6`. Generated as a `.glb` (rigged with morph targets for `mouthOpen`, `mouthSmile`, `blink`, `eyeLookL/R`).
 
-**Web (`src/pages/lemtel/LemtelGateways.tsx`)**
-- Replace placeholder banner with a real "Add gateway" drawer (name, proxy, realm, username, password, register on/off, profile, context, expire_seconds, retry_seconds, caller-id-in-from).
-- Row actions: Edit, Start, Stop, Restart, Delete.
-- Realtime subscribe to `pbx_gateways` so changes from desktop appear instantly.
+Three states:
+- **Idle** — slow breathing, occasional blink, ear twitch
+- **Listening** — head tilts toward user, eyes pulse
+- **Talking** — lipsync via morph-target driven by streamed-token cadence (token arrival → mouthOpen amplitude). No audio needed for text-only.
 
-**Desktop (`apps/ava-softphone-desktop/src/components/console/admin/PbxResourceSection.tsx`)**
-- Wire the existing Gateways section to the same proxy actions; reuse the new drawer component (extract to `src/components/pbx/GatewayDrawer.tsx` for sharing).
+### 2. Placement & UX
 
----
+```text
+┌──────────────────────────────────────┐
+│  page content                        │
+│                                      │
+│                                      │
+│                          ┌────────┐  │
+│                          │  3D    │  │  ← floating launcher (bottom-right)
+│                          │ Mascot │  │     128×128, always visible
+│                          └────────┘  │
+└──────────────────────────────────────┘
+```
 
-## Phase 2 — ElevenLabs SIP trunk → FusionPBX
+- Floating launcher bottom-right of every authenticated page (NOT inside softphone window — uses its own portal layer at z-index above sidebar, below softphone overlay).
+- Click → expands to a 420×640 glass-morphism chat panel (slides up + scales).
+- Minimize button → collapses back to the bouncing mascot.
+- Drag handle on header so user can reposition.
+- Hidden on `/auth`, `/landing`, `/portal/*` (client portal), and inside softphone apps.
 
-**Database migration** (single migration, with GRANTs + RLS)
-- New table `voice_agent_gateway_routes` — columns: `organization_id`, `agent_id` (FK `agents.id`), `elevenlabs_phone_id`, `pbx_gateway_uuid` (FK `pbx_gateways.pbx_uuid`), `did_e164`, `direction` (`inbound`/`outbound`/`both`), `auto_bound` (bool), `manual_override` (bool), timestamps.
-- Unique on `(organization_id, did_e164)`.
-- Policies: org members read; org_admin/super_admin write.
+### 3. Capabilities — what the mascot can do
 
-**Backend — extend `supabase/functions/elevenlabs-phone-numbers/index.ts`**
-- Add action `create_sip_trunk_via_pbx`:
-  1. Read selected `pbx_gateway_uuid` from `pbx_gateways`; build SIP URI (`sip:<proxy>;transport=udp`), pull register username/password from gateway record (decrypt with `PBX_ENCRYPTION_KEY`).
-  2. POST `/v1/convai/phone-numbers/sip-trunk` to ElevenLabs with that URI + creds + label + agent_id.
-  3. Insert row into `voice_agent_gateway_routes` (auto_bound=true).
-- Add action `bind_agent` to update `voice_agent_gateway_routes.agent_id` + flip `manual_override=true` and call ElevenLabs `assign_agent`.
+Tool-calling agent. Every tool maps to existing edge functions / RPCs. The agent **always** previews the action and asks "Confirm?" before mutation.
 
-**Auto-binding rule** (server-side in same function)
-- When a new ElevenLabs phone number is provisioned and `voice_agent_gateway_routes` has no row, look up `pbx_phone_number_assignments` for the DID; if found, auto-bind the agent attached to that assignment.
+| Domain | Tools (sample) |
+|---|---|
+| Org & users | `create_sub_org`, `invite_member`, `assign_role`, `list_members`, `deactivate_user` |
+| Customers/clients | `create_client`, `update_client`, `assign_agent_to_client`, `list_clients` |
+| Voice agents | `create_voice_agent` (ElevenLabs/Vapi/Retell), `update_prompt`, `bind_agent_to_phone`, `test_agent` |
+| Telephony / PBX | `list_extensions`, `create_extension`, `create_ivr`, `add_ivr_option`, `create_queue`, `add_queue_agent`, `create_ring_group`, `list_gateways`, `create_gateway`, `assign_did` |
+| Reports / analytics | `get_call_stats`, `get_agent_health`, `get_lead_funnel`, `export_csv`, `schedule_report` |
+| Knowledge base | `add_kb_article`, `search_kb`, `delete_kb_article` |
+| Webhooks / API keys | `list_endpoints`, `create_endpoint`, `rotate_api_key` |
+| Navigation | `goto_page(route)` — drives `useNavigate` so the bot can take the user to the result |
 
-**Frontend**
-- New page `src/pages/lemtel/LemtelVoiceGateways.tsx` (linked in admin nav and desktop admin):
-  - Card per ElevenLabs SIP trunk: shows DID, bound FusionPBX gateway, current agent, auto/manual badge.
-  - "Create SIP trunk from gateway" CTA → drawer with gateway dropdown (from `pbx_gateways`), DID, agent dropdown (from `agents`), direction.
-  - Per-row "Override agent" select that calls `bind_agent`.
-- Desktop section "Voice Gateways" added to `PbxResourceSection.tsx`.
+All tools route through one new edge function `mascot-agent` (server-side AI SDK with `stepCountIs(50)`), which dispatches to the existing edge functions (`fusionpbx-proxy`, `elevenlabs-phone-numbers`, `create-platform-agent`, etc.) and Supabase RPCs. No new business logic — the mascot is a thin orchestrator over what already exists.
 
----
+### 4. Conversation behavior
 
-## Phase 3 — Lovable Connector Gateway for ElevenLabs
+System prompt encodes:
+- Identity: "Lemtel, the AVA Statistic mascot"
+- Business model: multi-tenant reseller, org → clients → voice agents → DIDs
+- Current page context (route, org id, selected client if any) — injected per turn
+- User role + permissions (gated server-side too)
+- **Mandatory protocol**: gather → propose → confirm → execute → report.
+  - Asks one question at a time when info is missing
+  - Always shows a structured preview ("I'll create extension 105 for John Doe in domain quebec.lemtel.tel — confirm? [Yes/No]")
+  - Mutations require explicit "yes/confirm/oui" before tool execution
+- Bilingual: detects French/English and matches
 
-**Goal**: stop using `xi-api-key` directly; route through `https://connector-gateway.lovable.dev/elevenlabs/...` so OAuth/key rotation is automatic.
+### 5. Persistence
 
-**Steps**
-1. Verify ElevenLabs connection is linked via `standard_connectors--list_connections`; if not, call `standard_connectors--connect` with `connector_id: "elevenlabs"`.
-2. Create shared helper `supabase/functions/_shared/elevenlabsGateway.ts` exporting `elevenlabsFetch(path, init)` that:
-   - Reads `LOVABLE_API_KEY` + `ELEVENLABS_API_KEY` from env.
-   - Calls `https://connector-gateway.lovable.dev/elevenlabs/${path}` with `Authorization: Bearer ${LOVABLE_API_KEY}` and `X-Connection-Api-Key: ${ELEVENLABS_API_KEY}`.
-   - Falls back to direct `api.elevenlabs.io` only if gateway returns `connector_no_gateway` (defensive).
-3. Refactor every `fetch("https://api.elevenlabs.io/...")` in:
-   - `elevenlabs-phone-numbers`
-   - `elevenlabs-convai-agent-config`
-   - `elevenlabs-convai-conversations`
-   - `elevenlabs-convai-knowledge-base`
-   - `elevenlabs-convai-analytics`
-   - `elevenlabs-all-agents-analytics`
-   - `elevenlabs-all-agents-conversations`
-   - `elevenlabs-signed-url`
-   - `elevenlabs-generate-greeting`
-   - `elevenlabs-api-proxy`
-   - `sync-elevenlabs-conversations`
-   to use `elevenlabsFetch`.
-4. Keep `ELEVENLABS_API_KEY` secret in place; it is now the gateway's `X-Connection-Api-Key`.
+- Threaded conversations per user, stored in new `mascot_threads` + `mascot_messages` tables (RLS scoped to `auth.uid()`).
+- Thread switcher in panel header. New-thread button. Last 30 days retained.
 
----
+### 6. Technical
 
-## Phase 4 — Verification
+```text
+src/components/mascot/
+  MascotLauncher.tsx        ← floating 3D button + state
+  MascotPanel.tsx           ← chat panel (AI Elements: Conversation, Message, PromptInput, Tool)
+  MascotProvider.tsx        ← global mount + page-context provider
+  three/
+    FoxModel.tsx            ← R3F Canvas + GLTF loader
+    useLipsync.ts           ← drives morph targets from streaming tokens
+  hooks/useMascotChat.ts    ← useChat() → /functions/v1/mascot-agent
+public/mascot/
+  lemtel-fox.glb            ← generated, ~400KB
 
-- Curl `fusionpbx-proxy { action: "list-gateways" }` → expect ≥1 row.
-- Curl `elevenlabs-phone-numbers { action: "list" }` through new gateway helper → 200.
-- Create a test SIP trunk in `LemtelVoiceGateways` and place a test call from desktop softphone; confirm CDR lands and `voice_agent_gateway_routes` row created.
-- Confirm Realtime updates the web Gateways list when desktop restarts a gateway.
+supabase/functions/mascot-agent/index.ts
+  - AI SDK streamText with Lovable Gateway (google/gemini-3-flash-preview)
+  - 25+ zod-typed tools, each calling existing edge fns / RPCs
+  - needsApproval=true on every mutating tool
+  - stepCountIs(50)
 
----
+migration: mascot_threads, mascot_messages tables + RLS
+```
 
-## Out of scope
-- New billing tiers / plan gating for SIP trunks.
-- Migrating Vapi/Retell to the connector gateway (only ElevenLabs requested).
-- Landing page changes.
+Dependencies to add: `@react-three/fiber@^8.18`, `@react-three/drei@^9.122`, `three`, `ai`, `@ai-sdk/react`, AI Elements components.
 
-## Risks
-- ElevenLabs SIP-trunk endpoint requires the agent be already created — handled by requiring agent selection in the drawer.
-- FusionPBX gateway passwords are encrypted at rest with `PBX_ENCRYPTION_KEY`; the create-SIP-trunk path must decrypt server-side only.
+### 7. Out of scope (phase 2)
+
+- Voice output (TTS) — flagged off; can be enabled later by flipping a setting
+- Embedding mascot into client portal or softphone apps
+- Cross-org actions (mascot is scoped to current org context only)
+
+### 8. Build order
+
+1. Migration (threads/messages) + edge function skeleton with 5 read-only tools (list members/clients/extensions/queues/gateways)
+2. `MascotProvider` + floating launcher with placeholder 2D avatar (verify positioning, hide rules)
+3. Generate fox GLB asset, wire R3F + idle/talking states
+4. Lipsync hook tied to streaming tokens
+5. Add write tools in waves: org/users → customers → telephony → voice agents → reports
+6. Confirmation UI (tool-result card with Yes/No buttons in chat)
+7. Thread switcher + persistence
+8. French/English polish + page-context injection
