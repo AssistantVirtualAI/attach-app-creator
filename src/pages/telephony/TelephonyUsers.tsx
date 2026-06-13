@@ -66,11 +66,10 @@ function useSoftphoneUsers() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pbx_softphone_users' as any)
-        .select('id, portal_user_id, extension, display_name, status, last_seen_at, active_platforms, account_status, total_calls')
+        .select('id, portal_user_id, extension, display_name, status, last_seen_at, active_platforms, account_status, total_calls, app_access_enabled')
         .eq('organization_id', LEMTEL_ORG)
         .order('extension');
       if (error) throw error;
-      // Fetch emails via profiles
       const ids = (data || []).map((d: any) => d.portal_user_id).filter(Boolean);
       let emailMap: Record<string, string> = {};
       if (ids.length) {
