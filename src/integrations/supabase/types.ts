@@ -6194,6 +6194,8 @@ export type Database = {
           id: string
           mailbox: string | null
           organization_id: string
+          pbx_record_name: string | null
+          pbx_record_path: string | null
           read_at: string | null
           received_at: string
           transcript: string | null
@@ -6213,6 +6215,8 @@ export type Database = {
           id?: string
           mailbox?: string | null
           organization_id: string
+          pbx_record_name?: string | null
+          pbx_record_path?: string | null
           read_at?: string | null
           received_at?: string
           transcript?: string | null
@@ -6232,6 +6236,8 @@ export type Database = {
           id?: string
           mailbox?: string | null
           organization_id?: string
+          pbx_record_name?: string | null
+          pbx_record_path?: string | null
           read_at?: string | null
           received_at?: string
           transcript?: string | null
