@@ -353,6 +353,9 @@ function mapCdrToCall(r: any): CallRecord {
     from:         r.caller_number ?? r.source_number ?? '',
     to:           r.destination ?? r.destination_number ?? '',
     customer:     r.caller_name && r.caller_name !== r.caller_number ? r.caller_name : undefined,
+    pbx_uuid:     r.pbx_uuid ?? null,
+    domain_uuid:  r.domain_uuid ?? null,
+    domain_name:  r.domain_name ?? null,
     startedAt:    r.start_at ?? new Date().toISOString(),
     durationSec:  billsec,
     hasRecording: !!(r.has_recording || r.recording_path || r.recording_name),
@@ -374,6 +377,13 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
     summary:     vm ? vm.slice(0, 120) + (vm.length > 120 ? '…' : '') : 'Aucun résumé disponible.',
     sentiment:   'neutral' as const,
     priority:    'normal' as const,
+    organization_id: r.organization_id ?? undefined,
+    callId:      r.id ?? undefined,
+    pbx_uuid:    r.pbx_uuid ?? null,
+    domain_uuid: r.domain_uuid ?? null,
+    domain_name: r.domain_name ?? null,
+    recording_path: r.recording_path ?? null,
+    recording_name: r.recording_name ?? null,
     handled:     false,
     feedback:    null,
   };
@@ -400,6 +410,9 @@ function mapCdrToRecording(r: any): RecordingItem {
     tags:        [],
     feedback:    null,
     organization_id: r.organization_id ?? undefined,
+    pbx_uuid: r.pbx_uuid ?? null,
+    domain_uuid: r.domain_uuid ?? null,
+    domain_name: r.domain_name ?? null,
     recording_path: r.recording_path ?? null,
     recording_name: r.recording_name ?? null,
     recordingUrl: directUrl,
@@ -414,7 +427,7 @@ async function readCallRecordRows(limit = 100): Promise<any[]> {
   const extFilter = me.extension_uuid
     ? `&extension_uuid=eq.${me.extension_uuid}`
     : (me.extension ? `&extension=eq.${me.extension}` : '');
-  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
+  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
 
   const res = await fetch(url, {
     headers: {
@@ -513,7 +526,7 @@ export const ava = {
       const extFilter = me.extension_uuid
         ? `&extension_uuid=eq.${me.extension_uuid}`
         : (me.extension ? `&extension=eq.${me.extension}` : '');
-      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
+      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
