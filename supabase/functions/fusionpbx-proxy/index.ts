@@ -950,6 +950,15 @@ Deno.serve(async (req) => {
         const publicPath = cleanPath.replace(/^var\/lib\/freeswitch\/recordings\//, "recordings/");
         tryUrls.push(`${FUSIONPBX_API_URL}/${publicPath}/${n}`);
         tryUrls.push(`${FUSIONPBX_API_URL}/${cleanPath}/${n}`);
+        try {
+          const base = new URL(FUSIONPBX_API_URL);
+          if (base.hostname === "portal.lemtel.tel") {
+            const fileBase = "https://pbxnode.lemtel.tel";
+            tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/${n}`));
+            tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recordings.php?action=download&type=rec&t=bin&filename=${rel}`));
+            tryUrls.push(`${fileBase}/${publicPath}/${n}`);
+          }
+        } catch { /* ignore alternate file host */ }
       }
 
       for (const url of tryUrls) {
