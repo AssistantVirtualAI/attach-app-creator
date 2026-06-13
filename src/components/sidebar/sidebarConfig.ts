@@ -125,6 +125,8 @@ const ORG_GROUPS: NavGroup[] = [
       { nameKey: 'Queue Agents', href: '/org/lemtel/admin/queues', icon: Users },
       { nameKey: 'Conferences', href: '/org/lemtel/admin/conferences', icon: Users },
       { nameKey: 'Music on Hold', href: '/org/lemtel/admin/hold-music', icon: Headphones },
+      { nameKey: 'Recording Rules', href: '/org/lemtel/admin/recording-rules', icon: Disc },
+      { nameKey: 'Voicemail Settings', href: '/org/lemtel/admin/voicemail-settings', icon: Voicemail },
       { nameKey: 'Wallboard', href: '/org/lemtel/callcenter/wallboard', icon: Activity },
       { nameKey: 'Agent Console', href: '/org/lemtel/callcenter/agent', icon: Phone },
       { nameKey: 'CC Admin', href: '/org/lemtel/callcenter/admin', icon: Shield },
