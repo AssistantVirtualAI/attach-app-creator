@@ -36,6 +36,10 @@ function fmtSize(kb?: number | null) {
   kb = Number(kb || 0);
   return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
 }
+// Module-level blob cache so re-selecting a recording is instant and prefetched audio survives renders.
+const audioBlobCache = new Map<string, string>();
+const audioInFlight = new Map<string, Promise<string | null>>();
+
 function rangeCutoff(r: Range): number {
   const ms = { '24h': 864e5, '7d': 7 * 864e5, '30d': 30 * 864e5, '90d': 90 * 864e5 } as const;
   return r === 'all' ? 0 : Date.now() - (ms as any)[r];
