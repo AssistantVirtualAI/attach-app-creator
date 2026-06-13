@@ -285,6 +285,12 @@ Deno.serve(async (req) => {
       return json({ status: "ok", latency_ms: r.latency_ms, extensions_count: exts.length });
     }
 
+    if (action === "debug-raw") {
+      const p = params.path || "gateways";
+      const r = await pbxFetch(p);
+      return json({ ok: r.ok, status: r.status, raw: r.data, latency_ms: r.latency_ms });
+    }
+
     // ---- LIST actions ----
     const listMap: Record<string, { path: string; key: string }> = {
       "list-extensions":    { path: `extensions?${domainQ}`,          key: "extensions" },
