@@ -1,60 +1,148 @@
-# Unified Password (Portal = Desktop = Mobile = PBX)
 
-## Goal
-Each user has **one password** that works for the portal login, the desktop app, the mobile app, and the SIP/PBX extension. Changing it in any one place updates the others. Existing users are migrated silently so the password they already use on their phone keeps working everywhere.
+# PBX ↔ Portal Full Parity Plan
 
-## Current state (what we found)
-- **Portal login password** lives in Supabase Auth (`auth.users`, hashed — not readable).
-- **SIP / extension password** lives in `pbx_softphone_users.sip_password` (plain text, service-role only) and mirrored in FusionPBX itself. Lemtel users may also have it in `lemtel_softphone_users.sip_password` (legacy column `n`).
-- Desktop and mobile apps log in with the **portal** password, then call the `softphone-credentials` edge function to fetch the **SIP** password separately. The two are independent today.
-- Provisioning is done by `provision-softphone-user` (generates SIP password, emails a magic-link to set the portal password). No sync between the two.
+Goal: every page that exists in the FusionPBX GUI for the `lemtel.lemtel.tel` domain (and any other domains) is visible in the portal with **complete** historical data, and every editable field can be modified in the portal and pushed back to FusionPBX (bidirectional sync).
 
-## Decisions (from your answers)
-- **Source of truth going forward:** the portal password the user already uses.
-- **Existing users:** silently overwrite — they keep using the password currently on their phone (which is the only one we can actually read), and that becomes their new portal password too.
-- **Future changes:** bidirectional. Changing it on the PBX/admin side updates the portal login; changing it from the portal updates the PBX.
+## Current gap (verified against DB)
 
-> Note on backfill direction: portal passwords are one-way hashed and cannot be read, so the only feasible one-time alignment is **PBX → portal** (push the existing `sip_password` into Supabase Auth for each linked user). After that initial alignment, ongoing changes flow in both directions per your preference.
+| Object             | In PBX | In portal mirror |
+|--------------------|--------|------------------|
+| Call recordings    | ~1500+ | **0**            |
+| Voicemails         | many   | **0**            |
+| Domains/customers  | many   | **0**            |
+| Gateways           | 13     | **0**            |
+| Destinations (inbound routes) | many | **0**  |
+| Dialplans          | many   | **0**            |
+| Time conditions    | many   | **0**            |
+| Conferences        | some   | **0**            |
+| Hold music (MoH)   | some   | **0**            |
+| SIP profiles       | 2      | **0**            |
+| IVR options        | many   | **0** (menus 13) |
+| CDRs               | ~5000+ | 239 (partial)    |
+| Extensions         | 21     | 21 ✅            |
+| Devices            | 17     | 17 ✅            |
+| Ring groups        | 9      | 9 ✅             |
+| Queues             | 3      | 3 ✅             |
+| Feature codes      | 4      | 4 ✅             |
 
-## What we'll build
+## Architecture (applies to every phase)
 
-### 1. One-time backfill (existing users)
-- Edge function `unify-passwords-backfill` (super-admin only) iterates every `pbx_softphone_users` row that has both `portal_user_id` and `sip_password`.
-- For each, calls `auth.admin.updateUserById(portal_user_id, { password: sip_password })` using the service role.
-- Mirrors the same value into `lemtel_softphone_users.sip_password` when a row exists for that extension.
-- Writes an audit row (`pbx_softphone_portal_audit`, action `password_unified`) and returns a summary `{ updated, skipped, errors[] }`.
-- Admin UI: a one-click "Unify all extension passwords" button in the Super Admin → PBX section.
+```text
+FusionPBX REST  ──► fusionpbx-proxy (read)  ──► pbx_<object> mirror table  ──► portal page
+                                                     ▲
+                                                     │ realtime invalidation
+portal page  ──► pbx-write (RBAC + audit)  ──► fusionpbx-proxy (write) ──► FusionPBX
+```
 
-### 2. Provisioning flow (new users)
-- Update `provision-softphone-user` so that the generated SIP password is **also** set as the user's Supabase Auth password (`auth.admin.createUser({ password })` or `updateUserById` if the user already exists), instead of sending a magic-link "set your password" email.
-- Welcome email is updated to include the password once (clearly labeled as the single password for portal/desktop/mobile/phone).
+- Every list-* action gets **paginated full pull** (loop `page_number` until empty, default page size 250) so we never see "20 rows only".
+- Every write action goes through `pbx-write` for RBAC, audit, mirror upsert, and `pbx_object_owner` linkage.
+- Cron `cron-pbx-sync` runs every 5 min per object type to keep mirrors fresh.
+- A "Refresh from PBX" button on each page forces an immediate sync for that object.
+- A "Pushed at" / "Synced at" badge on each row shows direction + last sync.
 
-### 3. Bidirectional sync (ongoing)
-- **PBX → Portal**: a single shared helper `setUnifiedPassword(userId, newPassword)` (edge function `set-unified-password`) updates, in order:
-  1. `auth.admin.updateUserById` (portal),
-  2. `pbx_softphone_users.sip_password` (+ `lemtel_softphone_users` mirror),
-  3. FusionPBX extension via `fusionpbx-proxy update-extension`.
-- All existing entry points are routed through this helper:
-  - Admin "Reset SIP password" buttons in `PbxResourceSection` / `AdminView` / portal admin pages.
-  - User "Change password" form in the portal profile page.
-  - `provision-softphone-user` (initial creation).
-- **Portal → PBX**: a Postgres trigger on `auth.users` is not allowed, so we expose a thin Edge Function `portal-password-changed` that the portal's "Change password" form calls right after `supabase.auth.updateUser({ password })` succeeds. It runs steps (2) and (3) above. (Supabase password-reset emails will additionally trigger the same hook from the `/reset-password` page after the new password is set.)
+## Phase 1 — Sync foundation (one-time, blocks everything else)
 
-### 4. Safety & audit
-- Every password change writes to `pbx_softphone_portal_audit` with actor, target user, source (`provision`, `admin_reset`, `user_self_serve`, `backfill`, `reset_link`).
-- The unified password is never returned to the frontend except the one-time provisioning email; the SIP fetch path (`softphone-credentials`) stays unchanged.
-- Backfill function is gated by `is_super_admin(auth.uid())`; per-user reset is gated by `is_lemtel_admin` or `org_admin` of the user's org, or the user themselves.
+1. Add `paginate(action, opts)` helper to `fusionpbx-proxy` that walks all pages until empty for any list endpoint.
+2. Add missing list endpoints: `list-time-conditions`, `list-feature-codes`, `list-extension-detail` (per-extension full config).
+3. Expand `sync-all` to:
+   - call each list endpoint with pagination
+   - upsert into the matching `pbx_*` table by `(organization_id, pbx_uuid)`
+   - delete local rows whose `pbx_uuid` no longer exists in PBX (true mirror)
+4. Schedule `cron-pbx-sync` per kind every 5 min; add per-kind sync job rows in `pbx_sync_jobs` with status + lag metric.
+5. Generic `pbx-write` wrapper extensions: support `delete` for every object; ensure mirror row is deleted on success.
 
-## Files / surfaces touched
-- **New edge functions**: `unify-passwords-backfill`, `set-unified-password`, `portal-password-changed`.
-- **Edited edge functions**: `provision-softphone-user` (use provided password as both portal + SIP, drop magic link path), `fusionpbx-proxy` (no change; already supports update-extension).
-- **Frontend**:
-  - `src/pages/ResetPassword.tsx` and the portal profile change-password form → call `portal-password-changed` after success.
-  - Admin "Reset SIP password" actions (`apps/ava-softphone-desktop/src/components/console/admin/PbxResourceSection.tsx`, `src/pages/lemtel/admin/*`) → call `set-unified-password`.
-  - New super-admin button: "Unify all extension passwords now".
-- **No schema migration** is strictly required (columns already exist); we'll add one tiny migration only to add `password_synced_at timestamptz` to `pbx_softphone_users` for observability.
+## Phase 2 — Recordings & CDRs (highest user pain)
 
-## Out of scope
-- Forcing password complexity changes (we keep current rules).
-- Rotating PBX_ENCRYPTION_KEY usage (currently unused; SIP password remains plaintext in DB, protected by column REVOKE + service-role-only access — same posture as today).
-- Mobile/desktop UI changes for changing the password (still done from the portal; apps just pick up the new password on next login).
+- Mirror table `pbx_call_recordings` filled from `list-recordings` (paginated) + linked to `pbx_call_records.pbx_uuid`.
+- Backfill all historical CDRs: extend `sync-cdrs` to walk all pages until `start_at < cutoff` (default = first record).
+- Recordings page (`/org/lemtel/admin/recordings`, exists as part of analytics) shows: caller, destination, length, date, direction, **Play / Download / Delete**.
+- Play already calls `fusionpbx-proxy get-recording` (fixed earlier). Add Delete → `pbx-write delete-recording`.
+- Filters: date range, direction, extension, caller number, has-recording.
+- CSV export of current filter.
+
+## Phase 3 — Voicemails
+
+- Mirror `pbx_voicemails` from paginated `list-voicemails` + per-extension `pbx_voicemail_settings`.
+- Voicemail page: list, mark read/unread, download audio, delete (writes back to PBX), forward to email toggle, PIN reset.
+- Voicemail Greetings: upload/replace via `voicemail-greetings` bucket then push to PBX.
+
+## Phase 4 — Customers / Domains
+
+- Mirror `pbx_domains` from paginated `list-domains`.
+- `LemtelCustomers.tsx` page becomes the domain admin:
+  - List all active domains (description, enabled, extension count, MoH, gateway count).
+  - Create new domain → `create-domain` (creates domain on PBX + spins up org-side `pbx_softphone_users` tenant if requested).
+  - Edit description / enabled / default settings.
+  - Delete (with confirmation + cascade warning).
+- Per-customer drill-in card already exists (`CustomerDetail.tsx`) — wire it to the live mirror.
+
+## Phase 5 — IVR Menus
+
+- Mirror `pbx_ivrs` (already 13) + new sync for `pbx_ivr_options` (DTMF → destination).
+- IVR editor page:
+  - List menus with greeting, timeout, max-failures.
+  - Visual option editor: digit, action (extension / ring-group / queue / IVR / hangup), destination picker.
+  - Upload greeting audio to `lemtel-ivr-audio` bucket → push to PBX.
+  - Reorder / add / delete options.
+- Write path: `create-ivr`, `update-ivr`, `delete-ivr`, `create-ivr-option`, `update-ivr-option`, `delete-ivr-option`.
+
+## Phase 6 — Inbound Routes (Destinations) + Dialplans + Time Conditions
+
+- Mirror `pbx_destinations`, `pbx_dialplans`, `pbx_time_conditions`.
+- Destinations page: DID → target (extension / IVR / queue / ring group / time condition / voicemail / external number). Full CRUD.
+- Time condition editor: weekday / hour ranges → match destination + fallback. Maps to FusionPBX time conditions.
+- Dialplan list (read-only first, edit later): show context, order, expression. Edit XML for super-admin only.
+
+## Phase 7 — Gateways & SIP profiles
+
+- Mirror `pbx_gateways` (paginated, multi-domain fallback already added) + `pbx_sip_profiles`.
+- Gateways page: list with status (Running/Down), proxy, realm, register flag.
+  - Create new (provider templates: VoIP.ms, Telnyx, generic).
+  - Edit proxy / realm / register / expire / retry.
+  - Start / Stop / Toggle (calls `update-gateways` action).
+  - Delete.
+- SIP profiles: read-only viewer + reload button.
+
+## Phase 8 — Ring Groups, Queues, Conferences, MoH, Feature Codes
+
+- Already mirrored for ring groups / queues / feature codes — add **edit + create + delete** UI.
+- Add mirror + CRUD for `pbx_conferences` and `pbx_hold_music` (upload audio to `lemtel-recordings` or new MoH bucket).
+- Queue agent management: add/remove agents per queue, pause/unpause (RPC already exists).
+
+## Phase 9 — Extensions enrichment
+
+- Existing page already lists 21. Extend per-extension dialog to expose every FusionPBX field group: voicemail, call forwarding, follow-me, CID overrides, hot-desk, advanced (limit max, toll allow, accountcode), recording mode.
+- Use new `get-extension` action to lazy-load full config on dialog open.
+- "Apply to all extensions in domain" bulk action (recording mode, voicemail email, etc.).
+
+## Phase 10 — Bidirectional & resilience polish
+
+- Webhook ingest: FusionPBX → `fusionpbx-webhook` already exists. Map every event type (extension.created, gateway.updated, recording.created, voicemail.created, cdr.completed, …) to the right mirror upsert so PBX-side edits land in the portal within seconds.
+- Conflict resolver: if both sides changed an object since `last_synced_at`, prompt admin (PBX-wins / Portal-wins / Merge) and audit the choice.
+- Per-page "Sync now" + "Last synced X ago" indicator, with global health page (`/org/lemtel/admin/sync-health`) listing every object kind, lag, last error.
+- Drift detector (already exists) extended to flag count mismatches per kind.
+
+## Phase 11 — Permissions, audit, RLS
+
+- Every new mirror table: `GRANT SELECT` to authenticated (scoped via RLS `current_user_org_ids()`), `GRANT ALL` to service_role.
+- Every write action recorded in `audit_logs` (already done in `pbx-write`).
+- Super-admin / lemtel-admin / org_admin matrix verified per page.
+
+## Phase 12 — UX consistency pass
+
+- Same table component across every PBX page (search, column toggle, CSV export, pagination 50/100/250, sort).
+- Empty-state CTA: "Sync from PBX" if mirror is empty.
+- Toast feedback: created / updated / deleted / synced.
+- Mobile-friendly columns (collapse non-essential on <768px).
+
+## Rollout order (recommended)
+
+1. Phase 1 (sync engine) — must ship first.
+2. Phase 2 (recordings & CDR backfill) — directly addresses the "I only see 20 rows" complaint.
+3. Phase 3 (voicemails) — same shape, low risk.
+4. Phase 4 (customers/domains) — unlocks multi-domain UI.
+5. Phase 5 (IVR) — visible business value.
+6. Phase 6 → 9 — back-office.
+7. Phase 10 → 12 — hardening & polish.
+
+Each phase is independently shippable. After Phase 1 + 2 you will already see every recording for the `lemtel.lemtel.tel` domain in the portal.
