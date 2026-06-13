@@ -231,6 +231,7 @@ export default function TelephonyUsers() {
                   <TableHead>Extension</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Platforms</TableHead>
+                  <TableHead>App access</TableHead>
                   <TableHead>Last seen</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -257,20 +258,28 @@ export default function TelephonyUsers() {
                       </span>
                     </TableCell>
                     <TableCell><PlatformIcons platforms={u.active_platforms || []} /></TableCell>
+                    <TableCell>
+                      <Switch
+                        checked={u.app_access_enabled !== false}
+                        disabled={!isAdmin}
+                        onCheckedChange={(v) => toggleAppAccess(u, v)}
+                      />
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {u.last_seen_at ? formatDistanceToNow(new Date(u.last_seen_at), { addSuffix: true }) : <span className="text-amber-600">Pending</span>}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="inline-flex gap-1">
+                        <Button size="icon" variant="ghost" title="Sync PBX password to portal/desktop/mobile" onClick={() => syncSipPassword(u)} disabled={!isAdmin}><RefreshCw className="w-4 h-4" /></Button>
                         <Button size="icon" variant="ghost" title="Resend welcome" onClick={() => resendWelcome(u)} disabled={!isAdmin}><Mail className="w-4 h-4" /></Button>
-                        <Button size="icon" variant="ghost" title="Reset password" onClick={() => resetPassword(u)} disabled={!isAdmin}><KeyRound className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" title="Reset password (email)" onClick={() => resetPassword(u)} disabled={!isAdmin}><KeyRound className="w-4 h-4" /></Button>
                         <Button size="icon" variant="ghost" title="Deactivate" onClick={() => deactivate(u)} disabled={!isAdmin}><Trash2 className="w-4 h-4" /></Button>
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
                 {!filtered.length && (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No users yet — click <b>Add User</b> to provision one.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No users yet — click <b>Add User</b> to provision one.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
