@@ -102,6 +102,8 @@ const ORG_GROUPS: NavGroup[] = [
       { nameKey: 'Extensions', href: '/org/lemtel/admin/extensions', icon: Smartphone },
       { nameKey: 'Devices', href: '/org/lemtel/admin/devices', icon: Router },
       { nameKey: 'Phone Numbers', href: '/org/lemtel/admin/dids', icon: Phone },
+      { nameKey: 'Inbound Routes', href: '/org/lemtel/admin/destinations', icon: Phone },
+      { nameKey: 'Time Conditions', href: '/org/lemtel/admin/time-conditions', icon: Bell },
       { nameKey: 'IVR / Auto-Attendant', href: '/org/lemtel/admin/ivr', icon: Voicemail },
       { nameKey: 'Ring Groups', href: '/org/lemtel/admin/ring-groups', icon: Bell },
       { nameKey: 'Gateways', href: '/org/lemtel/admin/gateways', icon: Network },
