@@ -256,7 +256,7 @@ export default function CustomerDetail() {
                     if (u) setExpandedRec(expandedRec === r.id ? null : r.id);
                   }}>{recLoading === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : expandedRec === r.id ? 'Hide' : 'Play'}</Button>
                 </div>
-                {expandedRec === r.id && recUrls[r.id] && <RecordingWavePlayer url={recUrls[r.id]} />}
+                {expandedRec === r.id && recUrls[r.id] && <RecordingWavePlayer key={r.id} url={recUrls[r.id]} autoPlay />}
               </div>
             ))}
           </CardContent></Card>
