@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,7 +10,10 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { pbxInvoke } from '@/lib/pbxInvoke';
 import { useOrganization } from '@/context/OrganizationContext';
-import { Users, RefreshCw, Search, Loader2, Plus, Trash2, Pencil } from 'lucide-react';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { StatusBadge } from '@/components/admin/StatusBadge';
+import { AdminSkeletonRows, AdminEmptyState } from '@/components/admin/AdminSkeletonRows';
+import { Users, RefreshCw, Search, Plus, Trash2, Pencil, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Conf = {
