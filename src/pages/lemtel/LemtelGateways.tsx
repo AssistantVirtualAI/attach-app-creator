@@ -143,6 +143,9 @@ export default function LemtelGateways() {
           <p className="text-muted-foreground text-sm">SIP trunks &amp; carrier connections programmed on the PBX</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={runDiagnostic}>
+            <Bug className="w-4 h-4 mr-2" /> Diagnostic
+          </Button>
           <Button variant="outline" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4 mr-2" /> Refresh
           </Button>
