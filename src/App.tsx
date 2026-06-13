@@ -95,6 +95,7 @@ import LemtelStub from "./pages/lemtel/LemtelStub";
 import LemtelCustomers from "./pages/lemtel/LemtelCustomers";
 import CustomerDetail from "./pages/lemtel/CustomerDetail";
 import LemtelGateways from "./pages/lemtel/LemtelGateways";
+import LemtelVoiceGateways from "./pages/lemtel/LemtelVoiceGateways";
 import LemtelExtensions from "./pages/lemtel/LemtelExtensions";
 import LemtelDIDs from "./pages/lemtel/LemtelDIDs";
 import LemtelQueues from "./pages/lemtel/LemtelQueues";
@@ -655,6 +656,7 @@ const App = () => (
                 <Route path="/org/lemtel/admin/customers" element={<LemtelAdminPage><LemtelCustomers /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/customers/:domainUuid" element={<LemtelAdminPage><CustomerDetail /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/gateways" element={<LemtelAdminPage><LemtelGateways /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/voice-gateways" element={<LemtelAdminPage><LemtelVoiceGateways /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/recordings" element={<LemtelAdminPage><AdminRecordings /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/voicemail" element={<LemtelAdminPage><AdminVoicemail /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/reports" element={<LemtelAdminPage><AdminReports /></LemtelAdminPage>} />

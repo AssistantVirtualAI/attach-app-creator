@@ -983,6 +983,14 @@ Deno.serve(async (req) => {
         commands: [{ command: "sofia", arguments: `profile external killgw ${name}` }],
       }));
     }
+    if (action === "start-gateway" || action === "stop-gateway") {
+      const name = params.gateway_name;
+      if (!name) return json({ error: "gateway_name required" }, 400);
+      const verb = action === "start-gateway" ? "rescan" : "killgw";
+      return json(await pbxWrite(`commands`, "POST", {
+        commands: [{ command: "sofia", arguments: `profile external ${verb} ${name}` }],
+      }));
+    }
     if (action === "restart-sip-profile") {
       const name = params.profile_name || "external";
       return json(await pbxWrite(`commands`, "POST", {
