@@ -205,11 +205,121 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        
+
+        // Persist binding override
+        if (organizationId) {
+          await admin.from('voice_agent_gateway_routes')
+            .update({ agent_id: agentId, manual_override: true, auto_bound: false, updated_at: new Date().toISOString() })
+            .eq('organization_id', organizationId)
+            .eq('elevenlabs_phone_id', phoneNumberId);
+        }
+
         return new Response(
           JSON.stringify({ success: true, phone_number: data }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      case 'create_sip_trunk_via_pbx': {
+        // Provision an ElevenLabs SIP trunk that registers against a FusionPBX gateway,
+        // bind it to a voice agent, and persist the route.
+        if (!agentId || !pbxGatewayUuid || !did || !organizationId) {
+          return new Response(
+            JSON.stringify({ error: 'organizationId, agentId, pbxGatewayUuid and did are required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const { data: gw, error: gwErr } = await admin
+          .from('pbx_gateways')
+          .select('pbx_uuid,name,proxy,realm,username,profile,config')
+          .eq('pbx_uuid', pbxGatewayUuid)
+          .maybeSingle();
+        if (gwErr || !gw) {
+          return new Response(JSON.stringify({ error: 'Gateway not found' }), {
+            status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const proxy = gw.proxy || gw.realm || '';
+        const sipUri = `sip:${proxy};transport=udp`;
+        const sipUser = gw.username || (gw.config as any)?.username || '';
+        const sipPass = (gw.config as any)?.password || '';
+
+        const body: any = {
+          phone_number: did,
+          agent_id: agentId,
+          label: `${gw.name} → ${did}`,
+          telephony_provider: {
+            type: 'sip_trunk',
+            sip_trunk_uri: sipUri,
+            sip_trunk_username: sipUser,
+            sip_trunk_password: sipPass,
+          },
+        };
+
+        const r = await fetch('https://api.elevenlabs.io/v1/convai/phone-numbers', {
+          method: 'POST',
+          headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const respText = await r.text();
+        if (!r.ok) {
+          console.error('[elevenlabs-phone-numbers] SIP trunk create failed', r.status, respText);
+          return new Response(JSON.stringify({ error: respText }), {
+            status: r.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const data = JSON.parse(respText);
+
+        // Persist route. Auto-bind if a phone_number_assignment exists for this DID.
+        const { data: existingAssign } = await admin
+          .from('pbx_phone_number_assignments')
+          .select('agent_id')
+          .eq('organization_id', organizationId)
+          .eq('e164', did)
+          .maybeSingle();
+
+        const finalAgentId = existingAssign?.agent_id || agentId;
+        const autoBound = !!existingAssign?.agent_id;
+
+        await admin.from('voice_agent_gateway_routes').upsert({
+          organization_id: organizationId,
+          agent_id: finalAgentId,
+          elevenlabs_phone_id: data?.phone_number_id || data?.id || null,
+          pbx_gateway_uuid: pbxGatewayUuid,
+          did_e164: did,
+          direction: direction || 'both',
+          auto_bound: autoBound,
+          manual_override: !autoBound,
+          metadata: { gateway_name: gw.name },
+        }, { onConflict: 'organization_id,did_e164' });
+
+        return new Response(
+          JSON.stringify({ success: true, phone_number: data, auto_bound: autoBound }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'list_routes': {
+        if (!organizationId) {
+          return new Response(JSON.stringify({ error: 'organizationId required' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const { data, error } = await admin
+          .from('voice_agent_gateway_routes')
+          .select('*')
+          .eq('organization_id', organizationId)
+          .order('created_at', { ascending: false });
+        if (error) {
+          return new Response(JSON.stringify({ error: error.message }), {
+            status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ routes: data || [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       default:
