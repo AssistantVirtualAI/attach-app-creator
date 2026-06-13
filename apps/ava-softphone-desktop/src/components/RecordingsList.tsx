@@ -19,6 +19,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [audio, setAudio] = useState<Record<string, string>>({});
+  const [audioLoading, setAudioLoading] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -77,12 +78,17 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
     }
   };
 
-  const play = (r: RecordingItem) => {
+  const play = async (r: RecordingItem) => {
     setError(null);
     if (audio[r.id]) return;
-    if (!r.recording_name) { setError('Recording file not available from PBX yet'); return; }
-    const url = `https://pbxnode.lemtel.tel/app/recordings/${r.recording_name}?key=1fzetTwb0VC1BiHjUgWfHE7y78THXTNX&username=mhassoun`;
-    setAudio((a) => ({ ...a, [r.id]: url }));
+    setAudioLoading(r.id);
+    try {
+      const url = await ava.getRecordingAudioUrl(r);
+      if (!url) { setError('Recording file not available from PBX yet'); return; }
+      setAudio((a) => ({ ...a, [r.id]: url }));
+    } finally {
+      setAudioLoading(null);
+    }
   };
 
 
@@ -137,7 +143,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
             {audio[r.id] ? (
               <audio controls src={audio[r.id]} style={{ width: '100%', marginTop: 8, height: 32 }} />
             ) : (
-              <button onClick={() => play(r)} style={{ marginTop: 8, width: '100%', padding: 7, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: `1px solid ${c.border}`, color: c.text, fontSize: 11, cursor: 'pointer' }}>▶ Load PBX audio{r.recording_name ? ` · ${r.recording_name}` : ''}</button>
+              <button onClick={() => play(r)} disabled={audioLoading === r.id} style={{ marginTop: 8, width: '100%', padding: 7, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: `1px solid ${c.border}`, color: c.text, fontSize: 11, cursor: audioLoading === r.id ? 'wait' : 'pointer' }}>{audioLoading === r.id ? 'Loading PBX audio…' : `▶ Load PBX audio${r.recording_name ? ` · ${r.recording_name}` : ''}`}</button>
             )}
 
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>

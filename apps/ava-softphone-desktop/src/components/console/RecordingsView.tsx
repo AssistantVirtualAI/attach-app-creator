@@ -344,7 +344,11 @@ export default function RecordingsView() {
                   autoPlay={!!audioUrl}
                   src={audioUrl || sel.recordingUrl || undefined}
                   style={{ width: '100%', height: 36 }}
-                  onError={() => setPlaybackError('Audio failed to load from PBX')}
+                  onError={() => {
+                    setPlaybackError('PBX recording file is not reachable yet. Sync the phone system and try again.');
+                    if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl);
+                    setAudioUrl(null);
+                  }}
                 />
               ) : (
                 <>

@@ -196,6 +196,7 @@ export interface CallRecord {
   sentiment?: 'positive' | 'neutral' | 'negative';
   customer?: string;
   organization_id?: string; transcript_text?: string;
+  pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
 }
@@ -229,6 +230,7 @@ export interface VoicemailItem {
   priority: 'low' | 'normal' | 'high';
   handled?: boolean; feedback?: Feedback;
   organization_id?: string; callId?: string;
+  pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
 }
@@ -238,6 +240,7 @@ export interface RecordingItem {
   qualityScore: number; sentiment: 'positive' | 'neutral' | 'negative';
   summary: string; topics: string[]; tags: string[]; feedback?: Feedback;
   organization_id?: string; transcript_text?: string;
+  pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
   recordingUrl?: string | null;
@@ -350,6 +353,9 @@ function mapCdrToCall(r: any): CallRecord {
     from:         r.caller_number ?? r.source_number ?? '',
     to:           r.destination ?? r.destination_number ?? '',
     customer:     r.caller_name && r.caller_name !== r.caller_number ? r.caller_name : undefined,
+    pbx_uuid:     r.pbx_uuid ?? null,
+    domain_uuid:  r.domain_uuid ?? null,
+    domain_name:  r.domain_name ?? null,
     startedAt:    r.start_at ?? new Date().toISOString(),
     durationSec:  billsec,
     hasRecording: !!(r.has_recording || r.recording_path || r.recording_name),
@@ -371,6 +377,13 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
     summary:     vm ? vm.slice(0, 120) + (vm.length > 120 ? '…' : '') : 'Aucun résumé disponible.',
     sentiment:   'neutral' as const,
     priority:    'normal' as const,
+    organization_id: r.organization_id ?? undefined,
+    callId:      r.id ?? undefined,
+    pbx_uuid:    r.pbx_uuid ?? null,
+    domain_uuid: r.domain_uuid ?? null,
+    domain_name: r.domain_name ?? null,
+    recording_path: r.recording_path ?? null,
+    recording_name: r.recording_name ?? null,
     handled:     false,
     feedback:    null,
   };
@@ -397,6 +410,9 @@ function mapCdrToRecording(r: any): RecordingItem {
     tags:        [],
     feedback:    null,
     organization_id: r.organization_id ?? undefined,
+    pbx_uuid: r.pbx_uuid ?? null,
+    domain_uuid: r.domain_uuid ?? null,
+    domain_name: r.domain_name ?? null,
     recording_path: r.recording_path ?? null,
     recording_name: r.recording_name ?? null,
     recordingUrl: directUrl,
@@ -411,7 +427,7 @@ async function readCallRecordRows(limit = 100): Promise<any[]> {
   const extFilter = me.extension_uuid
     ? `&extension_uuid=eq.${me.extension_uuid}`
     : (me.extension ? `&extension=eq.${me.extension}` : '');
-  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
+  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
 
   const res = await fetch(url, {
     headers: {
@@ -510,7 +526,7 @@ export const ava = {
       const extFilter = me.extension_uuid
         ? `&extension_uuid=eq.${me.extension_uuid}`
         : (me.extension ? `&extension=eq.${me.extension}` : '');
-      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
+      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
@@ -532,14 +548,22 @@ export const ava = {
     if (direct) return direct;
     const record_path = cleanText(recording.record_path ?? recording.recording_path);
     const record_name = cleanText(recording.record_name ?? recording.recording_name);
-    if (!record_path || !record_name) return null;
+    const xml_cdr_uuid = cleanText(recording.pbx_uuid || recording.callId || recording.id);
+    const domain_uuid = cleanText(recording.domain_uuid);
+    const domain_name = cleanText(recording.domain_name);
+    if (!xml_cdr_uuid && (!record_path || !record_name)) return null;
     try {
       const res = await fetch(resolveUrl(`/fn/${FN.fusionpbxProxy}`), {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ action: 'get-recording', params: { record_path, record_name } }),
+        body: JSON.stringify({ action: 'get-recording', organization_id: recording.organization_id, params: { xml_cdr_uuid, record_path, record_name, domain_uuid, domain_name } }),
       });
       if (!res.ok) throw new Error(`Recording unavailable (${res.status})`);
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.startsWith('audio/') && !ct.includes('octet-stream')) {
+        const msg = await res.text().catch(() => '');
+        throw new Error(msg.slice(0, 180) || 'PBX did not return audio');
+      }
       const buf = await res.arrayBuffer();
       if (!buf.byteLength) throw new Error('Empty recording');
       const lower = record_name.toLowerCase();
@@ -547,7 +571,6 @@ export const ava = {
         : lower.endsWith('.ogg') ? 'audio/ogg'
         : lower.endsWith('.m4a') ? 'audio/mp4'
         : 'audio/wav';
-      const ct = res.headers.get('content-type') || fallbackMime;
       const blob = new Blob([buf], { type: ct.split(';')[0].trim() || fallbackMime });
       return URL.createObjectURL(blob);
     } catch (err) {
