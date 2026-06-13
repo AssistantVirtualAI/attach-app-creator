@@ -548,14 +548,22 @@ export const ava = {
     if (direct) return direct;
     const record_path = cleanText(recording.record_path ?? recording.recording_path);
     const record_name = cleanText(recording.record_name ?? recording.recording_name);
-    if (!record_path || !record_name) return null;
+    const xml_cdr_uuid = cleanText(recording.pbx_uuid || recording.callId || recording.id);
+    const domain_uuid = cleanText(recording.domain_uuid);
+    const domain_name = cleanText(recording.domain_name);
+    if (!xml_cdr_uuid && (!record_path || !record_name)) return null;
     try {
       const res = await fetch(resolveUrl(`/fn/${FN.fusionpbxProxy}`), {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ action: 'get-recording', params: { record_path, record_name } }),
+        body: JSON.stringify({ action: 'get-recording', organization_id: recording.organization_id, params: { xml_cdr_uuid, record_path, record_name, domain_uuid, domain_name } }),
       });
       if (!res.ok) throw new Error(`Recording unavailable (${res.status})`);
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.startsWith('audio/') && !ct.includes('octet-stream')) {
+        const msg = await res.text().catch(() => '');
+        throw new Error(msg.slice(0, 180) || 'PBX did not return audio');
+      }
       const buf = await res.arrayBuffer();
       if (!buf.byteLength) throw new Error('Empty recording');
       const lower = record_name.toLowerCase();
@@ -563,7 +571,6 @@ export const ava = {
         : lower.endsWith('.ogg') ? 'audio/ogg'
         : lower.endsWith('.m4a') ? 'audio/mp4'
         : 'audio/wav';
-      const ct = res.headers.get('content-type') || fallbackMime;
       const blob = new Blob([buf], { type: ct.split(';')[0].trim() || fallbackMime });
       return URL.createObjectURL(blob);
     } catch (err) {
