@@ -30,13 +30,20 @@ export async function loadPbxRecordingAudio(recording: RecordingMeta, organizati
     throw new Error('Missing recording metadata');
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
+  let { data: { session } } = await supabase.auth.getSession();
+  // Refresh if expired or close to expiry (stale JWT causes 401 "Session ... does not exist").
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (!session || (session.expires_at && session.expires_at - nowSec < 60)) {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    if (refreshed?.session) session = refreshed.session;
+  }
+
+  const doFetch = (token?: string) => fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       apikey: SUPABASE_KEY,
-      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({
       action: 'get-recording',
@@ -50,6 +57,19 @@ export async function loadPbxRecordingAudio(recording: RecordingMeta, organizati
       },
     }),
   });
+
+  let res = await doFetch(session?.access_token);
+
+  // On 401, force-refresh once and retry — the cached session may be stale.
+  if (res.status === 401) {
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    if (refreshed?.session?.access_token) {
+      res = await doFetch(refreshed.session.access_token);
+    }
+    if (res.status === 401) {
+      throw new Error('Your session has expired. Please sign out and sign in again to play recordings.');
+    }
+  }
 
   if (!res.ok) {
     const message = await res.text().catch(() => '');
