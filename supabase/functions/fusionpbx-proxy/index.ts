@@ -922,8 +922,10 @@ Deno.serve(async (req) => {
         tryUrls.push(`${FUSIONPBX_API_URL}/app/recordings/recording_download.php?path=${p}&filename=${n}`);
         tryUrls.push(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?a=download&path=${p}&filename=${n}`);
         tryUrls.push(`${FUSIONPBX_API_URL}/app/api/7/recordings/download?domain_uuid=${du}&path=${p}&name=${n}`);
-        // last resort: filesystem path appended to base (legacy behaviour)
+        // Last resorts: FusionPBX stores absolute file paths, but serves them from /recordings/...
         const cleanPath = String(record_path).replace(/^\/+/, "");
+        const publicPath = cleanPath.replace(/^var\/lib\/freeswitch\/recordings\//, "recordings/");
+        tryUrls.push(`${FUSIONPBX_API_URL}/${publicPath}/${n}`);
         tryUrls.push(`${FUSIONPBX_API_URL}/${cleanPath}/${n}`);
       }
 
@@ -933,8 +935,11 @@ Deno.serve(async (req) => {
           if (r.ok) {
             const buf = await r.arrayBuffer();
             const rct = r.headers.get("content-type") || "";
-            // Reject HTML login pages masquerading as 200
-            if (rct.includes("text/html") || buf.byteLength < 200) {
+            const head = new TextDecoder().decode(buf.slice(0, Math.min(buf.byteLength, 160))).trim().toLowerCase();
+            const looksLikeError = head.startsWith("{") || head.startsWith("[") || head.startsWith("<") || head.includes("sqlstate") || head.includes("undefined column") || head.includes("error");
+            const looksLikeAudio = head.startsWith("id3") || head.startsWith("riff") || head.startsWith("oggs") || head.includes("ftyp") || (buf.byteLength > 1200 && !looksLikeError);
+            // Reject HTML/JSON/PBX error pages masquerading as successful audio.
+            if (rct.includes("text/html") || rct.includes("application/json") || looksLikeError || !looksLikeAudio) {
               attempts.push({ url, status: r.status });
               continue;
             }
