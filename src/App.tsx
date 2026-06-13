@@ -134,6 +134,8 @@ import MyDashboard from "./pages/lemtel/my/MyDashboard";
 import AdminRecordings from "./pages/lemtel/admin/AdminRecordings";
 import AdminVoicemail from "./pages/lemtel/admin/AdminVoicemail";
 import AdminReports from "./pages/lemtel/admin/AdminReports";
+import AdminDestinations from "./pages/lemtel/admin/AdminDestinations";
+import AdminTimeConditions from "./pages/lemtel/admin/AdminTimeConditions";
 import MySettings from "./pages/lemtel/my/MySettings";
 import MyForwarding from "./pages/lemtel/my/MyForwarding";
 import MyDevices from "./pages/lemtel/my/MyDevices";
@@ -661,6 +663,8 @@ const App = () => (
                 <Route path="/org/lemtel/admin/recordings" element={<LemtelAdminPage><AdminRecordings /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/voicemail" element={<LemtelAdminPage><AdminVoicemail /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/reports" element={<LemtelAdminPage><AdminReports /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/destinations" element={<LemtelAdminPage><AdminDestinations /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/time-conditions" element={<LemtelAdminPage><AdminTimeConditions /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/settings" element={<LemtelAdminPage><TelephonySettings /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/hours" element={<LemtelAdminPage><BusinessHours /></LemtelAdminPage>} />
                 <Route path="/org/:slug/admin/hours" element={<ProtectedRoute><AdminPortalLayout><BusinessHours /></AdminPortalLayout></ProtectedRoute>} />

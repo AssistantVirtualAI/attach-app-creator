@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Network, RefreshCw, Search, Loader2, Power, Play, Square, Plus, Bug } from 'lucide-react';
+import { Network, RefreshCw, Search, Loader2, Power, Play, Square, Plus, Bug, Trash2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Gateway = {
@@ -110,25 +110,58 @@ export default function LemtelGateways() {
     } catch (e: any) { toast.error('Failed: ' + (e?.message || '')); }
   };
 
-  const createGateway = async () => {
+  const saveGateway = async () => {
     setCreating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'create-gateways', params: {
-          gateway: form.gateway, proxy: form.proxy, username: form.username, password: form.password,
-          realm: form.realm || form.proxy, context: form.context, profile: form.profile,
-          register: form.register ? 'true' : 'false', enabled: form.enabled ? 'true' : 'false',
-          expire_seconds: form.expire_seconds, retry_seconds: form.retry_seconds,
-        } },
-      });
+      const isEdit = !!(form as any).gateway_uuid;
+      const action = isEdit ? 'update-gateways' : 'create-gateways';
+      const params: any = {
+        gateway: form.gateway, proxy: form.proxy, username: form.username, password: form.password,
+        realm: form.realm || form.proxy, context: form.context, profile: form.profile,
+        register: form.register ? 'true' : 'false', enabled: form.enabled ? 'true' : 'false',
+        expire_seconds: form.expire_seconds, retry_seconds: form.retry_seconds,
+      };
+      if (isEdit) params.gateway_uuid = (form as any).gateway_uuid;
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action, params } });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      toast.success('Gateway created');
+      toast.success(isEdit ? 'Gateway updated' : 'Gateway created');
       setOpen(false);
       refetch();
     } catch (e: any) {
-      toast.error(e?.message || 'Create failed');
+      toast.error(e?.message || 'Save failed');
     } finally { setCreating(false); }
+  };
+  const createGateway = saveGateway;
+
+  const openEdit = (g: Gateway) => {
+    setForm({
+      gateway: g.gateway || '',
+      proxy: g.proxy || '',
+      username: '',
+      password: '',
+      realm: g.hostname || g.proxy || '',
+      context: g.context || 'public',
+      register: g.register === true || g.register === 'true',
+      enabled: g.enabled === true || g.enabled === 'true',
+      profile: 'external',
+      expire_seconds: '600',
+      retry_seconds: '30',
+      gateway_uuid: g.gateway_uuid,
+    } as any);
+    setOpen(true);
+  };
+
+  const deleteGateway = async (g: Gateway) => {
+    if (!confirm(`Delete gateway "${g.gateway}"? This cannot be undone.`)) return;
+    try {
+      const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'delete-gateways', params: { gateway_uuid: g.gateway_uuid } },
+      });
+      if (error) throw error;
+      toast.success('Gateway deleted');
+      refetch();
+    } catch (e: any) { toast.error(e?.message || 'Delete failed'); }
   };
 
   const filtered = rows.filter(g =>
@@ -150,9 +183,9 @@ export default function LemtelGateways() {
             <RefreshCw className="w-4 h-4 mr-2" /> Refresh
           </Button>
           <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild><Button><Plus className="w-4 h-4 mr-2" /> Add Gateway</Button></SheetTrigger>
+            <SheetTrigger asChild><Button onClick={() => { setForm({ gateway: '', proxy: '', username: '', password: '', realm: '', context: 'public', register: true, enabled: true, profile: 'external', expire_seconds: '600', retry_seconds: '30' }); }}><Plus className="w-4 h-4 mr-2" /> Add Gateway</Button></SheetTrigger>
             <SheetContent className="space-y-3 overflow-y-auto">
-              <SheetHeader><SheetTitle>New SIP Gateway</SheetTitle></SheetHeader>
+              <SheetHeader><SheetTitle>{(form as any).gateway_uuid ? 'Edit' : 'New'} SIP Gateway</SheetTitle></SheetHeader>
               <div className="space-y-3">
                 {[
                   ['gateway', 'Name'], ['proxy', 'Proxy (host:port)'], ['realm', 'Realm (optional)'],
@@ -176,9 +209,9 @@ export default function LemtelGateways() {
                   <Switch checked={form.enabled} onCheckedChange={(v) => setForm({ ...form, enabled: v })} />
                   <Label>Enabled</Label>
                 </div>
-                <Button className="w-full" disabled={creating || !form.gateway || !form.proxy} onClick={createGateway}>
+                <Button className="w-full" disabled={creating || !form.gateway || !form.proxy} onClick={saveGateway}>
                   {creating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  Create
+                  {(form as any).gateway_uuid ? 'Save Changes' : 'Create'}
                 </Button>
               </div>
             </SheetContent>
@@ -230,11 +263,13 @@ export default function LemtelGateways() {
                       <TableCell><Badge variant={enabled ? 'default' : 'secondary'}>{enabled ? 'On' : 'Off'}</Badge></TableCell>
                       <TableCell className="text-xs text-muted-foreground">{g.hostname || g.description || '—'}</TableCell>
                       <TableCell className="text-right space-x-1">
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(g)} title="Edit"><Pencil className="w-3.5 h-3.5" /></Button>
                         <Button variant="ghost" size="sm" onClick={() => sofiaCmd(g, 'start-gateway')} title="Start"><Play className="w-3.5 h-3.5" /></Button>
                         <Button variant="ghost" size="sm" onClick={() => sofiaCmd(g, 'stop-gateway')} title="Stop"><Square className="w-3.5 h-3.5" /></Button>
                         <Button variant="ghost" size="sm" disabled={restarting === g.gateway_uuid} onClick={() => restart(g)} title="Restart">
                           {restarting === g.gateway_uuid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Power className="w-3.5 h-3.5" />}
                         </Button>
+                        <Button variant="ghost" size="sm" onClick={() => deleteGateway(g)} title="Delete"><Trash2 className="w-3.5 h-3.5" /></Button>
                       </TableCell>
                     </TableRow>
                   );
