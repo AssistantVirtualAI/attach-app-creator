@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 
 export function useMascotChat(threadId: string) {
   const location = useLocation();
-  const { selectedOrganization } = useOrganization() as any;
+  const { selectedOrg } = useOrganization();
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
