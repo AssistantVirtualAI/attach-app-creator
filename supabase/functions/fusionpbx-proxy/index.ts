@@ -894,7 +894,9 @@ Deno.serve(async (req) => {
 
     // ---- Recording proxy ----
     if (action === "get-recording") {
-      const { record_path, record_name, xml_cdr_uuid, domain_uuid, domain_name } = params as any;
+      const recordingParams = { ...(params || {}) } as any;
+      if (!recordingParams.xml_cdr_uuid) recordingParams.xml_cdr_uuid = body.xml_cdr_uuid || body.id;
+      const { record_path, record_name, xml_cdr_uuid, domain_uuid, domain_name, local_recording_url } = recordingParams;
       if (!xml_cdr_uuid && !(record_path && record_name)) {
         return json({ error: "xml_cdr_uuid or (record_path, record_name) required" }, 400);
       }
@@ -923,24 +925,71 @@ Deno.serve(async (req) => {
         return u.toString();
       };
       const decodeJsonDownload = (value: any): Uint8Array | null => {
-        const pick = value?.data || value?.recording || value?.recordings?.[0] || value;
-        const encoded = pick?.recording_base64 || pick?.base64 || pick?.content || pick?.file || pick?.audio;
-        if (typeof encoded !== "string" || encoded.length < 32) return null;
-        const body = encoded.includes(",") ? encoded.split(",").pop()! : encoded;
+        const seen = new Set<any>();
+        const visit = (node: any): string | null => {
+          if (!node || seen.has(node)) return null;
+          if (typeof node === "string") {
+            const body = node.includes(",") ? node.split(",").pop()! : node;
+            return /^[A-Za-z0-9+/=\s_-]{1200,}$/.test(body) ? body : null;
+          }
+          if (typeof node !== "object") return null;
+          seen.add(node);
+          for (const key of ["recording_base64", "audio_base64", "base64", "content", "file", "audio", "bytes", "data", "recording"]) {
+            const found = visit(node[key]);
+            if (found) return found;
+          }
+          if (Array.isArray(node)) {
+            for (const item of node) { const found = visit(item); if (found) return found; }
+          }
+          return null;
+        };
+        const encoded = visit(value);
+        if (!encoded) return null;
         try {
-          const bin = atob(body.replace(/\s/g, ""));
+          const bin = atob(encoded.replace(/\s/g, "").replace(/-/g, "+").replace(/_/g, "/"));
           return Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
         } catch { return null; }
+      };
+      const extractJsonDownloadUrl = (value: any): string | null => {
+        const seen = new Set<any>();
+        const visit = (node: any): string | null => {
+          if (!node || seen.has(node)) return null;
+          if (typeof node === "string") {
+            if (/^https?:\/\//i.test(node) || node.startsWith("/app/") || node.startsWith("download.php")) return node;
+            return null;
+          }
+          if (typeof node !== "object") return null;
+          seen.add(node);
+          for (const key of ["download_url", "recording_url", "audio_url", "url", "href", "link", "location", "download"]) {
+            const found = visit(node[key]);
+            if (found) return found;
+          }
+          if (Array.isArray(node)) {
+            for (const item of node) { const found = visit(item); if (found) return found; }
+          }
+          return null;
+        };
+        return visit(value);
       };
       const attempts: { url: string; status: number; content_type?: string }[] = [];
       const tryUrls: string[] = [];
       const fileBases = [FUSIONPBX_API_URL];
+      if (local_recording_url && String(local_recording_url).startsWith("http")) {
+        tryUrls.push(String(local_recording_url));
+      }
       try {
         const base = new URL(FUSIONPBX_API_URL);
         if (base.hostname === "portal.lemtel.tel") fileBases.push("https://pbxnode.lemtel.tel");
       } catch { /* ignore alternate file host */ }
       if (xml_cdr_uuid) {
+        const du = encodeURIComponent(String(domain_uuid || FUSIONPBX_DOMAIN_UUID || ""));
         for (const fileBase of fileBases) {
+          tryUrls.push(withQueryAuth(`${fileBase}/app/api/7/call_recordings/download?domain_uuid=${du}&id=${encodeURIComponent(xml_cdr_uuid)}`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/api/7/call_recordings/${encodeURIComponent(xml_cdr_uuid)}/download?domain_uuid=${du}`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/api/7/call_recordings/${encodeURIComponent(xml_cdr_uuid)}?domain_uuid=${du}&download=true`));
+          tryUrls.push(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`);
+          tryUrls.push(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&binary`);
+          tryUrls.push(withQueryAuth(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&binary`));
@@ -963,6 +1012,8 @@ Deno.serve(async (req) => {
           ? `${cleanPath.replace(new RegExp(`^var/lib/freeswitch/recordings/${domainName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?`), "")}/${String(record_name)}`
           : `${String(record_path).split("/recordings/").pop()?.split("/").slice(1).join("/") || cleanPath}/${String(record_name)}`;
         const rel = encodeURIComponent(relativeName.replace(/^\/+/, ""));
+        tryUrls.push(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?action=download&type=rec&filename=${rel}`);
+        tryUrls.push(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?a=download&type=rec&filename=${rel}`);
         tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?action=download&type=rec&t=bin&filename=${rel}`));
         tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?a=download&type=rec&t=bin&filename=${rel}`));
         const publicPath = cleanPath.replace(/^var\/lib\/freeswitch\/recordings\//, "recordings/");
@@ -976,7 +1027,8 @@ Deno.serve(async (req) => {
       }
 
       const uniqueUrls = [...new Set(tryUrls)];
-      for (const url of uniqueUrls) {
+      for (let i = 0; i < uniqueUrls.length; i++) {
+        const url = uniqueUrls[i];
         try {
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 4500);
@@ -989,11 +1041,19 @@ Deno.serve(async (req) => {
             const looksLikeAudio = head.startsWith("id3") || head.startsWith("riff") || head.startsWith("oggs") || head.includes("ftyp") || (buf.byteLength > 1200 && !looksLikeError);
             if (rct.includes("application/json")) {
               try {
-                const decoded = decodeJsonDownload(JSON.parse(new TextDecoder().decode(buf)));
+                const parsed = JSON.parse(new TextDecoder().decode(buf));
+                const decoded = decodeJsonDownload(parsed);
                 if (decoded && decoded.byteLength > 1200) {
                   return new Response(decoded, {
                     headers: { ...corsHeaders, "Content-Type": ct, "Content-Length": String(decoded.byteLength), "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=300" },
                   });
+                }
+                const nextUrl = extractJsonDownloadUrl(parsed);
+                if (nextUrl) {
+                  const absoluteUrl = nextUrl.startsWith("http")
+                    ? nextUrl
+                    : `${FUSIONPBX_API_URL}/${nextUrl.replace(/^\/+/, "")}`;
+                  if (!uniqueUrls.includes(absoluteUrl)) uniqueUrls.push(absoluteUrl);
                 }
               } catch { /* not a base64 download response */ }
             }
@@ -1017,7 +1077,7 @@ Deno.serve(async (req) => {
           attempts.push({ url: safeUrl(url), status: 0, content_type: e?.name === "AbortError" ? "timeout" : undefined });
         }
       }
-      return json({ error: "RECORDING_NOT_FOUND", message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.", attempts }, 404);
+      return json({ ok: false, error: "RECORDING_NOT_FOUND", message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.", attempts }, 200, { "X-Recording-Status": "not-found" });
     }
 
     // ---- Voicemail CRUD ----

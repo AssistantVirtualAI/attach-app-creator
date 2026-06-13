@@ -65,6 +65,13 @@ export async function loadPbxRecordingAudio(recording: RecordingMeta, organizati
   }
 
   const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const parsed = await res.json().catch(() => null);
+    if (parsed?.error === 'RECORDING_NOT_FOUND') {
+      throw new Error('PBX recording file is not reachable. Sync the phone system and verify the file still exists on the PBX server.');
+    }
+    throw new Error(parsed?.message || 'PBX did not return audio');
+  }
   if (!contentType.startsWith('audio/') && !contentType.includes('octet-stream')) {
     const message = await res.text().catch(() => '');
     throw new Error(message.slice(0, 220) || 'PBX did not return audio');
