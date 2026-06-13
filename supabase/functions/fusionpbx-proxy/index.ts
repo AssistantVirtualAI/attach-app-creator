@@ -923,14 +923,51 @@ Deno.serve(async (req) => {
         return u.toString();
       };
       const decodeJsonDownload = (value: any): Uint8Array | null => {
-        const pick = value?.data || value?.recording || value?.recordings?.[0] || value;
-        const encoded = pick?.recording_base64 || pick?.base64 || pick?.content || pick?.file || pick?.audio;
-        if (typeof encoded !== "string" || encoded.length < 32) return null;
-        const body = encoded.includes(",") ? encoded.split(",").pop()! : encoded;
+        const seen = new Set<any>();
+        const visit = (node: any): string | null => {
+          if (!node || seen.has(node)) return null;
+          if (typeof node === "string") {
+            const body = node.includes(",") ? node.split(",").pop()! : node;
+            return /^[A-Za-z0-9+/=\s_-]{1200,}$/.test(body) ? body : null;
+          }
+          if (typeof node !== "object") return null;
+          seen.add(node);
+          for (const key of ["recording_base64", "audio_base64", "base64", "content", "file", "audio", "bytes", "data", "recording"]) {
+            const found = visit(node[key]);
+            if (found) return found;
+          }
+          if (Array.isArray(node)) {
+            for (const item of node) { const found = visit(item); if (found) return found; }
+          }
+          return null;
+        };
+        const encoded = visit(value);
+        if (!encoded) return null;
         try {
-          const bin = atob(body.replace(/\s/g, ""));
+          const bin = atob(encoded.replace(/\s/g, "").replace(/-/g, "+").replace(/_/g, "/"));
           return Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
         } catch { return null; }
+      };
+      const extractJsonDownloadUrl = (value: any): string | null => {
+        const seen = new Set<any>();
+        const visit = (node: any): string | null => {
+          if (!node || seen.has(node)) return null;
+          if (typeof node === "string") {
+            if (/^https?:\/\//i.test(node) || node.startsWith("/app/") || node.startsWith("download.php")) return node;
+            return null;
+          }
+          if (typeof node !== "object") return null;
+          seen.add(node);
+          for (const key of ["download_url", "recording_url", "audio_url", "url", "href", "link", "location", "download"]) {
+            const found = visit(node[key]);
+            if (found) return found;
+          }
+          if (Array.isArray(node)) {
+            for (const item of node) { const found = visit(item); if (found) return found; }
+          }
+          return null;
+        };
+        return visit(value);
       };
       const attempts: { url: string; status: number; content_type?: string }[] = [];
       const tryUrls: string[] = [];
@@ -941,6 +978,9 @@ Deno.serve(async (req) => {
       } catch { /* ignore alternate file host */ }
       if (xml_cdr_uuid) {
         for (const fileBase of fileBases) {
+          tryUrls.push(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`);
+          tryUrls.push(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&binary`);
+          tryUrls.push(withQueryAuth(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&binary`));
@@ -963,6 +1003,8 @@ Deno.serve(async (req) => {
           ? `${cleanPath.replace(new RegExp(`^var/lib/freeswitch/recordings/${domainName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?`), "")}/${String(record_name)}`
           : `${String(record_path).split("/recordings/").pop()?.split("/").slice(1).join("/") || cleanPath}/${String(record_name)}`;
         const rel = encodeURIComponent(relativeName.replace(/^\/+/, ""));
+        tryUrls.push(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?action=download&type=rec&filename=${rel}`);
+        tryUrls.push(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?a=download&type=rec&filename=${rel}`);
         tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?action=download&type=rec&t=bin&filename=${rel}`));
         tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?a=download&type=rec&t=bin&filename=${rel}`));
         const publicPath = cleanPath.replace(/^var\/lib\/freeswitch\/recordings\//, "recordings/");
