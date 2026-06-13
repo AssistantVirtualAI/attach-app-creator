@@ -524,9 +524,21 @@ export default function LemtelIVR() {
                           <div className="text-xs text-muted-foreground">→ {opt.destination_id || opt.description || '—'}</div>
                         </div>
                         <Button size="sm" variant="ghost" onClick={async () => {
-                          const { error } = await supabase.from('pbx_ivr_options').delete().eq('id', opt.id);
-                          if (error) toast.error(error.message);
-                          else { toast.success('Option supprimée'); queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivr_options', selectedId] }); }
+                          try {
+                            if (opt.pbx_uuid) {
+                              await supabase.functions.invoke('pbx-write', {
+                                body: {
+                                  organizationId: selectedOrgId,
+                                  action: 'delete-ivr-option',
+                                  params: { ivr_menu_option_uuid: opt.pbx_uuid },
+                                },
+                              });
+                            }
+                            const { error } = await supabase.from('pbx_ivr_options').delete().eq('id', opt.id);
+                            if (error) throw error;
+                            toast.success('Option supprimée');
+                            queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivr_options', selectedId] });
+                          } catch (e: any) { toast.error(e?.message || 'Suppression échouée'); }
                         }}>×</Button>
                       </div>
                     ))}
