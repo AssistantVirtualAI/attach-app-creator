@@ -291,6 +291,18 @@ Deno.serve(async (req) => {
       return json({ ok: r.ok, status: r.status, raw: r.data, latency_ms: r.latency_ms });
     }
 
+    if (action === "list-gateways-all-domains") {
+      const d = await pbxFetch("domains");
+      const domains = collection(d.data, "domains");
+      const all: any[] = [];
+      for (const dom of domains) {
+        const r = await pbxFetch(`gateways?domain_uuid=${dom.domain_uuid}`);
+        const rows = collection(r.data, "gateways");
+        for (const g of rows) all.push({ ...g, _domain_name: dom.domain_name });
+      }
+      return json({ ok: true, data: all, total_domains: domains.length });
+    }
+
     // ---- LIST actions ----
     const listMap: Record<string, { path: string; key: string }> = {
       "list-extensions":    { path: `extensions?${domainQ}`,          key: "extensions" },
