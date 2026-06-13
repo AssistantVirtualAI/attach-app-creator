@@ -12,6 +12,7 @@ import { usePbxWrite } from "@/hooks/usePbxWrite";
 import { RecordingWavePlayer } from "@/components/portal/RecordingWavePlayer";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { loadPbxRecordingAudio } from "@/lib/pbxRecordingAudio";
 
 type Scope = "org" | "mine";
 
@@ -155,7 +156,7 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
     queryKey: ["media", "recordings", orgId, extension],
     queryFn: async () => {
       let q = (supabase as any).from("pbx_call_records")
-        .select("id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,recording_url,transcript,ai_summary,ai_sentiment,transcribed,pbx_uuid")
+        .select("id,organization_id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,recording_name,recording_url,transcript,ai_summary,ai_sentiment,transcribed,pbx_uuid,domain_uuid,domain_name")
         .eq("organization_id", orgId).not("recording_path", "is", null).order("start_at", { ascending: false }).limit(150);
       if (extension) q = q.eq("extension", extension);
       const { data } = await q;
@@ -163,14 +164,18 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
     },
   });
 
-  const sign = async (path: string) => {
-    if (signed[path]) return signed[path];
-    const { data } = await supabase.storage.from("lemtel-recordings").createSignedUrl(path, 3600);
-    if (data?.signedUrl) { setSigned((s) => ({ ...s, [path]: data.signedUrl })); return data.signedUrl; }
-  };
-  const share = async (path: string) => {
-    const { data } = await supabase.storage.from("lemtel-recordings").createSignedUrl(path, 7 * 24 * 3600);
-    if (data?.signedUrl) { await navigator.clipboard.writeText(data.signedUrl); toast.success("Lien copié (7 jours)"); }
+  const sign = async (r: any) => {
+    if (signed[r.id]) return signed[r.id];
+    setWorking(r.id);
+    try {
+      const url = await loadPbxRecordingAudio(r, orgId);
+      setSigned((s) => ({ ...s, [r.id]: url }));
+      return url;
+    } catch (e: any) {
+      toast.error(e?.message || "Lecture impossible");
+    } finally {
+      setWorking(null);
+    }
   };
   const transcribe = async (id: string) => {
     setWorking(id);
