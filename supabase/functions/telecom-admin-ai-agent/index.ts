@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
     if (!mode && Array.isArray(messages) && messages.length) {
       const apiKey = Deno.env.get("LOVABLE_API_KEY");
       if (!apiKey) return json({ error: "ai_not_configured" }, 500);
-      const [callsRes, extRes, queuesRes, ivrsRes, vmRes, smsRes, usersRes] = await Promise.all([
+      const [callsRes, extRes, queuesRes, ivrsRes, vmRes, smsRes, usersRes, insightsRes, recRes, ringRes, gwRes] = await Promise.all([
         admin.from("pbx_call_records")
           .select("start_at,direction,caller_number,destination_number,duration_seconds,call_status,missed_call,extension")
           .eq("organization_id", orgId).order("start_at", { ascending: false }).limit(100),
@@ -120,6 +120,10 @@ Deno.serve(async (req) => {
         admin.from("pbx_voicemails").select("extension,read_at,created_at").eq("organization_id", orgId).order("created_at", { ascending: false }).limit(50),
         admin.from("pbx_sms_threads").select("id,last_message_at,unread_count").eq("organization_id", orgId).order("last_message_at", { ascending: false }).limit(20),
         admin.from("pbx_softphone_users").select("extension,display_name,status,cc_role").eq("organization_id", orgId),
+        admin.from("pbx_ai_insights").select("summary,sentiment,intent,topics,action_items,severity,created_at").eq("organization_id", orgId).order("created_at", { ascending: false }).limit(20),
+        admin.from("pbx_call_records").select("id", { count: "exact", head: true }).eq("organization_id", orgId).eq("has_recording", true),
+        admin.from("pbx_ring_groups").select("name,extension,strategy").eq("organization_id", orgId),
+        admin.from("pbx_gateways").select("gateway_name,proxy,enabled").eq("organization_id", orgId),
       ]);
       const calls = callsRes.data ?? [];
       const ctx = calls.map((c: any) =>
@@ -130,9 +134,13 @@ Deno.serve(async (req) => {
         `Users (${(usersRes.data ?? []).length}): ${JSON.stringify(usersRes.data ?? [])}`,
         `Extensions (${(extRes.data ?? []).length}): ${JSON.stringify(extRes.data ?? [])}`,
         `Call Queues (${(queuesRes.data ?? []).length}): ${JSON.stringify(queuesRes.data ?? [])}`,
+        `Ring Groups (${(ringRes.data ?? []).length}): ${JSON.stringify(ringRes.data ?? [])}`,
         `IVRs (${(ivrsRes.data ?? []).length}): ${JSON.stringify(ivrsRes.data ?? [])}`,
+        `Gateways (${(gwRes.data ?? []).length}): ${JSON.stringify(gwRes.data ?? [])}`,
         `Voicemails (${(vmRes.data ?? []).length}, unread=${(vmRes.data ?? []).filter((v:any)=>!v.read_at).length})`,
         `SMS threads (${(smsRes.data ?? []).length})`,
+        `Recordings total: ${recRes.count ?? 0}`,
+        `Recent AI insights (${(insightsRes.data ?? []).length}): ${JSON.stringify(insightsRes.data ?? [])}`,
       ].join("\n\n");
       const flatMessages = messages.map((m: any) => ({
         role: m.role,
