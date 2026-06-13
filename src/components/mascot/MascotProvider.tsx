@@ -42,19 +42,19 @@ export default function MascotProvider() {
           />
         )}
       </Suspense>
-      {/* Launcher — TOP-RIGHT so it never overlaps the softphone bottom-right */}
+      {/* Launcher — small, cute, top-right, never overlapping bottom-right softphone */}
       <button
         type="button"
         aria-label="Open Lemtel assistant"
         onClick={() => setOpen((v) => !v)}
-        className="group fixed top-4 right-4 z-[60] w-24 h-28 rounded-2xl bg-background/70 backdrop-blur-xl border border-primary/40 shadow-[0_8px_32px_hsl(var(--primary)/0.35)] hover:scale-105 transition-transform overflow-hidden"
+        className="group fixed top-3 right-3 z-[60] w-16 h-16 rounded-full bg-background/80 backdrop-blur-xl border border-primary/40 shadow-[0_6px_24px_hsl(var(--primary)/0.4)] hover:scale-110 active:scale-95 transition-transform overflow-hidden"
       >
         <MascotRobot listening={!open} compact />
-        <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse ring-2 ring-background" />
-        <span className="absolute bottom-1 left-1 right-1 text-[10px] font-semibold text-foreground/80 opacity-0 group-hover:opacity-100 transition-opacity">
-          Ask Lemtel
-        </span>
+        <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-emerald-400 animate-pulse ring-2 ring-background" />
       </button>
+      <span className="fixed top-[76px] right-3 z-[60] pointer-events-none text-[10px] font-semibold text-foreground/70 bg-background/80 px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100">
+        Hi! 👋
+      </span>
     </>
   );
 }
