@@ -5,13 +5,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Disc, Voicemail as VmIcon, PhoneCall, Trash2, RefreshCw, Download, Share2, Sparkles, Loader2, Play, Pause } from "lucide-react";
+import { Disc, Voicemail as VmIcon, PhoneCall, Trash2, RefreshCw, Download, Sparkles, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { LEMTEL_ORG } from "@/hooks/usePbxData";
 import { usePbxWrite } from "@/hooks/usePbxWrite";
 import { RecordingWavePlayer } from "@/components/portal/RecordingWavePlayer";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { loadPbxRecordingAudio } from "@/lib/pbxRecordingAudio";
 
 type Scope = "org" | "mine";
 
@@ -155,7 +156,7 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
     queryKey: ["media", "recordings", orgId, extension],
     queryFn: async () => {
       let q = (supabase as any).from("pbx_call_records")
-        .select("id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,recording_url,transcript,ai_summary,ai_sentiment,transcribed,pbx_uuid")
+        .select("id,organization_id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,recording_name,recording_url,transcript,ai_summary,ai_sentiment,transcribed,pbx_uuid,domain_uuid,domain_name")
         .eq("organization_id", orgId).not("recording_path", "is", null).order("start_at", { ascending: false }).limit(150);
       if (extension) q = q.eq("extension", extension);
       const { data } = await q;
@@ -163,14 +164,18 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
     },
   });
 
-  const sign = async (path: string) => {
-    if (signed[path]) return signed[path];
-    const { data } = await supabase.storage.from("lemtel-recordings").createSignedUrl(path, 3600);
-    if (data?.signedUrl) { setSigned((s) => ({ ...s, [path]: data.signedUrl })); return data.signedUrl; }
-  };
-  const share = async (path: string) => {
-    const { data } = await supabase.storage.from("lemtel-recordings").createSignedUrl(path, 7 * 24 * 3600);
-    if (data?.signedUrl) { await navigator.clipboard.writeText(data.signedUrl); toast.success("Lien copié (7 jours)"); }
+  const sign = async (r: any) => {
+    if (signed[r.id]) return signed[r.id];
+    setWorking(r.id);
+    try {
+      const url = await loadPbxRecordingAudio(r, orgId);
+      setSigned((s) => ({ ...s, [r.id]: url }));
+      return url;
+    } catch (e: any) {
+      toast.error(e?.message || "Lecture impossible");
+    } finally {
+      setWorking(null);
+    }
   };
   const transcribe = async (id: string) => {
     setWorking(id);
@@ -202,7 +207,7 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
       <CardContent className="space-y-3">
         {filtered.length === 0 && <p className="text-sm text-muted-foreground">Aucun enregistrement.</p>}
         {filtered.map((r) => {
-          const url = r.recording_path ? signed[r.recording_path] : r.recording_url;
+          const url = signed[r.id] || r.recording_url;
           return (
             <div key={r.id} className="border rounded-lg p-3 space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2 text-sm">
@@ -220,8 +225,7 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
                   )}
                   {r.recording_path && (
                     <>
-                      <Button size="sm" variant="outline" onClick={() => sign(r.recording_path)}>Charger</Button>
-                      <Button size="icon" variant="ghost" onClick={() => share(r.recording_path)}><Share2 className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="outline" onClick={() => sign(r)} disabled={working === r.id}>{working === r.id ? 'Chargement…' : 'Charger'}</Button>
                       {url && <Button size="icon" variant="ghost" asChild><a href={url} download><Download className="h-4 w-4" /></a></Button>}
                     </>
                   )}

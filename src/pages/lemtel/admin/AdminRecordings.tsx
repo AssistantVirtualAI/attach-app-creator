@@ -8,6 +8,7 @@ import { RecordingWavePlayer } from '@/components/portal/RecordingWavePlayer';
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
 
 const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 
@@ -19,9 +20,6 @@ type Rec = {
   pbx_uuid: string | null; domain_uuid: string | null; domain_name: string | null;
   transcript?: string | null;
 };
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
 export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
   const [rows, setRows] = useState<Rec[]>([]);
@@ -57,31 +55,7 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
     }
     setLoading(r.id);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${session?.access_token ?? SUPABASE_KEY}`,
-        },
-        body: JSON.stringify({
-          action: 'get-recording',
-          params: {
-            xml_cdr_uuid: r.pbx_uuid,
-            record_path: r.recording_path,
-            record_name: r.recording_name,
-            domain_uuid: r.domain_uuid,
-            domain_name: r.domain_name,
-          },
-        }),
-      });
-      if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt.slice(0, 200));
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const url = await loadPbxRecordingAudio(r, LEMTEL_ORG_ID);
       setUrls(s => ({ ...s, [r.id]: url }));
       return url;
     } catch (e: any) {
