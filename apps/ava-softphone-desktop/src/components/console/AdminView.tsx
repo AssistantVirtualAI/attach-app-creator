@@ -264,7 +264,7 @@ export default function AdminView() {
         {sec === 'extensions' && <ExtensionsTable />}
         {sec === 'devices' && (
           <PbxResourceSection
-            kind="devices" title="Devices" uuidField="device_uuid"
+            kind="devices" actionKind="device" title="Devices" uuidField="device_uuid"
             cols={[{ key: 'device_vendor', label: 'Vendor' }, { key: 'device_mac_address', label: 'MAC' }, { key: 'device_template', label: 'Template' }, { key: 'device_label', label: 'Assigned' }, { key: 'device_enabled', label: 'Enabled' }]}
             fields={[{ key: 'device_label', label: 'Label' }, { key: 'device_vendor', label: 'Vendor' }, { key: 'device_mac_address', label: 'MAC Address' }, { key: 'device_template', label: 'Template' }, { key: 'device_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] }]}
           />
@@ -280,7 +280,7 @@ export default function AdminView() {
         {sec === 'queues' && <QueuesTable />}
         {sec === 'ringgroups' && (
           <PbxResourceSection
-            kind="ring-groups" title="Ring Groups" uuidField="ring_group_uuid"
+            kind="ring-groups" actionKind="ring-group" title="Ring Groups" uuidField="ring_group_uuid"
             cols={[{ key: 'ring_group_name', label: 'Name' }, { key: 'ring_group_extension', label: 'Extension' }, { key: 'ring_group_strategy', label: 'Strategy' }, { key: 'ring_group_enabled', label: 'Enabled' }]}
             fields={[{ key: 'ring_group_name', label: 'Name' }, { key: 'ring_group_extension', label: 'Extension' }, { key: 'ring_group_strategy', label: 'Strategy', type: 'select', options: ['simultaneous', 'sequence', 'enterprise'] }, { key: 'ring_group_timeout_app', label: 'Timeout App' }, { key: 'ring_group_forward_destination', label: 'Forwarding / fallback' }, { key: 'ring_group_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] }, { key: 'ring_group_description', label: 'Description', type: 'textarea' }]}
           />
