@@ -339,6 +339,31 @@ export default function LemtelCustomers() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!editDomain} onOpenChange={(o) => !o && setEditDomain(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit {editDomain?.domain_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Description</Label>
+              <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label>Enabled</Label>
+              <Switch checked={editEnabled} onCheckedChange={setEditEnabled} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDomain(null)}>Cancel</Button>
+            <Button onClick={saveEdit} disabled={editSaving}>
+              {editSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
