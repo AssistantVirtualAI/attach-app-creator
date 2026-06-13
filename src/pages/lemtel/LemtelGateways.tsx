@@ -244,6 +244,17 @@ export default function LemtelGateways() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={diagOpen} onOpenChange={setDiagOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader><DialogTitle>FusionPBX /gateways raw response</DialogTitle></DialogHeader>
+          {diagLoading ? (
+            <div className="py-8 flex justify-center"><Loader2 className="animate-spin" /></div>
+          ) : (
+            <pre className="text-xs bg-muted p-3 rounded max-h-[60vh] overflow-auto">{JSON.stringify(diag, null, 2)}</pre>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
