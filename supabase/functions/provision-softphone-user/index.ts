@@ -24,8 +24,8 @@ function generatePassword(len = 16) {
   return Array.from(arr, (n) => chars[n % chars.length]).join("");
 }
 
-function welcomeHtml(opts: { displayName: string; extension: string; email: string; magicLink: string | null }) {
-  const { displayName, extension, email, magicLink } = opts;
+function welcomeHtml(opts: { displayName: string; extension: string; email: string; magicLink: string | null; password?: string | null }) {
+  const { displayName, extension, email, magicLink, password } = opts;
   const RELEASE = "https://github.com/AssistantVirtualAI/attach-app-creator/releases/latest/download";
   const downloads = [
     { icon: "📱", title: "iPhone & iPad", note: "Download on the App Store", href: "https://apps.apple.com/" },
