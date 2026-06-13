@@ -1077,7 +1077,7 @@ Deno.serve(async (req) => {
           attempts.push({ url: safeUrl(url), status: 0, content_type: e?.name === "AbortError" ? "timeout" : undefined });
         }
       }
-      return json({ error: "RECORDING_NOT_FOUND", message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.", attempts }, 404);
+      return json({ ok: false, error: "RECORDING_NOT_FOUND", message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.", attempts }, 200, { "X-Recording-Status": "not-found" });
     }
 
     // ---- Voicemail CRUD ----
