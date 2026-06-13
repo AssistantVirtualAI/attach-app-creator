@@ -26,6 +26,9 @@ type Gateway = {
 export default function LemtelGateways() {
   const [q, setQ] = useState('');
   const [restarting, setRestarting] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({ gateway: '', proxy: '', username: '', password: '', realm: '', context: 'public', register: true, enabled: true, profile: 'external', expire_seconds: '600', retry_seconds: '30' });
 
   const { data: rows = [], isLoading, refetch } = useQuery({
     queryKey: ['fpbx', 'gateways'],
