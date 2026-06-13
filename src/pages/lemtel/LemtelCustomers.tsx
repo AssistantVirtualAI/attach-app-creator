@@ -42,6 +42,11 @@ export default function LemtelCustomers() {
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [editDomain, setEditDomain] = useState<Domain | null>(null);
+  const [editDesc, setEditDesc] = useState('');
+  const [editEnabled, setEditEnabled] = useState(true);
+  const [editSaving, setEditSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   // 1) FusionPBX domains (live, via proxy)
   const { data: domains = [], isLoading: loadingDomains, refetch: refetchDomains } = useQuery({
