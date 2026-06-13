@@ -1,4 +1,6 @@
 import React from 'react';
+import lemtelIcon from '../assets/lemtel-icon.png';
+
 
 export type LemtelLogoSize = 'xs' | 'sm' | 'md' | 'lg';
 
