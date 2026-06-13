@@ -5159,6 +5159,7 @@ export type Database = {
           digit: string
           id: string
           ivr_id: string
+          pbx_uuid: string | null
           sort_order: number | null
         }
         Insert: {
@@ -5168,6 +5169,7 @@ export type Database = {
           digit: string
           id?: string
           ivr_id: string
+          pbx_uuid?: string | null
           sort_order?: number | null
         }
         Update: {
@@ -5177,6 +5179,7 @@ export type Database = {
           digit?: string
           id?: string
           ivr_id?: string
+          pbx_uuid?: string | null
           sort_order?: number | null
         }
         Relationships: [
