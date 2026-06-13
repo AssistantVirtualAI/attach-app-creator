@@ -27,6 +27,23 @@ const SuperAdminDashboard = () => {
   const { language } = useLanguage();
   const { stats, organizations, isLoading, refetch } = useSuperAdminStats();
   const [searchQuery, setSearchQuery] = useState('');
+  const [unifying, setUnifying] = useState(false);
+
+  const handleUnifyPasswords = async () => {
+    if (!confirm('This will overwrite the portal login password of every activated user with their current phone (SIP) password, so the same password works on portal, desktop, mobile and the phone. Continue?')) return;
+    setUnifying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('unify-passwords-backfill', { body: {} });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).message || (data as any).error);
+      const d: any = data;
+      toast.success(`Unified ${d.updated}/${d.total} users (${d.skipped} skipped, ${d.errors?.length || 0} errors)`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to unify passwords');
+    } finally {
+      setUnifying(false);
+    }
+  };
 
   const texts = {
     title: language === 'fr' ? 'Tableau de bord Super Admin' : 'Super Admin Dashboard',
