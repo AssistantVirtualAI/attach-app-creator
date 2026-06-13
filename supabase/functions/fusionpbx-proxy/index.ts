@@ -925,6 +925,8 @@ Deno.serve(async (req) => {
       const attempts: { url: string; status: number; content_type?: string }[] = [];
       const tryUrls: string[] = [];
       if (xml_cdr_uuid) {
+        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`));
+        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
         tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin&ext=${ext}`));
         tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin&ext=${ext}`));
         tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
