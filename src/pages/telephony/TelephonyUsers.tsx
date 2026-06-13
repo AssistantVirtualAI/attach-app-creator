@@ -57,6 +57,7 @@ interface UserRow {
   active_platforms: string[] | null;
   account_status: string | null;
   total_calls: number | null;
+  app_access_enabled?: boolean | null;
   email?: string | null;
 }
 
