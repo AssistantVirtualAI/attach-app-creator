@@ -11,72 +11,60 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  const admin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
   try {
-    const { action, agentId, phoneNumberId, phoneConfig, apiKey: providedApiKey } = await req.json();
-    
+    const { action, agentId, phoneNumberId, phoneConfig, apiKey: providedApiKey, organizationId, pbxGatewayUuid, did, direction } = await req.json();
+
     console.log(`[elevenlabs-phone-numbers] Action: ${action}`);
-    
+
     let apiKey = providedApiKey;
-    
-    // If no API key provided, get from user's integration
+    let userId: string | null = null;
+
+    // Resolve API key
     if (!apiKey) {
       const authHeader = req.headers.get('Authorization');
-      if (!authHeader) {
-        return new Response(JSON.stringify({ error: 'API key or authorization required' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      
-      const token = authHeader.replace('Bearer ', '');
-      
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { global: { headers: { Authorization: authHeader } } }
-      );
-
-      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-      if (userError || !user) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Get API key from agent or integration
-      if (agentId) {
-        const { data: agentData } = await supabase
-          .from('agents')
-          .select('platform_api_key, config')
-          .eq('platform_agent_id', agentId)
-          .single();
-
-        if (agentData?.platform_api_key) {
-          apiKey = agentData.platform_api_key;
-        } else if (agentData?.config && (agentData.config as any)?.api_key) {
-          apiKey = (agentData.config as any).api_key;
+      if (authHeader) {
+        const token = authHeader.replace('Bearer ', '');
+        const supabase = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+          { global: { headers: { Authorization: authHeader } } }
+        );
+        const { data: { user } } = await supabase.auth.getUser(token);
+        if (user) {
+          userId = user.id;
+          if (agentId) {
+            const { data: agentData } = await supabase
+              .from('agents')
+              .select('platform_api_key, config')
+              .eq('platform_agent_id', agentId)
+              .maybeSingle();
+            if (agentData?.platform_api_key) apiKey = agentData.platform_api_key;
+            else if ((agentData?.config as any)?.api_key) apiKey = (agentData?.config as any).api_key;
+          }
+          if (!apiKey) {
+            const { data: integration } = await supabase
+              .from('organization_integrations')
+              .select('api_key')
+              .eq('user_id', user.id)
+              .eq('platform', 'elevenlabs')
+              .eq('is_active', true)
+              .maybeSingle();
+            if (integration?.api_key) apiKey = integration.api_key;
+          }
         }
       }
-
-      if (!apiKey) {
-        const { data: integration } = await supabase
-          .from('organization_integrations')
-          .select('api_key')
-          .eq('user_id', user.id)
-          .eq('platform', 'elevenlabs')
-          .eq('is_active', true)
-          .single();
-
-        if (integration?.api_key) {
-          apiKey = integration.api_key;
-        }
-      }
+      // Connector-synced workspace key as final fallback
+      if (!apiKey) apiKey = Deno.env.get('ELEVENLABS_API_KEY') ?? '';
     }
 
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: 'ElevenLabs API key required' }),
+        JSON.stringify({ error: 'ElevenLabs API key required (connect ElevenLabs in Integrations)' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
