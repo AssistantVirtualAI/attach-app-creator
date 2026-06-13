@@ -263,11 +263,13 @@ export default function LemtelGateways() {
                       <TableCell><Badge variant={enabled ? 'default' : 'secondary'}>{enabled ? 'On' : 'Off'}</Badge></TableCell>
                       <TableCell className="text-xs text-muted-foreground">{g.hostname || g.description || '—'}</TableCell>
                       <TableCell className="text-right space-x-1">
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(g)} title="Edit"><Pencil className="w-3.5 h-3.5" /></Button>
                         <Button variant="ghost" size="sm" onClick={() => sofiaCmd(g, 'start-gateway')} title="Start"><Play className="w-3.5 h-3.5" /></Button>
                         <Button variant="ghost" size="sm" onClick={() => sofiaCmd(g, 'stop-gateway')} title="Stop"><Square className="w-3.5 h-3.5" /></Button>
                         <Button variant="ghost" size="sm" disabled={restarting === g.gateway_uuid} onClick={() => restart(g)} title="Restart">
                           {restarting === g.gateway_uuid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Power className="w-3.5 h-3.5" />}
                         </Button>
+                        <Button variant="ghost" size="sm" onClick={() => deleteGateway(g)} title="Delete"><Trash2 className="w-3.5 h-3.5" /></Button>
                       </TableCell>
                     </TableRow>
                   );
