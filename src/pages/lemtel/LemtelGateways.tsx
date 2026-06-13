@@ -76,6 +76,37 @@ export default function LemtelGateways() {
     } finally { setRestarting(null); }
   };
 
+  const sofiaCmd = async (gw: Gateway, action: 'start-gateway' | 'stop-gateway') => {
+    try {
+      const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action, params: { gateway_name: gw.gateway } },
+      });
+      if (error) throw error;
+      toast.success(`${action === 'start-gateway' ? 'Started' : 'Stopped'} ${gw.gateway}`);
+    } catch (e: any) { toast.error('Failed: ' + (e?.message || '')); }
+  };
+
+  const createGateway = async () => {
+    setCreating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'create-gateways', params: {
+          gateway: form.gateway, proxy: form.proxy, username: form.username, password: form.password,
+          realm: form.realm || form.proxy, context: form.context, profile: form.profile,
+          register: form.register ? 'true' : 'false', enabled: form.enabled ? 'true' : 'false',
+          expire_seconds: form.expire_seconds, retry_seconds: form.retry_seconds,
+        } },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success('Gateway created');
+      setOpen(false);
+      refetch();
+    } catch (e: any) {
+      toast.error(e?.message || 'Create failed');
+    } finally { setCreating(false); }
+  };
+
   const filtered = rows.filter(g =>
     !q || `${g.gateway} ${g.proxy ?? ''} ${g.hostname ?? ''}`.toLowerCase().includes(q.toLowerCase())
   );
