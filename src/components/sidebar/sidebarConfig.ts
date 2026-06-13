@@ -158,6 +158,7 @@ const ORG_GROUPS: NavGroup[] = [
       { nameKey: 'Download Apps', href: '/org/lemtel/admin/downloads', icon: Download },
       { nameKey: 'PBX Advanced', href: '/org/lemtel/telephony/advanced', icon: Shield },
       { nameKey: 'Sync Health', href: '/org/lemtel/telephony/sync-health', icon: Activity },
+      { nameKey: 'PBX Sync Health', href: '/org/lemtel/admin/sync-health', icon: Activity },
       { nameKey: 'Settings', href: '/org/lemtel/admin/settings', icon: Settings },
     ],
   },
