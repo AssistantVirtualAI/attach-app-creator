@@ -262,11 +262,29 @@ export default function AdminView() {
       </aside>
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px' }}>
         {sec === 'extensions' && <ExtensionsTable />}
-        {sec === 'devices' && <Table title="Devices" cols={['Vendor', 'MAC', 'Template', 'Assigned', 'Registered']} load={ava.devices} row={(d: any) => [d.vendor, d.mac, d.template, d.assignedTo || '—', d.registered ? 'Yes' : 'No']} />}
-        {sec === 'numbers' && <Table title="Phone Numbers" cols={['Number', 'Assigned To', 'Type']} load={ava.phoneNumbers} row={(n: any) => [n.number, n.assignedTo, n.type]} />}
+        {sec === 'devices' && (
+          <PbxResourceSection
+            kind="devices" title="Devices" uuidField="device_uuid"
+            cols={[{ key: 'device_vendor', label: 'Vendor' }, { key: 'device_mac_address', label: 'MAC' }, { key: 'device_template', label: 'Template' }, { key: 'device_label', label: 'Assigned' }, { key: 'device_enabled', label: 'Enabled' }]}
+            fields={[{ key: 'device_label', label: 'Label' }, { key: 'device_vendor', label: 'Vendor' }, { key: 'device_mac_address', label: 'MAC Address' }, { key: 'device_template', label: 'Template' }, { key: 'device_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] }]}
+          />
+        )}
+        {sec === 'numbers' && (
+          <PbxResourceSection
+            kind="destinations" actionKind="destination" title="Phone Numbers" uuidField="destination_uuid"
+            cols={[{ key: 'destination_number', label: 'Number' }, { key: 'destination_action', label: 'Assigned To' }, { key: 'destination_type', label: 'Type' }, { key: 'destination_enabled', label: 'Enabled' }]}
+            fields={[{ key: 'destination_number', label: 'Number' }, { key: 'destination_action', label: 'Destination Action' }, { key: 'destination_type', label: 'Type' }, { key: 'destination_description', label: 'Description' }, { key: 'destination_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] }]}
+          />
+        )}
         {sec === 'ivrs' && <IvrsTable />}
         {sec === 'queues' && <QueuesTable />}
-        {sec === 'ringgroups' && <Table title="Ring Groups" cols={['Name', 'Members', 'Strategy']} load={ava.ringGroups} row={(r: any) => [r.name, r.members, r.strategy]} />}
+        {sec === 'ringgroups' && (
+          <PbxResourceSection
+            kind="ring-groups" title="Ring Groups" uuidField="ring_group_uuid"
+            cols={[{ key: 'ring_group_name', label: 'Name' }, { key: 'ring_group_extension', label: 'Extension' }, { key: 'ring_group_strategy', label: 'Strategy' }, { key: 'ring_group_enabled', label: 'Enabled' }]}
+            fields={[{ key: 'ring_group_name', label: 'Name' }, { key: 'ring_group_extension', label: 'Extension' }, { key: 'ring_group_strategy', label: 'Strategy', type: 'select', options: ['simultaneous', 'sequence', 'enterprise'] }, { key: 'ring_group_timeout_app', label: 'Timeout App' }, { key: 'ring_group_forward_destination', label: 'Forwarding / fallback' }, { key: 'ring_group_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] }, { key: 'ring_group_description', label: 'Description', type: 'textarea' }]}
+          />
+        )}
         {sec === 'gateways' && (
           <PbxResourceSection
             kind="gateways" title="Gateways" uuidField="gateway_uuid" global
