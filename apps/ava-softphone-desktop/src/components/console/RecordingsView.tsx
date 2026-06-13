@@ -382,12 +382,12 @@ export default function RecordingsView() {
               {(audioUrl || sel.recordingUrl) ? (
                 <audio
                   controls
-                  autoPlay={!!audioUrl}
+                  preload="auto"
                   src={audioUrl || sel.recordingUrl || undefined}
                   style={{ width: '100%', height: 36 }}
                   onError={() => {
                     setPlaybackError('PBX recording file is not reachable yet. Sync the phone system and try again.');
-                    if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl);
+                    if (sel) { const u = audioBlobCache.get(sel.id); if (u) { URL.revokeObjectURL(u); audioBlobCache.delete(sel.id); } }
                     setAudioUrl(null);
                   }}
                 />
