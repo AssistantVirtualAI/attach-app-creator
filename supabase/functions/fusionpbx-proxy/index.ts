@@ -730,60 +730,123 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ---- CDRs (list / sync) ----
-    if (action === "list-cdrs" || action === "sync-cdrs" || action === "get-cdrs") {
+    // ---- CDRs (list / sync / full backfill via offset pagination) ----
+    if (action === "list-cdrs" || action === "sync-cdrs" || action === "get-cdrs" || action === "backfill-cdrs") {
       const b: any = body;
       const extension: string | undefined = params.extension ?? b.extension;
-      // FusionPBX xml_cdr API does not accept start_date/end_date or operators
-      // in querystring filters — it triggers internal SQL errors. We always
-      // pull the latest N rows and rely on upsert to dedupe.
-      const extra: Record<string, string> = { limit: String(params.limit ?? b.limit ?? 100) };
-      if (extension) extra.extension = extension;
+      const isBackfill = action === "backfill-cdrs";
+      const pageSize: number = parseInt(String(params.page_size ?? b.page_size ?? (isBackfill ? 500 : (params.limit ?? b.limit ?? 100))));
+      const maxPages: number = parseInt(String(params.max_pages ?? b.max_pages ?? (isBackfill ? 50 : 1)));
+      let totalFetched = 0, totalUpserted = 0, lastEndpoint: string | null = null, pages = 0;
+      const allErrors: string[] = [];
+      let firstPage: any[] = [];
 
-
-
-      const r = await fetchCdrsWithFallback(extra);
-      if (!r.ok) {
-        await admin.from("pbx_sync_jobs").insert({
-          organization_id, job_type: action, status: "failed",
-          started_at: new Date().toISOString(),
-          completed_at: new Date().toISOString(),
-          error: `No working CDR endpoint. Attempts: ${JSON.stringify(r.attempts).slice(0, 1500)}`,
-          stats: {},
-        });
-        return json({ error: "NO_CDR_ENDPOINT", attempts: r.attempts }, 502);
-      }
-      const cdrs = r.records;
-      let upserted = 0;
-      if (cdrs.length > 0) {
-        const rows = cdrs.map(mapCdr).filter((x) => x.pbx_uuid);
-        const uuids = [...new Set(rows.map((x) => x.extension_uuid).filter(Boolean))];
-        if (uuids.length) {
-          const { data: exts } = await admin.from("pbx_extensions")
-            .select("pbx_uuid, extension, effective_cid_number")
-            .eq("organization_id", organization_id)
-            .in("pbx_uuid", uuids);
-          const byUuid = new Map((exts || []).map((e: any) => [e.pbx_uuid, e.extension || e.effective_cid_number]));
-          rows.forEach((row: any) => {
-            if (!row.extension && row.extension_uuid) row.extension = byUuid.get(row.extension_uuid) || null;
-          });
+      for (let i = 0; i < maxPages; i++) {
+        const extra: Record<string, string> = { limit: String(pageSize), offset: String(i * pageSize) };
+        if (extension) extra.extension = extension;
+        const r = await fetchCdrsWithFallback(extra);
+        if (!r.ok) {
+          if (i === 0) {
+            await admin.from("pbx_sync_jobs").insert({
+              organization_id, job_type: action, status: "failed",
+              started_at: new Date().toISOString(), completed_at: new Date().toISOString(),
+              error: `No working CDR endpoint. Attempts: ${JSON.stringify(r.attempts).slice(0, 1500)}`, stats: {},
+            });
+            return json({ error: "NO_CDR_ENDPOINT", attempts: r.attempts }, 502);
+          }
+          allErrors.push(`page ${i}: fetch_failed`);
+          break;
         }
-        const { error, count } = await admin.from("pbx_call_records").upsert(rows, { onConflict: "pbx_uuid", count: "exact" });
-        if (!error) upserted = count ?? rows.length;
+        lastEndpoint = r.endpoint;
+        const cdrs = r.records;
+        if (i === 0) firstPage = cdrs;
+        totalFetched += cdrs.length;
+        pages++;
+        if (cdrs.length > 0) {
+          const rows = cdrs.map(mapCdr).filter((x) => x.pbx_uuid);
+          const uuids = [...new Set(rows.map((x) => x.extension_uuid).filter(Boolean))];
+          if (uuids.length) {
+            const { data: exts } = await admin.from("pbx_extensions")
+              .select("pbx_uuid, extension, effective_cid_number")
+              .eq("organization_id", organization_id).in("pbx_uuid", uuids);
+            const byUuid = new Map((exts || []).map((e: any) => [e.pbx_uuid, e.extension || e.effective_cid_number]));
+            rows.forEach((row: any) => {
+              if (!row.extension && row.extension_uuid) row.extension = byUuid.get(row.extension_uuid) || null;
+            });
+          }
+          const { error, count } = await admin.from("pbx_call_records").upsert(rows, { onConflict: "pbx_uuid", count: "exact" });
+          if (error) allErrors.push(`upsert page ${i}: ${error.message}`);
+          else totalUpserted += count ?? rows.length;
+        }
+        if (cdrs.length < pageSize) break; // reached end
       }
+
       await admin.from("pbx_sync_jobs").insert({
-        organization_id, job_type: action, status: "completed",
-        started_at: new Date(Date.now() - (r.latency_ms || 0)).toISOString(),
-        completed_at: new Date().toISOString(),
-        stats: { cdrs: upserted, fetched: cdrs.length, endpoint: r.endpoint, duration_ms: r.latency_ms },
+        organization_id, job_type: action,
+        status: allErrors.length ? "completed_with_errors" : "completed",
+        started_at: new Date().toISOString(), completed_at: new Date().toISOString(),
+        stats: { cdrs: totalUpserted, fetched: totalFetched, pages, endpoint: lastEndpoint },
+        error: allErrors.length ? allErrors.join("; ").slice(0, 2000) : null,
       });
-      try {
-        await admin.from("audit_logs").insert({
-          organization_id, action: "pbx_sync_completed", resource_type: "pbx_integration",
-          metadata: { job_type: action, stats: { cdrs: upserted, fetched: cdrs.length, endpoint: r.endpoint }, duration_ms: r.latency_ms, timestamp: new Date().toISOString() },
-        });
-      } catch (auditErr: any) { console.warn("Audit log failed:", auditErr?.message); }
-      return json({ ok: true, endpoint: r.endpoint, data: action === "list-cdrs" ? cdrs : undefined, stats: { cdrs: upserted, fetched: cdrs.length } });
+      return json({
+        ok: true, endpoint: lastEndpoint,
+        data: action === "list-cdrs" ? firstPage : undefined,
+        stats: { cdrs: totalUpserted, fetched: totalFetched, pages },
+        errors: allErrors,
+      });
+    }
+
+    // ---- Domains mirror ----
+    if (action === "sync-domains") {
+      const r = await pbxFetch(`domains`);
+      if (!r.ok) return json(r, r.status || 500);
+      const domains = collection(r.data, "domains");
+      const rows = domains.map((d: any) => ({
+        organization_id,
+        pbx_uuid: d.domain_uuid,
+        name: d.domain_name,
+        description: d.domain_description ?? null,
+        enabled: !(d.domain_enabled === "false" || d.domain_enabled === false),
+        last_synced_at: new Date().toISOString(),
+      })).filter((x: any) => x.pbx_uuid && x.name);
+      let upserted = 0;
+      if (rows.length) {
+        const { error, count } = await admin.from("pbx_domains").upsert(rows, { onConflict: "pbx_uuid", count: "exact" });
+        if (error) return json({ ok: false, error: error.message }, 500);
+        upserted = count ?? rows.length;
+      }
+      return json({ ok: true, domains: upserted, fetched: domains.length });
+    }
+
+    // ---- Voicemail messages mirror ----
+    if (action === "sync-voicemail-messages") {
+      const r = await pbxFetch(`voicemail_messages?${domainQ}&limit=2000`);
+      if (!r.ok) return json(r, r.status || 500);
+      const msgs = collection(r.data, "voicemail_messages");
+      const rows = msgs.map((m: any) => ({
+        organization_id,
+        extension: String(m.voicemail_id ?? m.extension ?? ""),
+        mailbox: String(m.voicemail_id ?? ""),
+        caller_number: m.caller_id_number ?? null,
+        caller_name: m.caller_id_name ?? null,
+        received_at: m.created_epoch
+          ? new Date(parseInt(m.created_epoch) * 1000).toISOString()
+          : (m.message_received ?? new Date().toISOString()),
+        duration_seconds: m.message_length ? parseInt(m.message_length) : 0,
+        audio_storage_path: m.message_path ?? null,
+        folder: m.message_status === "saved" ? "archived" : "inbox",
+        fusionpbx_uuid: m.voicemail_message_uuid ?? null,
+      })).filter((x: any) => x.fusionpbx_uuid && x.extension);
+      let upserted = 0;
+      if (rows.length) {
+        const uuids = rows.map((r: any) => r.fusionpbx_uuid);
+        await admin.from("pbx_voicemails").delete()
+          .eq("organization_id", organization_id).in("fusionpbx_uuid", uuids);
+        const { error, count } = await admin.from("pbx_voicemails").insert(rows, { count: "exact" });
+        if (error) return json({ ok: false, error: error.message }, 500);
+        upserted = count ?? rows.length;
+      }
+      return json({ ok: true, voicemails: upserted, fetched: msgs.length });
     }
 
     // ---- Full sync ----
