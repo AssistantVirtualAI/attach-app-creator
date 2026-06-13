@@ -41,7 +41,7 @@ export default function LemtelLogo({
       style={{ display: 'inline-flex', alignItems: 'center', lineHeight: 0, filter, ...style }}
     >
       <img
-        src="/lemtel-icon.png"
+        src={lemtelIcon}
         alt="Lemtel"
         width={s}
         height={s}
