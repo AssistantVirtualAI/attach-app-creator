@@ -571,17 +571,32 @@ export default function LemtelIVR() {
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setOptDialogOpen(false)}>Annuler</Button>
                       <Button onClick={async () => {
-                        if (!selectedId || !optDigit) return;
-                        const { error } = await supabase.from('pbx_ivr_options').insert({
-                          ivr_id: selectedId, digit: optDigit, destination_type: optDestType,
-                          destination_id: optDestId || null, description: optDesc || null,
-                        });
-                        if (error) toast.error(error.message);
-                        else {
+                        if (!selectedId || !optDigit || !selected?.pbx_uuid) return toast.error('IVR not synced with PBX');
+                        try {
+                          const res: any = await supabase.functions.invoke('pbx-write', {
+                            body: {
+                              organizationId: selectedOrgId,
+                              action: 'create-ivr-option',
+                              params: {
+                                ivr_menu_uuid: selected.pbx_uuid,
+                                ivr_menu_option_digits: optDigit,
+                                ivr_menu_option_action: optDestType,
+                                ivr_menu_option_param: optDestId || '',
+                                ivr_menu_option_description: optDesc || '',
+                                ivr_menu_option_enabled: 'true',
+                              },
+                            },
+                          });
+                          if (res?.error) throw res.error;
+                          const pbxUuid: string | null = res?.data?.proxy?.data?.[0]?.ivr_menu_option_uuid ?? null;
+                          await supabase.from('pbx_ivr_options').insert({
+                            ivr_id: selectedId, digit: optDigit, destination_type: optDestType,
+                            destination_id: optDestId || null, description: optDesc || null, pbx_uuid: pbxUuid,
+                          });
                           toast.success('Option ajoutée');
                           setOptDialogOpen(false);
                           queryClient.invalidateQueries({ queryKey: ['pbx', 'pbx_ivr_options', selectedId] });
-                        }
+                        } catch (e: any) { toast.error(e?.message || 'Échec ajout'); }
                       }}>Ajouter</Button>
                     </DialogFooter>
                   </DialogContent>
