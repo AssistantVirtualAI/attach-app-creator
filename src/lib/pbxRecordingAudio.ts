@@ -53,6 +53,14 @@ export async function loadPbxRecordingAudio(recording: RecordingMeta, organizati
 
   if (!res.ok) {
     const message = await res.text().catch(() => '');
+    try {
+      const parsed = JSON.parse(message);
+      if (parsed?.error === 'RECORDING_NOT_FOUND') {
+        throw new Error('PBX recording file is not reachable. Sync the phone system and verify the file still exists on the PBX server.');
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('PBX recording file')) throw err;
+    }
     throw new Error(message.slice(0, 220) || `Recording unavailable (${res.status})`);
   }
 
