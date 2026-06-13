@@ -127,16 +127,19 @@ Deno.serve(async (req) => {
 
     const sipPass = sip_password || generatePassword();
 
-    // STEP 1 — Auth user (create or reuse)
+    // STEP 1 — Auth user (create or reuse), and align Supabase Auth password with SIP password
     let authUserId: string;
     let userCreated = false;
     const { data: list } = await admin.auth.admin.listUsers();
     const existing = list?.users?.find((u: any) => u.email?.toLowerCase() === String(email).toLowerCase());
     if (existing) {
       authUserId = existing.id;
+      // Align portal password to the SIP password (single unified password)
+      await admin.auth.admin.updateUserById(authUserId, { password: sipPass });
     } else {
       const { data: created, error: authErr } = await admin.auth.admin.createUser({
         email,
+        password: sipPass,
         email_confirm: true,
         user_metadata: { display_name, extension, organization_id, role: "lemtel_user" },
       });
