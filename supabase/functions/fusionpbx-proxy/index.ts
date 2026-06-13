@@ -940,6 +940,13 @@ Deno.serve(async (req) => {
         tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/api/7/recordings/download?domain_uuid=${du}&path=${p}&name=${n}`));
         // Last resorts: FusionPBX stores absolute file paths, but serves them from /recordings/...
         const cleanPath = String(record_path).replace(/^\/+/, "");
+        const domainName = String(domain_name || "");
+        const relativeName = domainName
+          ? `${cleanPath.replace(new RegExp(`^var/lib/freeswitch/recordings/${domainName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?`), "")}/${String(record_name)}`
+          : `${String(record_path).split("/recordings/").pop()?.split("/").slice(1).join("/") || cleanPath}/${String(record_name)}`;
+        const rel = encodeURIComponent(relativeName.replace(/^\/+/, ""));
+        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?action=download&type=rec&t=bin&filename=${rel}`));
+        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?a=download&type=rec&t=bin&filename=${rel}`));
         const publicPath = cleanPath.replace(/^var\/lib\/freeswitch\/recordings\//, "recordings/");
         tryUrls.push(`${FUSIONPBX_API_URL}/${publicPath}/${n}`);
         tryUrls.push(`${FUSIONPBX_API_URL}/${cleanPath}/${n}`);
