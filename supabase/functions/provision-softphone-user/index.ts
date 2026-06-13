@@ -266,7 +266,7 @@ Deno.serve(async (req) => {
             from: "Lemtel Telecom <welcome@lemtel.ca>",
             to: [email],
             subject: `Welcome to Lemtel Telecom — Your extension is ready (Ext. ${extension})`,
-            html: welcomeHtml({ displayName: display_name, extension: String(extension), email, magicLink }),
+            html: welcomeHtml({ displayName: display_name, extension: String(extension), email, magicLink, password: sipPass }),
           }),
         });
         emailSent = res.ok;
