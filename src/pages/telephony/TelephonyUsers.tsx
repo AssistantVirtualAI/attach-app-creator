@@ -57,6 +57,7 @@ interface UserRow {
   active_platforms: string[] | null;
   account_status: string | null;
   total_calls: number | null;
+  app_access_enabled?: boolean | null;
   email?: string | null;
 }
 
@@ -66,11 +67,10 @@ function useSoftphoneUsers() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pbx_softphone_users' as any)
-        .select('id, portal_user_id, extension, display_name, status, last_seen_at, active_platforms, account_status, total_calls')
+        .select('id, portal_user_id, extension, display_name, status, last_seen_at, active_platforms, account_status, total_calls, app_access_enabled')
         .eq('organization_id', LEMTEL_ORG)
         .order('extension');
       if (error) throw error;
-      // Fetch emails via profiles
       const ids = (data || []).map((d: any) => d.portal_user_id).filter(Boolean);
       let emailMap: Record<string, string> = {};
       if (ids.length) {
@@ -146,6 +146,31 @@ export default function TelephonyUsers() {
     else toast.success(`Password reset email sent to ${u.email}`);
   };
 
+  const syncSipPassword = async (u: UserRow) => {
+    toast.loading('Syncing PBX password to apps…', { id: u.id });
+    const { data, error } = await supabase.functions.invoke('set-unified-password', {
+      body: { softphone_id: u.id, use_current_sip_password: true, source: 'admin_sync_sip' },
+    });
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.message || error?.message || 'Failed', { id: u.id });
+    } else {
+      toast.success(`Password unified for ext ${u.extension}`, { id: u.id });
+      refetch();
+    }
+  };
+
+  const toggleAppAccess = async (u: UserRow, enabled: boolean) => {
+    const { data, error } = await supabase.rpc('set_softphone_app_access' as any, {
+      _softphone_id: u.id, _enabled: enabled,
+    });
+    if (error || (data as any)?.ok === false) {
+      toast.error(error?.message || 'Failed to update access');
+    } else {
+      toast.success(enabled ? 'App access enabled' : 'App access disabled');
+      qc.invalidateQueries({ queryKey: ['lemtel', 'softphone-users'] });
+    }
+  };
+
   const deactivate = async (u: UserRow) => {
     if (!confirm(`Deactivate ${u.display_name || u.extension}?`)) return;
     const { error } = await supabase
@@ -163,9 +188,20 @@ export default function TelephonyUsers() {
           <h1 className="text-3xl font-bold flex items-center gap-2"><Users className="w-7 h-7" /> Team Members</h1>
           <p className="text-muted-foreground">Manage softphone users across all platforms</p>
         </div>
-        <Button onClick={() => setOpen(true)} disabled={!isAdmin}>
-          <Plus className="w-4 h-4 mr-2" /> Add User
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" disabled={!isAdmin} onClick={async () => {
+            if (!confirm('Push every PBX SIP password into portal/desktop/mobile auth?')) return;
+            toast.loading('Unifying passwords…', { id: 'backfill' });
+            const { data, error } = await supabase.functions.invoke('unify-passwords-backfill', { body: {} });
+            if (error || (data as any)?.error) toast.error((data as any)?.message || error?.message || 'Failed', { id: 'backfill' });
+            else toast.success(`Unified ${(data as any)?.updated ?? 0} users`, { id: 'backfill' });
+          }}>
+            <KeyRound className="w-4 h-4 mr-2" /> Sync all passwords
+          </Button>
+          <Button onClick={() => setOpen(true)} disabled={!isAdmin}>
+            <Plus className="w-4 h-4 mr-2" /> Add User
+          </Button>
+        </div>
       </div>
 
       {!isAdmin && (
@@ -206,6 +242,7 @@ export default function TelephonyUsers() {
                   <TableHead>Extension</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Platforms</TableHead>
+                  <TableHead>App access</TableHead>
                   <TableHead>Last seen</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -232,20 +269,28 @@ export default function TelephonyUsers() {
                       </span>
                     </TableCell>
                     <TableCell><PlatformIcons platforms={u.active_platforms || []} /></TableCell>
+                    <TableCell>
+                      <Switch
+                        checked={u.app_access_enabled !== false}
+                        disabled={!isAdmin}
+                        onCheckedChange={(v) => toggleAppAccess(u, v)}
+                      />
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {u.last_seen_at ? formatDistanceToNow(new Date(u.last_seen_at), { addSuffix: true }) : <span className="text-amber-600">Pending</span>}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="inline-flex gap-1">
+                        <Button size="icon" variant="ghost" title="Sync PBX password to portal/desktop/mobile" onClick={() => syncSipPassword(u)} disabled={!isAdmin}><RefreshCw className="w-4 h-4" /></Button>
                         <Button size="icon" variant="ghost" title="Resend welcome" onClick={() => resendWelcome(u)} disabled={!isAdmin}><Mail className="w-4 h-4" /></Button>
-                        <Button size="icon" variant="ghost" title="Reset password" onClick={() => resetPassword(u)} disabled={!isAdmin}><KeyRound className="w-4 h-4" /></Button>
+                        <Button size="icon" variant="ghost" title="Reset password (email)" onClick={() => resetPassword(u)} disabled={!isAdmin}><KeyRound className="w-4 h-4" /></Button>
                         <Button size="icon" variant="ghost" title="Deactivate" onClick={() => deactivate(u)} disabled={!isAdmin}><Trash2 className="w-4 h-4" /></Button>
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
                 {!filtered.length && (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No users yet — click <b>Add User</b> to provision one.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No users yet — click <b>Add User</b> to provision one.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

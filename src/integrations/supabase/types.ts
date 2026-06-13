@@ -8534,6 +8534,10 @@ export type Database = {
         Args: { _email: string; _softphone_id: string }
         Returns: Json
       }
+      admin_link_softphone_by_extension_email: {
+        Args: { _email: string; _extension: string; _org_id: string }
+        Returns: Json
+      }
       can_access_chat_channel: {
         Args: { _channel_id: string; _user_id: string }
         Returns: boolean

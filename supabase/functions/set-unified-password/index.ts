@@ -40,29 +40,33 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const target_user_id: string | undefined = body?.target_user_id;
     const target_softphone_id: string | undefined = body?.softphone_id;
-    const password: string = body?.password || generatePassword();
+    const use_current_sip: boolean = !!body?.use_current_sip_password;
+    let password: string = body?.password || "";
     const source: string = body?.source || "admin_reset";
 
-    if (password.length < 8) return json({ error: "WEAK_PASSWORD", message: "Min 8 chars" }, 400);
-
-    // Resolve softphone user row
+    // Resolve softphone user row (sip_password needed if use_current_sip)
     let row: any = null;
+    const cols = "id, organization_id, extension, portal_user_id, sip_password";
     if (target_softphone_id) {
       const { data } = await admin
-        .from("pbx_softphone_users")
-        .select("id, organization_id, extension, portal_user_id")
-        .eq("id", target_softphone_id)
-        .maybeSingle();
+        .from("pbx_softphone_users").select(cols).eq("id", target_softphone_id).maybeSingle();
       row = data;
     } else if (target_user_id) {
       const { data } = await admin
-        .from("pbx_softphone_users")
-        .select("id, organization_id, extension, portal_user_id")
-        .eq("portal_user_id", target_user_id)
-        .maybeSingle();
+        .from("pbx_softphone_users").select(cols).eq("portal_user_id", target_user_id).maybeSingle();
       row = data;
     }
     if (!row) return json({ error: "USER_NOT_FOUND" }, 404);
+
+    if (use_current_sip) {
+      if (!row.sip_password || row.sip_password.length < 6) {
+        return json({ error: "NO_SIP_PASSWORD", message: "No SIP password stored for this extension" }, 400);
+      }
+      password = row.sip_password;
+    } else if (!password) {
+      password = generatePassword();
+    }
+    if (password.length < 8) return json({ error: "WEAK_PASSWORD", message: "Min 8 chars" }, 400);
 
     // Authorization
     const isSelf = row.portal_user_id === caller.id;

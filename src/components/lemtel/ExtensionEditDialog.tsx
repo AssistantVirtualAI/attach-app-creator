@@ -178,16 +178,19 @@ export function ExtensionEditDialog({ open, onOpenChange, extension }: Props) {
             </div>
             <div className="flex gap-2">
               <Input placeholder="user@example.com" value={assignEmail} onChange={(e) => setAssignEmail(e.target.value)} />
-              <Button type="button" variant="outline" disabled={assigning || !extension.id}
+              <Button type="button" variant="outline" disabled={assigning || !extension.extension}
                 onClick={async () => {
                   setAssigning(true);
                   try {
-                    const { data, error } = await (supabase as any).rpc('admin_link_softphone_by_email', {
-                      _softphone_id: extension.id, _email: assignEmail.trim(),
+                    const { data, error } = await (supabase as any).rpc('admin_link_softphone_by_extension_email', {
+                      _org_id: extension.organization_id,
+                      _extension: String(extension.extension),
+                      _email: assignEmail.trim() || null,
                     });
                     if (error) throw error;
                     toast({ title: 'User linked', description: assignEmail || 'Unlinked' });
                     qc.invalidateQueries({ queryKey: ['pbx_extensions'] });
+                    qc.invalidateQueries({ queryKey: ['lemtel', 'softphone-users'] });
                   } catch (e: any) {
                     toast({ title: 'Link failed', description: e?.message || String(e), variant: 'destructive' });
                   } finally { setAssigning(false); }
