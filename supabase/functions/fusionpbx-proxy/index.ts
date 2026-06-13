@@ -1018,7 +1018,8 @@ Deno.serve(async (req) => {
       }
 
       const uniqueUrls = [...new Set(tryUrls)];
-      for (const url of uniqueUrls) {
+      for (let i = 0; i < uniqueUrls.length; i++) {
+        const url = uniqueUrls[i];
         try {
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 4500);
@@ -1031,11 +1032,19 @@ Deno.serve(async (req) => {
             const looksLikeAudio = head.startsWith("id3") || head.startsWith("riff") || head.startsWith("oggs") || head.includes("ftyp") || (buf.byteLength > 1200 && !looksLikeError);
             if (rct.includes("application/json")) {
               try {
-                const decoded = decodeJsonDownload(JSON.parse(new TextDecoder().decode(buf)));
+                const parsed = JSON.parse(new TextDecoder().decode(buf));
+                const decoded = decodeJsonDownload(parsed);
                 if (decoded && decoded.byteLength > 1200) {
                   return new Response(decoded, {
                     headers: { ...corsHeaders, "Content-Type": ct, "Content-Length": String(decoded.byteLength), "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=300" },
                   });
+                }
+                const nextUrl = extractJsonDownloadUrl(parsed);
+                if (nextUrl) {
+                  const absoluteUrl = nextUrl.startsWith("http")
+                    ? nextUrl
+                    : `${FUSIONPBX_API_URL}/${nextUrl.replace(/^\/+/, "")}`;
+                  if (!uniqueUrls.includes(absoluteUrl)) uniqueUrls.push(absoluteUrl);
                 }
               } catch { /* not a base64 download response */ }
             }
