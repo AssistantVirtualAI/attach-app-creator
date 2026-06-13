@@ -209,9 +209,9 @@ export default function LemtelGateways() {
                   <Switch checked={form.enabled} onCheckedChange={(v) => setForm({ ...form, enabled: v })} />
                   <Label>Enabled</Label>
                 </div>
-                <Button className="w-full" disabled={creating || !form.gateway || !form.proxy} onClick={createGateway}>
+                <Button className="w-full" disabled={creating || !form.gateway || !form.proxy} onClick={saveGateway}>
                   {creating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                  Create
+                  {(form as any).gateway_uuid ? 'Save Changes' : 'Create'}
                 </Button>
               </div>
             </SheetContent>
