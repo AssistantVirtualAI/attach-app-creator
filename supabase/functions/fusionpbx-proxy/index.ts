@@ -612,7 +612,7 @@ Deno.serve(async (req) => {
       const id = params.ivr_menu_option_uuid;
       if (!id) return json({ error: "ivr_menu_option_uuid required" }, 400);
       return json(await pbxWrite(`ivr_menu_options/${id}`, "DELETE"));
-    }
+    if (action === "create-queue") return json(await writeCollection("call_center_queues", "call_center_queues", params));
     if (action === "update-queue") return json(await writeCollection("call_center_queues", "call_center_queues", params));
     if (action === "delete-queue") {
       const id = params.call_center_queue_uuid || params.queue_uuid;
