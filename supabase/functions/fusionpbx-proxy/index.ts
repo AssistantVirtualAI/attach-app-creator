@@ -294,13 +294,13 @@ Deno.serve(async (req) => {
     if (action === "list-gateways-all-domains") {
       const d = await pbxFetch("domains");
       const domains = collection(d.data, "domains");
-      const all: any[] = [];
-      for (const dom of domains) {
+      const results = await Promise.all(domains.map(async (dom: any) => {
         const r = await pbxFetch(`gateways?domain_uuid=${dom.domain_uuid}`);
         const rows = collection(r.data, "gateways");
-        for (const g of rows) all.push({ ...g, _domain_name: dom.domain_name });
-      }
-      return json({ ok: true, data: all, total_domains: domains.length });
+        return rows.map((g: any) => ({ ...g, _domain_name: dom.domain_name, _domain_uuid: dom.domain_uuid }));
+      }));
+      const all = results.flat();
+      return json({ ok: true, data: all, total_domains: domains.length, total_gateways: all.length });
     }
 
     // ---- LIST actions ----
