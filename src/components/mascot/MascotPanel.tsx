@@ -89,11 +89,11 @@ export default function MascotPanel({
 
   if (!open) return null;
   return (
-    <Card className="fixed bottom-24 right-6 z-[60] w-[400px] h-[600px] max-h-[80vh] flex flex-col overflow-hidden border-primary/30 shadow-2xl backdrop-blur-xl bg-background/95 animate-in fade-in slide-in-from-bottom-4">
+    <Card className="fixed top-36 right-4 z-[60] w-[380px] h-[560px] max-h-[80vh] flex flex-col overflow-hidden border-primary/30 shadow-2xl backdrop-blur-xl bg-background/95 animate-in fade-in slide-in-from-top-4">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-gradient-to-r from-primary/10 to-transparent">
-        <div className="w-9 h-9 shrink-0">
-          <MascotFox talking={talking} listening={listening} />
+        <div className="w-10 h-10 shrink-0">
+          <MascotRobot talking={talking} listening={listening} compact />
         </div>
         <div className="flex-1 min-w-0">
           <div className="font-semibold leading-tight">Lemtel</div>
