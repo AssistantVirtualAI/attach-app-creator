@@ -118,9 +118,45 @@ export default function LemtelGateways() {
           <h1 className="text-3xl font-bold flex items-center gap-2"><Network className="w-7 h-7" /> Gateways</h1>
           <p className="text-muted-foreground text-sm">SIP trunks &amp; carrier connections programmed on the PBX</p>
         </div>
-        <Button variant="outline" onClick={() => refetch()}>
-          <RefreshCw className="w-4 h-4 mr-2" /> Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="w-4 h-4 mr-2" /> Refresh
+          </Button>
+          <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger asChild><Button><Plus className="w-4 h-4 mr-2" /> Add Gateway</Button></SheetTrigger>
+            <SheetContent className="space-y-3 overflow-y-auto">
+              <SheetHeader><SheetTitle>New SIP Gateway</SheetTitle></SheetHeader>
+              <div className="space-y-3">
+                {[
+                  ['gateway', 'Name'], ['proxy', 'Proxy (host:port)'], ['realm', 'Realm (optional)'],
+                  ['username', 'Username'], ['password', 'Password'],
+                  ['context', 'Context'], ['profile', 'Profile'], ['expire_seconds', 'Expire (s)'], ['retry_seconds', 'Retry (s)'],
+                ].map(([k, label]) => (
+                  <div key={k}>
+                    <Label>{label}</Label>
+                    <Input
+                      type={k === 'password' ? 'password' : 'text'}
+                      value={(form as any)[k]}
+                      onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+                    />
+                  </div>
+                ))}
+                <div className="flex items-center gap-3">
+                  <Switch checked={form.register} onCheckedChange={(v) => setForm({ ...form, register: v })} />
+                  <Label>Register</Label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch checked={form.enabled} onCheckedChange={(v) => setForm({ ...form, enabled: v })} />
+                  <Label>Enabled</Label>
+                </div>
+                <Button className="w-full" disabled={creating || !form.gateway || !form.proxy} onClick={createGateway}>
+                  {creating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Create
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
 
       <Card>
