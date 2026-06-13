@@ -9,6 +9,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { pbxInvoke } from '@/lib/pbxInvoke';
+import { useOrganization } from '@/context/OrganizationContext';
 import { Music, RefreshCw, Search, Loader2, Plus, Trash2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -33,7 +35,9 @@ const empty = {
 };
 
 export default function AdminHoldMusic() {
-  const [q, setQ] = useState('');
+  
+  const { selectedOrgId } = useOrganization();
+const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<any>(empty);

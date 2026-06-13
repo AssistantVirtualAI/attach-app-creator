@@ -9,6 +9,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { pbxInvoke } from '@/lib/pbxInvoke';
+import { useOrganization } from '@/context/OrganizationContext';
 import { Server, RefreshCw, Loader2, Plus, Trash2, Pencil, Power } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -23,7 +25,9 @@ type Prof = {
 const empty: any = { sip_profile_uuid: '', sip_profile_name: '', sip_profile_hostname: '', sip_profile_enabled: true, sip_profile_description: '' };
 
 export default function AdminSipProfiles() {
-  const [open, setOpen] = useState(false);
+  
+  const { selectedOrgId } = useOrganization();
+const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<any>(empty);
 
