@@ -241,7 +241,7 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
         WebkitAppRegion: 'no-drag' as any,
       }}>
         <img
-          src="/ava-statistic-logo.png"
+          src={avaStatisticLogo}
           alt="AVA Statistic"
           width={28}
           height={28}
