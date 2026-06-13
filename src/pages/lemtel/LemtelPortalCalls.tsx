@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { usePbxCallRecords, usePbxSync, usePbxTestCdrEndpoint, LEMTEL_ORG } from '@/hooks/usePbxData';
 import { useQueryClient } from '@tanstack/react-query';
+import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
 
 function statusBadge(c: any) {
   if (c.missed_call) return <Badge className="bg-red-500/15 text-red-600 border-red-500/30 border">Missed</Badge>;
@@ -88,17 +89,13 @@ export default function LemtelPortalCalls() {
 
   const playRecording = async (c: any) => {
     setPlayingId(c.id); setAudioUrl(null);
-    const record_path = c.recording_path || (c.recording_url || '').split('/').slice(0, -1).join('/');
-    const record_name = c.recording_name || (c.recording_url || '').split('/').pop();
-    const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-      body: { action: 'get-recording', params: { record_path, record_name }, organization_id: LEMTEL_ORG },
-    });
-    if (error || !data) {
-      toast({ title: 'Playback failed', description: error?.message, variant: 'destructive' });
+    try {
+      const url = await loadPbxRecordingAudio(c, LEMTEL_ORG);
+      setAudioUrl(url);
+    } catch (e: any) {
+      toast({ title: 'Playback failed', description: e?.message, variant: 'destructive' });
       setPlayingId(null); return;
     }
-    const blob = data instanceof Blob ? data : new Blob([data as any], { type: 'audio/wav' });
-    setAudioUrl(URL.createObjectURL(blob));
   };
 
   const openDiagnose = async () => {
