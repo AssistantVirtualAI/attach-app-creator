@@ -196,6 +196,7 @@ export interface CallRecord {
   sentiment?: 'positive' | 'neutral' | 'negative';
   customer?: string;
   organization_id?: string; transcript_text?: string;
+  pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
 }
@@ -229,6 +230,7 @@ export interface VoicemailItem {
   priority: 'low' | 'normal' | 'high';
   handled?: boolean; feedback?: Feedback;
   organization_id?: string; callId?: string;
+  pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
 }
@@ -238,6 +240,7 @@ export interface RecordingItem {
   qualityScore: number; sentiment: 'positive' | 'neutral' | 'negative';
   summary: string; topics: string[]; tags: string[]; feedback?: Feedback;
   organization_id?: string; transcript_text?: string;
+  pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
   recordingUrl?: string | null;
