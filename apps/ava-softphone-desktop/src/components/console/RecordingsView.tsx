@@ -36,6 +36,10 @@ function fmtSize(kb?: number | null) {
   kb = Number(kb || 0);
   return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
 }
+// Module-level blob cache so re-selecting a recording is instant and prefetched audio survives renders.
+const audioBlobCache = new Map<string, string>();
+const audioInFlight = new Map<string, Promise<string | null>>();
+
 function rangeCutoff(r: Range): number {
   const ms = { '24h': 864e5, '7d': 7 * 864e5, '30d': 30 * 864e5, '90d': 90 * 864e5 } as const;
   return r === 'all' ? 0 : Date.now() - (ms as any)[r];
@@ -78,14 +82,54 @@ export default function RecordingsView() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Helper: fetch (or reuse cached) blob URL for a recording, deduping concurrent calls.
+  const fetchAudio = useCallback(async (rec: RecordingItem): Promise<string | null> => {
+    const cached = audioBlobCache.get(rec.id);
+    if (cached) return cached;
+    const pending = audioInFlight.get(rec.id);
+    if (pending) return pending;
+    const p = (async () => {
+      const url = await ava.getRecordingAudioUrl(rec);
+      if (url) audioBlobCache.set(rec.id, url);
+      return url;
+    })().finally(() => audioInFlight.delete(rec.id));
+    audioInFlight.set(rec.id, p);
+    return p;
+  }, []);
+
+  // When selection changes: show cached blob immediately, otherwise fetch silently in background.
   useEffect(() => {
     setPlaybackError(null);
-    if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
     setTranscript(String((sel as any)?.transcript_text || (sel as any)?.raw_data?.transcript_text || ''));
     setAnalysis((sel as any)?.raw_data?.ai || null);
     setAiError(null);
-  }, [sel?.id]);
+    if (!sel) return;
+    const cached = audioBlobCache.get(sel.id);
+    if (cached) { setAudioUrl(cached); return; }
+    let cancelled = false;
+    setPlaybackLoading(true);
+    fetchAudio(sel)
+      .then((u) => { if (!cancelled) { if (u) setAudioUrl(u); else setPlaybackError('Recording file not available from PBX yet'); } })
+      .finally(() => { if (!cancelled) setPlaybackLoading(false); });
+    return () => { cancelled = true; };
+  }, [sel?.id, fetchAudio]);
+
+  // Background prefetch: download the first 25 recordings (concurrency 2) so playback is instant.
+  useEffect(() => {
+    if (!items.length) return;
+    const queue = items.slice(0, 25).filter((r) => !audioBlobCache.get(r.id));
+    let cancelled = false;
+    const worker = async () => {
+      while (!cancelled && queue.length) {
+        const next = queue.shift();
+        if (!next) break;
+        try { await fetchAudio(next); } catch { /* ignore */ }
+      }
+    };
+    worker(); worker();
+    return () => { cancelled = true; };
+  }, [items, fetchAudio]);
 
   const filtered = useMemo(() => {
     const cutoff = rangeCutoff(range);
@@ -152,11 +196,8 @@ export default function RecordingsView() {
     if (!sel) return;
     setPlaybackError(null); setPlaybackLoading(true);
     try {
-      const url = await ava.getRecordingAudioUrl(sel);
-      if (!url) {
-        setPlaybackError('Recording file not available from PBX yet');
-        return;
-      }
+      const url = await fetchAudio(sel);
+      if (!url) { setPlaybackError('Recording file not available from PBX yet'); return; }
       setAudioUrl(url);
     } finally {
       setPlaybackLoading(false);
@@ -341,12 +382,12 @@ export default function RecordingsView() {
               {(audioUrl || sel.recordingUrl) ? (
                 <audio
                   controls
-                  autoPlay={!!audioUrl}
+                  preload="auto"
                   src={audioUrl || sel.recordingUrl || undefined}
                   style={{ width: '100%', height: 36 }}
                   onError={() => {
                     setPlaybackError('PBX recording file is not reachable yet. Sync the phone system and try again.');
-                    if (audioUrl?.startsWith('blob:')) URL.revokeObjectURL(audioUrl);
+                    if (sel) { const u = audioBlobCache.get(sel.id); if (u) { URL.revokeObjectURL(u); audioBlobCache.delete(sel.id); } }
                     setAudioUrl(null);
                   }}
                 />
