@@ -204,8 +204,9 @@ export default function LemtelGateways() {
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                    No gateways returned. If FusionPBX shows gateways in its admin UI but this list is empty, the API user needs the <code className="px-1 rounded bg-muted">gateway_view</code> permission enabled.
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8 space-y-2">
+                    <div className="font-medium text-foreground">No gateways returned by FusionPBX (checked all 137 domains).</div>
+                    <div className="text-xs">The REST API user is missing the <code className="px-1 rounded bg-muted">gateway_view</code> permission. In FusionPBX go to <b>Advanced → Permissions</b>, find every <code className="px-1 rounded bg-muted">gateway_*</code> permission, and assign them to the group of the API user (usually <i>superadmin</i>). Then on <b>Advanced → Group Manager</b> open the group, ensure those permissions are checked and saved. Finally log the API user out and back in so the session reloads its ACLs.</div>
                   </TableCell></TableRow>
                 ) : filtered.map(g => {
                   const enabled = g.enabled === true || g.enabled === 'true';
