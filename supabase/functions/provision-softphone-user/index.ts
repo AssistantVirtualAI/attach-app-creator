@@ -50,11 +50,13 @@ function welcomeHtml(opts: { displayName: string; extension: string; email: stri
           <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:8px;padding:16px;">
             <tr><td style="padding:6px 0;color:#64748b;">Extension</td><td align="right" style="padding:6px 0;font-weight:600;">${extension}</td></tr>
             <tr><td style="padding:6px 0;color:#64748b;">Email</td><td align="right" style="padding:6px 0;font-weight:600;">${email}</td></tr>
+            ${password ? `<tr><td style="padding:6px 0;color:#64748b;">Password</td><td align="right" style="padding:6px 0;font-weight:700;font-family:Fira Code,monospace;background:#fef3c7;border-radius:6px;padding:6px 10px;">${password}</td></tr>` : ""}
             <tr><td style="padding:6px 0;color:#64748b;">SIP Domain</td><td align="right" style="padding:6px 0;font-weight:600;">${SIP_DOMAIN}</td></tr>
             <tr><td style="padding:6px 0;color:#64748b;">Portal</td><td align="right" style="padding:6px 0;font-weight:600;">avastatistic.ca</td></tr>
           </table>
+          ${password ? `<p style="margin:14px 0;color:#475569;font-size:13px;">This single password works for the <b>portal</b>, the <b>desktop app</b>, the <b>mobile app</b>, and your <b>desk phone</b>.</p>` : ""}
           ${magicLink ? `<div style="text-align:center;margin:24px 0;">
-            <a href="${magicLink}" style="background:#0023e6;color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:600;display:inline-block;">✨ Set Your Password & Sign In →</a>
+            <a href="${magicLink}" style="background:#0023e6;color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:600;display:inline-block;">✨ Open Portal →</a>
             <div style="margin-top:8px;color:#94a3b8;font-size:12px;">Link expires in 24 hours</div>
           </div>` : ""}
           <h2 style="font-size:16px;margin:28px 0 12px;">📱 Download Lemtel Telecom</h2>
