@@ -894,7 +894,9 @@ Deno.serve(async (req) => {
 
     // ---- Recording proxy ----
     if (action === "get-recording") {
-      const { record_path, record_name, xml_cdr_uuid, domain_uuid, domain_name, local_recording_url } = params as any;
+      const recordingParams = { ...(params || {}) } as any;
+      if (!recordingParams.xml_cdr_uuid) recordingParams.xml_cdr_uuid = body.xml_cdr_uuid || body.id;
+      const { record_path, record_name, xml_cdr_uuid, domain_uuid, domain_name, local_recording_url } = recordingParams;
       if (!xml_cdr_uuid && !(record_path && record_name)) {
         return json({ error: "xml_cdr_uuid or (record_path, record_name) required" }, 400);
       }
@@ -980,7 +982,11 @@ Deno.serve(async (req) => {
         if (base.hostname === "portal.lemtel.tel") fileBases.push("https://pbxnode.lemtel.tel");
       } catch { /* ignore alternate file host */ }
       if (xml_cdr_uuid) {
+        const du = encodeURIComponent(String(domain_uuid || FUSIONPBX_DOMAIN_UUID || ""));
         for (const fileBase of fileBases) {
+          tryUrls.push(withQueryAuth(`${fileBase}/app/api/7/call_recordings/download?domain_uuid=${du}&id=${encodeURIComponent(xml_cdr_uuid)}`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/api/7/call_recordings/${encodeURIComponent(xml_cdr_uuid)}/download?domain_uuid=${du}`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/api/7/call_recordings/${encodeURIComponent(xml_cdr_uuid)}?domain_uuid=${du}&download=true`));
           tryUrls.push(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`);
           tryUrls.push(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&binary`);
           tryUrls.push(withQueryAuth(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
