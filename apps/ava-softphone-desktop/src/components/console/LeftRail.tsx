@@ -58,9 +58,13 @@ interface Props {
   onOpenSearch: () => void;
   compact?: boolean;
   isAdmin?: boolean;
+  isSuperAdmin?: boolean;
+  onStartTour?: () => void;
 }
 
-export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch, compact, isAdmin }: Props) {
+const SUPER_ADMIN_EXTRAS: ConsoleView[] = ['customers', 'voiceagents', 'reports', 'admin', 'aiadmin'];
+
+export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch, compact, isAdmin, isSuperAdmin, onStartTour }: Props) {
   const { t } = useTranslation();
   const { pbx, syncConnected, lastEvent, ageMs, healthy } = useSyncStatus();
   const ITEMS: ConsoleView[] = isAdmin ? [...USER_ITEMS, ...ADMIN_ITEMS] : USER_ITEMS;
@@ -168,7 +172,43 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
 
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, WebkitAppRegion: 'no-drag' as any, overflowY: 'auto' }}>
         {ITEMS.map((v) => <RailItem key={v} v={v} active={view === v} onClick={() => onChange(v)} label={t(NAV_KEY[v])} />)}
+
+        {isSuperAdmin && (
+          <>
+            <div style={{
+              marginTop: 14, marginBottom: 4, padding: '4px 10px',
+              fontSize: 9, fontWeight: 800, letterSpacing: 1.8,
+              color: c.signalGold, textTransform: 'uppercase',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span>👑 Platform</span>
+              <span style={{ flex: 1, height: 1, background: `linear-gradient(90deg, ${c.borderGold || c.border}, transparent)` }} />
+            </div>
+            {SUPER_ADMIN_EXTRAS.map((v) => (
+              <RailItem key={`sa-${v}`} v={v} active={view === v} onClick={() => onChange(v)} label={t(NAV_KEY[v])} />
+            ))}
+          </>
+        )}
       </nav>
+
+      {onStartTour && (
+        <button
+          onClick={onStartTour}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 11,
+            padding: '7px 11px', borderRadius: 9,
+            background: 'transparent', border: 'none',
+            color: c.mutedSilver, fontSize: 11.5, fontWeight: 500,
+            cursor: 'pointer', textAlign: 'left',
+            WebkitAppRegion: 'no-drag' as any,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = c.signalGold; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = c.mutedSilver; }}
+        >
+          <span style={{ fontSize: 14 }}>💡</span>
+          Restart tour
+        </button>
+      )}
 
       <button
         onClick={onOpenSettings}
