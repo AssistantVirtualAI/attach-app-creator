@@ -965,9 +965,12 @@ Deno.serve(async (req) => {
         }
       }
 
-      for (const url of tryUrls) {
+      const uniqueUrls = [...new Set(tryUrls)];
+      for (const url of uniqueUrls) {
         try {
-          const r = await fetch(url, { headers: { Authorization: basicHeader, Accept: "*/*" }, redirect: "follow" });
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 4500);
+          const r = await fetch(url, { headers: { Authorization: basicHeader, Accept: "*/*" }, redirect: "follow", signal: controller.signal }).finally(() => clearTimeout(timeout));
           if (r.ok) {
             const buf = await r.arrayBuffer();
             const rct = r.headers.get("content-type") || "";
@@ -991,7 +994,7 @@ Deno.serve(async (req) => {
           }
           attempts.push({ url: safeUrl(url), status: r.status, content_type: r.headers.get("content-type") || undefined });
         } catch (e: any) {
-          attempts.push({ url: safeUrl(url), status: 0 });
+          attempts.push({ url: safeUrl(url), status: 0, content_type: e?.name === "AbortError" ? "timeout" : undefined });
         }
       }
       return json({ error: "RECORDING_NOT_FOUND", attempts }, 502);
