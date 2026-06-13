@@ -897,6 +897,7 @@ const App = () => (
 
 
               </Routes>
+              <MascotProvider />
             </Suspense>
           </OrganizationProvider>
           </BrowserRouter>
