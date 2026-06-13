@@ -408,6 +408,9 @@ export default function LemtelIVR() {
                     <CardTitle>{selected.name}</CardTitle>
                     <p className="text-sm text-muted-foreground mt-1">Extension {selected.extension || '—'}</p>
                   </div>
+                  <Button variant="ghost" size="sm" onClick={deleteIvr} className="text-destructive">
+                    Supprimer
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
