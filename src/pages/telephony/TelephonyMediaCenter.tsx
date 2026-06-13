@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Disc, Voicemail as VmIcon, PhoneCall, Trash2, RefreshCw, Download, Share2, Sparkles, Loader2, Play, Pause } from "lucide-react";
+import { Disc, Voicemail as VmIcon, PhoneCall, Trash2, RefreshCw, Download, Sparkles, Loader2, Play, Pause } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { LEMTEL_ORG } from "@/hooks/usePbxData";
 import { usePbxWrite } from "@/hooks/usePbxWrite";
@@ -207,7 +207,7 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
       <CardContent className="space-y-3">
         {filtered.length === 0 && <p className="text-sm text-muted-foreground">Aucun enregistrement.</p>}
         {filtered.map((r) => {
-          const url = r.recording_path ? signed[r.recording_path] : r.recording_url;
+          const url = signed[r.id] || r.recording_url;
           return (
             <div key={r.id} className="border rounded-lg p-3 space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2 text-sm">
@@ -225,8 +225,7 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
                   )}
                   {r.recording_path && (
                     <>
-                      <Button size="sm" variant="outline" onClick={() => sign(r.recording_path)}>Charger</Button>
-                      <Button size="icon" variant="ghost" onClick={() => share(r.recording_path)}><Share2 className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="outline" onClick={() => sign(r)} disabled={working === r.id}>{working === r.id ? 'Chargement…' : 'Charger'}</Button>
                       {url && <Button size="icon" variant="ghost" asChild><a href={url} download><Download className="h-4 w-4" /></a></Button>}
                     </>
                   )}
