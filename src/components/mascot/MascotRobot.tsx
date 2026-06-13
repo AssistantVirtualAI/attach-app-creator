@@ -170,10 +170,10 @@ function Robot({ talking, listening }: { talking: boolean; listening: boolean })
           <capsuleGeometry args={[0.045, 0.16, 6, 12]} />
         </mesh>
         {/* Side bolts/ears */}
-        <mesh position={[-0.7, -0.02, 0]} material={accent}>
-          <cylinderGeometry args={[0.07, 0.07, 0.12, 16]} rotation={[0, 0, Math.PI / 2]} />
+        <mesh position={[-0.7, -0.02, 0]} rotation={[0, 0, Math.PI / 2]} material={accent}>
+          <cylinderGeometry args={[0.07, 0.07, 0.12, 16]} />
         </mesh>
-        <mesh position={[0.7, -0.02, 0]} material={accent}>
+        <mesh position={[0.7, -0.02, 0]} rotation={[0, 0, Math.PI / 2]} material={accent}>
           <cylinderGeometry args={[0.07, 0.07, 0.12, 16]} />
         </mesh>
         {/* Antenna */}
