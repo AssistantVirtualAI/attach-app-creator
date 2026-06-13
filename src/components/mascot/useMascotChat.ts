@@ -33,13 +33,13 @@ export function useMascotChat(threadId: string) {
       body: {
         context: {
           route: location.pathname,
-          organizationId: selectedOrganization?.id,
-          organizationName: selectedOrganization?.name,
+          organizationId: selectedOrg?.id,
+          organizationName: selectedOrg?.name,
           locale: typeof navigator !== "undefined" ? navigator.language : "en",
         },
       },
     });
-  }, [token, location.pathname, selectedOrganization?.id, selectedOrganization?.name]);
+  }, [token, location.pathname, selectedOrg?.id, selectedOrg?.name]);
 
   const chat = useChat({
     id: threadId,
