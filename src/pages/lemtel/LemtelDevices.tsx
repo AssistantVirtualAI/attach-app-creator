@@ -73,7 +73,7 @@ export default function LemtelDevices() {
             table: 'pbx_devices',
             row: {
               ...(form.id ? { id: form.id } : {}),
-              pbx_uuid: form.pbx_uuid ?? (data as any)?.proxy?.uuid ?? null,
+              pbx_uuid: form.pbx_uuid ?? null,
               mac_address: params.device_mac_address,
               label: form.label, vendor: form.vendor,
               template: form.template, profile: form.profile,
