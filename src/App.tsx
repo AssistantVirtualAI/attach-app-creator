@@ -138,6 +138,13 @@ import AdminDestinations from "./pages/lemtel/admin/AdminDestinations";
 import AdminTimeConditions from "./pages/lemtel/admin/AdminTimeConditions";
 import AdminConferences from "./pages/lemtel/admin/AdminConferences";
 import AdminHoldMusic from "./pages/lemtel/admin/AdminHoldMusic";
+import AdminSyncHealth from "./pages/lemtel/admin/AdminSyncHealth";
+import AdminSipProfiles from "./pages/lemtel/admin/AdminSipProfiles";
+import AdminDialplans from "./pages/lemtel/admin/AdminDialplans";
+import AdminFeatureCodes from "./pages/lemtel/admin/AdminFeatureCodes";
+import AdminCallForwarding from "./pages/lemtel/admin/AdminCallForwarding";
+import AdminRecordingRules from "./pages/lemtel/admin/AdminRecordingRules";
+import AdminVoicemailSettings from "./pages/lemtel/admin/AdminVoicemailSettings";
 import MySettings from "./pages/lemtel/my/MySettings";
 import MyForwarding from "./pages/lemtel/my/MyForwarding";
 import MyDevices from "./pages/lemtel/my/MyDevices";
@@ -675,6 +682,13 @@ const App = () => (
                 <Route path="/org/lemtel/admin/fax" element={<LemtelAdminPage><LemtelStub title="Fax Server" description="Configure inbound/outbound fax routing." /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/conferences" element={<LemtelAdminPage><AdminConferences /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/hold-music" element={<LemtelAdminPage><AdminHoldMusic /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/sync-health" element={<LemtelAdminPage><AdminSyncHealth /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/sip-profiles" element={<LemtelAdminPage><AdminSipProfiles /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/dialplans" element={<LemtelAdminPage><AdminDialplans /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/feature-codes" element={<LemtelAdminPage><AdminFeatureCodes /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/call-forwarding" element={<LemtelAdminPage><AdminCallForwarding /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/recording-rules" element={<LemtelAdminPage><AdminRecordingRules /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/voicemail-settings" element={<LemtelAdminPage><AdminVoicemailSettings /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/conference-centers" element={<LemtelAdminPage><LemtelStub title="Conference Centers" description="Multi-tenant conference bridges." /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/email-queue" element={<LemtelAdminPage><LemtelStub title="Email Queue" description="Outbound notification email queue." /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/call-block" element={<LemtelAdminPage><LemtelStub title="Call Block" description="Block inbound caller IDs and patterns." /></LemtelAdminPage>} />
