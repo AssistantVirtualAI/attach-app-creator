@@ -3,9 +3,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { RecordingWavePlayer } from '@/components/portal/RecordingWavePlayer';
-import { Download, RefreshCw, ChevronDown } from 'lucide-react';
+import { Download, RefreshCw, ChevronDown, Trash2, FileDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
@@ -26,6 +34,9 @@ type Rec = {
 export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
   const [rows, setRows] = useState<Rec[]>([]);
   const [q, setQ] = useState('');
+  const [direction, setDirection] = useState<string>('all');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [loadingRow, setLoadingRow] = useState<string | null>(null);
@@ -33,6 +44,7 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [total, setTotal] = useState<number | null>(null);
 
   const loadPage = useCallback(async (pageNum: number, reset = false) => {
@@ -46,6 +58,12 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
         .eq('has_recording', true)
         .order('start_at', { ascending: false })
         .range(from, to);
+      if (direction !== 'all') query = query.eq('direction', direction);
+      if (fromDate) query = query.gte('start_at', new Date(fromDate).toISOString());
+      if (toDate) {
+        const end = new Date(toDate); end.setDate(end.getDate() + 1);
+        query = query.lt('start_at', end.toISOString());
+      }
       if (scope === 'mine') {
         const { data: auth } = await supabase.auth.getUser();
         const { data: spu } = await (supabase as any).from('pbx_softphone_users')
@@ -64,7 +82,7 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
     } finally {
       setLoading(false);
     }
-  }, [scope]);
+  }, [scope, direction, fromDate, toDate]);
 
   useEffect(() => { loadPage(0, true); }, [loadPage]);
 
@@ -104,6 +122,57 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
     }
   };
 
+  const deleteRecording = async (r: Rec) => {
+    setDeleting(r.id);
+    try {
+      const { error } = await (supabase as any).functions.invoke('pbx-write', {
+        body: {
+          organizationId: LEMTEL_ORG_ID,
+          action: 'delete-recording',
+          params: {
+            call_recording_uuid: r.pbx_uuid,
+            record_path: r.recording_path,
+            record_name: r.recording_name,
+          },
+          objectType: 'recording',
+          objectPbxUuid: r.pbx_uuid,
+        },
+      });
+      if (error) throw error;
+      // clear has_recording locally so it disappears
+      await (supabase as any).from('pbx_call_records')
+        .update({ has_recording: false, recording_path: null, recording_name: null })
+        .eq('id', r.id);
+      setRows(prev => prev.filter(x => x.id !== r.id));
+      toast.success('Recording deleted.');
+    } catch (e: any) {
+      toast.error('Delete failed: ' + (e?.message || 'unknown'));
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const exportCsv = () => {
+    const headers = ['date','direction','extension','caller_name','caller_number','destination','duration_seconds'];
+    const csv = [headers.join(',')].concat(
+      filtered.map(r => [
+        r.start_at,
+        r.direction ?? '',
+        r.extension ?? '',
+        (r.caller_name ?? '').replace(/,/g, ' '),
+        r.caller_number ?? '',
+        r.destination_number ?? r.destination ?? '',
+        r.duration_seconds ?? 0,
+      ].join(','))
+    ).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `recordings-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
   const filtered = rows.filter(r =>
     !q || `${r.caller_name ?? ''} ${r.caller_number ?? ''} ${r.destination_number ?? ''} ${r.destination ?? ''} ${r.extension ?? ''}`
       .toLowerCase().includes(q.toLowerCase())
@@ -120,7 +189,21 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold">{scope === 'mine' ? 'My Recordings' : 'Call Recordings'}</h1>
         <div className="flex items-center gap-2 flex-wrap">
-          <Input placeholder="Search caller, number, extension…" value={q} onChange={e => setQ(e.target.value)} className="max-w-sm" />
+          <Input placeholder="Search caller, number, extension…" value={q} onChange={e => setQ(e.target.value)} className="max-w-xs" />
+          <Select value={direction} onValueChange={setDirection}>
+            <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All directions</SelectItem>
+              <SelectItem value="inbound">Inbound</SelectItem>
+              <SelectItem value="outbound">Outbound</SelectItem>
+              <SelectItem value="local">Local</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-[150px]" />
+          <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-[150px]" />
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
+            <FileDown className="h-4 w-4 mr-2" />CSV
+          </Button>
           {scope === 'org' && (
             <Button variant="outline" size="sm" disabled={syncing} onClick={syncFromPbx}>
               <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
@@ -163,6 +246,27 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
                     <Button size="icon" variant="outline" asChild>
                       <a href={urls[r.id]} download={r.recording_name ?? `${r.id}.wav`}><Download className="h-4 w-4" /></a>
                     </Button>
+                  )}
+                  {scope === 'org' && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="icon" variant="outline" disabled={deleting === r.id}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete this recording?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently remove the recording from the PBX server. The CDR row stays.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => deleteRecording(r)}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   )}
                 </div>
               </div>
