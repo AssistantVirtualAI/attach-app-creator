@@ -105,6 +105,7 @@ const ORG_GROUPS: NavGroup[] = [
       { nameKey: 'IVR / Auto-Attendant', href: '/org/lemtel/admin/ivr', icon: Voicemail },
       { nameKey: 'Ring Groups', href: '/org/lemtel/admin/ring-groups', icon: Bell },
       { nameKey: 'Gateways', href: '/org/lemtel/admin/gateways', icon: Network },
+      { nameKey: 'Voice Gateways', href: '/org/lemtel/admin/voice-gateways', icon: Network },
       { nameKey: 'Voice Agents', href: '/org/lemtel/admin/agents', icon: Bot },
       { nameKey: 'Agent Conversations', href: '/org/lemtel/admin/conversations', icon: MessageSquare },
       { nameKey: 'Customers', href: '/org/lemtel/admin/customers', icon: Users },
