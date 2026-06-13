@@ -409,6 +409,16 @@ Deno.serve(async (req) => {
       return json(await pbxWrite(`domains/${id}`, "DELETE"));
     }
 
+    if (action === "update-domain") {
+      const id = body.domain_uuid || params.domain_uuid;
+      if (!id) return json({ ok: false, error: "domain_uuid required" }, 400);
+      const patch: Record<string, unknown> = { domain_uuid: id };
+      if ("domain_description" in params) patch.domain_description = (params as any).domain_description;
+      if ("domain_enabled" in params) patch.domain_enabled = String((params as any).domain_enabled);
+      if ("domain_name" in params) patch.domain_name = (params as any).domain_name;
+      return json(await pbxWrite(`domains/${id}`, "PUT", { domains: [patch] }));
+    }
+
     if (action === "get-registrations") {
       const r = await pbxFetch(`registrations?${domainQ}`);
       if (!r.ok) return json(r, r.status || 500);
