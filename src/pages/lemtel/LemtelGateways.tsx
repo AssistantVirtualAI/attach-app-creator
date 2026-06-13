@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Network, RefreshCw, Search, Loader2, Power, Play, Square, Plus } from 'lucide-react';
+import { Network, RefreshCw, Search, Loader2, Power, Play, Square, Plus, Bug } from 'lucide-react';
 import { toast } from 'sonner';
 
 type Gateway = {
@@ -28,16 +29,16 @@ export default function LemtelGateways() {
   const [restarting, setRestarting] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [diag, setDiag] = useState<any>(null);
+  const [diagOpen, setDiagOpen] = useState(false);
+  const [diagLoading, setDiagLoading] = useState(false);
   const [form, setForm] = useState({ gateway: '', proxy: '', username: '', password: '', realm: '', context: 'public', register: true, enabled: true, profile: 'external', expire_seconds: '600', retry_seconds: '30' });
 
   const { data: rows = [], isLoading, refetch } = useQuery({
     queryKey: ['fpbx', 'gateways'],
     queryFn: async () => {
-      // Aggregate gateways across every FusionPBX domain (the REST API filters
-      // by the API-user's domain, so a single-domain call only ever returns
-      // the gateways of that one tenant).
       const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'list-gateways-all-domains' },
+        body: { action: 'list-gateways-merged' },
       });
       let arr: Gateway[] = [];
       if (!error) {
@@ -51,13 +52,6 @@ export default function LemtelGateways() {
           hostname: g.hostname || g._domain_name,
           description: g.description || g._domain_name,
         }));
-      }
-      // Fallback: single-domain call
-      if (arr.length === 0) {
-        const { data: d2 } = await supabase.functions.invoke('fusionpbx-proxy', {
-          body: { action: 'list-gateways' },
-        });
-        arr = (d2?.data || d2?.gateways || []) as Gateway[];
       }
       // Last resort: cached pbx_gateways rows
       if (!Array.isArray(arr) || arr.length === 0) {
@@ -79,6 +73,19 @@ export default function LemtelGateways() {
       return Array.isArray(arr) ? arr : [];
     },
   });
+
+  const runDiagnostic = async () => {
+    setDiagLoading(true);
+    setDiagOpen(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'debug-raw', params: { path: 'gateways' } },
+      });
+      setDiag(error ? { error: error.message } : data);
+    } catch (e: any) {
+      setDiag({ error: e?.message || String(e) });
+    } finally { setDiagLoading(false); }
+  };
 
   const restart = async (gw: Gateway) => {
     setRestarting(gw.gateway_uuid);
@@ -136,6 +143,9 @@ export default function LemtelGateways() {
           <p className="text-muted-foreground text-sm">SIP trunks &amp; carrier connections programmed on the PBX</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={runDiagnostic}>
+            <Bug className="w-4 h-4 mr-2" /> Diagnostic
+          </Button>
           <Button variant="outline" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4 mr-2" /> Refresh
           </Button>
@@ -205,8 +215,8 @@ export default function LemtelGateways() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8 space-y-2">
-                    <div className="font-medium text-foreground">No gateways returned by FusionPBX (checked all 137 domains).</div>
-                    <div className="text-xs">The REST API user is missing the <code className="px-1 rounded bg-muted">gateway_view</code> permission. In FusionPBX go to <b>Advanced → Permissions</b>, find every <code className="px-1 rounded bg-muted">gateway_*</code> permission, and assign them to the group of the API user (usually <i>superadmin</i>). Then on <b>Advanced → Group Manager</b> open the group, ensure those permissions are checked and saved. Finally log the API user out and back in so the session reloads its ACLs.</div>
+                    <div className="font-medium text-foreground">No gateways returned.</div>
+                    <div className="text-xs">Click <b>Diagnostic</b> above to see the raw FusionPBX API response for <code className="px-1 rounded bg-muted">/gateways</code>.</div>
                   </TableCell></TableRow>
                 ) : filtered.map(g => {
                   const enabled = g.enabled === true || g.enabled === 'true';
@@ -234,6 +244,17 @@ export default function LemtelGateways() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={diagOpen} onOpenChange={setDiagOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader><DialogTitle>FusionPBX /gateways raw response</DialogTitle></DialogHeader>
+          {diagLoading ? (
+            <div className="py-8 flex justify-center"><Loader2 className="animate-spin" /></div>
+          ) : (
+            <pre className="text-xs bg-muted p-3 rounded max-h-[60vh] overflow-auto">{JSON.stringify(diag, null, 2)}</pre>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
