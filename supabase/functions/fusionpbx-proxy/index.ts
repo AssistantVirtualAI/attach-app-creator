@@ -908,20 +908,34 @@ Deno.serve(async (req) => {
                : ext === "m4a" ? "audio/mp4"
                : "audio/wav";
 
-      const attempts: { url: string; status: number }[] = [];
+      const safeUrl = (value: string) => {
+        try {
+          const u = new URL(value);
+          u.searchParams.delete("key");
+          u.searchParams.delete("username");
+          return u.toString();
+        } catch { return value; }
+      };
+      const withQueryAuth = (value: string) => {
+        const u = new URL(value);
+        u.searchParams.set("key", FUSIONPBX_API_KEY);
+        u.searchParams.set("username", FUSIONPBX_USERNAME);
+        return u.toString();
+      };
+      const attempts: { url: string; status: number; content_type?: string }[] = [];
       const tryUrls: string[] = [];
       if (xml_cdr_uuid) {
-        tryUrls.push(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin&ext=${ext}`);
-        tryUrls.push(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin&ext=${ext}`);
-        tryUrls.push(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}`);
+        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin&ext=${ext}`));
+        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin&ext=${ext}`));
+        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
       }
       if (record_path && record_name) {
         const p = encodeURIComponent(String(record_path));
         const n = encodeURIComponent(String(record_name));
         const du = encodeURIComponent(String(domain_uuid || FUSIONPBX_DOMAIN_UUID || ""));
-        tryUrls.push(`${FUSIONPBX_API_URL}/app/recordings/recording_download.php?path=${p}&filename=${n}`);
-        tryUrls.push(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?a=download&path=${p}&filename=${n}`);
-        tryUrls.push(`${FUSIONPBX_API_URL}/app/api/7/recordings/download?domain_uuid=${du}&path=${p}&name=${n}`);
+        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/recordings/recording_download.php?path=${p}&filename=${n}`));
+        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?a=download&path=${p}&filename=${n}`));
+        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/api/7/recordings/download?domain_uuid=${du}&path=${p}&name=${n}`));
         // Last resorts: FusionPBX stores absolute file paths, but serves them from /recordings/...
         const cleanPath = String(record_path).replace(/^\/+/, "");
         const publicPath = cleanPath.replace(/^var\/lib\/freeswitch\/recordings\//, "recordings/");
@@ -940,7 +954,7 @@ Deno.serve(async (req) => {
             const looksLikeAudio = head.startsWith("id3") || head.startsWith("riff") || head.startsWith("oggs") || head.includes("ftyp") || (buf.byteLength > 1200 && !looksLikeError);
             // Reject HTML/JSON/PBX error pages masquerading as successful audio.
             if (rct.includes("text/html") || rct.includes("application/json") || looksLikeError || !looksLikeAudio) {
-              attempts.push({ url, status: r.status });
+               attempts.push({ url: safeUrl(url), status: r.status, content_type: rct || undefined });
               continue;
             }
             return new Response(buf, {
@@ -953,9 +967,9 @@ Deno.serve(async (req) => {
               },
             });
           }
-          attempts.push({ url, status: r.status });
+          attempts.push({ url: safeUrl(url), status: r.status, content_type: r.headers.get("content-type") || undefined });
         } catch (e: any) {
-          attempts.push({ url, status: 0 });
+          attempts.push({ url: safeUrl(url), status: 0 });
         }
       }
       return json({ error: "RECORDING_NOT_FOUND", attempts }, 502);
