@@ -79,13 +79,16 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const checkSuperAdmin = async () => {
     if (!user) return;
     try {
+      // Use security-definer RPC to bypass RLS recursion edge cases
+      const { data: viaRpc } = await supabase.rpc('is_super_admin', { _user_id: user.id });
+      if (viaRpc === true) { setIsSuperAdmin(true); return; }
       const { data } = await supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
         .eq('role', 'super_admin')
-        .maybeSingle();
-      setIsSuperAdmin(!!data);
+        .limit(1);
+      setIsSuperAdmin(Array.isArray(data) && data.length > 0);
     } catch {
       setIsSuperAdmin(false);
     }

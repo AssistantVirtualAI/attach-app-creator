@@ -1,37 +1,64 @@
-# Fix Gateway Listing
+# Polish pass: edit dialogs, recordings, desktop super-admin, white theme, logo & mascot
 
-## Diagnosis
+## 1. Edit sheets/dialogs render properly
 
-Your screenshot is from FusionPBX's gateway page, which shows **global gateways** (sofia profile external) stored in `v_gateways` with `domain_uuid = NULL`. Our current loader calls `list-gateways-all-domains`, which iterates every domain and queries `gateways?domain_uuid=<dom>` — FusionPBX's REST filter **excludes globals** because their `domain_uuid` is NULL, so 137 domains × 0 matches = 0 rows.
+All Lemtel edit sheets (Extension, Gateway, IVR, Queue, Ring Group) use shadcn `Sheet`/`Dialog` which on small viewports clip and lose their footer button.
 
-The plain `gateways` endpoint (without `domain_uuid=`) returns the globals — exactly what's in your screenshot.
+- Apply a shared pattern to every edit surface:
+  - `SheetContent`: `flex flex-col h-full max-h-screen w-full sm:max-w-xl`
+  - Wrap body fields in a scrollable middle: `flex-1 overflow-y-auto px-1 space-y-3`
+  - Pin footer (Save / Cancel) in a `flex-shrink-0 border-t pt-3` block so it's always visible
+- Make form labels and helper text use semantic tokens (`text-foreground` / `text-muted-foreground`) so they remain legible in white theme.
+- Files: `LemtelGateways.tsx`, `LemtelExtensions.tsx`, `LemtelIvrs.tsx`, `LemtelQueues.tsx`, `LemtelRingGroups.tsx`, plus the matching `*EditSheet` / `*Dialog` components.
 
-## Changes
+## 2. Recording playback
 
-### 1. `supabase/functions/fusionpbx-proxy/index.ts`
-Add a new action `list-gateways-merged` that:
-- Calls `gateways` with no filter → captures globals (rows with `domain_uuid` NULL or any).
-- Calls `gateways?domain_uuid=<each>` per domain → captures domain-scoped gateways.
-- De-dupes by `gateway_uuid`, attaches `_domain_name` when present.
-- Returns `{ ok, data, total_global, total_scoped, total_unique }`.
+Rows load but Play does nothing — `fetchRecording()` resolves a URL but `RecordingWavePlayer` never starts. Fix:
 
-Also: make `debug-raw` accept `?key=&username=` query-param auth as a fallback (some FusionPBX installs reject Basic auth on read endpoints) and surface raw status + first 500 chars for quick diagnosis.
+- In `CustomerDetail.tsx` (and the global `RecordingsPage`), after `recUrls[r.id]` is set, mount `RecordingWavePlayer` with `autoPlay` and a fresh `key={r.id}`.
+- In `RecordingWavePlayer.tsx`: support `autoPlay` prop, recreate the WaveSurfer instance on URL change, add an `<audio>` fallback when WaveSurfer fails to decode (current symptom), and surface load/play errors via toast.
+- Edge function `fusionpbx-proxy` `get-recording` already returns a signed URL; add a small `Content-Type: audio/wav` enforcement and CORS `Range` header so seeking works.
 
-### 2. `src/pages/lemtel/LemtelGateways.tsx`
-- Replace the `list-gateways-all-domains` call with `list-gateways-merged`.
-- Drop the misleading "checked all 137 domains / gateway_view permission" empty state (the permission is fine — you can see them in the GUI). Replace with: "No gateways returned. Click **Run diagnostic** to call the raw `/gateways` endpoint and view the response."
-- Add a small "Run diagnostic" button that fires `debug-raw` with `path: 'gateways'` and shows the raw JSON in a dialog — so if it still returns empty we can see exactly what FusionPBX says.
+## 3. Super-admin sees everything in desktop app, regular admin only their org
 
-### 3. No DB / RLS changes
-Pure read path; no migration.
+Console shows `Role: super_admin isSuperAdmin: false` — `useDesktopRole` is reading `role` but not flipping the `isSuperAdmin` flag. Fix:
 
-## Validation
+- `useDesktopRole.ts`: compute `isSuperAdmin = userRole?.role === 'super_admin'` and export it.
+- Wire the desktop sidebar/route guards to `isSuperAdmin`: when true, show **all** Lemtel domains + global admin nav (Users, Domains, Gateways, Billing, Webhooks, System). When false, scope queries by `organization_id` and hide global admin entries.
+- For data queries used by desktop pages, branch the Supabase calls: super_admin → no `organization_id` filter; otherwise → `.eq('organization_id', currentOrgId)`. Touch points: extensions, recordings, voicemails, queues, IVRs, gateways, sms, conversations.
 
-After deploy:
-1. Open `/lemtel/gateways` → expect the 13 gateways from your screenshot.
-2. If still empty, the diagnostic dialog shows the raw API response so we know whether it's an auth issue, an empty response, or a parse mismatch.
+## 4. White theme for desktop app + light/dark toggle
+
+- Extend `index.css` with a `:root[data-theme="light"]` block: white background, near-black foreground, soft gray muted, keep `--primary` at #0023e6 (already AA on white). Map card / popover / sidebar tokens accordingly so existing components recolor automatically — no per-component hex.
+- Add `useDesktopTheme()` hook persisting `light | dark | system` in `localStorage` and applying `data-theme` on `<html>`. Default = `light` for Electron, `dark` for web (detect via `window.electronAPI` flag already set by `electron/main.cjs`).
+- Add a Theme toggle in Desktop Settings (`/desktop/settings`) with three options.
+- Audit hard-coded `text-white` / `bg-black` in desktop pages and replace with `text-foreground` / `bg-background`.
+
+## 5. AVA logo + favicon consistency
+
+- Replace every `<img src="/ava-logo.png">` / hard-coded logo path in desktop with a shared `<AvaLogo />` component that swaps to a white-theme-aware variant (`/lemtel-icon.png` for the "L" mark in tight spots, full `/ava-logo.png` for headers).
+- Update `electron/main.cjs` `icon:` and `BrowserWindow.setIcon()` to `public/lemtel-icon.png`.
+- Update desktop Auth screen (`/desktop/auth`) to use the same `<AvaLogo />` + the L favicon as the window icon.
+- Copy `public/lemtel-icon.png` → `public/favicon.png` and ensure `index.html` references `/favicon.png`. Update `manifest.webmanifest` icons too.
+
+## 6. Mascot — full body, funny 3D robot, repositioned
+
+- Move launcher to **top-right**, above the softphone: `fixed top-6 right-6 z-[60]`. Softphone (`fixed bottom-6 right-6 z-[55]`) stays unobstructed.
+- Replace the cropped `MascotFox` with a new `MascotRobot.tsx` (React Three Fiber): chunky boxy body, oversized round head, dish-antenna, glowing cyan eyes, jointed arms doing idle wave, breathing bob, blinking, mouth opens during streaming tokens. Camera framed so the **whole body** is visible — adjust `fov`, camera Z, and `<group position-y={-0.4}>` to fit.
+- Launcher avatar shows the same robot but framed full-body in a 96×96 capsule (not cropped to a circle that hides legs).
+- Expanded `MascotPanel`: dock as a 360×520 floating card to the **left** of the launcher so it doesn't cover the softphone.
+- Keep the existing tool-calling agent and gather→propose→confirm flow untouched.
 
 ## Out of scope
 
-- Editing gateway create/update flow (works through `create-gateways` already).
-- Mascot chatbot work (separate track, already in progress).
+- New backend tables or RLS changes.
+- Voice TTS for the mascot.
+- Mobile / public landing page edits.
+
+## Validation
+
+- Open each edit sheet → footer button visible, fields scroll.
+- Recordings → click play → audio plays, seek bar works.
+- Log in as super_admin → all 137 domains visible; demote and verify org-scoping.
+- Toggle theme in Desktop Settings → instant white/dark swap, text remains readable everywhere.
+- Mascot visible in full, doesn't overlap softphone; opening the panel doesn't cover incoming-call UI.

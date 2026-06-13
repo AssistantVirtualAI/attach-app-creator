@@ -12,8 +12,12 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('theme') as Theme;
-      return stored || 'dark';
+      const stored = localStorage.getItem('theme') as Theme | null;
+      if (stored === 'light' || stored === 'dark') return stored;
+      // Default: Electron / desktop app → light, web → dark
+      const isElectron = !!(window as any).electronAPI
+        || /electron/i.test(navigator.userAgent || '');
+      return isElectron ? 'light' : 'dark';
     }
     return 'dark';
   });
