@@ -1,45 +1,71 @@
-# Final PBX Parity Phases (9-12) + Desktop App Hardening
+# Phase 13–15 — Visual Polish & Real-Data Wiring Audit
 
-Phases 1-8 are complete. This plan closes the remaining gaps so the portal reaches full FusionPBX parity, and ensures the Electron desktop app shows the exact same views as the web portal.
+Two parallel tracks: (A) visual refinement on portal + desktop, (B) verify every admin page reads/writes real FusionPBX data (no mocks, no stubs).
 
-## Phase 9 — Global Sync Health & Refresh Dashboard
-- New page `AdminSyncHealth.tsx` under Phone System → Sync Health.
-- Surfaces `telecom_sync_health` + `telecom_sync_jobs` + `pbx_sync_jobs`: last sync per entity (extensions, gateways, IVRs, destinations, time conditions, conferences, hold music, voicemail, recordings), status, error, duration.
-- Per-row "Resync now" + global "Resync all" buttons calling `fusionpbx-proxy` list actions and updating cache tables.
-- Auto-refresh every 30s via React Query.
+---
 
-## Phase 10 — SIP Profiles & Advanced Dialplan
-- New page `AdminSipProfiles.tsx`: list/create/edit/delete from `pbx_sip_profiles` via proxy (`list-sip-profiles`, `upsert-sip-profile`, `delete-sip-profile`).
-- New page `AdminDialplans.tsx`: full dialplan CRUD (not just time-conditions filter) with XML editor, context selector, order field, enabled toggle.
-- Add proxy actions in `supabase/functions/fusionpbx-proxy/index.ts`.
+## Track A — Visual Improvements
 
-## Phase 11 — Feature Codes & Call Forwarding (admin)
-- `AdminFeatureCodes.tsx` backed by `pbx_feature_codes` (e.g. *97 voicemail, *72 forward) with enable/disable + code editing.
-- `AdminCallForwarding.tsx` admin view of `pbx_call_forwarding` per extension (always/busy/no-answer/unavailable) with quick edit.
+### A1. Portal (web) — design pass on admin PBX pages
+All `src/pages/lemtel/admin/Admin*.tsx` pages were built fast and share a flat look. Apply a consistent design language:
 
-## Phase 12 — Recording Rules & Voicemail Settings (admin policies)
-- `AdminRecordingRules.tsx` for `pbx_call_recording_rules` (inbound/outbound/internal toggles, retention days).
-- `AdminVoicemailSettings.tsx` for org defaults in `pbx_voicemail_settings` (PIN policy, email-to-vm, transcription toggle, retention).
+- **Page header pattern**: gradient icon chip + title + subtitle + right-aligned action cluster (Refresh / New). Reuse a new `<AdminPageHeader>` component so all 14+ admin pages match.
+- **Stat strip**: small KPI cards at top of list pages (e.g. Extensions: total / online / offline / recording-on) using existing `Card` + semantic tokens.
+- **Tables**: zebra rows, sticky header, hover row highlight, status pill component (`<StatusBadge variant="on|off|warn|err">`), monospace for UUIDs/contexts.
+- **Empty states**: illustration + 1-line hint + primary CTA (instead of "No data.").
+- **Sheets (create/edit)**: section dividers, helper text under labels, sticky footer with Cancel + Save, destructive zone at bottom for Delete.
+- **Loading**: skeleton rows instead of centered spinner.
+- **Color tokens only** — no hard-coded hex. Add 2 new semantic tokens in `index.css` if needed (`--surface-elevated`, `--row-hover`).
+- **Sidebar grouping cleanup** in `sidebarConfig.ts`: collapse the 14 new admin entries under clear sub-sections (Routing, Telephony, Voicemail & Recording, Sync & Health) with section icons.
 
-## Desktop App Parity Hardening (Electron)
-- `electron/main.cjs`: switch from hard-coded `https://avastatistic.ca` to an env-driven URL (`PORTAL_URL` env, defaults to prod) so dev/staging builds show the same portal.
-- Add a "Reload portal" + "Open in browser" menu and a tiny in-app navbar fallback (only if `did-fail-load`).
-- Ensure mic + notifications + clipboard permissions auto-grant (already there) + add `display-capture` for screen share in conferences.
-- Add deep-link handler `avastatistic://` so the desktop opens routes like `/lemtel/admin/sync-health` directly.
-- Add packaging scripts (`build:linux`, `build:mac`, `build:win`) in `package.json` using `@electron/packager` per project conventions.
-- Confirm `vite.config.ts` has `base: './'` (required for Electron file loads) — patch if missing.
-- Document in `electron/README.md` how every new admin page (Phase 9-12) automatically appears in desktop since it's the same React bundle.
+### A2. Desktop app — parity polish
+- `apps/ava-softphone-desktop/src/components/console/AdminView.tsx` currently exposes a subset. Expand left-rail "Admin" to mirror the portal sidebar (Extensions, IVRs, Queues, Ring Groups, Time Conditions, Destinations, Conferences, Hold Music, SIP Profiles, Dialplans, Feature Codes, Call Forwarding, Recording Rules, Voicemail Settings, Sync Health).
+- Reuse the same data hooks (`fusionpbx-proxy` actions) so behavior is identical.
+- Apply the desktop theme tokens (`theme.colors`) — keep the cyber/glass aesthetic, don't import shadcn Cards. Build a thin `<DesktopAdminPage>` wrapper that matches the portal's structure but in desktop styling.
+- Top-bar SYNC button: add per-entity dropdown (sync just Extensions, just CDRs, etc.) instead of only "Sync Phone System".
+- HomeDashboard: replace placeholder tiles with live counts from `pbx_extensions`, `pbx_call_records` (today), `pbx_voicemails` (unread), `telecom_live_calls`.
 
-## Routing & Sidebar
-- Register all 7 new routes in `src/App.tsx`.
-- Add entries in `sidebarConfig.ts`:
-  - Phone System → Sync Health, SIP Profiles, Dialplans, Feature Codes
-  - Call Center → Recording Rules, Voicemail Settings
-  - Phone System → Call Forwarding
+### A3. Cross-cutting
+- Inter (body) + a display font for H1/H2 on admin pages (keep current brand). Confirm Fira Code on UUID/XML blocks per memory.
+- Consistent 4px spacing rhythm.
+- Dark + light parity check on each new admin page.
+
+---
+
+## Track B — Real-Data Wiring Audit
+
+### B1. Inventory pass
+For each admin page created in Phases 1–12, verify:
+1. List query hits a real source (`fusionpbx-proxy` list-* action OR mirrored `pbx_*` table) — no `useState([...])` seed data.
+2. Create / Update / Delete all route through `pbx-write` edge function (RBAC + mirror + audit) — fix any page calling `fusionpbx-proxy` directly for mutations.
+3. Optimistic UI invalidates the React Query key on success.
+4. Form fields cover every column FusionPBX actually accepts (compare against `fusionpbx-proxy/index.ts` action schema).
+
+### B2. Known gaps to fix
+- `AdminDialplans.tsx`, `AdminSipProfiles.tsx`, `AdminFeatureCodes.tsx`, `AdminCallForwarding.tsx`, `AdminRecordingRules.tsx`, `AdminVoicemailSettings.tsx`, `AdminConferences.tsx`, `AdminHoldMusic.tsx`, `AdminDestinations.tsx`, `AdminTimeConditions.tsx` — route mutations through `pbx-write` (currently invoke `fusionpbx-proxy` directly, bypassing audit + mirror).
+- `AdminSyncHealth.tsx` — verify each "Resync" button maps to a real proxy action and surfaces the returned job row in `pbx_sync_jobs`.
+- `LemtelCustomers.tsx`, `LemtelIVR.tsx` — already on real data; confirm edit flows persist.
+- Desktop `AdminView` — wire same hooks; no mock fallbacks unless `useLemtelMockMode` is explicitly on.
+
+### B3. Edge function coverage
+Add any missing actions in `fusionpbx-proxy/index.ts` discovered during B1 (e.g. update single field on extension, toggle recording, restart SIP profile). Mirror tables get an upsert in `pbx-write`'s `mirror` block.
+
+### B4. End-to-end smoke checklist (manual, post-build)
+For each entity: list ✓, create ✓, edit ✓, delete ✓, audit row appears in `audit_logs`, mirror row appears in corresponding `pbx_*` table.
+
+---
 
 ## Out of scope
-- No schema migrations expected (tables already exist).
-- No changes to landing page, billing, or auth flows.
+- Landing page (locked per memory).
+- Auth / billing / RLS changes.
+- New backend tables — only fill gaps in existing `fusionpbx-proxy` and `pbx-write`.
+- Mobile app (`apps/ava-softphone-mobile`) — separate phase if requested.
 
-## Deliverable
-After build mode: 7 new admin pages, expanded `fusionpbx-proxy` actions, hardened Electron shell with env-based URL + deep links + screen-share permission, packaging scripts, and updated sidebar/routes — giving identical parity between web portal and desktop app.
+## Deliverables
+- `<AdminPageHeader>`, `<StatusBadge>`, `<AdminStatStrip>`, skeleton row component (portal).
+- Restyled 14 admin pages + grouped sidebar.
+- Desktop `<DesktopAdminPage>` wrapper + expanded AdminView with all 14 entities.
+- Live HomeDashboard tiles on desktop.
+- All admin mutations routed through `pbx-write` (RBAC + audit + mirror).
+- Any missing `fusionpbx-proxy` actions added.
+- One pass of the smoke checklist documented in `.lovable/plan.md`.

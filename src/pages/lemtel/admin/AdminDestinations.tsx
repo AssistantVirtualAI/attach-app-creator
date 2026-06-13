@@ -9,6 +9,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { pbxInvoke } from '@/lib/pbxInvoke';
+import { useOrganization } from '@/context/OrganizationContext';
 import { PhoneIncoming, RefreshCw, Search, Loader2, Plus, Trash2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -32,7 +34,9 @@ const empty = {
 };
 
 export default function AdminDestinations() {
-  const [q, setQ] = useState('');
+  
+  const { selectedOrgId } = useOrganization();
+const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<any>(empty);
@@ -77,7 +81,7 @@ export default function AdminDestinations() {
         destination_description: form.destination_description,
       };
       if (form.destination_uuid) params.destination_uuid = form.destination_uuid;
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action, params } });
+      const { data, error } = await pbxInvoke(action, params, { organizationId: selectedOrgId });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success(form.destination_uuid ? 'Updated' : 'Created');
@@ -91,9 +95,7 @@ export default function AdminDestinations() {
   const remove = async (d: Dest) => {
     if (!confirm(`Delete inbound route ${d.destination_number}?`)) return;
     try {
-      const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'delete-destination', params: { destination_uuid: d.destination_uuid } },
-      });
+      const { error } = await pbxInvoke('delete-destination', { destination_uuid: d.destination_uuid }, { organizationId: selectedOrgId });
       if (error) throw error;
       toast.success('Deleted');
       refetch();

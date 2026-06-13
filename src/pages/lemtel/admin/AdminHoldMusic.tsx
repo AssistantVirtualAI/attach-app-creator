@@ -9,6 +9,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { pbxInvoke } from '@/lib/pbxInvoke';
+import { useOrganization } from '@/context/OrganizationContext';
 import { Music, RefreshCw, Search, Loader2, Plus, Trash2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -33,7 +35,9 @@ const empty = {
 };
 
 export default function AdminHoldMusic() {
-  const [q, setQ] = useState('');
+  
+  const { selectedOrgId } = useOrganization();
+const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<any>(empty);
@@ -71,7 +75,7 @@ export default function AdminHoldMusic() {
         music_on_hold_enabled: form.music_on_hold_enabled ? 'true' : 'false',
       };
       if (!form.music_on_hold_uuid) delete params.music_on_hold_uuid;
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action, params } });
+      const { data, error } = await pbxInvoke(action, params, { organizationId: selectedOrgId });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success(form.music_on_hold_uuid ? 'Updated' : 'Created');
@@ -84,9 +88,7 @@ export default function AdminHoldMusic() {
   const remove = async (m: MoH) => {
     if (!confirm(`Delete "${m.music_on_hold_name}"?`)) return;
     try {
-      const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'delete-hold-music', params: { music_on_hold_uuid: m.music_on_hold_uuid } },
-      });
+      const { error } = await pbxInvoke('delete-hold-music', { music_on_hold_uuid: m.music_on_hold_uuid }, { organizationId: selectedOrgId });
       if (error) throw error;
       toast.success('Deleted');
       refetch();

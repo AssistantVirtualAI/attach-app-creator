@@ -9,6 +9,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { pbxInvoke } from '@/lib/pbxInvoke';
+import { useOrganization } from '@/context/OrganizationContext';
 import { Server, RefreshCw, Loader2, Plus, Trash2, Pencil, Power } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -23,7 +25,9 @@ type Prof = {
 const empty: any = { sip_profile_uuid: '', sip_profile_name: '', sip_profile_hostname: '', sip_profile_enabled: true, sip_profile_description: '' };
 
 export default function AdminSipProfiles() {
-  const [open, setOpen] = useState(false);
+  
+  const { selectedOrgId } = useOrganization();
+const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<any>(empty);
 
@@ -42,7 +46,7 @@ export default function AdminSipProfiles() {
       const action = form.sip_profile_uuid ? 'update-sip-profiles' : 'create-sip-profiles';
       const params: any = { ...form, sip_profile_enabled: form.sip_profile_enabled ? 'true' : 'false' };
       if (!form.sip_profile_uuid) delete params.sip_profile_uuid;
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action, params } });
+      const { data, error } = await pbxInvoke(action, params, { organizationId: selectedOrgId });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success(form.sip_profile_uuid ? 'Updated' : 'Created');
@@ -54,7 +58,7 @@ export default function AdminSipProfiles() {
   const remove = async (p: Prof) => {
     if (!confirm(`Delete SIP profile "${p.sip_profile_name}"?`)) return;
     try {
-      const { error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action: 'delete-sip-profiles', params: { sip_profile_uuid: p.sip_profile_uuid } } });
+      const { error } = await pbxInvoke('delete-sip-profiles', { sip_profile_uuid: p.sip_profile_uuid }, { organizationId: selectedOrgId });
       if (error) throw error;
       toast.success('Deleted'); refetch();
     } catch (e: any) { toast.error(e?.message || 'Delete failed'); }
@@ -62,7 +66,7 @@ export default function AdminSipProfiles() {
 
   const restart = async (p: Prof) => {
     try {
-      const { error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action: 'restart-sip-profile', params: { profile_name: p.sip_profile_name } } });
+      const { error } = await pbxInvoke('restart-sip-profile', { profile_name: p.sip_profile_name }, { organizationId: selectedOrgId });
       if (error) throw error;
       toast.success(`Restarted ${p.sip_profile_name}`);
     } catch (e: any) { toast.error(e?.message || 'Restart failed'); }

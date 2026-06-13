@@ -8,6 +8,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { pbxInvoke } from '@/lib/pbxInvoke';
+import { useOrganization } from '@/context/OrganizationContext';
 import { Clock, RefreshCw, Search, Loader2, Plus, Trash2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -35,7 +37,9 @@ const empty = {
 // specific app type. We list dialplans and let the admin pick which ones are
 // time conditions by name/description convention.
 export default function AdminTimeConditions() {
-  const [q, setQ] = useState('');
+  
+  const { selectedOrgId } = useOrganization();
+const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<any>(empty);
@@ -89,7 +93,7 @@ export default function AdminTimeConditions() {
         app_uuid: '4b821450-926b-175a-af93-a03c441818b1', // time_conditions app uuid
       };
       if (form.dialplan_uuid) params.dialplan_uuid = form.dialplan_uuid;
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action, params } });
+      const { data, error } = await pbxInvoke(action, params, { organizationId: selectedOrgId });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
       toast.success(form.dialplan_uuid ? 'Updated' : 'Created');
@@ -103,9 +107,7 @@ export default function AdminTimeConditions() {
   const remove = async (d: Plan) => {
     if (!confirm(`Delete time condition "${d.dialplan_name}"?`)) return;
     try {
-      const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'delete-time-conditions', params: { dialplan_uuid: d.dialplan_uuid } },
-      });
+      const { error } = await pbxInvoke('delete-time-conditions', { dialplan_uuid: d.dialplan_uuid }, { organizationId: selectedOrgId });
       if (error) throw error;
       toast.success('Deleted');
       refetch();
