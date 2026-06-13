@@ -922,6 +922,16 @@ Deno.serve(async (req) => {
         u.searchParams.set("username", FUSIONPBX_USERNAME);
         return u.toString();
       };
+      const decodeJsonDownload = (value: any): Uint8Array | null => {
+        const pick = value?.data || value?.recording || value?.recordings?.[0] || value;
+        const encoded = pick?.recording_base64 || pick?.base64 || pick?.content || pick?.file || pick?.audio;
+        if (typeof encoded !== "string" || encoded.length < 32) return null;
+        const body = encoded.includes(",") ? encoded.split(",").pop()! : encoded;
+        try {
+          const bin = atob(body.replace(/\s/g, ""));
+          return Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+        } catch { return null; }
+      };
       const attempts: { url: string; status: number; content_type?: string }[] = [];
       const tryUrls: string[] = [];
       const fileBases = [FUSIONPBX_API_URL];
@@ -977,6 +987,16 @@ Deno.serve(async (req) => {
             const head = new TextDecoder().decode(buf.slice(0, Math.min(buf.byteLength, 160))).trim().toLowerCase();
             const looksLikeError = head.startsWith("{") || head.startsWith("[") || head.startsWith("<") || head.includes("sqlstate") || head.includes("undefined column") || head.includes("error");
             const looksLikeAudio = head.startsWith("id3") || head.startsWith("riff") || head.startsWith("oggs") || head.includes("ftyp") || (buf.byteLength > 1200 && !looksLikeError);
+            if (rct.includes("application/json")) {
+              try {
+                const decoded = decodeJsonDownload(JSON.parse(new TextDecoder().decode(buf)));
+                if (decoded && decoded.byteLength > 1200) {
+                  return new Response(decoded, {
+                    headers: { ...corsHeaders, "Content-Type": ct, "Content-Length": String(decoded.byteLength), "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=300" },
+                  });
+                }
+              } catch { /* not a base64 download response */ }
+            }
             // Reject HTML/JSON/PBX error pages masquerading as successful audio.
             if (rct.includes("text/html") || rct.includes("application/json") || looksLikeError || !looksLikeAudio) {
                attempts.push({ url: safeUrl(url), status: r.status, content_type: rct || undefined });
@@ -997,7 +1017,7 @@ Deno.serve(async (req) => {
           attempts.push({ url: safeUrl(url), status: 0, content_type: e?.name === "AbortError" ? "timeout" : undefined });
         }
       }
-      return json({ error: "RECORDING_NOT_FOUND", attempts }, 502);
+      return json({ error: "RECORDING_NOT_FOUND", message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.", attempts }, 404);
     }
 
     // ---- Voicemail CRUD ----
