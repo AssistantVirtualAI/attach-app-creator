@@ -29,16 +29,16 @@ export default function LemtelGateways() {
   const [restarting, setRestarting] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [diag, setDiag] = useState<any>(null);
+  const [diagOpen, setDiagOpen] = useState(false);
+  const [diagLoading, setDiagLoading] = useState(false);
   const [form, setForm] = useState({ gateway: '', proxy: '', username: '', password: '', realm: '', context: 'public', register: true, enabled: true, profile: 'external', expire_seconds: '600', retry_seconds: '30' });
 
   const { data: rows = [], isLoading, refetch } = useQuery({
     queryKey: ['fpbx', 'gateways'],
     queryFn: async () => {
-      // Aggregate gateways across every FusionPBX domain (the REST API filters
-      // by the API-user's domain, so a single-domain call only ever returns
-      // the gateways of that one tenant).
       const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'list-gateways-all-domains' },
+        body: { action: 'list-gateways-merged' },
       });
       let arr: Gateway[] = [];
       if (!error) {
@@ -52,13 +52,6 @@ export default function LemtelGateways() {
           hostname: g.hostname || g._domain_name,
           description: g.description || g._domain_name,
         }));
-      }
-      // Fallback: single-domain call
-      if (arr.length === 0) {
-        const { data: d2 } = await supabase.functions.invoke('fusionpbx-proxy', {
-          body: { action: 'list-gateways' },
-        });
-        arr = (d2?.data || d2?.gateways || []) as Gateway[];
       }
       // Last resort: cached pbx_gateways rows
       if (!Array.isArray(arr) || arr.length === 0) {
@@ -80,6 +73,19 @@ export default function LemtelGateways() {
       return Array.isArray(arr) ? arr : [];
     },
   });
+
+  const runDiagnostic = async () => {
+    setDiagLoading(true);
+    setDiagOpen(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'debug-raw', params: { path: 'gateways' } },
+      });
+      setDiag(error ? { error: error.message } : data);
+    } catch (e: any) {
+      setDiag({ error: e?.message || String(e) });
+    } finally { setDiagLoading(false); }
+  };
 
   const restart = async (gw: Gateway) => {
     setRestarting(gw.gateway_uuid);
