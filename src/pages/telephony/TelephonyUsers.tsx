@@ -146,6 +146,31 @@ export default function TelephonyUsers() {
     else toast.success(`Password reset email sent to ${u.email}`);
   };
 
+  const syncSipPassword = async (u: UserRow) => {
+    toast.loading('Syncing PBX password to apps…', { id: u.id });
+    const { data, error } = await supabase.functions.invoke('set-unified-password', {
+      body: { softphone_id: u.id, use_current_sip_password: true, source: 'admin_sync_sip' },
+    });
+    if (error || (data as any)?.error) {
+      toast.error((data as any)?.message || error?.message || 'Failed', { id: u.id });
+    } else {
+      toast.success(`Password unified for ext ${u.extension}`, { id: u.id });
+      refetch();
+    }
+  };
+
+  const toggleAppAccess = async (u: UserRow, enabled: boolean) => {
+    const { data, error } = await supabase.rpc('set_softphone_app_access' as any, {
+      _softphone_id: u.id, _enabled: enabled,
+    });
+    if (error || (data as any)?.ok === false) {
+      toast.error(error?.message || 'Failed to update access');
+    } else {
+      toast.success(enabled ? 'App access enabled' : 'App access disabled');
+      qc.invalidateQueries({ queryKey: ['lemtel', 'softphone-users'] });
+    }
+  };
+
   const deactivate = async (u: UserRow) => {
     if (!confirm(`Deactivate ${u.display_name || u.extension}?`)) return;
     const { error } = await supabase
