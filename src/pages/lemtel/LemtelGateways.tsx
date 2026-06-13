@@ -183,9 +183,9 @@ export default function LemtelGateways() {
             <RefreshCw className="w-4 h-4 mr-2" /> Refresh
           </Button>
           <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild><Button><Plus className="w-4 h-4 mr-2" /> Add Gateway</Button></SheetTrigger>
+            <SheetTrigger asChild><Button onClick={() => { setForm({ gateway: '', proxy: '', username: '', password: '', realm: '', context: 'public', register: true, enabled: true, profile: 'external', expire_seconds: '600', retry_seconds: '30' }); }}><Plus className="w-4 h-4 mr-2" /> Add Gateway</Button></SheetTrigger>
             <SheetContent className="space-y-3 overflow-y-auto">
-              <SheetHeader><SheetTitle>New SIP Gateway</SheetTitle></SheetHeader>
+              <SheetHeader><SheetTitle>{(form as any).gateway_uuid ? 'Edit' : 'New'} SIP Gateway</SheetTitle></SheetHeader>
               <div className="space-y-3">
                 {[
                   ['gateway', 'Name'], ['proxy', 'Proxy (host:port)'], ['realm', 'Realm (optional)'],
