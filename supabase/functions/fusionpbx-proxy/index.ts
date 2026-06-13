@@ -924,12 +924,20 @@ Deno.serve(async (req) => {
       };
       const attempts: { url: string; status: number; content_type?: string }[] = [];
       const tryUrls: string[] = [];
+      const fileBases = [FUSIONPBX_API_URL];
+      try {
+        const base = new URL(FUSIONPBX_API_URL);
+        if (base.hostname === "portal.lemtel.tel") fileBases.push("https://pbxnode.lemtel.tel");
+      } catch { /* ignore alternate file host */ }
       if (xml_cdr_uuid) {
-        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`));
-        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
-        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin&ext=${ext}`));
-        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin&ext=${ext}`));
-        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
+        for (const fileBase of fileBases) {
+          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&binary`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin&ext=${ext}`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin&ext=${ext}`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
+        }
       }
       if (record_path && record_name) {
         const p = encodeURIComponent(String(record_path));
@@ -950,15 +958,11 @@ Deno.serve(async (req) => {
         const publicPath = cleanPath.replace(/^var\/lib\/freeswitch\/recordings\//, "recordings/");
         tryUrls.push(`${FUSIONPBX_API_URL}/${publicPath}/${n}`);
         tryUrls.push(`${FUSIONPBX_API_URL}/${cleanPath}/${n}`);
-        try {
-          const base = new URL(FUSIONPBX_API_URL);
-          if (base.hostname === "portal.lemtel.tel") {
-            const fileBase = "https://pbxnode.lemtel.tel";
-            tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/${n}`));
-            tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recordings.php?action=download&type=rec&t=bin&filename=${rel}`));
-            tryUrls.push(`${fileBase}/${publicPath}/${n}`);
-          }
-        } catch { /* ignore alternate file host */ }
+        for (const fileBase of fileBases.filter((x) => x !== FUSIONPBX_API_URL)) {
+          tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/${n}`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recordings.php?action=download&type=rec&t=bin&filename=${rel}`));
+          tryUrls.push(`${fileBase}/${publicPath}/${n}`);
+        }
       }
 
       for (const url of tryUrls) {
