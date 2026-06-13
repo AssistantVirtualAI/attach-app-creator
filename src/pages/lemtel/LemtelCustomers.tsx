@@ -170,6 +170,55 @@ export default function LemtelCustomers() {
     } finally { setSyncing(null); }
   };
 
+  const openEdit = (d: Domain) => {
+    setEditDomain(d);
+    setEditDesc(d.domain_description || '');
+    setEditEnabled(d.domain_enabled === true || d.domain_enabled === 'true');
+  };
+
+  const saveEdit = async () => {
+    if (!editDomain) return;
+    setEditSaving(true);
+    try {
+      const { error } = await supabase.functions.invoke('pbx-write', {
+        body: {
+          organizationId: LEMTEL_ORG,
+          action: 'update-domain',
+          params: {
+            domain_uuid: editDomain.domain_uuid,
+            domain_description: editDesc,
+            domain_enabled: editEnabled,
+          },
+        },
+      });
+      if (error) throw error;
+      toast.success('Domain updated');
+      setEditDomain(null);
+      qc.invalidateQueries({ queryKey: ['fusionpbx', 'list-domains'] });
+    } catch (e: any) {
+      toast.error(e?.message || 'Update failed');
+    } finally { setEditSaving(false); }
+  };
+
+  const deleteDomain = async (d: Domain) => {
+    if (!confirm(`Delete domain ${d.domain_name}? This removes all extensions on the PBX.`)) return;
+    setDeleting(d.domain_uuid);
+    try {
+      const { error } = await supabase.functions.invoke('pbx-write', {
+        body: {
+          organizationId: LEMTEL_ORG,
+          action: 'delete-domain',
+          params: { domain_uuid: d.domain_uuid },
+        },
+      });
+      if (error) throw error;
+      toast.success(`Deleted ${d.domain_name}`);
+      qc.invalidateQueries({ queryKey: ['fusionpbx', 'list-domains'] });
+    } catch (e: any) {
+      toast.error(e?.message || 'Delete failed');
+    } finally { setDeleting(null); }
+  };
+
   return (
     <div className="space-y-6 w-full min-w-0">
       <div className="flex items-center justify-between gap-4 flex-wrap">
