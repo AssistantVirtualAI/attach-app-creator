@@ -303,6 +303,37 @@ Deno.serve(async (req) => {
       return json({ ok: true, data: all, total_domains: domains.length, total_gateways: all.length });
     }
 
+    // Merged: global gateways (no domain filter) + per-domain gateways, de-duped.
+    // FusionPBX stores most gateways with domain_uuid=NULL (global to FreeSWITCH),
+    // which are filtered OUT when ?domain_uuid= is supplied. The unfiltered call
+    // is the one that matches what the FusionPBX GUI shows.
+    if (action === "list-gateways-merged") {
+      const globalRes = await pbxFetch(`gateways`);
+      const globals = collection(globalRes.data, "gateways");
+      const d = await pbxFetch("domains");
+      const domains = collection(d.data, "domains");
+      const perDomain = await Promise.all(domains.map(async (dom: any) => {
+        const r = await pbxFetch(`gateways?domain_uuid=${dom.domain_uuid}`);
+        return collection(r.data, "gateways").map((g: any) => ({ ...g, _domain_name: dom.domain_name, _domain_uuid: dom.domain_uuid }));
+      }));
+      const scoped = perDomain.flat();
+      const map = new Map<string, any>();
+      for (const g of [...globals, ...scoped]) {
+        const id = g.gateway_uuid || g.gateway;
+        if (id && !map.has(id)) map.set(id, g);
+      }
+      const data = Array.from(map.values());
+      return json({
+        ok: true,
+        data,
+        total_global: globals.length,
+        total_scoped: scoped.length,
+        total_unique: data.length,
+        global_status: globalRes.status,
+        global_error: globalRes.ok ? null : ((globalRes as any).error || (globalRes as any).raw || null),
+      });
+    }
+
     // ---- LIST actions ----
     const listMap: Record<string, { path: string; key: string }> = {
       "list-extensions":    { path: `extensions?${domainQ}`,          key: "extensions" },
