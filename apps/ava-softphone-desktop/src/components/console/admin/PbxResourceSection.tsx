@@ -24,6 +24,8 @@ export interface FieldDef {
 interface Props {
   /** kind matches fusionpbx-proxy ADV map: gateways, sip-profiles, conferences, hold-music, dialplans, time-conditions */
   kind: string;
+  /** Optional singular action name when list and write action names differ. */
+  actionKind?: string;
   title: string;
   /** primary key field name returned by FusionPBX (e.g. gateway_uuid) */
   uuidField: string;
@@ -55,7 +57,7 @@ const btnDanger: React.CSSProperties = {
 };
 
 export default function PbxResourceSection({
-  kind, title, uuidField, cols, fields = [], transform, rowActions = [], canCreate = true,
+  kind, actionKind, title, uuidField, cols, fields = [], transform, rowActions = [], canCreate = true,
 }: Props) {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,9 +91,10 @@ export default function PbxResourceSection({
     setSaving(true);
     try {
       const isUpdate = !!record[uuidField];
+      const writeKind = actionKind || kind;
       const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: {
-          action: isUpdate ? `update-${kind}` : `create-${kind}`,
+          action: isUpdate ? `update-${writeKind}` : `create-${writeKind}`,
           organization_id: orgId,
           params: { domain_uuid: LEMTEL_DOMAIN, ...record },
         },
@@ -107,9 +110,10 @@ export default function PbxResourceSection({
   const remove = async (row: any) => {
     if (!confirm(`Delete this ${title.toLowerCase().slice(0, -1) || 'record'}?`)) return;
     try {
+      const writeKind = actionKind || kind;
       const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: {
-          action: `delete-${kind}`,
+          action: `delete-${writeKind}`,
           organization_id: orgId,
           params: { [uuidField]: row[uuidField], domain_uuid: LEMTEL_DOMAIN },
         },
