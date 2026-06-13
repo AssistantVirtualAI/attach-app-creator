@@ -110,25 +110,58 @@ export default function LemtelGateways() {
     } catch (e: any) { toast.error('Failed: ' + (e?.message || '')); }
   };
 
-  const createGateway = async () => {
+  const saveGateway = async () => {
     setCreating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'create-gateways', params: {
-          gateway: form.gateway, proxy: form.proxy, username: form.username, password: form.password,
-          realm: form.realm || form.proxy, context: form.context, profile: form.profile,
-          register: form.register ? 'true' : 'false', enabled: form.enabled ? 'true' : 'false',
-          expire_seconds: form.expire_seconds, retry_seconds: form.retry_seconds,
-        } },
-      });
+      const isEdit = !!(form as any).gateway_uuid;
+      const action = isEdit ? 'update-gateways' : 'create-gateways';
+      const params: any = {
+        gateway: form.gateway, proxy: form.proxy, username: form.username, password: form.password,
+        realm: form.realm || form.proxy, context: form.context, profile: form.profile,
+        register: form.register ? 'true' : 'false', enabled: form.enabled ? 'true' : 'false',
+        expire_seconds: form.expire_seconds, retry_seconds: form.retry_seconds,
+      };
+      if (isEdit) params.gateway_uuid = (form as any).gateway_uuid;
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action, params } });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      toast.success('Gateway created');
+      toast.success(isEdit ? 'Gateway updated' : 'Gateway created');
       setOpen(false);
       refetch();
     } catch (e: any) {
-      toast.error(e?.message || 'Create failed');
+      toast.error(e?.message || 'Save failed');
     } finally { setCreating(false); }
+  };
+  const createGateway = saveGateway;
+
+  const openEdit = (g: Gateway) => {
+    setForm({
+      gateway: g.gateway || '',
+      proxy: g.proxy || '',
+      username: '',
+      password: '',
+      realm: g.hostname || g.proxy || '',
+      context: g.context || 'public',
+      register: g.register === true || g.register === 'true',
+      enabled: g.enabled === true || g.enabled === 'true',
+      profile: 'external',
+      expire_seconds: '600',
+      retry_seconds: '30',
+      gateway_uuid: g.gateway_uuid,
+    } as any);
+    setOpen(true);
+  };
+
+  const deleteGateway = async (g: Gateway) => {
+    if (!confirm(`Delete gateway "${g.gateway}"? This cannot be undone.`)) return;
+    try {
+      const { error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'delete-gateways', params: { gateway_uuid: g.gateway_uuid } },
+      });
+      if (error) throw error;
+      toast.success('Gateway deleted');
+      refetch();
+    } catch (e: any) { toast.error(e?.message || 'Delete failed'); }
   };
 
   const filtered = rows.filter(g =>
