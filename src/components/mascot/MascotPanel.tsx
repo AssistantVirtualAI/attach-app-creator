@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, X, Minus, Plus, MessagesSquare } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
-import MascotFox from "./MascotFox";
+import MascotRobot from "./MascotRobot";
 import { useMascotChat } from "./useMascotChat";
 
 type Thread = { id: string; title: string; last_message_at: string };
