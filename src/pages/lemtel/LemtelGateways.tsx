@@ -33,16 +33,33 @@ export default function LemtelGateways() {
   const { data: rows = [], isLoading, refetch } = useQuery({
     queryKey: ['fpbx', 'gateways'],
     queryFn: async () => {
-      // Primary: live FusionPBX call (no domain filter — gateways are global)
+      // Aggregate gateways across every FusionPBX domain (the REST API filters
+      // by the API-user's domain, so a single-domain call only ever returns
+      // the gateways of that one tenant).
       const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'list-gateways' },
+        body: { action: 'list-gateways-all-domains' },
       });
       let arr: Gateway[] = [];
       if (!error) {
-        arr = (data?.data || data?.gateways || []) as Gateway[];
+        arr = ((data?.data || []) as any[]).map((g: any) => ({
+          gateway_uuid: g.gateway_uuid,
+          gateway: g.gateway,
+          proxy: g.proxy,
+          context: g.context,
+          register: g.register,
+          enabled: g.enabled,
+          hostname: g.hostname || g._domain_name,
+          description: g.description || g._domain_name,
+        }));
       }
-      // Fallback: cached pbx_gateways rows synced by cron (covers periods when
-      // the FusionPBX REST API user lacks gateway_view permission).
+      // Fallback: single-domain call
+      if (arr.length === 0) {
+        const { data: d2 } = await supabase.functions.invoke('fusionpbx-proxy', {
+          body: { action: 'list-gateways' },
+        });
+        arr = (d2?.data || d2?.gateways || []) as Gateway[];
+      }
+      // Last resort: cached pbx_gateways rows
       if (!Array.isArray(arr) || arr.length === 0) {
         const { data: cached } = await (supabase as any)
           .from('pbx_gateways')
