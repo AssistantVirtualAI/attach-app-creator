@@ -818,35 +818,48 @@ Deno.serve(async (req) => {
       return json({ ok: true, domains: upserted, fetched: domains.length });
     }
 
-    // ---- Voicemail messages mirror ----
+    // ---- Voicemail messages mirror (paginated) ----
     if (action === "sync-voicemail-messages") {
-      const r = await pbxFetch(`voicemail_messages?${domainQ}&limit=2000`);
-      if (!r.ok) return json(r, r.status || 500);
-      const msgs = collection(r.data, "voicemail_messages");
-      const rows = msgs.map((m: any) => ({
-        organization_id,
-        extension: String(m.voicemail_id ?? m.extension ?? ""),
-        mailbox: String(m.voicemail_id ?? ""),
-        caller_number: m.caller_id_number ?? null,
-        caller_name: m.caller_id_name ?? null,
-        received_at: m.created_epoch
-          ? new Date(parseInt(m.created_epoch) * 1000).toISOString()
-          : (m.message_received ?? new Date().toISOString()),
-        duration_seconds: m.message_length ? parseInt(m.message_length) : 0,
-        audio_storage_path: m.message_path ?? null,
-        folder: m.message_status === "saved" ? "archived" : "inbox",
-        fusionpbx_uuid: m.voicemail_message_uuid ?? null,
-      })).filter((x: any) => x.fusionpbx_uuid && x.extension);
-      let upserted = 0;
-      if (rows.length) {
-        const uuids = rows.map((r: any) => r.fusionpbx_uuid);
-        await admin.from("pbx_voicemails").delete()
-          .eq("organization_id", organization_id).in("fusionpbx_uuid", uuids);
-        const { error, count } = await admin.from("pbx_voicemails").insert(rows, { count: "exact" });
-        if (error) return json({ ok: false, error: error.message }, 500);
-        upserted = count ?? rows.length;
+      const pageSize = Math.min(Number((params as any).page_size ?? 250), 500);
+      const maxPages = Math.min(Number((params as any).max_pages ?? 40), 100);
+      let totalFetched = 0;
+      let totalUpserted = 0;
+      for (let i = 0; i < maxPages; i++) {
+        const offset = i * pageSize;
+        const r = await pbxFetch(`voicemail_messages?${domainQ}&limit=${pageSize}&offset=${offset}`);
+        if (!r.ok) {
+          if (i === 0) return json(r, r.status || 500);
+          break;
+        }
+        const msgs = collection(r.data, "voicemail_messages");
+        if (!msgs.length) break;
+        totalFetched += msgs.length;
+        const rows = msgs.map((m: any) => ({
+          organization_id,
+          extension: String(m.voicemail_id ?? m.extension ?? ""),
+          mailbox: String(m.voicemail_id ?? ""),
+          caller_number: m.caller_id_number ?? null,
+          caller_name: m.caller_id_name ?? null,
+          received_at: m.created_epoch
+            ? new Date(parseInt(m.created_epoch) * 1000).toISOString()
+            : (m.message_received ?? new Date().toISOString()),
+          duration_seconds: m.message_length ? parseInt(m.message_length) : 0,
+          pbx_record_path: m.message_path ?? null,
+          pbx_record_name: m.message_name ?? null,
+          folder: m.message_status === "saved" ? "archived" : "inbox",
+          fusionpbx_uuid: m.voicemail_message_uuid ?? null,
+        })).filter((x: any) => x.fusionpbx_uuid && x.extension);
+        if (rows.length) {
+          const uuids = rows.map((rr: any) => rr.fusionpbx_uuid);
+          await admin.from("pbx_voicemails").delete()
+            .eq("organization_id", organization_id).in("fusionpbx_uuid", uuids);
+          const { error, count } = await admin.from("pbx_voicemails").insert(rows, { count: "exact" });
+          if (error) return json({ ok: false, error: error.message, page: i }, 500);
+          totalUpserted += count ?? rows.length;
+        }
+        if (msgs.length < pageSize) break;
       }
-      return json({ ok: true, voicemails: upserted, fetched: msgs.length });
+      return json({ ok: true, voicemails: totalUpserted, fetched: totalFetched });
     }
 
     // ---- Full sync ----
