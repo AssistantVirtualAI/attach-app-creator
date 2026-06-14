@@ -87,6 +87,8 @@ export default function HomeDashboard({
         <Stat label="Answered" value={stats.answeredToday} accent={c.success} hint="Today" />
         <Stat label="Unread SMS" value={stats.unreadSms} accent={c.signalGold} hint="All threads" />
         <Stat label="Voicemail" value={stats.unreadVoicemail} accent={c.avaCyan} hint="New" />
+        <Stat label="Live Calls" value={stats.liveCalls} accent={c.avaViolet} hint="In progress" />
+        <Stat label="Extensions" value={stats.extensionsTotal} accent={c.lemtelBlue} hint="Provisioned" />
         <Stat label="Sync" value={syncConnected ? 'Live' : 'Off'} accent={syncConnected ? c.avaCyan : c.mutedSilver} hint={lastEvent ? formatAge(ageMs) : 'Idle'} />
         <Stat label="PBX Health" value={pbx === 'registered' ? 'OK' : pbx === 'error' ? 'Down' : '…'} accent={pbx === 'registered' ? c.success : pbx === 'error' ? c.danger : c.mutedSilver} hint={pbx === 'registered' ? 'SIP registered' : pbx} />
       </div>
