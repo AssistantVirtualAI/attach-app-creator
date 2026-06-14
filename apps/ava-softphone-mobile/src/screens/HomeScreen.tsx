@@ -37,7 +37,7 @@ export default function HomeScreen({ onNavigate, haptic }: Props) {
 
         <div style={{ marginTop: 16 }}>
           <div style={{ fontSize: font.sm, color: colors.mutedSilver }}>
-            {me ? `${me.dataScope === 'domain_admin' ? 'Admin domaine' : 'Extension'} ${me.extension.number} · ${me.domain.sipDomain || me.organization.name}` : <Skeleton w="60%" h={10} />}
+            {me ? `Extension ${me.extension.number} · ${me.domain.sipDomain || me.organization.name}` : <Skeleton w="60%" h={10} />}
           </div>
           <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '6px 0 4px', fontWeight: 800, letterSpacing: -0.5 }}>
             {data?.greeting || (me ? `Good morning, ${me.user.name.split(' ')[0]}` : <Skeleton w="70%" h={26} />)}
@@ -65,10 +65,10 @@ export default function HomeScreen({ onNavigate, haptic }: Props) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 38, height: 38, borderRadius: 14, display: 'grid', placeItems: 'center', background: gradients.ai, fontSize: 18 }}>⌁</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: font.base, fontWeight: 800, color: colors.textIce }}>{data?.scope.label || (me?.dataScope === 'domain_admin' ? 'Domain admin' : 'Extension user')}</div>
+            <div style={{ fontSize: font.base, fontWeight: 800, color: colors.textIce }}>{data?.scope.label || 'Own extension only'}</div>
             <div style={{ fontSize: font.sm, color: colors.mutedSilver, marginTop: 2 }}>{me ? `${me.client?.name ? `${me.client.name} · ` : ''}${me.organization.name} · ${me.domain.sipDomain || me.extension.sipDomain}` : 'Loading secure domain scope…'}</div>
           </div>
-          <Chip tone={me?.permissions.admin ? 'gold' : 'cyan'}>{me?.permissions.admin ? 'Admin' : 'User'}</Chip>
+          <Chip tone="cyan">Extension</Chip>
         </div>
       </Card>
 
