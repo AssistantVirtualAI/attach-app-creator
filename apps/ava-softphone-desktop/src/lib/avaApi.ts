@@ -84,6 +84,22 @@ let _meInflight: Promise<MeContext> | null = null;
 
 const EMPTY_ME: MeContext = { organization_id: null, extension: null, extension_uuid: null, display_name: null, user_id: null };
 
+function scopedCdrFilter(me: MeContext): string {
+  const parts: string[] = [];
+  if (me.extension_uuid) parts.push(`extension_uuid.eq.${me.extension_uuid}`);
+  if (me.extension) {
+    const ext = encodeURIComponent(me.extension);
+    parts.push(`extension.eq.${ext}`, `caller_number.eq.${ext}`, `destination_number.eq.${ext}`, `source_number.eq.${ext}`);
+  }
+  return parts.length ? `&or=(${parts.join(',')})` : '&id=eq.__no_softphone_extension__';
+}
+
+function scopedThreadFilter(me: MeContext): string {
+  if (me.extension_uuid) return `&extension_uuid=eq.${encodeURIComponent(me.extension_uuid)}`;
+  if (me.extension) return `&extension=eq.${encodeURIComponent(me.extension)}`;
+  return '&id=eq.__no_softphone_extension__';
+}
+
 export async function getMeContext(): Promise<MeContext> {
   if (_meCache) return _meCache;
   if (_meInflight) return _meInflight;
@@ -476,9 +492,7 @@ function mapCdrToRecording(r: any): RecordingItem {
 async function readCallRecordRows(limit = 100): Promise<any[]> {
   const me = await getMeContext();
   const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-  const extFilter = me.extension_uuid
-    ? `&extension_uuid=eq.${me.extension_uuid}`
-    : (me.extension ? `&extension=eq.${me.extension}` : '');
+  const extFilter = scopedCdrFilter(me);
   const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos,raw_data,notes,tags${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
 
   const res = await fetch(url, {
@@ -532,7 +546,8 @@ export const ava = {
     if (MOCK) return MOCK_THREADS;
     const me = await getMeContext();
     const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-    const raw = await call<any>(`/db/${TABLES.smsThreads}?select=*${orgFilter}&order=last_message_at.desc&limit=200`, {}, MOCK_THREADS);
+    const extFilter = scopedThreadFilter(me);
+    const raw = await call<any>(`/db/${TABLES.smsThreads}?select=*${orgFilter}${extFilter}&order=last_message_at.desc&limit=200`, {}, MOCK_THREADS);
     return asArray(raw).map((t: any) => ({
       id: t.id,
       contact: t.contact_name || t.contact_phone || '—',
@@ -546,8 +561,9 @@ export const ava = {
     if (MOCK) return MOCK_MESSAGES[threadId] || [];
     const me = await getMeContext();
     const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
+    const extFilter = scopedThreadFilter(me);
     try {
-      const raw = await call<any>(`/db/${TABLES.smsMessages}?select=*&thread_id=eq.${threadId}${orgFilter}&order=created_at.asc&limit=500`, {}, [] as any);
+      const raw = await call<any>(`/db/${TABLES.smsMessages}?select=*,pbx_sms_threads!inner(id)&thread_id=eq.${threadId}${orgFilter}&pbx_sms_threads.id=eq.${threadId}${extFilter.replace('&', '&pbx_sms_threads.')}&order=created_at.asc&limit=500`, {}, [] as any);
       return asArray(raw).map((m: any) => {
         const direction = cleanText(m.direction || m.message_direction || m.type).toLowerCase();
         const outbound = direction === 'outbound' || direction === 'out' || m.is_outbound === true || m.sender === 'me';
@@ -665,9 +681,7 @@ export const ava = {
     try {
       const me = await getMeContext();
       const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-      const extFilter = me.extension_uuid
-        ? `&extension_uuid=eq.${me.extension_uuid}`
-        : (me.extension ? `&extension=eq.${me.extension}` : '');
+      const extFilter = scopedCdrFilter(me);
       const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
         headers: {
