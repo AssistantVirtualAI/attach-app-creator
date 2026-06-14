@@ -32,7 +32,7 @@ export default function AdminVoicemailSettings() {
     const id = key(r);
     setSavingId(id);
     try {
-      const q = supabase.from('pbx_voicemail_settings').update(edits[id]);
+      const q: any = supabase.from('pbx_voicemail_settings').update(edits[id] as any);
       const { error } = r.user_id ? await q.eq('user_id', r.user_id) : await q.eq('id', r.id);
       if (error) throw error;
       toast.success('Saved');
