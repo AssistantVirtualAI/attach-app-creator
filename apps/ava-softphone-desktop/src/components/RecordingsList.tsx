@@ -4,6 +4,7 @@ import { theme } from '../lib/theme';
 import { ava, RecordingItem } from '../lib/avaApi';
 import { useRealtimeRefresh } from '../lib/useRealtimeRefresh';
 import { useOrgId } from '../lib/useOrgId';
+import { audit } from '../lib/audit';
 
 const { colors: c, glow } = theme;
 
@@ -94,6 +95,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
       const url = await ava.getRecordingAudioUrl(r);
       if (!url) { setError('Recording file not available from PBX yet'); return; }
       setAudio((a) => ({ ...a, [r.id]: url }));
+      audit('recording.played', r.callId || r.id, { recording_name: r.recording_name });
     } finally {
       setAudioLoading(null);
     }

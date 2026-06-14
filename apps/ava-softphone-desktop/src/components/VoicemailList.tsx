@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { ava, VoicemailItem } from '@/lib/avaApi';
 import { useRealtimeRefresh } from '@/lib/useRealtimeRefresh';
 import { useOrgId } from '@/lib/useOrgId';
+import { audit } from '@/lib/audit';
 
 interface Props {
   extension: string;
@@ -55,6 +56,7 @@ export default function VoicemailList({ extension, onCall }: Props) {
       if (!url) { setErr('No voicemail audio available yet'); return; }
       setAudio((a) => ({ ...a, [r.id]: url }));
     }
+    audit('voicemail.played', r.id, { from: r.from, duration: r.durationSec });
     setPlaying(r.id);
   };
 

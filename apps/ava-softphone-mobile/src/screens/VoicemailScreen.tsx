@@ -3,6 +3,7 @@ import { ImpactStyle } from '@capacitor/haptics';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, VoicemailEntry } from '../lib/mobileApi';
 import { Card, Chip, EmptyState, GhostButton, AIPanel, Skeleton } from '../components/ui/Primitives';
+import { audit } from '../lib/audit';
 
 const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 
@@ -100,6 +101,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
     audio.onerror = () => { setErrorId(id); setPlaying(null); };
     audioRef.current = audio;
     setPlaying(id);
+    audit('voicemail.played', id, { duration: v.durationSec });
     audio.play().catch(() => { setErrorId(id); setPlaying(null); });
   };
 

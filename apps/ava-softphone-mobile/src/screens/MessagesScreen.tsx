@@ -3,6 +3,7 @@ import { ImpactStyle } from '@capacitor/haptics';
 import { colors, font, radius, gradients } from '../lib/theme';
 import { mobileApi, SmsThread, SmsMessage } from '../lib/mobileApi';
 import { Card, Chip, EmptyState, GhostButton, SectionTitle, Skeleton } from '../components/ui/Primitives';
+import { audit } from '../lib/audit';
 
 export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) => Promise<void> }) {
   const [threads, setThreads] = useState<SmsThread[] | null>(null);
@@ -21,6 +22,7 @@ export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) =
     setDraft('');
     haptic(ImpactStyle.Light);
     await mobileApi.sendMessage(active.id, m.body);
+    audit('sms.sent', active.id, { len: m.body.length });
   };
 
   const aiAction = async (action: 'rewrite' | 'professional' | 'shorten' | 'translate') => {
