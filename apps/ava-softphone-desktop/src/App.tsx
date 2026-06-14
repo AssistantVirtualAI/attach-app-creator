@@ -10,6 +10,7 @@ import { useTheme } from './lib/theme';
 import { useContrast } from './hooks/useContrast';
 import { supabase } from './lib/supabaseClient';
 import { setAuthToken } from './lib/avaApi';
+import { audit } from './lib/audit';
 import { sipProvider } from './lib/sip/jssipProvider';
 
 const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
