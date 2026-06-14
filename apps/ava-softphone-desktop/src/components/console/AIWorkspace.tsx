@@ -77,10 +77,10 @@ function Transcripts() {
         .from('pbx_call_records' as any)
         .select('id, caller_number, destination_number, start_at, transcript_text, raw_data')
         .eq('organization_id', me.organization_id || '__no_softphone_org__')
-        .or(`transcript_text.ilike.%${query}%,caller_number.ilike.%${query}%,destination_number.ilike.%${query}%`)
       scoped = applyMyExtensionScope(scoped, me);
-      const { data } = await scoped.order('start_at', { ascending: false }).limit(30);
-      setRows((data as any[]) || []);
+      const { data } = await scoped.order('start_at', { ascending: false }).limit(100);
+      const needle = query.toLowerCase();
+      setRows(((data as any[]) || []).filter((r) => `${r.transcript_text || ''} ${r.raw_data?.transcript_text || ''} ${r.caller_number || ''} ${r.destination_number || ''}`.toLowerCase().includes(needle)).slice(0, 30));
       setLoading(false);
     }, 280);
     return () => clearTimeout(t);
