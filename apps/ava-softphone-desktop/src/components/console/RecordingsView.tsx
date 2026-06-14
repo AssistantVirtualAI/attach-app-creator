@@ -84,6 +84,11 @@ export default function RecordingsView() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Realtime: new recordings (rows on pbx_call_records with audio) trigger refetch.
+  const orgId = useOrgId();
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, load);
+
+
   // Helper: fetch (or reuse cached) blob URL for a recording, deduping concurrent calls.
   const fetchAudio = useCallback(async (rec: RecordingItem): Promise<string | null> => {
     const cached = audioBlobCache.get(rec.id);
