@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
       },
     });
 
-    if (writeRes.error) {
+    if (writeRes.error || (writeRes.data as any)?.ok === false) {
       // Fallback: direct proxy call
       const { error: pErr } = await admin.functions.invoke("fusionpbx-proxy", {
         body: { action: "update-extension", organization_id: spu.organization_id, params: { extension_uuid: extensionUuid, extension: spu.extension, password: newPwd } },
