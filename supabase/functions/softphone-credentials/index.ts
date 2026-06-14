@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
       user_id: user.id,
       action: "softphone_credentials_accessed",
       resource_type: "pbx_softphone",
-      metadata: { extension: sp.extension, credential_source: (sp as any).sip_password_encrypted ? "encrypted" : "legacy" },
+      metadata: { extension: sp.extension, credential_source: String(sp.sip_password || "").startsWith("aesgcm:") ? "encrypted" : "plain" },
     });
 
     return json({
