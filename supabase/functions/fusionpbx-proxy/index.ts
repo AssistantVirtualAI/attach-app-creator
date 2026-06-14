@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
   // domain_uuid is being acted upon. This lets each customer's admin manage
   // their own phone system through the proxy.
   if (!isServiceCall && userId) {
-    const readOnly = new Set(["ping", "debug-raw", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "backfill-cdrs", "sync-domains", "sync-voicemail-messages", "sync-ivr-options", "sync-all", "get-recording", "get-recording-signed-url", "list-queues", "list-ivrs", "list-ring-groups", "list-moh", "list-recordings", "list-devices", "list-destinations", "list-voicemails", "list-voicemail-messages", "list-registrations", "get-registrations", "list-gateways", "list-gateways-all-domains", "list-gateways-merged", "get-gateways", "list-sip-profiles", "list-conferences", "list-hold-music", "list-dialplans", "get-extension", "sync_status", "sync-status", "list-active-calls", "system-status", "desktop-audit"]);
+    const readOnly = new Set(["ping", "debug-raw", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "backfill-cdrs", "sync-domains", "sync-voicemail-messages", "sync-ivr-options", "sync-all", "get-recording", "check-recording", "get-recording-signed-url", "list-queues", "list-ivrs", "list-ring-groups", "list-moh", "list-recordings", "list-devices", "list-destinations", "list-voicemails", "list-voicemail-messages", "list-registrations", "get-registrations", "list-gateways", "list-gateways-all-domains", "list-gateways-merged", "get-gateways", "list-sip-profiles", "list-conferences", "list-hold-music", "list-dialplans", "get-extension", "sync_status", "sync-status", "list-active-calls", "system-status", "desktop-audit"]);
     const isRead = readOnly.has(_earlyAction);
     const rpcName = isRead ? "is_lemtel_member" : "is_lemtel_admin";
     const { data: allowed } = await admin.rpc(rpcName, { _user_id: userId });
@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
         }
       }
     }
-    if (!permitted && (_earlyAction === "get-recording" || _earlyAction === "get-recording-signed-url")) {
+    if (!permitted && (_earlyAction === "get-recording" || _earlyAction === "check-recording" || _earlyAction === "get-recording-signed-url")) {
       const p = _bodyEarly?.params || {};
       const xml = String(p.xml_cdr_uuid || _bodyEarly?.xml_cdr_uuid || _bodyEarly?.id || "").trim();
       const recordPath = String(p.record_path || "").trim();
@@ -1073,10 +1073,11 @@ Deno.serve(async (req) => {
     }
 
     // ---- Recording proxy ----
-    if (action === "get-recording") {
+    if (action === "get-recording" || action === "check-recording") {
       const recordingParams = { ...(params || {}) } as any;
       if (!recordingParams.xml_cdr_uuid) recordingParams.xml_cdr_uuid = body.xml_cdr_uuid || body.id;
       const { record_path, record_name, xml_cdr_uuid, domain_uuid, domain_name, local_recording_url } = recordingParams;
+      const probeOnly = action === "check-recording" || recordingParams.probe === true || body.probe === true;
       if (!xml_cdr_uuid && !(record_path && record_name)) {
         return json({ error: "xml_cdr_uuid or (record_path, record_name) required" }, 400);
       }
@@ -1254,6 +1255,9 @@ Deno.serve(async (req) => {
                attempts.push({ url: safeUrl(url), status: r.status, content_type: rct || undefined });
               continue;
             }
+            if (probeOnly) {
+              return json({ ok: true, available: true, content_type: rct.startsWith("audio/") ? rct : ct }, 200, { "X-Recording-Status": "available" });
+            }
             return new Response(buf, {
               headers: {
                 ...corsHeaders,
@@ -1268,6 +1272,9 @@ Deno.serve(async (req) => {
         } catch (e: any) {
           attempts.push({ url: safeUrl(url), status: 0, content_type: e?.name === "AbortError" ? "timeout" : undefined });
         }
+      }
+      if (probeOnly) {
+        return json({ ok: true, available: false }, 200, { "X-Recording-Status": "not-found" });
       }
       return json({ ok: false, error: "RECORDING_NOT_FOUND", message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.", attempts }, 200, { "X-Recording-Status": "not-found" });
     }
