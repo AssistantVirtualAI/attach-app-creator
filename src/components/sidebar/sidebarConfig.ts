@@ -152,13 +152,21 @@ const ORG_GROUPS: NavGroup[] = [
     ],
   },
   {
+    id: 'org-monitoring', labelKey: '🩺 Monitoring', icon: Activity, scope: 'org', lemtelOnly: true,
+    items: [
+      { nameKey: 'Active Calls', href: '/org/lemtel/admin/active-calls', icon: PhoneCall },
+      { nameKey: 'Registrations', href: '/org/lemtel/admin/registrations', icon: Network },
+      { nameKey: 'System Status', href: '/org/lemtel/admin/system-status', icon: Activity },
+      { nameKey: 'PBX Sync Health', href: '/org/lemtel/admin/sync-health', icon: Activity },
+    ],
+  },
+  {
     id: 'org-admin', labelKey: '⚙️ Administration', icon: Settings, scope: 'org', lemtelOnly: true,
     items: [
       { nameKey: 'Users & Access', href: '/org/lemtel/telephony/users', icon: Users },
       { nameKey: 'Download Apps', href: '/org/lemtel/admin/downloads', icon: Download },
       { nameKey: 'PBX Advanced', href: '/org/lemtel/telephony/advanced', icon: Shield },
       { nameKey: 'Sync Health', href: '/org/lemtel/telephony/sync-health', icon: Activity },
-      { nameKey: 'PBX Sync Health', href: '/org/lemtel/admin/sync-health', icon: Activity },
       { nameKey: 'Settings', href: '/org/lemtel/admin/settings', icon: Settings },
     ],
   },

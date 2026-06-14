@@ -1,99 +1,60 @@
-# Phase 5 — Audit trail for sensitive actions (desktop + mobile)
+# Phase 8 — Portail AVA Statistic: temps réel téléphonie
 
-Scope: `apps/ava-softphone-desktop`, `apps/ava-softphone-mobile`, `supabase/functions/fusionpbx-proxy`. No UI redesign, no compact mode (next phase). Builds on Phase 2's `recording.signed_url_issued`.
+3 nouvelles pages admin temps-réel branchées sur FusionPBX via `fusionpbx-proxy`.
 
-## Goal
+## 1. Edge function — nouvelles actions
 
-Every sensitive softphone action lands in `audit_logs` with `{actor_user_id, organization_id, action, resource_type, resource_id, metadata, ip, user_agent}`. Closes the "Audit" line of the acceptance matrix.
+`supabase/functions/fusionpbx-proxy/index.ts` ajout de:
 
-## New `audit-log` edge function
+- **`list-active-calls`** — `GET /api/index.php?type=cmd&cmd=show+channels+as+json` (mod_commands FreeSWITCH). Parse JSON `{rows: [{uuid, name, cid_name, cid_num, dest, application, read_codec, secure, hostname, created}]}`. Retourne `{ok:true, data:rows}`.
+- **`kill-active-call`** — `uuidkill <uuid>` (admin-only, audité).
+- **`system-status`** — agrège `status` + `sofia status` (compte profiles/gateways UP/DOWN). Retourne `{uptime, version, sessions:{active,peak,total}, sofia:[{profile,state,calls}]}`.
+- Ajout dans `readOnly` whitelist: `list-active-calls`, `system-status`.
 
-Single server endpoint `POST /audit-log` that:
-- Resolves the caller from the bearer (Supabase Auth).
-- Resolves their `organization_id` via existing `get_my_extension_summary()` / `current_user_org_ids()`.
-- Whitelists `action` values; rejects anything else (no free-form client-supplied actions).
-- Inserts into `public.audit_logs` with service role.
+## 2. Nouvelles pages admin
 
-Whitelisted actions (constants):
+| Page | Route | Données | Refresh |
+|---|---|---|---|
+| AdminActiveCalls | `/org/lemtel/admin/active-calls` | `list-active-calls` | 5s (polling) |
+| AdminRegistrations | `/org/lemtel/admin/registrations` | `get-registrations` existant | 10s |
+| AdminSystemStatus | `/org/lemtel/admin/system-status` | `system-status` + `sync-status` | 15s |
 
-| action | resource_type | when fired |
-|---|---|---|
-| `recording.played` | `pbx_call_record` | user starts playback in Recordings or Voicemail |
-| `recording.downloaded` | `pbx_call_record` | user clicks download |
-| `voicemail.played` | `pbx_voicemail` | user starts voicemail playback |
-| `voicemail.downloaded` | `pbx_voicemail` | user downloads voicemail |
-| `voicemail.deleted` | `pbx_voicemail` | user deletes a voicemail |
-| `sms.sent` | `pbx_sms_thread` | user sends SMS from desktop/mobile |
-| `call.originated` | `pbx_extension` | user initiates an outbound call |
-| `call.transferred` | `pbx_call_record` | blind/attended transfer triggered |
-| `softphone.signed_in` | `pbx_softphone_user` | successful sign-in |
-| `softphone.signed_out` | `pbx_softphone_user` | sign-out |
+Style: cohérent avec autres pages admin (Card + Table + AdminPageHeader + StatusBadge). Tables denses, recherche locale, bouton refresh manuel + indicateur "last updated".
 
-Server-side `recording.signed_url_issued` (Phase 2) stays as-is — it's the cryptographic proof. Client `recording.played` is the user-intent proof.
+### AdminActiveCalls
+Colonnes: UUID (court), Caller (cid_name/cid_num), Destination, Application, Durée (now - created), Codec, Profile.
+Action par ligne: **Hang up** (confirme + appelle `kill-active-call`, audité via `log-audit-event`).
 
-## Client wiring
+### AdminRegistrations
+Colonnes: User (utilisateur SIP), Agent (user-agent), Contact (IP:port), Expires, Status.
+Groupe par profile SIP. Bouton "Re-register" → flush registrations (action future).
 
-New tiny helper `src/lib/audit.ts` (same shape in both apps):
+### AdminSystemStatus
+Cards: Uptime, Active sessions, Peak sessions, Sessions/sec.
+Tableau Sofia profiles: nom, état (running/down), calls, REGs. Action restart par profile (réutilise `restart-sip-profile` existant).
+Section "Sync jobs" (réutilise composant de `AdminSyncHealth`).
 
-```ts
-export async function audit(action: AuditAction, resourceId?: string, metadata?: Record<string, unknown>)
-```
+## 3. Routes + sidebar
 
-Behavior:
-- Fire-and-forget POST to `audit-log` edge function with current Supabase session token.
-- Never throws (audit failure must not break UX).
-- Drops the call when `isMockMode()` is true.
+- `src/App.tsx`: 3 nouvelles routes sous `<LemtelAdminPage>`.
+- `src/components/sidebar/sidebarConfig.ts` + `cockpitNavConfig.ts`: ajouter entrées dans le groupe "Monitoring" (sous PBX Sync Health):
+  - Active Calls (icon `PhoneCall`)
+  - Registrations (icon `Wifi`)
+  - System Status (icon `Activity`)
 
-Wiring points:
+## 4. Sécurité & audit
 
-**Desktop**
-- `components/RecordingsList.tsx`, `console/RecordingsView.tsx` — on `<audio>` `play` + download button.
-- `components/VoicemailList.tsx`, `console/VoicemailView.tsx` — on play, download, delete.
-- `components/SmsThreads.tsx`, `console/MessagesView.tsx` — on send success.
-- `lib/sip/*` outbound call entry point — on `originate` and on `transfer`.
-- `App.tsx` — on session restore (signed_in) and on sign-out.
+- Hang-up et restart-profile = `is_lemtel_admin` requis (déjà en place via proxy).
+- Audit log chaque action destructive: `pbx.call_killed`, `pbx.profile_restarted`.
+- RLS inchangée (lectures via proxy, pas de tables).
 
-**Mobile**
-- `screens/VoicemailScreen.tsx` — play, download, delete.
-- `screens/MessagesScreen.tsx` — send.
-- `screens/DialerScreen.tsx` — call originate.
-- `screens/AuthScreen.tsx` — sign-in / sign-out.
+## Hors scope (phases suivantes)
 
-## Permissions / RLS
+- Call Block réel, SMS admin org, polish drawers admin → Phase 9.
+- Test Playwright des écrans temps-réel.
 
-`audit_logs` already has policies (per `<supabase-tables>`: 2 policies). The new edge function uses service role to insert, so RLS is bypassed for writes; reads stay under existing RLS. No migration needed.
+## Livrables
 
-## Verification
-
-- Trigger each action in dev and confirm a matching row in `audit_logs` with the correct `organization_id` for the active user.
-- Confirm a non-whitelisted `action` value is rejected with 400.
-- Confirm logging failures don't surface as UI errors.
-
-## Out of scope
-
-Compact mode rebuild, UI/design cohesion pass, packaging hardening, E2E tests. Those follow in Phase 6+.
-
-## Files touched
-
-```
-supabase/functions/audit-log/index.ts                       (new)
-supabase/config.toml                                        (register function, verify_jwt = true)
-
-apps/ava-softphone-desktop/src/lib/audit.ts                 (new)
-apps/ava-softphone-desktop/src/App.tsx                      (sign-in/out)
-apps/ava-softphone-desktop/src/components/RecordingsList.tsx
-apps/ava-softphone-desktop/src/components/VoicemailList.tsx
-apps/ava-softphone-desktop/src/components/SmsThreads.tsx
-apps/ava-softphone-desktop/src/components/console/RecordingsView.tsx
-apps/ava-softphone-desktop/src/components/console/VoicemailView.tsx
-apps/ava-softphone-desktop/src/components/console/MessagesView.tsx
-apps/ava-softphone-desktop/src/lib/sip/jssipProvider.ts     (originate/transfer hooks)
-
-apps/ava-softphone-mobile/src/lib/audit.ts                  (new)
-apps/ava-softphone-mobile/src/screens/AuthScreen.tsx
-apps/ava-softphone-mobile/src/screens/VoicemailScreen.tsx
-apps/ava-softphone-mobile/src/screens/MessagesScreen.tsx
-apps/ava-softphone-mobile/src/screens/DialerScreen.tsx
-```
-
-No DB migration, no schema change.
+- 3 nouvelles actions edge function.
+- 3 nouvelles pages React.
+- 3 nouvelles routes + entrées sidebar.
