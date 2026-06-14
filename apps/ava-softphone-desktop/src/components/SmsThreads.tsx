@@ -114,6 +114,7 @@ export default function SmsThreads() {
       });
       const j = await res.json();
       if (!res.ok) { setErr(j.error || 'Send failed'); return; }
+      audit('sms.sent', selected.id, { to: selected.contact_phone, did: selected.did_number, len: draft.trim().length });
       setDraft('');
     } catch (e: any) {
       setErr(String(e?.message || e));
