@@ -1073,11 +1073,11 @@ Deno.serve(async (req) => {
     }
 
     // ---- Recording proxy ----
-    if (action === "get-recording") {
+    if (action === "get-recording" || action === "check-recording") {
       const recordingParams = { ...(params || {}) } as any;
       if (!recordingParams.xml_cdr_uuid) recordingParams.xml_cdr_uuid = body.xml_cdr_uuid || body.id;
       const { record_path, record_name, xml_cdr_uuid, domain_uuid, domain_name, local_recording_url } = recordingParams;
-      const probeOnly = recordingParams.probe === true || body.probe === true;
+      const probeOnly = action === "check-recording" || recordingParams.probe === true || body.probe === true;
       if (!xml_cdr_uuid && !(record_path && record_name)) {
         return json({ error: "xml_cdr_uuid or (record_path, record_name) required" }, 400);
       }
