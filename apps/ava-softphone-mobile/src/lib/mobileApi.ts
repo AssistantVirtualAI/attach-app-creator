@@ -103,6 +103,13 @@ export interface VoicemailEntry {
   durationSec: number; transcript: string; summary: string;
   priority: 'low' | 'normal' | 'high'; sentiment: 'positive' | 'neutral' | 'negative';
   isNew: boolean;
+  // Fields needed by `voicemailAudio` to issue a signed URL.
+  xml_cdr_uuid?: string;
+  record_path?: string;
+  record_name?: string;
+  domain_uuid?: string;
+  domain_name?: string;
+  organization_id?: string;
 }
 
 /* ─── Mock data (fallback) ────────────────────────────────────── */
