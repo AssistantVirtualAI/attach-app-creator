@@ -37,10 +37,19 @@ export default function MessagesView() {
   const [tplQuery, setTplQuery] = useState('');
   const [tplCategory, setTplCategory] = useState<TemplateCategory | 'All'>('All');
 
-  useEffect(() => {
-    ava.threads().then((t) => { setThreads(t); if (t[0]) setActiveId(t[0].id); });
+  const loadThreads = React.useCallback(() => {
+    ava.threads().then((t) => {
+      setThreads(t);
+      setActiveId((prev) => prev && t.some((x) => x.id === prev) ? prev : (t[0]?.id ?? null));
+    }).catch(() => {});
   }, []);
+  useEffect(() => { loadThreads(); }, [loadThreads]);
   useEffect(() => { if (activeId) setMsgs(MOCK_MSGS[activeId] || []); }, [activeId]);
+
+  // Realtime: new SMS threads/messages for this tenant refresh the list.
+  const orgId = useOrgId();
+  useRealtimeRefresh({ table: 'pbx_sms_threads', organizationId: orgId }, loadThreads);
+  useRealtimeRefresh({ table: 'pbx_sms_messages', organizationId: orgId }, loadThreads);
 
   const active = threads.find((t) => t.id === activeId);
   const contactKey = active?.id || '';
