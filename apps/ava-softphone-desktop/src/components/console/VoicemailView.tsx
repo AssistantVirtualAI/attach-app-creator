@@ -56,6 +56,12 @@ export default function VoicemailView() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Realtime: refresh on new voicemail / call rows for this tenant.
+  const orgId = useOrgId();
+  useRealtimeRefresh({ table: 'pbx_voicemails', organizationId: orgId }, load);
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, load);
+
+
   // Reset playback when selection changes
   useEffect(() => {
     setPlaying(false); setPos(0); setPlaybackError(null);
