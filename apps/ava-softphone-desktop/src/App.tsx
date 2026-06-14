@@ -99,6 +99,7 @@ export default function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
+        try { audit('softphone.signed_out'); } catch { /* noop */ }
         try { await sipProvider.stop?.(); } catch { /* noop */ }
         await window.electronAPI?.saveCredentials?.(null).catch(() => {});
         setAuthToken(null);
@@ -107,7 +108,10 @@ export default function App() {
       }
       if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
         setAuthToken(session.access_token);
-        if (event === 'SIGNED_IN') triggerCdrSync();
+        if (event === 'SIGNED_IN') {
+          triggerCdrSync();
+          audit('softphone.signed_in', session.user?.id, { email: session.user?.email });
+        }
         setCreds((prev) => prev ? {
           ...prev,
           accessToken: session.access_token,
