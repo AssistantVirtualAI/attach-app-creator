@@ -100,7 +100,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
       if (!url) {
         setAudioErrors((all) => ({
           ...all,
-          [r.id]: 'PBX metadata exists, but the audio file is not reachable from FusionPBX storage yet.',
+          [r.id]: 'Recording not yet available on PBX — retry in a few minutes.',
         }));
         return;
       }
