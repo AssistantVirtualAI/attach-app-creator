@@ -4,6 +4,7 @@ import { theme } from '../lib/theme';
 import { ava, RecordingItem } from '../lib/avaApi';
 import { useRealtimeRefresh } from '../lib/useRealtimeRefresh';
 import { useOrgId } from '../lib/useOrgId';
+import { audit } from '../lib/audit';
 
 const { colors: c, glow } = theme;
 
