@@ -72,7 +72,7 @@ export function setAuthToken(token: string | null) {
   _meCache = null;
 }
 
-type MeContext = {
+export type MeContext = {
   organization_id: string | null;
   extension: string | null;
   extension_uuid: string | null;
@@ -100,7 +100,7 @@ function scopedThreadFilter(me: MeContext): string {
   return '&id=eq.__no_softphone_extension__';
 }
 
-export function applyMyExtensionScope<T extends { or: (filters: string) => T; eq: (column: string, value: string) => T }>(query: T, me: MeContext): T {
+export function applyMyExtensionScope(query: any, me: MeContext): any {
   const parts: string[] = [];
   if (me.extension_uuid) parts.push(`extension_uuid.eq.${me.extension_uuid}`);
   if (me.extension) parts.push(`extension.eq.${me.extension}`, `caller_number.eq.${me.extension}`, `destination_number.eq.${me.extension}`, `source_number.eq.${me.extension}`);
