@@ -96,7 +96,8 @@ Deno.serve(async (req) => {
     }
 
     const localChanged = desiredPwd !== spu.sip_password;
-    if (localChanged || pbxChanged) {
+    const shouldForceApps = forceLocalToPbx && desiredPwd.length >= 8;
+    if (localChanged || pbxChanged || shouldForceApps) {
       await admin.from("pbx_softphone_users")
         .update({ sip_password: desiredPwd, updated_at: new Date().toISOString() })
         .eq("id", spu.id);
@@ -126,7 +127,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return json({ ok: true, extension: spu.extension, changed: localChanged || pbxChanged, pbx_changed: pbxChanged, local_changed: localChanged });
+    return json({ ok: true, extension: spu.extension, changed: localChanged || pbxChanged || shouldForceApps, pbx_changed: pbxChanged, local_changed: localChanged, apps_forced: shouldForceApps });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }
