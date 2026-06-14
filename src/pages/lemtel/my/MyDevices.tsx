@@ -13,6 +13,20 @@ export default function MyDevices() {
   const [softphone, setSoftphone] = useState<any>(null);
   const [devices, setDevices] = useState<any[]>([]);
   const [resetting, setResetting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const syncSipPassword = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('softphone-sync-password', { body: {} });
+      if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error || (data as any)?.message);
+      const changed = (data as any)?.changed;
+      toast.success(changed ? 'SIP password aligned with PBX. Reloading…' : 'Already in sync.');
+      if (changed) setTimeout(() => window.location.reload(), 800);
+    } catch (e: any) {
+      toast.error('Sync failed: ' + (e?.message || e));
+    } finally { setSyncing(false); }
+  };
 
   const resetSipPassword = async () => {
     if (!confirm('Reset SIP password? You will need to sign in again on every device.')) return;
@@ -77,7 +91,11 @@ export default function MyDevices() {
             {softphone?.last_seen_at && (
               <Badge variant="outline" className="ml-2">last seen {formatDistanceToNow(new Date(softphone.last_seen_at), { addSuffix: true })}</Badge>
             )}
-            <Button size="sm" variant="outline" className="ml-auto" disabled={resetting} onClick={resetSipPassword}>
+            <Button size="sm" variant="outline" className="ml-auto" disabled={syncing} onClick={syncSipPassword}>
+              {syncing ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <KeyRound className="w-3.5 h-3.5 mr-1" />}
+              Align with PBX
+            </Button>
+            <Button size="sm" variant="outline" disabled={resetting} onClick={resetSipPassword}>
               {resetting ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <KeyRound className="w-3.5 h-3.5 mr-1" />}
               Reset SIP password
             </Button>
