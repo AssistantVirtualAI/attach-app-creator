@@ -1277,7 +1277,16 @@ function SipDiagnostics({
           <span style={{
             display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: statusColor,
           }} />
-          <span style={{ color: '#fff', fontWeight: 700, fontSize: 11 }}>SIP {sp.snap.status}</span>
+          <span style={{ color: '#fff', fontWeight: 700, fontSize: 11 }}>
+            {sp.snap.status === 'registered'
+              ? `✓ Registered · ext ${sp.config?.extension || ''}`
+              : `SIP ${sp.snap.status}`}
+          </span>
+          {sp.snap.status === 'registered' && sp.config?.sipDomain && (
+            <span style={{ color: 'rgba(235,240,255,0.55)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              @ {sp.config.sipDomain}
+            </span>
+          )}
           {sp.snap.errorCause && (
             <span title={sp.snap.errorCause} style={{
               color: '#fca5a5', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis',
