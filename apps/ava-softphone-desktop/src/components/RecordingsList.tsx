@@ -92,7 +92,9 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
     if (audio[r.id]) return;
     setAudioLoading(r.id);
     try {
-      const url = await ava.getRecordingAudioUrl(r);
+      // Prefer short-lived signed URL (no client download); fallback to proxy blob.
+      const signed = await ava.getRecordingSignedUrl(r);
+      const url = signed?.url || (await ava.getRecordingAudioUrl(r));
       if (!url) { setError('Recording file not available from PBX yet'); return; }
       setAudio((a) => ({ ...a, [r.id]: url }));
       audit('recording.played', r.callId || r.id, { recording_name: r.recording_name });
