@@ -119,7 +119,7 @@ export default function RecordingsView() {
     let cancelled = false;
     setPlaybackLoading(true);
     fetchAudio(sel)
-      .then((u) => { if (!cancelled) { if (u) setAudioUrl(u); else setPlaybackError('Recording file not available from PBX yet'); } })
+      .then((u) => { if (!cancelled && u) setAudioUrl(u); })
       .finally(() => { if (!cancelled) setPlaybackLoading(false); });
     return () => { cancelled = true; };
   }, [sel?.id, fetchAudio]);
@@ -360,7 +360,7 @@ export default function RecordingsView() {
                   {r.customer || `${r.from || 'Unknown'} → ${r.to || 'Unknown'}`}
                 </span>
                 <span style={{ fontSize: 10.5, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {r.summary || 'Enregistrement disponible.'}
+                  {r.summary || 'No AI summary yet — open to transcribe.'}
                 </span>
               </span>
               <span style={{ fontSize: 11, color: qualityColor(r.qualityScore || 0), fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{r.qualityScore || 0}</span>
@@ -479,7 +479,7 @@ export default function RecordingsView() {
                 </div>
               }
             >
-              <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0 }}>{sel.summary || 'Enregistrement disponible.'}</p>
+              <p style={{ fontSize: 12, lineHeight: 1.55, color: c.textIce, margin: 0 }}>{sel.summary || 'No AI summary yet. Click ✨ Transcribe & Analyze to generate one.'}</p>
               {sel.feedback && (
                 <div style={{ fontSize: 10, color: c.mutedSilver, marginTop: 6 }}>
                   Feedback recorded — AVA will adapt future summaries.
