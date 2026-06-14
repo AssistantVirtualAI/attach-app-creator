@@ -360,7 +360,7 @@ export default function RecordingsView() {
                   {r.customer || `${r.from || 'Unknown'} → ${r.to || 'Unknown'}`}
                 </span>
                 <span style={{ fontSize: 10.5, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {r.summary || 'Enregistrement disponible.'}
+                  {r.summary || 'No AI summary yet — open to transcribe.'}
                 </span>
               </span>
               <span style={{ fontSize: 11, color: qualityColor(r.qualityScore || 0), fontWeight: 700, fontFamily: 'JetBrains Mono, monospace' }}>{r.qualityScore || 0}</span>
