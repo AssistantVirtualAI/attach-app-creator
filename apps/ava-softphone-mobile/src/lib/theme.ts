@@ -9,13 +9,13 @@ export const colors = {
   midnight2:  '#F5F8FD',
   graphite:   'rgba(255,255,255,0.72)',
   graphite2:  'rgba(255,255,255,0.86)',
-  // Brand
-  lemtelBlue: '#0052CC',
-  blueGlow:   '#2D7BE5',
+  // Brand — aligned with AVA Statistic portal (primary #0023e6)
+  lemtelBlue: '#0023e6',
+  blueGlow:   '#2a4dff',
   signalGold: '#E0A800',
   goldSoft:   '#F2C94C',
   // AI shimmer
-  avaCyan:    '#0BB5D6',
+  avaCyan:    '#23d6ff',
   avaViolet:  '#7A4CFF',
   // Text on light
   textIce:    '#0E1B3D',
