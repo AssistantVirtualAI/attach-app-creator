@@ -51,13 +51,18 @@ export default function MessagesView() {
     try {
       const rows = await ava.messages(activeId);
       setMsgs(rows.map(mapMsg));
+      if (threads.find((t) => t.id === activeId)?.unread) {
+        await ava.markThreadRead(activeId);
+        setThreads((prev) => prev.map((t) => t.id === activeId ? { ...t, unread: 0 } : t));
+        loadThreads();
+      }
     } catch (err: any) {
       setMsgs([]);
       setMessagesError(err?.message || 'Unable to load live message history.');
     } finally {
       setMessagesLoading(false);
     }
-  }, [activeId]);
+  }, [activeId, threads, loadThreads]);
   useEffect(() => { loadMessages(); }, [loadMessages]);
 
   // Realtime: new SMS threads/messages for this tenant refresh the list.

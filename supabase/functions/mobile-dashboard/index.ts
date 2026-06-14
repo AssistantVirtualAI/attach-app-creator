@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
 
     const { data: sp } = await sb
       .from("pbx_softphone_users")
-      .select("organization_id, extension, extension_uuid, sip_domain, display_name, status, forward_enabled, forward_to, dnd_enabled")
+      .select("organization_id, extension, extension_uuid, sip_domain, display_name, status, status_updated_at, updated_at, forward_enabled, forward_to, dnd_enabled")
       .eq("portal_user_id", u.user.id)
       .maybeSingle();
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
@@ -58,13 +58,19 @@ Deno.serve(async (req) => {
       }
     }
 
+    let smsQ = sb.from("pbx_sms_threads")
+      .select("id, contact_name, contact_phone, unread_count, last_message_at, extension_uuid, extension")
+      .eq("organization_id", orgId)
+      .order("last_message_at", { ascending: false })
+      .limit(admin ? 50 : 20);
+    if (!admin) {
+      if (sp.extension_uuid) smsQ = smsQ.eq("extension_uuid", sp.extension_uuid);
+      else if (sp.extension) smsQ = smsQ.eq("extension", sp.extension);
+    }
+
     const [{ data: calls }, { data: threads }, { data: vmails }, { count: activeUsers }] = await Promise.all([
       callsQ.order("start_at", { ascending: false }).limit(100),
-      sb.from("pbx_sms_threads")
-        .select("id, contact_name, contact_phone, unread_count, last_message_at")
-        .eq("organization_id", orgId)
-        .order("last_message_at", { ascending: false })
-        .limit(admin ? 50 : 20),
+      smsQ,
       vmQ.order("start_at", { ascending: false }).limit(admin ? 25 : 10),
       admin
         ? sb.from("pbx_softphone_users").select("id", { count: "exact", head: true }).eq("organization_id", orgId).neq("status", "offline")
@@ -111,7 +117,7 @@ Deno.serve(async (req) => {
       scope: { mode: admin ? "domain_admin" : "extension_user", label: admin ? `Domain admin · ${sp.sip_domain || orgId}` : `Extension ${sp.extension}`, organizationId: orgId, sipDomain: sp.sip_domain || undefined, extension: sp.extension, role },
       metrics: { missedCalls: missed, answeredCalls: answered, unreadSms, voicemails: vmList.length, actionItems: needsAttention.length, activeUsers: activeUsers ?? undefined },
       needsAttention,
-      status: { sipState: sp.status === "registered" ? "registered" : sp.status === "connecting" ? "connecting" : "offline", doNotDisturb: !!sp.dnd_enabled, forwarding: sp.forward_enabled ? sp.forward_to : null },
+      status: { sipState: sp.status === "registered" ? "registered" : sp.status === "connecting" ? "connecting" : "offline", doNotDisturb: !!sp.dnd_enabled, forwarding: sp.forward_enabled ? sp.forward_to : null, updatedAt: sp.status_updated_at || sp.updated_at || undefined },
     });
   } catch (e) {
     console.error("[mobile-dashboard]", e);

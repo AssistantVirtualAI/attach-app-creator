@@ -11,6 +11,39 @@ const corsHeaders = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+const te = new TextEncoder();
+const td = new TextDecoder();
+const b64 = {
+  enc: (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)),
+  dec: (value: string) => Uint8Array.from(atob(value), (c) => c.charCodeAt(0)),
+};
+async function importAesKey(secret: string) {
+  const material = await crypto.subtle.digest("SHA-256", te.encode(secret));
+  return crypto.subtle.importKey("raw", material, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+async function encryptSecret(value: string) {
+  const secret = Deno.env.get("PBX_SECRETS_KEY") || Deno.env.get("PBX_ENCRYPTION_KEY") || "";
+  if (!secret || !value) return null;
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await importAesKey(secret), te.encode(value)));
+  return `aesgcm:${b64.enc(iv)}:${b64.enc(cipher)}`;
+}
+async function decryptSecret(value?: string | null) {
+  if (!value?.startsWith("aesgcm:")) return value || "";
+  const secret = Deno.env.get("PBX_SECRETS_KEY") || Deno.env.get("PBX_ENCRYPTION_KEY") || "";
+  if (!secret) return "";
+  const [, ivB64, cipherB64] = value.split(":");
+  try {
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64.dec(ivB64) }, await importAesKey(secret), b64.dec(cipherB64));
+    return td.decode(plain);
+  } catch (_e) {
+    return "";
+  }
+}
+async function safeAudit(client: any, row: Record<string, unknown>) {
+  try { await client.from("audit_logs").insert(row); } catch { /* non-fatal */ }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   const reqId = crypto.randomUUID().slice(0, 8);
@@ -53,7 +86,7 @@ Deno.serve(async (req) => {
 
     const { data: sp, error: spErr } = await supabaseAdmin
       .from("pbx_softphone_users")
-      .select("extension, organization_id, extension_id, display_name, sip_password, sip_domain, wss_url")
+      .select("extension, organization_id, extension_id, display_name, sip_password, sip_password_encrypted, sip_domain, wss_url")
       .eq("portal_user_id", user.id)
       .maybeSingle();
     if (spErr) log("lookup by portal_user_id error", spErr.message);
@@ -88,7 +121,7 @@ Deno.serve(async (req) => {
       `wss://${sipDomain}:7443`,
     ]));
 
-    let password = sp.sip_password || "";
+    let password = await decryptSecret((sp as any).sip_password_encrypted) || await decryptSecret(sp.sip_password) || "";
     if (!password && sp.extension_id) {
       const { data: ext } = await supabase
         .from("pbx_extensions").select("raw_data").eq("id", sp.extension_id).maybeSingle();
@@ -109,9 +142,13 @@ Deno.serve(async (req) => {
           || "";
         if (fpPwd) {
           password = fpPwd;
-          await supabase
+          const encrypted = await encryptSecret(fpPwd);
+          const updatePayload: Record<string, unknown> = encrypted
+            ? { sip_password_encrypted: encrypted, sip_password: null }
+            : { sip_password: fpPwd };
+          await supabaseAdmin
             .from("pbx_softphone_users")
-            .update({ sip_password: fpPwd })
+            .update(updatePayload)
             .eq("portal_user_id", user.id);
         }
       } catch (_e) { /* non-fatal */ }
@@ -125,16 +162,13 @@ Deno.serve(async (req) => {
     }
 
 
-    // Audit
-    try {
-      await supabase.from("audit_logs").insert({
-        organization_id: sp.organization_id,
-        user_id: user.id,
-        action: "softphone_credentials_accessed",
-        resource_type: "pbx_softphone",
-        metadata: { extension: sp.extension },
-      });
-    } catch { /* non-fatal */ }
+    await safeAudit(supabaseAdmin, {
+      organization_id: sp.organization_id,
+      user_id: user.id,
+      action: "softphone_credentials_accessed",
+      resource_type: "pbx_softphone",
+      metadata: { extension: sp.extension, credential_source: (sp as any).sip_password_encrypted ? "encrypted" : "legacy" },
+    });
 
     return json({
       // SIP

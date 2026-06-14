@@ -67,6 +67,7 @@ export interface MeResponse {
   role: MobileRole;
   dataScope: DataScope;
   permissions: { admin: boolean; canManageNumbers: boolean; canManageAgents: boolean; canManageUsers: boolean; canManageRouting: boolean; canViewDomainReports: boolean };
+  status?: { sipState: 'registered' | 'connecting' | 'offline'; doNotDisturb: boolean; forwarding: string | null; updatedAt?: string };
 }
 
 export interface DashboardBrief {
@@ -75,7 +76,7 @@ export interface DashboardBrief {
   scope: { mode: DataScope; label: string; organizationId: string; sipDomain?: string; extension?: string; role?: MobileRole };
   metrics: { missedCalls: number; answeredCalls: number; unreadSms: number; voicemails: number; actionItems: number; activeUsers?: number };
   needsAttention: { id: string; kind: 'follow_up' | 'callback' | 'voicemail' | 'unread'; title: string; subtitle: string; accent: 'gold' | 'cyan' | 'violet' | 'danger' }[];
-  status: { sipState: 'registered' | 'connecting' | 'offline'; doNotDisturb: boolean; forwarding: string | null };
+  status: { sipState: 'registered' | 'connecting' | 'offline'; doNotDisturb: boolean; forwarding: string | null; updatedAt?: string };
 }
 
 export interface CallRecord {
@@ -281,8 +282,8 @@ export const mobileApi = {
       { ok: true, url: '', expiresInSec: 0, contentType: 'audio/wav' },
     ),
 
-  analyzeCall: (callId: string) => call<{ jobId: string }>(
-    '/ai-analyze-call', { method: 'POST', body: JSON.stringify({ callId }) },
+  analyzeCall: (callId: string) => call<{ jobId?: string; transcript?: string; transcript_text?: string; summary?: string; sentiment?: string; topics?: string[]; action_items?: string[]; analysis?: any }>(
+    '/ai-analyze-call', { method: 'POST', body: JSON.stringify({ call_record_id: callId }) },
     { jobId: 'job-' + Date.now() },
   ),
   generateGreeting: (prompt: string) => call<{ text: string; audioUrl?: string }>(

@@ -46,7 +46,26 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!member) return json({ error: "Forbidden" }, 403);
 
-    const { from, to, text, media_urls } = await req.json();
+    const payload = await req.json();
+    let { from, to, text, media_urls } = payload;
+    const threadId = payload.threadId || payload.thread_id;
+    if (!text && payload.body) text = payload.body;
+
+    let sourceThread: any = null;
+    if (threadId) {
+      const { data: threadRow, error: threadLookupErr } = await admin
+        .from("pbx_sms_threads")
+        .select("id, organization_id, did_number, contact_phone")
+        .eq("id", threadId)
+        .eq("organization_id", LEMTEL_ORG_ID)
+        .maybeSingle();
+      if (threadLookupErr) return json({ error: threadLookupErr.message }, 500);
+      if (!threadRow) return json({ error: "Thread not found" }, 404);
+      sourceThread = threadRow;
+      from = from || threadRow.did_number;
+      to = to || threadRow.contact_phone;
+    }
+
     if (!from || !to || !text) return json({ error: "from, to, text required" }, 400);
 
     // Get Telnyx config from integration row (mock-mode aware)
@@ -78,13 +97,17 @@ Deno.serve(async (req) => {
     }
 
     // Find or create thread
-    let { data: thread } = await admin
-      .from("pbx_sms_threads")
-      .select("id")
-      .eq("organization_id", LEMTEL_ORG_ID)
-      .eq("did_number", from)
-      .eq("contact_phone", to)
-      .maybeSingle();
+    let thread: any = sourceThread ? { id: sourceThread.id } : null;
+    if (!thread) {
+      const lookup = await admin
+        .from("pbx_sms_threads")
+        .select("id")
+        .eq("organization_id", LEMTEL_ORG_ID)
+        .eq("did_number", from)
+        .eq("contact_phone", to)
+        .maybeSingle();
+      thread = lookup.data;
+    }
 
     if (!thread) {
       const { data: newThread, error: threadErr } = await admin
@@ -146,7 +169,7 @@ Deno.serve(async (req) => {
       action: "sms_send",
       resource_type: "pbx_sms_messages",
       resource_id: message.id,
-      metadata: { from, to, mock },
+      metadata: { from, to, mock, thread_id: thread!.id, source: threadId ? "desktop_thread" : "direct" },
     }).then(() => {}, () => {});
 
     return json({ ok: true, message, provider: providerResult });

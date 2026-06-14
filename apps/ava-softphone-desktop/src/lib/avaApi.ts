@@ -220,6 +220,27 @@ export interface SmsMessage {
   id: string; threadId: string; from: 'me' | 'them'; body: string; at: string; status?: string;
 }
 
+export interface PbxActiveCall {
+  uuid: string;
+  direction?: string;
+  caller?: string;
+  destination?: string;
+  created?: string;
+  durationSec?: number;
+  state?: string;
+  raw?: Record<string, any>;
+}
+export interface PbxSystemStatus {
+  ok: boolean;
+  statusText?: string;
+  sofiaText?: string;
+  uptime?: string;
+  registrations?: number;
+  channels?: number;
+  latency_ms?: number;
+  raw?: Record<string, any>;
+}
+
 export interface Extension {
   id: string; extension: string; displayName: string;
   user?: string; voicemailEnabled: boolean; enabled: boolean;
@@ -544,8 +565,62 @@ export const ava = {
       return [];
     }
   },
+  markThreadRead: async (threadId: string) => {
+    if (!threadId) return { ok: true as const };
+    if (MOCK) return { ok: true as const };
+    try {
+      await call<any>(`/db/${TABLES.smsThreads}?id=eq.${encodeURIComponent(threadId)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ unread_count: 0 }),
+      });
+      await ava.audit('sms.thread_marked_read', 'pbx_sms_threads', threadId, { source: 'desktop' });
+      return { ok: true as const };
+    } catch (err) {
+      console.warn('[avaApi] markThreadRead failed:', err);
+      return { ok: false as const };
+    }
+  },
   sendMessage: (threadId: string, body: string) =>
     call<{ ok: true }>(`/fn/${FN.telnyxSms}`, { method: 'POST', body: JSON.stringify({ op: 'send', threadId, body }) }, { ok: true }),
+  audit: (action: string, resourceType?: string, resourceId?: string, metadata?: Record<string, any>) =>
+    call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'desktop-audit', params: { action, resource_type: resourceType, resource_id: resourceId, metadata } }),
+    }, { ok: true }).catch(() => ({ ok: true as const })),
+  activeCalls: async (): Promise<PbxActiveCall[]> => {
+    const data = await call<any>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'list-active-calls' }) }, { ok: true, data: [] });
+    return asArray(data?.data ?? data?.rows ?? data).map((r: any) => {
+      const uuid = cleanText(r.uuid || r.call_uuid || r.channel_uuid || r['Unique-ID'] || r.variable_uuid || r.id);
+      const createdEpoch = Number(r.created_epoch || r.created || r.created_time || 0);
+      const created = createdEpoch > 1000000000 ? new Date(createdEpoch * 1000).toISOString() : cleanText(r.created_at || r.created_time);
+      return {
+        uuid: uuid || String(Math.random()),
+        direction: cleanText(r.direction || r.call_direction || r.variable_direction),
+        caller: cleanText(r.cid_num || r.caller_id_number || r.caller || r.from || r['Caller-Caller-ID-Number']),
+        destination: cleanText(r.dest || r.destination_number || r.destination || r.to || r['Caller-Destination-Number']),
+        created,
+        durationSec: Number(r.duration || r.callstate_time || r.billsec || 0) || undefined,
+        state: cleanText(r.callstate || r.state || r.channel_state || r.status),
+        raw: r,
+      };
+    }).filter((x) => x.uuid);
+  },
+  killActiveCall: (uuid: string) =>
+    call<any>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'kill-active-call', params: { uuid }, uuid }) }),
+  systemStatus: async (): Promise<PbxSystemStatus> => {
+    const data = await call<any>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'system-status' }) }, { ok: true });
+    return {
+      ok: data?.ok !== false && !data?.error,
+      statusText: cleanText(data?.status_text || data?.status || data?.data?.status || data?.data?.status_text),
+      sofiaText: cleanText(data?.sofia_text || data?.sofia || data?.data?.sofia || data?.data?.sofia_text),
+      uptime: cleanText(data?.uptime || data?.data?.uptime),
+      registrations: Number(data?.registrations ?? data?.data?.registrations ?? 0) || undefined,
+      channels: Number(data?.channels ?? data?.data?.channels ?? 0) || undefined,
+      latency_ms: Number(data?.latency_ms ?? data?.data?.latency_ms ?? 0) || undefined,
+      raw: data,
+    };
+  },
   aiRewrite: (text: string, action: 'professional' | 'shorten' | 'translate' | 'rewrite') =>
     call<{ text: string }>(`/fn/${FN.aiAnalyzeCall}`, { method: 'POST', body: JSON.stringify({ op: 'rewrite', text, action }) }, {
       text: action === 'shorten' ? text.split('.')[0] + '.' :

@@ -71,10 +71,23 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true }), { status: 200, headers: corsHeaders });
     }
 
-    const { call_record_id, organization_id } = body;
+    let call_record_id = body.call_record_id || body.callId;
+    let organization_id = body.organization_id;
     let transcript_text = body.transcript_text;
-    if (!call_record_id || !organization_id) {
+    if (!call_record_id) {
       return new Response(JSON.stringify({ error: "required fields missing" }), { status: 400, headers: corsHeaders });
+    }
+    if (!organization_id) {
+      const { data: sp } = await admin.from("pbx_softphone_users")
+        .select("organization_id, extension, extension_uuid")
+        .eq("portal_user_id", user.id)
+        .maybeSingle();
+      if (sp?.organization_id) {
+        organization_id = sp.organization_id;
+      }
+    }
+    if (!organization_id) {
+      return new Response(JSON.stringify({ error: "organization required" }), { status: 400, headers: corsHeaders });
     }
     const { data: member } = await admin.from("organization_members")
       .select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle();
@@ -149,7 +162,7 @@ ${transcript_text}` }],
       raw_data: { ...((existingCall?.raw_data as Record<string, unknown>) || {}), ai: insights },
     }).eq("id", call_record_id);
 
-    return new Response(JSON.stringify(insights), { headers: corsHeaders });
+    return new Response(JSON.stringify({ ...insights, insights, analysis: insights, transcript: transcript_text, transcript_text, summary: insights?.summary, sentiment: insights?.sentiment, topics: insights?.topics, action_items: insights?.action_items, jobId: crypto.randomUUID() }), { headers: corsHeaders });
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: corsHeaders });
   }

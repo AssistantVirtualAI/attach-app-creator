@@ -23,6 +23,7 @@ const en = {
   'nav.orgchat': 'Org Chat',
   'nav.aiadmin': 'AI Admin',
   'nav.reports': 'Reports',
+  'nav.pbxlive': 'PBX Live',
   'nav.search': 'Search',
 
   // Status pills
@@ -126,6 +127,7 @@ const fr: Record<keyof typeof en, string> = {
   'nav.orgchat': 'Chat équipe',
   'nav.aiadmin': 'IA Admin',
   'nav.reports': 'Rapports',
+  'nav.pbxlive': 'PBX Live',
   'nav.search': 'Rechercher',
 
   'status.connected': 'Connecté',

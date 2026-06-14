@@ -24,14 +24,22 @@ Deno.serve(async (req) => {
     if (!u?.user) return json({ error: "unauthorized" }, 401);
 
     const { target } = await req.json().catch(() => ({}));
-    const enabled = !!target;
+    const normalized = typeof target === "string" ? target.trim() : "";
+    const enabled = normalized.length > 0;
+    if (enabled && !/^\+?[0-9][0-9 .()\-]{5,24}$/.test(normalized)) {
+      return json({ error: "invalid_forwarding_target" }, 400);
+    }
 
+    const { data: sp } = await sb.from("pbx_softphone_users").select("organization_id, extension, forward_to").eq("portal_user_id", u.user.id).maybeSingle();
     const { error } = await sb.from("pbx_softphone_users")
-      .update({ forward_enabled: enabled, forward_to: enabled ? String(target) : null, updated_at: new Date().toISOString() })
+      .update({ forward_enabled: enabled, forward_to: enabled ? normalized : null, updated_at: new Date().toISOString() })
       .eq("portal_user_id", u.user.id);
     if (error) return json({ error: error.message }, 400);
+    try {
+      await sb.from("audit_logs").insert({ organization_id: sp?.organization_id, user_id: u.user.id, action: "mobile_forwarding_updated", resource_type: "pbx_softphone", metadata: { extension: sp?.extension, previous: sp?.forward_to || null, next: enabled ? normalized : null } });
+    } catch { /* non-fatal */ }
 
-    return json({ ok: true, forwarding: enabled ? String(target) : null });
+    return json({ ok: true, forwarding: enabled ? normalized : null });
   } catch (e) {
     console.error("[mobile-settings-forwarding]", e);
     return json({ error: String((e as Error).message || e) }, 500);

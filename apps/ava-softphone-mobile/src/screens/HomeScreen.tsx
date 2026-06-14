@@ -66,11 +66,17 @@ export default function HomeScreen({ onNavigate, haptic }: Props) {
           <div style={{ width: 38, height: 38, borderRadius: 14, display: 'grid', placeItems: 'center', background: gradients.ai, fontSize: 18 }}>⌁</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: font.base, fontWeight: 800, color: colors.textIce }}>{data?.scope.label || (me?.dataScope === 'domain_admin' ? 'Domain admin' : 'Extension user')}</div>
-            <div style={{ fontSize: font.sm, color: colors.mutedSilver, marginTop: 2 }}>{me ? `${me.organization.name} · ${me.domain.sipDomain || me.extension.sipDomain}` : 'Loading secure domain scope…'}</div>
+            <div style={{ fontSize: font.sm, color: colors.mutedSilver, marginTop: 2 }}>{me ? `${me.client?.name ? `${me.client.name} · ` : ''}${me.organization.name} · ${me.domain.sipDomain || me.extension.sipDomain}` : 'Loading secure domain scope…'}</div>
           </div>
           <Chip tone={me?.permissions.admin ? 'gold' : 'cyan'}>{me?.permissions.admin ? 'Admin' : 'User'}</Chip>
         </div>
       </Card>
+
+      {me?.status?.updatedAt && (
+        <div style={{ margin: '8px 2px 0', fontSize: font.xs, color: colors.mutedSilver }}>
+          PBX status synced {new Date(me.status.updatedAt).toLocaleString()}
+        </div>
+      )}
 
       {/* Communication health */}
       <SectionTitle eyebrow="Today" title="Communication health" />

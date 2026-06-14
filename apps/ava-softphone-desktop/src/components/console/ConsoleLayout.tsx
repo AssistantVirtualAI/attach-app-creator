@@ -16,6 +16,7 @@ import AdminAIChatView from './AdminAIChatView';
 import ReportsView from './ReportsView';
 import CustomersView from './CustomersView';
 import VoiceAgentsView from './VoiceAgentsView';
+import PBXLiveView from './PBXLiveView';
 import SoftphonePane from '../SoftphonePane';
 import SettingsPage from '../SettingsPage';
 import { AppErrorBoundary } from '../AppErrorBoundary';
@@ -74,7 +75,7 @@ export default function ConsoleLayout({
 
   // Redirect non-admins away from admin-only views
   useEffect(() => {
-    const adminOnly: ConsoleView[] = ['admin', 'aiadmin', 'reports', 'customers', 'voiceagents'];
+    const adminOnly: ConsoleView[] = ['admin', 'aiadmin', 'reports', 'customers', 'voiceagents', 'pbxlive'];
     if (!isAdmin && adminOnly.includes(view)) setView('home');
   }, [isAdmin, view]);
 
@@ -209,6 +210,7 @@ export default function ConsoleLayout({
           {view === 'reports' && <ReportsView />}
           {view === 'customers' && <CustomersView />}
           {view === 'voiceagents' && <VoiceAgentsView />}
+          {view === 'pbxlive' && <PBXLiveView />}
           {view === 'settings' && (
             <SettingsPage
               creds={creds}

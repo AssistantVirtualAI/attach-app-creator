@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 // VITE_AVA_MOCK=true. Must run before any UI mounts.
 import './lib/buildGuard';
 import App from './App';
+import MessagesHarness from './test-harness/MessagesHarness';
 import { ThemeProvider } from './lib/theme';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import DemoModeBanner from './components/DemoModeBanner';
@@ -35,12 +36,15 @@ window.addEventListener('error', (e) => {
   } catch { /* noop */ }
 });
 
+const params = new URLSearchParams(window.location.search);
+const RootComponent = params.get('testHarness') === 'messages' ? MessagesHarness : App;
+
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppErrorBoundary>
       <ThemeProvider>
         <DemoModeBanner />
-        <App />
+        <RootComponent />
       </ThemeProvider>
     </AppErrorBoundary>
   </React.StrictMode>

@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
   // domain_uuid is being acted upon. This lets each customer's admin manage
   // their own phone system through the proxy.
   if (!isServiceCall && userId) {
-    const readOnly = new Set(["ping", "debug-raw", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "backfill-cdrs", "sync-domains", "sync-voicemail-messages", "sync-ivr-options", "sync-all", "get-recording", "get-recording-signed-url", "list-queues", "list-ivrs", "list-ring-groups", "list-moh", "list-recordings", "list-devices", "list-destinations", "list-voicemails", "list-voicemail-messages", "list-registrations", "get-registrations", "list-gateways", "list-gateways-all-domains", "list-gateways-merged", "get-gateways", "list-sip-profiles", "list-conferences", "list-hold-music", "list-dialplans", "get-extension", "sync_status", "sync-status", "list-active-calls", "system-status"]);
+    const readOnly = new Set(["ping", "debug-raw", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "backfill-cdrs", "sync-domains", "sync-voicemail-messages", "sync-ivr-options", "sync-all", "get-recording", "get-recording-signed-url", "list-queues", "list-ivrs", "list-ring-groups", "list-moh", "list-recordings", "list-devices", "list-destinations", "list-voicemails", "list-voicemail-messages", "list-registrations", "get-registrations", "list-gateways", "list-gateways-all-domains", "list-gateways-merged", "get-gateways", "list-sip-profiles", "list-conferences", "list-hold-music", "list-dialplans", "get-extension", "sync_status", "sync-status", "list-active-calls", "system-status", "desktop-audit"]);
     const isRead = readOnly.has(_earlyAction);
     const rpcName = isRead ? "is_lemtel_member" : "is_lemtel_admin";
     const { data: allowed } = await admin.rpc(rpcName, { _user_id: userId });
@@ -289,6 +289,23 @@ Deno.serve(async (req) => {
       const p = params.path || "gateways";
       const r = await pbxFetch(p);
       return json({ ok: r.ok, status: r.status, raw: r.data, latency_ms: r.latency_ms });
+    }
+
+    if (action === "desktop-audit") {
+      const auditAction = params.action || body.audit_action || "desktop.event";
+      try {
+        await admin.from("audit_logs").insert({
+          organization_id,
+          user_id: userId,
+          action: auditAction,
+          resource_type: params.resource_type || null,
+          resource_id: params.resource_id || null,
+          metadata: { source: "ava-softphone-desktop", ...(params.metadata || {}) },
+        });
+      } catch (auditErr: any) {
+        console.warn("desktop audit failed:", auditErr?.message);
+      }
+      return json({ ok: true });
     }
 
     if (action === "list-gateways-all-domains") {

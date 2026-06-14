@@ -14,7 +14,13 @@ export default function SettingsScreen({
   const [forwarding, setForwarding] = useState<string | null>(null);
   const [perms, setPerms] = useState<AllPermissions | null>(null);
 
-  useEffect(() => { mobileApi.me().then(setMe); }, []);
+  useEffect(() => {
+    mobileApi.me().then((next) => {
+      setMe(next);
+      setDnd(!!next.status?.doNotDisturb);
+      setForwarding(next.status?.forwarding || null);
+    });
+  }, []);
   useEffect(() => { checkAllPermissions().then(setPerms); }, []);
 
   const toggleDnd = async () => { const next = !dnd; setDnd(next); try { await mobileApi.setDnd(next); } catch {} };
@@ -38,7 +44,7 @@ export default function SettingsScreen({
               <AvaBadge compact />
             </div>
             <div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 3, fontFamily: 'JetBrains Mono, monospace' }}>
-              Ext {creds.extension} · {me?.domain.sipDomain || me?.organization.name || creds.sipDomain || 'lemtel.tel'}
+              Ext {creds.extension} · {me?.client?.name ? `${me.client.name} · ` : ''}{me?.domain.sipDomain || me?.organization.name || creds.sipDomain || 'lemtel.tel'}
             </div>
             <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><StatusDot state={sipState} /><Chip tone={me?.permissions.admin ? 'gold' : 'cyan'}>{me?.permissions.admin ? 'Admin domaine' : 'Utilisateur'}</Chip></div>
           </div>
@@ -56,6 +62,7 @@ export default function SettingsScreen({
       <Card padded={false}>
         <SettingsRow label="Extension" icon="☎" value={me?.extension.number || creds.extension} />
         <SettingsRow label="SIP domain" icon="🌐" value={me?.domain.sipDomain || me?.extension.sipDomain || creds.sipDomain || '—'} />
+        {me?.client && <SettingsRow label="Client" icon="◈" value={me.client.name} />}
         <SettingsRow label="Data scope" icon="⌁" value={me?.dataScope === 'domain_admin' ? 'Domain-wide PBX' : 'Own extension only'} />
         <SettingsRow label="Role" icon="◎" value={me?.role || creds.role || 'agent'} />
         <SettingsRow label="Devices" icon="📱" value="This device · WebRTC" onPress={() => {}} />
