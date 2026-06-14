@@ -457,7 +457,7 @@ export default function SoftphonePane({
                 }}
               >Go to portal →</button>
               <button
-                onClick={() => sp.retry?.()}
+                onClick={() => sp.restart()}
                 style={{
                   padding: '8px 14px', borderRadius: 10,
                   background: 'rgba(255,255,255,0.06)',
