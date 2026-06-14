@@ -91,7 +91,11 @@ export default function MyDevices() {
             {softphone?.last_seen_at && (
               <Badge variant="outline" className="ml-2">last seen {formatDistanceToNow(new Date(softphone.last_seen_at), { addSuffix: true })}</Badge>
             )}
-            <Button size="sm" variant="outline" className="ml-auto" disabled={resetting} onClick={resetSipPassword}>
+            <Button size="sm" variant="outline" className="ml-auto" disabled={syncing} onClick={syncSipPassword}>
+              {syncing ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <KeyRound className="w-3.5 h-3.5 mr-1" />}
+              Align with PBX
+            </Button>
+            <Button size="sm" variant="outline" disabled={resetting} onClick={resetSipPassword}>
               {resetting ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <KeyRound className="w-3.5 h-3.5 mr-1" />}
               Reset SIP password
             </Button>
