@@ -1318,7 +1318,18 @@ function SipDiagnostics({
               ↻ Restart SIP
             </button>
           </div>
-          {devices && (
+          {sp.config && (
+            <div style={{
+              padding: 6, borderRadius: 6, background: 'rgba(0,0,0,0.3)',
+              fontSize: 10, color: 'rgba(235,240,255,0.85)',
+              fontFamily: 'JetBrains Mono, Menlo, monospace',
+            }}>
+              <div>📞 Extension: {sp.config.extension} ({sp.config.displayName})</div>
+              <div>🌐 SIP domain: {sp.config.sipDomain}</div>
+              <div>🔌 WSS: {sp.config.wssUrl}</div>
+              <div>🔐 Registration: <span style={{ color: statusColor, fontWeight: 700 }}>{sp.snap.status}</span></div>
+            </div>
+          )}
             <div style={{
               padding: 6, borderRadius: 6, background: 'rgba(0,0,0,0.3)',
               fontSize: 10, color: 'rgba(235,240,255,0.85)',
