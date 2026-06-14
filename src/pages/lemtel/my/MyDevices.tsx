@@ -13,6 +13,20 @@ export default function MyDevices() {
   const [softphone, setSoftphone] = useState<any>(null);
   const [devices, setDevices] = useState<any[]>([]);
   const [resetting, setResetting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const syncSipPassword = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('softphone-sync-password', { body: {} });
+      if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error || (data as any)?.message);
+      const changed = (data as any)?.changed;
+      toast.success(changed ? 'SIP password aligned with PBX. Reloading…' : 'Already in sync.');
+      if (changed) setTimeout(() => window.location.reload(), 800);
+    } catch (e: any) {
+      toast.error('Sync failed: ' + (e?.message || e));
+    } finally { setSyncing(false); }
+  };
 
   const resetSipPassword = async () => {
     if (!confirm('Reset SIP password? You will need to sign in again on every device.')) return;
