@@ -52,7 +52,8 @@ export default function VoicemailList({ extension, onCall }: Props) {
   const togglePlay = async (r: VoicemailItem) => {
     if (playing === r.id) { setPlaying(null); return; }
     if (!audio[r.id]) {
-      const url = await ava.getRecordingAudioUrl(r);
+      const signed = await ava.getRecordingSignedUrl(r);
+      const url = signed?.url || (await ava.getRecordingAudioUrl(r));
       if (!url) { setErr('No voicemail audio available yet'); return; }
       setAudio((a) => ({ ...a, [r.id]: url }));
     }
