@@ -68,8 +68,8 @@ Deno.serve(async (req) => {
       domain: { organizationId: sp.organization_id, sipDomain, fusionpbxDomainUuid: org?.fusionpbx_domain_uuid || undefined, portalUrl, wssUrl: sp.wss_url || undefined },
       extension: { number: sp.extension, displayName: sp.display_name || "", sipDomain, id: sp.extension_id || undefined },
       role,
-      dataScope: isDomainAdmin ? "domain_admin" : "extension_user",
-      permissions: { admin: isDomainAdmin, canManageNumbers: isDomainAdmin, canManageAgents: isDomainAdmin, canManageUsers: role === "org_admin" || role === "super_admin", canManageRouting, canViewDomainReports: isDomainAdmin },
+      dataScope: "extension_user",
+      permissions: { admin: isDomainAdmin, canManageNumbers: isDomainAdmin, canManageAgents: isDomainAdmin, canManageUsers: role === "org_admin" || role === "super_admin", canManageRouting, canViewDomainReports: false },
       status: {
         sipState: sp.status === "registered" ? "registered" : sp.status === "connecting" ? "connecting" : "offline",
         doNotDisturb: !!sp.dnd_enabled,

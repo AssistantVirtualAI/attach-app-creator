@@ -8,6 +8,13 @@ const cors = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
+function scopeToExtension(query: any, sp: any) {
+  const parts: string[] = [];
+  if (sp.extension_uuid) parts.push(`extension_uuid.eq.${sp.extension_uuid}`);
+  if (sp.extension) parts.push(`extension.eq.${sp.extension}`, `caller_number.eq.${sp.extension}`, `destination_number.eq.${sp.extension}`, `source_number.eq.${sp.extension}`);
+  return parts.length ? query.or(parts.join(",")) : query.eq("id", "__no_softphone_extension__");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   try {
@@ -36,8 +43,7 @@ Deno.serve(async (req) => {
       .eq("organization_id", sp.organization_id)
       .eq("call_status", "voicemail");
     // Per-user scoping — never leak voicemails across extensions in the same org.
-    if (sp.extension_uuid) q = q.eq("extension_uuid", sp.extension_uuid);
-    else if (sp.extension) q = q.eq("extension", sp.extension);
+    q = scopeToExtension(q, sp);
 
     const { data: rows } = await q.order("start_at", { ascending: false }).limit(60);
 

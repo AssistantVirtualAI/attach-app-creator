@@ -3,6 +3,7 @@ import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabaseClient';
 import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
 import { useTranslation } from '../../lib/i18n';
+import { applyMyExtensionScope, getMeContext } from '../../lib/avaApi';
 
 const { colors: c } = theme;
 
@@ -40,12 +41,14 @@ export default function ReportsView() {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data } = await supabase
+      const me = await getMeContext();
+      let q = supabase
         .from('pbx_call_records')
         .select('id,direction,extension,caller_number,destination_number,duration_seconds,billsec,call_status,missed_call,start_at')
+        .eq('organization_id', me.organization_id || '__no_softphone_org__')
         .gte('start_at', rangeStart(range))
-        .order('start_at', { ascending: false })
-        .limit(500);
+      q = applyMyExtensionScope(q, me);
+      const { data } = await q.order('start_at', { ascending: false }).limit(500);
       if (!cancelled) {
         setRows((data ?? []) as Row[]);
         setLoading(false);

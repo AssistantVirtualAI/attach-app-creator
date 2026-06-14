@@ -127,15 +127,15 @@ const meMock: MeResponse = {
   organization: { id: 'org-lemtel', name: 'Lemtel Communications', sipDomain: 'lemtel.lemtel.tel', portalUrl: 'https://avastatistic.ca', wssUrl: 'wss://pbxnode.lemtel.tel:7443' },
   domain: { organizationId: 'org-lemtel', sipDomain: 'lemtel.lemtel.tel', portalUrl: 'https://avastatistic.ca', wssUrl: 'wss://pbxnode.lemtel.tel:7443' },
   extension: { number: '1042', displayName: 'Alex M.', sipDomain: 'lemtel.lemtel.tel' },
-  role: 'org_admin',
-  dataScope: 'domain_admin',
-  permissions: { admin: true, canManageNumbers: true, canManageAgents: true, canManageUsers: true, canManageRouting: true, canViewDomainReports: true },
+  role: 'agent',
+  dataScope: 'extension_user',
+  permissions: { admin: false, canManageNumbers: false, canManageAgents: false, canManageUsers: false, canManageRouting: false, canViewDomainReports: false },
 };
 
 const dashboardMock: DashboardBrief = {
   greeting: 'Good morning',
   brief: 'You have 3 missed calls, 2 voicemails, and 4 unread messages. AVA flagged 2 follow-ups worth your attention.',
-  scope: { mode: 'domain_admin', label: 'Domain admin · Lemtel Communications', organizationId: 'org-lemtel', sipDomain: 'lemtel.lemtel.tel', extension: '1042', role: 'org_admin' },
+  scope: { mode: 'extension_user', label: 'Extension 1042', organizationId: 'org-lemtel', sipDomain: 'lemtel.lemtel.tel', extension: '1042', role: 'agent' },
   metrics: { missedCalls: 3, answeredCalls: 12, unreadSms: 4, voicemails: 2, actionItems: 5, activeUsers: 8 },
   needsAttention: [
     { id: 'a1', kind: 'voicemail', title: 'Marie Tremblay left a voicemail', subtitle: 'Renewal — high priority · 1m 12s', accent: 'gold' },
