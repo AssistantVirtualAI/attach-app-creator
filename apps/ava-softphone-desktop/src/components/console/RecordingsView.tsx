@@ -119,7 +119,7 @@ export default function RecordingsView() {
     let cancelled = false;
     setPlaybackLoading(true);
     fetchAudio(sel)
-      .then((u) => { if (!cancelled) { if (u) setAudioUrl(u); else setPlaybackError('Recording file not available from PBX yet'); } })
+      .then((u) => { if (!cancelled && u) setAudioUrl(u); })
       .finally(() => { if (!cancelled) setPlaybackLoading(false); });
     return () => { cancelled = true; };
   }, [sel?.id, fetchAudio]);
