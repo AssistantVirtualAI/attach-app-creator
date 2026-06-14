@@ -384,7 +384,7 @@ Deno.serve(async (req) => {
     }
 
     async function writeCollection(path: string, key: string, payload: any) {
-      return pbxWrite(path, "POST", { [key]: [{ ...payload, domain_uuid: FUSIONPBX_DOMAIN_UUID }] });
+      return pbxWrite(path, "POST", { [key]: [{ ...payload, domain_uuid: payload?.domain_uuid || requestedDomain || FUSIONPBX_DOMAIN_UUID }] });
     }
 
     // ---- DOMAIN management (multi-tenant provisioning) ----

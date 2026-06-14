@@ -1,5 +1,5 @@
-// Pulls the SIP password from FusionPBX and aligns it with pbx_softphone_users.sip_password.
-// Use this when the softphone gets 403 Rejected — typically the stored credential drifted.
+// Aligns one SIP password across PBX, portal auth, web, desktop, and mobile apps.
+// Default direction is local -> PBX because apps read pbx_softphone_users.sip_password.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const cors = {
@@ -25,6 +25,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const extensionArg: string | undefined = body?.extension;
+    const forceLocalToPbx = body?.force_local_to_pbx !== false;
 
     let spu: any;
     if (extensionArg) {
@@ -50,45 +51,84 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Pull live extension from FusionPBX
+    const { data: extRow } = await admin
+      .from("pbx_extensions")
+      .select("id, pbx_uuid, raw_data")
+      .eq("organization_id", spu.organization_id)
+      .eq("extension", spu.extension)
+      .maybeSingle();
+
+    const localPwd = spu.sip_password || (extRow?.raw_data as any)?.password || (extRow?.raw_data as any)?.sip_password || "";
+    if (forceLocalToPbx && !localPwd) {
+      return json({ error: "NO_LOCAL_PASSWORD", message: "No stored SIP password exists to force into the PBX." }, 424);
+    }
+
+    // Pull live extension from FusionPBX.
     const { data: fp, error: fpErr } = await admin.functions.invoke("fusionpbx-proxy", {
       body: { action: "get-extension", extension: spu.extension, organization_id: spu.organization_id },
     });
     if (fpErr) return json({ error: "PBX_GET_FAILED", details: fpErr.message }, 502);
 
+    const fpExtension = (fp as any)?.extension || (fp as any)?.extensions?.[0] || (fp as any)?.data?.extensions?.[0] || (Array.isArray(fp) ? (fp as any)[0] : null);
     const pwd: string =
-      (fp as any)?.extension?.password ||
+      fpExtension?.password ||
+      fpExtension?.sip_password ||
       (fp as any)?.password ||
       (fp as any)?.data?.password ||
-      (fp as any)?.extension?.sip_password ||
       "";
 
-    if (!pwd) return json({ error: "PBX_HAS_NO_PASSWORD", message: "FusionPBX did not return a password for this extension. Reset it from the portal." }, 424);
+    const desiredPwd = forceLocalToPbx ? localPwd : pwd;
+    if (!desiredPwd) return json({ error: "PBX_HAS_NO_PASSWORD", message: "FusionPBX did not return a password for this extension. Reset it from the portal." }, 424);
 
-    const changed = pwd !== spu.sip_password;
-    if (changed) {
+    const extensionUuid = extRow?.pbx_uuid || fpExtension?.extension_uuid || undefined;
+    let pbxChanged = false;
+    if (forceLocalToPbx && desiredPwd !== pwd) {
+      const { data: writeData, error: writeErr } = await admin.functions.invoke("fusionpbx-proxy", {
+        body: {
+          action: "update-extension",
+          organization_id: spu.organization_id,
+          params: { extension_uuid: extensionUuid, extension: spu.extension, password: desiredPwd },
+        },
+      });
+      if (writeErr || (writeData as any)?.ok === false) {
+        return json({ error: "PBX_UPDATE_FAILED", details: writeErr?.message || (writeData as any)?.message || (writeData as any)?.error }, 502);
+      }
+      pbxChanged = true;
+    }
+
+    const localChanged = desiredPwd !== spu.sip_password;
+    const shouldForceApps = forceLocalToPbx && desiredPwd.length >= 8;
+    if (localChanged || pbxChanged || shouldForceApps) {
       await admin.from("pbx_softphone_users")
-        .update({ sip_password: pwd, updated_at: new Date().toISOString() })
+        .update({ sip_password: desiredPwd, updated_at: new Date().toISOString() })
         .eq("id", spu.id);
 
+      await admin.from("lemtel_softphone_users")
+        .update({ sip_password: desiredPwd, updated_at: new Date().toISOString() })
+        .eq("organization_id", spu.organization_id)
+        .eq("extension", spu.extension);
+
+      if (spu.portal_user_id && desiredPwd.length >= 8) {
+        await admin.auth.admin.updateUserById(spu.portal_user_id, { password: desiredPwd });
+      }
+
       // mirror onto pbx_extensions.raw_data if present
-      if (spu.extension_id) {
-        const { data: ext } = await admin.from("pbx_extensions").select("raw_data").eq("id", spu.extension_id).maybeSingle();
-        const raw = (ext?.raw_data as any) || {};
-        raw.password = pwd;
-        await admin.from("pbx_extensions").update({ raw_data: raw }).eq("id", spu.extension_id);
+      if (extRow?.id || spu.extension_id) {
+        const raw = (extRow?.raw_data as any) || {};
+        raw.password = desiredPwd;
+        await admin.from("pbx_extensions").update({ raw_data: raw }).eq("id", extRow?.id || spu.extension_id);
       }
 
       await admin.from("audit_logs").insert({
         organization_id: spu.organization_id,
         user_id: user.id,
-        action: "softphone_password_synced",
+        action: forceLocalToPbx ? "softphone_password_forced_to_pbx" : "softphone_password_synced",
         resource_type: "pbx_softphone",
-        metadata: { extension: spu.extension },
+        metadata: { extension: spu.extension, pbx_changed: pbxChanged, local_changed: localChanged },
       });
     }
 
-    return json({ ok: true, extension: spu.extension, changed });
+    return json({ ok: true, extension: spu.extension, changed: localChanged || pbxChanged || shouldForceApps, pbx_changed: pbxChanged, local_changed: localChanged, apps_forced: shouldForceApps });
   } catch (e) {
     return json({ error: String(e) }, 500);
   }

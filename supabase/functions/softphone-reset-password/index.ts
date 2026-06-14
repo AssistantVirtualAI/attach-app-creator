@@ -61,22 +61,29 @@ Deno.serve(async (req) => {
     }
 
     const newPwd = genPwd(24);
+    const { data: extRow } = await admin
+      .from("pbx_extensions")
+      .select("pbx_uuid")
+      .eq("organization_id", spu.organization_id)
+      .eq("extension", spu.extension)
+      .maybeSingle();
+    const extensionUuid = extRow?.pbx_uuid ?? undefined;
 
     // Push update through pbx-write (so audit + mirror happen)
     const writeRes = await admin.functions.invoke("pbx-write", {
       body: {
         organizationId: spu.organization_id,
         action: "update-extension",
-        params: { extension_uuid: spu.extension_id ?? undefined, extension: spu.extension, password: newPwd },
+        params: { extension_uuid: extensionUuid, extension: spu.extension, password: newPwd },
         objectType: "pbx_extensions",
-        objectPbxUuid: spu.extension_id ?? undefined,
+        objectPbxUuid: extensionUuid,
       },
     });
 
-    if (writeRes.error) {
+    if (writeRes.error || (writeRes.data as any)?.ok === false) {
       // Fallback: direct proxy call
       const { error: pErr } = await admin.functions.invoke("fusionpbx-proxy", {
-        body: { action: "update-extension", params: { extension: spu.extension, password: newPwd } },
+        body: { action: "update-extension", organization_id: spu.organization_id, params: { extension_uuid: extensionUuid, extension: spu.extension, password: newPwd } },
       });
       if (pErr) return json({ error: "PBX_UPDATE_FAILED", details: pErr.message }, 502);
     }
@@ -84,6 +91,15 @@ Deno.serve(async (req) => {
     await admin.from("pbx_softphone_users")
       .update({ sip_password: newPwd, updated_at: new Date().toISOString() })
       .eq("id", spu.id);
+
+    await admin.from("lemtel_softphone_users")
+      .update({ sip_password: newPwd, updated_at: new Date().toISOString() })
+      .eq("organization_id", spu.organization_id)
+      .eq("extension", spu.extension);
+
+    if (spu.portal_user_id) {
+      await admin.auth.admin.updateUserById(spu.portal_user_id, { password: newPwd });
+    }
 
     await admin.from("audit_logs").insert({
       organization_id: spu.organization_id,

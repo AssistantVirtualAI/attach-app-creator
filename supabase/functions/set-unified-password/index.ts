@@ -104,26 +104,21 @@ Deno.serve(async (req) => {
 
     // 3) FusionPBX
     try {
-      const FUSIONPBX_API_URL = (Deno.env.get("FUSIONPBX_API_URL") || "")
-        .replace(/\/+$/, "").replace(/\/app\/api(\/\d+)?$/, "");
-      const FUSIONPBX_API_KEY = Deno.env.get("FUSIONPBX_API_KEY");
-      const DOMAIN_UUID = Deno.env.get("FUSIONPBX_DOMAIN_UUID");
-      if (FUSIONPBX_API_URL && FUSIONPBX_API_KEY && DOMAIN_UUID) {
-        await fetch(`${FUSIONPBX_API_URL}/app/api/7/extensions`, {
-          method: "PUT",
-          headers: {
-            Authorization: `Basic ${FUSIONPBX_API_KEY}`,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            extensions: [{
-              domain_uuid: DOMAIN_UUID,
-              extension: String(row.extension),
-              password,
-            }],
-          }),
-        });
+      const { data: extRow } = await admin
+        .from("pbx_extensions")
+        .select("pbx_uuid")
+        .eq("organization_id", row.organization_id)
+        .eq("extension", row.extension)
+        .maybeSingle();
+      const { data: pbxRes, error: pbxErr } = await admin.functions.invoke("fusionpbx-proxy", {
+        body: {
+          action: "update-extension",
+          organization_id: row.organization_id,
+          params: { extension_uuid: extRow?.pbx_uuid || undefined, extension: String(row.extension), password },
+        },
+      });
+      if (pbxErr || (pbxRes as any)?.ok === false) {
+        errors.push({ step: "fusionpbx", err: pbxErr?.message || (pbxRes as any)?.message || (pbxRes as any)?.error || "PBX update failed" });
       }
     } catch (e: any) {
       errors.push({ step: "fusionpbx", err: e?.message || String(e) });
