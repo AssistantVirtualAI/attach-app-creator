@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
         }
       }
     }
-    if (!permitted && (_earlyAction === "get-recording" || _earlyAction === "get-recording-signed-url")) {
+    if (!permitted && (_earlyAction === "get-recording" || _earlyAction === "check-recording" || _earlyAction === "get-recording-signed-url")) {
       const p = _bodyEarly?.params || {};
       const xml = String(p.xml_cdr_uuid || _bodyEarly?.xml_cdr_uuid || _bodyEarly?.id || "").trim();
       const recordPath = String(p.record_path || "").trim();
