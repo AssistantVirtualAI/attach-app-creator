@@ -20,6 +20,7 @@ import { registerPush, sendPushTokenToBackend } from './lib/pushNotifications';
 import { syncDeviceContacts } from './lib/contacts';
 import { bootNative, onAppStateChange } from './lib/nativeBoot';
 import { configureMobileApi } from './lib/mobileApi';
+import { configureAudit, audit } from './lib/audit';
 
 export default function MobileApp() {
   const { creds, setCreds, clearCreds, loading } = useStoredCreds();
