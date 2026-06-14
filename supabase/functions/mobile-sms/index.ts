@@ -11,6 +11,12 @@ const cors = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
+function scopeThreadToExtension(query: any, sp: any) {
+  if (sp.extension_uuid) return query.eq("extension_uuid", sp.extension_uuid);
+  if (sp.extension) return query.eq("extension", sp.extension);
+  return query.eq("id", "__no_softphone_extension__");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   try {
@@ -25,7 +31,7 @@ Deno.serve(async (req) => {
     if (!u?.user) return json({ error: "unauthorized" }, 401);
 
     const { data: sp } = await sb.from("pbx_softphone_users")
-      .select("organization_id").eq("portal_user_id", u.user.id).maybeSingle();
+      .select("organization_id, extension, extension_uuid").eq("portal_user_id", u.user.id).maybeSingle();
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
     const orgId = sp.organization_id;
     const url = new URL(req.url);
@@ -37,9 +43,11 @@ Deno.serve(async (req) => {
       if (!threadId || !text) return json({ error: "missing_fields" }, 400);
 
       const { data: th } = await sb.from("pbx_sms_threads")
-        .select("id, did_number, contact_phone, organization_id")
-        .eq("id", threadId).maybeSingle();
+        .select("id, did_number, contact_phone, organization_id, extension, extension_uuid")
+        .eq("id", threadId)
+        .maybeSingle();
       if (!th || th.organization_id !== orgId) return json({ error: "forbidden" }, 403);
+      if ((sp.extension_uuid && th.extension_uuid !== sp.extension_uuid) || (!sp.extension_uuid && sp.extension && th.extension !== sp.extension)) return json({ error: "forbidden" }, 403);
 
       const { data: msg, error } = await sb.from("pbx_sms_messages").insert({
         thread_id: th.id, organization_id: orgId, direction: "outbound",
@@ -62,6 +70,10 @@ Deno.serve(async (req) => {
 
     const threadId = url.searchParams.get("threadId");
     if (threadId) {
+      let threadQ = sb.from("pbx_sms_threads").select("id").eq("id", threadId).eq("organization_id", orgId);
+      threadQ = scopeThreadToExtension(threadQ, sp);
+      const { data: th } = await threadQ.maybeSingle();
+      if (!th) return json({ error: "forbidden" }, 403);
       const { data: rows } = await sb.from("pbx_sms_messages")
         .select("id, direction, body, sent_at")
         .eq("thread_id", threadId).eq("organization_id", orgId)
@@ -72,10 +84,11 @@ Deno.serve(async (req) => {
       })));
     }
 
-    const { data: rows } = await sb.from("pbx_sms_threads")
+    let threadsQ = sb.from("pbx_sms_threads")
       .select("id, contact_name, contact_phone, unread_count, last_message_at, pbx_sms_messages(body, sent_at)")
-      .eq("organization_id", orgId)
-      .order("last_message_at", { ascending: false }).limit(80);
+      .eq("organization_id", orgId);
+    threadsQ = scopeThreadToExtension(threadsQ, sp);
+    const { data: rows } = await threadsQ.order("last_message_at", { ascending: false }).limit(80);
     return json((rows || []).map((t: any) => {
       const msgs = t.pbx_sms_messages || [];
       const last = msgs[msgs.length - 1];
