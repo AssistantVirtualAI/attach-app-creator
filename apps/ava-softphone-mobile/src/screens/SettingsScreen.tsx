@@ -46,7 +46,7 @@ export default function SettingsScreen({
             <div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 3, fontFamily: 'JetBrains Mono, monospace' }}>
               Ext {creds.extension} · {me?.client?.name ? `${me.client.name} · ` : ''}{me?.domain.sipDomain || me?.organization.name || creds.sipDomain || 'lemtel.tel'}
             </div>
-            <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><StatusDot state={sipState} /><Chip tone={me?.permissions.admin ? 'gold' : 'cyan'}>{me?.permissions.admin ? 'Admin domaine' : 'Utilisateur'}</Chip></div>
+            <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><StatusDot state={sipState} /><Chip tone=
           </div>
         </div>
       </Card>
