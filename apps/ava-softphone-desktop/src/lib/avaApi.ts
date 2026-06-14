@@ -549,12 +549,54 @@ export const ava = {
     }
   },
 
-  getRecordingAudioUrl: async (recording: Partial<RecordingItem & VoicemailItem & CallRecord & { record_path?: string | null; record_name?: string | null }>) => {
-    const direct = cleanText(recording.recording_url);
-    if (direct) return direct;
+  /**
+   * Get a short-lived signed URL (default 5 min) for a recording / voicemail.
+   * The audio bytes are pulled from FusionPBX by the edge function and
+   * re-uploaded to private Supabase Storage; the player never sees raw
+   * FusionPBX URLs or PHP endpoints. Every issuance is audited.
+   */
+  getRecordingSignedUrl: async (
+    recording: Partial<RecordingItem & VoicemailItem & CallRecord & { record_path?: string | null; record_name?: string | null }>,
+    expiresInSec = 300,
+  ): Promise<{ url: string; expiresInSec: number; contentType: string } | null> => {
     const record_path = cleanText(recording.record_path ?? recording.recording_path);
     const record_name = cleanText(recording.record_name ?? recording.recording_name);
-    const xml_cdr_uuid = cleanText(recording.pbx_uuid || recording.callId || recording.id);
+    const xml_cdr_uuid = cleanText(recording.pbx_uuid || (recording as any).callId || recording.id);
+    const domain_uuid = cleanText(recording.domain_uuid);
+    const domain_name = cleanText(recording.domain_name);
+    if (!xml_cdr_uuid && (!record_path || !record_name)) return null;
+    try {
+      const res = await fetch(resolveUrl(`/fn/${FN.fusionpbxProxy}`), {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          action: 'get-recording-signed-url',
+          organization_id: recording.organization_id,
+          params: { xml_cdr_uuid, record_path, record_name, domain_uuid, domain_name, expires_in: expiresInSec },
+        }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data?.ok || !data?.url) return null;
+      return { url: data.url, expiresInSec: data.expiresInSec, contentType: data.contentType };
+    } catch (err) {
+      console.warn('[avaApi] get-recording-signed-url failed:', err);
+      return null;
+    }
+  },
+
+  /**
+   * Stream the recording bytes through the edge proxy and return a blob URL.
+   * Kept for callers that need a guaranteed-local URL (e.g. download button).
+   * Prefer `getRecordingSignedUrl` for `<audio>` playback.
+   */
+  getRecordingAudioUrl: async (recording: Partial<RecordingItem & VoicemailItem & CallRecord & { record_path?: string | null; record_name?: string | null }>) => {
+    // SECURITY: never trust a raw `recording_url` value — that would bypass the
+    // proxy and leak FusionPBX paths / credentials to the client. Always go
+    // through the edge function.
+    const record_path = cleanText(recording.record_path ?? recording.recording_path);
+    const record_name = cleanText(recording.record_name ?? recording.recording_name);
+    const xml_cdr_uuid = cleanText(recording.pbx_uuid || (recording as any).callId || recording.id);
     const domain_uuid = cleanText(recording.domain_uuid);
     const domain_name = cleanText(recording.domain_name);
     if (!xml_cdr_uuid && (!record_path || !record_name)) return null;
