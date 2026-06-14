@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { theme } from '../lib/theme';
+import { applyMyExtensionScope, getMeContext } from '../lib/avaApi';
 
 const { colors: c, glow } = theme;
 const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
@@ -63,11 +64,13 @@ export default function AIInsights() {
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
-    const { data, error } = await supabase
+    const me = await getMeContext();
+    let q = supabase
       .from('pbx_call_records' as any)
       .select('*')
-      .order('start_at', { ascending: false })
-      .limit(100);
+      .eq('organization_id', me.organization_id || '__no_softphone_org__');
+    q = applyMyExtensionScope(q, me);
+    const { data, error } = await q.order('start_at', { ascending: false }).limit(100);
     if (error) setError(error.message);
     else setItems((data || []) as any[]);
     setLoading(false);
