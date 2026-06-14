@@ -7,6 +7,21 @@ import { useAuth } from "@/hooks/useAuth";
 
 export type UserStatus = "available" | "busy" | "dnd" | "away";
 
+let passwordHealInFlight = false;
+let lastPasswordHealKey = "";
+
+function buildConfig(raw: any): SoftphoneConfig {
+  return {
+    extension: raw.extension,
+    displayName: raw.displayName || raw.display_name || raw.extension,
+    sipDomain: raw.sipDomain || raw.sip_domain || "lemtel.lemtel.tel",
+    wssUrl: raw.wssUrl || raw.wss_url || "wss://lemtel.lemtel.tel:7443",
+    wssUrls: raw.wssUrls || raw.wss_urls || [],
+    password: raw.password || raw.sip_password || "",
+    mock: !!raw.mock,
+  };
+}
+
 export function useSoftphone() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -35,16 +50,7 @@ export function useSoftphone() {
           setConfig(null);
           return;
         }
-        const raw = data as any;
-        const cfg: SoftphoneConfig = {
-          extension: raw.extension,
-          displayName: raw.displayName || raw.display_name || raw.extension,
-          sipDomain: raw.sipDomain || raw.sip_domain || "lemtel.lemtel.tel",
-          wssUrl: raw.wssUrl || raw.wss_url || "wss://lemtel.lemtel.tel:7443",
-          wssUrls: raw.wssUrls || raw.wss_urls || [],
-          password: raw.password || raw.sip_password || "",
-          mock: !!raw.mock,
-        };
+        const cfg = buildConfig(data as any);
         setConfig(cfg);
         await sipProvider.init(cfg);
       } finally {
@@ -53,6 +59,33 @@ export function useSoftphone() {
     })();
     return () => { cancelled = true; };
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user || !config || snap.status !== "error") return;
+    if (!/rejected|403|forbidden|auth/i.test(snap.errorCause || "")) return;
+    const healKey = `${user.id}:${config.extension}:${snap.errorCause}`;
+    if (passwordHealInFlight || lastPasswordHealKey === healKey) return;
+    passwordHealInFlight = true;
+    lastPasswordHealKey = healKey;
+    (async () => {
+      try {
+        sipProvider.log("warn", "sip", "Registration rejected; forcing stored password into PBX and app auth");
+        const { data, error } = await supabase.functions.invoke("softphone-sync-password", {
+          body: { force_local_to_pbx: true },
+        });
+        if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.message || (data as any)?.error);
+        const creds = await supabase.functions.invoke("softphone-credentials");
+        if (creds.error || !creds.data || (creds.data as any)?.error) throw new Error(creds.error?.message || (creds.data as any)?.message || "Credential refresh failed");
+        const cfg = buildConfig(creds.data as any);
+        setConfig(cfg);
+        await sipProvider.init(cfg);
+      } catch (e: any) {
+        sipProvider.log("error", "sip", `Password auto-sync failed: ${e?.message || e}`);
+      } finally {
+        passwordHealInFlight = false;
+      }
+    })();
+  }, [user?.id, config, snap.status, snap.errorCause]);
 
   // Ringtone on incoming call
   useEffect(() => {
