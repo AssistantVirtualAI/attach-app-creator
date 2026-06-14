@@ -1156,27 +1156,26 @@ Deno.serve(async (req) => {
         const p = encodeURIComponent(String(record_path));
         const n = encodeURIComponent(String(record_name));
         const du = encodeURIComponent(String(domain_uuid || FUSIONPBX_DOMAIN_UUID || ""));
-        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/recordings/recording_download.php?path=${p}&filename=${n}`));
-        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?a=download&path=${p}&filename=${n}`));
-        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/api/7/recordings/download?domain_uuid=${du}&path=${p}&name=${n}`));
-        // Last resorts: FusionPBX stores absolute file paths, but serves them from /recordings/...
+        // FusionPBX's GUI serves call recordings from the file host, which may
+        // differ from the REST API host. Try the complete path-based matrix on
+        // every known base (portal + pbxnode), not just the API base.
         const cleanPath = String(record_path).replace(/^\/+/, "");
         const domainName = String(domain_name || "");
         const relativeName = domainName
           ? `${cleanPath.replace(new RegExp(`^var/lib/freeswitch/recordings/${domainName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?`), "")}/${String(record_name)}`
           : `${String(record_path).split("/recordings/").pop()?.split("/").slice(1).join("/") || cleanPath}/${String(record_name)}`;
         const rel = encodeURIComponent(relativeName.replace(/^\/+/, ""));
-        tryUrls.push(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?action=download&type=rec&filename=${rel}`);
-        tryUrls.push(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?a=download&type=rec&filename=${rel}`);
-        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?action=download&type=rec&t=bin&filename=${rel}`));
-        tryUrls.push(withQueryAuth(`${FUSIONPBX_API_URL}/app/recordings/recordings.php?a=download&type=rec&t=bin&filename=${rel}`));
         const publicPath = cleanPath.replace(/^var\/lib\/freeswitch\/recordings\//, "recordings/");
-        tryUrls.push(`${FUSIONPBX_API_URL}/${publicPath}/${n}`);
-        tryUrls.push(`${FUSIONPBX_API_URL}/${cleanPath}/${n}`);
-        for (const fileBase of fileBases.filter((x) => x !== FUSIONPBX_API_URL)) {
-          tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/${n}`));
+        for (const fileBase of fileBases) {
+          tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recording_download.php?path=${p}&filename=${n}`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recordings.php?action=download&type=rec&filename=${rel}`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recordings.php?a=download&type=rec&filename=${rel}`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recordings.php?action=download&type=rec&t=bin&filename=${rel}`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recordings.php?a=download&type=rec&t=bin&filename=${rel}`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/api/7/recordings/download?domain_uuid=${du}&path=${p}&name=${n}`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/${n}`));
           tryUrls.push(`${fileBase}/${publicPath}/${n}`);
+          tryUrls.push(`${fileBase}/${cleanPath}/${n}`);
         }
       }
 
