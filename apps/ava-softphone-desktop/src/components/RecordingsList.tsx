@@ -139,16 +139,32 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
 
   if (loading) return <div style={{ textAlign: 'center', padding: 40, color: c.textSub }}>Loading recordings…</div>;
 
+  const checkingCount = items.filter(r => available[r.id] === undefined).length;
+  const unavailableCount = items.filter(r => available[r.id] === false).length;
+  const visibleItems = showUnavailable ? items : items.filter(r => available[r.id] !== false);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, gap: 8, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 11, color: c.textSub, letterSpacing: 1, textTransform: 'uppercase' }}>
-          {items.length} recording{items.length !== 1 ? 's' : ''}
+          {visibleItems.length} recording{visibleItems.length !== 1 ? 's' : ''}
+          {checkingCount > 0 && <span style={{ marginLeft: 8, color: c.textSub, textTransform: 'none', letterSpacing: 0 }}>· checking {checkingCount} on PBX…</span>}
+          {unavailableCount > 0 && !showUnavailable && (
+            <span style={{ marginLeft: 8, color: '#eab308', textTransform: 'none', letterSpacing: 0 }}>· {unavailableCount} hidden (audio not yet on PBX)</span>
+          )}
         </div>
-        <button onClick={load} style={{
-          background: 'rgba(255,255,255,0.05)', border: `1px solid ${c.border}`,
-          color: c.text, padding: '4px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
-        }}>↻ Refresh</button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {unavailableCount > 0 && (
+            <button onClick={() => setShowUnavailable(s => !s)} style={{
+              background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.5)',
+              color: '#eab308', padding: '4px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
+            }}>{showUnavailable ? 'Hide unavailable' : 'Show unavailable'}</button>
+          )}
+          <button onClick={load} style={{
+            background: 'rgba(255,255,255,0.05)', border: `1px solid ${c.border}`,
+            color: c.text, padding: '4px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
+          }}>↻ Refresh</button>
+        </div>
       </div>
 
       {error && (
@@ -157,17 +173,20 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
         </div>
       )}
 
-      {items.length === 0 ? (
+      {visibleItems.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 40, color: c.textSub, fontSize: 12 }}>
-          No recordings yet.
+          {items.length === 0 ? 'No recordings yet.' : 'No reachable recordings on PBX yet.'}
         </div>
-      ) : items.map(r => {
+      ) : visibleItems.map(r => {
         const sentiment = r.sentiment;
         const sentColor =
           sentiment?.includes('positive') ? c.green :
           sentiment?.includes('negative') ? c.red : c.yellow;
+        const avail = available[r.id];
+        const healthLabel = avail === undefined ? '⏳ Checking PBX…' : avail ? '✓ On PBX' : '⚠ Not on PBX';
+        const healthColor = avail === undefined ? c.textSub : avail ? c.green : '#eab308';
         return (
-          <div key={r.id} style={{ ...theme.glass.card, padding: 12 }}>
+          <div key={r.id} style={{ ...theme.glass.card, padding: 12, opacity: avail === false ? 0.6 : 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, color: c.text }}>
@@ -177,12 +196,18 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
                   {r.recordedAt ? new Date(r.recordedAt).toLocaleString() : ''} · {r.durationSec || 0}s
                 </div>
               </div>
-              {sentiment && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                 <span style={{
                   fontSize: 9, padding: '2px 6px', borderRadius: 6,
-                  background: `${sentColor}22`, color: sentColor, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700,
-                }}>{sentiment}</span>
-              )}
+                  background: `${healthColor}22`, color: healthColor, letterSpacing: 0.5, fontWeight: 700,
+                }}>{healthLabel}</span>
+                {sentiment && (
+                  <span style={{
+                    fontSize: 9, padding: '2px 6px', borderRadius: 6,
+                    background: `${sentColor}22`, color: sentColor, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700,
+                  }}>{sentiment}</span>
+                )}
+              </div>
             </div>
 
             {audio[r.id] ? (
@@ -196,7 +221,12 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
                 }}
               />
             ) : (
-              <button onClick={() => play(r)} disabled={audioLoading === r.id} style={{ marginTop: 8, width: '100%', padding: 7, borderRadius: 8, background: audioErrors[r.id] ? 'rgba(234,179,8,0.08)' : 'rgba(255,255,255,0.06)', border: `1px solid ${audioErrors[r.id] ? 'rgba(234,179,8,0.5)' : c.border}`, color: audioErrors[r.id] ? '#eab308' : c.text, fontSize: 11, cursor: audioLoading === r.id ? 'wait' : 'pointer' }}>{audioLoading === r.id ? 'Loading PBX audio…' : audioErrors[r.id] ? '↻ Retry loading audio' : `▶ Load PBX audio${r.recording_name ? ` · ${r.recording_name}` : ''}`}</button>
+              <button
+                onClick={() => play(r)}
+                disabled={audioLoading === r.id || avail === false}
+                title={avail === false ? 'Recording file is not reachable on PBX yet — try again later.' : undefined}
+                style={{ marginTop: 8, width: '100%', padding: 7, borderRadius: 8, background: audioErrors[r.id] || avail === false ? 'rgba(234,179,8,0.08)' : 'rgba(255,255,255,0.06)', border: `1px solid ${audioErrors[r.id] || avail === false ? 'rgba(234,179,8,0.5)' : c.border}`, color: audioErrors[r.id] || avail === false ? '#eab308' : c.text, fontSize: 11, cursor: audioLoading === r.id ? 'wait' : avail === false ? 'not-allowed' : 'pointer' }}
+              >{audioLoading === r.id ? 'Loading PBX audio…' : avail === false ? '⚠ Audio not yet on PBX' : audioErrors[r.id] ? '↻ Retry loading audio' : `▶ Load PBX audio${r.recording_name ? ` · ${r.recording_name}` : ''}`}</button>
             )}
             {audioErrors[r.id] && <div style={{ marginTop: 6, fontSize: 10, color: c.textSub, lineHeight: 1.35 }}>{audioErrors[r.id]}</div>}
 
