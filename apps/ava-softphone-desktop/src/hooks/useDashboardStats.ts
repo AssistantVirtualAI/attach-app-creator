@@ -30,15 +30,18 @@ export function useDashboardStats(orgId: string | null, extension: string | null
     const callsQ = supabase.from('pbx_call_records')
       .select('id, missed_call, call_status, hangup_cause, voicemail_message', { count: 'exact', head: false })
       .eq('organization_id', orgId)
-      .gte('start_at', since);
+      .gte('start_at', since)
+      .or(extension ? `extension.eq.${extension},caller_number.eq.${extension},destination_number.eq.${extension},source_number.eq.${extension}` : 'id.eq.__no_softphone_extension__');
 
     const smsQ = supabase.from('pbx_sms_threads')
       .select('unread_count')
-      .eq('organization_id', orgId);
+      .eq('organization_id', orgId)
+      .eq('extension', extension || '__no_softphone_extension__');
 
     const extQ = supabase.from('pbx_extensions')
       .select('id', { count: 'exact', head: true })
-      .eq('organization_id', orgId);
+      .eq('organization_id', orgId)
+      .eq('extension', extension || '__no_softphone_extension__');
 
     const liveQ = supabase.from('telecom_live_calls')
       .select('id', { count: 'exact', head: true })
