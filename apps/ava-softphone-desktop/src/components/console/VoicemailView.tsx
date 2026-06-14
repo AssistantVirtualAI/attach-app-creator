@@ -113,7 +113,8 @@ export default function VoicemailView() {
     if (!sel) return;
     setPlaybackError(null);
     if (!audioUrl) {
-      const url = await ava.getRecordingAudioUrl(sel);
+      const signed = await ava.getRecordingSignedUrl(sel);
+      const url = signed?.url || (await ava.getRecordingAudioUrl(sel));
       if (!url) {
         setPlaying(false);
         setPlaybackError('No voicemail audio available yet');

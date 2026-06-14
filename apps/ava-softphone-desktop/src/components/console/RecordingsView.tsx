@@ -89,14 +89,16 @@ export default function RecordingsView() {
   useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, load);
 
 
-  // Helper: fetch (or reuse cached) blob URL for a recording, deduping concurrent calls.
+  // Helper: fetch (or reuse cached) signed audio URL for a recording, deduping concurrent calls.
   const fetchAudio = useCallback(async (rec: RecordingItem): Promise<string | null> => {
     const cached = audioBlobCache.get(rec.id);
     if (cached) return cached;
     const pending = audioInFlight.get(rec.id);
     if (pending) return pending;
     const p = (async () => {
-      const url = await ava.getRecordingAudioUrl(rec);
+      // Prefer short-lived signed URL (no client-side blob download); fallback to proxy stream.
+      const signed = await ava.getRecordingSignedUrl(rec);
+      const url = signed?.url || (await ava.getRecordingAudioUrl(rec));
       if (url) audioBlobCache.set(rec.id, url);
       return url;
     })().finally(() => audioInFlight.delete(rec.id));
@@ -104,7 +106,7 @@ export default function RecordingsView() {
     return p;
   }, []);
 
-  // When selection changes: show cached blob immediately, otherwise fetch silently in background.
+  // When selection changes: show cached URL immediately, otherwise fetch silently in background.
   useEffect(() => {
     setPlaybackError(null);
     setAudioUrl(null);
@@ -122,21 +124,8 @@ export default function RecordingsView() {
     return () => { cancelled = true; };
   }, [sel?.id, fetchAudio]);
 
-  // Background prefetch: download the first 25 recordings (concurrency 2) so playback is instant.
-  useEffect(() => {
-    if (!items.length) return;
-    const queue = items.slice(0, 25).filter((r) => !audioBlobCache.get(r.id));
-    let cancelled = false;
-    const worker = async () => {
-      while (!cancelled && queue.length) {
-        const next = queue.shift();
-        if (!next) break;
-        try { await fetchAudio(next); } catch { /* ignore */ }
-      }
-    };
-    worker(); worker();
-    return () => { cancelled = true; };
-  }, [items, fetchAudio]);
+  // No background prefetch: signed URLs are cheap on demand and each issuance is audited.
+
 
   const filtered = useMemo(() => {
     const cutoff = rangeCutoff(range);
