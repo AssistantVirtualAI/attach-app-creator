@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { ava, VoicemailItem } from '@/lib/avaApi';
 import { useRealtimeRefresh } from '@/lib/useRealtimeRefresh';
 import { useOrgId } from '@/lib/useOrgId';
+import { audit } from '@/lib/audit';
 
 interface Props {
   extension: string;
