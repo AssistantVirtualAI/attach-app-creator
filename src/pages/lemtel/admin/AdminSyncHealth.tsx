@@ -1,12 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Activity, RefreshCw, Loader2, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { AdminSkeletonRows } from '@/components/admin/AdminSkeletonRows';
+import { StatusBadge } from '@/components/admin/StatusBadge';
+
+const toneFor = (s?: string) => s === 'success' ? 'on' : s === 'failed' ? 'err' : s === 'running' ? 'info' : 'off';
 
 const ENTITIES = [
   { key: 'extensions', label: 'Extensions', action: 'sync-domains' },
@@ -63,16 +67,17 @@ export default function AdminSyncHealth() {
 
   return (
     <div className="space-y-4 w-full min-w-0">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2"><Activity className="w-7 h-7" /> Sync Health</h1>
-          <p className="text-muted-foreground text-sm">Last sync per PBX entity, with per-row resync.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => jobs.refetch()}><RefreshCw className="w-4 h-4 mr-2" /> Refresh</Button>
-          <Button onClick={resyncAll}><Play className="w-4 h-4 mr-2" /> Resync all</Button>
-        </div>
-      </div>
+      <AdminPageHeader
+        icon={Activity}
+        title="Sync Health"
+        subtitle="Last sync per PBX entity, with per-row resync."
+        actions={
+          <>
+            <Button variant="outline" onClick={() => jobs.refetch()}><RefreshCw className="w-4 h-4 mr-2" /> Refresh</Button>
+            <Button onClick={resyncAll}><Play className="w-4 h-4 mr-2" /> Resync all</Button>
+          </>
+        }
+      />
 
       <Card>
         <CardHeader><CardTitle>Entities</CardTitle></CardHeader>
@@ -91,13 +96,9 @@ export default function AdminSyncHealth() {
               {ENTITIES.map(e => {
                 const j: any = lastFor(e.key);
                 return (
-                  <TableRow key={e.key}>
+                  <TableRow key={e.key} className="hover:bg-muted/40">
                     <TableCell className="font-medium">{e.label}</TableCell>
-                    <TableCell>
-                      <Badge variant={j?.status === 'success' ? 'default' : j?.status === 'failed' ? 'destructive' : 'secondary'}>
-                        {j?.status || 'unknown'}
-                      </Badge>
-                    </TableCell>
+                    <TableCell><StatusBadge tone={toneFor(j?.status) as any}>{j?.status || 'unknown'}</StatusBadge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {j?.completed_at ? formatDistanceToNow(new Date(j.completed_at), { addSuffix: true }) : '—'}
                     </TableCell>
@@ -116,28 +117,27 @@ export default function AdminSyncHealth() {
       <Card>
         <CardHeader><CardTitle>Recent sync jobs</CardTitle></CardHeader>
         <CardContent>
-          {jobs.isLoading ? <div className="py-8 flex justify-center"><Loader2 className="animate-spin" /></div> : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Type</TableHead><TableHead>Status</TableHead>
-                  <TableHead>Started</TableHead><TableHead>Completed</TableHead>
-                  <TableHead>Error</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(jobs.data || []).slice(0, 25).map((j: any) => (
-                  <TableRow key={j.id}>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Type</TableHead><TableHead>Status</TableHead>
+                <TableHead>Started</TableHead><TableHead>Completed</TableHead>
+                <TableHead>Error</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {jobs.isLoading ? <AdminSkeletonRows rows={5} cols={5} /> :
+                (jobs.data || []).slice(0, 25).map((j: any) => (
+                  <TableRow key={j.id} className="hover:bg-muted/40">
                     <TableCell className="font-mono text-xs">{j.job_type}</TableCell>
-                    <TableCell><Badge variant={j.status === 'success' ? 'default' : j.status === 'failed' ? 'destructive' : 'secondary'}>{j.status}</Badge></TableCell>
+                    <TableCell><StatusBadge tone={toneFor(j.status) as any}>{j.status}</StatusBadge></TableCell>
                     <TableCell className="text-xs">{j.started_at ? new Date(j.started_at).toLocaleString() : '—'}</TableCell>
                     <TableCell className="text-xs">{j.completed_at ? new Date(j.completed_at).toLocaleString() : '—'}</TableCell>
                     <TableCell className="text-xs text-destructive max-w-xs truncate">{j.error || '—'}</TableCell>
                   </TableRow>
                 ))}
-              </TableBody>
-            </Table>
-          )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>
