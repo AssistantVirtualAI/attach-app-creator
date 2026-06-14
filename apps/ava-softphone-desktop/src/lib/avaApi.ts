@@ -414,6 +414,12 @@ function mapCdrToRecording(r: any): RecordingItem {
   // Audio is fetched on demand via the fusionpbx-proxy edge function
   // (keeps the PBX API key server-side). See getRecordingAudioUrl().
   const directUrl: string | null = null;
+  const ai = r.raw_data?.ai || r.raw_data || {};
+  const summary = (ai.summary || r.notes || '').toString().trim() || null;
+  const topics = Array.isArray(ai.topics) ? ai.topics : [];
+  const tags = Array.isArray(r.tags) ? r.tags : (Array.isArray(ai.tags) ? ai.tags : []);
+  const sentiment = (ai.sentiment === 'positive' || ai.sentiment === 'negative' || ai.sentiment === 'neutral')
+    ? ai.sentiment : 'neutral';
 
   return {
     id:          r.id ?? String(Math.random()),
@@ -425,10 +431,10 @@ function mapCdrToRecording(r: any): RecordingItem {
     durationSec: Number(r.billsec ?? r.duration_seconds ?? 0),
     sizeKb:      0,
     qualityScore: Math.round((r.mos ?? 0) * 20),
-    sentiment:   'neutral' as const,
-    summary:     r.recording_path && r.recording_name ? 'Enregistrement disponible.' : 'Chemin enregistrement non disponible.',
-    topics:      [],
-    tags:        [],
+    sentiment,
+    summary,
+    topics,
+    tags,
     feedback:    null,
     organization_id: r.organization_id ?? undefined,
     pbx_uuid: r.pbx_uuid ?? null,
@@ -437,7 +443,10 @@ function mapCdrToRecording(r: any): RecordingItem {
     recording_path: r.recording_path ?? null,
     recording_name: r.recording_name ?? null,
     recordingUrl: directUrl,
-  };
+    transcript_text: r.raw_data?.transcript_text ?? null,
+    raw_data: r.raw_data ?? null,
+    analyzed: Boolean(ai.summary || r.transcribed),
+  } as RecordingItem;
 }
 
 
