@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase, SB_URL, SB_KEY } from '@/lib/supabaseClient';
 import { audit } from '@/lib/audit';
+import { getMeContext } from '@/lib/avaApi';
 
 interface Thread {
   id: string;
@@ -42,11 +43,13 @@ export default function SmsThreads() {
 
   const loadThreads = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const me = await getMeContext();
+    let q = supabase
       .from('pbx_sms_threads')
       .select('id,did_number,contact_phone,contact_name,unread_count,last_message_at')
-      .order('last_message_at', { ascending: false })
-      .limit(200);
+      .eq('organization_id', me.organization_id || '__no_softphone_org__')
+      .eq('extension', me.extension || '__no_softphone_extension__');
+    const { data, error } = await q.order('last_message_at', { ascending: false }).limit(200);
     if (error) setErr(error.message);
     else setThreads((data as Thread[]) || []);
     setLoading(false);
