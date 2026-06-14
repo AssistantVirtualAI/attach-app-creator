@@ -65,7 +65,7 @@ export function useSoftphone(args: UseSoftphoneArgs) {
   const [snap, setSnap] = useState<SoftphoneSnapshot>(() => sipProvider.getSnapshot());
   const [config, setConfig] = useState<SoftphoneConfig | null>(null);
   const [loading, setLoading] = useState(true);
-  const [credError, setCredError] = useState<string | null>(null);
+  const [credError, setCredError] = useState<CredErrorInfo | null>(null);
   const [manualStatus, setManualStatus] = useState<ManualStatus>('auto');
   const [retryTick, setRetryTick] = useState(0);
   const [recording, setRecording] = useState(false);
