@@ -25,14 +25,14 @@ Deno.serve(async (req) => {
     const [{ data: profile }, { data: sp }] = await Promise.all([
       sb.from("profiles").select("full_name, email, avatar_url").eq("id", u.user.id).maybeSingle(),
       sb.from("pbx_softphone_users")
-        .select("organization_id, client_id, extension, sip_domain, display_name, forward_enabled, forward_to, dnd_enabled, status")
+        .select("organization_id, client_id, extension_id, extension, sip_domain, display_name, forward_enabled, forward_to, dnd_enabled, status, wss_url")
         .eq("portal_user_id", u.user.id)
         .maybeSingle(),
     ]);
 
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
 
-    const { data: org } = await sb.from("organizations").select("name").eq("id", sp.organization_id).maybeSingle();
+    const { data: org } = await sb.from("organizations").select("name, sip_domain, fusionpbx_domain_uuid").eq("id", sp.organization_id).maybeSingle();
     const { data: client } = sp.client_id
       ? await sb.from("clients").select("id, name").eq("id", sp.client_id).maybeSingle()
       : { data: null };
@@ -41,14 +41,20 @@ Deno.serve(async (req) => {
       .from("user_roles").select("role")
       .eq("user_id", u.user.id).eq("organization_id", sp.organization_id).maybeSingle();
     const role = roleRow?.role || "agent";
-    const admin = role === "org_admin" || role === "super_admin";
+    const admin = role === "org_admin" || role === "super_admin" || role === "manager";
+    const canManageRouting = role === "org_admin" || role === "super_admin" || role === "manager";
+    const sipDomain = sp.sip_domain || org?.sip_domain || "";
+    const portalUrl = Deno.env.get("AVA_PORTAL_URL") || "https://avastatistic.ca";
 
     return json({
       user: { id: u.user.id, name: profile?.full_name || u.user.email || "User", email: profile?.email || u.user.email || "", avatarUrl: profile?.avatar_url || undefined },
-      organization: { id: sp.organization_id, name: org?.name || "Workspace" },
+      organization: { id: sp.organization_id, name: org?.name || "Workspace", sipDomain, fusionpbxDomainUuid: org?.fusionpbx_domain_uuid || undefined, portalUrl, wssUrl: sp.wss_url || undefined },
       client: client ? { id: client.id, name: client.name } : undefined,
-      extension: { number: sp.extension, displayName: sp.display_name || "", sipDomain: sp.sip_domain || "" },
-      permissions: { admin, canManageNumbers: admin, canManageAgents: admin },
+      domain: { organizationId: sp.organization_id, sipDomain, fusionpbxDomainUuid: org?.fusionpbx_domain_uuid || undefined, portalUrl, wssUrl: sp.wss_url || undefined },
+      extension: { number: sp.extension, displayName: sp.display_name || "", sipDomain, id: sp.extension_id || undefined },
+      role,
+      dataScope: admin ? "domain_admin" : "extension_user",
+      permissions: { admin, canManageNumbers: admin, canManageAgents: admin, canManageUsers: role === "org_admin" || role === "super_admin", canManageRouting, canViewDomainReports: admin },
       status: {
         sipState: sp.status === "registered" ? "registered" : sp.status === "connecting" ? "connecting" : "offline",
         doNotDisturb: !!sp.dnd_enabled,

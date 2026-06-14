@@ -38,9 +38,9 @@ export default function SettingsScreen({
               <AvaBadge compact />
             </div>
             <div style={{ fontSize: font.xs, color: colors.mutedSilver, marginTop: 3, fontFamily: 'JetBrains Mono, monospace' }}>
-              Ext {creds.extension} · {me?.organization.name || creds.sipDomain || 'lemtel.tel'}
+              Ext {creds.extension} · {me?.domain.sipDomain || me?.organization.name || creds.sipDomain || 'lemtel.tel'}
             </div>
-            <div style={{ marginTop: 6 }}><StatusDot state={sipState} /></div>
+            <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}><StatusDot state={sipState} /><Chip tone={me?.permissions.admin ? 'gold' : 'cyan'}>{me?.permissions.admin ? 'Admin domaine' : 'Utilisateur'}</Chip></div>
           </div>
         </div>
       </Card>
@@ -55,8 +55,10 @@ export default function SettingsScreen({
       <SectionTitle eyebrow="Account" title="Extension & devices" />
       <Card padded={false}>
         <SettingsRow label="Extension" icon="☎" value={me?.extension.number || creds.extension} />
-        <SettingsRow label="SIP domain" icon="🌐" value={me?.extension.sipDomain || creds.sipDomain || '—'} />
-        <SettingsRow label="Devices" icon="📱" value="This iPhone · Web" onPress={() => {}} />
+        <SettingsRow label="SIP domain" icon="🌐" value={me?.domain.sipDomain || me?.extension.sipDomain || creds.sipDomain || '—'} />
+        <SettingsRow label="Data scope" icon="⌁" value={me?.dataScope === 'domain_admin' ? 'Domain-wide PBX' : 'Own extension only'} />
+        <SettingsRow label="Role" icon="◎" value={me?.role || creds.role || 'agent'} />
+        <SettingsRow label="Devices" icon="📱" value="This device · WebRTC" onPress={() => {}} />
         <SettingsRow label="Notifications" icon="🔔" value="Push enabled" onPress={() => {}} />
       </Card>
 
@@ -64,11 +66,11 @@ export default function SettingsScreen({
         <>
           <SectionTitle eyebrow="Admin" title="Workspace controls" />
           <Card padded={false}>
-            <SettingsRow label="Users & extensions" icon="👥" onPress={() => {}} />
-            <SettingsRow label="Phone numbers" icon="#" onPress={() => {}} />
-            <SettingsRow label="IVRs & queues" icon="🎛" onPress={() => {}} />
-            <SettingsRow label="Voice agents" icon="🤖" onPress={() => {}} />
-            <SettingsRow label="Sync status" icon="↻" value="Up to date" onPress={() => {}} />
+            {me.permissions.canManageUsers && <SettingsRow label="Users & extensions" icon="👥" value={me.domain.sipDomain} onPress={() => {}} />}
+            {me.permissions.canManageNumbers && <SettingsRow label="Phone numbers" icon="#" value="Domain inventory" onPress={() => {}} />}
+            {me.permissions.canManageRouting && <SettingsRow label="IVRs, queues & routing" icon="🎛" value="Editable in AVA portal" onPress={() => {}} />}
+            {me.permissions.canManageAgents && <SettingsRow label="Voice agents" icon="🤖" value="Domain agents" onPress={() => {}} />}
+            <SettingsRow label="Sync status" icon="↻" value="Live PBX scope" onPress={() => {}} />
           </Card>
         </>
       )}
@@ -100,7 +102,7 @@ export default function SettingsScreen({
 
       <AIPanel title="AVA powers this app" accent={colors.avaCyan}>
         <p style={{ fontSize: font.sm, color: colors.textIce, margin: 0, lineHeight: 1.55 }}>
-          All sensitive telephony operations run through secure AVA backend services. No PBX or SIP secrets are stored on this device.
+          All telephony data is scoped by the authenticated AVA organization/domain. Standard users can access only their own extension, while domain admins can manage the phone system features enabled for their role. No PBX secrets are exposed on this device.
         </p>
       </AIPanel>
 

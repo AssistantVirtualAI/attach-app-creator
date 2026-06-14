@@ -7,8 +7,8 @@ export const colors = {
   // Light foundation
   midnight:   '#EEF3FB',
   midnight2:  '#F5F8FD',
-  graphite:   'rgba(255,255,255,0.72)',
-  graphite2:  'rgba(255,255,255,0.86)',
+  graphite:   'rgba(255,255,255,0.78)',
+  graphite2:  'rgba(255,255,255,0.92)',
   // Brand — aligned with AVA Statistic portal (primary #0023e6)
   lemtelBlue: '#0023e6',
   blueGlow:   '#2a4dff',
@@ -32,7 +32,7 @@ export const colors = {
 } as const;
 
 export const gradients = {
-  app:    `radial-gradient(1200px 700px at 8% -10%, rgba(0,35,230,0.16), transparent 60%), radial-gradient(900px 600px at 100% 110%, rgba(255,196,0,0.14), transparent 55%), linear-gradient(180deg, #F7FAFE 0%, #E8F0FA 100%)`,
+  app:    `radial-gradient(1000px 620px at 6% -12%, rgba(0,35,230,0.18), transparent 62%), radial-gradient(780px 560px at 105% 105%, rgba(224,168,0,0.16), transparent 58%), linear-gradient(180deg, #F9FBFF 0%, #EDF3FB 52%, #E6EFFA 100%)`,
   call:   `linear-gradient(135deg, ${colors.lemtelBlue} 0%, ${colors.blueGlow} 50%, ${colors.signalGold} 140%)`,
   ai:     `linear-gradient(135deg, ${colors.avaViolet}, ${colors.avaCyan})`,
   card:   `linear-gradient(155deg, rgba(255,255,255,0.78) 0%, rgba(255,255,255,0.62) 100%)`,
@@ -41,7 +41,7 @@ export const gradients = {
   shinyPrimary: `linear-gradient(135deg, #0023e6 0%, #2a4dff 55%, #6680ff 100%)`,
 } as const;
 
-export const radius = { sm: 8, md: 12, lg: 16, xl: 22, pill: 999 } as const;
+export const radius = { sm: 10, md: 14, lg: 18, xl: 24, xxl: 30, pill: 999 } as const;
 export const space  = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 7: 32, 8: 40 } as const;
 
 export const font = {
@@ -51,8 +51,8 @@ export const font = {
 } as const;
 
 export const shadow = {
-  card: '0 10px 32px -16px rgba(0,35,230,0.22)',
-  lift: '0 18px 40px -20px rgba(0,35,230,0.35)',
+  card: '0 12px 34px -18px rgba(0,35,230,0.24)',
+  lift: '0 22px 48px -22px rgba(0,35,230,0.38)',
   gold: '0 14px 36px -16px rgba(224,168,0,0.40)',
   ai:   '0 14px 36px -16px rgba(122,76,255,0.40)',
   glass: '0 8px 24px -10px rgba(0,35,230,0.20), inset 0 1px 0 rgba(255,255,255,0.7)',

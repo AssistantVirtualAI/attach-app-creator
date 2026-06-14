@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { colors } from '../lib/theme';
 
 interface Props {
@@ -20,13 +19,9 @@ export default function IncomingCallSheet({ open, callerName, callerNumber, onAc
   const quickReplies = ["Can't talk now", "Call you back", "On my way"];
 
   return (
-    <AnimatePresence>
+    <>
       {open && (
-        <motion.div
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+        <div
           style={{
             position: 'fixed', inset: 0, zIndex: 9999,
             background: 'linear-gradient(180deg, #0b1220 0%, #060912 100%)',
@@ -65,9 +60,9 @@ export default function IncomingCallSheet({ open, callerName, callerNumber, onAc
               <ActionButton color="#22c55e" label="Accept" onClick={onAccept}>✓</ActionButton>
             </div>
           )}
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 }
 

@@ -55,18 +55,25 @@ async function call<T>(path: string, init: RequestInit | undefined, mockData: T)
 
 /* ─── Types ───────────────────────────────────────────────────── */
 
+export type MobileRole = 'super_admin' | 'org_admin' | 'manager' | 'agent' | 'viewer';
+export type DataScope = 'domain_admin' | 'extension_user';
+
 export interface MeResponse {
   user: { id: string; name: string; email: string; avatarUrl?: string };
-  organization: { id: string; name: string };
+  organization: { id: string; name: string; sipDomain?: string; fusionpbxDomainUuid?: string; portalUrl?: string; wssUrl?: string };
   client?: { id: string; name: string };
-  extension: { number: string; displayName: string; sipDomain: string };
-  permissions: { admin: boolean; canManageNumbers: boolean; canManageAgents: boolean };
+  domain: { organizationId: string; sipDomain: string; fusionpbxDomainUuid?: string; portalUrl?: string; wssUrl?: string };
+  extension: { number: string; displayName: string; sipDomain: string; id?: string };
+  role: MobileRole;
+  dataScope: DataScope;
+  permissions: { admin: boolean; canManageNumbers: boolean; canManageAgents: boolean; canManageUsers: boolean; canManageRouting: boolean; canViewDomainReports: boolean };
 }
 
 export interface DashboardBrief {
   greeting: string;
   brief: string;
-  metrics: { missedCalls: number; answeredCalls: number; unreadSms: number; voicemails: number; actionItems: number };
+  scope: { mode: DataScope; label: string; organizationId: string; sipDomain?: string; extension?: string; role?: MobileRole };
+  metrics: { missedCalls: number; answeredCalls: number; unreadSms: number; voicemails: number; actionItems: number; activeUsers?: number };
   needsAttention: { id: string; kind: 'follow_up' | 'callback' | 'voicemail' | 'unread'; title: string; subtitle: string; accent: 'gold' | 'cyan' | 'violet' | 'danger' }[];
   status: { sipState: 'registered' | 'connecting' | 'offline'; doNotDisturb: boolean; forwarding: string | null };
 }
@@ -116,15 +123,19 @@ export interface VoicemailEntry {
 
 const meMock: MeResponse = {
   user: { id: 'u1', name: 'Alex Morin', email: 'alex@lemtel.tel' },
-  organization: { id: 'org-lemtel', name: 'Lemtel Communications' },
+  organization: { id: 'org-lemtel', name: 'Lemtel Communications', sipDomain: 'lemtel.lemtel.tel', portalUrl: 'https://avastatistic.ca', wssUrl: 'wss://pbxnode.lemtel.tel:7443' },
+  domain: { organizationId: 'org-lemtel', sipDomain: 'lemtel.lemtel.tel', portalUrl: 'https://avastatistic.ca', wssUrl: 'wss://pbxnode.lemtel.tel:7443' },
   extension: { number: '1042', displayName: 'Alex M.', sipDomain: 'lemtel.lemtel.tel' },
-  permissions: { admin: true, canManageNumbers: true, canManageAgents: true },
+  role: 'org_admin',
+  dataScope: 'domain_admin',
+  permissions: { admin: true, canManageNumbers: true, canManageAgents: true, canManageUsers: true, canManageRouting: true, canViewDomainReports: true },
 };
 
 const dashboardMock: DashboardBrief = {
   greeting: 'Good morning',
   brief: 'You have 3 missed calls, 2 voicemails, and 4 unread messages. AVA flagged 2 follow-ups worth your attention.',
-  metrics: { missedCalls: 3, answeredCalls: 12, unreadSms: 4, voicemails: 2, actionItems: 5 },
+  scope: { mode: 'domain_admin', label: 'Domain admin · Lemtel Communications', organizationId: 'org-lemtel', sipDomain: 'lemtel.lemtel.tel', extension: '1042', role: 'org_admin' },
+  metrics: { missedCalls: 3, answeredCalls: 12, unreadSms: 4, voicemails: 2, actionItems: 5, activeUsers: 8 },
   needsAttention: [
     { id: 'a1', kind: 'voicemail', title: 'Marie Tremblay left a voicemail', subtitle: 'Renewal — high priority · 1m 12s', accent: 'gold' },
     { id: 'a2', kind: 'callback', title: 'Callback Acme Corp', subtitle: 'Wants to reschedule demo', accent: 'cyan' },

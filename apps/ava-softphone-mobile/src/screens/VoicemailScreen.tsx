@@ -5,8 +5,6 @@ import { mobileApi, VoicemailEntry } from '../lib/mobileApi';
 import { Card, Chip, EmptyState, GhostButton, AIPanel, Skeleton } from '../components/ui/Primitives';
 import { audit } from '../lib/audit';
 
-const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
-
 export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle) => Promise<void> }) {
   const [items, setItems] = useState<VoicemailEntry[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -43,19 +41,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
         analysis = d?.analysis || d?.summary ? { summary: d?.summary, sentiment: d?.sentiment, topics: d?.topics, action_items: d?.action_items, ...(d?.analysis || {}) } : null;
       } catch {}
       if (!txt) {
-        try {
-          const res = await fetch(`https://gejxisrqtvxavbrfcoxz.supabase.co/functions/v1/ai-transcribe-call`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ call_record_id: v.id, organization_id: LEMTEL_ORG }),
-          });
-          const j = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`);
-          txt = j?.transcript_text || j?.transcript || null;
-          if (j?.analysis || j?.summary) analysis = { summary: j?.summary, sentiment: j?.sentiment, topics: j?.topics, action_items: j?.action_items, ...(j?.analysis || {}) };
-        } catch (e: any) {
-          setTranscribeError((p) => ({ ...p, [v.id]: e?.message || 'Transcription failed' }));
-        }
+        setTranscribeError((p) => ({ ...p, [v.id]: 'No authenticated transcript is available for this voicemail yet.' }));
       }
       if (txt) setTranscripts((p) => ({ ...p, [v.id]: txt! }));
       else if (!transcribeError[v.id]) setTranscribeError((p) => ({ ...p, [v.id]: 'No transcript returned' }));
@@ -202,7 +188,8 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
                   </div>
                 )}
 
-                <AIPanel title="AVA summary" accent={colors.avaViolet} style={{ marginTop: 10 }}>
+                <div style={{ marginTop: 10 }}>
+                  <AIPanel title="AVA summary" accent={colors.avaViolet}>
                   <div style={{ fontSize: font.sm, color: colors.textIce, lineHeight: 1.5 }}>{analyses[v.id]?.summary || v.summary}</div>
                   {analyses[v.id]?.sentiment && (
                     <div style={{ marginTop: 6, fontSize: 11, color: colors.mutedSilver }}>Sentiment: <span style={{ color: colors.avaCyan }}>{analyses[v.id]!.sentiment}</span></div>
@@ -237,7 +224,8 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
                       {liveTranscript || v.transcript || (transcribing === v.id ? '…' : '(no transcript yet)')}
                     </div>
                   </div>
-                </AIPanel>
+                  </AIPanel>
+                </div>
 
                 <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                   <GhostButton tone="cyan" onClick={() => haptic?.(ImpactStyle.Medium)}>📞 Call back</GhostButton>

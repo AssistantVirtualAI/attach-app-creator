@@ -22,9 +22,9 @@ export function Card({
       position: 'relative',
       background: gradients.card,
       border: `1px solid ${accentColor ? accentColor + '44' : colors.border}`,
-      borderRadius: radius.lg,
+      borderRadius: radius.xl,
       padding: padded ? 16 : 0,
-      boxShadow: shadow.card,
+      boxShadow: shadow.glass,
       overflow: 'hidden',
       cursor: onPress ? 'pointer' : 'default',
       ...style,
@@ -62,7 +62,8 @@ export function Chip({
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
-      padding: size === 'xs' ? '2px 7px' : '3px 9px',
+      minHeight: size === 'xs' ? 20 : 24,
+      padding: size === 'xs' ? '2px 7px' : '3px 10px',
       borderRadius: radius.pill,
       background: c + '14',
       border: `1px solid ${c}44`,
@@ -115,7 +116,8 @@ export function PrimaryButton({
 }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; style?: React.CSSProperties }) {
   return (
     <button onClick={onClick} disabled={disabled} style={{
-      padding: '12px 18px', borderRadius: radius.md, border: 'none',
+      minHeight: 46,
+      padding: '12px 18px', borderRadius: radius.lg, border: 'none',
       background: disabled ? 'rgba(255,255,255,0.06)' : gradients.call,
       color: disabled ? colors.mutedSilver : '#fff',
       fontSize: font.base, fontWeight: 700, letterSpacing: 0.2,
@@ -135,8 +137,9 @@ export function GhostButton({
   const c = tone === 'cyan' ? colors.avaCyan : tone === 'violet' ? colors.avaViolet : tone === 'gold' ? colors.signalGold : colors.textIce;
   return (
     <button onClick={onClick} style={{
-      padding: '10px 14px', borderRadius: radius.md,
-      background: 'rgba(255,255,255,0.03)',
+      minHeight: 42,
+      padding: '10px 14px', borderRadius: radius.lg,
+      background: 'rgba(255,255,255,0.66)',
       border: `1px solid ${c}55`,
       color: c, fontSize: font.sm, fontWeight: 700, cursor: 'pointer',
       ...style,
@@ -175,7 +178,7 @@ export function SettingsRow({
   return (
     <button onClick={onPress} style={{
       display: 'flex', alignItems: 'center', gap: 12,
-      width: '100%', padding: '14px 14px',
+      width: '100%', minHeight: 54, padding: '14px 14px',
       background: 'transparent', border: 'none',
       borderBottom: `1px solid ${colors.border}`,
       color: colors.textIce, cursor: onPress ? 'pointer' : 'default',

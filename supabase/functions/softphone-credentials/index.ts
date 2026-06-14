@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
 
     const { data: sp, error: spErr } = await supabaseAdmin
       .from("pbx_softphone_users")
-      .select("extension, organization_id, extension_id, display_name, sip_password, wss_url")
+      .select("extension, organization_id, extension_id, display_name, sip_password, sip_domain, wss_url")
       .eq("portal_user_id", user.id)
       .maybeSingle();
     if (spErr) log("lookup by portal_user_id error", spErr.message);
@@ -66,15 +66,26 @@ Deno.serve(async (req) => {
       return json({ error: "NO_SOFTPHONE_ACCOUNT", message: "Contact your administrator to enable softphone" }, 404);
     }
 
-    // Fixed Lemtel endpoints — overridable via Vault for other tenants.
-    // Primary host MUST be covered by a valid TLS certificate (browsers reject WSS on SAN mismatch).
-    const sipDomain = Deno.env.get("FUSIONPBX_SIP_DOMAIN") || "lemtel.lemtel.tel";
-    const wssUrl = sp.wss_url || Deno.env.get("FUSIONPBX_WSS_URL") || "wss://pbxnode.lemtel.tel:7443";
+    const { data: org } = await supabaseAdmin
+      .from("organizations")
+      .select("name, sip_domain, fusionpbx_domain_uuid")
+      .eq("id", sp.organization_id)
+      .maybeSingle();
+    const { data: roleRow } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("organization_id", sp.organization_id)
+      .maybeSingle();
+    const role = roleRow?.role || "agent";
+    const admin = role === "org_admin" || role === "super_admin" || role === "manager";
+
+    // Per-domain endpoints. A softphone user can override the SIP/WSS host, otherwise the organization domain is used.
+    const sipDomain = sp.sip_domain || org?.sip_domain || Deno.env.get("FUSIONPBX_SIP_DOMAIN") || "lemtel.lemtel.tel";
+    const wssUrl = sp.wss_url || Deno.env.get("FUSIONPBX_WSS_URL") || `wss://${sipDomain}:7443`;
     const wssUrls = Array.from(new Set([
       wssUrl,
-      "wss://pbxnode.lemtel.tel:7443",
-      "wss://portal.lemtel.tel:7443",
-      "wss://lemtel.lemtel.tel:7443",
+      `wss://${sipDomain}:7443`,
     ]));
 
     let password = sp.sip_password || "";
@@ -139,8 +150,13 @@ Deno.serve(async (req) => {
       sip_password: password,
       password,
       // App config
-      portal_url: "https://avastatistic.ca",
+      portal_url: Deno.env.get("AVA_PORTAL_URL") || "https://avastatistic.ca",
       organization_id: sp.organization_id,
+      organization_name: org?.name || undefined,
+      fusionpbx_domain_uuid: org?.fusionpbx_domain_uuid || undefined,
+      role,
+      data_scope: admin ? "domain_admin" : "extension_user",
+      permissions: { admin, can_manage_numbers: admin, can_manage_agents: admin, can_manage_users: role === "org_admin" || role === "super_admin", can_manage_routing: admin, can_view_domain_reports: admin },
       // User
       email: user.email,
       user_id: user.id,

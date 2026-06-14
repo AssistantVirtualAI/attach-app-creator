@@ -37,7 +37,7 @@ export default function HomeScreen({ onNavigate, haptic }: Props) {
 
         <div style={{ marginTop: 16 }}>
           <div style={{ fontSize: font.sm, color: colors.mutedSilver }}>
-            {me ? `Extension ${me.extension.number} · ${me.organization.name}` : <Skeleton w="60%" h={10} />}
+            {me ? `${me.dataScope === 'domain_admin' ? 'Admin domaine' : 'Extension'} ${me.extension.number} · ${me.domain.sipDomain || me.organization.name}` : <Skeleton w="60%" h={10} />}
           </div>
           <h1 style={{ fontSize: font.xxl, color: colors.textIce, margin: '6px 0 4px', fontWeight: 800, letterSpacing: -0.5 }}>
             {data?.greeting || (me ? `Good morning, ${me.user.name.split(' ')[0]}` : <Skeleton w="70%" h={26} />)}
@@ -51,13 +51,26 @@ export default function HomeScreen({ onNavigate, haptic }: Props) {
       {/* Quick actions */}
       <SectionTitle eyebrow="Shortcuts" title="Quick actions" />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-        <QuickAction label="Call" icon="📞" tone="gold" onPress={() => { haptic(ImpactStyle.Medium); onNavigate('calls'); }} />
+        <QuickAction label="Call" icon="☎" tone="gold" onPress={() => { haptic(ImpactStyle.Medium); onNavigate('calls'); }} />
         <QuickAction label="Message" icon="✉" tone="cyan" onPress={() => { haptic(); onNavigate('messages'); }} />
-        <QuickAction label="Ask AVA" icon="✨" tone="violet" onPress={() => { haptic(); onNavigate('ai'); }} />
-        <QuickAction label="Greeting" icon="🎙" tone="violet" onPress={() => { haptic(); onNavigate('ai'); }} />
+        <QuickAction label="Ask AVA" icon="✦" tone="violet" onPress={() => { haptic(); onNavigate('ai'); }} />
+        <QuickAction label="Greeting" icon="◉" tone="violet" onPress={() => { haptic(); onNavigate('ai'); }} />
         <QuickAction label="Forwarding" icon="↪" tone="gold" onPress={() => { haptic(); onNavigate('settings'); }} />
-        <QuickAction label="Voicemail" icon="📩" tone="cyan" onPress={() => { haptic(); onNavigate('calls'); }} />
+        <QuickAction label="Voicemail" icon="✉" tone="cyan" onPress={() => { haptic(); onNavigate('calls'); }} />
       </div>
+
+      {/* Data scope */}
+      <SectionTitle eyebrow="Real PBX data" title="Access scope" />
+      <Card padded={true} style={{ marginBottom: 10, background: 'linear-gradient(145deg, rgba(23,198,204,0.12), rgba(255,255,255,0.045))' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 14, display: 'grid', placeItems: 'center', background: gradients.ai, fontSize: 18 }}>⌁</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: font.base, fontWeight: 800, color: colors.textIce }}>{data?.scope.label || (me?.dataScope === 'domain_admin' ? 'Domain admin' : 'Extension user')}</div>
+            <div style={{ fontSize: font.sm, color: colors.mutedSilver, marginTop: 2 }}>{me ? `${me.organization.name} · ${me.domain.sipDomain || me.extension.sipDomain}` : 'Loading secure domain scope…'}</div>
+          </div>
+          <Chip tone={me?.permissions.admin ? 'gold' : 'cyan'}>{me?.permissions.admin ? 'Admin' : 'User'}</Chip>
+        </div>
+      </Card>
 
       {/* Communication health */}
       <SectionTitle eyebrow="Today" title="Communication health" />
@@ -66,6 +79,7 @@ export default function HomeScreen({ onNavigate, haptic }: Props) {
         <Metric label="Answered" value={data?.metrics.answeredCalls} tone="success" />
         <Metric label="Unread SMS" value={data?.metrics.unreadSms} tone="cyan" />
         <Metric label="Voicemail" value={data?.metrics.voicemails} tone="gold" />
+        {me?.permissions.admin && <Metric label="Active users" value={data?.metrics.activeUsers} tone="success" />}
       </div>
 
       {/* Needs attention */}
@@ -112,10 +126,11 @@ function QuickAction({
   return (
     <button onClick={onPress} style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-      padding: '14px 8px', borderRadius: radius.lg,
+      minHeight: 78,
+      padding: '14px 8px', borderRadius: radius.xl,
       background: `linear-gradient(155deg, ${c}1a, ${colors.graphite} 70%)`,
       border: `1px solid ${c}44`,
-      color: colors.textIce, fontSize: font.sm, fontWeight: 700, cursor: 'pointer',
+      color: colors.textIce, fontSize: font.sm, fontWeight: 800, cursor: 'pointer', boxShadow: '0 10px 24px -18px rgba(0,35,230,0.35)',
     }}>
       <span style={{ fontSize: 20 }}>{icon}</span>
       {label}

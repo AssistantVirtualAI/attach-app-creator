@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Capacitor } from '@capacitor/core';
 // Re-use battle-tested SIP hook from the desktop app
@@ -62,14 +62,51 @@ function AuthenticatedShell({
     return () => { cancelled = true; };
   }, []);
 
-  const sp = useSoftphone({
-    extension: creds.extension,
-    displayName: creds.displayName,
-    sipDomain: creds.sipDomain,
-    wssUrl: creds.wssUrl,
-    accessToken: creds.accessToken,
-    refreshToken: creds.refreshToken,
-  });
+  const sipConfig = creds.extension && creds.wssUrl && creds.sipDomain && (creds as any).sipPassword
+    ? {
+        extension: creds.extension,
+        displayName: creds.displayName,
+        password: (creds as any).sipPassword,
+        domain: creds.sipDomain,
+        wssUrl: creds.wssUrl,
+      }
+    : null;
+  const softphone = useSoftphone(sipConfig);
+
+  const sp = useMemo(() => {
+    const richCallState = softphone.callState === 'ringing' ? 'ringing-out' : softphone.callState;
+    return {
+      snap: {
+        status: softphone.sipStatus,
+        error: softphone.sipError,
+        callState: richCallState,
+        startedAt: softphone.callState === 'active' ? Date.now() - softphone.callTimer * 1000 : null,
+        remoteParty: softphone.activeCallNumber,
+        remoteUri: softphone.activeCallNumber,
+        muted: softphone.isMuted,
+        recording: false,
+        contacts: [],
+        recents: [],
+      },
+      call: softphone.call,
+      addCall: softphone.call,
+      hangup: softphone.hangup,
+      answer: softphone.answer,
+      mute: softphone.mute,
+      unmute: softphone.unmute,
+      hold: softphone.hold,
+      unhold: softphone.unhold,
+      sendDtmf: softphone.sendDTMF,
+      sendDTMF: softphone.sendDTMF,
+      setStatus: softphone.setStatus,
+      reconnect: () => softphone.setStatus('reconnect'),
+      setAudioEl: (_el: HTMLAudioElement | null) => {},
+      transfer: (_target?: string) => {},
+      park: () => {},
+      startRecord: () => {},
+      stopRecord: () => {},
+    };
+  }, [softphone]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
-import { colors, font, gradients, radius } from '../lib/theme';
+import { colors, font, gradients, radius, shadow } from '../lib/theme';
 
 export default function ActiveCallSheet({
   sp,
@@ -53,7 +53,7 @@ export default function ActiveCallSheet({
   return (
     <div style={sheetStyle}>
       {/* Top brand strip */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px 8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0 16px 8px', padding: '10px 12px', borderRadius: radius.lg, background: 'rgba(255,255,255,0.72)', border: `1px solid ${colors.border}`, boxShadow: shadow.glass }}>
         <span style={{ fontSize: 10, letterSpacing: 1.6, fontWeight: 800, color: colors.signalGold, textTransform: 'uppercase' }}>
           {isIncoming ? 'Incoming · Lemtel' : isOutgoing ? 'Outgoing · Lemtel' : onHold ? 'On hold' : 'In call'}
         </span>
@@ -67,7 +67,7 @@ export default function ActiveCallSheet({
           background: gradients.call,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 54, fontWeight: 300, color: colors.textIce,
-          boxShadow: '0 30px 80px rgba(7,22,168,0.55), inset 0 1px 0 rgba(255,255,255,0.18)',
+          boxShadow: '0 30px 80px rgba(0,35,230,0.28), inset 0 1px 0 rgba(255,255,255,0.32)',
           position: 'relative',
         }}>
           {String(remote).charAt(0).toUpperCase()}
@@ -94,8 +94,9 @@ export default function ActiveCallSheet({
       {aiOpen && (
         <div style={{
           margin: '0 16px 12px', padding: 14, borderRadius: radius.lg,
-          background: `linear-gradient(135deg, rgba(122,76,255,0.18), rgba(35,214,255,0.12))`,
+          background: `linear-gradient(135deg, rgba(122,76,255,0.16), rgba(35,214,255,0.10), rgba(255,255,255,0.72))`,
           border: `1px solid ${colors.borderAI}`,
+          boxShadow: shadow.glass,
         }}>
           <div style={{ fontSize: 10, color: colors.avaCyan, fontWeight: 800, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 6 }}>AVA Live Assist</div>
           <div style={{ fontSize: 13, color: colors.textIce, lineHeight: 1.5 }}>
@@ -142,8 +143,9 @@ export default function ActiveCallSheet({
         <div style={{
           position: 'absolute', left: 0, right: 0, bottom: 'calc(120px + var(--safe-bottom))',
           padding: '12px 16px',
-          background: 'rgba(5,8,22,0.85)', backdropFilter: 'blur(14px)',
+          background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(18px) saturate(170%)',
           borderTop: `1px solid ${colors.border}`,
+          boxShadow: '0 -18px 46px -24px rgba(0,35,230,0.32)',
         }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {['1','2','3','4','5','6','7','8','9','*','0','#'].map((d) => (
@@ -171,11 +173,12 @@ function Ctrl({ label, icon, onClick, active, tone = 'default' }: {
       background: 'transparent', border: 'none', cursor: 'pointer', color: colors.textIce,
     }}>
       <span style={{
-        width: 58, height: 58, borderRadius: '50%',
-        background: active ? `${accent}33` : 'rgba(255,255,255,0.06)',
+        width: 60, height: 60, borderRadius: '50%',
+        background: active ? `${accent}24` : 'rgba(255,255,255,0.76)',
         border: `1px solid ${active ? accent : colors.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 22, color: active ? accent : colors.textIce,
+        boxShadow: active ? `0 12px 28px -18px ${accent}` : shadow.glass,
         transition: 'all 0.18s cubic-bezier(.4,.0,.2,1)',
       }}>{icon}</span>
       <span style={{ fontSize: 10, color: colors.mutedSilver, letterSpacing: 0.6, fontWeight: 600 }}>{label}</span>
@@ -203,7 +206,7 @@ function BigButton({ color, onClick, label, icon }: { color: string; onClick: ()
 
 const sheetStyle: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 100,
-  background: `radial-gradient(900px 600px at 50% -10%, rgba(7,22,168,0.55), transparent 65%), linear-gradient(180deg, ${colors.midnight} 0%, #07091a 100%)`,
+  background: `radial-gradient(900px 600px at 50% -12%, rgba(0,35,230,0.18), transparent 66%), radial-gradient(720px 520px at 100% 100%, rgba(224,168,0,0.16), transparent 60%), linear-gradient(180deg, #F9FBFF 0%, #E8F0FA 100%)`,
   paddingTop: 'calc(36px + var(--safe-top))',
   display: 'flex', flexDirection: 'column',
   color: colors.textIce,
