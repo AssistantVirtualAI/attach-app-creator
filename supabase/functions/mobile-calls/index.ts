@@ -10,6 +10,13 @@ const cors = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
+function scopeToExtension(query: any, sp: any) {
+  const parts: string[] = [];
+  if (sp.extension_uuid) parts.push(`extension_uuid.eq.${sp.extension_uuid}`);
+  if (sp.extension) parts.push(`extension.eq.${sp.extension}`, `caller_number.eq.${sp.extension}`, `destination_number.eq.${sp.extension}`, `source_number.eq.${sp.extension}`);
+  return parts.length ? query.or(parts.join(",")) : query.eq("id", "__no_softphone_extension__");
+}
+
 function mapCall(r: any) {
   const direction = r.direction === "outbound" ? "out" : "in";
   const status = r.missed_call ? "missed" : r.call_status === "voicemail" ? "voicemail" : "answered";
@@ -48,8 +55,7 @@ Deno.serve(async (req) => {
       let detailQ = sb.from("pbx_call_records").select("*")
         .eq("id", id).eq("organization_id", sp.organization_id);
       // Scope per-extension so two users in the same org cannot see each other's records.
-      if (sp.extension_uuid) detailQ = detailQ.eq("extension_uuid", sp.extension_uuid);
-      else if (sp.extension) detailQ = detailQ.eq("extension", sp.extension);
+      detailQ = scopeToExtension(detailQ, sp);
       const { data: r } = await detailQ.maybeSingle();
       if (!r) return json({ error: "not_found" }, 404);
 
@@ -88,8 +94,7 @@ Deno.serve(async (req) => {
     let listQ = sb.from("pbx_call_records")
       .select("id, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, transcribed")
       .eq("organization_id", sp.organization_id);
-    if (sp.extension_uuid) listQ = listQ.eq("extension_uuid", sp.extension_uuid);
-    else if (sp.extension) listQ = listQ.eq("extension", sp.extension);
+    listQ = scopeToExtension(listQ, sp);
     const { data: rows, error } = await listQ
       .order("start_at", { ascending: false }).limit(limit);
     if (error) throw error;
