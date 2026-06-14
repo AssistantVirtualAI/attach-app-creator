@@ -747,6 +747,38 @@ export const ava = {
   },
 
   /**
+   * Health-check: probes FusionPBX to verify the audio file is reachable
+   * without downloading bytes or issuing a signed URL. Returns true only
+   * when an audio response is confirmed.
+   */
+  checkRecording: async (
+    recording: Partial<RecordingItem & VoicemailItem & CallRecord & { record_path?: string | null; record_name?: string | null }>,
+  ): Promise<boolean> => {
+    const record_path = cleanText(recording.record_path ?? recording.recording_path);
+    const record_name = cleanText(recording.record_name ?? recording.recording_name);
+    const xml_cdr_uuid = cleanText(recording.pbx_uuid || (recording as any).callId || recording.id);
+    const domain_uuid = cleanText(recording.domain_uuid);
+    const domain_name = cleanText(recording.domain_name);
+    if (!xml_cdr_uuid && (!record_path || !record_name)) return false;
+    try {
+      const res = await fetch(resolveUrl(`/fn/${FN.fusionpbxProxy}`), {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          action: 'check-recording',
+          organization_id: recording.organization_id,
+          params: { xml_cdr_uuid, record_path, record_name, domain_uuid, domain_name },
+        }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      return !!data?.available;
+    } catch {
+      return false;
+    }
+  },
+
+  /**
    * Stream the recording bytes through the edge proxy and return a blob URL.
    * Kept for callers that need a guaranteed-local URL (e.g. download button).
    * Prefer `getRecordingSignedUrl` for `<audio>` playback.
