@@ -51,11 +51,11 @@ export const font = {
 } as const;
 
 export const shadow = {
-  card: '0 10px 32px -16px rgba(0,61,166,0.22)',
-  lift: '0 18px 40px -20px rgba(0,82,204,0.35)',
+  card: '0 10px 32px -16px rgba(0,35,230,0.22)',
+  lift: '0 18px 40px -20px rgba(0,35,230,0.35)',
   gold: '0 14px 36px -16px rgba(224,168,0,0.40)',
   ai:   '0 14px 36px -16px rgba(122,76,255,0.40)',
-  glass: '0 8px 24px -10px rgba(0,61,166,0.20), inset 0 1px 0 rgba(255,255,255,0.7)',
+  glass: '0 8px 24px -10px rgba(0,35,230,0.20), inset 0 1px 0 rgba(255,255,255,0.7)',
 } as const;
 
 export const glass = {
