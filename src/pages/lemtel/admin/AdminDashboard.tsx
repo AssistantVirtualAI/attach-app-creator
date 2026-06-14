@@ -126,17 +126,30 @@ export default function AdminDashboard() {
   const reg = `${stats?.registered ?? 0} / ${stats?.totalExts ?? 0}`;
   const newMsgs = (stats?.newVoicemails ?? 0) + (stats?.unreadSms ?? 0);
 
-  // Mini live series for the bottom status panels
+  // Live status series sourced from real telecom signals
   const [cpu, setCpu] = useState<any[]>(Array.from({ length: 20 }, (_, i) => ({ t: i, v: 0 })));
   const [net, setNet] = useState<any[]>(Array.from({ length: 20 }, (_, i) => ({ t: i, v: 0 })));
   const [active, setActive] = useState<any[]>(Array.from({ length: 20 }, (_, i) => ({ t: i, v: 0 })));
+
   useEffect(() => {
-    const id = setInterval(() => {
-      setCpu((p) => [...p.slice(1), { t: p.length, v: 10 + Math.random() * 30 }]);
-      setNet((p) => [...p.slice(1), { t: p.length, v: 0.8 + Math.random() * 1.6 }]);
-      setActive((p) => [...p.slice(1), { t: p.length, v: Math.max(0, Math.round(4 + Math.random() * 6)) }]);
-    }, 2000);
-    return () => clearInterval(id);
+    let cancelled = false;
+    const tick = async () => {
+      const [liveRes, healthRes, jobsRes] = await Promise.all([
+        (supabase as any).from('telecom_live_calls').select('id', { count: 'exact', head: true }).eq('organization_id', LEMTEL_ORG_ID),
+        (supabase as any).from('telecom_sync_health').select('latency_ms,error_rate').eq('organization_id', LEMTEL_ORG_ID).order('checked_at', { ascending: false }).limit(1).maybeSingle(),
+        (supabase as any).from('pbx_sync_jobs').select('duration_ms').eq('organization_id', LEMTEL_ORG_ID).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      const activeCount = (liveRes as any).count ?? 0;
+      const latency = (healthRes.data?.latency_ms as number | undefined) ?? (jobsRes.data?.duration_ms as number | undefined) ?? 0;
+      const errRate = ((healthRes.data?.error_rate as number | undefined) ?? 0) * 100;
+      setActive((p) => [...p.slice(1), { t: p.length, v: activeCount }]);
+      setNet((p) => [...p.slice(1), { t: p.length, v: Math.min(100, latency / 20) }]);
+      setCpu((p) => [...p.slice(1), { t: p.length, v: Math.min(100, errRate + activeCount * 5) }]);
+    };
+    tick();
+    const id = setInterval(tick, 5000);
+    return () => { cancelled = true; clearInterval(id); };
   }, []);
 
   const triggerSoftphone = () => {
