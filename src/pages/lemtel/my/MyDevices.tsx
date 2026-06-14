@@ -18,10 +18,10 @@ export default function MyDevices() {
   const syncSipPassword = async () => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('softphone-sync-password', { body: {} });
+      const { data, error } = await supabase.functions.invoke('softphone-sync-password', { body: { force_local_to_pbx: true } });
       if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error || (data as any)?.message);
       const changed = (data as any)?.changed;
-      toast.success(changed ? 'SIP password aligned with PBX. Reloading…' : 'Already in sync.');
+      toast.success(changed ? 'SIP password forced into PBX and apps. Reloading…' : 'Password already aligned.');
       if (changed) setTimeout(() => window.location.reload(), 800);
     } catch (e: any) {
       toast.error('Sync failed: ' + (e?.message || e));
@@ -93,14 +93,14 @@ export default function MyDevices() {
             )}
             <Button size="sm" variant="outline" className="ml-auto" disabled={syncing} onClick={syncSipPassword}>
               {syncing ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <KeyRound className="w-3.5 h-3.5 mr-1" />}
-              Align with PBX
+              Force password sync
             </Button>
             <Button size="sm" variant="outline" disabled={resetting} onClick={resetSipPassword}>
               {resetting ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <KeyRound className="w-3.5 h-3.5 mr-1" />}
               Reset SIP password
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mb-3">If the softphone shows <code>Registration failed: Rejected (403)</code>, the stored SIP password is out of sync with the PBX. Resetting generates a fresh password and pushes it to FusionPBX.</p>
+          <p className="text-xs text-muted-foreground mb-3">If the softphone shows <code>Registration failed: Rejected (403)</code>, force-sync pushes the stored SIP password into the PBX, portal login, desktop app, and mobile app.</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {platforms.map(([name, ts]) => (
               <div key={name} className="rounded-lg border border-cockpit-border/40 p-3">
