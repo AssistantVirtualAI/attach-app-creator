@@ -24,19 +24,44 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   const [audio, setAudio] = useState<Record<string, string>>({});
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [audioLoading, setAudioLoading] = useState<string | null>(null);
+  // Per-recording PBX availability: undefined = checking, true = reachable,
+  // false = PBX has metadata but the audio file is not yet on storage.
+  const [available, setAvailable] = useState<Record<string, boolean | undefined>>({});
+  const [showUnavailable, setShowUnavailable] = useState(false);
+
+  // Bounded-concurrency health check against FusionPBX.
+  const runHealthChecks = useCallback(async (list: RecordingItem[]) => {
+    const concurrency = 3;
+    let idx = 0;
+    const worker = async () => {
+      while (idx < list.length) {
+        const cur = list[idx++];
+        try {
+          const ok = await ava.checkRecording(cur);
+          setAvailable((m) => ({ ...m, [cur.id]: ok }));
+        } catch {
+          setAvailable((m) => ({ ...m, [cur.id]: false }));
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(concurrency, list.length) }, worker));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
       const data = await ava.recordings();
-      setItems(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setItems(list);
+      setAvailable({}); // reset; new health pass will populate
+      void runHealthChecks(list);
     } catch (e: any) {
       setError(e?.message || 'Unable to load recordings.');
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [runHealthChecks]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
