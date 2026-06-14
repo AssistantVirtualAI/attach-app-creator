@@ -80,6 +80,8 @@ function AuthenticatedShell({
       portalUrl: (creds as any).portalUrl || 'https://avastatistic.ca',
       accessToken: creds.accessToken || null,
     });
+    configureAudit(async () => creds.accessToken || null);
+    if (creds.accessToken) audit('softphone.signed_in', creds.userId, { extension: creds.extension });
   }, [creds]);
 
   // Once the permission gate is dismissed, finalize permissions + push.
