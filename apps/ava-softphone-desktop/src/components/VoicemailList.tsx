@@ -56,6 +56,7 @@ export default function VoicemailList({ extension, onCall }: Props) {
       if (!url) { setErr('No voicemail audio available yet'); return; }
       setAudio((a) => ({ ...a, [r.id]: url }));
     }
+    audit('voicemail.played', r.id, { from: r.from, duration: r.durationSec });
     setPlaying(r.id);
   };
 
