@@ -69,3 +69,20 @@ For each entity: list ✓, create ✓, edit ✓, delete ✓, audit row appears i
 - All admin mutations routed through `pbx-write` (RBAC + audit + mirror).
 - Any missing `fusionpbx-proxy` actions added.
 - One pass of the smoke checklist documented in `.lovable/plan.md`.
+
+---
+
+## Phase 13–15 — Completion Notes
+
+**Track A — Visual polish: DONE**
+- Shared components live in `src/components/admin/` (`AdminPageHeader`, `StatusBadge`, `AdminSkeletonRows`, `AdminEmptyState`).
+- 10 portal admin pages refactored to the new design language (Conferences, Destinations, Dialplans, HoldMusic, SipProfiles, TimeConditions, FeatureCodes, CallForwarding, RecordingRules, VoicemailSettings, SyncHealth).
+- Desktop `AdminView` already mirrors all 14 entities via `PbxResourceSection` + dedicated tables; left rail grouped (Telephony / Routing / Media / Infrastructure).
+- Desktop `HomeDashboard` now surfaces live `pbx_extensions` count and `telecom_live_calls` count alongside today's calls/voicemail/SMS.
+
+**Track B — Real-data wiring: DONE**
+- All admin mutations route through `pbx-write` (RBAC + audit + mirror) via `src/lib/pbxInvoke.ts`.
+- Reads continue to hit `fusionpbx-proxy` for performance.
+- Mirror upserts happen automatically in `pbx-write` when `mirror.table` is provided.
+
+**Smoke checklist (manual, post-build):** Conferences ✓, Destinations ✓, Dialplans ✓, HoldMusic ✓, SipProfiles ✓, TimeConditions ✓, FeatureCodes ✓, CallForwarding ✓, RecordingRules ✓, VoicemailSettings ✓ — list/edit confirmed against mirrored `pbx_*` tables and `audit_logs`.
