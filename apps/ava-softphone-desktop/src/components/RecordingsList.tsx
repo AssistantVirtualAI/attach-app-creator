@@ -22,6 +22,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [audio, setAudio] = useState<Record<string, string>>({});
+  const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [audioLoading, setAudioLoading] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -89,13 +90,20 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
 
   const play = async (r: RecordingItem) => {
     setError(null);
+    setAudioErrors((all) => { const next = { ...all }; delete next[r.id]; return next; });
     if (audio[r.id]) return;
     setAudioLoading(r.id);
     try {
       // Prefer short-lived signed URL (no client download); fallback to proxy blob.
       const signed = await ava.getRecordingSignedUrl(r);
       const url = signed?.url || (await ava.getRecordingAudioUrl(r));
-      if (!url) { setError('Recording file not available from PBX yet'); return; }
+      if (!url) {
+        setAudioErrors((all) => ({
+          ...all,
+          [r.id]: 'PBX metadata exists, but the audio file is not reachable from FusionPBX storage yet.',
+        }));
+        return;
+      }
       setAudio((a) => ({ ...a, [r.id]: url }));
       audit('recording.played', r.callId || r.id, { recording_name: r.recording_name });
     } finally {
@@ -153,10 +161,19 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
             </div>
 
             {audio[r.id] ? (
-              <audio controls src={audio[r.id]} style={{ width: '100%', marginTop: 8, height: 32 }} />
+              <audio
+                controls
+                src={audio[r.id]}
+                style={{ width: '100%', marginTop: 8, height: 32 }}
+                onError={() => {
+                  setAudio((all) => { const next = { ...all }; delete next[r.id]; return next; });
+                  setAudioErrors((all) => ({ ...all, [r.id]: 'Audio URL expired or PBX returned a non-audio response. Try refresh, then load again.' }));
+                }}
+              />
             ) : (
-              <button onClick={() => play(r)} disabled={audioLoading === r.id} style={{ marginTop: 8, width: '100%', padding: 7, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: `1px solid ${c.border}`, color: c.text, fontSize: 11, cursor: audioLoading === r.id ? 'wait' : 'pointer' }}>{audioLoading === r.id ? 'Loading PBX audio…' : `▶ Load PBX audio${r.recording_name ? ` · ${r.recording_name}` : ''}`}</button>
+              <button onClick={() => play(r)} disabled={audioLoading === r.id} style={{ marginTop: 8, width: '100%', padding: 7, borderRadius: 8, background: audioErrors[r.id] ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.06)', border: `1px solid ${audioErrors[r.id] ? c.red : c.border}`, color: audioErrors[r.id] ? c.red : c.text, fontSize: 11, cursor: audioLoading === r.id ? 'wait' : 'pointer' }}>{audioLoading === r.id ? 'Loading PBX audio…' : audioErrors[r.id] ? 'Audio file not reachable on PBX' : `▶ Load PBX audio${r.recording_name ? ` · ${r.recording_name}` : ''}`}</button>
             )}
+            {audioErrors[r.id] && <div style={{ marginTop: 6, fontSize: 10, color: c.textSub, lineHeight: 1.35 }}>{audioErrors[r.id]}</div>}
 
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
               {!(r as any).analyzed ? (
