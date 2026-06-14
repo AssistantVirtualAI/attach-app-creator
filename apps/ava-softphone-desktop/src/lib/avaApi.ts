@@ -100,6 +100,13 @@ function scopedThreadFilter(me: MeContext): string {
   return '&id=eq.__no_softphone_extension__';
 }
 
+export function applyMyExtensionScope<T extends { or: (filters: string) => T; eq: (column: string, value: string) => T }>(query: T, me: MeContext): T {
+  const parts: string[] = [];
+  if (me.extension_uuid) parts.push(`extension_uuid.eq.${me.extension_uuid}`);
+  if (me.extension) parts.push(`extension.eq.${me.extension}`, `caller_number.eq.${me.extension}`, `destination_number.eq.${me.extension}`, `source_number.eq.${me.extension}`);
+  return parts.length ? query.or(parts.join(',')) : query.eq('id', '__no_softphone_extension__');
+}
+
 export async function getMeContext(): Promise<MeContext> {
   if (_meCache) return _meCache;
   if (_meInflight) return _meInflight;
