@@ -32,15 +32,13 @@ export const colors = {
 } as const;
 
 export const gradients = {
-  app:    `radial-gradient(1200px 700px at 8% -10%, rgba(0,82,204,0.16), transparent 60%), radial-gradient(900px 600px at 100% 110%, rgba(255,196,0,0.14), transparent 55%), linear-gradient(180deg, #F7FAFE 0%, #E8F0FA 100%)`,
+  app:    `radial-gradient(1200px 700px at 8% -10%, rgba(0,35,230,0.16), transparent 60%), radial-gradient(900px 600px at 100% 110%, rgba(255,196,0,0.14), transparent 55%), linear-gradient(180deg, #F7FAFE 0%, #E8F0FA 100%)`,
   call:   `linear-gradient(135deg, ${colors.lemtelBlue} 0%, ${colors.blueGlow} 50%, ${colors.signalGold} 140%)`,
   ai:     `linear-gradient(135deg, ${colors.avaViolet}, ${colors.avaCyan})`,
-  // Frosted glass card — translucent white over the app gradient
   card:   `linear-gradient(155deg, rgba(255,255,255,0.78) 0%, rgba(255,255,255,0.62) 100%)`,
-  hero:   `linear-gradient(160deg, rgba(0,82,204,0.20) 0%, rgba(45,123,229,0.10) 45%, rgba(255,255,255,0.0) 100%)`,
-  // Shiny glass button — specular highlight for CTAs
+  hero:   `linear-gradient(160deg, rgba(0,35,230,0.20) 0%, rgba(42,77,255,0.10) 45%, rgba(255,255,255,0.0) 100%)`,
   shiny:  `linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(235,243,253,0.78) 45%, rgba(255,255,255,0.92) 100%)`,
-  shinyPrimary: `linear-gradient(135deg, #0052CC 0%, #2D7BE5 55%, #4F9CFF 100%)`,
+  shinyPrimary: `linear-gradient(135deg, #0023e6 0%, #2a4dff 55%, #6680ff 100%)`,
 } as const;
 
 export const radius = { sm: 8, md: 12, lg: 16, xl: 22, pill: 999 } as const;
