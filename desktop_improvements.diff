@@ -1,0 +1,356 @@
+[1mdiff --git a/apps/ava-softphone-desktop/src/components/console/ConsoleLayout.tsx b/apps/ava-softphone-desktop/src/components/console/ConsoleLayout.tsx[m
+[1mindex ce5cb37d..4a09139d 100644[m
+[1m--- a/apps/ava-softphone-desktop/src/components/console/ConsoleLayout.tsx[m
+[1m+++ b/apps/ava-softphone-desktop/src/components/console/ConsoleLayout.tsx[m
+[36m@@ -154,8 +154,32 @@[m [mexport default function ConsoleLayout({[m
+ [m
+       <main style={{[m
+         flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', position: 'relative',[m
+[31m-        paddingBottom: compact ? 78 : 0, display: 'flex', flexDirection: 'column',[m
+[32m+[m[32m        paddingBottom: compact ? 78 : 0, paddingTop: compact ? 54 : 0, display: 'flex', flexDirection: 'column',[m
+       }}>[m
+[32m+[m[32m        {compact && ([m
+[32m+[m[32m          <div style={{[m
+[32m+[m[32m            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 8,[m
+[32m+[m[32m            height: 54, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,[m
+[32m+[m[32m            padding: '8px 10px', boxSizing: 'border-box',[m
+[32m+[m[32m            background: `linear-gradient(180deg, ${c.deepPanel}f6, ${c.midnight}e8)`,[m
+[32m+[m[32m            borderBottom: `1px solid ${c.border}`,[m
+[32m+[m[32m            backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',[m
+[32m+[m[32m            WebkitAppRegion: 'drag' as any,[m
+[32m+[m[32m          }}>[m
+[32m+[m[32m            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.1 }}>[m
+[32m+[m[32m              <span style={{ fontSize: 11, color: c.signalGold, fontWeight: 900, letterSpacing: 1.4, textTransform: 'uppercase' }}>AVA Statistic</span>[m
+[32m+[m[32m              <span style={{ fontSize: 10, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 210 }}>[m
+[32m+[m[32m                Ext {creds.extension} · {syncNote || orgName || 'Phone system live data'}[m
+[32m+[m[32m              </span>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m            <div style={{ display: 'flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' as any }}>[m
+[32m+[m[32m              <button onClick={() => setPaletteOpen(true)} style={{ width: 34, height: 32, borderRadius: 10, border: `1px solid ${c.border}`, background: 'rgba(255,255,255,0.04)', color: c.textIce, cursor: 'pointer' }} aria-label="Search">⌘K</button>[m
+[32m+[m[32m              <button onClick={runFullSync} disabled={syncing} style={{ height: 32, padding: '0 10px', borderRadius: 10, border: `1px solid ${c.borderGold}`, background: syncing ? 'rgba(255,230,0,0.08)' : 'rgba(255,230,0,0.14)', color: c.signalGold, fontSize: 10, fontWeight: 900, letterSpacing: 0.8, cursor: syncing ? 'wait' : 'pointer' }}>[m
+[32m+[m[32m                {syncing ? 'SYNC…' : 'SYNC'}[m
+[32m+[m[32m              </button>[m
+[32m+[m[32m            </div>[m
+[32m+[m[32m          </div>[m
+[32m+[m[32m        )}[m
+         {!compact && ([m
+           <div style={{ position: 'absolute', top: 12, right: 16, zIndex: 4, display: 'flex', alignItems: 'center', gap: 8 }}>[m
+             {syncNote && <span style={{ maxWidth: 360, color: c.mutedSilver, fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{syncNote}</span>}[m
+[1mdiff --git a/apps/ava-softphone-desktop/src/components/console/MessagesView.tsx b/apps/ava-softphone-desktop/src/components/console/MessagesView.tsx[m
+[1mindex 42c01938..08924331 100644[m
+[1m--- a/apps/ava-softphone-desktop/src/components/console/MessagesView.tsx[m
+[1m+++ b/apps/ava-softphone-desktop/src/components/console/MessagesView.tsx[m
+[36m@@ -1,6 +1,6 @@[m
+ import React, { useEffect, useState } from 'react';[m
+ import { theme } from '../../lib/theme';[m
+[31m-import { ava, SmsThread } from '../../lib/avaApi';[m
+[32m+[m[32mimport { ava, SmsThread, SmsMessage } from '../../lib/avaApi';[m
+ import { useRealtimeRefresh } from '../../lib/useRealtimeRefresh';[m
+ import { useOrgId } from '../../lib/useOrgId';[m
+ import {[m
+[36m@@ -11,25 +11,26 @@[m [mimport {[m
+ [m
+ const { colors: c } = theme;[m
+ [m
+[31m-interface Msg { id: string; from: 'me' | 'them'; body: string; at: string; }[m
+[32m+[m[32minterface Msg { id: string; from: 'me' | 'them'; body: string; at: string; status?: string; }[m
+ [m
+[31m-const MOCK_MSGS: Record<string, Msg[]> = {[m
+[31m-  t1: [[m
+[31m-    { id: 'm1', from: 'them', body: 'Hi, did you get the updated quote?', at: '10:14' },[m
+[31m-    { id: 'm2', from: 'me', body: 'Yes, sending the revised version this afternoon.', at: '10:16' },[m
+[31m-    { id: 'm3', from: 'them', body: 'Perfect, I\'ll review the quote tonight.', at: '10:42' },[m
+[31m-  ],[m
+[31m-  t2: [[m
+[31m-    { id: 'm4', from: 'them', body: 'Can we reschedule to Thursday?', at: '09:30' },[m
+[31m-    { id: 'm5', from: 'them', body: 'Same time works for us.', at: '09:31' },[m
+[31m-  ],[m
+[31m-  t3: [{ id: 'm6', from: 'them', body: 'Thanks for the call earlier.', at: 'Yesterday' }],[m
+[31m-};[m
+[32m+[m[32mfunction fmtMsgTime(value?: string | null) {[m
+[32m+[m[32m  if (!value) return '—';[m
+[32m+[m[32m  const d = new Date(value);[m
+[32m+[m[32m  if (Number.isNaN(d.getTime())) return String(value);[m
+[32m+[m[32m  const now = new Date();[m
+[32m+[m[32m  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });[m
+[32m+[m[32m  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });[m
+[32m+[m[32m}[m
+[32m+[m[32mfunction mapMsg(m: SmsMessage): Msg {[m
+[32m+[m[32m  return { id: m.id, from: m.from, body: m.body, at: fmtMsgTime(m.at), status: m.status };[m
+[32m+[m[32m}[m
+ [m
+ export default function MessagesView() {[m
+   const [threads, setThreads] = useState<SmsThread[]>([]);[m
+   const [activeId, setActiveId] = useState<string | null>(null);[m
+   const [msgs, setMsgs] = useState<Msg[]>([]);[m
+[32m+[m[32m  const [messagesLoading, setMessagesLoading] = useState(false);[m
+[32m+[m[32m  const [messagesError, setMessagesError] = useState<string | null>(null);[m
+   const [draft, setDraft] = useState('');[m
+   const [aiBusy, setAiBusy] = useState(false);[m
+   const [templates, setTemplates] = useState<MsgTemplate[]>(() => loadTemplates());[m
+[36m@@ -44,12 +45,25 @@[m [mexport default function MessagesView() {[m
+     }).catch(() => {});[m
+   }, []);[m
+   useEffect(() => { loadThreads(); }, [loadThreads]);[m
+[31m-  useEffect(() => { if (activeId) setMsgs(MOCK_MSGS[activeId] || []); }, [activeId]);[m
+[32m+[m[32m  const loadMessages = React.useCallback(async () => {[m
+[32m+[m[32m    if (!activeId) { setMsgs([]); return; }[m
+[32m+[m[32m    setMessagesLoading(true); setMessagesError(null);[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      const rows = await ava.messages(activeId);[m
+[32m+[m[32m      setMsgs(rows.map(mapMsg));[m
+[32m+[m[32m    } catch (err: any) {[m
+[32m+[m[32m      setMsgs([]);[m
+[32m+[m[32m      setMessagesError(err?.message || 'Unable to load live message history.');[m
+[32m+[m[32m    } finally {[m
+[32m+[m[32m      setMessagesLoading(false);[m
+[32m+[m[32m    }[m
+[32m+[m[32m  }, [activeId]);[m
+[32m+[m[32m  useEffect(() => { loadMessages(); }, [loadMessages]);[m
+ [m
+   // Realtime: new SMS threads/messages for this tenant refresh the list.[m
+   const orgId = useOrgId();[m
+   useRealtimeRefresh({ table: 'pbx_sms_threads', organizationId: orgId }, loadThreads);[m
+[31m-  useRealtimeRefresh({ table: 'pbx_sms_messages', organizationId: orgId }, loadThreads);[m
+[32m+[m[32m  useRealtimeRefresh({ table: 'pbx_sms_messages', organizationId: orgId }, () => { loadThreads(); loadMessages(); });[m
+ [m
+   const active = threads.find((t) => t.id === activeId);[m
+   const contactKey = active?.id || '';[m
+[36m@@ -58,10 +72,18 @@[m [mexport default function MessagesView() {[m
+ [m
+   const send = async () => {[m
+     if (!draft.trim() || !activeId) return;[m
+[31m-    const m: Msg = { id: 'm' + Date.now(), from: 'me', body: draft, at: 'now' };[m
+[32m+[m[32m    const body = draft.trim();[m
+[32m+[m[32m    const m: Msg = { id: 'm' + Date.now(), from: 'me', body, at: 'sending…', status: 'sending' };[m
+     setMsgs((p) => [...p, m]);[m
+     setDraft('');[m
+[31m-    await ava.sendMessage(activeId, m.body);[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      await ava.sendMessage(activeId, body);[m
+[32m+[m[32m      setMsgs((p) => p.map((x) => x.id === m.id ? { ...x, at: 'sent', status: 'sent' } : x));[m
+[32m+[m[32m      loadThreads();[m
+[32m+[m[32m      setTimeout(loadMessages, 600);[m
+[32m+[m[32m    } catch (err) {[m
+[32m+[m[32m      setMsgs((p) => p.map((x) => x.id === m.id ? { ...x, at: 'failed', status: 'failed' } : x));[m
+[32m+[m[32m    }[m
+   };[m
+ [m
+   const aiAction = async (action: 'professional' | 'shorten' | 'translate' | 'rewrite') => {[m
+[36m@@ -159,7 +181,7 @@[m [mexport default function MessagesView() {[m
+               <div style={{ fontSize: 14, fontWeight: 700, color: c.textIce }}>{active.contact}</div>[m
+               <div style={{ fontSize: 10.5, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>via {active.number}</div>[m
+             </div>[m
+[31m-            <button style={{ padding: '6px 12px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 11, cursor: 'pointer' }}>Assign</button>[m
+[32m+[m[32m            <button title="Assignment is managed from the AVA portal permissions workflow." style={{ padding: '6px 12px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 11, cursor: 'default' }}>Assigned to me</button>[m
+           </header>[m
+         )}[m
+ [m
+[36m@@ -185,7 +207,10 @@[m [mexport default function MessagesView() {[m
+               </div>[m
+             </div>[m
+           )}[m
+[31m-          {msgs.map((m) => ([m
+[32m+[m[32m          {messagesLoading && <div style={{ margin: 'auto', color: c.mutedSilver, fontSize: 12 }}>Loading live message history…</div>}[m
+[32m+[m[32m          {messagesError && <div style={{ margin: 'auto', color: c.danger, fontSize: 12 }}>{messagesError}</div>}[m
+[32m+[m[32m          {!messagesLoading && !messagesError && active && msgs.length === 0 && <div style={{ margin: 'auto', color: c.mutedSilver, fontSize: 12 }}>No live messages in this conversation yet.</div>}[m
+[32m+[m[32m          {!messagesLoading && msgs.map((m) => ([m
+             <div key={m.id} style={{[m
+               alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start',[m
+               maxWidth: '72%',[m
+[1mdiff --git a/apps/ava-softphone-desktop/src/components/console/RecordingsView.tsx b/apps/ava-softphone-desktop/src/components/console/RecordingsView.tsx[m
+[1mindex 78db7b33..596bd30d 100644[m
+[1m--- a/apps/ava-softphone-desktop/src/components/console/RecordingsView.tsx[m
+[1m+++ b/apps/ava-softphone-desktop/src/components/console/RecordingsView.tsx[m
+[36m@@ -188,6 +188,32 @@[m [mexport default function RecordingsView() {[m
+     const allSelected = allIds.every((id) => selectedIds.has(id));[m
+     setSelectedIds(allSelected ? new Set() : new Set(allIds));[m
+   };[m
+[32m+[m[32m  const downloadSelectedRecording = async () => {[m
+[32m+[m[32m    if (!sel) return;[m
+[32m+[m[32m    setPlaybackError(null); setPlaybackLoading(true);[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      const url = await fetchAudio(sel);[m
+[32m+[m[32m      if (!url) { setPlaybackError('Recording file not available from PBX yet'); return; }[m
+[32m+[m[32m      const a = document.createElement('a');[m
+[32m+[m[32m      const safeName = `${(sel.recording_name || sel.callId || sel.id || 'recording').replace(/[^a-z0-9._-]+/gi, '_')}.wav`;[m
+[32m+[m[32m      a.href = url;[m
+[32m+[m[32m      a.download = safeName;[m
+[32m+[m[32m      document.body.appendChild(a);[m
+[32m+[m[32m      a.click();[m
+[32m+[m[32m      a.remove();[m
+[32m+[m[32m    } finally { setPlaybackLoading(false); }[m
+[32m+[m[32m  };[m
+[32m+[m
+[32m+[m[32m  const shareSelectedRecording = async () => {[m
+[32m+[m[32m    if (!sel) return;[m
+[32m+[m[32m    setPlaybackError(null);[m
+[32m+[m[32m    const meta = `${sel.customer || `${sel.from || 'Unknown'} → ${sel.to || 'Unknown'}`} · ${fmtDate(sel.recordedAt)} · ${fmtDur(sel.durationSec)}`;[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      if (navigator.share) await navigator.share({ title: 'AVA recording', text: meta });[m
+[32m+[m[32m      else { await navigator.clipboard?.writeText(meta); setPlaybackError('Recording details copied. Audio sharing uses the secure AVA portal link only.'); }[m
+[32m+[m[32m    } catch { /* user cancelled or clipboard unavailable */ }[m
+[32m+[m[32m  };[m
+[32m+[m
+   const exportSelected = async () => {[m
+     if (selectedIds.size === 0) return;[m
+     setExporting(true); setExportNote(null);[m
+[36m@@ -386,11 +412,11 @@[m [mexport default function RecordingsView() {[m
+             </div>[m
+ [m
+             <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12, marginBottom: 14 }}>[m
+[31m-              {(audioUrl || sel.recordingUrl) ? ([m
+[32m+[m[32m              {audioUrl ? ([m
+                 <audio[m
+                   controls[m
+                   preload="auto"[m
+[31m-                  src={audioUrl || sel.recordingUrl || undefined}[m
+[32m+[m[32m                  src={audioUrl}[m
+                   style={{ width: '100%', height: 36 }}[m
+                   onError={() => {[m
+                     setPlaybackError('PBX recording file is not reachable yet. Sync the phone system and try again.');[m
+[36m@@ -486,8 +512,8 @@[m [mexport default function RecordingsView() {[m
+             </Panel>[m
+ [m
+             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>[m
+[31m-              <button style={btnPrimary}>Download</button>[m
+[31m-              <button style={btnGhost}>Share</button>[m
+[32m+[m[32m              <button onClick={downloadSelectedRecording} disabled={playbackLoading} style={{ ...btnPrimary, opacity: playbackLoading ? 0.65 : 1 }}>{playbackLoading ? 'Preparing…' : 'Download'}</button>[m
+[32m+[m[32m              <button onClick={shareSelectedRecording} style={btnGhost}>Share details</button>[m
+             </div>[m
+           </>[m
+         )}[m
+[1mdiff --git a/apps/ava-softphone-desktop/src/components/console/VoicemailView.tsx b/apps/ava-softphone-desktop/src/components/console/VoicemailView.tsx[m
+[1mindex ea155ecd..0d5bbdfd 100644[m
+[1m--- a/apps/ava-softphone-desktop/src/components/console/VoicemailView.tsx[m
+[1m+++ b/apps/ava-softphone-desktop/src/components/console/VoicemailView.tsx[m
+[36m@@ -39,6 +39,7 @@[m [mexport default function VoicemailView() {[m
+   const [playbackError, setPlaybackError] = useState<string | null>(null);[m
+   const [pos, setPos] = useState(0);[m
+   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);[m
+[32m+[m[32m  const audioRef = useRef<HTMLAudioElement | null>(null);[m
+   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);[m
+ [m
+   const load = useCallback(async () => {[m
+[36m@@ -73,7 +74,7 @@[m [mexport default function VoicemailView() {[m
+   // Tick[m
+   useEffect(() => {[m
+     if (tickRef.current) clearInterval(tickRef.current);[m
+[31m-    if (playing && sel) {[m
+[32m+[m[32m    if (playing && sel && !audioUrl) {[m
+       tickRef.current = setInterval(() => {[m
+         setPos((p) => {[m
+           const next = p + 0.2 * speed;[m
+[36m@@ -84,7 +85,15 @@[m [mexport default function VoicemailView() {[m
+       }, 200);[m
+     }[m
+     return () => { if (tickRef.current) clearInterval(tickRef.current); };[m
+[31m-  }, [playing, speed, sel]);[m
+[32m+[m[32m  }, [playing, speed, sel, audioUrl]);[m
+[32m+[m
+[32m+[m[32m  useEffect(() => {[m
+[32m+[m[32m    const audio = audioRef.current;[m
+[32m+[m[32m    if (!audio) return;[m
+[32m+[m[32m    audio.playbackRate = speed;[m
+[32m+[m[32m    if (playing) audio.play().catch(() => setPlaybackError('Playback requires a user click.'));[m
+[32m+[m[32m    else audio.pause();[m
+[32m+[m[32m  }, [playing, speed, audioUrl]);[m
+ [m
+   const filtered = useMemo(() => items.filter((v) =>[m
+     filter === 'all' ? true :[m
+[36m@@ -262,16 +271,16 @@[m [mexport default function VoicemailView() {[m
+               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>[m
+                 <span style={{ fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(pos)}</span>[m
+                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>[m
+[31m-                  <button onClick={() => setPos((p) => Math.max(0, p - 5))} style={iconBtn}>«5s</button>[m
+[32m+[m[32m                  <button onClick={() => setPos((p) => { const next = Math.max(0, p - 5); if (audioRef.current) audioRef.current.currentTime = next; return next; })} style={iconBtn}>«5s</button>[m
+                   <button onClick={playSelected} style={{ ...iconBtn, background: c.signalGold, color: c.midnight, fontWeight: 700, padding: '6px 14px' }}>[m
+                     {playing ? '⏸ Pause' : '▶ Play'}[m
+                   </button>[m
+[31m-                  <button onClick={() => setPos((p) => Math.min(Number(sel.durationSec || 0), p + 5))} style={iconBtn}>5s»</button>[m
+[31m-                  <button onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])} style={iconBtn}>{speed}x</button>[m
+[32m+[m[32m                  <button onClick={() => setPos((p) => { const next = Math.min(Number(sel.durationSec || 0), p + 5); if (audioRef.current) audioRef.current.currentTime = next; return next; })} style={iconBtn}>5s»</button>[m
+[32m+[m[32m                  <button onClick={() => { const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]; setSpeed(next); if (audioRef.current) audioRef.current.playbackRate = next; }} style={iconBtn}>{speed}x</button>[m
+                 </div>[m
+                 <span style={{ fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(sel.durationSec)}</span>[m
+               </div>[m
+[31m-              {audioUrl && <audio src={audioUrl} autoPlay={playing} controls style={{ width: '100%', marginTop: 8, height: 30 }} onEnded={() => setPlaying(false)} />}[m
+[32m+[m[32m              {audioUrl && <audio ref={audioRef} src={audioUrl} controls style={{ width: '100%', marginTop: 8, height: 30 }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onTimeUpdate={(e) => setPos(e.currentTarget.currentTime)} onLoadedMetadata={(e) => { e.currentTarget.playbackRate = speed; if (playing) e.currentTarget.play().catch(() => setPlaybackError('Playback requires a user click.')); }} onEnded={() => setPlaying(false)} onError={() => { setPlaying(false); setPlaybackError('PBX voicemail audio is not reachable yet. Sync the phone system and try again.'); }} />}[m
+               {playbackError && <div style={{ fontSize: 11, color: c.mutedSilver, marginTop: 8 }}>{playbackError}</div>}[m
+             </div>[m
+ [m
+[1mdiff --git a/apps/ava-softphone-desktop/src/lib/avaApi.ts b/apps/ava-softphone-desktop/src/lib/avaApi.ts[m
+[1mindex 27459260..b553ae63 100644[m
+[1m--- a/apps/ava-softphone-desktop/src/lib/avaApi.ts[m
+[1m+++ b/apps/ava-softphone-desktop/src/lib/avaApi.ts[m
+[36m@@ -216,6 +216,9 @@[m [mexport interface SmsThread {[m
+   id: string; contact: string; lastMessage: string; lastAt: string;[m
+   unread: number; number: string;[m
+ }[m
+[32m+[m[32mexport interface SmsMessage {[m
+[32m+[m[32m  id: string; threadId: string; from: 'me' | 'them'; body: string; at: string; status?: string;[m
+[32m+[m[32m}[m
+ [m
+ export interface Extension {[m
+   id: string; extension: string; displayName: string;[m
+[36m@@ -283,6 +286,18 @@[m [mconst MOCK_THREADS: SmsThread[] = [[m
+   { id: 't2', contact: 'Acme Corp', lastMessage: 'Can we reschedule to Thursday?', lastAt: new Date(Date.now()-3600e3).toISOString(), unread: 2, number: '+15145550100' },[m
+   { id: 't3', contact: '+15145550141', lastMessage: 'Thanks for the call earlier.', lastAt: new Date(Date.now()-7200e3).toISOString(), unread: 1, number: '+15145550100' },[m
+ ];[m
+[32m+[m[32mconst MOCK_MESSAGES: Record<string, SmsMessage[]> = {[m
+[32m+[m[32m  t1: [[m
+[32m+[m[32m    { id: 'm1', threadId: 't1', from: 'them', body: 'Hi, did you get the updated quote?', at: new Date(Date.now()-3600e3).toISOString() },[m
+[32m+[m[32m    { id: 'm2', threadId: 't1', from: 'me', body: 'Yes, sending the revised version this afternoon.', at: new Date(Date.now()-3300e3).toISOString() },[m
+[32m+[m[32m    { id: 'm3', threadId: 't1', from: 'them', body: 'Perfect, I\'ll review the quote tonight.', at: new Date(Date.now()-1800e3).toISOString() },[m
+[32m+[m[32m  ],[m
+[32m+[m[32m  t2: [[m
+[32m+[m[32m    { id: 'm4', threadId: 't2', from: 'them', body: 'Can we reschedule to Thursday?', at: new Date(Date.now()-3800e3).toISOString() },[m
+[32m+[m[32m    { id: 'm5', threadId: 't2', from: 'them', body: 'Same time works for us.', at: new Date(Date.now()-3600e3).toISOString() },[m
+[32m+[m[32m  ],[m
+[32m+[m[32m  t3: [{ id: 'm6', threadId: 't3', from: 'them', body: 'Thanks for the call earlier.', at: new Date(Date.now()-7200e3).toISOString() }],[m
+[32m+[m[32m};[m
+ [m
+ const MOCK_EXT: Extension[] = [[m
+   { id: 'e1', extension: '301', displayName: 'Demo User', user: 'demo@lemtel.tel', voicemailEnabled: true, enabled: true },[m
+[36m@@ -496,6 +511,29 @@[m [mexport const ava = {[m
+       number: t.did_number || t.contact_phone || '',[m
+     })) as SmsThread[];[m
+   },[m
+[32m+[m[32m  messages: async (threadId: string): Promise<SmsMessage[]> => {[m
+[32m+[m[32m    if (MOCK) return MOCK_MESSAGES[threadId] || [];[m
+[32m+[m[32m    const me = await getMeContext();[m
+[32m+[m[32m    const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      const raw = await call<any>(`/db/${TABLES.smsMessages}?select=*&thread_id=eq.${threadId}${orgFilter}&order=created_at.asc&limit=500`, {}, [] as any);[m
+[32m+[m[32m      return asArray(raw).map((m: any) => {[m
+[32m+[m[32m        const direction = cleanText(m.direction || m.message_direction || m.type).toLowerCase();[m
+[32m+[m[32m        const outbound = direction === 'outbound' || direction === 'out' || m.is_outbound === true || m.sender === 'me';[m
+[32m+[m[32m        return {[m
+[32m+[m[32m          id: String(m.id ?? `${threadId}-${Math.random()}`),[m
+[32m+[m[32m          threadId,[m
+[32m+[m[32m          from: outbound ? 'me' : 'them',[m
+[32m+[m[32m          body: cleanText(m.body ?? m.message ?? m.text ?? m.content),[m
+[32m+[m[32m          at: m.created_at ?? m.sent_at ?? m.received_at ?? m.updated_at ?? new Date().toISOString(),[m
+[32m+[m[32m          status: cleanText(m.status),[m
+[32m+[m[32m        } as SmsMessage;[m
+[32m+[m[32m      }).filter((m: SmsMessage) => m.body);[m
+[32m+[m[32m    } catch (err) {[m
+[32m+[m[32m      console.warn('[avaApi] messages failed:', err);[m
+[32m+[m[32m      return [];[m
+[32m+[m[32m    }[m
+[32m+[m[32m  },[m
+   sendMessage: (threadId: string, body: string) =>[m
+     call<{ ok: true }>(`/fn/${FN.telnyxSms}`, { method: 'POST', body: JSON.stringify({ op: 'send', threadId, body }) }, { ok: true }),[m
+   aiRewrite: (text: string, action: 'professional' | 'shorten' | 'translate' | 'rewrite') =>[m
+[1mdiff --git a/apps/ava-softphone-desktop/src/lib/config.ts b/apps/ava-softphone-desktop/src/lib/config.ts[m
+[1mindex 67c742ce..38446f07 100644[m
+[1m--- a/apps/ava-softphone-desktop/src/lib/config.ts[m
+[1m+++ b/apps/ava-softphone-desktop/src/lib/config.ts[m
+[36m@@ -21,6 +21,7 @@[m [mexport const TABLES = {[m
+   extensions: 'pbx_extensions',[m
+   aiInsights: 'pbx_ai_insights',[m
+   smsThreads: 'pbx_sms_threads',[m
+[32m+[m[32m  smsMessages: 'pbx_sms_messages',[m
+   softphoneUsers: 'pbx_softphone_users',[m
+ } as const;[m
+ [m
