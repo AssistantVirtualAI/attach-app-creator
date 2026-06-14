@@ -216,6 +216,9 @@ export interface SmsThread {
   id: string; contact: string; lastMessage: string; lastAt: string;
   unread: number; number: string;
 }
+export interface SmsMessage {
+  id: string; threadId: string; from: 'me' | 'them'; body: string; at: string; status?: string;
+}
 
 export interface Extension {
   id: string; extension: string; displayName: string;
@@ -283,6 +286,18 @@ const MOCK_THREADS: SmsThread[] = [
   { id: 't2', contact: 'Acme Corp', lastMessage: 'Can we reschedule to Thursday?', lastAt: new Date(Date.now()-3600e3).toISOString(), unread: 2, number: '+15145550100' },
   { id: 't3', contact: '+15145550141', lastMessage: 'Thanks for the call earlier.', lastAt: new Date(Date.now()-7200e3).toISOString(), unread: 1, number: '+15145550100' },
 ];
+const MOCK_MESSAGES: Record<string, SmsMessage[]> = {
+  t1: [
+    { id: 'm1', threadId: 't1', from: 'them', body: 'Hi, did you get the updated quote?', at: new Date(Date.now()-3600e3).toISOString() },
+    { id: 'm2', threadId: 't1', from: 'me', body: 'Yes, sending the revised version this afternoon.', at: new Date(Date.now()-3300e3).toISOString() },
+    { id: 'm3', threadId: 't1', from: 'them', body: 'Perfect, I\'ll review the quote tonight.', at: new Date(Date.now()-1800e3).toISOString() },
+  ],
+  t2: [
+    { id: 'm4', threadId: 't2', from: 'them', body: 'Can we reschedule to Thursday?', at: new Date(Date.now()-3800e3).toISOString() },
+    { id: 'm5', threadId: 't2', from: 'them', body: 'Same time works for us.', at: new Date(Date.now()-3600e3).toISOString() },
+  ],
+  t3: [{ id: 'm6', threadId: 't3', from: 'them', body: 'Thanks for the call earlier.', at: new Date(Date.now()-7200e3).toISOString() }],
+};
 
 const MOCK_EXT: Extension[] = [
   { id: 'e1', extension: '301', displayName: 'Demo User', user: 'demo@lemtel.tel', voicemailEnabled: true, enabled: true },
@@ -495,6 +510,29 @@ export const ava = {
       unread: Number(t.unread_count ?? 0),
       number: t.did_number || t.contact_phone || '',
     })) as SmsThread[];
+  },
+  messages: async (threadId: string): Promise<SmsMessage[]> => {
+    if (MOCK) return MOCK_MESSAGES[threadId] || [];
+    const me = await getMeContext();
+    const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
+    try {
+      const raw = await call<any>(`/db/${TABLES.smsMessages}?select=*&thread_id=eq.${threadId}${orgFilter}&order=created_at.asc&limit=500`, {}, [] as any);
+      return asArray(raw).map((m: any) => {
+        const direction = cleanText(m.direction || m.message_direction || m.type).toLowerCase();
+        const outbound = direction === 'outbound' || direction === 'out' || m.is_outbound === true || m.sender === 'me';
+        return {
+          id: String(m.id ?? `${threadId}-${Math.random()}`),
+          threadId,
+          from: outbound ? 'me' : 'them',
+          body: cleanText(m.body ?? m.message ?? m.text ?? m.content),
+          at: m.created_at ?? m.sent_at ?? m.received_at ?? m.updated_at ?? new Date().toISOString(),
+          status: cleanText(m.status),
+        } as SmsMessage;
+      }).filter((m: SmsMessage) => m.body);
+    } catch (err) {
+      console.warn('[avaApi] messages failed:', err);
+      return [];
+    }
   },
   sendMessage: (threadId: string, body: string) =>
     call<{ ok: true }>(`/fn/${FN.telnyxSms}`, { method: 'POST', body: JSON.stringify({ op: 'send', threadId, body }) }, { ok: true }),

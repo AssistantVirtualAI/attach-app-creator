@@ -188,6 +188,32 @@ export default function RecordingsView() {
     const allSelected = allIds.every((id) => selectedIds.has(id));
     setSelectedIds(allSelected ? new Set() : new Set(allIds));
   };
+  const downloadSelectedRecording = async () => {
+    if (!sel) return;
+    setPlaybackError(null); setPlaybackLoading(true);
+    try {
+      const url = await fetchAudio(sel);
+      if (!url) { setPlaybackError('Recording file not available from PBX yet'); return; }
+      const a = document.createElement('a');
+      const safeName = `${(sel.recording_name || sel.callId || sel.id || 'recording').replace(/[^a-z0-9._-]+/gi, '_')}.wav`;
+      a.href = url;
+      a.download = safeName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } finally { setPlaybackLoading(false); }
+  };
+
+  const shareSelectedRecording = async () => {
+    if (!sel) return;
+    setPlaybackError(null);
+    const meta = `${sel.customer || `${sel.from || 'Unknown'} → ${sel.to || 'Unknown'}`} · ${fmtDate(sel.recordedAt)} · ${fmtDur(sel.durationSec)}`;
+    try {
+      if (navigator.share) await navigator.share({ title: 'AVA recording', text: meta });
+      else { await navigator.clipboard?.writeText(meta); setPlaybackError('Recording details copied. Audio sharing uses the secure AVA portal link only.'); }
+    } catch { /* user cancelled or clipboard unavailable */ }
+  };
+
   const exportSelected = async () => {
     if (selectedIds.size === 0) return;
     setExporting(true); setExportNote(null);
@@ -386,11 +412,11 @@ export default function RecordingsView() {
             </div>
 
             <div style={{ background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 10, padding: 12, marginBottom: 14 }}>
-              {(audioUrl || sel.recordingUrl) ? (
+              {audioUrl ? (
                 <audio
                   controls
                   preload="auto"
-                  src={audioUrl || sel.recordingUrl || undefined}
+                  src={audioUrl}
                   style={{ width: '100%', height: 36 }}
                   onError={() => {
                     setPlaybackError('PBX recording file is not reachable yet. Sync the phone system and try again.');
@@ -486,8 +512,8 @@ export default function RecordingsView() {
             </Panel>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-              <button style={btnPrimary}>Download</button>
-              <button style={btnGhost}>Share</button>
+              <button onClick={downloadSelectedRecording} disabled={playbackLoading} style={{ ...btnPrimary, opacity: playbackLoading ? 0.65 : 1 }}>{playbackLoading ? 'Preparing…' : 'Download'}</button>
+              <button onClick={shareSelectedRecording} style={btnGhost}>Share details</button>
             </div>
           </>
         )}

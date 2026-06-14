@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
-import { ava, SmsThread } from '../../lib/avaApi';
+import { ava, SmsThread, SmsMessage } from '../../lib/avaApi';
 import { useRealtimeRefresh } from '../../lib/useRealtimeRefresh';
 import { useOrgId } from '../../lib/useOrgId';
 import {
@@ -11,25 +11,26 @@ import {
 
 const { colors: c } = theme;
 
-interface Msg { id: string; from: 'me' | 'them'; body: string; at: string; }
+interface Msg { id: string; from: 'me' | 'them'; body: string; at: string; status?: string; }
 
-const MOCK_MSGS: Record<string, Msg[]> = {
-  t1: [
-    { id: 'm1', from: 'them', body: 'Hi, did you get the updated quote?', at: '10:14' },
-    { id: 'm2', from: 'me', body: 'Yes, sending the revised version this afternoon.', at: '10:16' },
-    { id: 'm3', from: 'them', body: 'Perfect, I\'ll review the quote tonight.', at: '10:42' },
-  ],
-  t2: [
-    { id: 'm4', from: 'them', body: 'Can we reschedule to Thursday?', at: '09:30' },
-    { id: 'm5', from: 'them', body: 'Same time works for us.', at: '09:31' },
-  ],
-  t3: [{ id: 'm6', from: 'them', body: 'Thanks for the call earlier.', at: 'Yesterday' }],
-};
+function fmtMsgTime(value?: string | null) {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+function mapMsg(m: SmsMessage): Msg {
+  return { id: m.id, from: m.from, body: m.body, at: fmtMsgTime(m.at), status: m.status };
+}
 
 export default function MessagesView() {
   const [threads, setThreads] = useState<SmsThread[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const [templates, setTemplates] = useState<MsgTemplate[]>(() => loadTemplates());
@@ -44,12 +45,25 @@ export default function MessagesView() {
     }).catch(() => {});
   }, []);
   useEffect(() => { loadThreads(); }, [loadThreads]);
-  useEffect(() => { if (activeId) setMsgs(MOCK_MSGS[activeId] || []); }, [activeId]);
+  const loadMessages = React.useCallback(async () => {
+    if (!activeId) { setMsgs([]); return; }
+    setMessagesLoading(true); setMessagesError(null);
+    try {
+      const rows = await ava.messages(activeId);
+      setMsgs(rows.map(mapMsg));
+    } catch (err: any) {
+      setMsgs([]);
+      setMessagesError(err?.message || 'Unable to load live message history.');
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, [activeId]);
+  useEffect(() => { loadMessages(); }, [loadMessages]);
 
   // Realtime: new SMS threads/messages for this tenant refresh the list.
   const orgId = useOrgId();
   useRealtimeRefresh({ table: 'pbx_sms_threads', organizationId: orgId }, loadThreads);
-  useRealtimeRefresh({ table: 'pbx_sms_messages', organizationId: orgId }, loadThreads);
+  useRealtimeRefresh({ table: 'pbx_sms_messages', organizationId: orgId }, () => { loadThreads(); loadMessages(); });
 
   const active = threads.find((t) => t.id === activeId);
   const contactKey = active?.id || '';
@@ -58,10 +72,18 @@ export default function MessagesView() {
 
   const send = async () => {
     if (!draft.trim() || !activeId) return;
-    const m: Msg = { id: 'm' + Date.now(), from: 'me', body: draft, at: 'now' };
+    const body = draft.trim();
+    const m: Msg = { id: 'm' + Date.now(), from: 'me', body, at: 'sending…', status: 'sending' };
     setMsgs((p) => [...p, m]);
     setDraft('');
-    await ava.sendMessage(activeId, m.body);
+    try {
+      await ava.sendMessage(activeId, body);
+      setMsgs((p) => p.map((x) => x.id === m.id ? { ...x, at: 'sent', status: 'sent' } : x));
+      loadThreads();
+      setTimeout(loadMessages, 600);
+    } catch (err) {
+      setMsgs((p) => p.map((x) => x.id === m.id ? { ...x, at: 'failed', status: 'failed' } : x));
+    }
   };
 
   const aiAction = async (action: 'professional' | 'shorten' | 'translate' | 'rewrite') => {
@@ -159,7 +181,7 @@ export default function MessagesView() {
               <div style={{ fontSize: 14, fontWeight: 700, color: c.textIce }}>{active.contact}</div>
               <div style={{ fontSize: 10.5, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>via {active.number}</div>
             </div>
-            <button style={{ padding: '6px 12px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 11, cursor: 'pointer' }}>Assign</button>
+            <button title="Assignment is managed from the AVA portal permissions workflow." style={{ padding: '6px 12px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 11, cursor: 'default' }}>Assigned to me</button>
           </header>
         )}
 
@@ -185,7 +207,10 @@ export default function MessagesView() {
               </div>
             </div>
           )}
-          {msgs.map((m) => (
+          {messagesLoading && <div style={{ margin: 'auto', color: c.mutedSilver, fontSize: 12 }}>Loading live message history…</div>}
+          {messagesError && <div style={{ margin: 'auto', color: c.danger, fontSize: 12 }}>{messagesError}</div>}
+          {!messagesLoading && !messagesError && active && msgs.length === 0 && <div style={{ margin: 'auto', color: c.mutedSilver, fontSize: 12 }}>No live messages in this conversation yet.</div>}
+          {!messagesLoading && msgs.map((m) => (
             <div key={m.id} style={{
               alignSelf: m.from === 'me' ? 'flex-end' : 'flex-start',
               maxWidth: '72%',

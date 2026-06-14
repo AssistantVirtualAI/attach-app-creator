@@ -39,6 +39,7 @@ export default function VoicemailView() {
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [pos, setPos] = useState(0);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
@@ -73,7 +74,7 @@ export default function VoicemailView() {
   // Tick
   useEffect(() => {
     if (tickRef.current) clearInterval(tickRef.current);
-    if (playing && sel) {
+    if (playing && sel && !audioUrl) {
       tickRef.current = setInterval(() => {
         setPos((p) => {
           const next = p + 0.2 * speed;
@@ -84,7 +85,15 @@ export default function VoicemailView() {
       }, 200);
     }
     return () => { if (tickRef.current) clearInterval(tickRef.current); };
-  }, [playing, speed, sel]);
+  }, [playing, speed, sel, audioUrl]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.playbackRate = speed;
+    if (playing) audio.play().catch(() => setPlaybackError('Playback requires a user click.'));
+    else audio.pause();
+  }, [playing, speed, audioUrl]);
 
   const filtered = useMemo(() => items.filter((v) =>
     filter === 'all' ? true :
@@ -262,16 +271,16 @@ export default function VoicemailView() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
                 <span style={{ fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(pos)}</span>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <button onClick={() => setPos((p) => Math.max(0, p - 5))} style={iconBtn}>«5s</button>
+                  <button onClick={() => setPos((p) => { const next = Math.max(0, p - 5); if (audioRef.current) audioRef.current.currentTime = next; return next; })} style={iconBtn}>«5s</button>
                   <button onClick={playSelected} style={{ ...iconBtn, background: c.signalGold, color: c.midnight, fontWeight: 700, padding: '6px 14px' }}>
                     {playing ? '⏸ Pause' : '▶ Play'}
                   </button>
-                  <button onClick={() => setPos((p) => Math.min(Number(sel.durationSec || 0), p + 5))} style={iconBtn}>5s»</button>
-                  <button onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])} style={iconBtn}>{speed}x</button>
+                  <button onClick={() => setPos((p) => { const next = Math.min(Number(sel.durationSec || 0), p + 5); if (audioRef.current) audioRef.current.currentTime = next; return next; })} style={iconBtn}>5s»</button>
+                  <button onClick={() => { const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]; setSpeed(next); if (audioRef.current) audioRef.current.playbackRate = next; }} style={iconBtn}>{speed}x</button>
                 </div>
                 <span style={{ fontSize: 10, color: c.mutedSilver, fontFamily: 'JetBrains Mono, monospace' }}>{fmtDur(sel.durationSec)}</span>
               </div>
-              {audioUrl && <audio src={audioUrl} autoPlay={playing} controls style={{ width: '100%', marginTop: 8, height: 30 }} onEnded={() => setPlaying(false)} />}
+              {audioUrl && <audio ref={audioRef} src={audioUrl} controls style={{ width: '100%', marginTop: 8, height: 30 }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onTimeUpdate={(e) => setPos(e.currentTarget.currentTime)} onLoadedMetadata={(e) => { e.currentTarget.playbackRate = speed; if (playing) e.currentTarget.play().catch(() => setPlaybackError('Playback requires a user click.')); }} onEnded={() => setPlaying(false)} onError={() => { setPlaying(false); setPlaybackError('PBX voicemail audio is not reachable yet. Sync the phone system and try again.'); }} />}
               {playbackError && <div style={{ fontSize: 11, color: c.mutedSilver, marginTop: 8 }}>{playbackError}</div>}
             </div>
 

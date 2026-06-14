@@ -154,8 +154,32 @@ export default function ConsoleLayout({
 
       <main style={{
         flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', position: 'relative',
-        paddingBottom: compact ? 78 : 0, display: 'flex', flexDirection: 'column',
+        paddingBottom: compact ? 78 : 0, paddingTop: compact ? 54 : 0, display: 'flex', flexDirection: 'column',
       }}>
+        {compact && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 8,
+            height: 54, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+            padding: '8px 10px', boxSizing: 'border-box',
+            background: `linear-gradient(180deg, ${c.deepPanel}f6, ${c.midnight}e8)`,
+            borderBottom: `1px solid ${c.border}`,
+            backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+            WebkitAppRegion: 'drag' as any,
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.1 }}>
+              <span style={{ fontSize: 11, color: c.signalGold, fontWeight: 900, letterSpacing: 1.4, textTransform: 'uppercase' }}>AVA Statistic</span>
+              <span style={{ fontSize: 10, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 210 }}>
+                Ext {creds.extension} · {syncNote || orgName || 'Phone system live data'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' as any }}>
+              <button onClick={() => setPaletteOpen(true)} style={{ width: 34, height: 32, borderRadius: 10, border: `1px solid ${c.border}`, background: 'rgba(255,255,255,0.04)', color: c.textIce, cursor: 'pointer' }} aria-label="Search">⌘K</button>
+              <button onClick={runFullSync} disabled={syncing} style={{ height: 32, padding: '0 10px', borderRadius: 10, border: `1px solid ${c.borderGold}`, background: syncing ? 'rgba(255,230,0,0.08)' : 'rgba(255,230,0,0.14)', color: c.signalGold, fontSize: 10, fontWeight: 900, letterSpacing: 0.8, cursor: syncing ? 'wait' : 'pointer' }}>
+                {syncing ? 'SYNC…' : 'SYNC'}
+              </button>
+            </div>
+          </div>
+        )}
         {!compact && (
           <div style={{ position: 'absolute', top: 12, right: 16, zIndex: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
             {syncNote && <span style={{ maxWidth: 360, color: c.mutedSilver, fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{syncNote}</span>}

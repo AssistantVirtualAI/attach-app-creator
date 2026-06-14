@@ -21,6 +21,7 @@ export const TABLES = {
   extensions: 'pbx_extensions',
   aiInsights: 'pbx_ai_insights',
   smsThreads: 'pbx_sms_threads',
+  smsMessages: 'pbx_sms_messages',
   softphoneUsers: 'pbx_softphone_users',
 } as const;
 
