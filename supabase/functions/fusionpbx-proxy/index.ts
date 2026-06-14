@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
   // domain_uuid is being acted upon. This lets each customer's admin manage
   // their own phone system through the proxy.
   if (!isServiceCall && userId) {
-    const readOnly = new Set(["ping", "debug-raw", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "backfill-cdrs", "sync-domains", "sync-voicemail-messages", "sync-ivr-options", "sync-all", "get-recording", "list-queues", "list-ivrs", "list-ring-groups", "list-moh", "list-recordings", "list-devices", "list-destinations", "list-voicemails", "list-voicemail-messages", "list-registrations", "list-gateways", "list-gateways-all-domains", "list-gateways-merged", "get-gateways", "list-sip-profiles", "list-conferences", "list-hold-music", "list-dialplans", "get-extension", "sync_status", "sync-status"]);
+    const readOnly = new Set(["ping", "debug-raw", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "backfill-cdrs", "sync-domains", "sync-voicemail-messages", "sync-ivr-options", "sync-all", "get-recording", "get-recording-signed-url", "list-queues", "list-ivrs", "list-ring-groups", "list-moh", "list-recordings", "list-devices", "list-destinations", "list-voicemails", "list-voicemail-messages", "list-registrations", "list-gateways", "list-gateways-all-domains", "list-gateways-merged", "get-gateways", "list-sip-profiles", "list-conferences", "list-hold-music", "list-dialplans", "get-extension", "sync_status", "sync-status"]);
     const isRead = readOnly.has(_earlyAction);
     const rpcName = isRead ? "is_lemtel_member" : "is_lemtel_admin";
     const { data: allowed } = await admin.rpc(rpcName, { _user_id: userId });
@@ -1215,6 +1215,74 @@ Deno.serve(async (req) => {
         }
       }
       return json({ ok: false, error: "RECORDING_NOT_FOUND", message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.", attempts }, 200, { "X-Recording-Status": "not-found" });
+    }
+
+    // ---- Signed-URL recording delivery ----
+    // Fetches the audio bytes via the existing get-recording pipeline, uploads
+    // them to the private `lemtel-recordings` bucket, and returns a short-lived
+    // signed URL (default 300s). Every issuance is written to audit_logs.
+    if (action === "get-recording-signed-url") {
+      try {
+        // Reuse the proven byte-fetch path by self-invoking get-recording.
+        const selfBody = { ...body, action: "get-recording" };
+        const selfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/fusionpbx-proxy`;
+        const selfRes = await fetch(selfUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceKey}`,
+            apikey: serviceKey,
+          },
+          body: JSON.stringify(selfBody),
+        });
+        const ct = selfRes.headers.get("content-type") || "";
+        if (!selfRes.ok || (!ct.startsWith("audio/") && !ct.includes("octet-stream"))) {
+          const detail = await selfRes.text().catch(() => "");
+          return json({ ok: false, error: "RECORDING_NOT_FOUND", detail: detail.slice(0, 240) }, 404);
+        }
+        const bytes = new Uint8Array(await selfRes.arrayBuffer());
+        if (!bytes.byteLength) return json({ ok: false, error: "RECORDING_EMPTY" }, 404);
+
+        const lower = String((params as any).record_name || "").toLowerCase();
+        const ext = lower.endsWith(".mp3") ? "mp3"
+                  : lower.endsWith(".ogg") ? "ogg"
+                  : lower.endsWith(".m4a") ? "m4a"
+                  : "wav";
+        const objectPath = `signed/${userId || "service"}/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await admin.storage
+          .from("lemtel-recordings")
+          .upload(objectPath, bytes, { contentType: ct, upsert: false });
+        if (upErr) return json({ ok: false, error: "STORAGE_UPLOAD_FAILED", message: upErr.message }, 500);
+
+        const ttl = Math.max(60, Math.min(900, Number((params as any).expires_in) || 300));
+        const { data: signed, error: signErr } = await admin.storage
+          .from("lemtel-recordings")
+          .createSignedUrl(objectPath, ttl);
+        if (signErr || !signed?.signedUrl) {
+          return json({ ok: false, error: "SIGN_URL_FAILED", message: signErr?.message }, 500);
+        }
+
+        // Audit
+        try {
+          await admin.from("audit_logs").insert({
+            organization_id,
+            user_id: userId,
+            action: "recording.signed_url_issued",
+            resource_type: "pbx_recording",
+            resource_id: (params as any).xml_cdr_uuid || null,
+            metadata: { object_path: objectPath, content_type: ct, bytes: bytes.byteLength, ttl },
+          });
+        } catch { /* audit best-effort */ }
+
+        return json({
+          ok: true,
+          url: signed.signedUrl,
+          expiresInSec: ttl,
+          contentType: ct,
+        });
+      } catch (e: any) {
+        return json({ ok: false, error: "SIGNED_URL_ERROR", message: String(e?.message || e) }, 500);
+      }
     }
 
     // ---- Voicemail CRUD ----

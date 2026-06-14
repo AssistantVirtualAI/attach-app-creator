@@ -103,6 +103,13 @@ export interface VoicemailEntry {
   durationSec: number; transcript: string; summary: string;
   priority: 'low' | 'normal' | 'high'; sentiment: 'positive' | 'neutral' | 'negative';
   isNew: boolean;
+  // Fields needed by `voicemailAudio` to issue a signed URL.
+  xml_cdr_uuid?: string;
+  record_path?: string;
+  record_name?: string;
+  domain_uuid?: string;
+  domain_name?: string;
+  organization_id?: string;
 }
 
 /* ─── Mock data (fallback) ────────────────────────────────────── */
@@ -194,6 +201,12 @@ function mapCdrToVoicemailEntry(r: any): VoicemailEntry {
     priority:    'normal' as const,
     sentiment:   'neutral' as const,
     isNew:       !r.voicemail_read,
+    xml_cdr_uuid:   r.pbx_uuid ?? r.xml_cdr_uuid ?? r.id ?? undefined,
+    record_path:    r.recording_path ?? undefined,
+    record_name:    r.recording_name ?? undefined,
+    domain_uuid:    r.domain_uuid ?? undefined,
+    domain_name:    r.domain_name ?? undefined,
+    organization_id: r.organization_id ?? undefined,
   };
 }
 
@@ -246,11 +259,30 @@ export const mobileApi = {
       .filter((r: any) => r.voicemail_message || r.missed_call)
       .map(mapCdrToVoicemailEntry);
   }),
-  voicemailAudio: (id: string) => call<{ url: string; expiresInSec: number }>(
-    '/fusionpbx-proxy',
-    { method: 'POST', body: JSON.stringify({ action: 'get-recording', id }) },
-    { url: '', expiresInSec: 0 },
-  ),
+  // Issues a short-lived signed URL (default 5 min) for the recording/voicemail
+  // audio. The bytes are pulled from FusionPBX by the edge function, uploaded
+  // to private Supabase Storage and signed there — the device never sees a
+  // raw FusionPBX URL. Every issuance is audited server-side.
+  voicemailAudio: (params: { xml_cdr_uuid?: string; record_path?: string; record_name?: string; domain_uuid?: string; domain_name?: string; organization_id?: string }) =>
+    call<{ ok: boolean; url: string; expiresInSec: number; contentType: string }>(
+      '/fusionpbx-proxy',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'get-recording-signed-url',
+          organization_id: params.organization_id,
+          params: {
+            xml_cdr_uuid: params.xml_cdr_uuid,
+            record_path: params.record_path,
+            record_name: params.record_name,
+            domain_uuid: params.domain_uuid,
+            domain_name: params.domain_name,
+            expires_in: 300,
+          },
+        }),
+      },
+      { ok: true, url: '', expiresInSec: 0, contentType: 'audio/wav' },
+    ),
 
   analyzeCall: (callId: string) => call<{ jobId: string }>(
     '/ai-analyze-call', { method: 'POST', body: JSON.stringify({ callId }) },
