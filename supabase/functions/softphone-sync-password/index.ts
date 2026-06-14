@@ -69,17 +69,18 @@ Deno.serve(async (req) => {
     });
     if (fpErr) return json({ error: "PBX_GET_FAILED", details: fpErr.message }, 502);
 
+    const fpExtension = (fp as any)?.extension || (fp as any)?.extensions?.[0] || (fp as any)?.data?.extensions?.[0] || (Array.isArray(fp) ? (fp as any)[0] : null);
     const pwd: string =
-      (fp as any)?.extension?.password ||
+      fpExtension?.password ||
+      fpExtension?.sip_password ||
       (fp as any)?.password ||
       (fp as any)?.data?.password ||
-      (fp as any)?.extension?.sip_password ||
       "";
 
     const desiredPwd = forceLocalToPbx ? localPwd : pwd;
     if (!desiredPwd) return json({ error: "PBX_HAS_NO_PASSWORD", message: "FusionPBX did not return a password for this extension. Reset it from the portal." }, 424);
 
-    const extensionUuid = extRow?.pbx_uuid || (fp as any)?.extension?.extension_uuid || (fp as any)?.extensions?.[0]?.extension_uuid || undefined;
+    const extensionUuid = extRow?.pbx_uuid || fpExtension?.extension_uuid || undefined;
     let pbxChanged = false;
     if (forceLocalToPbx && desiredPwd !== pwd) {
       const { data: writeData, error: writeErr } = await admin.functions.invoke("fusionpbx-proxy", {
