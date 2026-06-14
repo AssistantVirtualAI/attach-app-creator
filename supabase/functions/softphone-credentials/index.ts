@@ -143,12 +143,9 @@ Deno.serve(async (req) => {
         if (fpPwd) {
           password = fpPwd;
           const encrypted = await encryptSecret(fpPwd);
-          const updatePayload: Record<string, unknown> = encrypted
-            ? { sip_password_encrypted: encrypted, sip_password: null }
-            : { sip_password: fpPwd };
           await supabaseAdmin
             .from("pbx_softphone_users")
-            .update(updatePayload)
+            .update({ sip_password: encrypted || fpPwd })
             .eq("portal_user_id", user.id);
         }
       } catch (_e) { /* non-fatal */ }
