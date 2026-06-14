@@ -64,8 +64,17 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
     }
   };
 
-  const fetchUrl = async (id: string): Promise<string> => {
-    const res = await mobileApi.voicemailAudio(id).catch(() => ({ url: '' } as any));
+  const fetchUrl = async (v: VoicemailEntry): Promise<string> => {
+    const res = await mobileApi
+      .voicemailAudio({
+        xml_cdr_uuid: v.xml_cdr_uuid,
+        record_path: v.record_path,
+        record_name: v.record_name,
+        domain_uuid: v.domain_uuid,
+        domain_name: v.domain_name,
+        organization_id: v.organization_id,
+      })
+      .catch(() => ({ url: '' } as any));
     return res?.url || '';
   };
 
@@ -78,7 +87,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
     let url = urlCache.current.get(id) || '';
     if (!url) {
       setLoadingId(id);
-      url = await fetchUrl(id);
+      url = await fetchUrl(v);
       setLoadingId(null);
       if (url) urlCache.current.set(id, url);
     }
