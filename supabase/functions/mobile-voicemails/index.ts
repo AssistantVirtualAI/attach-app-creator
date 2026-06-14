@@ -22,19 +22,24 @@ Deno.serve(async (req) => {
     if (!u?.user) return json({ error: "unauthorized" }, 401);
 
     const { data: sp } = await sb.from("pbx_softphone_users")
-      .select("organization_id").eq("portal_user_id", u.user.id).maybeSingle();
+      .select("organization_id, extension, extension_uuid")
+      .eq("portal_user_id", u.user.id).maybeSingle();
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
 
-    const { data: rows } = await sb.from("pbx_call_records")
+    let q = sb.from("pbx_call_records")
       .select(`
         id, caller_name, caller_number, start_at, duration_seconds, voicemail_message,
+        organization_id, pbx_uuid, domain_uuid, domain_name, recording_path, recording_name,
         pbx_call_transcripts(transcript_text),
         pbx_ai_insights(summary, sentiment)
       `)
       .eq("organization_id", sp.organization_id)
-      .eq("call_status", "voicemail")
-      .order("start_at", { ascending: false })
-      .limit(60);
+      .eq("call_status", "voicemail");
+    // Per-user scoping — never leak voicemails across extensions in the same org.
+    if (sp.extension_uuid) q = q.eq("extension_uuid", sp.extension_uuid);
+    else if (sp.extension) q = q.eq("extension", sp.extension);
+
+    const { data: rows } = await q.order("start_at", { ascending: false }).limit(60);
 
     const now = Date.now();
     const out = (rows || []).map((r: any) => {
@@ -51,6 +56,13 @@ Deno.serve(async (req) => {
         priority: ai?.sentiment === "negative" ? "high" : "normal",
         sentiment: ai?.sentiment || "neutral",
         isNew: now - new Date(r.start_at).getTime() < 24 * 36e5,
+        // Metadata for the signed-URL audio proxy (fusionpbx-proxy get-recording-signed-url).
+        xml_cdr_uuid: r.pbx_uuid || r.id,
+        record_path: r.recording_path || undefined,
+        record_name: r.recording_name || undefined,
+        domain_uuid: r.domain_uuid || undefined,
+        domain_name: r.domain_name || undefined,
+        organization_id: r.organization_id,
       };
     });
     return json(out);

@@ -482,7 +482,20 @@ export const ava = {
     qualityScore: 87,
   }).then((raw: any) => MOCK ? raw as CallInsight : mapInsightRow(id, asArray(raw)[0])),
   startCall: (to: string) => call<{ callId: string }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ op: 'start_call', to }) }, { callId: 'mock' }),
-  threads: () => call<SmsThread[]>(`/db/${TABLES.smsThreads}?select=*&order=last_message_at.desc`, {}, MOCK_THREADS),
+  threads: async () => {
+    if (MOCK) return MOCK_THREADS;
+    const me = await getMeContext();
+    const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
+    const raw = await call<any>(`/db/${TABLES.smsThreads}?select=*${orgFilter}&order=last_message_at.desc&limit=200`, {}, MOCK_THREADS);
+    return asArray(raw).map((t: any) => ({
+      id: t.id,
+      contact: t.contact_name || t.contact_phone || '—',
+      lastMessage: t.last_message_preview || '',
+      lastAt: t.last_message_at || t.updated_at || new Date().toISOString(),
+      unread: Number(t.unread_count ?? 0),
+      number: t.did_number || t.contact_phone || '',
+    })) as SmsThread[];
+  },
   sendMessage: (threadId: string, body: string) =>
     call<{ ok: true }>(`/fn/${FN.telnyxSms}`, { method: 'POST', body: JSON.stringify({ op: 'send', threadId, body }) }, { ok: true }),
   aiRewrite: (text: string, action: 'professional' | 'shorten' | 'translate' | 'rewrite') =>

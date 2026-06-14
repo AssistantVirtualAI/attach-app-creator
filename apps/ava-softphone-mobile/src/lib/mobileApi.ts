@@ -224,17 +224,11 @@ export const mobileApi = {
     { callId: 'call-' + Date.now(), mode: 'webrtc' },
   ),
 
-  calls: () => call<CallRecord[]>(
-    '/fusionpbx-proxy',
-    { method: 'POST', body: JSON.stringify({ action: 'sync-cdrs', limit: 50 }) },
-    callsMock
-  ).then((raw: any) => {
+  // Recents: scoped server-side to the caller's org + extension via mobile-calls.
+  calls: () => call<CallRecord[] | any>('/mobile-calls', undefined, callsMock).then((raw: any) => {
     if (isMockMode()) return raw as CallRecord[];
-    const rows = raw?.rows ?? raw;
-    if (!Array.isArray(rows)) {
-      throw new Error('Invalid response from fusionpbx-proxy');
-    }
-    return rows.map(mapCdrToCallRecord);
+    if (!Array.isArray(raw)) throw new Error('Invalid response from mobile-calls');
+    return raw as CallRecord[];
   }),
   callDetail: (id: string) => call<CallDetail>(`/mobile-calls?id=${encodeURIComponent(id)}`, undefined, callDetailMock(id)),
 
@@ -245,19 +239,11 @@ export const mobileApi = {
     { id: 'm' + Date.now() },
   ),
 
-  voicemails: () => call<VoicemailEntry[]>(
-    '/fusionpbx-proxy',
-    { method: 'POST', body: JSON.stringify({ action: 'sync-cdrs', limit: 50 }) },
-    voicemailMock
-  ).then((raw: any) => {
+  // Voicemail: scoped server-side via mobile-voicemails (returns audio metadata for signed URL).
+  voicemails: () => call<VoicemailEntry[] | any>('/mobile-voicemails', undefined, voicemailMock).then((raw: any) => {
     if (isMockMode()) return raw as VoicemailEntry[];
-    const rows = raw?.rows ?? raw;
-    if (!Array.isArray(rows)) {
-      throw new Error('Invalid response from fusionpbx-proxy');
-    }
-    return rows
-      .filter((r: any) => r.voicemail_message || r.missed_call)
-      .map(mapCdrToVoicemailEntry);
+    if (!Array.isArray(raw)) throw new Error('Invalid response from mobile-voicemails');
+    return raw as VoicemailEntry[];
   }),
   // Issues a short-lived signed URL (default 5 min) for the recording/voicemail
   // audio. The bytes are pulled from FusionPBX by the edge function, uploaded
