@@ -1193,7 +1193,12 @@ Deno.serve(async (req) => {
         try {
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 4500);
-          const r = await fetch(url, { headers: { Authorization: basicHeader, Accept: "*/*" }, redirect: "follow", signal: controller.signal }).finally(() => clearTimeout(timeout));
+          const isRestApiUrl = /\/app\/api\/\d+\//.test(url);
+          const r = await fetch(url, {
+            headers: { ...(isRestApiUrl ? { Authorization: basicHeader } : {}), Accept: "*/*" },
+            redirect: "follow",
+            signal: controller.signal,
+          }).finally(() => clearTimeout(timeout));
           if (r.ok) {
             const buf = await r.arrayBuffer();
             const rct = r.headers.get("content-type") || "";
