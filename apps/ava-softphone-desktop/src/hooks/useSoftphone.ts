@@ -20,7 +20,16 @@ interface FetchedCreds {
   password: string;
 }
 
-async function fetchSoftphoneCredentials(accessToken: string): Promise<FetchedCreds | null> {
+export interface CredErrorInfo {
+  code: 'NO_SIP_PASSWORD' | 'NO_SOFTPHONE_ACCOUNT' | 'NETWORK' | 'NO_SESSION' | 'UNKNOWN';
+  message: string;
+  extension?: string;
+  httpStatus?: number;
+}
+
+async function fetchSoftphoneCredentials(
+  accessToken: string,
+): Promise<{ creds: FetchedCreds | null; error: CredErrorInfo | null }> {
   try {
     const res = await fetch(`${SB_URL}/functions/v1/softphone-credentials`, {
       method: 'POST',
@@ -31,12 +40,22 @@ async function fetchSoftphoneCredentials(accessToken: string): Promise<FetchedCr
       },
       body: '{}',
     });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.error) return null;
-    return data as FetchedCreds;
-  } catch {
-    return null;
+    const data = await res.json().catch(() => ({} as any));
+    if (!res.ok || data?.error) {
+      const code = (data?.error || 'UNKNOWN') as CredErrorInfo['code'];
+      return {
+        creds: null,
+        error: {
+          code,
+          message: data?.message || `Failed to load SIP credentials (HTTP ${res.status}).`,
+          extension: data?.extension,
+          httpStatus: res.status,
+        },
+      };
+    }
+    return { creds: data as FetchedCreds, error: null };
+  } catch (e: any) {
+    return { creds: null, error: { code: 'NETWORK', message: String(e?.message || e) } };
   }
 }
 
