@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
       `wss://${sipDomain}:7443`,
     ]));
 
-    let password = await decryptSecret((sp as any).sip_password_encrypted) || await decryptSecret(sp.sip_password) || "";
+    let password = await decryptSecret(sp.sip_password) || "";
     if (!password && sp.extension_id) {
       const { data: ext } = await supabase
         .from("pbx_extensions").select("raw_data").eq("id", sp.extension_id).maybeSingle();
