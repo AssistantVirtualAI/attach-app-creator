@@ -12,6 +12,20 @@ export default function MyDevices() {
   const [ext, setExt] = useState<string | null>(null);
   const [softphone, setSoftphone] = useState<any>(null);
   const [devices, setDevices] = useState<any[]>([]);
+  const [resetting, setResetting] = useState(false);
+
+  const resetSipPassword = async () => {
+    if (!confirm('Reset SIP password? You will need to sign in again on every device.')) return;
+    setResetting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('softphone-reset-password', { body: {} });
+      if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error);
+      toast.success('SIP password reset. Reloading…');
+      setTimeout(() => window.location.reload(), 800);
+    } catch (e: any) {
+      toast.error('Reset failed: ' + (e?.message || e));
+    } finally { setResetting(false); }
+  };
 
   useEffect(() => {
     (async () => {
@@ -68,7 +82,22 @@ export default function MyDevices() {
             {platforms.map(([name, ts]) => (
               <div key={name} className="rounded-lg border border-cockpit-border/40 p-3">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">{name}</div>
-                <div className="text-sm mt-1">{ts ? formatDistanceToNow(new Date(ts), { addSuffix: true }) : '—'}</div>
+      <Card>
+        <CardHeader><CardTitle>Registration status</CardTitle></CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2 mb-4">
+            {softphone?.status === 'online'
+              ? <><CheckCircle2 className="h-4 w-4 text-cockpit-success" /><span>Online</span></>
+              : <><XCircle className="h-4 w-4 text-muted-foreground" /><span>Offline</span></>}
+            {softphone?.last_seen_at && (
+              <Badge variant="outline" className="ml-2">last seen {formatDistanceToNow(new Date(softphone.last_seen_at), { addSuffix: true })}</Badge>
+            )}
+            <Button size="sm" variant="outline" className="ml-auto" disabled={resetting} onClick={resetSipPassword}>
+              {resetting ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <KeyRound className="w-3.5 h-3.5 mr-1" />}
+              Reset SIP password
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">If the softphone shows <code>Registration failed: Rejected (403)</code>, the stored SIP password is out of sync with the PBX. Resetting generates a fresh password and pushes it to FusionPBX.</p>
               </div>
             ))}
           </div>
