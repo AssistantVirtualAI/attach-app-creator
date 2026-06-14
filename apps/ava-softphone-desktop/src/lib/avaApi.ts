@@ -119,7 +119,7 @@ export async function getMeContext(): Promise<MeContext> {
         uid = payload?.sub ?? null;
       } catch {}
       const filter = uid ? `portal_user_id=eq.${uid}` : `limit=1`;
-      const url = `${BACKEND.url}/rest/v1/pbx_softphone_users?select=organization_id,extension,extension_uuid,display_name,portal_user_id&${filter}&limit=1`;
+      const url = `${BACKEND.url}/rest/v1/pbx_softphone_users?select=organization_id,extension,display_name,portal_user_id&${filter}&limit=1`;
       const r = await fetch(url, { headers: authHeaders() });
       if (!r.ok) return EMPTY_ME;
       const rows = await r.json();
