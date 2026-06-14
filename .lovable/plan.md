@@ -1,171 +1,84 @@
+# Phase 1 — Real data only in production, real auth scoping (desktop + mobile)
 
-# Lemtel Portal + Desktop — Stabilization & Parity Plan
+Scope: `apps/ava-softphone-desktop` and `apps/ava-softphone-mobile`. No UI redesign, no audio proxy, no realtime — those are later phases.
 
-Goal: every admin page reads and writes the real FusionPBX through `fusionpbx-proxy` (reads) and `pbx-write` (mutations), with the same field set the PBX UI exposes; the desktop app mirrors the portal; SIP registers cleanly; i18n is complete; tests cover each page.
+## Goal
 
----
+After this pass, neither app can silently show fictional data in a production build, both apps authenticate the same user against the same Supabase project as the portal, and every PBX query is scoped server-side to that user's organization and extension via existing DB functions (`has_role`, `is_lemtel_admin`, `current_user_org_ids`, `get_my_extension_summary`).
 
-## Phase 1 — SIP "Rejected (403)" fix (softphone)
+## Current problems found
 
-Symptoms from console: WSS connects, then `Registration failed: Rejected {status: 403}` for `300@lemtel.lemtel.tel`.
+- `apps/ava-softphone-desktop/src/lib/avaApi.ts`: `MOCK` defaults to `false`, but mock arrays are bundled into the production build and `call()` falls back to them on any non-OK response — masking real failures.
+- `apps/ava-softphone-mobile/src/lib/mobileApi.ts`: `call()` *silently* returns mock data when (a) no portal URL / access token, or (b) any thrown error. A user logged out, or backend down, sees fake calls/threads.
+- Both apps trust a client-provided `extension` from creds storage instead of resolving it server-side from the authenticated user.
+- No visible indicator when mocks are active.
 
-403 on REGISTER on FusionPBX almost always means one of:
-1. The SIP password returned by `softphone-credentials` does not match the password stored on the FusionPBX extension (most common — `pbx_softphone_users.sip_password` is stale vs. PBX).
-2. The realm/domain mismatches (`sipDomain` ≠ extension's domain on PBX).
-3. ACL / "register from this IP" rule on PBX rejects browser source.
-4. Extension disabled or "do_not_disturb"/"call_timeout" blocking.
+## Deliverables
 
-Work:
-- Add a `softphone-diagnose` edge function returning: extension exists on PBX, enabled flag, domain UUID match, password hash match (compare `pbx_softphone_users.sip_password` against PBX `get-extension`), realm, last register attempt.
-- In `softphone-credentials`, when 403 has happened recently (track in `pbx_softphone_users.last_register_status`), force re-fetch from `fusionpbx-proxy get-extension` and overwrite stored password before returning.
-- Add a portal action "Reset SIP password" on `MyDevices` and on admin extensions row → calls `pbx-write update-extension` with a freshly generated 24-char password, mirrors to `pbx_extensions`, and updates `pbx_softphone_users.sip_password`.
-- Surface registration failure cause in the softphone UI (banner with "Reset SIP password" CTA).
+### 1. Hard gate against mocks in production builds
 
-Test: after reset on ext 300, REGISTER returns 200 OK in JsSIP logs.
+- Add `apps/ava-softphone-desktop/src/lib/buildGuard.ts` and `apps/ava-softphone-mobile/src/lib/buildGuard.ts` that, at module import, throw if `import.meta.env.PROD && import.meta.env.VITE_AVA_MOCK === 'true'`. Import it from each app's `index.tsx` so any production build with mocks enabled fails to boot loudly.
+- Replace the silent fallback in `mobileApi.ts:call()` and `avaApi.ts:call()` with: throw on error, never return mock data unless `isMockMode()` is true. `isMockMode()` returns `import.meta.env.DEV && import.meta.env.VITE_AVA_MOCK === 'true'`.
 
----
+### 2. Visible demo banner when mocks are active
 
-## Phase 2 — Favicon = AVA Statistic
+- New `<DemoModeBanner />` rendered at the top of each app shell when `isMockMode()` is true. Yellow strip, text "Mode démonstration — données fictives", non-dismissible.
+- Files: `apps/ava-softphone-desktop/src/components/DemoModeBanner.tsx`, `apps/ava-softphone-mobile/src/components/DemoModeBanner.tsx`. Mounted in each app root.
 
-- Use existing `src/assets/ava-statistics-logo.png` → copy to `public/favicon.png`.
-- Delete `public/favicon.ico` so browser stops requesting the old one.
-- Update `index.html` `<link rel="icon" href="/favicon.png" type="image/png">` + apple-touch-icon.
+### 3. Single source of truth for user scope
 
----
+- New shared helper inside each app (`src/lib/avaScope.ts`) that calls the existing `get_my_extension_summary()` RPC once after login and caches `{ orgId, extension, displayName, sipDomain, role }`. Hook `useAvaScope()` exposes it.
+- Replace every place that reads `extension` from creds/localStorage for *data queries* with `useAvaScope().extension`. Creds storage still drives SIP registration (no change to that path).
 
-## Phase 3 — Dashboard real-data + new tiles
+### 4. Real Supabase Auth on both apps
 
-`HomeDashboard` (desktop) and `src/pages/lemtel/Dashboard.tsx` (portal):
+- Desktop & mobile already use `setAuthToken` / `configureMobileApi` to attach a bearer to PostgREST requests. Verify and fix that the bearer is always the live Supabase session token (`supabase.auth.getSession()`), refreshed via `onAuthStateChange`. No manual JWT pasting paths remain.
+- Auth screens (`AuthScreen.tsx` on mobile, equivalent on desktop) sign in directly via `supabase.auth.signInWithPassword` — no separate edge-function login path that returns a long-lived token.
+- On sign-out, clear creds AND call `supabase.auth.signOut()`.
 
-- Replace placeholder "system CPU / network / active calls" with live values:
-  - `Active calls` ← `telecom_live_calls` filtered by org (currently sometimes 0 due to wrong filter — verify org_id passed).
-  - `Registered extensions` ← `pbx_softphone_users.status='online'` count.
-  - `Today inbound / outbound / missed` ← `pbx_call_records` grouped by `direction` for `start_at >= today`.
-  - `Unread SMS` ← `pbx_sms_threads.unread_count` sum.
-  - `Unread voicemail` ← `pbx_voicemails.read_at IS NULL` count.
-  - `PBX health` ← latest `telecom_sync_health.status`.
-  - `Sync lag` ← `now() - telecom_sync_health.last_sync_at`.
-  - `Trunks up/down` ← derived from `pbx_gateways` last status (Phase 6).
-- CPU / network: drop the fake gauges OR wire them to a new `pbx_system_metrics` table populated by `fusionpbx-proxy` action `system-stats` (FusionPBX exposes `/app/status/status.php` JSON). If unavailable, remove the tiles cleanly rather than show wrong data.
-- Add Realtime channel subscriptions so tiles auto-update.
+### 5. Error states instead of empty arrays
 
-Each tile becomes a link to its detail page (Calls, SMS, Voicemail, Extensions, Trunks).
+- Replace silent `[]` / mock fallbacks with thrown errors propagated to the calling React Query hook.
+- Add a small `<DataError />` component reused by Calls / Voicemail / SMS / Recordings lists: shows a short message + retry button. No technical stack trace.
 
----
+### 6. Mobile-specific: remove the "fallback to mock" branch
 
-## Phase 4 — Full CRUD parity per admin page
+- `mobileApi.ts` line ~46 (`catch (e) { ...return mockData; }`): remove the catch's mock fallback. Errors must bubble.
+- `mobileApi.ts` line ~199 (`{ token: 'mock', ... }`): remove the synthetic SIP creds path. If `softphone-credentials` fails, surface the error.
 
-For every admin page, three guarantees: (a) all fields the PBX exposes are editable, (b) writes go through `pbx-write` and mirror to `pbx_*` tables, (c) row actions: edit / delete / duplicate / toggle-enabled.
+### 7. No backend / schema changes
 
-Pages to bring to parity (re-scan after each):
+This phase reuses existing RPCs (`get_my_extension_summary`, `current_user_org_ids`) and existing RLS. No migrations.
 
-| Page | Add | Edit | Delete | Notes |
-|---|---|---|---|---|
-| Extensions | ✓ | ✓ | ✓ | Add: voicemail, call-forward, ring strategy, codecs, caller-id, NAT, DTMF mode, vm pin, hot-desking |
-| Devices | ✓ | ✓ | ✓ | Use `src/data/pbxDeviceModels.ts` for vendor/model picker, expose provisioning template, MAC, line keys, lines mapping — same form as FusionPBX `/app/devices/device_edit.php` |
-| Call Queues | ✓ | ✓ | ✓ | Strategy, MOH, timeout, wrap-up, max wait, announce position, tier rules, agents grid |
-| Ring Groups | ✓ | ✓ | ✓ | Members, strategy, timeout, forward on no-answer |
-| IVRs + IVR options | ✓ | ✓ | ✓ | Greeting upload to `lemtel-ivr-audio`, key→action mapping |
-| Time Conditions | ✓ | ✓ | ✓ | Already started; verify week/holiday matchers |
-| Conferences | ✓ | ✓ | ✓ | PIN, max members, record flag |
-| Hold Music | ✓ | ✓ | ✓ | Upload + assign to categories |
-| Dialplans | ✓ | ✓ | ✓ | Raw XML editor + parsed condition/action rows |
-| Destinations (inbound routes) | ✓ | ✓ | ✓ | DID → action picker (ext/queue/ringgroup/ivr/voicemail/conference/dialplan) with cascading selectors |
-| Gateways (trunks) | ✓ | ✓ | ✓ | See Phase 6 |
-| SIP Profiles | ✓ | ✓ | ✓ | Already done — verify reload action |
-| Feature Codes | ✓ | ✓ | ✓ | Done — re-verify |
-| Call Forwarding / Recording Rules / Voicemail Settings | ✓ | ✓ | ✓ | Done — re-verify |
-| Phone Numbers / DIDs | ✓ | ✓ | ✓ | Provider field, assignment to destination |
-| SMS Threads | view | reply | archive | Wire to `pbx_sms_messages` send via `pbx-write send-sms` |
-| Voicemail | listen | mark read | delete | Audio stream from `voicemail-audio` bucket |
-| Live Calls | view | hangup | transfer / barge | Uses `telecom_live_calls` + `pbx-write hangup-call` |
-| Recordings | listen | download | delete | `lemtel-recordings` bucket |
-| Sync Health | view | trigger resync | — | Done — verify |
+## Files touched
 
-Implementation pattern (reused everywhere): `<EntityFormDialog>` reading PBX field schema, `usePbxAction` for save/delete, `useEffect` to refetch after success, optimistic mirror upsert.
+```
+apps/ava-softphone-desktop/src/lib/avaApi.ts            (remove silent mock fallback)
+apps/ava-softphone-desktop/src/lib/buildGuard.ts        (new)
+apps/ava-softphone-desktop/src/lib/avaScope.ts          (new)
+apps/ava-softphone-desktop/src/components/DemoModeBanner.tsx  (new)
+apps/ava-softphone-desktop/src/components/DataError.tsx (new)
+apps/ava-softphone-desktop/src/index.tsx / App.tsx      (import guard, mount banner)
 
----
+apps/ava-softphone-mobile/src/lib/mobileApi.ts          (remove silent mock fallback + 'mock' token)
+apps/ava-softphone-mobile/src/lib/buildGuard.ts         (new)
+apps/ava-softphone-mobile/src/lib/avaScope.ts           (new)
+apps/ava-softphone-mobile/src/components/DemoModeBanner.tsx  (new)
+apps/ava-softphone-mobile/src/components/DataError.tsx  (new)
+apps/ava-softphone-mobile/src/MobileApp.tsx             (import guard, mount banner)
+apps/ava-softphone-mobile/src/screens/AuthScreen.tsx    (route signin through supabase.auth)
+```
 
-## Phase 5 — Inbound routes (Destinations) full wiring
+No portal (`src/**`) files change. No edge functions change. No DB migrations.
 
-- List = `list-destinations` from proxy, mirrored to `pbx_destinations`.
-- Edit dialog cascading: pick DID → pick action type → pick target (queries the matching list endpoint).
-- Save calls `update-destination` with `destination_actions` JSON; mirror writes update `pbx_destinations.destination_actions`.
-- Delete calls `delete-destination`.
+## Acceptance
 
----
+- A production build of either app with `VITE_AVA_MOCK=true` refuses to boot (clear error overlay).
+- A dev build with mocks active shows the yellow "Mode démonstration" strip on every screen.
+- Logging out, then opening Calls / Voicemail / SMS shows the `<DataError />` with retry, never fake records.
+- Two different test users in the same org see only their own extension's data; switching account immediately reflects in the lists (no stale cache from previous session).
+- The desktop and mobile call lists show the same `pbx_call_records` rows for the same extension as the portal's `/org/lemtel/telephony/calls`.
 
-## Phase 6 — Gateways ("No gateways returned") fix
+## Out of scope (later phases)
 
-Likely causes:
-1. Proxy `list-gateways` not implemented or returns `{gateways:[]}` while UI reads `data` not `gateways`.
-2. `FUSIONPBX_DOMAIN_UUID` filter excludes global gateways (gateways are usually global, not per-domain).
-
-Work:
-- Inspect `fusionpbx-proxy` `list-gateways` handler — query `v_gateways` with no domain filter, normalize to `[{uuid, gateway, profile, proxy, register, enabled, state, status}]`.
-- Update `AdminGateways` page to render either `data.gateways` or `data.data`.
-- Diagnostic button already exists — keep, but add "Raw proxy URL" + HTTP status + first error line.
-- Add full CRUD (create/edit/delete/register/unregister) via `pbx-write`.
-
----
-
-## Phase 7 — Devices page = PBX Devices
-
-- Replace minimal form with full device editor: vendor + model picker (from `pbxDeviceModels.ts`), MAC, template, profile, line keys grid, BLF assignments, time zone, firmware, user assignment.
-- Provisioning URL preview.
-- Same dialog used for create + edit.
-
----
-
-## Phase 8 — Per-page rescan & connection audit
-
-Script `scripts/audit-admin-pages.ts` iterates every `src/pages/lemtel/admin/*.tsx`, checks: (a) calls `pbxInvoke` or `pbx-write`, (b) renders from `pbx_*` mirror or proxy response, (c) has Add/Edit/Delete handlers, (d) has loading + empty + error states. Output a checklist into `.lovable/admin-audit.md`.
-
----
-
-## Phase 9 — i18n EN/FR completeness
-
-- Run a script to extract all string literals from `src/pages/lemtel/**` and `apps/ava-softphone-desktop/src/**`, diff against `src/locales/fr.ts` and `en.ts`.
-- Fill missing keys; route all admin labels through `useTranslation`.
-
----
-
-## Phase 10 — Desktop app parity
-
-- Mirror every portal admin page inside `apps/ava-softphone-desktop/src/components/console/AdminView` using the same `pbxInvoke` calls.
-- Lemtel admins see the full admin tree; lemtel customers see only `My …` pages (extension, voicemail, SMS, devices, billing). Gate by `useDesktopRole` → `is_lemtel_admin` vs membership-only.
-- Dashboard tiles identical to portal Phase 3.
-
----
-
-## Phase 11 — Tests (per page, both surfaces)
-
-- Playwright spec per admin page under `tests/admin/*.spec.ts`: load → expect non-empty list OR empty-state → open Create dialog → fill → save → row appears → edit → delete.
-- Desktop: Vitest + JSDOM smoke per page rendering, plus `scripts/smoke-electron.mjs` extended to navigate each admin route.
-- SIP integration test: mock JsSIP, ensure 200 OK path after password reset.
-
----
-
-## Phase 12 — Acceptance checklist
-
-- [ ] Softphone registers (200 OK), no 403 loop.
-- [ ] Favicon = AVA Statistic on portal + desktop.
-- [ ] Dashboard tiles show real numbers; no fake CPU/network.
-- [ ] Every admin page supports create / edit / delete identical to FusionPBX UI.
-- [ ] Gateways list populates; CRUD works.
-- [ ] Inbound routes editable end-to-end.
-- [ ] Devices page has same fields as PBX device editor.
-- [ ] All strings translated EN + FR.
-- [ ] Desktop app shows admin tree for lemtel admins, customer-scoped pages for customers.
-- [ ] Playwright + Vitest green for every page.
-
----
-
-## Technical reference
-
-- Read path: `pbxInvoke('list-…')` → `fusionpbx-proxy` → mirror upsert into `pbx_*`.
-- Write path: `pbxInvoke('create|update|delete-…', params, { organizationId, objectType })` → `pbx-write` (RBAC + audit + mirror).
-- Realtime: subscribe to `pbx_*` mirror tables to auto-refresh lists.
-- New edge functions: `softphone-diagnose`, optional `pbx-system-stats`.
-- New table (only if CPU/net kept): `pbx_system_metrics(org_id, cpu, mem, rx, tx, sampled_at)` + GRANTs + RLS by org membership.
-- Files touched (high-level): `supabase/functions/{softphone-credentials,softphone-diagnose,fusionpbx-proxy,pbx-write}/index.ts`, `src/pages/lemtel/admin/*`, `src/pages/lemtel/Dashboard.tsx`, `src/locales/{fr,en}.ts`, `apps/ava-softphone-desktop/src/components/console/**`, `public/favicon.png`, `index.html`, `tests/admin/*.spec.ts`.
+Audio proxy & signed URLs, UI redesign, compact mode rebuild, realtime sync & notifications, E2E tests / packaging hardening.
