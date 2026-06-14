@@ -171,7 +171,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
                 }}
               />
             ) : (
-              <button onClick={() => play(r)} disabled={audioLoading === r.id} style={{ marginTop: 8, width: '100%', padding: 7, borderRadius: 8, background: audioErrors[r.id] ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.06)', border: `1px solid ${audioErrors[r.id] ? c.red : c.border}`, color: audioErrors[r.id] ? c.red : c.text, fontSize: 11, cursor: audioLoading === r.id ? 'wait' : 'pointer' }}>{audioLoading === r.id ? 'Loading PBX audio…' : audioErrors[r.id] ? 'Audio file not reachable on PBX' : `▶ Load PBX audio${r.recording_name ? ` · ${r.recording_name}` : ''}`}</button>
+              <button onClick={() => play(r)} disabled={audioLoading === r.id} style={{ marginTop: 8, width: '100%', padding: 7, borderRadius: 8, background: audioErrors[r.id] ? 'rgba(234,179,8,0.08)' : 'rgba(255,255,255,0.06)', border: `1px solid ${audioErrors[r.id] ? 'rgba(234,179,8,0.5)' : c.border}`, color: audioErrors[r.id] ? '#eab308' : c.text, fontSize: 11, cursor: audioLoading === r.id ? 'wait' : 'pointer' }}>{audioLoading === r.id ? 'Loading PBX audio…' : audioErrors[r.id] ? '↻ Retry loading audio' : `▶ Load PBX audio${r.recording_name ? ` · ${r.recording_name}` : ''}`}</button>
             )}
             {audioErrors[r.id] && <div style={{ marginTop: 6, fontSize: 10, color: c.textSub, lineHeight: 1.35 }}>{audioErrors[r.id]}</div>}
 
