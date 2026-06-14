@@ -1330,6 +1330,7 @@ function SipDiagnostics({
               <div>🔐 Registration: <span style={{ color: statusColor, fontWeight: 700 }}>{sp.snap.status}</span></div>
             </div>
           )}
+          {devices && (
             <div style={{
               padding: 6, borderRadius: 6, background: 'rgba(0,0,0,0.3)',
               fontSize: 10, color: 'rgba(235,240,255,0.85)',
