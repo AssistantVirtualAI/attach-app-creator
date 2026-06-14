@@ -47,7 +47,8 @@ Deno.serve(async (req) => {
         .eq("id", threadId)
         .maybeSingle();
       if (!th || th.organization_id !== orgId) return json({ error: "forbidden" }, 403);
-      if ((sp.extension_uuid && th.extension_uuid !== sp.extension_uuid) || (!sp.extension_uuid && sp.extension && th.extension !== sp.extension)) return json({ error: "forbidden" }, 403);
+      if (!sp.extension_uuid && !sp.extension) return json({ error: "forbidden" }, 403);
+      if ((sp.extension_uuid && th.extension_uuid !== sp.extension_uuid) || (!sp.extension_uuid && th.extension !== sp.extension)) return json({ error: "forbidden" }, 403);
 
       const { data: msg, error } = await sb.from("pbx_sms_messages").insert({
         thread_id: th.id, organization_id: orgId, direction: "outbound",
