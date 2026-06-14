@@ -2,8 +2,13 @@
  * Lemtel AI Phone — Mobile API client.
  *
  * Talks to Supabase Edge Functions backed by FusionPBX + _safe views.
- * Falls back to mock data only when no portal URL / access token is configured.
+ *
+ * Mock data is ONLY returned in DEV builds with VITE_AVA_MOCK=true.
+ * Production builds with that flag refuse to boot (see buildGuard.ts),
+ * and the live `call()` path never silently falls back to mocks — errors
+ * bubble up so the UI can render a real error state instead of fake data.
  */
+import { isMockMode } from './buildGuard';
 
 export const MOBILE_DEFAULT_PORTAL = 'https://gejxisrqtvxavbrfcoxz.supabase.co';
 
@@ -18,8 +23,6 @@ export function configureMobileApi(opts: { portalUrl?: string; accessToken?: str
 }
 
 export function setAuthToken(t: string | null) { authToken = t; }
-
-const isLive = () => !!authToken;
 
 async function liveCall<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
@@ -38,12 +41,16 @@ async function liveCall<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 async function call<T>(path: string, init: RequestInit | undefined, mockData: T): Promise<T> {
-  if (!isLive()) {
+  // Mock data ONLY in dev builds explicitly opted into mock mode.
+  if (isMockMode()) {
     await new Promise((r) => setTimeout(r, 220));
     return mockData;
   }
-  try { return await liveCall<T>(path, init); }
-  catch (e) { console.warn('[mobileApi] fallback to mock for', path, e); return mockData; }
+  // Real users must see real errors, not fake records.
+  if (!authToken) {
+    throw new Error('Not authenticated');
+  }
+  return liveCall<T>(path, init);
 }
 
 /* ─── Types ───────────────────────────────────────────────────── */
@@ -209,8 +216,12 @@ export const mobileApi = {
     { method: 'POST', body: JSON.stringify({ action: 'sync-cdrs', limit: 50 }) },
     callsMock
   ).then((raw: any) => {
-    if (!Array.isArray(raw?.rows ?? raw)) return callsMock;
-    return (raw?.rows ?? raw).map(mapCdrToCallRecord);
+    if (isMockMode()) return raw as CallRecord[];
+    const rows = raw?.rows ?? raw;
+    if (!Array.isArray(rows)) {
+      throw new Error('Invalid response from fusionpbx-proxy');
+    }
+    return rows.map(mapCdrToCallRecord);
   }),
   callDetail: (id: string) => call<CallDetail>(`/mobile-calls?id=${encodeURIComponent(id)}`, undefined, callDetailMock(id)),
 
@@ -226,8 +237,12 @@ export const mobileApi = {
     { method: 'POST', body: JSON.stringify({ action: 'sync-cdrs', limit: 50 }) },
     voicemailMock
   ).then((raw: any) => {
-    if (!Array.isArray(raw?.rows ?? raw)) return voicemailMock;
-    return (raw?.rows ?? raw)
+    if (isMockMode()) return raw as VoicemailEntry[];
+    const rows = raw?.rows ?? raw;
+    if (!Array.isArray(rows)) {
+      throw new Error('Invalid response from fusionpbx-proxy');
+    }
+    return rows
       .filter((r: any) => r.voicemail_message || r.missed_call)
       .map(mapCdrToVoicemailEntry);
   }),
