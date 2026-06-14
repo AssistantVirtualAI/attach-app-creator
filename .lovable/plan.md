@@ -1,84 +1,99 @@
-# Phase 1 — Real data only in production, real auth scoping (desktop + mobile)
+# Phase 5 — Audit trail for sensitive actions (desktop + mobile)
 
-Scope: `apps/ava-softphone-desktop` and `apps/ava-softphone-mobile`. No UI redesign, no audio proxy, no realtime — those are later phases.
+Scope: `apps/ava-softphone-desktop`, `apps/ava-softphone-mobile`, `supabase/functions/fusionpbx-proxy`. No UI redesign, no compact mode (next phase). Builds on Phase 2's `recording.signed_url_issued`.
 
 ## Goal
 
-After this pass, neither app can silently show fictional data in a production build, both apps authenticate the same user against the same Supabase project as the portal, and every PBX query is scoped server-side to that user's organization and extension via existing DB functions (`has_role`, `is_lemtel_admin`, `current_user_org_ids`, `get_my_extension_summary`).
+Every sensitive softphone action lands in `audit_logs` with `{actor_user_id, organization_id, action, resource_type, resource_id, metadata, ip, user_agent}`. Closes the "Audit" line of the acceptance matrix.
 
-## Current problems found
+## New `audit-log` edge function
 
-- `apps/ava-softphone-desktop/src/lib/avaApi.ts`: `MOCK` defaults to `false`, but mock arrays are bundled into the production build and `call()` falls back to them on any non-OK response — masking real failures.
-- `apps/ava-softphone-mobile/src/lib/mobileApi.ts`: `call()` *silently* returns mock data when (a) no portal URL / access token, or (b) any thrown error. A user logged out, or backend down, sees fake calls/threads.
-- Both apps trust a client-provided `extension` from creds storage instead of resolving it server-side from the authenticated user.
-- No visible indicator when mocks are active.
+Single server endpoint `POST /audit-log` that:
+- Resolves the caller from the bearer (Supabase Auth).
+- Resolves their `organization_id` via existing `get_my_extension_summary()` / `current_user_org_ids()`.
+- Whitelists `action` values; rejects anything else (no free-form client-supplied actions).
+- Inserts into `public.audit_logs` with service role.
 
-## Deliverables
+Whitelisted actions (constants):
 
-### 1. Hard gate against mocks in production builds
+| action | resource_type | when fired |
+|---|---|---|
+| `recording.played` | `pbx_call_record` | user starts playback in Recordings or Voicemail |
+| `recording.downloaded` | `pbx_call_record` | user clicks download |
+| `voicemail.played` | `pbx_voicemail` | user starts voicemail playback |
+| `voicemail.downloaded` | `pbx_voicemail` | user downloads voicemail |
+| `voicemail.deleted` | `pbx_voicemail` | user deletes a voicemail |
+| `sms.sent` | `pbx_sms_thread` | user sends SMS from desktop/mobile |
+| `call.originated` | `pbx_extension` | user initiates an outbound call |
+| `call.transferred` | `pbx_call_record` | blind/attended transfer triggered |
+| `softphone.signed_in` | `pbx_softphone_user` | successful sign-in |
+| `softphone.signed_out` | `pbx_softphone_user` | sign-out |
 
-- Add `apps/ava-softphone-desktop/src/lib/buildGuard.ts` and `apps/ava-softphone-mobile/src/lib/buildGuard.ts` that, at module import, throw if `import.meta.env.PROD && import.meta.env.VITE_AVA_MOCK === 'true'`. Import it from each app's `index.tsx` so any production build with mocks enabled fails to boot loudly.
-- Replace the silent fallback in `mobileApi.ts:call()` and `avaApi.ts:call()` with: throw on error, never return mock data unless `isMockMode()` is true. `isMockMode()` returns `import.meta.env.DEV && import.meta.env.VITE_AVA_MOCK === 'true'`.
+Server-side `recording.signed_url_issued` (Phase 2) stays as-is — it's the cryptographic proof. Client `recording.played` is the user-intent proof.
 
-### 2. Visible demo banner when mocks are active
+## Client wiring
 
-- New `<DemoModeBanner />` rendered at the top of each app shell when `isMockMode()` is true. Yellow strip, text "Mode démonstration — données fictives", non-dismissible.
-- Files: `apps/ava-softphone-desktop/src/components/DemoModeBanner.tsx`, `apps/ava-softphone-mobile/src/components/DemoModeBanner.tsx`. Mounted in each app root.
+New tiny helper `src/lib/audit.ts` (same shape in both apps):
 
-### 3. Single source of truth for user scope
+```ts
+export async function audit(action: AuditAction, resourceId?: string, metadata?: Record<string, unknown>)
+```
 
-- New shared helper inside each app (`src/lib/avaScope.ts`) that calls the existing `get_my_extension_summary()` RPC once after login and caches `{ orgId, extension, displayName, sipDomain, role }`. Hook `useAvaScope()` exposes it.
-- Replace every place that reads `extension` from creds/localStorage for *data queries* with `useAvaScope().extension`. Creds storage still drives SIP registration (no change to that path).
+Behavior:
+- Fire-and-forget POST to `audit-log` edge function with current Supabase session token.
+- Never throws (audit failure must not break UX).
+- Drops the call when `isMockMode()` is true.
 
-### 4. Real Supabase Auth on both apps
+Wiring points:
 
-- Desktop & mobile already use `setAuthToken` / `configureMobileApi` to attach a bearer to PostgREST requests. Verify and fix that the bearer is always the live Supabase session token (`supabase.auth.getSession()`), refreshed via `onAuthStateChange`. No manual JWT pasting paths remain.
-- Auth screens (`AuthScreen.tsx` on mobile, equivalent on desktop) sign in directly via `supabase.auth.signInWithPassword` — no separate edge-function login path that returns a long-lived token.
-- On sign-out, clear creds AND call `supabase.auth.signOut()`.
+**Desktop**
+- `components/RecordingsList.tsx`, `console/RecordingsView.tsx` — on `<audio>` `play` + download button.
+- `components/VoicemailList.tsx`, `console/VoicemailView.tsx` — on play, download, delete.
+- `components/SmsThreads.tsx`, `console/MessagesView.tsx` — on send success.
+- `lib/sip/*` outbound call entry point — on `originate` and on `transfer`.
+- `App.tsx` — on session restore (signed_in) and on sign-out.
 
-### 5. Error states instead of empty arrays
+**Mobile**
+- `screens/VoicemailScreen.tsx` — play, download, delete.
+- `screens/MessagesScreen.tsx` — send.
+- `screens/DialerScreen.tsx` — call originate.
+- `screens/AuthScreen.tsx` — sign-in / sign-out.
 
-- Replace silent `[]` / mock fallbacks with thrown errors propagated to the calling React Query hook.
-- Add a small `<DataError />` component reused by Calls / Voicemail / SMS / Recordings lists: shows a short message + retry button. No technical stack trace.
+## Permissions / RLS
 
-### 6. Mobile-specific: remove the "fallback to mock" branch
+`audit_logs` already has policies (per `<supabase-tables>`: 2 policies). The new edge function uses service role to insert, so RLS is bypassed for writes; reads stay under existing RLS. No migration needed.
 
-- `mobileApi.ts` line ~46 (`catch (e) { ...return mockData; }`): remove the catch's mock fallback. Errors must bubble.
-- `mobileApi.ts` line ~199 (`{ token: 'mock', ... }`): remove the synthetic SIP creds path. If `softphone-credentials` fails, surface the error.
+## Verification
 
-### 7. No backend / schema changes
+- Trigger each action in dev and confirm a matching row in `audit_logs` with the correct `organization_id` for the active user.
+- Confirm a non-whitelisted `action` value is rejected with 400.
+- Confirm logging failures don't surface as UI errors.
 
-This phase reuses existing RPCs (`get_my_extension_summary`, `current_user_org_ids`) and existing RLS. No migrations.
+## Out of scope
+
+Compact mode rebuild, UI/design cohesion pass, packaging hardening, E2E tests. Those follow in Phase 6+.
 
 ## Files touched
 
 ```
-apps/ava-softphone-desktop/src/lib/avaApi.ts            (remove silent mock fallback)
-apps/ava-softphone-desktop/src/lib/buildGuard.ts        (new)
-apps/ava-softphone-desktop/src/lib/avaScope.ts          (new)
-apps/ava-softphone-desktop/src/components/DemoModeBanner.tsx  (new)
-apps/ava-softphone-desktop/src/components/DataError.tsx (new)
-apps/ava-softphone-desktop/src/index.tsx / App.tsx      (import guard, mount banner)
+supabase/functions/audit-log/index.ts                       (new)
+supabase/config.toml                                        (register function, verify_jwt = true)
 
-apps/ava-softphone-mobile/src/lib/mobileApi.ts          (remove silent mock fallback + 'mock' token)
-apps/ava-softphone-mobile/src/lib/buildGuard.ts         (new)
-apps/ava-softphone-mobile/src/lib/avaScope.ts           (new)
-apps/ava-softphone-mobile/src/components/DemoModeBanner.tsx  (new)
-apps/ava-softphone-mobile/src/components/DataError.tsx  (new)
-apps/ava-softphone-mobile/src/MobileApp.tsx             (import guard, mount banner)
-apps/ava-softphone-mobile/src/screens/AuthScreen.tsx    (route signin through supabase.auth)
+apps/ava-softphone-desktop/src/lib/audit.ts                 (new)
+apps/ava-softphone-desktop/src/App.tsx                      (sign-in/out)
+apps/ava-softphone-desktop/src/components/RecordingsList.tsx
+apps/ava-softphone-desktop/src/components/VoicemailList.tsx
+apps/ava-softphone-desktop/src/components/SmsThreads.tsx
+apps/ava-softphone-desktop/src/components/console/RecordingsView.tsx
+apps/ava-softphone-desktop/src/components/console/VoicemailView.tsx
+apps/ava-softphone-desktop/src/components/console/MessagesView.tsx
+apps/ava-softphone-desktop/src/lib/sip/jssipProvider.ts     (originate/transfer hooks)
+
+apps/ava-softphone-mobile/src/lib/audit.ts                  (new)
+apps/ava-softphone-mobile/src/screens/AuthScreen.tsx
+apps/ava-softphone-mobile/src/screens/VoicemailScreen.tsx
+apps/ava-softphone-mobile/src/screens/MessagesScreen.tsx
+apps/ava-softphone-mobile/src/screens/DialerScreen.tsx
 ```
 
-No portal (`src/**`) files change. No edge functions change. No DB migrations.
-
-## Acceptance
-
-- A production build of either app with `VITE_AVA_MOCK=true` refuses to boot (clear error overlay).
-- A dev build with mocks active shows the yellow "Mode démonstration" strip on every screen.
-- Logging out, then opening Calls / Voicemail / SMS shows the `<DataError />` with retry, never fake records.
-- Two different test users in the same org see only their own extension's data; switching account immediately reflects in the lists (no stale cache from previous session).
-- The desktop and mobile call lists show the same `pbx_call_records` rows for the same extension as the portal's `/org/lemtel/telephony/calls`.
-
-## Out of scope (later phases)
-
-Audio proxy & signed URLs, UI redesign, compact mode rebuild, realtime sync & notifications, E2E tests / packaging hardening.
+No DB migration, no schema change.
