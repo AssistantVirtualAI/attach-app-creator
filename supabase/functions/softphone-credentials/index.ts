@@ -154,7 +154,8 @@ Deno.serve(async (req) => {
     if (!password) {
       return json({
         error: "NO_SIP_PASSWORD",
-        message: "Your extension is missing a SIP password. Contact your administrator or open the portal to configure it.",
+        extension: sp.extension,
+        message: `Extension ${sp.extension} is missing a SIP password. Contact your administrator or open the portal to configure it.`,
       }, 424);
     }
 
