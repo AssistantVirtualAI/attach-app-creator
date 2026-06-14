@@ -1353,6 +1353,84 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ---- Live channels / active calls ----
+    if (action === "list-active-calls") {
+      const r = await pbxWrite(`commands`, "POST", {
+        commands: [{ command: "show", arguments: "channels as json" }],
+      });
+      let rows: any[] = [];
+      const raw = r?.data;
+      // FreeSWITCH returns either { rows: [...] } or a string body
+      const candidates = [raw?.details?.[0]?.response, raw?.response, raw?.raw, raw];
+      for (const c of candidates) {
+        if (!c) continue;
+        if (typeof c === "string") {
+          try { const j = JSON.parse(c); if (Array.isArray(j?.rows)) { rows = j.rows; break; } } catch { /* noop */ }
+        } else if (Array.isArray(c?.rows)) { rows = c.rows; break; }
+      }
+      return json({ ok: true, data: rows, count: rows.length, latency_ms: r?.latency_ms });
+    }
+
+    if (action === "kill-active-call") {
+      const uuid = body.uuid || params.uuid;
+      if (!uuid) return json({ error: "uuid required" }, 400);
+      const r = await pbxWrite(`commands`, "POST", {
+        commands: [{ command: "uuid_kill", arguments: String(uuid) }],
+      });
+      if (organization_id) {
+        await admin.from("audit_logs").insert({
+          organization_id, user_id: userId, action: "pbx.call_killed",
+          resource_type: "active_call", resource_id: uuid,
+          metadata: { uuid, ok: r?.ok },
+        });
+      }
+      return json(r, r?.ok ? 200 : 500);
+    }
+
+    if (action === "system-status") {
+      const [status, sofia] = await Promise.all([
+        pbxWrite(`commands`, "POST", { commands: [{ command: "status", arguments: "" }] }),
+        pbxWrite(`commands`, "POST", { commands: [{ command: "sofia", arguments: "status" }] }),
+      ]);
+      const pickText = (r: any) => {
+        const raw = r?.data;
+        const cands = [raw?.details?.[0]?.response, raw?.response, raw?.raw];
+        for (const c of cands) if (typeof c === "string" && c.length) return c;
+        return typeof raw === "string" ? raw : JSON.stringify(raw || {});
+      };
+      const statusText = pickText(status);
+      const sofiaText = pickText(sofia);
+
+      // Parse status text: UP X years, ... ; X session(s) since startup ; X session(s) - peak X
+      const uptimeMatch = statusText.match(/UP\s+([^\n]+)/i);
+      const sessionsSince = parseInt(((statusText.match(/(\d+)\s+session\(s\)\s+since\s+startup/i) || [])[1]) || "0");
+      const sessionsPeak = parseInt(((statusText.match(/peak\s+(\d+)/i) || [])[1]) || "0");
+      const sessionsActive = parseInt(((statusText.match(/(\d+)\s+session\(s\)\s+-\s+peak/i) || [])[1]) || "0");
+      const sps = parseFloat(((statusText.match(/(\d+(?:\.\d+)?)\s+session\(s\)\s+per\s+Sec/i) || [])[1]) || "0");
+      const version = (statusText.match(/FreeSWITCH \(Version\s+([^\)]+)\)/i) || [])[1] || null;
+
+      // Parse sofia status profiles (skip headers/separators)
+      const profiles: any[] = [];
+      for (const line of sofiaText.split("\n")) {
+        // Format:  external          profile    sip:mod_sofia@... RUNNING (0)
+        const m = line.match(/^\s*(\S+)\s+(profile|alias|gateway)\s+(\S+)\s+(\S+)(?:\s+\((\d+)\))?/);
+        if (m && m[2] === "profile") {
+          profiles.push({ name: m[1], type: m[2], url: m[3], state: m[4], calls: parseInt(m[5] || "0") });
+        }
+      }
+
+      return json({
+        ok: true,
+        data: {
+          uptime: uptimeMatch ? uptimeMatch[1].trim() : null,
+          version,
+          sessions: { active: sessionsActive, peak: sessionsPeak, total: sessionsSince, perSecond: sps },
+          sofia: profiles,
+          raw: { status: statusText.slice(0, 4000), sofia: sofiaText.slice(0, 4000) },
+        },
+      });
+    }
+
     // ---- Gateway restart (FreeSWITCH command via API) ----
     if (action === "restart-gateway") {
       const name = params.gateway_name;
@@ -1371,10 +1449,18 @@ Deno.serve(async (req) => {
     }
     if (action === "restart-sip-profile") {
       const name = params.profile_name || "external";
-      return json(await pbxWrite(`commands`, "POST", {
+      const r = await pbxWrite(`commands`, "POST", {
         commands: [{ command: "sofia", arguments: `profile ${name} restart` }],
-      }));
+      });
+      if (organization_id) {
+        await admin.from("audit_logs").insert({
+          organization_id, user_id: userId, action: "pbx.profile_restarted",
+          resource_type: "sip_profile", resource_id: name, metadata: { profile: name, ok: r?.ok },
+        });
+      }
+      return json(r);
     }
+
 
     return json({ error: "UNKNOWN_ACTION", action }, 400);
   } catch (e: any) {
