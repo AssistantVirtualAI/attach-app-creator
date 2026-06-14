@@ -1165,6 +1165,7 @@ Deno.serve(async (req) => {
           ? `${cleanPath.replace(new RegExp(`^var/lib/freeswitch/recordings/${domainName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?`), "")}/${String(record_name)}`
           : `${String(record_path).split("/recordings/").pop()?.split("/").slice(1).join("/") || cleanPath}/${String(record_name)}`;
         const rel = encodeURIComponent(relativeName.replace(/^\/+/, ""));
+        const crossDomainRel = domainName ? encodeURIComponent(`../${domainName}/${relativeName.replace(/^\/+/, "")}`) : "";
         const publicPath = cleanPath.replace(/^var\/lib\/freeswitch\/recordings\//, "recordings/");
         for (const fileBase of fileBases) {
           tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recording_download.php?path=${p}&filename=${n}`));
@@ -1172,6 +1173,13 @@ Deno.serve(async (req) => {
           tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recordings.php?a=download&type=rec&filename=${rel}`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recordings.php?action=download&type=rec&t=bin&filename=${rel}`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recordings.php?a=download&type=rec&t=bin&filename=${rel}`));
+          // API-key auth can bind the PHP session to the API user's default
+          // domain, while CDR files remain under the tenant domain directory.
+          // The target domain comes from trusted CDR metadata, not user input.
+          if (crossDomainRel) {
+            tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recordings.php?action=download&type=rec&filename=${crossDomainRel}`));
+            tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recordings.php?action=download&type=rec&t=bin&filename=${crossDomainRel}`));
+          }
           tryUrls.push(withQueryAuth(`${fileBase}/app/api/7/recordings/download?domain_uuid=${du}&path=${p}&name=${n}`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/${n}`));
           tryUrls.push(`${fileBase}/${publicPath}/${n}`);
