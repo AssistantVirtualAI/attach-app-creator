@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
-import { ava } from '../../lib/avaApi';
+import { applyMyExtensionScope, ava, getMeContext } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
 import PageHeader from './PageHeader';
 import AIInsights from '../AIInsights';
@@ -72,12 +72,14 @@ function Transcripts() {
       const query = q.trim();
       if (!query) { setRows([]); return; }
       setLoading(true);
-      const { data } = await supabase
+      const me = await getMeContext();
+      let scoped = supabase
         .from('pbx_call_records' as any)
         .select('id, caller_number, destination_number, start_at, transcript_text, raw_data')
+        .eq('organization_id', me.organization_id || '__no_softphone_org__')
         .or(`transcript_text.ilike.%${query}%,caller_number.ilike.%${query}%,destination_number.ilike.%${query}%`)
-        .order('start_at', { ascending: false })
-        .limit(30);
+      scoped = applyMyExtensionScope(scoped, me);
+      const { data } = await scoped.order('start_at', { ascending: false }).limit(30);
       setRows((data as any[]) || []);
       setLoading(false);
     }, 280);
