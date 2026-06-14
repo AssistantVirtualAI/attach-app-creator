@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase, SB_URL, SB_KEY } from '@/lib/supabaseClient';
+import { audit } from '@/lib/audit';
 
 interface Thread {
   id: string;
