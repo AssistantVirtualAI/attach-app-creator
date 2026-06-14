@@ -108,9 +108,11 @@ Deno.serve(async (req) => {
         .eq("organization_id", spu.organization_id)
         .eq("extension", spu.extension);
 
-      if (spu.portal_user_id && desiredPwd.length >= 8) {
-        await admin.auth.admin.updateUserById(spu.portal_user_id, { password: desiredPwd });
-      }
+      // NOTE: intentionally NOT calling auth.admin.updateUserById here.
+      // Updating the Supabase auth password invalidates every active session,
+      // which causes softphone-credentials to fail with "no authenticated user"
+      // and leaves SIP stuck in Idle. The portal-login password is managed
+      // separately via set-unified-password / softphone-reset-password.
 
       // mirror onto pbx_extensions.raw_data if present
       if (extRow?.id || spu.extension_id) {
