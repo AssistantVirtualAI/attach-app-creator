@@ -22,7 +22,7 @@ export const colors = {
   textSub:    '#42547A',
   mutedSilver:'#5A6B8C',
   // Lines
-  border:     'rgba(0,61,166,0.10)',
+  border:     'rgba(0,35,230,0.10)',
   borderGold: 'rgba(255,196,0,0.45)',
   borderAI:   'rgba(122,76,255,0.32)',
   // State
