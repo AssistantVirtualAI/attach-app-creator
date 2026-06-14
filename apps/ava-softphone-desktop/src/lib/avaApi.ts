@@ -113,7 +113,6 @@ export async function getMeContext(): Promise<MeContext> {
   _meInflight = (async () => {
     try {
       if (!authToken) return EMPTY_ME;
-      // Decode current auth user id from JWT payload (no network round-trip).
       let uid: string | null = null;
       try {
         const payload = JSON.parse(atob(authToken.split('.')[1] || '')) as any;
@@ -125,7 +124,6 @@ export async function getMeContext(): Promise<MeContext> {
       if (!r.ok) return EMPTY_ME;
       const rows = await r.json();
       let row = Array.isArray(rows) && rows[0] ? rows[0] : {};
-      // Fallback: admin users may not have a softphone — resolve org via membership tables
       if (!row.organization_id && uid) {
         try {
           const memUrl = `${BACKEND.url}/rest/v1/organization_members?select=organization_id&user_id=eq.${uid}&limit=1`;
@@ -136,14 +134,20 @@ export async function getMeContext(): Promise<MeContext> {
           }
         } catch { /* noop */ }
       }
-      _meCache = {
+      const ctx: MeContext = {
         organization_id: row.organization_id ?? null,
         extension: row.extension ?? null,
         extension_uuid: row.extension_uuid ?? null,
         display_name: row.display_name ?? null,
         user_id: row.portal_user_id ?? uid,
       };
-      return _meCache;
+      // Only cache when we successfully resolved an extension — otherwise allow retries.
+      if (ctx.extension) {
+        _meCache = ctx;
+      } else {
+        console.warn('[avaApi] getMeContext: no softphone extension resolved for current user; scope will be empty until next call');
+      }
+      return ctx;
     } catch {
       return EMPTY_ME;
     } finally {
