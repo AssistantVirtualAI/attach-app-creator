@@ -91,13 +91,19 @@ export function useSoftphone(args: UseSoftphoneArgs) {
         const { data: sess } = await supabase.auth.getSession();
         const token = sess.session?.access_token || args.accessToken;
         if (!token) {
-          setCredError('No session token. Re-sign-in.');
+          setCredError({ code: 'NO_SESSION', message: 'No session token. Please sign in again.' });
           return;
         }
-        const fetched = await fetchSoftphoneCredentials(token);
+        const { creds: fetched, error: fetchErr } = await fetchSoftphoneCredentials(token);
         if (cancelled) return;
         if (!fetched || !fetched.password) {
-          setCredError(fetched ? 'No SIP password on file. Contact your admin.' : 'Failed to load SIP credentials.');
+          setCredError(
+            fetchErr || {
+              code: 'NO_SIP_PASSWORD',
+              message: `Extension ${args.extension} has no SIP password on file. Contact your administrator.`,
+              extension: args.extension,
+            },
+          );
           return;
         }
         const cfg: SoftphoneConfig = {
@@ -110,7 +116,7 @@ export function useSoftphone(args: UseSoftphoneArgs) {
         setConfig(cfg);
         await sipProvider.init(cfg);
       } catch (e: any) {
-        setCredError(String(e?.message || e));
+        setCredError({ code: 'UNKNOWN', message: String(e?.message || e) });
       } finally {
         if (!cancelled) setLoading(false);
       }
