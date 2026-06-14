@@ -132,18 +132,18 @@ export function useTheme() {
    ============================================================ */
 export const theme = {
   colors: {
-    // Futuristic cyber-glass — deep midnight with ice/cyan accents and violet AI shimmer
+    // Aligned with AVA Statistic portal — primary #0023e6 (HSL 231 100% 50%).
     bg: '#05060d',
     bgGradient:
-      'radial-gradient(1400px 700px at 8% -12%, rgba(35,214,255,0.16), transparent 60%), radial-gradient(900px 600px at 108% 110%, rgba(124,76,255,0.16), transparent 55%), linear-gradient(180deg, #05060d 0%, #07091a 100%)',
+      'radial-gradient(1400px 700px at 8% -12%, rgba(0,35,230,0.20), transparent 60%), radial-gradient(900px 600px at 108% 110%, rgba(124,76,255,0.16), transparent 55%), linear-gradient(180deg, #05060d 0%, #07091a 100%)',
     bgCard: 'rgba(255,255,255,0.04)',
     bgCardHover: 'rgba(255,255,255,0.07)',
     bgElev: 'rgba(255,255,255,0.06)',
-    border: 'rgba(140,180,255,0.10)',
+    border: 'rgba(140,170,255,0.10)',
     borderGold: 'rgba(255,184,74,0.45)',
     borderAI: 'rgba(124,76,255,0.32)',
-    primary: '#23d6ff',
-    primaryLight: '#7fe6ff',
+    primary: '#0023e6',
+    primaryLight: '#6680ff',
     gold: '#ffb84a',
     goldSoft: '#ffd07a',
     goldDim: 'rgba(255,184,74,0.18)',
@@ -153,26 +153,26 @@ export const theme = {
     green: '#22d39a',
     red: '#ff5577',
     yellow: '#ffb84a',
-    text: '#eaf4ff',
-    textSub: '#9eb1d4',
-    textDim: 'rgba(234,244,255,0.40)',
+    text: '#eaf0ff',
+    textSub: '#9eabd4',
+    textDim: 'rgba(234,240,255,0.40)',
     // Console tokens — dark glass layers
     midnight: '#05060d',
     deepPanel: 'rgba(11,16,30,0.78)',
     graphite: 'rgba(18,24,42,0.66)',
-    lemtelBlue: '#23d6ff',
+    lemtelBlue: '#0023e6',
     signalGold: '#ffb84a',
     avaCyan: '#23d6ff',
     avaViolet: '#7a4cff',
-    textIce: '#eaf4ff',
-    mutedSilver: 'rgba(234,244,255,0.55)',
+    textIce: '#eaf0ff',
+    mutedSilver: 'rgba(234,240,255,0.55)',
     success: '#22d39a',
     warning: '#ffb84a',
     danger: '#ff5577',
   },
   glow: {
     gold: '0 8px 28px -8px rgba(255,184,74,0.45)',
-    blue: '0 10px 36px -10px rgba(35,214,255,0.55)',
+    blue: '0 10px 36px -10px rgba(0,35,230,0.55)',
     ai: '0 10px 30px -8px rgba(122,76,255,0.45)',
     green: '0 8px 22px -6px rgba(34,211,154,0.45)',
     red: '0 8px 22px -6px rgba(255,85,119,0.45)',
@@ -180,7 +180,7 @@ export const theme = {
   glass: {
     card: {
       background: 'rgba(255,255,255,0.04)',
-      border: '1px solid rgba(140,180,255,0.12)',
+      border: '1px solid rgba(140,170,255,0.12)',
       borderRadius: 16,
       backdropFilter: 'blur(22px) saturate(160%)',
       WebkitBackdropFilter: 'blur(22px) saturate(160%)',
