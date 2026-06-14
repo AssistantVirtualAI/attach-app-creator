@@ -101,6 +101,7 @@ export default function VoicemailScreen({ haptic }: { haptic?: (s?: ImpactStyle)
     audio.onerror = () => { setErrorId(id); setPlaying(null); };
     audioRef.current = audio;
     setPlaying(id);
+    audit('voicemail.played', id, { duration: v.durationSec });
     audio.play().catch(() => { setErrorId(id); setPlaying(null); });
   };
 
