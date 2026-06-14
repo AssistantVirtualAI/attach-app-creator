@@ -22,6 +22,7 @@ export default function MessagesScreen({ haptic }: { haptic: (s?: ImpactStyle) =
     setDraft('');
     haptic(ImpactStyle.Light);
     await mobileApi.sendMessage(active.id, m.body);
+    audit('sms.sent', active.id, { len: m.body.length });
   };
 
   const aiAction = async (action: 'rewrite' | 'professional' | 'shorten' | 'translate') => {
