@@ -410,34 +410,68 @@ export default function SoftphonePane({
       {/* Diagnostics strip — always available */}
       <SipDiagnostics sp={sp} compact={compact} c={c} />
 
-      {sp.credError && (
-        <div style={{
-          position: 'relative', zIndex: 1,
-          margin: compact ? '10px 12px 0' : '14px 16px 0',
-          padding: 16,
-          borderRadius: 12,
-          background: 'rgba(239,68,68,0.08)',
-          border: '1px solid rgba(239,68,68,0.3)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center',
-        }}>
-          <div style={{ fontSize: 32, lineHeight: 1 }} aria-hidden>🔐</div>
-          <div style={{ color: '#fff', fontSize: 16, fontWeight: 700 }}>SIP Not Configured</div>
-          <div style={{ color: 'rgba(235,240,255,0.78)', fontSize: 12, lineHeight: 1.5, maxWidth: 280 }}>
-            Your extension needs a SIP password. Contact your administrator or visit the portal.
+      {sp.credError && (() => {
+        const err = sp.credError;
+        const ext = err.extension || creds.extension;
+        const isMissingPwd = err.code === 'NO_SIP_PASSWORD';
+        const isNoAccount = err.code === 'NO_SOFTPHONE_ACCOUNT';
+        const isSession = err.code === 'NO_SESSION';
+        const title = isMissingPwd ? `Extension ${ext} is missing a SIP password`
+          : isNoAccount ? 'No softphone account assigned to your user'
+          : isSession ? 'Your session expired'
+          : 'Failed to load SIP credentials';
+        const body = isMissingPwd
+          ? `Extension ${ext} exists in the PBX but no SIP password is stored for it. An administrator must set the password (or you can set it from the portal) before the softphone can register.`
+          : isNoAccount
+            ? 'Your user is not linked to any PBX extension. Ask an administrator to assign a softphone extension to your account.'
+            : isSession
+              ? 'Please sign out and sign back in to refresh your session.'
+              : err.message;
+        const portalUrl = isMissingPwd
+          ? `https://avastatistic.ca/portal/extensions?ext=${encodeURIComponent(ext || '')}`
+          : 'https://avastatistic.ca/portal/extensions';
+        return (
+          <div style={{
+            position: 'relative', zIndex: 1,
+            margin: compact ? '10px 12px 0' : '14px 16px 0',
+            padding: 16,
+            borderRadius: 12,
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 32, lineHeight: 1 }} aria-hidden>🔐</div>
+            <div style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>{title}</div>
+            <div style={{ color: 'rgba(235,240,255,0.78)', fontSize: 12, lineHeight: 1.5, maxWidth: 320 }}>
+              {body}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button
+                onClick={() => window.electronAPI?.openExternal?.(portalUrl)}
+                style={{
+                  padding: '8px 16px', borderRadius: 10,
+                  background: 'linear-gradient(135deg, #003DA6, #7C3AED)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
+                }}
+              >Go to portal →</button>
+              <button
+                onClick={() => sp.retry?.()}
+                style={{
+                  padding: '8px 14px', borderRadius: 10,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                }}
+              >↻ Retry</button>
+            </div>
+            <div style={{ color: 'rgba(235,240,255,0.45)', fontSize: 10, marginTop: 4, fontFamily: 'JetBrains Mono, monospace' }}>
+              code: {err.code}{err.httpStatus ? ` · HTTP ${err.httpStatus}` : ''}{ext ? ` · ext ${ext}` : ''}
+            </div>
           </div>
-          <button
-            onClick={() => window.electronAPI?.openExternal?.('https://avastatistic.ca')}
-            style={{
-              marginTop: 4, padding: '8px 16px', borderRadius: 10,
-              background: 'linear-gradient(135deg, #003DA6, #7C3AED)',
-              border: '1px solid rgba(255,255,255,0.18)',
-              color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(124,58,237,0.35)',
-            }}
-          >Open Portal →</button>
-          <div style={{ color: 'rgba(235,240,255,0.5)', fontSize: 10, marginTop: 4 }}>{sp.credError}</div>
-        </div>
-      )}
+        );
+      })()}
 
       {!sp.credError && sp.snap.status !== 'registered' && sp.snap.status !== 'idle' && (
         <div style={{
