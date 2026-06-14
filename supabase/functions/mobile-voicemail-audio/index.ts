@@ -8,6 +8,13 @@ const cors = {
 const json = (b: unknown, s = 200) =>
   new Response(JSON.stringify(b), { status: s, headers: { ...cors, "Content-Type": "application/json" } });
 
+function scopeToExtension(query: any, sp: any) {
+  const parts: string[] = [];
+  if (sp.extension_uuid) parts.push(`extension_uuid.eq.${sp.extension_uuid}`);
+  if (sp.extension) parts.push(`extension.eq.${sp.extension}`, `caller_number.eq.${sp.extension}`, `destination_number.eq.${sp.extension}`, `source_number.eq.${sp.extension}`);
+  return parts.length ? query.or(parts.join(",")) : query.eq("id", "__no_softphone_extension__");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   try {
@@ -26,12 +33,15 @@ Deno.serve(async (req) => {
     if (!u?.user) return json({ error: "unauthorized" }, 401);
 
     const { data: sp } = await sb.from("pbx_softphone_users")
-      .select("organization_id").eq("portal_user_id", u.user.id).maybeSingle();
+      .select("organization_id, extension, extension_uuid").eq("portal_user_id", u.user.id).maybeSingle();
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
 
-    const { data: rec } = await sb.from("pbx_call_records")
+    let recQ = sb.from("pbx_call_records")
       .select("id, organization_id, recording_path, voicemail_path")
-      .eq("id", id).maybeSingle();
+      .eq("id", id)
+      .eq("organization_id", sp.organization_id);
+    recQ = scopeToExtension(recQ, sp);
+    const { data: rec } = await recQ.maybeSingle();
     if (!rec || rec.organization_id !== sp.organization_id) return json({ error: "not_found" }, 404);
 
     const path = (rec as any).voicemail_path || (rec as any).recording_path;
