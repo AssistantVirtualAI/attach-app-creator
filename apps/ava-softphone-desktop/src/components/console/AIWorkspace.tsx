@@ -72,13 +72,20 @@ function Transcripts() {
       const query = q.trim();
       if (!query) { setRows([]); return; }
       setLoading(true);
-      const { data } = await supabase
-        .from('pbx_call_records' as any)
-        .select('id, caller_number, destination_number, start_at, transcript_text, raw_data')
-        .or(`transcript_text.ilike.%${query}%,caller_number.ilike.%${query}%,destination_number.ilike.%${query}%`)
-        .order('start_at', { ascending: false })
-        .limit(30);
-      setRows((data as any[]) || []);
+      const all = await ava.scopedCallRecords(100);
+      const needle = query.toLowerCase();
+      const data = (all as any[]).filter((r) => {
+        const haystack = [
+          r.transcript_text,
+          r.raw_data?.transcript_text,
+          r.raw_data?.transcript,
+          r.caller_number,
+          r.destination_number,
+          r.destination,
+        ].filter(Boolean).join(' ').toLowerCase();
+        return haystack.includes(needle);
+      }).slice(0, 30);
+      setRows(data || []);
       setLoading(false);
     }, 280);
     return () => clearTimeout(t);

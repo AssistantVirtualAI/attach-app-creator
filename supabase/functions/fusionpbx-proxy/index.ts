@@ -1050,9 +1050,9 @@ Deno.serve(async (req) => {
     if (action === "get-recording") {
       const recordingParams = { ...(params || {}) } as any;
       if (!recordingParams.xml_cdr_uuid) recordingParams.xml_cdr_uuid = body.xml_cdr_uuid || body.id;
-      const { record_path, record_name, xml_cdr_uuid, domain_uuid, domain_name, local_recording_url } = recordingParams;
-      if (!xml_cdr_uuid && !(record_path && record_name)) {
-        return json({ error: "xml_cdr_uuid or (record_path, record_name) required" }, 400);
+      const { record_path, record_name, xml_cdr_uuid, domain_uuid, domain_name, local_recording_url, recorded_at } = recordingParams;
+      if (!xml_cdr_uuid && !record_name && !(record_path && record_name)) {
+        return json({ error: "xml_cdr_uuid, record_name, or (record_path, record_name) required" }, 400);
       }
       const lower = String(record_name || "").toLowerCase();
       const ext = lower.endsWith(".mp3") ? "mp3"
@@ -1078,6 +1078,17 @@ Deno.serve(async (req) => {
         u.searchParams.set("username", FUSIONPBX_USERNAME);
         return u.toString();
       };
+      const pushUrl = (value: string, auth = false) => {
+        try { tryUrls.push(auth ? withQueryAuth(value) : value); } catch { /* ignore malformed candidate */ }
+      };
+      const archiveDateParts = (value: any) => {
+        if (!value) return null;
+        const d = new Date(String(value));
+        if (Number.isNaN(d.getTime())) return null;
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        return { yyyy: String(d.getFullYear()), mon: months[d.getMonth()], dd: String(d.getDate()).padStart(2, "0") };
+      };
+      const normalizeRecordName = (value: any) => String(value || "").split(/[\\/]/).pop() || String(value || "");
       const decodeJsonDownload = (value: any): Uint8Array | null => {
         const seen = new Set<any>();
         const visit = (node: any): string | null => {
@@ -1152,9 +1163,40 @@ Deno.serve(async (req) => {
           tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
         }
       }
+      if (record_name) {
+        const rawName = normalizeRecordName(record_name);
+        const n = encodeURIComponent(rawName);
+        const du = encodeURIComponent(String(domain_uuid || FUSIONPBX_DOMAIN_UUID || ""));
+        const domainName = String(domain_name || "").replace(/^\/+|\/+$/g, "");
+        // Some FusionPBX CDRs expose only record_name. In that case the file usually
+        // lives under recordings/<domain>/archive/YYYY/Mon/DD/<record_name>.
+        const parts = archiveDateParts(recorded_at);
+        const inferredRelatives = new Set<string>();
+        if (domainName && parts) {
+          inferredRelatives.add(`recordings/${domainName}/archive/${parts.yyyy}/${parts.mon}/${parts.dd}/${rawName}`);
+          inferredRelatives.add(`var/lib/freeswitch/recordings/${domainName}/archive/${parts.yyyy}/${parts.mon}/${parts.dd}/${rawName}`);
+          inferredRelatives.add(`archive/${parts.yyyy}/${parts.mon}/${parts.dd}/${rawName}`);
+        }
+        for (const fileBase of fileBases) {
+          pushUrl(`${fileBase}/app/recordings/recording_download.php?filename=${n}`, true);
+          pushUrl(`${fileBase}/app/recordings/recordings.php?a=download&filename=${n}`, true);
+          pushUrl(`${fileBase}/app/api/7/recordings/download?domain_uuid=${du}&name=${n}`, true);
+          pushUrl(`${fileBase}/app/api/7/call_recordings/download?domain_uuid=${du}&record_name=${n}`, true);
+          pushUrl(`${fileBase}/app/call_recordings/download.php?record_name=${n}`, true);
+          pushUrl(`${fileBase}/app/xml_cdr/xml_cdr_audio.php?record_name=${n}&t=bin&ext=${ext}`, true);
+          pushUrl(`${fileBase}/app/recordings/${n}`, true);
+          for (const relCandidate of inferredRelatives) {
+            const relEncoded = encodeURI(relCandidate).replace(/#/g, "%23");
+            pushUrl(`${fileBase}/${relEncoded}`);
+            pushUrl(`${fileBase}/${relEncoded}`, true);
+            pushUrl(`${fileBase}/app/recordings/recordings.php?action=download&type=rec&t=bin&filename=${encodeURIComponent(relCandidate)}`, true);
+            pushUrl(`${fileBase}/app/recordings/recordings.php?a=download&type=rec&t=bin&filename=${encodeURIComponent(relCandidate)}`, true);
+          }
+        }
+      }
       if (record_path && record_name) {
         const p = encodeURIComponent(String(record_path));
-        const n = encodeURIComponent(String(record_name));
+        const n = encodeURIComponent(normalizeRecordName(record_name));
         const du = encodeURIComponent(String(domain_uuid || FUSIONPBX_DOMAIN_UUID || ""));
         // FusionPBX's GUI serves call recordings from the file host, which may
         // differ from the REST API host. Try the complete path-based matrix on
@@ -1277,10 +1319,11 @@ Deno.serve(async (req) => {
                   : lower.endsWith(".ogg") ? "ogg"
                   : lower.endsWith(".m4a") ? "m4a"
                   : "wav";
+        const storageContentType = ct.startsWith("audio/") ? ct : (ext === "mp3" ? "audio/mpeg" : ext === "ogg" ? "audio/ogg" : ext === "m4a" ? "audio/mp4" : "audio/wav");
         const objectPath = `signed/${userId || "service"}/${crypto.randomUUID()}.${ext}`;
         const { error: upErr } = await admin.storage
           .from("lemtel-recordings")
-          .upload(objectPath, bytes, { contentType: ct, upsert: false });
+          .upload(objectPath, bytes, { contentType: storageContentType, upsert: false });
         if (upErr) return json({ ok: false, error: "STORAGE_UPLOAD_FAILED", message: upErr.message }, 500);
 
         const ttl = Math.max(60, Math.min(900, Number((params as any).expires_in) || 300));
@@ -1299,7 +1342,7 @@ Deno.serve(async (req) => {
             action: "recording.signed_url_issued",
             resource_type: "pbx_recording",
             resource_id: (params as any).xml_cdr_uuid || null,
-            metadata: { object_path: objectPath, content_type: ct, bytes: bytes.byteLength, ttl },
+            metadata: { object_path: objectPath, content_type: storageContentType, bytes: bytes.byteLength, ttl },
           });
         } catch { /* audit best-effort */ }
 
@@ -1307,7 +1350,7 @@ Deno.serve(async (req) => {
           ok: true,
           url: signed.signedUrl,
           expiresInSec: ttl,
-          contentType: ct,
+          contentType: storageContentType,
         });
       } catch (e: any) {
         return json({ ok: false, error: "SIGNED_URL_ERROR", message: String(e?.message || e) }, 500);

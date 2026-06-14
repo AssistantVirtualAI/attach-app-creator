@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { supabase } from '../../lib/supabaseClient';
+import { ava } from '../../lib/avaApi';
 import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
 import { useTranslation } from '../../lib/i18n';
 
@@ -40,17 +41,27 @@ export default function ReportsView() {
     let cancelled = false;
     setLoading(true);
     (async () => {
-      const { data } = await supabase
-        .from('pbx_call_records')
-        .select('id,direction,extension,caller_number,destination_number,duration_seconds,billsec,call_status,missed_call,start_at')
-        .gte('start_at', rangeStart(range))
-        .order('start_at', { ascending: false })
-        .limit(500);
+      const start = rangeStart(range);
+      const data = await ava.scopedCallRecords(500);
+      const scopedRows = (data ?? [])
+        .filter((r: any) => !r.start_at || r.start_at >= start)
+        .map((r: any) => ({
+          id: r.id,
+          direction: r.direction ?? null,
+          extension: r.extension ?? null,
+          caller_number: r.caller_number ?? null,
+          destination_number: r.destination_number ?? r.destination ?? null,
+          duration_seconds: r.duration_seconds ?? null,
+          billsec: r.billsec ?? null,
+          call_status: r.call_status ?? null,
+          missed_call: r.missed_call ?? null,
+          start_at: r.start_at ?? null,
+        }));
       if (!cancelled) {
-        setRows((data ?? []) as Row[]);
+        setRows(scopedRows as Row[]);
         setLoading(false);
       }
-    })();
+    })().catch(() => { if (!cancelled) { setRows([]); setLoading(false); } });
     return () => { cancelled = true; };
   }, [range]);
 

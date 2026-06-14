@@ -111,6 +111,26 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
     }
   };
 
+  const recoverAudio = async (r: RecordingItem) => {
+    setAudio((a) => {
+      const next = { ...a };
+      delete next[r.id];
+      return next;
+    });
+    setAudioLoading(r.id);
+    setError(null);
+    try {
+      const url = await ava.getRecordingAudioUrl(r);
+      if (url) {
+        setAudio((a) => ({ ...a, [r.id]: url }));
+        return;
+      }
+      setError('Recording file is listed in PBX, but the audio bytes are not reachable yet. Refresh the PBX sync and retry.');
+    } finally {
+      setAudioLoading(null);
+    }
+  };
+
 
   if (loading) return <div style={{ textAlign: 'center', padding: 40, color: c.textSub }}>Loading recordings…</div>;
 
@@ -163,11 +183,23 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
             {audio[r.id] ? (
               <audio
                 controls
+autoPlay
                 src={audio[r.id]}
                 style={{ width: '100%', marginTop: 8, height: 32 }}
                 onError={() => {
-                  setAudio((all) => { const next = { ...all }; delete next[r.id]; return next; });
-                  setAudioErrors((all) => ({ ...all, [r.id]: 'Audio URL expired or PBX returned a non-audio response. Try refresh, then load again.' }));
+                  if (String(audio[r.id] || '').startsWith('blob:')) {
+                    setAudio((a) => {
+                      const next = { ...a };
+                      delete next[r.id];
+                      return next;
+                    });
+                    setAudioErrors((all) => ({
+                      ...all,
+                      [r.id]: 'PBX returned an audio file, but Electron could not decode it. The file may still be transcoding or may be corrupted on PBX storage.',
+                    }));
+                    return;
+                  }
+                  void recoverAudio(r);
                 }}
               />
             ) : (

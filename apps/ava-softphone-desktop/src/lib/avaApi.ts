@@ -201,7 +201,7 @@ export interface CallRecord {
   hasRecording: boolean; hasTranscript: boolean;
   sentiment?: 'positive' | 'neutral' | 'negative';
   customer?: string;
-  organization_id?: string; transcript_text?: string;
+  organization_id?: string; extension?: string | null; extension_uuid?: string | null; transcript_text?: string;
   pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
@@ -259,7 +259,7 @@ export interface VoicemailItem {
   summary: string; sentiment: 'positive' | 'neutral' | 'negative';
   priority: 'low' | 'normal' | 'high';
   handled?: boolean; feedback?: Feedback;
-  organization_id?: string; callId?: string;
+  organization_id?: string; extension?: string | null; extension_uuid?: string | null; callId?: string;
   pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
@@ -269,7 +269,7 @@ export interface RecordingItem {
   recordedAt: string; durationSec: number; sizeKb: number;
   qualityScore: number; sentiment: 'positive' | 'neutral' | 'negative';
   summary: string | null; topics: string[]; tags: string[]; feedback?: Feedback;
-  organization_id?: string; transcript_text?: string | null;
+  organization_id?: string; extension?: string | null; extension_uuid?: string | null; transcript_text?: string | null;
   pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
@@ -421,6 +421,8 @@ function mapCdrToVoicemail(r: any): VoicemailItem {
     sentiment:   'neutral' as const,
     priority:    'normal' as const,
     organization_id: r.organization_id ?? undefined,
+    extension: r.extension ?? null,
+    extension_uuid: r.extension_uuid ?? null,
     callId:      r.id ?? undefined,
     pbx_uuid:    r.pbx_uuid ?? null,
     domain_uuid: r.domain_uuid ?? null,
@@ -459,6 +461,8 @@ function mapCdrToRecording(r: any): RecordingItem {
     tags,
     feedback:    null,
     organization_id: r.organization_id ?? undefined,
+    extension: r.extension ?? null,
+    extension_uuid: r.extension_uuid ?? null,
     pbx_uuid: r.pbx_uuid ?? null,
     domain_uuid: r.domain_uuid ?? null,
     domain_name: r.domain_name ?? null,
@@ -479,7 +483,7 @@ async function readCallRecordRows(limit = 100): Promise<any[]> {
   const extFilter = me.extension_uuid
     ? `&extension_uuid=eq.${me.extension_uuid}`
     : (me.extension ? `&extension=eq.${me.extension}` : '');
-  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos,raw_data,notes,tags${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
+  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,analyzed,mos,raw_data,notes,tags${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
 
   const res = await fetch(url, {
     headers: {
@@ -518,6 +522,11 @@ export const ava = {
     if (MOCK) return MOCK_CALLS;
     await bestEffortCdrSync(Math.max(limit, 200));
     return (await readCallRecordRows(limit)).map(mapCdrToCall);
+  },
+  scopedCallRecords: async (limit = 100) => {
+    if (MOCK) return MOCK_CALLS as any[];
+    await bestEffortCdrSync(Math.max(limit, 200));
+    return readCallRecordRows(limit);
   },
   callDetail: (id: string) => call<any>(`/db/${TABLES.aiInsights}?call_record_id=eq.${id}&select=*&limit=1`, {}, {
     callId: id,
@@ -668,7 +677,7 @@ export const ava = {
       const extFilter = me.extension_uuid
         ? `&extension_uuid=eq.${me.extension_uuid}`
         : (me.extension ? `&extension=eq.${me.extension}` : '');
-      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
+      const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
@@ -700,7 +709,9 @@ export const ava = {
     const xml_cdr_uuid = cleanText(recording.pbx_uuid || (recording as any).callId || recording.id);
     const domain_uuid = cleanText(recording.domain_uuid);
     const domain_name = cleanText(recording.domain_name);
-    if (!xml_cdr_uuid && (!record_path || !record_name)) return null;
+    const recorded_at = cleanText((recording as any).recordedAt ?? (recording as any).start_at ?? (recording as any).startedAt ?? (recording as any).receivedAt);
+    const local_recording_url = cleanText(recording.recording_url ?? (recording as any).recordingUrl);
+    if (!xml_cdr_uuid && !record_name && (!record_path || !record_name)) return null;
     try {
       const res = await fetch(resolveUrl(`/fn/${FN.fusionpbxProxy}`), {
         method: 'POST',
@@ -708,7 +719,7 @@ export const ava = {
         body: JSON.stringify({
           action: 'get-recording-signed-url',
           organization_id: recording.organization_id,
-          params: { xml_cdr_uuid, record_path, record_name, domain_uuid, domain_name, expires_in: expiresInSec },
+          params: { xml_cdr_uuid, record_path, record_name, domain_uuid, domain_name, recorded_at, local_recording_url, expires_in: expiresInSec },
         }),
       });
       if (!res.ok) return null;
@@ -735,12 +746,14 @@ export const ava = {
     const xml_cdr_uuid = cleanText(recording.pbx_uuid || (recording as any).callId || recording.id);
     const domain_uuid = cleanText(recording.domain_uuid);
     const domain_name = cleanText(recording.domain_name);
-    if (!xml_cdr_uuid && (!record_path || !record_name)) return null;
+    const recorded_at = cleanText((recording as any).recordedAt ?? (recording as any).start_at ?? (recording as any).startedAt ?? (recording as any).receivedAt);
+    const local_recording_url = cleanText(recording.recording_url ?? (recording as any).recordingUrl);
+    if (!xml_cdr_uuid && !record_name && (!record_path || !record_name)) return null;
     try {
       const res = await fetch(resolveUrl(`/fn/${FN.fusionpbxProxy}`), {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ action: 'get-recording', organization_id: recording.organization_id, params: { xml_cdr_uuid, record_path, record_name, domain_uuid, domain_name } }),
+        body: JSON.stringify({ action: 'get-recording', organization_id: recording.organization_id, params: { xml_cdr_uuid, record_path, record_name, domain_uuid, domain_name, recorded_at, local_recording_url } }),
       });
       if (!res.ok) throw new Error(`Recording unavailable (${res.status})`);
       const ct = res.headers.get('content-type') || '';

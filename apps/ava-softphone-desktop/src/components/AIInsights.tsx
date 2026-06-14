@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
+import { ava } from '../lib/avaApi';
 import { theme } from '../lib/theme';
 
 const { colors: c, glow } = theme;
@@ -63,13 +64,13 @@ export default function AIInsights() {
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
-    const { data, error } = await supabase
-      .from('pbx_call_records' as any)
-      .select('*')
-      .order('start_at', { ascending: false })
-      .limit(100);
-    if (error) setError(error.message);
-    else setItems((data || []) as any[]);
+    try {
+      const data = await ava.scopedCallRecords(100);
+      setItems((data || []) as any[]);
+    } catch (e: any) {
+      setError(e?.message || 'Unable to load AI insights for your extension.');
+      setItems([]);
+    }
     setLoading(false);
   }, []);
 

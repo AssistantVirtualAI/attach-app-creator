@@ -37,7 +37,8 @@ Deno.serve(async (req) => {
       .from("user_roles").select("role")
       .eq("user_id", u.user.id).eq("organization_id", orgId).maybeSingle();
     const role = roleRow?.role || "agent";
-    const admin = role === "org_admin" || role === "super_admin" || role === "manager";
+    // Mobile is an end-user softphone surface: always scope to the signed-in extension,
+    // even if the same account has admin permissions in the web portal.
 
     let callsQ = sb.from("pbx_call_records")
       .select("id, direction, call_status, caller_name, caller_number, start_at, duration_seconds, missed_call, has_recording, voicemail_message")
@@ -48,33 +49,26 @@ Deno.serve(async (req) => {
       .eq("organization_id", orgId)
       .eq("call_status", "voicemail");
 
-    if (!admin) {
-      if (sp.extension_uuid) {
-        callsQ = callsQ.eq("extension_uuid", sp.extension_uuid);
-        vmQ = vmQ.eq("extension_uuid", sp.extension_uuid);
-      } else if (sp.extension) {
-        callsQ = callsQ.eq("extension", sp.extension);
-        vmQ = vmQ.eq("extension", sp.extension);
-      }
+    if (sp.extension_uuid) {
+      callsQ = callsQ.eq("extension_uuid", sp.extension_uuid);
+      vmQ = vmQ.eq("extension_uuid", sp.extension_uuid);
+    } else if (sp.extension) {
+      callsQ = callsQ.eq("extension", sp.extension);
+      vmQ = vmQ.eq("extension", sp.extension);
     }
 
     let smsQ = sb.from("pbx_sms_threads")
       .select("id, contact_name, contact_phone, unread_count, last_message_at, extension_uuid, extension")
       .eq("organization_id", orgId)
       .order("last_message_at", { ascending: false })
-      .limit(admin ? 50 : 20);
-    if (!admin) {
-      if (sp.extension_uuid) smsQ = smsQ.eq("extension_uuid", sp.extension_uuid);
-      else if (sp.extension) smsQ = smsQ.eq("extension", sp.extension);
-    }
+      .limit(20);
+    if (sp.extension_uuid) smsQ = smsQ.eq("extension_uuid", sp.extension_uuid);
+    else if (sp.extension) smsQ = smsQ.eq("extension", sp.extension);
 
-    const [{ data: calls }, { data: threads }, { data: vmails }, { count: activeUsers }] = await Promise.all([
+    const [{ data: calls }, { data: threads }, { data: vmails }] = await Promise.all([
       callsQ.order("start_at", { ascending: false }).limit(100),
       smsQ,
-      vmQ.order("start_at", { ascending: false }).limit(admin ? 25 : 10),
-      admin
-        ? sb.from("pbx_softphone_users").select("id", { count: "exact", head: true }).eq("organization_id", orgId).neq("status", "offline")
-        : Promise.resolve({ count: null } as any),
+      vmQ.order("start_at", { ascending: false }).limit(10),
     ]);
 
     const callList = calls || [];
@@ -114,8 +108,8 @@ Deno.serve(async (req) => {
     return json({
       greeting: `${greeting}, ${sp.display_name || ""}`.trim(),
       brief: `You have ${missed} missed call${missed === 1 ? "" : "s"}, ${vmList.length} voicemail${vmList.length === 1 ? "" : "s"}, and ${unreadSms} unread message${unreadSms === 1 ? "" : "s"}.`,
-      scope: { mode: admin ? "domain_admin" : "extension_user", label: admin ? `Domain admin · ${sp.sip_domain || orgId}` : `Extension ${sp.extension}`, organizationId: orgId, sipDomain: sp.sip_domain || undefined, extension: sp.extension, role },
-      metrics: { missedCalls: missed, answeredCalls: answered, unreadSms, voicemails: vmList.length, actionItems: needsAttention.length, activeUsers: activeUsers ?? undefined },
+      scope: { mode: "extension_user", label: `Extension ${sp.extension}`, organizationId: orgId, sipDomain: sp.sip_domain || undefined, extension: sp.extension, role },
+      metrics: { missedCalls: missed, answeredCalls: answered, unreadSms, voicemails: vmList.length, actionItems: needsAttention.length },
       needsAttention,
       status: { sipState: sp.status === "registered" ? "registered" : sp.status === "connecting" ? "connecting" : "offline", doNotDisturb: !!sp.dnd_enabled, forwarding: sp.forward_enabled ? sp.forward_to : null, updatedAt: sp.status_updated_at || sp.updated_at || undefined },
     });

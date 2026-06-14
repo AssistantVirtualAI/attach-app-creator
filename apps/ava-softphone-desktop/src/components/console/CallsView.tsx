@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, CallRecord } from '../../lib/avaApi';
-import { supabase } from '../../lib/supabaseClient';
 import PageHeader, { ListSkeleton, EmptyState } from './PageHeader';
 
 const { colors: c } = theme;
@@ -29,37 +28,13 @@ export default function CallsView() {
   const [insight, setInsight] = useState<any>(null);
 
   useEffect(() => {
-    const mapRow = (r: any): CallRecord => ({
-      id: r.id,
-      direction: r.direction === 'outbound' ? 'out' : 'in',
-      status: r.voicemail_message ? 'voicemail' : r.hangup_cause === 'NO_ANSWER' ? 'missed' : ((r.billsec || r.duration_seconds || 0) > 0 ? 'answered' : 'missed'),
-      from: r.caller_number || '',
-      to: r.destination_number || '',
-      customer: r.caller_name || undefined,
-      startedAt: r.start_at || new Date().toISOString(),
-      durationSec: r.billsec || r.duration_seconds || 0,
-      hasRecording: !!(r.has_recording || r.recording_path || r.recording_name),
-      hasTranscript: !!(r.transcript_text || r.raw_data?.transcript_text || r.raw_data?.transcript),
-      sentiment: r.raw_data?.ai?.sentiment || r.raw_data?.sentiment || undefined,
-      organization_id: r.organization_id,
-      transcript_text: r.transcript_text || r.raw_data?.transcript_text || r.raw_data?.transcript || undefined,
-      recording_path: r.recording_path || null,
-      recording_name: r.recording_name || null,
-    } as any);
-
     const load = async () => {
       setLoading(true); setError(null); setSyncing(true);
       try {
-        await ava.calls(100);
-        const { data, error } = await supabase
-          .from('pbx_call_records')
-          .select('*')
-          .order('start_at', { ascending: false })
-          .limit(100);
-        if (error) throw error;
-        setCalls(((data || []) as any[]).map(mapRow));
+        const scopedCalls = await ava.calls(100);
+        setCalls(scopedCalls);
       } catch (err: any) {
-        setError(err?.message || 'Unable to load live call records.');
+        setError(err?.message || 'Unable to load live call records for your extension.');
         setCalls([]);
       } finally {
         setLoading(false); setSyncing(false);
@@ -67,14 +42,8 @@ export default function CallsView() {
     };
     (window as any).__lemtelRefreshCalls = load;
     load();
-
-    const channel = supabase
-      .channel('cdr-live')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records' }, (payload) => {
-        setCalls((prev) => [mapRow(payload.new), ...prev]);
-      })
-      .subscribe();
-    return () => { delete (window as any).__lemtelRefreshCalls; supabase.removeChannel(channel); };
+    const refreshTimer = window.setInterval(load, 30_000);
+    return () => { delete (window as any).__lemtelRefreshCalls; window.clearInterval(refreshTimer); };
   }, []);
   useEffect(() => {
     if (sel) { setInsight(null); ava.callDetail(sel.id).then(setInsight).catch(() => setInsight({ summary: 'No AI insight has been generated for this call yet.', topics: [], actionItems: [], qualityScore: 0 })); }

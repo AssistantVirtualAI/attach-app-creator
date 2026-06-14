@@ -26,13 +26,17 @@ Deno.serve(async (req) => {
     if (!u?.user) return json({ error: "unauthorized" }, 401);
 
     const { data: sp } = await sb.from("pbx_softphone_users")
-      .select("organization_id").eq("portal_user_id", u.user.id).maybeSingle();
+      .select("organization_id, extension_uuid, extension").eq("portal_user_id", u.user.id).maybeSingle();
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
 
     const { data: rec } = await sb.from("pbx_call_records")
-      .select("id, organization_id, recording_path, voicemail_path")
+      .select("id, organization_id, extension_uuid, extension, recording_path, voicemail_path")
       .eq("id", id).maybeSingle();
-    if (!rec || rec.organization_id !== sp.organization_id) return json({ error: "not_found" }, 404);
+    const sameOrg = !!rec && rec.organization_id === sp.organization_id;
+    const sameExtension = !!rec && (sp.extension_uuid
+      ? rec.extension_uuid === sp.extension_uuid
+      : String(rec.extension || "") === String(sp.extension || ""));
+    if (!sameOrg || !sameExtension) return json({ error: "not_found" }, 404);
 
     const path = (rec as any).voicemail_path || (rec as any).recording_path;
     if (!path) return json({ error: "no_recording" }, 404);
