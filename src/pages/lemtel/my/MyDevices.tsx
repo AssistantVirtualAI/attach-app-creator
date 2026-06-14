@@ -2,14 +2,30 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Smartphone, CheckCircle2, XCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Smartphone, CheckCircle2, XCircle, KeyRound, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
 
 export default function MyDevices() {
   const [loading, setLoading] = useState(true);
   const [ext, setExt] = useState<string | null>(null);
   const [softphone, setSoftphone] = useState<any>(null);
   const [devices, setDevices] = useState<any[]>([]);
+  const [resetting, setResetting] = useState(false);
+
+  const resetSipPassword = async () => {
+    if (!confirm('Reset SIP password? You will need to sign in again on every device.')) return;
+    setResetting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('softphone-reset-password', { body: {} });
+      if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.error);
+      toast.success('SIP password reset. Reloading…');
+      setTimeout(() => window.location.reload(), 800);
+    } catch (e: any) {
+      toast.error('Reset failed: ' + (e?.message || e));
+    } finally { setResetting(false); }
+  };
 
   useEffect(() => {
     (async () => {
@@ -61,7 +77,12 @@ export default function MyDevices() {
             {softphone?.last_seen_at && (
               <Badge variant="outline" className="ml-2">last seen {formatDistanceToNow(new Date(softphone.last_seen_at), { addSuffix: true })}</Badge>
             )}
+            <Button size="sm" variant="outline" className="ml-auto" disabled={resetting} onClick={resetSipPassword}>
+              {resetting ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <KeyRound className="w-3.5 h-3.5 mr-1" />}
+              Reset SIP password
+            </Button>
           </div>
+          <p className="text-xs text-muted-foreground mb-3">If the softphone shows <code>Registration failed: Rejected (403)</code>, the stored SIP password is out of sync with the PBX. Resetting generates a fresh password and pushes it to FusionPBX.</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {platforms.map(([name, ts]) => (
               <div key={name} className="rounded-lg border border-cockpit-border/40 p-3">

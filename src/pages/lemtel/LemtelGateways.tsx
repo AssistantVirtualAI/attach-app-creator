@@ -248,8 +248,8 @@ export default function LemtelGateways() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8 space-y-2">
-                    <div className="font-medium text-foreground">No gateways returned.</div>
-                    <div className="text-xs">Click <b>Diagnostic</b> above to see the raw FusionPBX API response for <code className="px-1 rounded bg-muted">/gateways</code>.</div>
+                    <div className="font-medium text-foreground">No SIP trunks configured on FusionPBX yet.</div>
+                    <div className="text-xs">FusionPBX <code className="px-1 rounded bg-muted">/gateways</code> returned an empty list — that's normal for a fresh PBX. Click <b>Add Gateway</b> to create your first SIP trunk, or <b>Diagnostic</b> to see the raw API response.</div>
                   </TableCell></TableRow>
                 ) : filtered.map(g => {
                   const enabled = g.enabled === true || g.enabled === 'true';
