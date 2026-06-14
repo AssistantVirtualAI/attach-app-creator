@@ -29,35 +29,11 @@ export default function CallsView() {
   const [insight, setInsight] = useState<any>(null);
 
   useEffect(() => {
-    const mapRow = (r: any): CallRecord => ({
-      id: r.id,
-      direction: r.direction === 'outbound' ? 'out' : 'in',
-      status: r.voicemail_message ? 'voicemail' : r.hangup_cause === 'NO_ANSWER' ? 'missed' : ((r.billsec || r.duration_seconds || 0) > 0 ? 'answered' : 'missed'),
-      from: r.caller_number || '',
-      to: r.destination_number || '',
-      customer: r.caller_name || undefined,
-      startedAt: r.start_at || new Date().toISOString(),
-      durationSec: r.billsec || r.duration_seconds || 0,
-      hasRecording: !!(r.has_recording || r.recording_path || r.recording_name),
-      hasTranscript: !!(r.transcript_text || r.raw_data?.transcript_text || r.raw_data?.transcript),
-      sentiment: r.raw_data?.ai?.sentiment || r.raw_data?.sentiment || undefined,
-      organization_id: r.organization_id,
-      transcript_text: r.transcript_text || r.raw_data?.transcript_text || r.raw_data?.transcript || undefined,
-      recording_path: r.recording_path || null,
-      recording_name: r.recording_name || null,
-    } as any);
-
     const load = async () => {
       setLoading(true); setError(null); setSyncing(true);
       try {
-        await ava.calls(100);
-        const { data, error } = await supabase
-          .from('pbx_call_records')
-          .select('*')
-          .order('start_at', { ascending: false })
-          .limit(100);
-        if (error) throw error;
-        setCalls(((data || []) as any[]).map(mapRow));
+        const data = await ava.calls(100);
+        setCalls(Array.isArray(data) ? data : []);
       } catch (err: any) {
         setError(err?.message || 'Unable to load live call records.');
         setCalls([]);
@@ -70,9 +46,7 @@ export default function CallsView() {
 
     const channel = supabase
       .channel('cdr-live')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records' }, (payload) => {
-        setCalls((prev) => [mapRow(payload.new), ...prev]);
-      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pbx_call_records' }, () => { void load(); })
       .subscribe();
     return () => { delete (window as any).__lemtelRefreshCalls; supabase.removeChannel(channel); };
   }, []);
