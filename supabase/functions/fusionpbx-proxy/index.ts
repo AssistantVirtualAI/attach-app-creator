@@ -1255,6 +1255,9 @@ Deno.serve(async (req) => {
                attempts.push({ url: safeUrl(url), status: r.status, content_type: rct || undefined });
               continue;
             }
+            if (probeOnly) {
+              return json({ ok: true, available: true, content_type: rct.startsWith("audio/") ? rct : ct }, 200, { "X-Recording-Status": "available" });
+            }
             return new Response(buf, {
               headers: {
                 ...corsHeaders,
@@ -1269,6 +1272,9 @@ Deno.serve(async (req) => {
         } catch (e: any) {
           attempts.push({ url: safeUrl(url), status: 0, content_type: e?.name === "AbortError" ? "timeout" : undefined });
         }
+      }
+      if (probeOnly) {
+        return json({ ok: true, available: false }, 200, { "X-Recording-Status": "not-found" });
       }
       return json({ ok: false, error: "RECORDING_NOT_FOUND", message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.", attempts }, 200, { "X-Recording-Status": "not-found" });
     }
