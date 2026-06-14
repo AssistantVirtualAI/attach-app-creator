@@ -145,6 +145,9 @@ import AdminFeatureCodes from "./pages/lemtel/admin/AdminFeatureCodes";
 import AdminCallForwarding from "./pages/lemtel/admin/AdminCallForwarding";
 import AdminRecordingRules from "./pages/lemtel/admin/AdminRecordingRules";
 import AdminVoicemailSettings from "./pages/lemtel/admin/AdminVoicemailSettings";
+import AdminActiveCalls from "./pages/lemtel/admin/AdminActiveCalls";
+import AdminRegistrations from "./pages/lemtel/admin/AdminRegistrations";
+import AdminSystemStatus from "./pages/lemtel/admin/AdminSystemStatus";
 import MySettings from "./pages/lemtel/my/MySettings";
 import MyForwarding from "./pages/lemtel/my/MyForwarding";
 import MyDevices from "./pages/lemtel/my/MyDevices";
@@ -683,6 +686,9 @@ const App = () => (
                 <Route path="/org/lemtel/admin/conferences" element={<LemtelAdminPage><AdminConferences /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/hold-music" element={<LemtelAdminPage><AdminHoldMusic /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/sync-health" element={<LemtelAdminPage><AdminSyncHealth /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/active-calls" element={<LemtelAdminPage><AdminActiveCalls /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/registrations" element={<LemtelAdminPage><AdminRegistrations /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/system-status" element={<LemtelAdminPage><AdminSystemStatus /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/sip-profiles" element={<LemtelAdminPage><AdminSipProfiles /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/dialplans" element={<LemtelAdminPage><AdminDialplans /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/feature-codes" element={<LemtelAdminPage><AdminFeatureCodes /></LemtelAdminPage>} />
