@@ -1,8 +1,12 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+// Side-effect import: throws at boot if a production build was bundled with
+// VITE_AVA_MOCK=true. Must run before any UI mounts.
+import './lib/buildGuard';
 import App from './App';
 import { ThemeProvider } from './lib/theme';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
+import DemoModeBanner from './components/DemoModeBanner';
 import './styles/animations.css';
 
 // Renderer-level safety net: never let an unhandled rejection or window error
@@ -35,6 +39,7 @@ createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppErrorBoundary>
       <ThemeProvider>
+        <DemoModeBanner />
         <App />
       </ThemeProvider>
     </AppErrorBoundary>
