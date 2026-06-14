@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ImpactStyle } from '@capacitor/haptics';
 import Dialpad from '../components/Dialpad';
+import { audit } from '../lib/audit';
 
 export default function DialerScreen({
   sp,
