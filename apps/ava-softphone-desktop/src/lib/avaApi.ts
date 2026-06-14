@@ -247,12 +247,13 @@ export interface RecordingItem {
   id: string; callId: string; from: string; to: string; customer?: string;
   recordedAt: string; durationSec: number; sizeKb: number;
   qualityScore: number; sentiment: 'positive' | 'neutral' | 'negative';
-  summary: string; topics: string[]; tags: string[]; feedback?: Feedback;
-  organization_id?: string; transcript_text?: string;
+  summary: string | null; topics: string[]; tags: string[]; feedback?: Feedback;
+  organization_id?: string; transcript_text?: string | null;
   pbx_uuid?: string | null; domain_uuid?: string | null; domain_name?: string | null;
   recording_path?: string | null; recording_name?: string | null;
   record_path?: string | null; record_name?: string | null; recording_url?: string | null;
   recordingUrl?: string | null;
+  raw_data?: any; analyzed?: boolean;
 }
 export interface ContactInteraction {
   id: string; kind: 'call' | 'sms' | 'voicemail';
