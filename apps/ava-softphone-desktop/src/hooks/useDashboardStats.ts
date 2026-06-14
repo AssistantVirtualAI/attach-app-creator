@@ -6,6 +6,8 @@ export type DashboardStats = {
   answeredToday: number;
   unreadSms: number;
   unreadVoicemail: number;
+  extensionsTotal: number;
+  liveCalls: number;
   pbxHealth: 'ok' | 'warn' | 'down';
   loading: boolean;
 };
@@ -17,7 +19,8 @@ const startOfDay = () => {
 export function useDashboardStats(orgId: string | null, extension: string | null) {
   const [stats, setStats] = useState<DashboardStats>({
     missedToday: 0, answeredToday: 0, unreadSms: 0,
-    unreadVoicemail: 0, pbxHealth: 'ok', loading: true,
+    unreadVoicemail: 0, extensionsTotal: 0, liveCalls: 0,
+    pbxHealth: 'ok', loading: true,
   });
 
   const refresh = useCallback(async () => {
@@ -33,7 +36,15 @@ export function useDashboardStats(orgId: string | null, extension: string | null
       .select('unread_count')
       .eq('organization_id', orgId);
 
-    const [callsR, smsR] = await Promise.all([callsQ, smsQ]);
+    const extQ = supabase.from('pbx_extensions')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId);
+
+    const liveQ = supabase.from('telecom_live_calls')
+      .select('id', { count: 'exact', head: true })
+      .eq('organization_id', orgId);
+
+    const [callsR, smsR, extR, liveR] = await Promise.all([callsQ, smsQ, extQ, liveQ]);
     const calls = (callsR.data || []) as any[];
     const missed = calls.filter((r) => r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER').length;
     const answered = calls.length - missed;
@@ -45,6 +56,8 @@ export function useDashboardStats(orgId: string | null, extension: string | null
       answeredToday: answered,
       unreadSms,
       unreadVoicemail,
+      extensionsTotal: extR.count || 0,
+      liveCalls: liveR.count || 0,
       pbxHealth: 'ok',
       loading: false,
     });
