@@ -216,8 +216,12 @@ export const mobileApi = {
     { method: 'POST', body: JSON.stringify({ action: 'sync-cdrs', limit: 50 }) },
     callsMock
   ).then((raw: any) => {
-    if (!Array.isArray(raw?.rows ?? raw)) return callsMock;
-    return (raw?.rows ?? raw).map(mapCdrToCallRecord);
+    if (isMockMode()) return raw as CallRecord[];
+    const rows = raw?.rows ?? raw;
+    if (!Array.isArray(rows)) {
+      throw new Error('Invalid response from fusionpbx-proxy');
+    }
+    return rows.map(mapCdrToCallRecord);
   }),
   callDetail: (id: string) => call<CallDetail>(`/mobile-calls?id=${encodeURIComponent(id)}`, undefined, callDetailMock(id)),
 
@@ -233,8 +237,12 @@ export const mobileApi = {
     { method: 'POST', body: JSON.stringify({ action: 'sync-cdrs', limit: 50 }) },
     voicemailMock
   ).then((raw: any) => {
-    if (!Array.isArray(raw?.rows ?? raw)) return voicemailMock;
-    return (raw?.rows ?? raw)
+    if (isMockMode()) return raw as VoicemailEntry[];
+    const rows = raw?.rows ?? raw;
+    if (!Array.isArray(rows)) {
+      throw new Error('Invalid response from fusionpbx-proxy');
+    }
+    return rows
       .filter((r: any) => r.voicemail_message || r.missed_call)
       .map(mapCdrToVoicemailEntry);
   }),
