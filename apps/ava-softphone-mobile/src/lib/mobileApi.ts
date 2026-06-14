@@ -201,6 +201,12 @@ function mapCdrToVoicemailEntry(r: any): VoicemailEntry {
     priority:    'normal' as const,
     sentiment:   'neutral' as const,
     isNew:       !r.voicemail_read,
+    xml_cdr_uuid:   r.pbx_uuid ?? r.xml_cdr_uuid ?? r.id ?? undefined,
+    record_path:    r.recording_path ?? undefined,
+    record_name:    r.recording_name ?? undefined,
+    domain_uuid:    r.domain_uuid ?? undefined,
+    domain_name:    r.domain_name ?? undefined,
+    organization_id: r.organization_id ?? undefined,
   };
 }
 
