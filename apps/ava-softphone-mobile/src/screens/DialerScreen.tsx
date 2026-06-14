@@ -51,7 +51,7 @@ export default function DialerScreen({
           <div style={{ width: 64 }} />
           <button
             disabled={!num || sp.snap.status !== 'registered'}
-            onClick={() => { haptic(ImpactStyle.Medium); sp.call(num); }}
+            onClick={() => { haptic(ImpactStyle.Medium); audit('call.originated', null, { destination: num }); sp.call(num); }}
             style={{
               width: 72, height: 72, borderRadius: '50%',
               background: !num ? 'rgba(34, 197, 94, 0.3)' : 'linear-gradient(135deg, #22c55e, #15803d)',
