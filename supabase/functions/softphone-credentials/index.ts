@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
 
     const { data: sp, error: spErr } = await supabaseAdmin
       .from("pbx_softphone_users")
-      .select("extension, organization_id, extension_id, display_name, sip_password, sip_password_encrypted, sip_domain, wss_url")
+      .select("extension, organization_id, extension_id, display_name, sip_password, sip_domain, wss_url")
       .eq("portal_user_id", user.id)
       .maybeSingle();
     if (spErr) log("lookup by portal_user_id error", spErr.message);
