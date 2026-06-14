@@ -457,7 +457,7 @@ async function readCallRecordRows(limit = 100): Promise<any[]> {
   const extFilter = me.extension_uuid
     ? `&extension_uuid=eq.${me.extension_uuid}`
     : (me.extension ? `&extension=eq.${me.extension}` : '');
-  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
+  const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,mos,raw_data,notes,tags${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
 
   const res = await fetch(url, {
     headers: {
