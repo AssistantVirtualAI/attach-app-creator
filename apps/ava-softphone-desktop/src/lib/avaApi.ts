@@ -13,8 +13,14 @@
  * desktop app — they are held by the Edge Functions above.
  */
 import { BACKEND, TABLES, FN, fnUrl } from './config';
+import { isMockMode } from './buildGuard';
 
-export const MOCK: boolean = (import.meta as any).env?.VITE_AVA_MOCK === 'true';
+/**
+ * MOCK is true ONLY in dev builds with VITE_AVA_MOCK=true.
+ * Production builds with that flag refuse to boot (see buildGuard.ts),
+ * so this constant is always false in any shipped binary.
+ */
+export const MOCK: boolean = isMockMode();
 
 /** Normalize any PostgREST/Edge response shape into an array (handles {data:[]}, {rows:[]}, null, single object). */
 function asArray<T = any>(raw: any): T[] {
