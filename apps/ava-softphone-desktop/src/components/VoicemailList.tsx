@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ava, VoicemailItem } from '@/lib/avaApi';
+import { useRealtimeRefresh } from '@/lib/useRealtimeRefresh';
+import { useOrgId } from '@/lib/useOrgId';
 
 interface Props {
   extension: string;
@@ -39,6 +41,12 @@ export default function VoicemailList({ extension, onCall }: Props) {
     window.addEventListener('lemtel:phone-sync-complete', onSync);
     return () => window.removeEventListener('lemtel:phone-sync-complete', onSync);
   }, [load]);
+
+  // Realtime: new voicemails for this tenant trigger a refetch.
+  const orgId = useOrgId();
+  useRealtimeRefresh({ table: 'pbx_voicemails', organizationId: orgId }, load);
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, load);
+
 
   const togglePlay = async (r: VoicemailItem) => {
     if (playing === r.id) { setPlaying(null); return; }

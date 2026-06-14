@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { theme } from '../lib/theme';
 import { ava, RecordingItem } from '../lib/avaApi';
+import { useRealtimeRefresh } from '../lib/useRealtimeRefresh';
+import { useOrgId } from '../lib/useOrgId';
 
 const { colors: c, glow } = theme;
 
@@ -40,6 +42,12 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
     window.addEventListener('lemtel:phone-sync-complete', onSync);
     return () => window.removeEventListener('lemtel:phone-sync-complete', onSync);
   }, [load]);
+
+  // Realtime: new/updated call records with recordings trigger a refetch.
+  const orgId = useOrgId();
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, load);
+
+
 
   const analyze = async (r: RecordingItem) => {
     setWorking(r.id); setError(null);

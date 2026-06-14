@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, VoicemailItem, Feedback } from '../../lib/avaApi';
+import { useRealtimeRefresh } from '../../lib/useRealtimeRefresh';
+import { useOrgId } from '../../lib/useOrgId';
 import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
 
 const { colors: c } = theme;
@@ -53,6 +55,12 @@ export default function VoicemailView() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Realtime: refresh on new voicemail / call rows for this tenant.
+  const orgId = useOrgId();
+  useRealtimeRefresh({ table: 'pbx_voicemails', organizationId: orgId }, load);
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, load);
+
 
   // Reset playback when selection changes
   useEffect(() => {

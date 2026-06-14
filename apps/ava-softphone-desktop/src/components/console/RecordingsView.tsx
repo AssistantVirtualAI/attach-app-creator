@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { ava, RecordingItem, Feedback } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
+import { useRealtimeRefresh } from '../../lib/useRealtimeRefresh';
+import { useOrgId } from '../../lib/useOrgId';
 import PageHeader, { EmptyState, ListSkeleton } from './PageHeader';
 
 const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
@@ -81,6 +83,11 @@ export default function RecordingsView() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Realtime: new recordings (rows on pbx_call_records with audio) trigger refetch.
+  const orgId = useOrgId();
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, load);
+
 
   // Helper: fetch (or reuse cached) blob URL for a recording, deduping concurrent calls.
   const fetchAudio = useCallback(async (rec: RecordingItem): Promise<string | null> => {
