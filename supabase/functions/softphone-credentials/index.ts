@@ -90,7 +90,9 @@ Deno.serve(async (req) => {
         const { data: fp } = await supabase.functions.invoke("fusionpbx-proxy", {
           body: { action: "get-extension", extension: sp.extension },
         });
-        const fpPwd = (fp as any)?.extension?.password
+        const fpExtension = (fp as any)?.extension || (fp as any)?.extensions?.[0] || (fp as any)?.data?.extensions?.[0] || (Array.isArray(fp) ? (fp as any)[0] : null);
+        const fpPwd = fpExtension?.password
+          || fpExtension?.sip_password
           || (fp as any)?.password
           || (fp as any)?.data?.password
           || "";
