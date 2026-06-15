@@ -560,6 +560,51 @@ Deno.serve(async (req) => {
         const id = g.gateway_uuid || g.gateway;
         if (id && !map.has(id)) map.set(id, g);
       }
+
+      // Fallback: FusionPBX API plugin auto-scopes to the API user's domain
+      // and won't return global (domain_uuid=NULL) gateways. Ask FreeSWITCH
+      // directly via `sofia status gateway` so we surface the same list the
+      // FusionPBX GUI shows.
+      let sofiaSource = "none";
+      if (map.size === 0) {
+        try {
+          const sofia = await pbxWrite(`commands`, "POST", {
+            commands: [{ command: "sofia", arguments: "status gateway" }],
+          });
+          const raw = sofia?.data;
+          const text: string =
+            (typeof raw?.details?.[0]?.response === "string" && raw.details[0].response) ||
+            (typeof raw?.response === "string" && raw.response) ||
+            (typeof raw?.raw === "string" && raw.raw) ||
+            (typeof raw === "string" ? raw : "");
+          for (const line of text.split("\n")) {
+            // Name   Type     Data                              State
+            const m = line.match(/^\s*(\S+)\s+gateway\s+(\S+)\s+(\S+)\s*$/i);
+            if (m) {
+              const name = m[1];
+              const data = m[2];
+              const state = m[3];
+              if (!map.has(name)) {
+                const proxy = (data.match(/sip:[^@]*@([^;]+)/i) || [, null])[1] || data;
+                map.set(name, {
+                  gateway_uuid: name,
+                  gateway: name,
+                  proxy,
+                  context: "public",
+                  register: state.toUpperCase() === "REGED" ? "true" : "false",
+                  enabled: "true",
+                  hostname: proxy,
+                  description: `via FreeSWITCH (${state})`,
+                  _source: "sofia",
+                  _state: state,
+                });
+              }
+            }
+          }
+          sofiaSource = "sofia";
+        } catch (_e) { /* swallow — pure best-effort fallback */ }
+      }
+
       const data = Array.from(map.values());
       return json({
         ok: true,
@@ -567,7 +612,9 @@ Deno.serve(async (req) => {
         total_global: globals.length,
         total_scoped: scoped.length,
         total_unique: data.length,
+        fallback: sofiaSource,
         global_status: globalRes.status,
+
         global_error: globalRes.ok ? null : ((globalRes as any).error || (globalRes as any).raw || null),
       });
     }
