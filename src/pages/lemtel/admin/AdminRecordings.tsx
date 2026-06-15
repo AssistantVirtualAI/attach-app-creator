@@ -29,6 +29,19 @@ type Rec = {
   recording_path: string | null; recording_name: string | null;
   has_recording: boolean | null;
   pbx_uuid: string | null; domain_uuid: string | null; domain_name: string | null;
+  recording_id?: string | null;
+  transcribed?: boolean | null; analyzed?: boolean | null;
+  sentiment?: string | null; summary?: string | null;
+};
+
+type RecMeta = {
+  recording_id: string;
+  transcript: string | null;
+  summary: string | null;
+  sentiment: string | null;
+  language: string | null;
+  transcript_status: string | null;
+  summary_status: string | null;
 };
 
 export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
