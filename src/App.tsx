@@ -242,7 +242,6 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
           <Sonner />
-          <PreviewOverlayToggle />
           <BrowserRouter
             future={{
               v7_startTransition: true,
