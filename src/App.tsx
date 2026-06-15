@@ -10,7 +10,6 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { ClientProvider } from "@/context/ClientContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AppErrorBoundary } from "@/components/errors/AppErrorBoundary";
-import { PreviewOverlayToggle } from "@/components/shared/PreviewOverlayToggle";
 import MascotProvider from "@/components/mascot/MascotProvider";
 
 import Landing from "./pages/Landing";
@@ -243,7 +242,6 @@ const App = () => (
           <TooltipProvider>
             <Toaster />
           <Sonner />
-          <PreviewOverlayToggle />
           <BrowserRouter
             future={{
               v7_startTransition: true,
