@@ -1,19 +1,89 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Router, RefreshCw, Loader2, Save } from 'lucide-react';
+import { Router, RefreshCw, Loader2, Save, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { AdminSkeletonRows, AdminEmptyState } from '@/components/admin/AdminSkeletonRows';
+import { LEMTEL_ORG } from '@/hooks/usePbxData';
+
+type DestKind = 'custom' | 'voicemail' | 'extension' | 'ring_group' | 'queue';
+
+function DestinationPicker({
+  value, onChange, extensions, ringGroups, queues, placeholder,
+}: {
+  value: string; onChange: (v: string) => void;
+  extensions: any[]; ringGroups: any[]; queues: any[];
+  placeholder?: string;
+}) {
+  // Detect kind by prefix or membership.
+  const detect = (): DestKind => {
+    if (!value) return 'custom';
+    if (value.startsWith('*97') || value.startsWith('voicemail:')) return 'voicemail';
+    if (extensions.some(e => e.extension === value)) return 'extension';
+    if (ringGroups.some(r => r.extension === value)) return 'ring_group';
+    if (queues.some(q => q.extension === value)) return 'queue';
+    return 'custom';
+  };
+  const kind = detect();
+
+  return (
+    <div className="flex gap-1 items-center">
+      <Select
+        value={kind}
+        onValueChange={(k: DestKind) => {
+          if (k === 'voicemail') onChange('*97');
+          else if (k === 'custom') onChange(value || '');
+          else onChange('');
+        }}
+      >
+        <SelectTrigger className="w-[110px] h-8 text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="custom">Custom</SelectItem>
+          <SelectItem value="voicemail">Voicemail</SelectItem>
+          <SelectItem value="extension">Extension</SelectItem>
+          <SelectItem value="ring_group">Ring group</SelectItem>
+          <SelectItem value="queue">Queue</SelectItem>
+        </SelectContent>
+      </Select>
+      {kind === 'extension' || kind === 'ring_group' || kind === 'queue' ? (
+        <Select value={value} onValueChange={onChange}>
+          <SelectTrigger className="w-32 h-8 text-xs"><SelectValue placeholder="Pick…" /></SelectTrigger>
+          <SelectContent>
+            {(kind === 'extension' ? extensions
+              : kind === 'ring_group' ? ringGroups
+              : queues
+            ).map((o: any) => (
+              <SelectItem key={o.id} value={o.extension || ''}>
+                {o.extension} {o.name || o.display_name ? `— ${o.name || o.display_name}` : ''}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Input
+          className="w-28 h-8 font-mono text-xs"
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          disabled={kind === 'voicemail'}
+        />
+      )}
+    </div>
+  );
+}
 
 export default function AdminCallForwarding() {
   const [edits, setEdits] = useState<Record<string, any>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const { data: rows = [], isLoading, refetch } = useQuery({
     queryKey: ['pbx-call-forwarding-admin'],
@@ -24,32 +94,96 @@ export default function AdminCallForwarding() {
     },
   });
 
+  const userIds = useMemo(() => rows.map((r: any) => r.user_id).filter(Boolean), [rows]);
+
+  const { data: directory = {} } = useQuery({
+    queryKey: ['cf-directory', userIds.join(',')],
+    enabled: userIds.length > 0,
+    queryFn: async () => {
+      const [{ data: profiles = [] }, { data: softphones = [] }] = await Promise.all([
+        supabase.from('profiles').select('id, email, full_name').in('id', userIds),
+        supabase.from('pbx_softphone_users').select('portal_user_id, extension, display_name').in('portal_user_id', userIds),
+      ]);
+      const map: Record<string, any> = {};
+      for (const p of profiles as any[]) map[p.id] = { ...(map[p.id] || {}), ...p };
+      for (const s of softphones as any[]) map[s.portal_user_id] = { ...(map[s.portal_user_id] || {}), extension: s.extension, display_name: s.display_name };
+      return map;
+    },
+  });
+
+  const { data: extensions = [] } = useQuery({
+    queryKey: ['cf-extensions'],
+    queryFn: async () => {
+      const { data } = await supabase.from('pbx_extensions').select('id, extension, display_name').eq('organization_id', LEMTEL_ORG).order('extension');
+      return data || [];
+    },
+  });
+  const { data: ringGroups = [] } = useQuery({
+    queryKey: ['cf-ring-groups'],
+    queryFn: async () => {
+      const { data } = await supabase.from('pbx_ring_groups').select('id, extension, name').eq('organization_id', LEMTEL_ORG).order('extension');
+      return data || [];
+    },
+  });
+  const { data: queues = [] } = useQuery({
+    queryKey: ['cf-queues'],
+    queryFn: async () => {
+      const { data } = await supabase.from('pbx_call_queues').select('id, extension, name').eq('organization_id', LEMTEL_ORG).order('extension');
+      return data || [];
+    },
+  });
+
   const val = (r: any, k: string) => edits[r.user_id]?.[k] ?? r[k];
   const setVal = (id: string, k: string, v: any) => setEdits(e => ({ ...e, [id]: { ...e[id], [k]: v } }));
 
   const save = async (r: any) => {
     setSavingId(r.user_id);
     try {
-      const { error } = await supabase.from('pbx_call_forwarding').update(edits[r.user_id]).eq('user_id', r.user_id);
+      const patch = edits[r.user_id];
+      const { error } = await supabase.from('pbx_call_forwarding').update(patch).eq('user_id', r.user_id);
       if (error) throw error;
-      toast.success('Saved');
+      try {
+        await supabase.functions.invoke('fusionpbx-proxy', {
+          body: { organization_id: LEMTEL_ORG, action: 'update-forwarding', params: { user_id: r.user_id, ...patch } },
+        });
+      } catch (e: any) {
+        toast.warning(`Saved locally — PBX sync warning: ${e?.message || 'unknown'}`);
+      }
+      toast.success('Forwarding rule saved');
       setEdits(e => { const n = { ...e }; delete n[r.user_id]; return n; });
       refetch();
     } catch (e: any) { toast.error(e?.message || 'Save failed'); }
     finally { setSavingId(null); }
   };
 
+  const filtered = useMemo(() => {
+    if (!search.trim()) return rows;
+    const s = search.toLowerCase();
+    return (rows as any[]).filter((r) => {
+      const d = directory[r.user_id] || {};
+      return [d.email, d.full_name, d.display_name, d.extension, r.user_id].some((v: any) => v && String(v).toLowerCase().includes(s));
+    });
+  }, [rows, directory, search]);
+
   return (
     <div className="space-y-4 w-full min-w-0">
       <AdminPageHeader
         icon={Router}
         title="Call Forwarding"
-        subtitle="Per-user forwarding rules (always, busy, no-answer, offline, DND)."
-        actions={<Button variant="outline" onClick={() => refetch()}><RefreshCw className="w-4 h-4 mr-2" /> Refresh</Button>}
+        subtitle="Per-user forwarding rules (always, busy, no-answer, offline, DND) — synced with FusionPBX."
+        actions={
+          <div className="flex gap-2 items-center">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search user, ext…" className="pl-8 w-48 h-9" />
+            </div>
+            <Button variant="outline" onClick={() => refetch()}><RefreshCw className="w-4 h-4 mr-2" /> Refresh</Button>
+          </div>
+        }
       />
 
       <Card>
-        <CardHeader><CardTitle>{rows.length} rule{rows.length === 1 ? '' : 's'}</CardTitle></CardHeader>
+        <CardHeader><CardTitle>{filtered.length} rule{filtered.length === 1 ? '' : 's'}</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader><TableRow>
@@ -63,21 +197,29 @@ export default function AdminCallForwarding() {
             </TableRow></TableHeader>
             <TableBody>
               {isLoading ? <AdminSkeletonRows rows={5} cols={11} /> :
-                rows.length === 0 ? <TableRow><TableCell colSpan={11}><AdminEmptyState title="No forwarding rules" hint="Users haven't configured call forwarding yet." /></TableCell></TableRow> :
-                rows.map((r: any) => (
+                filtered.length === 0 ? <TableRow><TableCell colSpan={11}><AdminEmptyState title="No forwarding rules" hint="Users haven't configured call forwarding yet." /></TableCell></TableRow> :
+                filtered.map((r: any) => {
+                  const d = directory[r.user_id] || {};
+                  return (
                   <TableRow key={r.user_id} className="hover:bg-muted/40">
-                    <TableCell className="font-mono text-xs">{r.user_id.slice(0, 8)}…</TableCell>
+                    <TableCell>
+                      <div className="text-sm font-medium">{d.full_name || d.display_name || d.email || r.user_id.slice(0, 8) + '…'}</div>
+                      <div className="text-xs text-muted-foreground flex gap-2 items-center">
+                        {d.extension && <Badge variant="outline" className="font-mono text-[10px]">ext {d.extension}</Badge>}
+                        {d.email && <span className="truncate max-w-[180px]">{d.email}</span>}
+                      </div>
+                    </TableCell>
                     <TableCell><Switch checked={!!val(r, 'always_enabled')} onCheckedChange={v => setVal(r.user_id, 'always_enabled', v)} /></TableCell>
-                    <TableCell><Input className="w-28 font-mono" value={val(r, 'always_to') || ''} onChange={e => setVal(r.user_id, 'always_to', e.target.value)} /></TableCell>
+                    <TableCell><DestinationPicker value={val(r, 'always_to') || ''} onChange={(v) => setVal(r.user_id, 'always_to', v)} extensions={extensions} ringGroups={ringGroups} queues={queues} /></TableCell>
                     <TableCell><Switch checked={!!val(r, 'busy_enabled')} onCheckedChange={v => setVal(r.user_id, 'busy_enabled', v)} /></TableCell>
-                    <TableCell><Input className="w-28 font-mono" value={val(r, 'busy_to') || ''} onChange={e => setVal(r.user_id, 'busy_to', e.target.value)} /></TableCell>
+                    <TableCell><DestinationPicker value={val(r, 'busy_to') || ''} onChange={(v) => setVal(r.user_id, 'busy_to', v)} extensions={extensions} ringGroups={ringGroups} queues={queues} /></TableCell>
                     <TableCell><Switch checked={!!val(r, 'no_answer_enabled')} onCheckedChange={v => setVal(r.user_id, 'no_answer_enabled', v)} /></TableCell>
                     <TableCell className="flex gap-1 items-center">
-                      <Input className="w-24 font-mono" value={val(r, 'no_answer_to') || ''} onChange={e => setVal(r.user_id, 'no_answer_to', e.target.value)} />
-                      <Input type="number" className="w-16" value={val(r, 'no_answer_seconds') ?? ''} onChange={e => setVal(r.user_id, 'no_answer_seconds', e.target.value ? parseInt(e.target.value) : null)} />
+                      <DestinationPicker value={val(r, 'no_answer_to') || ''} onChange={(v) => setVal(r.user_id, 'no_answer_to', v)} extensions={extensions} ringGroups={ringGroups} queues={queues} />
+                      <Input type="number" className="w-14 h-8" value={val(r, 'no_answer_seconds') ?? ''} onChange={e => setVal(r.user_id, 'no_answer_seconds', e.target.value ? parseInt(e.target.value) : null)} />
                     </TableCell>
                     <TableCell><Switch checked={!!val(r, 'offline_enabled')} onCheckedChange={v => setVal(r.user_id, 'offline_enabled', v)} /></TableCell>
-                    <TableCell><Input className="w-28 font-mono" value={val(r, 'offline_to') || ''} onChange={e => setVal(r.user_id, 'offline_to', e.target.value)} /></TableCell>
+                    <TableCell><DestinationPicker value={val(r, 'offline_to') || ''} onChange={(v) => setVal(r.user_id, 'offline_to', v)} extensions={extensions} ringGroups={ringGroups} queues={queues} /></TableCell>
                     <TableCell><Switch checked={!!val(r, 'dnd_enabled')} onCheckedChange={v => setVal(r.user_id, 'dnd_enabled', v)} /></TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" disabled={!edits[r.user_id] || savingId === r.user_id} onClick={() => save(r)}>
@@ -85,7 +227,8 @@ export default function AdminCallForwarding() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
             </TableBody>
           </Table>
         </CardContent>
