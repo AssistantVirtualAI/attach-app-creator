@@ -179,7 +179,7 @@ export default function App() {
         <BrightnessOverlay />
         <TitleBar />
         <div style={{ flex: 1, overflow: 'auto', position: 'relative', zIndex: 1 }}>
-          <SetupWizard onComplete={(c: any) => setCreds(c)} />
+          <SetupWizard onComplete={(c: any) => { setCreds(c); triggerCdrSync(); }} />
         </div>
       </div>
     );

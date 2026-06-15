@@ -30,8 +30,16 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ organization_id: orgId, ...payload }),
     });
 
-    const [cdrRes, vmRes] = await Promise.all([
-      callProxy({ action: "sync-cdrs", page_size: 250, max_pages: 4 }),
+    // Lemtel extension 300 CDRs are clustered around offsets 12000-14500 in the
+    // FusionPBX xml_cdr API (which orders by UUID, not date). New rows append
+    // at the high end (14500+). We run three parallel sync passes per tick:
+    //   1. Rolling cursor — broad catch-up across the full dataset.
+    //   2. Priority window — covers the known ext-300 cluster (12000-14500).
+    //   3. Recent tail — captures freshly-written CDRs (14500-17000).
+    const [cdrRes, cdrPriorityRes, cdrTailRes, vmRes] = await Promise.all([
+      callProxy({ action: "sync-cdrs", page_size: 500, max_pages: 4 }),
+      callProxy({ action: "sync-cdrs", page_size: 500, max_pages: 5, start_offset: 12000 }),
+      callProxy({ action: "sync-cdrs", page_size: 500, max_pages: 5, start_offset: 14500 }),
       callProxy({ action: "sync-voicemail-messages", params: { page_size: 250, max_pages: 1 } }),
     ]);
     const parse = async (r: Response) => {
@@ -39,7 +47,12 @@ Deno.serve(async (req) => {
       try { return { ok: r.ok, status: r.status, data: JSON.parse(text) }; }
       catch { return { ok: r.ok, status: r.status, data: text.slice(0, 500) }; }
     };
-    const data = { cdrs: await parse(cdrRes), voicemails: await parse(vmRes) };
+    const data = {
+      cdrs: await parse(cdrRes),
+      cdrs_priority: await parse(cdrPriorityRes),
+      cdrs_tail: await parse(cdrTailRes),
+      voicemails: await parse(vmRes),
+    };
     const ok = data.cdrs.ok && data.voicemails.ok;
     return new Response(JSON.stringify({ ok, duration_ms: Date.now() - t0, data }), {
       status: ok ? 200 : 502,
