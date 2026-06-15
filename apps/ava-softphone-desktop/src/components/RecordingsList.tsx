@@ -37,29 +37,31 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [audioLoading, setAudioLoading] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
+    setError(null);
     try {
       const data = await ava.recordings();
       setItems(Array.isArray(data) ? data : []);
     } catch (e: any) {
       setError(e?.message || 'Unable to load recordings.');
-      setItems([]);
+      if (!opts?.silent) setItems([]);
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, []);
 
+  const silentLoad = useCallback(() => { void load({ silent: true }); }, [load]);
+
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    const onSync = () => { void load(); };
-    window.addEventListener('lemtel:phone-sync-complete', onSync);
-    return () => window.removeEventListener('lemtel:phone-sync-complete', onSync);
-  }, [load]);
+    window.addEventListener('lemtel:phone-sync-complete', silentLoad);
+    return () => window.removeEventListener('lemtel:phone-sync-complete', silentLoad);
+  }, [silentLoad]);
 
-  // Realtime: new/updated call records with recordings trigger a refetch.
+  // Realtime: new/updated call records with recordings trigger a silent refetch (no flicker).
   const orgId = useOrgId();
-  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId, events: ['INSERT', 'UPDATE'], throttleMs: 30_000, shouldRefresh: isRecordingRealtimeChange }, load);
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId, events: ['INSERT', 'UPDATE'], throttleMs: 30_000, shouldRefresh: isRecordingRealtimeChange }, silentLoad);
 
 
 
@@ -91,8 +93,17 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
         },
       });
       if (r2.error) throw r2.error;
+      const ai = (r2.data as any)?.analysis || (r2.data as any) || null;
+      // Optimistic local update — avoid full reload that causes list flicker.
+      setItems((all) => all.map((x) => x.id === r.id ? {
+        ...x,
+        transcript_text,
+        summary: ai?.summary || x.summary,
+        topics: ai?.topics || x.topics,
+        sentiment: ai?.sentiment || x.sentiment,
+        analyzed: true,
+      } as RecordingItem : x));
       onAnalyze?.(r.id);
-      await load();
     } catch (e: any) {
       setError(displayError(e));
     } finally {
