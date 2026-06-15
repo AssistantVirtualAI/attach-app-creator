@@ -653,6 +653,8 @@ const App = () => (
                 <Route path="/org/lemtel/callcenter/admin" element={<LemtelTelephonyPage><CallCenterAdmin /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/diagnostics" element={<LemtelTelephonyPage><TelephonyDiagnostics /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/qa" element={<LemtelTelephonyPage><TelephonyDiagnostics /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/source-audit" element={<LemtelTelephonyPage><TelephonySourceAudit /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/_diagnostics" element={<LemtelTelephonyPage><TelephonySourceAudit /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/checklist" element={<LemtelTelephonyPage><TelephonyChecklist /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/portal-mappings" element={<LemtelTelephonyPage><TelephonyPortalMappings /></LemtelTelephonyPage>} />
 
