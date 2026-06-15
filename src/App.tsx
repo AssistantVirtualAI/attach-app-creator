@@ -97,6 +97,7 @@ import CustomerDetail from "./pages/lemtel/CustomerDetail";
 import LemtelGateways from "./pages/lemtel/LemtelGateways";
 import LemtelVoiceGateways from "./pages/lemtel/LemtelVoiceGateways";
 import LemtelExtensions from "./pages/lemtel/LemtelExtensions";
+import LemtelPbxUsers from "./pages/lemtel/LemtelPbxUsers";
 import LemtelDIDs from "./pages/lemtel/LemtelDIDs";
 import LemtelQueues from "./pages/lemtel/LemtelQueues";
 import LemtelIVR from "./pages/lemtel/LemtelIVR";
