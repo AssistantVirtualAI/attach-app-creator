@@ -244,6 +244,42 @@ export function ExtensionEditDialog({ open, onOpenChange, extension }: Props) {
             </div>
           </div>
 
+          <div className="rounded-md border p-3 bg-muted/20 space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2"><KeyRound className="w-4 h-4" /> Desktop & Mobile app access</Label>
+              <span className="text-xs text-muted-foreground">
+                {softphone?.app_access_enabled ? 'Active' : 'Revoked'}
+                {savingAccess && <Loader2 className="inline w-3 h-3 ml-2 animate-spin" />}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              When enabled, the user signs in to the AVA desktop and mobile apps with their
+              <strong> existing extension password</strong> — no rotation, no new credentials.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center justify-between border rounded p-3">
+                <Label htmlFor="desk" className="flex items-center gap-2"><Monitor className="w-4 h-4" /> Desktop app</Label>
+                <Switch id="desk" disabled={savingAccess}
+                  checked={desktopAccess}
+                  onCheckedChange={(v) => saveAppAccess(v, mobileAccess)} />
+              </div>
+              <div className="flex items-center justify-between border rounded p-3">
+                <Label htmlFor="mob" className="flex items-center gap-2"><Smartphone className="w-4 h-4" /> Mobile app</Label>
+                <Switch id="mob" disabled={savingAccess}
+                  checked={mobileAccess}
+                  onCheckedChange={(v) => saveAppAccess(desktopAccess, v)} />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" disabled={savingAccess}
+                onClick={() => saveAppAccess(true, true)}>Grant all</Button>
+              <Button size="sm" variant="outline" disabled={savingAccess}
+                className="text-red-600 border-red-500/30 hover:bg-red-500/10"
+                onClick={() => saveAppAccess(false, false)}>Revoke all</Button>
+            </div>
+          </div>
+
+
           <div>
             <div className="flex items-center justify-between mb-2">
               <Label className="flex items-center gap-2"><QrCode className="w-4 h-4" /> Mobile provisioning QR</Label>
