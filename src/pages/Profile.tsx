@@ -53,12 +53,12 @@ export default function Profile() {
     setUploading(true);
     try {
       const ext = file.name.split('.').pop();
-      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+      const path = `avatars/${user.id}/avatar-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage
-        .from('avatars')
+        .from('organization-assets')
         .upload(path, file, { upsert: true, cacheControl: '3600' });
       if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+      const { data: pub } = supabase.storage.from('organization-assets').getPublicUrl(path);
       const url = pub.publicUrl;
       const { error: dbErr } = await supabase
         .from('profiles')
