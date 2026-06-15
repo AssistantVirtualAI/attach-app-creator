@@ -47,7 +47,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
 
   // Realtime: new/updated call records with recordings trigger a refetch.
   const orgId = useOrgId();
-  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, load);
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId, events: ['INSERT'], throttleMs: 30_000 }, load);
 
 
 
