@@ -42,9 +42,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateError: (cb: (msg: string) => void) =>
     ipcRenderer.on('update-error', (_e, m) => cb(m)),
 
-  // Status from tray
+  // Status from tray / global shortcuts
   onSetStatus: (cb: (status: string) => void) =>
     ipcRenderer.on('set-status', (_e, status) => cb(status)),
+  onSetUiStatus: (cb: (status: 'available' | 'busy' | 'meeting' | 'away') => void) =>
+    ipcRenderer.on('set-ui-status', (_e, status) => cb(status)),
 
   // Custom protocol (lemtel://call/<number>)
   onProtocolCall: (cb: (data: { number: string }) => void) =>
