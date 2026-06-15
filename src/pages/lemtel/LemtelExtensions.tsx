@@ -47,14 +47,46 @@ export default function LemtelExtensions() {
   const queryClient = useQueryClient();
   const [prefill, setPrefill] = useState<{ extension?: string; displayName?: string; outboundCid?: string } | undefined>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: extensions = [], isLoading } = usePbxExtensions();
+  const { data: extensions = [], isLoading, refetch } = usePbxExtensions();
   const { data: softphones = [] } = usePbxSoftphoneUsers();
+  const { data: recentJobs = [] } = usePbxSyncJobs(5);
+  const lastExtJob = (recentJobs as any[]).find(j => String(j.job_type || '').includes('extensions'));
+  const [autoSyncing, setAutoSyncing] = useState(false);
   const softphoneByExt = useMemo(() => {
     const m = new Map<string, any>();
     (softphones as any[]).forEach(s => m.set(String(s.extension), s));
     return m;
   }, [softphones]);
   const all = extensions as any[];
+
+  // Auto-resync once when the table is empty (first visit after deploy / cache miss).
+  useEffect(() => {
+    if (!isLoading && all.length === 0 && !autoSyncing) {
+      setAutoSyncing(true);
+      supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'sync-extensions', organization_id: LEMTEL_ORG },
+      }).then(({ error }) => {
+        if (!error) { queryClient.invalidateQueries({ queryKey: ['pbx'] }); refetch(); }
+      }).finally(() => setAutoSyncing(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, all.length]);
+
+  const runManualSync = async () => {
+    setAutoSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'sync-extensions', organization_id: LEMTEL_ORG },
+      });
+      if (error) throw error;
+      toast({ title: 'Sync complete', description: `Fetched ${(data as any)?.fetched ?? 0}, upserted ${(data as any)?.upserted ?? 0}` });
+      queryClient.invalidateQueries({ queryKey: ['pbx'] });
+      refetch();
+    } catch (e: any) {
+      toast({ title: 'Sync failed', description: e?.message || String(e), variant: 'destructive' });
+    } finally { setAutoSyncing(false); }
+  };
+
 
   const handleDelete = async (e: any) => {
     if (!confirm(`Delete extension ${e.extension}? This removes it from FusionPBX.`)) return;
