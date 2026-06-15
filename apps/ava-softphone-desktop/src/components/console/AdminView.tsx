@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { theme } from '../../lib/theme';
 import { ava, getMeContext } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
@@ -8,6 +9,57 @@ const { colors: c } = theme;
 
 const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 const LEMTEL_DOMAIN = '2936594e-17b7-42a9-9165-95be48627923';
+
+/**
+ * Shared modal shell — rendered via portal so ancestor `transform`, `filter`,
+ * `overflow:hidden`, or backdrop-filter ancestors (e.g. the animated console
+ * page wrapper) can't trap the overlay or bleed table text through it.
+ * Uses a fully opaque panel background so edit forms read cleanly.
+ */
+function ModalShell({ title, onClose, width = 460, children }: { title: string; onClose: () => void; width?: number; children: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
+  }, [onClose]);
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(2,6,20,0.78)',
+        backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+        display: 'grid', placeItems: 'center', padding: 24,
+        animation: 'fadeIn 140ms ease-out',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: width, maxHeight: '88vh', overflowY: 'auto',
+          background: '#0c1733',
+          backgroundImage: 'linear-gradient(160deg, rgba(35,214,255,0.06), rgba(122,76,255,0.05))',
+          border: `1px solid ${(c as any).borderAI || c.border}`,
+          borderRadius: 16, padding: 22,
+          boxShadow: '0 30px 80px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(35,214,255,0.08)',
+          color: c.textIce,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${c.border}` }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: c.textIce, letterSpacing: 0.2 }}>{title}</div>
+          <button onClick={onClose} aria-label="Close" style={{
+            width: 28, height: 28, borderRadius: 8, border: `1px solid ${c.border}`,
+            background: 'rgba(255,255,255,0.04)', color: c.mutedSilver, cursor: 'pointer', fontSize: 14,
+          }}>✕</button>
+        </div>
+        {children}
+      </div>
+    </div>,
+    document.body,
+  );
+}
 
 function ExtensionsTable() {
   const [data, setData] = useState<any[]>([]);
