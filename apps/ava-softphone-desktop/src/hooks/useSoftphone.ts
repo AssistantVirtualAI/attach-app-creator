@@ -21,23 +21,45 @@ interface FetchedCreds {
 }
 
 async function fetchSoftphoneCredentials(accessToken: string): Promise<FetchedCreds | null> {
-  try {
-    const res = await fetch(`${SB_URL}/functions/v1/softphone-credentials`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        apikey: SB_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: '{}',
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.error) return null;
-    return data as FetchedCreds;
-  } catch {
-    return null;
+  // Retry transient DB / network errors before giving up.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const res = await fetch(`${SB_URL}/functions/v1/softphone-credentials`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          apikey: SB_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      });
+      if (res.status === 503 || res.status === 502 || res.status === 504) {
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        continue;
+      }
+      if (!res.ok) {
+        // Inspect body — backend may flag retryable transient errors.
+        const data = await res.json().catch(() => null);
+        if (data?.retryable) {
+          await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+          continue;
+        }
+        return null;
+      }
+      const data = await res.json();
+      if (data.error) {
+        if (data.retryable) {
+          await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+          continue;
+        }
+        return null;
+      }
+      return data as FetchedCreds;
+    } catch {
+      await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+    }
   }
+  return null;
 }
 
 export type ManualStatus = 'auto' | 'available' | 'dnd' | 'away';
