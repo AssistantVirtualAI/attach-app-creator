@@ -1439,20 +1439,32 @@ Deno.serve(async (req) => {
               sessionUrls.push(`${fileBase}/app/recordings/recordings.php?a=download&type=rec&t=bin&filename=${rel}`);
             }
           }
-          let cookie = await getFusionSessionCookie(fileBase).catch(() => "");
+          let cookie = "";
+          let loginError = "";
+          try {
+            cookie = await getFusionSessionCookie(fileBase);
+          } catch (e: any) {
+            loginError = String(e?.message || e).slice(0, 200);
+            console.log("[get-recording] FusionPBX login failed:", loginError, {
+              origin: fusionBaseOrigin(fileBase),
+              has_username: !!Deno.env.get("FUSIONPBX_USERNAME"),
+              has_password: !!Deno.env.get("FUSIONPBX_PASSWORD"),
+            });
+            attemptsSession.push({ url: `${fusionBaseOrigin(fileBase)}/login.php`, status: 0, content_type: `login_failed: ${loginError}` });
+          }
           for (const sessionUrl of sessionUrls) try {
             const doFetch = async (c: string) => {
               const controller = new AbortController();
               const timeout = setTimeout(() => controller.abort(), 8000);
               try {
                 return await fetch(sessionUrl, {
-                  headers: { Cookie: c, Accept: "*/*" },
+                  headers: { ...(c ? { Cookie: c } : {}), Accept: "*/*" },
                   redirect: "follow",
                   signal: controller.signal,
                 });
               } finally { clearTimeout(timeout); }
             };
-            let r = cookie ? await doFetch(cookie) : null;
+            let r = await doFetch(cookie);
             // If session expired, force re-login once.
             if (r && (r.status === 401 || r.status === 403 || r.headers.get("content-type")?.includes("text/html"))) {
               FUSION_SESSIONS.delete(fusionBaseOrigin(fileBase));
