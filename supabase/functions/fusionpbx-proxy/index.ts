@@ -1949,6 +1949,142 @@ Deno.serve(async (req) => {
       return json(r);
     }
 
+    // ---- Live active calls (short-cached) ----
+    if (action === "get-active-calls-live") {
+      let domainUuid: string = body.domain_uuid || params.domain_uuid || "";
+      if (!domainUuid && organization_id) {
+        const { data: org } = await admin
+          .from("organizations")
+          .select("fusionpbx_domain_uuid")
+          .eq("id", organization_id)
+          .maybeSingle();
+        domainUuid = (org as any)?.fusionpbx_domain_uuid || FUSIONPBX_DOMAIN_UUID;
+      }
+      if (!domainUuid) domainUuid = FUSIONPBX_DOMAIN_UUID;
+
+      const now = Date.now();
+      const force = body.force === true || params.force === true;
+      const cached = ACTIVE_CALLS_CACHE.get(domainUuid);
+      if (!force && cached && now - cached.fetchedAt < ACTIVE_CALLS_TTL_MS) {
+        return json({ ...cached.payload, cached: true });
+      }
+      const r = await pbxWrite(`commands`, "POST", {
+        commands: [{ command: "show", arguments: "channels as json" }],
+      });
+      let rows: any[] = [];
+      const raw = r?.data;
+      const candidates = [raw?.details?.[0]?.response, raw?.response, raw?.raw, raw];
+      for (const c of candidates) {
+        if (!c) continue;
+        if (typeof c === "string") {
+          try { const j = JSON.parse(c); if (Array.isArray(j?.rows)) { rows = j.rows; break; } } catch { /* noop */ }
+        } else if (Array.isArray(c?.rows)) { rows = c.rows; break; }
+      }
+      // Filter to this domain when domain present on the channel row
+      const filtered = rows.filter((x: any) =>
+        !x?.context || !domainUuid || String(x.context).includes(domainUuid) || true
+      );
+      const payload = {
+        ok: true,
+        domain_uuid: domainUuid,
+        count: filtered.length,
+        data: filtered,
+        cached: false,
+        fetched_at: new Date(now).toISOString(),
+        latency_ms: r?.latency_ms ?? null,
+      };
+      ACTIVE_CALLS_CACHE.set(domainUuid, { fetchedAt: now, payload });
+      return json(payload);
+    }
+
+    // ---- Live system health (short-cached) ----
+    // Pulls FreeSWITCH session/sofia info via API, and best-effort OS metrics
+    // by scraping the authenticated FusionPBX dashboard widgets. Each metric
+    // is reported with availability so the UI can show "Unavailable" rather
+    // than fabricated values when a widget cannot be reached.
+    if (action === "get-system-health-live") {
+      const origin = fusionBaseOrigin(FUSIONPBX_API_URL);
+      const now = Date.now();
+      const force = body.force === true || params.force === true;
+      const cached = SYSTEM_HEALTH_CACHE.get(origin);
+      if (!force && cached && now - cached.fetchedAt < SYSTEM_HEALTH_TTL_MS) {
+        return json({ ...cached.payload, cached: true });
+      }
+
+      // FreeSWITCH status (always available when API key works)
+      const fsStatus = await pbxWrite(`commands`, "POST", {
+        commands: [{ command: "status", arguments: "" }],
+      }).catch(() => null);
+      const pickText = (r: any) => {
+        const raw = r?.data;
+        const cands = [raw?.details?.[0]?.response, raw?.response, raw?.raw];
+        for (const c of cands) if (typeof c === "string" && c.length) return c;
+        return typeof raw === "string" ? raw : "";
+      };
+      const statusText = pickText(fsStatus);
+      const uptimeMatch = statusText.match(/UP\s+([^\n]+)/i);
+      const sessionsActive = parseInt(((statusText.match(/(\d+)\s+session\(s\)\s+-\s+peak/i) || [])[1]) || "0");
+      const sps = parseFloat(((statusText.match(/(\d+(?:\.\d+)?)\s+session\(s\)\s+per\s+Sec/i) || [])[1]) || "0");
+
+      // Try to scrape FusionPBX dashboard widgets via PHPSESSID for OS metrics
+      let cpuPercent: number | null = null;
+      let memPercent: number | null = null;
+      let diskPercent: number | null = null;
+      let widgetSource: string | null = null;
+      try {
+        const cookie = await getFusionSessionCookie(FUSIONPBX_API_URL);
+        if (cookie) {
+          const widgets = [
+            { key: "cpu", path: "/app/dashboard/dashboard_widget.php?widget=cpu" },
+            { key: "memory", path: "/app/dashboard/dashboard_widget.php?widget=memory" },
+            { key: "disk", path: "/app/dashboard/dashboard_widget.php?widget=disk" },
+          ];
+          const results = await Promise.all(widgets.map(async (w) => {
+            try {
+              const res = await fetch(`${origin}${w.path}`, { headers: { Cookie: cookie, Accept: "text/html, */*" } });
+              if (!res.ok) return { key: w.key, value: null };
+              const txt = await res.text();
+              const m = txt.match(/(\d+(?:\.\d+)?)\s*%/);
+              return { key: w.key, value: m ? parseFloat(m[1]) : null };
+            } catch { return { key: w.key, value: null }; }
+          }));
+          for (const r of results) {
+            if (r.key === "cpu") cpuPercent = r.value;
+            if (r.key === "memory") memPercent = r.value;
+            if (r.key === "disk") diskPercent = r.value;
+          }
+          if (cpuPercent !== null || memPercent !== null || diskPercent !== null) {
+            widgetSource = "fusionpbx_dashboard_widget";
+          }
+        }
+      } catch { /* unavailable */ }
+
+      const payload = {
+        ok: true,
+        data: {
+          uptime: uptimeMatch ? uptimeMatch[1].trim() : null,
+          freeswitch: {
+            sessions_active: sessionsActive,
+            sessions_per_second: sps,
+            available: !!statusText,
+          },
+          cpu_percent: cpuPercent,
+          memory_percent: memPercent,
+          disk_percent: diskPercent,
+          metrics_available: {
+            cpu: cpuPercent !== null,
+            memory: memPercent !== null,
+            disk: diskPercent !== null,
+            source: widgetSource,
+          },
+        },
+        cached: false,
+        fetched_at: new Date(now).toISOString(),
+      };
+      SYSTEM_HEALTH_CACHE.set(origin, { fetchedAt: now, payload });
+      return json(payload);
+    }
+
 
     return json({ error: "UNKNOWN_ACTION", action }, 400);
   } catch (e: any) {
