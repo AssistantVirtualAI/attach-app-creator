@@ -119,6 +119,7 @@ import CallCenterAgent from "./pages/callcenter/CallCenterAgent";
 import CallCenterWallboard from "./pages/callcenter/CallCenterWallboard";
 import CallCenterAdmin from "./pages/callcenter/CallCenterAdmin";
 import TelephonyDiagnostics from "./pages/telephony/TelephonyDiagnostics";
+import TelephonySourceAudit from "./pages/telephony/TelephonySourceAudit";
 import TelephonyAdvanced from "./pages/telephony/TelephonyAdvanced";
 import TelephonySyncHealth from "./pages/telephony/TelephonySyncHealth";
 import TelephonyChecklist from "./pages/telephony/TelephonyChecklist";
@@ -652,6 +653,8 @@ const App = () => (
                 <Route path="/org/lemtel/callcenter/admin" element={<LemtelTelephonyPage><CallCenterAdmin /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/diagnostics" element={<LemtelTelephonyPage><TelephonyDiagnostics /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/qa" element={<LemtelTelephonyPage><TelephonyDiagnostics /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/source-audit" element={<LemtelTelephonyPage><TelephonySourceAudit /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/_diagnostics" element={<LemtelTelephonyPage><TelephonySourceAudit /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/checklist" element={<LemtelTelephonyPage><TelephonyChecklist /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/portal-mappings" element={<LemtelTelephonyPage><TelephonyPortalMappings /></LemtelTelephonyPage>} />
 

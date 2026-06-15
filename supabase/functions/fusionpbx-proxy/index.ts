@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
   // domain_uuid is being acted upon. This lets each customer's admin manage
   // their own phone system through the proxy.
   if (!isServiceCall && userId) {
-    const readOnly = new Set(["ping", "debug-raw", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "backfill-cdrs", "sync-domains", "sync-voicemail-messages", "sync-ivr-options", "sync-all", "get-recording", "get-recording-signed-url", "list-queues", "list-ivrs", "list-ring-groups", "list-moh", "list-recordings", "list-devices", "list-destinations", "list-voicemails", "list-voicemail-messages", "list-registrations", "get-registrations", "get-registrations-live", "list-gateways", "list-gateways-all-domains", "list-gateways-merged", "get-gateways", "list-sip-profiles", "list-conferences", "list-hold-music", "list-dialplans", "get-extension", "sync_status", "sync-status", "list-active-calls", "get-active-calls-live", "system-status", "get-system-health-live", "desktop-audit"]);
+    const readOnly = new Set(["ping", "debug-raw", "resolve-domain", "diagnostics", "list-extensions", "list-domains", "list-cdrs", "get-cdrs", "sync-cdrs", "backfill-cdrs", "sync-domains", "sync-voicemail-messages", "sync-ivr-options", "sync-all", "get-recording", "get-recording-signed-url", "list-queues", "list-ivrs", "list-ring-groups", "list-moh", "list-recordings", "list-devices", "list-destinations", "list-voicemails", "list-voicemail-messages", "list-registrations", "get-registrations", "get-registrations-live", "list-gateways", "list-gateways-all-domains", "list-gateways-merged", "get-gateways", "list-sip-profiles", "list-conferences", "list-hold-music", "list-dialplans", "get-extension", "sync_status", "sync-status", "list-active-calls", "get-active-calls-live", "system-status", "get-system-health-live", "desktop-audit"]);
     const isRead = readOnly.has(_earlyAction);
     const rpcName = isRead ? "is_lemtel_member" : "is_lemtel_admin";
     const { data: allowed } = await admin.rpc(rpcName, { _user_id: userId });
@@ -213,9 +213,30 @@ Deno.serve(async (req) => {
   // confirmed-working pattern: Basic <FUSIONPBX_API_KEY>.
   const basicHeader = `Basic ${FUSIONPBX_API_KEY}`;
 
-  // Per-request domain override (each list/action can target any tenant domain)
-  const requestedDomain: string = body.domain_uuid || params.domain_uuid || FUSIONPBX_DOMAIN_UUID;
+  // ─── Phase 1: Normalized org → domain_uuid resolution ──────────────────
+  // Priority: explicit body.domain_uuid > params.domain_uuid > org lookup > vault fallback.
+  // Resolving from organization_id ensures every list-*/sync-*/get-* action targets
+  // the correct tenant domain instead of silently using the global vault default.
+  async function resolveDomain(): Promise<{ domain: string; source: string; org_id: string | null }> {
+    if (body.domain_uuid) return { domain: body.domain_uuid, source: "body", org_id: organization_id || null };
+    if (params.domain_uuid) return { domain: params.domain_uuid, source: "params", org_id: organization_id || null };
+    if (organization_id) {
+      const { data: org } = await admin
+        .from("organizations")
+        .select("fusionpbx_domain_uuid")
+        .eq("id", organization_id)
+        .maybeSingle();
+      const du = (org as any)?.fusionpbx_domain_uuid;
+      if (du) return { domain: du, source: "organization", org_id: organization_id };
+      console.warn(`[fusionpbx-proxy] org ${organization_id} has no fusionpbx_domain_uuid; falling back to vault default`);
+    }
+    return { domain: FUSIONPBX_DOMAIN_UUID, source: "vault", org_id: organization_id || null };
+  }
+  const _resolved = await resolveDomain();
+  const requestedDomain: string = _resolved.domain;
   const domainQ = `domain_uuid=${requestedDomain}`;
+  // Expose for debug actions
+  (body as any)._resolvedDomain = _resolved;
 
   async function pbxFetch(path: string, init: RequestInit = {}) {
     const url = `${FUSIONPBX_API_URL}/app/api/7/${path}`;
@@ -392,8 +413,53 @@ Deno.serve(async (req) => {
       const r = await pbxFetch(`extensions?${domainQ}&limit=1`);
       if (!r.ok) return json(r, r.status || 500);
       const exts = collection(r.data, "extensions");
-      return json({ status: "ok", latency_ms: r.latency_ms, extensions_count: exts.length });
+      return json({ status: "ok", latency_ms: r.latency_ms, extensions_count: exts.length, resolved_domain: _resolved });
     }
+
+    if (action === "resolve-domain") {
+      // Phase 0/1 diagnostics: report how the proxy resolves the active domain.
+      return json({ ok: true, resolved: _resolved, vault_default: FUSIONPBX_DOMAIN_UUID, organization_id });
+    }
+
+    if (action === "diagnostics") {
+      // Phase 0: per-inventory PBX vs AVA delta for the resolved domain.
+      const orgId = organization_id;
+      const dom = requestedDomain;
+      const counts: Record<string, any> = { resolved_domain: _resolved };
+      try {
+        const r = await pbxFetch(`extensions?${domainQ}&limit=500`);
+        counts.extensions_pbx = r.ok ? collection(r.data, "extensions").length : { error: r.status };
+      } catch (e) { counts.extensions_pbx = { error: String(e) }; }
+      try {
+        const r = await pbxFetch(`devices?${domainQ}&limit=500`);
+        counts.devices_pbx = r.ok ? collection(r.data, "devices").length : { error: r.status };
+      } catch (e) { counts.devices_pbx = { error: String(e) }; }
+      try {
+        const r = await pbxFetch(`destinations?${domainQ}&limit=500`);
+        counts.destinations_pbx = r.ok ? collection(r.data, "destinations").length : { error: r.status };
+      } catch (e) { counts.destinations_pbx = { error: String(e) }; }
+      try {
+        const r = await pbxFetch(`registrations?${domainQ}`);
+        counts.registrations_pbx = r.ok ? collection(r.data, "registrations").length : { error: r.status };
+      } catch (e) { counts.registrations_pbx = { error: String(e) }; }
+
+      if (orgId) {
+        const tables = ["pbx_extensions","pbx_softphone_users","pbx_devices","pbx_destinations","phone_numbers"] as const;
+        for (const t of tables) {
+          const { count, error } = await admin.from(t).select("*", { count: "exact", head: true }).eq("organization_id", orgId);
+          counts[`${t}_ava`] = error ? { error: error.message } : count;
+        }
+        const { data: lastSync } = await admin
+          .from("pbx_sync_jobs")
+          .select("id, job_type, status, started_at, completed_at, error_message")
+          .eq("organization_id", orgId)
+          .order("started_at", { ascending: false })
+          .limit(10);
+        counts.recent_sync_jobs = lastSync || [];
+      }
+      return json({ ok: true, organization_id: orgId, ...counts });
+    }
+
 
     if (action === "debug-raw") {
       // Restricted to lemtel/super admins only — exposes raw FusionPBX
