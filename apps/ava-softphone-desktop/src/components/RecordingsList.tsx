@@ -33,6 +33,10 @@ function displayError(e: any) {
   return text;
 }
 
+// Module-level cache: survives unmount/remount when navigating between pages,
+// so users don't have to re-download the same PBX audio every time they revisit.
+const audioCache = new Map<string, string>();
+
 export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string) => void }) {
   const [items, setItems] = useState<RecordingItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +44,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   const [error, setError] = useState<string | null>(null);
   const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
   const [itemSuccess, setItemSuccess] = useState<Record<string, string>>({});
-  const [audio, setAudio] = useState<Record<string, string>>({});
+  const [audio, setAudio] = useState<Record<string, string>>(() => Object.fromEntries(audioCache));
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [audioLoading, setAudioLoading] = useState<string | null>(null);
 
@@ -127,7 +131,11 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   const play = async (r: RecordingItem) => {
     setError(null);
     setAudioErrors((all) => { const next = { ...all }; delete next[r.id]; return next; });
-    if (audio[r.id]) return;
+    if (audio[r.id] || audioCache.has(r.id)) {
+      const cached = audio[r.id] || audioCache.get(r.id)!;
+      if (!audio[r.id]) setAudio((a) => ({ ...a, [r.id]: cached }));
+      return;
+    }
     setAudioLoading(r.id);
     try {
       // Prefer short-lived signed URL (no client download); fallback to proxy blob.
@@ -140,6 +148,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
         }));
         return;
       }
+      audioCache.set(r.id, url);
       setAudio((a) => ({ ...a, [r.id]: url }));
       audit('recording.played', r.callId || r.id, { recording_name: r.recording_name });
     } finally {
@@ -148,6 +157,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   };
 
   const recoverAudio = async (r: RecordingItem) => {
+    audioCache.delete(r.id);
     setAudio((a) => {
       const next = { ...a };
       delete next[r.id];
@@ -158,6 +168,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
     try {
       const url = await ava.getRecordingAudioUrl(r);
       if (url) {
+        audioCache.set(r.id, url);
         setAudio((a) => ({ ...a, [r.id]: url }));
         return;
       }
