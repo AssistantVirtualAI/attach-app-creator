@@ -1,49 +1,65 @@
-# Fix Extensions page + add PBX Users page
+# Command Center — Phases 1 to 5
 
-## Current state
+Phase 0 is shipped (audit table, sync columns, sources registry, SourceBadge, WriteScopeButton, usePlatformAccess, logAdminAction). This plan covers everything left from the master plan.
 
-- DB already has 21 rows in `pbx_extensions` for Lemtel, but every row has `sync_status = pending` and `last_synced_at = NULL`, one row has an empty `extension`, and `9999` is duplicated. So either:
-  - the page renders but looks empty because of stale/blank rows + an active type filter, or
-  - the current viewer is not a Lemtel member / super_admin and the three RLS policies on `pbx_extensions` hide everything.
-- The sync route only fetches FusionPBX `/extensions`. FusionPBX also exposes domain `Users` (the admins/operators attached to the domain) — we never pull that, so there is no "Users" page to mirror what the PBX shows.
+## Phase 1 — Desktop shell (Command Center)
 
-## What to build
+New left-rail console shell for the desktop app, distinct from the user softphone shell. Lives in `apps/ava-softphone-desktop/`.
 
-### 1. Make `/org/lemtel/admin/extensions` actually show the extensions
+- New `src/components/console/ConsoleShell.tsx` with a collapsible left rail: Dashboard, Extensions, Devices, Live Registrations, Active Calls, CDR & Recordings, Voicemail, DIDs, Inbound Routes, IVRs, Ring Groups, Queues, AI (insights), Chatbot, Audit. Each item shows a `<SourceBadge>` next to its label.
+- Rail items gated by role (`org_admin` / `lemtel_admin` / `super_admin`) using a new `useDesktopRole()` hook backed by `has_role` + `is_lemtel_admin`.
+- New routes in `apps/ava-softphone-desktop/src/App.tsx` mounted under `/console/*` plus a top-right ProfileMenu that mirrors the web `UserAvatarMenu`.
+- Header strip per page: page title, source kind badge, write-scope dropdown, "Last synced" + refresh.
 
-- Add a diagnostic banner on `LemtelExtensions.tsx` that, when `all.length === 0`, calls a new SECURITY DEFINER function `audit_my_pbx_extensions_access()` and shows: row count visible to the user, whether they are `is_super_admin` / `is_lemtel_admin` / `is_lemtel_member`, and the last `sync-extensions` job result. This turns "nothing appears" into an actionable message.
-- Force a fresh sync when the page mounts if `last_synced_at` is `NULL` for every row OR the most recent sync job is older than 30 min, instead of only on the user clicking "Resync".
-- After sync, run a cleanup migration:
-  - delete the row where `extension = ''` or `extension IS NULL`,
-  - de-duplicate `(organization_id, extension)` keeping the row with the newest `last_synced_at` / `updated_at`,
-  - add a partial unique index `(organization_id, extension) WHERE extension <> ''` so duplicates can't come back.
-- In the mapper inside `fusionpbx-proxy` `sync-extensions`, set `sync_status = 'synced'` and `last_synced_at = now()` on every upsert so the "Last synced" header stops saying "never".
-- Reset the type filter when it would hide every row (defensive: if `exts.length === 0 && all.length > 0 && typeFilter`, auto-clear it).
+## Phase 2 — Inventory pages (read of `_safe` views, write via WriteScopeButton)
 
-### 2. Add a real "PBX Users" page
+For every entity in `PBX_SOURCES`, ship a Command Center page reusing one generic `<InventoryTable>` driven by a column descriptor file:
 
-FusionPBX `Users` (domain users) are different from `Extensions`. Mirror them in their own page:
+- Extensions, Devices, IVRs, IVR options, Ring Groups, Queues, DIDs, Inbound Routes, Time Conditions, Voicemail boxes.
+- Each row: SourceBadge, edit dialog (push to PBX confirmation), delete (with audit log via `logAdminAction`).
+- Each list page calls the right `sync-*` action on demand + auto when `last_synced_at > staleAfterSeconds`.
+- Empty state always renders a diagnostic explaining why (no rows / RLS blocked / sync failed) just like Extensions does today.
 
-- New migration: `pbx_domain_users` table with `organization_id`, `pbx_uuid` (user_uuid), `username`, `email`, `status`, `api_key`, `user_enabled`, `last_login_at`, `groups jsonb`, `last_synced_at`, `sync_status`, `raw_data jsonb`, unique `(organization_id, pbx_uuid)`. GRANTs for `authenticated` + `service_role`. RLS: same three policies pattern (`lemtel_staff_select`, `org_members_select`, `org_admin_modify`).
-- New `sync-users` action in `fusionpbx-proxy` calling `users?domain_uuid=...` with a `mapUser` mapper, registered through the existing `genericSync`.
-- New page `src/pages/lemtel/LemtelPbxUsers.tsx` modeled on `LemtelExtensions.tsx`: list, search, type/status badges, "Resync from PBX" button, link-to-portal-user button (reuses `admin_link_softphone_by_email` when a matching extension exists).
-- Sidebar entry under the same Lemtel admin section: `Users` → `/org/lemtel/admin/users`, plus route in `App.tsx` wrapped in `LemtelAdminPage`.
-- Update `SyncEverythingButton` to also fire `sync-users`.
+## Phase 3 — Live operations
 
-### 3. Make the two pages feel like FusionPBX
+- Live Registrations page polling `fusionpbx-proxy?action=list-registrations` every 15 s.
+- Active Calls page polling `get-active-calls-live` every 5 s, with hangup / transfer / monitor actions wired through new `fusionpbx-proxy` actions (`hangup-call`, `transfer-call`, `eavesdrop-call`) — each logs to `pbx_admin_actions` with `requires confirmation` modal.
+- CDR & Recordings: paginated, filter by date/extension/queue; play recording via signed URL; "Analyze with AI" + "Transcribe" buttons calling existing edge functions and showing job status from `pbx_ai_jobs`.
 
-- On `LemtelExtensions.tsx`, add a small tab strip at the top: `Extensions` (current page) | `Users` (links to the new page) so admins can switch the way they do in FusionPBX.
-- Show a `SourceBadge` (already in `src/components/pbx/SourceBadge.tsx`) next to each row with `live`/`synced`/`stale` based on `last_synced_at` so admins immediately see what is fresh vs stale.
+## Phase 4 — AI Insights & Chatbot
 
-## Acceptance
+- `Insights` page surfacing `pbx_ai_insights` + `topic_aggregates` with coverage chart (rows analyzed vs total CDR) even when nothing is processed yet (so user sees baseline).
+- Chatbot panel (right drawer) consuming a new edge function `pbx-admin-chatbot` that:
+  - resolves source by entity (e.g. "extension 300") via Postgres functions,
+  - returns the row + a suggested action,
+  - exposes a "Run action" button which triggers the matching `fusionpbx-proxy` write and logs `pbx_admin_actions`.
 
-- Opening `/org/lemtel/admin/extensions` as a Lemtel admin shows all extensions (no empty list), with a non-"never" last-synced timestamp.
-- If the list is still empty, the page tells the user exactly why (no membership, sync failed with X, etc.).
-- A new `/org/lemtel/admin/users` page lists the FusionPBX domain users for Lemtel and offers a "Resync from PBX" button.
-- "Sync everything" pulls extensions AND users in one click.
-- No duplicate `9999` row, no empty-extension row.
+## Phase 5 — Audit & manual presence
+
+- New `Audit` page listing `pbx_admin_actions` with filters (entity, actor, action, result, rollback).
+- Per-row "Rollback" button (when `before_json` exists) that pushes the previous payload through the matching write action and records a new audit row with `rollback_of`.
+- Manual presence override already shipped; this phase adds the auto `on_call` reset on desktop softphone disconnect events too.
+
+## Acceptance (per the master spec)
+
+- Source kind badge on every list page and detail header.
+- Every write goes through `<WriteScopeButton>` and logs to `pbx_admin_actions`.
+- Live pages refresh on the cadence declared in `PBX_SOURCES.staleAfterSeconds`.
+- A desktop-blocked user no longer sees Command Center routes (gated by `usePlatformAccess`).
+- AI Insights always renders coverage, even at 0 analyses.
+- Chatbot returns a real source + confirmable action for "show me extension 300".
+
+## Order of work
+
+1. Phase 1 shell (no inventory yet) → ship and verify routes.
+2. Phase 2 inventory pages reusing one shared table component.
+3. Phase 3 live ops + recordings.
+4. Phase 4 insights + chatbot.
+5. Phase 5 audit + rollback.
 
 ## Technical notes
 
-- Files touched: `src/pages/lemtel/LemtelExtensions.tsx`, new `src/pages/lemtel/LemtelPbxUsers.tsx`, `src/hooks/usePbxData.ts` (add `usePbxDomainUsers`), `src/components/sidebar/sidebarConfig.ts`, `src/App.tsx`, `src/components/lemtel/SyncEverythingButton.tsx`, `supabase/functions/fusionpbx-proxy/index.ts`.
-- Migrations: cleanup `pbx_extensions` duplicates + partial unique index; create `pbx_domain_users` with GRANTs + RLS; create `audit_my_pbx_extensions_access()` SECURITY DEFINER helper.
+- New files: `apps/ava-softphone-desktop/src/components/console/ConsoleShell.tsx`, `…/components/console/InventoryTable.tsx`, `…/pages/console/*.tsx` (one per entity), `…/hooks/useDesktopRole.ts`, `supabase/functions/pbx-admin-chatbot/index.ts`.
+- New edge actions in `fusionpbx-proxy`: `hangup-call`, `transfer-call`, `eavesdrop-call`.
+- Migration: index `pbx_admin_actions(organization_id, created_at desc)` + RPC `rollback_admin_action(_id uuid)` (server-side guard) — done in Phase 5.
+- All reads stay on `_safe` views; writes go through edge functions only.
