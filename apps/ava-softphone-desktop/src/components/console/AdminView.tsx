@@ -242,8 +242,8 @@ function Label({ children }: { children: React.ReactNode }) {
 type Section =
   | 'extensions' | 'devices' | 'numbers' | 'ivrs' | 'queues' | 'ringgroups'
   | 'gateways' | 'sip-profiles' | 'conferences' | 'hold-music' | 'dialplans'
-  | 'time-conditions' | 'registrations' | 'voicemails' | 'recordings' | 'feature-codes'
-  | 'sync';
+  | 'time-conditions' | 'registrations' | 'voicemails' | 'recordings'
+  | 'call-history' | 'feature-codes' | 'sync';
 
 const NAV_GROUPS: { label: string; items: { id: Section; label: string }[] }[] = [
   {
