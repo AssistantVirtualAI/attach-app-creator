@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { ava } from '../lib/avaApi';
 
 interface ExtRow {
   id: string;
@@ -8,6 +9,7 @@ interface ExtRow {
   description: string | null;
   enabled: boolean | null;
   do_not_disturb: boolean | null;
+  status?: string | null;
 }
 
 interface PresenceRow {
@@ -38,22 +40,25 @@ export default function ContactsList({ selfExtension, onCall }: Props) {
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
-    const [extRes, presRes] = await Promise.all([
-      supabase
-        .from('pbx_extensions')
-        .select('id,extension,effective_cid_name,description,enabled,do_not_disturb')
-        .eq('enabled', true)
-        .order('extension', { ascending: true })
-        .limit(500),
+    const [extRows, presRes] = await Promise.all([
+      ava.extensions().catch(() => [] as any[]),
       supabase
         .from('pbx_softphone_users')
         .select('extension,status,last_seen_at'),
     ]);
-    if (extRes.error) setErr(extRes.error.message);
-    else setExts((extRes.data as ExtRow[]) || []);
+    setExts((extRows || []).map((e: any) => ({
+      id: e.id,
+      extension: String(e.extension),
+      effective_cid_name: e.displayName || null,
+      description: e.user || null,
+      enabled: e.enabled !== false,
+      do_not_disturb: !!e.doNotDisturb,
+      status: e.status || null,
+    })));
     if (!presRes.error && presRes.data) {
       const map: Record<string, string> = {};
       (presRes.data as PresenceRow[]).forEach((p) => { map[p.extension] = p.status || 'offline'; });
+      (extRows || []).forEach((e: any) => { if (e.extension && e.status && !map[e.extension]) map[e.extension] = e.status; });
       setPresence(map);
     }
     setLoading(false);
