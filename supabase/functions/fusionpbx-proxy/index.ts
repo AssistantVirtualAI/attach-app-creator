@@ -895,16 +895,18 @@ Deno.serve(async (req) => {
       const allErrors: string[] = [];
       let firstPage: any[] = [];
 
+      // FusionPBX's xml_cdr API injects any query param as a WHERE clause, so we cannot
+      // pass `order` / `order_by` / `order_type` — they crash the handler. Instead we
+      // restrict the window to the last N days so each sync surfaces the freshest CDRs
+      // even though FusionPBX returns oldest-first within the window.
+      const sinceDays = parseInt(String((params as any).since_days ?? b.since_days ?? 14));
+      const sinceDate = new Date(Date.now() - sinceDays * 86400_000)
+        .toISOString().replace("T", " ").slice(0, 19);
       for (let i = 0; i < maxPages; i++) {
-        // IMPORTANT: FusionPBX returns CDRs oldest-first by default. Without an explicit
-        // sort, sync-cdrs keeps re-ingesting the same historical rows and never reaches
-        // recent calls. `order_by` + `order_type` are accepted (only the bare param name
-        // `order` conflicts with the PG reserved word inside FusionPBX's API handler).
         const extra: Record<string, string> = {
           limit: String(pageSize),
           offset: String(i * pageSize),
-          order_by: "start_stamp",
-          order_type: "desc",
+          start_stamp: `>${sinceDate}`,
         };
         if (extension) extra.extension = extension;
         const r = await fetchCdrsWithFallback(extra);
