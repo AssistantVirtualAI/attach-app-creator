@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
+import "./lib/reloadDiagnostics";
 import "./lib/devPreviewGuard";
 import "./lib/styleHealthGuard";
 import "./lib/buildVersionPoller";
