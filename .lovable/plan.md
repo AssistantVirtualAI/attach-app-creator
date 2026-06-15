@@ -1,75 +1,49 @@
-# Remaining Phases B–D + Presence — Implementation Plan
+# Fix Extensions page + add PBX Users page
 
-## Phase B — Workspace sidebar shell rewrite
+## Current state
 
-Replace the current top tab bar in `PortalShells` (user workspace shell) with a collapsible left sidebar using shadcn `Sidebar` (`collapsible="icon"`). Mobile (Capacitor + small viewports) keeps a bottom tab bar fallback.
+- DB already has 21 rows in `pbx_extensions` for Lemtel, but every row has `sync_status = pending` and `last_synced_at = NULL`, one row has an empty `extension`, and `9999` is duplicated. So either:
+  - the page renders but looks empty because of stale/blank rows + an active type filter, or
+  - the current viewer is not a Lemtel member / super_admin and the three RLS policies on `pbx_extensions` hide everything.
+- The sync route only fetches FusionPBX `/extensions`. FusionPBX also exposes domain `Users` (the admins/operators attached to the domain) — we never pull that, so there is no "Users" page to mirror what the PBX shows.
 
-Layout:
-```text
-┌─Sidebar──────┬──────── Header (trigger + breadcrumbs + UserAvatarMenu) ─────┐
-│ Workspace    │                                                              │
-│  Dashboard   │                                                              │
-│  Softphone   │                       <Outlet/>                              │
-│  Calls       │                                                              │
-│  Voicemail   │                                                              │
-│  Recordings  │                                                              │
-│  SMS         │                                                              │
-│ Collaboration│                                                              │
-│  Org Chat    │                                                              │
-│  Contacts    │                                                              │
-│ Tools        │                                                              │
-│  Profile     │                                                              │
-│  Settings    │                                                              │
-│  AI Insights │                                                              │
-└──────────────┴──────────────────────────────────────────────────────────────┘
-```
+## What to build
 
-New files:
-- `src/components/portals/WorkspaceSidebar.tsx` — sections gated by `usePlatformAccess` + role; active route via `NavLink`; persists collapsed state in `localStorage("ava.sidebar.collapsed")`.
-- `src/components/portals/UserAvatarMenu.tsx` — avatar, name, status pill; menu: Profile, Settings, Change password, Admin Portal (if super/lemtel admin), Sign out.
-- Rewrite `src/components/portals/PortalShells.tsx` user shell to use `SidebarProvider` + `WorkspaceSidebar` + header with `SidebarTrigger`.
+### 1. Make `/org/lemtel/admin/extensions` actually show the extensions
 
-Admin shells keep current chrome; just inject `UserAvatarMenu` consistently.
+- Add a diagnostic banner on `LemtelExtensions.tsx` that, when `all.length === 0`, calls a new SECURITY DEFINER function `audit_my_pbx_extensions_access()` and shows: row count visible to the user, whether they are `is_super_admin` / `is_lemtel_admin` / `is_lemtel_member`, and the last `sync-extensions` job result. This turns "nothing appears" into an actionable message.
+- Force a fresh sync when the page mounts if `last_synced_at` is `NULL` for every row OR the most recent sync job is older than 30 min, instead of only on the user clicking "Resync".
+- After sync, run a cleanup migration:
+  - delete the row where `extension = ''` or `extension IS NULL`,
+  - de-duplicate `(organization_id, extension)` keeping the row with the newest `last_synced_at` / `updated_at`,
+  - add a partial unique index `(organization_id, extension) WHERE extension <> ''` so duplicates can't come back.
+- In the mapper inside `fusionpbx-proxy` `sync-extensions`, set `sync_status = 'synced'` and `last_synced_at = now()` on every upsert so the "Last synced" header stops saying "never".
+- Reset the type filter when it would hide every row (defensive: if `exts.length === 0 && all.length > 0 && typeFilter`, auto-clear it).
 
-## Phase C — `/my/settings` change-password + profile section
+### 2. Add a real "PBX Users" page
 
-New page `src/pages/my/Settings.tsx` with three tabs (shadcn `Tabs`):
-1. **Profile** — full name, avatar (uploads to `organization-assets`), status emoji default.
-2. **Security** — change password form (`supabase.auth.updateUser({ password })` with confirm + zxcvbn-style strength meter), sign-out-all-sessions button.
-3. **Notifications & Devices** — `user_notification_prefs` toggles + linked desktop/mobile platforms (read-only from `pbx_softphone_users.active_platforms`).
+FusionPBX `Users` (domain users) are different from `Extensions`. Mirror them in their own page:
 
-Wire `/my/settings` route. Existing `/profile` redirects to `/my/settings?tab=profile`.
+- New migration: `pbx_domain_users` table with `organization_id`, `pbx_uuid` (user_uuid), `username`, `email`, `status`, `api_key`, `user_enabled`, `last_login_at`, `groups jsonb`, `last_synced_at`, `sync_status`, `raw_data jsonb`, unique `(organization_id, pbx_uuid)`. GRANTs for `authenticated` + `service_role`. RLS: same three policies pattern (`lemtel_staff_select`, `org_members_select`, `org_admin_modify`).
+- New `sync-users` action in `fusionpbx-proxy` calling `users?domain_uuid=...` with a `mapUser` mapper, registered through the existing `genericSync`.
+- New page `src/pages/lemtel/LemtelPbxUsers.tsx` modeled on `LemtelExtensions.tsx`: list, search, type/status badges, "Resync from PBX" button, link-to-portal-user button (reuses `admin_link_softphone_by_email` when a matching extension exists).
+- Sidebar entry under the same Lemtel admin section: `Users` → `/org/lemtel/admin/users`, plus route in `App.tsx` wrapped in `LemtelAdminPage`.
+- Update `SyncEverythingButton` to also fire `sync-users`.
 
-## Phase D — Recordings RLS + extension-mapping audit (deeper)
+### 3. Make the two pages feel like FusionPBX
 
-Currently `AdminRecordings` "mine" scope returns empty even when the PBX has recordings. Root causes to fix:
+- On `LemtelExtensions.tsx`, add a small tab strip at the top: `Extensions` (current page) | `Users` (links to the new page) so admins can switch the way they do in FusionPBX.
+- Show a `SourceBadge` (already in `src/components/pbx/SourceBadge.tsx`) next to each row with `live`/`synced`/`stale` based on `last_synced_at` so admins immediately see what is fresh vs stale.
 
-1. **Mapping**: confirm `pbx_softphone_users.portal_user_id` is set for the signed-in user. Add a maintenance edge function `audit-my-recordings` that returns: resolved extension(s), domain, count of `pbx_call_records` where caller/callee matches, count of `pbx_call_recordings` joined, list of missing mappings.
-2. **RLS**: review `pbx_call_recordings` policies — add policy `recordings_user_self` allowing SELECT when the row joins a `pbx_call_records` where the resolved extension matches caller/destination AND domain matches. Use the existing `is_my_extension_call` SECURITY DEFINER helper (already present) to avoid recursion.
-3. **Backfill**: ensure `pbx_call_recordings_mirror_flags` trigger has run; expose a "Re-link my recordings" button on `/my/recordings` that calls the audit function and the existing reconcile function.
-4. **UI**: new `/my/recordings` page (separate from admin) with date filter, search, play button via existing `pbxRecordingAudio`, transcript panel. Empty state explains exactly why (no mapping, no PBX recordings, RLS blocked).
+## Acceptance
 
-Migration:
-- New policy on `pbx_call_recordings` for user self-access.
-- Optional: index `pbx_call_recordings (organization_id, pbx_uuid)` if missing.
+- Opening `/org/lemtel/admin/extensions` as a Lemtel admin shows all extensions (no empty list), with a non-"never" last-synced timestamp.
+- If the list is still empty, the page tells the user exactly why (no membership, sync failed with X, etc.).
+- A new `/org/lemtel/admin/users` page lists the FusionPBX domain users for Lemtel and offers a "Resync from PBX" button.
+- "Sync everything" pulls extensions AND users in one click.
+- No duplicate `9999` row, no empty-extension row.
 
-## Phase E — Presence: manual override + auto `on_call` from softphone
+## Technical notes
 
-1. **Manual override**: extend `UserAvatarMenu` with status submenu (Available, Busy, In meeting, Away, Do not disturb, Offline) + custom emoji/message field. Persists via existing `upsert_user_presence` RPC.
-2. **Auto `on_call`**: hook into `useSoftphone` lifecycle — on session start call `upsert_user_presence({ call_state: 'on_call', status: previous })`; on session end revert to previous status (cache previous in `sessionStorage("ava.presence.prev")`).
-3. **Heartbeat** already running from Phase A (`useChatHeartbeat` 30s). Add visibility/idle detection: after 5 min idle → `status='away'`; on focus return → revert.
-4. **Desktop parity**: emit same presence updates from the Electron softphone via the existing supabase client wired in `apps/ava-softphone-desktop`.
-
-## Acceptance checks
-- Sidebar collapses to icon strip, state persisted across reload.
-- `UserAvatarMenu` opens reliably (no z-index regression), shows correct super-admin "Admin Portal" link.
-- `/my/settings` Security tab successfully changes password and signs other sessions out.
-- A user with a recording in the PBX sees it under `/my/recordings`; empty state names the reason when none.
-- Setting status to "Busy" persists across pages and is visible to teammates in Org Chat directory; placing a call flips status to `on_call` and reverts on hangup.
-
-## Files touched (summary)
-- new: `WorkspaceSidebar.tsx`, `UserAvatarMenu.tsx`, `src/pages/my/Settings.tsx`, `src/pages/my/Recordings.tsx`, `supabase/functions/audit-my-recordings/index.ts`.
-- edit: `PortalShells.tsx`, `useSoftphone` (presence hooks), `App.tsx` routes, `useOrgChat` (idle detect), Electron softphone presence wiring.
-- migration: recordings self-access RLS policy.
-
-Order: B → C → E → D (D depends on knowing whether mapping or RLS is the blocker — audit function runs first inside D).
+- Files touched: `src/pages/lemtel/LemtelExtensions.tsx`, new `src/pages/lemtel/LemtelPbxUsers.tsx`, `src/hooks/usePbxData.ts` (add `usePbxDomainUsers`), `src/components/sidebar/sidebarConfig.ts`, `src/App.tsx`, `src/components/lemtel/SyncEverythingButton.tsx`, `supabase/functions/fusionpbx-proxy/index.ts`.
+- Migrations: cleanup `pbx_extensions` duplicates + partial unique index; create `pbx_domain_users` with GRANTs + RLS; create `audit_my_pbx_extensions_access()` SECURITY DEFINER helper.
