@@ -1296,13 +1296,26 @@ Deno.serve(async (req) => {
       const attempts: { url: string; status: number; content_type?: string }[] = [];
       const tryUrls: string[] = [];
       const fileBases = getPbxFileBases();
+      const isAudioContentType = (value: string) => /audio\//i.test(value) || /octet-stream/i.test(value);
+      const looksLikeAudioBytes = (buf: ArrayBuffer, contentType: string) => {
+        const head = new TextDecoder().decode(buf.slice(0, Math.min(buf.byteLength, 180))).trim().toLowerCase();
+        const looksLikeError = head.startsWith("{") || head.startsWith("[") || head.startsWith("<") || head.includes("sqlstate") || head.includes("undefined column") || head.includes("error");
+        return !looksLikeError && (isAudioContentType(contentType) || head.startsWith("id3") || head.startsWith("riff") || head.startsWith("oggs") || head.includes("ftyp") || buf.byteLength > 1200);
+      };
+      const audioResponse = (buf: ArrayBuffer | Uint8Array, contentType: string) => new Response(buf, {
+        headers: { ...corsHeaders, "Content-Type": isAudioContentType(contentType) ? contentType : ct, "Content-Length": String(buf.byteLength), "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=300" },
+      });
       if (xml_cdr_uuid) {
         for (const fileBase of fileBases) {
           const id = encodeURIComponent(String(xml_cdr_uuid));
           // Match the FusionPBX portal player exactly: /app/xml_cdr/download.php?id={xml_cdr_uuid}.
           // Add API-key query auth for server-side access because the portal normally uses a PHP session cookie.
+          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}&t=bin`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${id}&t=bin`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${id}`));
+          tryUrls.push(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}&t=bin`);
+          tryUrls.push(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}`);
           tryUrls.push(`${fileBase}/app/xml_cdr/download.php?id=${id}&t=bin`);
           tryUrls.push(`${fileBase}/app/xml_cdr/download.php?id=${id}`);
         }
@@ -1381,11 +1394,33 @@ Deno.serve(async (req) => {
       if (xml_cdr_uuid) {
         for (const fileBase of fileBases) {
           const sessionUrls = [
+            `${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`,
+            `${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${encodeURIComponent(xml_cdr_uuid)}`,
             `${fileBase}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`,
             `${fileBase}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`,
+            `${fileBase}/app/call_recordings/call_recording_download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`,
+            `${fileBase}/app/call_recordings/call_recording_download.php?id=${encodeURIComponent(xml_cdr_uuid)}`,
             `${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`,
             `${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`,
           ];
+          if (record_name) {
+            const rawName = normalizeRecordName(record_name);
+            const n = encodeURIComponent(rawName);
+            sessionUrls.push(`${fileBase}/app/xml_cdr/xml_cdr_download.php?record_name=${n}&t=bin`);
+            sessionUrls.push(`${fileBase}/app/call_recordings/call_recording_download.php?record_name=${n}&t=bin`);
+            if (record_path) {
+              const p = encodeURIComponent(String(record_path));
+              const cleanPath = String(record_path).replace(/^\/+/, "");
+              const domainName = String(domain_name || "");
+              const relativeName = domainName
+                ? `${cleanPath.replace(new RegExp(`^var/lib/freeswitch/recordings/${domainName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?`), "")}/${rawName}`
+                : `${String(record_path).split("/recordings/").pop()?.split("/").slice(1).join("/") || cleanPath}/${rawName}`;
+              const rel = encodeURIComponent(relativeName.replace(/^\/+/, ""));
+              sessionUrls.push(`${fileBase}/app/recordings/recording_download.php?path=${p}&filename=${n}`);
+              sessionUrls.push(`${fileBase}/app/recordings/recordings.php?action=download&type=rec&t=bin&filename=${rel}`);
+              sessionUrls.push(`${fileBase}/app/recordings/recordings.php?a=download&type=rec&t=bin&filename=${rel}`);
+            }
+          }
           let cookie = await getFusionSessionCookie(fileBase).catch(() => "");
           for (const sessionUrl of sessionUrls) try {
             const doFetch = async (c: string) => {
@@ -1412,21 +1447,11 @@ Deno.serve(async (req) => {
             if (r && r.ok) {
               const buf = await r.arrayBuffer();
               const rct = r.headers.get("content-type") || "";
-              const head = new TextDecoder().decode(buf.slice(0, Math.min(buf.byteLength, 160))).trim().toLowerCase();
-              const looksLikeAudio = head.startsWith("id3") || head.startsWith("riff") || head.startsWith("oggs") || head.includes("ftyp") || (buf.byteLength > 1200 && !head.startsWith("<") && !head.startsWith("{"));
-              if (looksLikeAudio && !rct.includes("text/html")) {
+              if (looksLikeAudioBytes(buf, rct) && !rct.includes("text/html")) {
                 if (probeOnly) {
                   return json({ ok: true, available: true, content_type: rct.startsWith("audio/") ? rct : ct }, 200, { "X-Recording-Status": "available" });
                 }
-                return new Response(buf, {
-                  headers: {
-                    ...corsHeaders,
-                    "Content-Type": rct.startsWith("audio/") ? rct : ct,
-                    "Content-Length": String(buf.byteLength),
-                    "Accept-Ranges": "bytes",
-                    "Cache-Control": "private, max-age=300",
-                  },
-                });
+                return audioResponse(buf, rct);
               }
               attemptsSession.push({ url: safeUrl(sessionUrl), status: r.status, content_type: rct });
             } else if (r) {
