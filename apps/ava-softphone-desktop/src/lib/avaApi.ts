@@ -508,6 +508,33 @@ async function bestEffortCdrSync(limit = 200) {
   }
 }
 
+async function bestEffortRecentTelephonySync(limit = 200) {
+  try {
+    await Promise.allSettled([
+      fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': BACKEND.anonKey,
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({ action: 'sync-cdrs', limit }),
+      }),
+      fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': BACKEND.anonKey,
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({ action: 'sync-voicemail-messages', params: { page_size: Math.max(limit, 200), max_pages: 1 } }),
+      }),
+    ]);
+  } catch (e) {
+    console.warn('[AVA] recent telephony sync failed', e);
+  }
+}
+
 export const ava = {
   me: () => call<Me>(`/db/${TABLES.softphoneUsers}?select=*&limit=1`, {}, MOCK_ME),
   dashboard: () => call<DashboardBrief>(`/fn/${FN.aiAnalyzeCall}?view=dashboard`, { method: 'POST', body: JSON.stringify({ view: 'dashboard' }) }, {
@@ -875,6 +902,11 @@ export const ava = {
       console.warn('[avaApi] sync-all failed:', err);
       return { ok: false, success: false, stats: {}, errors: [err?.message || 'Phone-system sync failed'], syncedAt: new Date().toISOString() };
     }
+  },
+  syncPhoneSystemRecent: async (limit = 200) => {
+    if (MOCK) return { ok: true, success: true, stats: { cdrs: MOCK_CALLS.length }, errors: [], syncedAt: new Date().toISOString() };
+    await bestEffortRecentTelephonySync(limit);
+    return { ok: true, success: true, stats: {}, errors: [], syncedAt: new Date().toISOString() };
   },
 };
 
