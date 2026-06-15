@@ -3988,6 +3988,7 @@ export type Database = {
       pbx_call_recordings: {
         Row: {
           access_status: string | null
+          action_items: Json | null
           analyzed: boolean | null
           available: boolean | null
           call_record_id: string | null
@@ -4012,12 +4013,14 @@ export type Database = {
           storage_path: string | null
           summary: string | null
           summary_status: string | null
+          topics: Json | null
           transcribed: boolean | null
           transcript_status: string | null
           transcription_status: string | null
         }
         Insert: {
           access_status?: string | null
+          action_items?: Json | null
           analyzed?: boolean | null
           available?: boolean | null
           call_record_id?: string | null
@@ -4042,12 +4045,14 @@ export type Database = {
           storage_path?: string | null
           summary?: string | null
           summary_status?: string | null
+          topics?: Json | null
           transcribed?: boolean | null
           transcript_status?: string | null
           transcription_status?: string | null
         }
         Update: {
           access_status?: string | null
+          action_items?: Json | null
           analyzed?: boolean | null
           available?: boolean | null
           call_record_id?: string | null
@@ -4072,6 +4077,7 @@ export type Database = {
           storage_path?: string | null
           summary?: string | null
           summary_status?: string | null
+          topics?: Json | null
           transcribed?: boolean | null
           transcript_status?: string | null
           transcription_status?: string | null
@@ -5895,6 +5901,7 @@ export type Database = {
           client_id: string | null
           created_at: string | null
           custom_status: string | null
+          desktop_access_enabled: boolean
           device_type: string | null
           display_name: string | null
           dnd_enabled: boolean
@@ -5910,6 +5917,7 @@ export type Database = {
           last_seen_mac: string | null
           last_seen_web: string | null
           last_seen_windows: string | null
+          mobile_access_enabled: boolean
           organization_id: string
           out_of_office_until: string | null
           portal_user_id: string | null
@@ -5936,6 +5944,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string | null
           custom_status?: string | null
+          desktop_access_enabled?: boolean
           device_type?: string | null
           display_name?: string | null
           dnd_enabled?: boolean
@@ -5951,6 +5960,7 @@ export type Database = {
           last_seen_mac?: string | null
           last_seen_web?: string | null
           last_seen_windows?: string | null
+          mobile_access_enabled?: boolean
           organization_id: string
           out_of_office_until?: string | null
           portal_user_id?: string | null
@@ -5977,6 +5987,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string | null
           custom_status?: string | null
+          desktop_access_enabled?: boolean
           device_type?: string | null
           display_name?: string | null
           dnd_enabled?: boolean
@@ -5992,6 +6003,7 @@ export type Database = {
           last_seen_mac?: string | null
           last_seen_web?: string | null
           last_seen_windows?: string | null
+          mobile_access_enabled?: boolean
           organization_id?: string
           out_of_office_until?: string | null
           portal_user_id?: string | null
@@ -8749,6 +8761,10 @@ export type Database = {
       }
       set_softphone_app_access: {
         Args: { _enabled: boolean; _softphone_id: string }
+        Returns: Json
+      }
+      set_softphone_platform_access: {
+        Args: { _desktop: boolean; _mobile: boolean; _softphone_id: string }
         Returns: Json
       }
       setup_new_user_organization: {

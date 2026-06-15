@@ -1,115 +1,54 @@
+# Plan — Real Lemtel data on every admin page
 
-# Plan — Recordings coverage & Sync Health alignment
+## 1. Fix "no extensions" on `/org/lemtel/admin/extensions`
 
-Scope: backend (proxy + DB) and Media Center / Sync Health UI only. No visual redesign, no AI voice agent changes.
+The 21 Lemtel extensions exist in the database, so this is a data-loading / RLS / sync issue, not missing data. I'll:
 
-## Part A — Recordings: full metadata + secure access
+- Add a diagnostic banner on the page when the query returns zero rows: shows whether it's an auth issue, an org-membership issue, or a stale sync, with a one-click "Resync from PBX" button that calls `sync-extensions` on the proxy.
+- Trigger an immediate `sync-extensions` on first load when no rows are present so the table is repopulated from FusionPBX (`v_extensions`) without manual action.
+- Surface the underlying `pbx_sync_jobs` row (last error, fetched count) inline so we can see exactly why a sync produced 0 rows.
+- Add `pbx_extensions` and `pbx_softphone_users` to realtime so the table updates the moment a sync finishes.
 
-### A1. Schema (`pbx_call_recordings` + `pbx_call_records`)
-Migration to guarantee every recording-bearing CDR has a complete row in `pbx_call_recordings`:
+## 2. Edit existing users + grant/revoke desktop & mobile app access
 
-- Add/ensure columns on `pbx_call_recordings`:
-  - `recording_name text`, `recording_path text`, `recording_url text`
-  - `recording_seconds int`, `recording_available boolean default false`
-  - `transcript_status text` (`none|pending|done|failed`), `transcribed boolean generated`
-  - `summary_status text`, `analyzed boolean generated`
-  - `sentiment text` (`positive|neutral|negative|mixed`)
-  - `summary text`, `language text`
-  - `access_status text` (`ok|forbidden|missing|stale`), `last_checked_at timestamptz`
-  - `pbx_uuid text` (FK link to CDR), `sip_call_id text`
-- Unique index `(organization_id, pbx_uuid)`.
-- Mirror flags on `pbx_call_records`: `has_recording`, `recording_id uuid`, `recording_available`, `transcribed`, `analyzed`, `sentiment` (already partially present — fill the gaps).
-- Backfill trigger so inserting/updating a `pbx_call_recordings` row updates the mirror flags on the matching `pbx_call_records`.
+Extend the existing **Edit** dialog so an admin can act on any extension the same way they would in FusionPBX, **without changing the user's current SIP password**:
 
-### A2. Proxy: recording resolver consolidation
-- New shared module `supabase/functions/_shared/recordingUrl.ts` (single source of truth) used by `fusionpbx-proxy`:
-  - Force host `pbxnode.lemtel.tel`.
-  - Try in order: signed FusionPBX URL → app/recordings download path → app/call_recordings path.
-  - PHPSESSID cookie auth, Basic auth fallback.
-  - Returns `{ url, available, seconds, content_length, http_status }`.
-- New proxy action `sync-recording-meta`:
-  - Walks `pbx_call_records` where `has_recording = true` AND (`recording_id IS NULL` OR `pbx_call_recordings.last_checked_at < now() - 6h`).
-  - Upserts `pbx_call_recordings` with resolver result + `access_status` (`ok|forbidden|missing`).
-  - Stamps `recording_available`, `recording_seconds`, `last_checked_at`.
-- New proxy action `get-recording-stream` (signed, short-lived redirect) for secure listen/download from the portal.
+- Editable fields written back to FusionPBX through `update-extension`: display name, caller ID name + number, voicemail on/off + PIN, Do-Not-Disturb, call forwarding, outbound CID, user/group, enabled/disabled, description.
+- "App access" section per extension:
+  - Toggle **Desktop app access** and **Mobile app access** (stored in `pbx_softphone_users.app_access_enabled`, with a new `desktop_access_enabled` / `mobile_access_enabled` split so each can be controlled independently).
+  - When access is granted, the softphone row is created/linked and `sip_password` is **kept exactly as it is in FusionPBX** (read from `v_extensions.password` via proxy). The user signs in to the desktop and mobile app with their existing extension number + existing PBX password. No password reset, no new credential to remember.
+  - When access is revoked, both toggles flip off, active sessions are invalidated (audit-logged), and the apps' login flow refuses the user until access is re-granted.
+- All changes write an `audit_logs` entry (who, when, what changed).
 
-### A3. Transcription & summary pipeline (queued, audited)
-- New table `pbx_recording_jobs` (`recording_id`, `job_type` = `transcribe|summarize`, `status`, `error`, `started_at`, `finished_at`, `requested_by`).
-- New proxy actions:
-  - `transcribe-recording` → enqueues job, calls Lovable AI Gateway (Whisper-equivalent / `google/gemini-2.5-flash` audio) using existing `LOVABLE_API_KEY`, stores transcript in `pbx_call_transcripts`, sets `transcript_status='done'`.
-  - `summarize-recording` → uses transcript → produces `summary`, `sentiment`, `language`; updates `pbx_call_recordings`.
-- Every action gated by `is_lemtel_admin()` / `has_role()` and writes to `audit_logs`.
+## 3. Recordings — transcription + AI insights
 
-### A4. Media Center UI (no redesign)
-- Reuse the existing list and badges. Wire:
-  - "Listen" → `get-recording-stream`.
-  - "Download" → same with `?download=1`.
-  - "Transcribe" / "Summarize" buttons → call the new actions, optimistic state.
-  - Filter chips: `Recorded only`, `Transcribed`, `Has summary`, `Sentiment`.
-  - Free-text search now hits `pbx_call_transcripts.content_tsv` (add tsvector + GIN index).
+On `AdminRecordings.tsx` and on the Call History row detail:
 
-## Part B — Sync Health alignment (real per-entity status)
+- Add **Transcribe** and **Analyze** buttons per recording. They call the existing `transcribe-recording` and `summarize-recording` actions on `fusionpbx-proxy` (Lovable AI Gateway, Gemini 2.5 Flash).
+- Display the resulting transcript, summary, sentiment, language, key topics, and action items inline. Status chips: `pending / running / done / failed`.
+- Add a bulk "Transcribe + analyze last 24h" button gated to Lemtel admins.
+- On the Call History page, each row with `has_recording=true` gets the same panel (collapsible) so insights live next to the call.
+- All AI results persist in `pbx_call_recordings` (`summary`, `sentiment`, `language`, `transcribed`, `analyzed`) and `pbx_call_transcripts` — already present, so no schema change beyond adding `topics jsonb` and `action_items jsonb` columns.
 
-### B1. Per-entity proxy actions
-Add or finalize these actions in `fusionpbx-proxy` (each does list → upsert → returns `{ fetched, upserted, skipped, duration_ms }`):
+## 4. Dashboard — fully real data + AI insights + more stats
 
-| Entity | Action | Target table |
-|---|---|---|
-| Extensions | `sync-extensions` | `pbx_extensions` |
-| Devices | `sync-devices` | `pbx_devices` |
-| Ring Groups | `sync-ring-groups` | `pbx_ring_groups` |
-| Call Queues | `sync-call-queues` | `pbx_call_queues` |
-| Queue Agents | `sync-queue-agents` | `pbx_queue_agents` |
-| IVRs / Options | `sync-ivrs` | `pbx_ivrs`, `pbx_ivr_options` |
-| Destinations | `sync-destinations` | `pbx_destinations` |
-| Time Conditions | `sync-time-conditions` | `pbx_time_conditions` |
-| Conferences | `sync-conferences` | `pbx_conferences` |
-| Hold Music | `sync-hold-music` | `pbx_hold_music` |
-| Gateways | `sync-gateways` | `pbx_gateways` |
-| Voicemail boxes | `sync-voicemail` | `pbx_voicemail_settings` |
-| Voicemail messages | `sync-voicemail-messages` | `pbx_voicemails` (exists, normalize output) |
-| Voicemail greetings | `sync-voicemail-greetings` | new column on `pbx_voicemail_settings` |
-| Recordings meta | `sync-recording-meta` | `pbx_call_recordings` |
-| CDRs | `sync-cdrs` (existing) | `pbx_call_records` |
-| CC Stats | `sync-cc-stats` | `cc_queue_stats` |
-| Contacts | `sync-contacts` | new `pbx_contacts` (created if missing) |
-| Feature codes | `sync-feature-codes` | `pbx_feature_codes` |
-| Dialplans | `sync-dialplans` | `pbx_dialplans` |
+Rework `AdminDashboard.tsx` so every widget reads real Lemtel data (no placeholders):
 
-Out-of-scope for FusionPBX (no native API): fax server, email queue, event guard. These will be marked `n/a` in Sync Health rather than `unknown`.
+- **Live tiles** (5–10s refresh via the existing `get-system-health-live` and `get-active-calls-live` proxy actions): active calls, registered extensions vs total, CPU / memory / disk, trunk status, today's inbound/outbound/missed, today's minutes.
+- **Historical charts** (from `pbx_call_records`): calls per hour today, calls per day last 30d, answer rate, average handle time, missed-call rate, top extensions, top destinations, busiest hours heatmap.
+- **Recordings & AI**: total recordings, % transcribed, % analyzed, sentiment distribution (positive / neutral / negative), top conversation topics across the last 7 days (aggregated from `pbx_call_recordings.summary` + topics).
+- **AI insights card** (new): one daily call to Lovable AI Gateway that summarizes the last 24h of PBX activity — anomalies (spike in missed calls, queue overflow, extension offline > N hours), recommended actions, sentiment trend. Cached for 1h in `pbx_ai_insights`.
+- **Quick links** to Active Calls, Recordings, Sync Health, Extensions with the same live counts.
 
-### B2. `pbx_sync_jobs` enrichment
-Add columns: `endpoint text`, `fetched int`, `upserted int`, `skipped int`, `duration_ms int`, `error text`.
-`sync-all` orchestrator writes one row per entity per run with proper status (`completed | completed_with_errors | failed`).
+## Technical notes
 
-### B3. AdminSyncHealth UI
-- Replace the static entity list with a config-driven list aligned with B1.
-- Per row show: last job status, `fetched/upserted/skipped`, duration, last run, "Run now" + "Backfill".
-- Entities without a backing action render as `n/a` (greyed) — never `unknown`.
-- Realtime subscription on `pbx_sync_jobs` so rows update live.
-
-### B4. Voicemail / SMS / Call Center surfaces
-- Voicemail page: bind list to `pbx_voicemails`, "Mark read" via existing `mark_voicemail_read`, "Play" via `get-voicemail-stream` (mirrors A2 resolver).
-- SMS page: already reads `pbx_sms_threads`/`pbx_sms_messages` — add the same realtime hook used elsewhere, no UI change.
-- Call Center page: bind tiles to `cc_queue_stats` rows produced by `sync-cc-stats`; live agents from existing `get-active-calls-live` + `pbx_queue_agent_state`.
-
-## Security & audit
-- All new write/sync actions: require `is_lemtel_admin()` or `has_role(_, _, 'org_admin')`.
-- Tenant scoping via `organizations.fusionpbx_domain_uuid`.
-- Every write → `audit_logs` (`resource_type`, `resource_id`, `action`, `metadata`).
-- Frontend keeps reading from `_safe` views; raw credentials never leave edge functions.
-
-## Files touched
-- `supabase/functions/fusionpbx-proxy/index.ts` (new actions)
-- `supabase/functions/_shared/recordingUrl.ts` (new)
-- `supabase/migrations/*` (recordings columns, `pbx_recording_jobs`, `pbx_sync_jobs` columns, transcript tsvector, optional `pbx_contacts`)
-- `src/pages/telephony/TelephonyMediaCenter.tsx` (wire new actions + filters)
-- `src/pages/lemtel/admin/AdminSyncHealth.tsx` (config-driven list + realtime)
-- Voicemail/SMS/Call Center page bindings (no visual changes)
+- New proxy actions: `update-extension-app-access`, `get-extension-secret` (admin-only, returns existing FusionPBX `password` to seed the softphone row at grant time without ever exposing it to the frontend — it's stored encrypted into `pbx_softphone_users.sip_password` via the edge function).
+- Migration: add `desktop_access_enabled boolean default true`, `mobile_access_enabled boolean default true` to `pbx_softphone_users`; add `topics jsonb`, `action_items jsonb` to `pbx_call_recordings`; enable realtime on `pbx_extensions`, `pbx_softphone_users`, `pbx_call_recordings`.
+- All writes gated by `is_lemtel_admin()` / `has_role(_, _, 'org_admin')` and logged to `audit_logs`.
+- No visual redesign, no changes to AI voice agent pages.
 
 ## Out of scope
-- Visual redesign, navigation changes, AI voice agent pages.
-- Host-level OS metrics (kept as "Unavailable" from previous step).
-- Fax / email queue / event guard sync (marked `n/a`).
 
-Proceed?
+- Resetting / rotating user PBX passwords (explicitly preserved).
+- Visual redesign of any page.
+- AI voice agent configuration.

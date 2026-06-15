@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Smartphone, Plus, Circle, Loader2, X, BellOff, PhoneForwarded, AlertCircle, Activity, Pencil, Trash2 } from 'lucide-react';
-import { usePbxExtensions, usePbxSoftphoneUsers } from '@/hooks/usePbxData';
+import { Smartphone, Plus, Circle, Loader2, X, BellOff, PhoneForwarded, AlertCircle, Activity, Pencil, Trash2, RefreshCw, Monitor } from 'lucide-react';
+import { usePbxExtensions, usePbxSoftphoneUsers, usePbxSyncJobs, LEMTEL_ORG } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
 import { SyncEverythingButton } from '@/components/lemtel/SyncEverythingButton';
 import { ProvisionExtensionModal } from '@/components/lemtel/ProvisionExtensionModal';
@@ -47,14 +47,46 @@ export default function LemtelExtensions() {
   const queryClient = useQueryClient();
   const [prefill, setPrefill] = useState<{ extension?: string; displayName?: string; outboundCid?: string } | undefined>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: extensions = [], isLoading } = usePbxExtensions();
+  const { data: extensions = [], isLoading, refetch } = usePbxExtensions();
   const { data: softphones = [] } = usePbxSoftphoneUsers();
+  const { data: recentJobs = [] } = usePbxSyncJobs(5);
+  const lastExtJob = (recentJobs as any[]).find(j => String(j.job_type || '').includes('extensions'));
+  const [autoSyncing, setAutoSyncing] = useState(false);
   const softphoneByExt = useMemo(() => {
     const m = new Map<string, any>();
     (softphones as any[]).forEach(s => m.set(String(s.extension), s));
     return m;
   }, [softphones]);
   const all = extensions as any[];
+
+  // Auto-resync once when the table is empty (first visit after deploy / cache miss).
+  useEffect(() => {
+    if (!isLoading && all.length === 0 && !autoSyncing) {
+      setAutoSyncing(true);
+      supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'sync-extensions', organization_id: LEMTEL_ORG },
+      }).then(({ error }) => {
+        if (!error) { queryClient.invalidateQueries({ queryKey: ['pbx'] }); refetch(); }
+      }).finally(() => setAutoSyncing(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, all.length]);
+
+  const runManualSync = async () => {
+    setAutoSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'sync-extensions', organization_id: LEMTEL_ORG },
+      });
+      if (error) throw error;
+      toast({ title: 'Sync complete', description: `Fetched ${(data as any)?.fetched ?? 0}, upserted ${(data as any)?.upserted ?? 0}` });
+      queryClient.invalidateQueries({ queryKey: ['pbx'] });
+      refetch();
+    } catch (e: any) {
+      toast({ title: 'Sync failed', description: e?.message || String(e), variant: 'destructive' });
+    } finally { setAutoSyncing(false); }
+  };
+
 
   const handleDelete = async (e: any) => {
     if (!confirm(`Delete extension ${e.extension}? This removes it from FusionPBX.`)) return;
@@ -145,6 +177,25 @@ export default function LemtelExtensions() {
         )}
       </div>
 
+      {!isLoading && all.length === 0 && (
+        <Card className="border-orange-500/40 bg-orange-500/5">
+          <CardContent className="py-4 flex items-center justify-between gap-4">
+            <div className="text-sm">
+              <div className="font-semibold">No extensions in database for Lemtel domain.</div>
+              <div className="text-muted-foreground">
+                {lastExtJob
+                  ? <>Last <code>{lastExtJob.job_type}</code> job: <strong>{lastExtJob.status}</strong> · fetched {lastExtJob.fetched ?? 0} · upserted {lastExtJob.upserted ?? 0}{lastExtJob.error && <> · <span className="text-red-600">{String(lastExtJob.error).slice(0,200)}</span></>}</>
+                  : 'No recent sync job found.'}
+              </div>
+            </div>
+            <Button onClick={runManualSync} disabled={autoSyncing}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${autoSyncing ? 'animate-spin' : ''}`} />
+              Resync from PBX
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader><CardTitle>{exts.length} extensions</CardTitle></CardHeader>
         <CardContent>
@@ -202,15 +253,30 @@ export default function LemtelExtensions() {
                     </TableCell>
                     <TableCell>{e.voicemail_enabled ? <Badge variant="secondary">On</Badge> : <Badge variant="outline">Off</Badge>}</TableCell>
                     <TableCell>
-                      {softphoneByExt.has(String(e.extension)) ? (
-                        <Badge variant="outline" className="bg-green-500/15 text-green-600 border-green-500/30">✅ Active</Badge>
-                      ) : (
-                        <EnableSoftphonePopover
-                          extensionId={e.id}
-                          extension={String(e.extension)}
-                          defaultDisplayName={e.effective_cid_name || e.description || ''}
-                        />
-                      )}
+                      {(() => {
+                        const sp = softphoneByExt.get(String(e.extension));
+                        if (!sp) {
+                          return (
+                            <EnableSoftphonePopover
+                              extensionId={e.id}
+                              extension={String(e.extension)}
+                              defaultDisplayName={e.effective_cid_name || e.description || ''}
+                            />
+                          );
+                        }
+                        const d = sp.desktop_access_enabled !== false;
+                        const m = sp.mobile_access_enabled !== false;
+                        return (
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="outline" className={d ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-muted text-muted-foreground'}>
+                              <Monitor className="w-3 h-3 mr-1" />{d ? 'Desktop' : 'Desktop off'}
+                            </Badge>
+                            <Badge variant="outline" className={m ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-muted text-muted-foreground'}>
+                              <Smartphone className="w-3 h-3 mr-1" />{m ? 'Mobile' : 'Mobile off'}
+                            </Badge>
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-1 text-sm">

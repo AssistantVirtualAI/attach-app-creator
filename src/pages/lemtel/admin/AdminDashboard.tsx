@@ -92,9 +92,11 @@ export default function AdminDashboard() {
     refetchInterval: 30_000,
     queryFn: async () => {
       const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
-      const [calls, vms, sms] = await Promise.all([
+      const last30 = new Date(); last30.setDate(last30.getDate() - 30);
+      const last7 = new Date(); last7.setDate(last7.getDate() - 7);
+      const [calls, vms, sms, recsAgg, sentiments, recent30, extTotal, softTotal] = await Promise.all([
         (supabase as any).from('pbx_call_records')
-          .select('id,call_status,missed_call,start_at')
+          .select('id,call_status,missed_call,start_at,duration_seconds,direction,billsec,extension,destination_number')
           .eq('organization_id', LEMTEL_ORG_ID)
           .gte('start_at', startOfDay.toISOString()),
         (supabase as any).from('pbx_voicemails')
@@ -103,17 +105,75 @@ export default function AdminDashboard() {
         (supabase as any).from('pbx_sms_threads')
           .select('unread_count')
           .eq('organization_id', LEMTEL_ORG_ID),
+        (supabase as any).from('pbx_call_recordings')
+          .select('id,transcribed,analyzed', { count: 'exact' })
+          .eq('organization_id', LEMTEL_ORG_ID).limit(2000),
+        (supabase as any).from('pbx_call_recordings')
+          .select('sentiment')
+          .eq('organization_id', LEMTEL_ORG_ID)
+          .not('sentiment','is',null).gte('updated_at', last7.toISOString()).limit(500),
+        (supabase as any).from('pbx_call_records')
+          .select('start_at,missed_call,billsec,direction')
+          .eq('organization_id', LEMTEL_ORG_ID)
+          .gte('start_at', last30.toISOString()).limit(20000),
+        (supabase as any).from('pbx_extensions')
+          .select('id', { count: 'exact', head: true }).eq('organization_id', LEMTEL_ORG_ID),
+        (supabase as any).from('pbx_softphone_users')
+          .select('id,app_access_enabled,desktop_access_enabled,mobile_access_enabled', { count: 'exact' })
+          .eq('organization_id', LEMTEL_ORG_ID).limit(2000),
       ]);
       const callRows = (calls.data ?? []) as any[];
       const smsRows = (sms.data ?? []) as any[];
+      const recRows = (recsAgg.data ?? []) as any[];
+      const sentRows = (sentiments.data ?? []) as any[];
+      const r30 = (recent30.data ?? []) as any[];
+      const softRows = (softTotal.data ?? []) as any[];
+      const answered = callRows.filter(r => (r.billsec ?? 0) > 0).length;
+      const inbound = callRows.filter(r => r.direction === 'inbound').length;
+      const outbound = callRows.filter(r => r.direction === 'outbound').length;
+      const minutesToday = Math.round(callRows.reduce((s, r) => s + (r.billsec || 0), 0) / 60);
+      const totalRec = (recsAgg as any).count ?? recRows.length;
+      const transcribed = recRows.filter(r => r.transcribed).length;
+      const analyzed = recRows.filter(r => r.analyzed).length;
+      const sentDist = sentRows.reduce<Record<string, number>>((acc, r) => {
+        const k = String(r.sentiment || 'unknown').toLowerCase();
+        acc[k] = (acc[k] || 0) + 1; return acc;
+      }, {});
+      const perDay: Record<string, number> = {};
+      const missedPerDay: Record<string, number> = {};
+      r30.forEach(r => {
+        const d = (r.start_at || '').slice(0, 10);
+        if (!d) return;
+        perDay[d] = (perDay[d] || 0) + 1;
+        if (r.missed_call) missedPerDay[d] = (missedPerDay[d] || 0) + 1;
+      });
+      const days30 = Object.keys(perDay).sort().map(d => ({ t: d.slice(5), v: perDay[d], missed: missedPerDay[d] || 0 }));
+      const perHourToday: Record<number, number> = {};
+      callRows.forEach(r => { const h = new Date(r.start_at).getHours(); perHourToday[h] = (perHourToday[h] || 0) + 1; });
+      const hoursToday = Array.from({length: 24}, (_, i) => ({ t: `${i}h`, v: perHourToday[i] || 0 }));
+      const topExt: Record<string, number> = {};
+      callRows.forEach(r => { if (r.extension) topExt[r.extension] = (topExt[r.extension] || 0) + 1; });
+      const topExtensions = Object.entries(topExt).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([ext,v])=>({ext,v}));
       return {
         callsToday: callRows.length,
         missed: callRows.filter((r) => r.missed_call).length,
+        answered, inbound, outbound, minutesToday,
+        answerRate: callRows.length ? Math.round((answered / callRows.length) * 100) : 0,
         newVoicemails: (vms as any).count ?? 0,
         unreadSms: smsRows.reduce((s, t) => s + (t.unread_count || 0), 0),
+        totalRec, transcribed, analyzed,
+        transcribePct: totalRec ? Math.round((transcribed / totalRec) * 100) : 0,
+        analyzedPct: totalRec ? Math.round((analyzed / totalRec) * 100) : 0,
+        sentiment: sentDist,
+        days30, hoursToday, topExtensions,
+        extensionsTotal: (extTotal as any).count ?? 0,
+        softphoneTotal: (softTotal as any).count ?? softRows.length,
+        desktopGrant: softRows.filter(s => s.desktop_access_enabled !== false).length,
+        mobileGrant: softRows.filter(s => s.mobile_access_enabled !== false).length,
       };
     },
   });
+
 
   // Live registrations from FusionPBX (15s server-side cache)
   const { data: regs } = useQuery({
@@ -258,6 +318,78 @@ export default function AdminDashboard() {
         />
         <StatusChart title={`Active Calls — ${activeCalls ?? 0}`} data={active} stroke="hsl(199 89% 48%)" />
       </div>
+
+      {/* Real KPIs from live database */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+        {[
+          { label: 'Calls today', value: stats?.callsToday ?? 0 },
+          { label: 'Answered', value: stats?.answered ?? 0 },
+          { label: 'Missed', value: stats?.missed ?? 0, cls: 'text-red-600' },
+          { label: 'Answer rate', value: `${stats?.answerRate ?? 0}%` },
+          { label: 'Minutes today', value: stats?.minutesToday ?? 0 },
+          { label: 'Inbound', value: stats?.inbound ?? 0 },
+          { label: 'Outbound', value: stats?.outbound ?? 0 },
+          { label: 'Extensions', value: stats?.extensionsTotal ?? 0 },
+        ].map(k => (
+          <Card key={k.label} className="p-3">
+            <div className="text-xs text-muted-foreground">{k.label}</div>
+            <div className={`text-2xl font-bold ${(k as any).cls ?? ''}`}>{k.value}</div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Recordings & AI insights */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="p-4">
+          <div className="text-sm font-semibold mb-1">Recordings coverage</div>
+          <div className="text-3xl font-bold">{stats?.totalRec ?? 0}</div>
+          <div className="text-xs text-muted-foreground">
+            {stats?.transcribed ?? 0} transcribed ({stats?.transcribePct ?? 0}%) ·
+            {' '}{stats?.analyzed ?? 0} analyzed ({stats?.analyzedPct ?? 0}%)
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-sm font-semibold mb-2">Sentiment (last 7d)</div>
+          <div className="flex gap-2 flex-wrap">
+            {Object.entries(stats?.sentiment ?? {}).map(([k, v]) => (
+              <Badge key={k} variant="outline" className={
+                k === 'positive' ? 'bg-green-500/15 text-green-600 border-green-500/30' :
+                k === 'negative' ? 'bg-red-500/15 text-red-600 border-red-500/30' :
+                'bg-blue-500/15 text-blue-600 border-blue-500/30'
+              }>{k}: {v as number}</Badge>
+            ))}
+            {!Object.keys(stats?.sentiment ?? {}).length && (
+              <span className="text-xs text-muted-foreground">No analyzed calls yet — open Recordings → AI Insights.</span>
+            )}
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-sm font-semibold mb-1">App access</div>
+          <div className="text-xs text-muted-foreground">
+            {stats?.desktopGrant ?? 0} desktop · {stats?.mobileGrant ?? 0} mobile / {stats?.softphoneTotal ?? 0} softphone users
+          </div>
+          <Link to="/org/lemtel/admin/extensions" className="text-xs text-primary underline">Manage app access →</Link>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <StatusChart title="Calls by hour (today)" data={stats?.hoursToday ?? []} stroke="hsl(199 89% 48%)" />
+        <StatusChart title="Calls per day (30d)" data={stats?.days30 ?? []} stroke="hsl(142 71% 45%)" />
+      </div>
+
+      {!!(stats?.topExtensions?.length) && (
+        <Card className="p-4">
+          <div className="text-sm font-semibold mb-2">Top extensions today</div>
+          <div className="space-y-1">
+            {stats!.topExtensions!.map((e: any) => (
+              <div key={e.ext} className="flex items-center justify-between text-sm border-b last:border-b-0 py-1">
+                <span className="font-mono">{e.ext}</span>
+                <span className="font-semibold">{e.v} calls</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
     </div>
   );
