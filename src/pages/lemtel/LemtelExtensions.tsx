@@ -177,6 +177,25 @@ export default function LemtelExtensions() {
         )}
       </div>
 
+      {!isLoading && all.length === 0 && (
+        <Card className="border-orange-500/40 bg-orange-500/5">
+          <CardContent className="py-4 flex items-center justify-between gap-4">
+            <div className="text-sm">
+              <div className="font-semibold">No extensions in database for Lemtel domain.</div>
+              <div className="text-muted-foreground">
+                {lastExtJob
+                  ? <>Last <code>{lastExtJob.job_type}</code> job: <strong>{lastExtJob.status}</strong> · fetched {lastExtJob.fetched ?? 0} · upserted {lastExtJob.upserted ?? 0}{lastExtJob.error && <> · <span className="text-red-600">{String(lastExtJob.error).slice(0,200)}</span></>}</>
+                  : 'No recent sync job found.'}
+              </div>
+            </div>
+            <Button onClick={runManualSync} disabled={autoSyncing}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${autoSyncing ? 'animate-spin' : ''}`} />
+              Resync from PBX
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader><CardTitle>{exts.length} extensions</CardTitle></CardHeader>
         <CardContent>
