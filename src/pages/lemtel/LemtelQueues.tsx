@@ -317,12 +317,43 @@ function DeleteQueueBtn({ queue }: { queue: any }) {
 }
 
 // ---------- Agents per queue ----------
+type ResyncStep = 'agents' | 'tiers' | 'upsert';
+type ResyncStatus = {
+  state: 'idle' | 'running' | 'success' | 'partial' | 'error';
+  step?: ResyncStep;
+  message?: string;
+  details?: string;
+  pulled?: number;
+  upserted?: number;
+  failed?: number;
+  attempts?: number;
+  at?: string;
+};
+
+async function invokeWithRetry(action: string, body: any, maxAttempts = 3): Promise<{ data: any; attempts: number }> {
+  let lastErr: any;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body });
+      if (error) throw new Error(error.message || `Edge function error (${action})`);
+      if ((data as any)?.ok === false) throw new Error((data as any)?.message || (data as any)?.error || `${action} failed on PBX`);
+      return { data, attempts: attempt };
+    } catch (e: any) {
+      lastErr = e;
+      if (attempt < maxAttempts) {
+        const delay = 400 * Math.pow(2, attempt - 1);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt: typeof qCopy.en }) {
   const [agents, setAgents] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [status, setStatus] = useState<ResyncStatus>({ state: 'idle' });
   const { toast } = useToast();
 
   const load = async () => {
@@ -336,20 +367,31 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
   };
 
   const resyncTiers = async () => {
-    setSyncing(true); setSyncMsg(null);
+    if (!queue.pbx_uuid) {
+      setStatus({ state: 'error', message: 'Queue has no PBX UUID — cannot sync', at: new Date().toISOString() });
+      return;
+    }
+    setStatus({ state: 'running', step: 'agents', message: 'Syncing agent registry from FusionPBX…' });
+    let totalAttempts = 0;
     try {
-      await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { organization_id: LEMTEL_ORG, action: 'sync-queue-agents' },
-      });
-      const { data: tiersResp } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { organization_id: LEMTEL_ORG, action: 'list-queue-tiers' },
-      });
-      const tiers: any[] = (tiersResp as any)?.data || [];
+      // Step 1: refresh agent registry
+      const r1 = await invokeWithRetry('sync-queue-agents', { organization_id: LEMTEL_ORG, action: 'sync-queue-agents' });
+      totalAttempts += r1.attempts;
+
+      // Step 2: fetch tier links
+      setStatus({ state: 'running', step: 'tiers', message: 'Fetching tier links…', attempts: totalAttempts });
+      const r2 = await invokeWithRetry('list-queue-tiers', { organization_id: LEMTEL_ORG, action: 'list-queue-tiers' });
+      totalAttempts += r2.attempts;
+      const tiers: any[] = (r2.data as any)?.data || [];
       const mine = tiers.filter((t) => t.call_center_queue_uuid === queue.pbx_uuid);
+
+      // Step 3: upsert local rows
+      setStatus({ state: 'running', step: 'upsert', message: `Upserting ${mine.length} tier${mine.length === 1 ? '' : 's'}…`, pulled: mine.length, attempts: totalAttempts });
       const { data: extFresh = [] } = await supabase.from('pbx_extensions')
         .select('id, extension, display_name').eq('organization_id', LEMTEL_ORG);
 
       let upserted = 0;
+      const upsertErrors: string[] = [];
       for (const t of mine) {
         const agentExt = (t.tier_agent || '').toString().split('@')[0];
         const ext = (extFresh as any[]).find((x) => x.extension === agentExt);
@@ -364,13 +406,40 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
           pbx_uuid: t.call_center_tier_uuid,
           raw_data: t,
         } as any, { onConflict: 'pbx_uuid' });
-        if (!error) upserted++;
+        if (error) upsertErrors.push(`${agentExt}: ${error.message}`);
+        else upserted++;
       }
-      setSyncMsg(`${upserted} tier${upserted === 1 ? '' : 's'} synced from FusionPBX`);
       await load();
+
+      if (upsertErrors.length === 0) {
+        setStatus({
+          state: 'success',
+          message: mine.length === 0 ? 'PBX has no tiers for this queue' : `${upserted} tier${upserted === 1 ? '' : 's'} synced`,
+          pulled: mine.length, upserted, failed: 0, attempts: totalAttempts,
+          at: new Date().toISOString(),
+        });
+      } else {
+        setStatus({
+          state: 'partial',
+          message: `${upserted}/${mine.length} tiers synced — ${upsertErrors.length} failed`,
+          details: upsertErrors.slice(0, 3).join(' · ') + (upsertErrors.length > 3 ? ` (+${upsertErrors.length - 3} more)` : ''),
+          pulled: mine.length, upserted, failed: upsertErrors.length, attempts: totalAttempts,
+          at: new Date().toISOString(),
+        });
+      }
     } catch (e: any) {
-      toast({ title: 'Resync failed', description: e?.message || 'Unknown error', variant: 'destructive' });
-    } finally { setSyncing(false); }
+      const step = (status.step) || 'agents';
+      const msg = e?.message || 'Unknown error';
+      setStatus({
+        state: 'error',
+        step,
+        message: `Resync failed at "${step}" step`,
+        details: msg,
+        attempts: totalAttempts || 1,
+        at: new Date().toISOString(),
+      });
+      toast({ title: 'Resync failed', description: msg, variant: 'destructive' });
+    }
   };
 
   useEffect(() => {
@@ -380,6 +449,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue.id]);
+
 
   const addAgent = async (extensionId: string, role: 'agent' | 'supervisor') => {
     if (!perms.canAssign) { toast({ title: 'Forbidden', description: 'Supervisor or admin required', variant: 'destructive' }); return; }
