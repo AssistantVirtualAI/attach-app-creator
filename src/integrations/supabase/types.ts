@@ -3651,6 +3651,77 @@ export type Database = {
           },
         ]
       }
+      pbx_admin_actions: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_user_id: string | null
+          after_json: Json | null
+          before_json: Json | null
+          confirmed_at: string | null
+          created_at: string
+          diff_json: Json | null
+          domain_uuid: string | null
+          entity_id: string | null
+          entity_type: string
+          error: string | null
+          id: string
+          metadata: Json | null
+          organization_id: string
+          result: string | null
+          rollback_of: string | null
+          source: string
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          after_json?: Json | null
+          before_json?: Json | null
+          confirmed_at?: string | null
+          created_at?: string
+          diff_json?: Json | null
+          domain_uuid?: string | null
+          entity_id?: string | null
+          entity_type: string
+          error?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id: string
+          result?: string | null
+          rollback_of?: string | null
+          source?: string
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          after_json?: Json | null
+          before_json?: Json | null
+          confirmed_at?: string | null
+          created_at?: string
+          diff_json?: Json | null
+          domain_uuid?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          error?: string | null
+          id?: string
+          metadata?: Json | null
+          organization_id?: string
+          result?: string | null
+          rollback_of?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pbx_admin_actions_rollback_of_fkey"
+            columns: ["rollback_of"]
+            isOneToOne: false
+            referencedRelation: "pbx_admin_actions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pbx_admin_users: {
         Row: {
           api_key_present: boolean
@@ -4590,8 +4661,10 @@ export type Database = {
           label: string | null
           last_pbx_seen_at: string | null
           last_seen_at: string | null
+          last_synced_at: string | null
           mac_address: string | null
           organization_id: string
+          pbx_source: string | null
           pbx_uuid: string | null
           profile: string | null
           raw_data: Json | null
@@ -4613,8 +4686,10 @@ export type Database = {
           label?: string | null
           last_pbx_seen_at?: string | null
           last_seen_at?: string | null
+          last_synced_at?: string | null
           mac_address?: string | null
           organization_id: string
+          pbx_source?: string | null
           pbx_uuid?: string | null
           profile?: string | null
           raw_data?: Json | null
@@ -4636,8 +4711,10 @@ export type Database = {
           label?: string | null
           last_pbx_seen_at?: string | null
           last_seen_at?: string | null
+          last_synced_at?: string | null
           mac_address?: string | null
           organization_id?: string
+          pbx_source?: string | null
           pbx_uuid?: string | null
           profile?: string | null
           raw_data?: Json | null
@@ -4848,6 +4925,7 @@ export type Database = {
           id: string
           is_demo: boolean
           last_pbx_seen_at: string | null
+          last_synced_at: string | null
           limit_destination: string | null
           limit_max: string | null
           max_registrations: number | null
@@ -4858,6 +4936,7 @@ export type Database = {
           outbound_cid_name: string | null
           outbound_cid_number: string | null
           password: string | null
+          pbx_source: string | null
           pbx_uuid: string | null
           portal_user_id: string | null
           raw_data: Json | null
@@ -4921,6 +5000,7 @@ export type Database = {
           id?: string
           is_demo?: boolean
           last_pbx_seen_at?: string | null
+          last_synced_at?: string | null
           limit_destination?: string | null
           limit_max?: string | null
           max_registrations?: number | null
@@ -4931,6 +5011,7 @@ export type Database = {
           outbound_cid_name?: string | null
           outbound_cid_number?: string | null
           password?: string | null
+          pbx_source?: string | null
           pbx_uuid?: string | null
           portal_user_id?: string | null
           raw_data?: Json | null
@@ -4994,6 +5075,7 @@ export type Database = {
           id?: string
           is_demo?: boolean
           last_pbx_seen_at?: string | null
+          last_synced_at?: string | null
           limit_destination?: string | null
           limit_max?: string | null
           max_registrations?: number | null
@@ -5004,6 +5086,7 @@ export type Database = {
           outbound_cid_name?: string | null
           outbound_cid_number?: string | null
           password?: string | null
+          pbx_source?: string | null
           pbx_uuid?: string | null
           portal_user_id?: string | null
           raw_data?: Json | null
