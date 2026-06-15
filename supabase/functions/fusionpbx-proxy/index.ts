@@ -906,7 +906,7 @@ Deno.serve(async (req) => {
         const extra: Record<string, string> = {
           limit: String(pageSize),
           offset: String(i * pageSize),
-          start_stamp: `>${sinceDate}`,
+          start_stamp_begin: sinceDate,
         };
         if (extension) extra.extension = extension;
         const r = await fetchCdrsWithFallback(extra);
