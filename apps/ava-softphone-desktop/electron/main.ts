@@ -206,6 +206,16 @@ app.whenReady().then(() => {
     if (!ok) console.warn(`[main] Failed to register global shortcut: ${accel}`);
   }
 
+  // Global shortcut to focus / toggle the meeting note field
+  const meetingNoteOk = globalShortcut.register('CmdOrCtrl+Shift+M', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.webContents.send('focus-meeting-note');
+    }
+  });
+  if (!meetingNoteOk) console.warn('[main] Failed to register global shortcut: CmdOrCtrl+Shift+M');
+
   // Auto-grant media/notification permissions to our own window's session too.
   const winSession = mainWindow?.webContents.session;
   if (winSession) {
