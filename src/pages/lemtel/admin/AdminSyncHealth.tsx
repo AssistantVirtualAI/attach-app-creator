@@ -194,21 +194,26 @@ export default function AdminSyncHealth() {
             </TableHeader>
             <TableBody>
               {ENTITIES.map(e => {
-                const j: any = lastFor(e.key);
+                const j: any = lastFor(e);
+                const status = e.action ? (j?.status || 'pending') : 'n/a';
                 return (
                   <TableRow key={e.key} className="hover:bg-muted/40">
                     <TableCell className="font-medium">{e.label}</TableCell>
-                    <TableCell><StatusBadge tone={toneFor(j?.status) as any}>{j?.status || 'unknown'}</StatusBadge></TableCell>
+                    <TableCell><StatusBadge tone={toneFor(j?.status) as any}>{status}</StatusBadge></TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {j?.completed_at ? formatDistanceToNow(new Date(j.completed_at), { addSuffix: true }) : '—'}
+                      {j ? <span className="ml-2 opacity-70">· {j.upserted ?? 0}/{j.fetched ?? 0}</span> : null}
                     </TableCell>
                     <TableCell className="text-xs text-destructive max-w-xs truncate">{j?.error || '—'}</TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => resync(e)}><RefreshCw className="w-3.5 h-3.5" /></Button>
+                      <Button variant="ghost" size="sm" disabled={!e.action} onClick={() => resync(e)}>
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 );
               })}
+
             </TableBody>
           </Table>
         </CardContent>
