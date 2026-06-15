@@ -659,6 +659,10 @@ const App = () => (
                 <Route path="/org/lemtel/telephony/qa" element={<LemtelTelephonyPage><TelephonyDiagnostics /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/source-audit" element={<LemtelTelephonyPage><TelephonySourceAudit /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/_diagnostics" element={<LemtelTelephonyPage><TelephonySourceAudit /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/phone-numbers-unified" element={<LemtelTelephonyPage><PhoneNumbersUnified /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/admin-users" element={<LemtelTelephonyPage><PbxAdminUsers /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/registrations-live" element={<LemtelTelephonyPage><LiveRegistrations /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/voice-agents-live" element={<LemtelTelephonyPage><VoiceAgentsLive /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/checklist" element={<LemtelTelephonyPage><TelephonyChecklist /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/portal-mappings" element={<LemtelTelephonyPage><TelephonyPortalMappings /></LemtelTelephonyPage>} />
 
