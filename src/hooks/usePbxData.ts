@@ -34,6 +34,25 @@ export const usePbxIvrOptions = (ivrId: string | null) => useQuery({
     return data || [];
   },
 });
+export const usePbxIvrAudio = (ivrId: string | null) => useQuery({
+  queryKey: ['pbx', 'pbx_ivr_audio', ivrId],
+  enabled: !!ivrId,
+  queryFn: async () => {
+    const { data, error } = await supabase.from('pbx_ivr_audio' as any)
+      .select('*').eq('ivr_id', ivrId).order('created_at', { ascending: false });
+    if (error) throw error;
+    const rows = (data || []) as any[];
+    // Hydrate signed URLs for items in the bucket
+    await Promise.all(rows.map(async (row: any) => {
+      if (row.storage_path) {
+        const { data: signed } = await supabase.storage
+          .from('lemtel-ivr-audio').createSignedUrl(row.storage_path, 3600);
+        if (signed?.signedUrl) row.audio_url = signed.signedUrl;
+      }
+    }));
+    return rows;
+  },
+});
 export const usePbxQueues = () => usePbxTable('pbx_call_queues', { order: 'name', ascending: true });
 export const usePbxRingGroups = () => usePbxTable('pbx_ring_groups', { order: 'name', ascending: true });
 export const usePbxCallRecords = (limit = 100, opts?: { extension?: string | null; enabled?: boolean }) => usePbxTable('pbx_call_records', {
