@@ -1319,6 +1319,9 @@ Deno.serve(async (req) => {
             last_synced_at: new Date().toISOString(),
           })).filter((x: any) => x.pbx_uuid);
           await doUpsert("pbx_gateways", rows, "pbx_uuid", "gateways");
+        } else if (k === "users") {
+          const rows = list.map(mapDomainUser).filter((x: any) => x && x.pbx_uuid);
+          await doUpsert("pbx_domain_users", rows, "organization_id,pbx_uuid", "users");
         }
       }
       if (cdrResult?.ok) {
