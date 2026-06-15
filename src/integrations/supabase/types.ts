@@ -9487,6 +9487,7 @@ export type Database = {
         Args: { _email: string; _extension: string; _org_id: string }
         Returns: Json
       }
+      audit_my_recordings_access: { Args: never; Returns: Json }
       can_access_chat_channel: {
         Args: { _channel_id: string; _user_id: string }
         Returns: boolean
@@ -9620,6 +9621,7 @@ export type Database = {
         Returns: boolean
       }
       reconcile_pbx_call_records: { Args: { _org_id: string }; Returns: Json }
+      relink_my_softphone_user: { Args: never; Returns: Json }
       run_security_audit: { Args: { _org_id: string }; Returns: Json }
       set_call_notes: {
         Args: { _call_id: string; _notes: string; _tags?: string[] }
