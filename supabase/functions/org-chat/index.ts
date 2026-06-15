@@ -218,6 +218,89 @@ Deno.serve(async (req) => {
       return json({ url: data.signedUrl });
     }
 
+    if (action === "list_directory") {
+      // Collect every user belonging to the same org (organization_members + org_members)
+      const [{ data: m1 }, { data: m2 }] = await Promise.all([
+        admin.from("organization_members").select("user_id").eq("organization_id", orgId),
+        admin.from("org_members").select("user_id").eq("org_id", orgId),
+      ]);
+      const ids = Array.from(new Set([
+        ...(m1 ?? []).map((r: any) => r.user_id),
+        ...(m2 ?? []).map((r: any) => r.user_id),
+      ])).filter(Boolean);
+      if (ids.length === 0) return json({ members: [] });
+      const [{ data: profs }, { data: pres }, { data: spu }] = await Promise.all([
+        admin.from("profiles").select("id, full_name, email, avatar_url").in("id", ids),
+        admin.from("user_presence").select("user_id, status, status_message, call_state, last_seen_at").in("user_id", ids),
+        admin.from("pbx_softphone_users").select("portal_user_id, extension").in("portal_user_id", ids),
+      ]);
+      const presenceMap = new Map((pres ?? []).map((p: any) => [p.user_id, p]));
+      const extMap = new Map((spu ?? []).map((s: any) => [s.portal_user_id, s.extension]));
+      const members = (profs ?? []).map((p: any) => {
+        const pr = presenceMap.get(p.id) as any;
+        const lastSeen = pr?.last_seen_at ? new Date(pr.last_seen_at).getTime() : 0;
+        const stale = !lastSeen || Date.now() - lastSeen > 5 * 60 * 1000;
+        let status = pr?.status || "offline";
+        if (stale && status !== "offline") status = "away";
+        if (pr?.call_state && pr.call_state !== "idle") status = "on_call";
+        return {
+          user_id: p.id,
+          full_name: p.full_name,
+          email: p.email,
+          avatar_url: p.avatar_url,
+          extension: extMap.get(p.id) ?? null,
+          status,
+          status_message: pr?.status_message ?? null,
+          is_self: p.id === userId,
+        };
+      }).sort((a: any, b: any) => (a.full_name || a.email || "").localeCompare(b.full_name || b.email || ""));
+      return json({ members });
+    }
+
+    if (action === "ensure_dm_channel") {
+      const otherId = String(payload?.user_id ?? "");
+      if (!otherId || otherId === userId) return json({ error: "invalid_user" }, 400);
+      // Verify other user belongs to the same org
+      const { data: other } = await admin.from("organization_members").select("user_id").eq("organization_id", orgId).eq("user_id", otherId).maybeSingle();
+      const { data: other2 } = await admin.from("org_members").select("user_id").eq("org_id", orgId).eq("user_id", otherId).maybeSingle();
+      if (!other && !other2) return json({ error: "not_in_org" }, 403);
+      const pair = [userId, otherId].sort();
+      const dmKey = `dm:${pair[0].slice(0, 8)}:${pair[1].slice(0, 8)}`;
+      const { data: existing } = await admin
+        .from("org_chat_channels")
+        .select("*")
+        .eq("organization_id", orgId)
+        .eq("name", dmKey)
+        .maybeSingle();
+      if (existing) return json({ channel: existing });
+      const { data: created, error } = await admin
+        .from("org_chat_channels")
+        .insert({
+          organization_id: orgId,
+          name: dmKey,
+          description: "Direct message",
+          channel_type: "private",
+          created_by: userId,
+          members: pair,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return json({ channel: created });
+    }
+
+    if (action === "heartbeat") {
+      const status = String(payload?.status ?? "available");
+      await admin.rpc("upsert_user_presence", {
+        _status: status,
+        _message: payload?.message ?? null,
+        _emoji: payload?.emoji ?? null,
+        _call_state: payload?.call_state ?? "idle",
+        _platform: payload?.platform ?? "web",
+      });
+      return json({ ok: true });
+    }
+
     return json({ error: "unknown_action" }, 400);
   } catch (e) {
     return json({ error: String(e?.message ?? e) }, 500);
