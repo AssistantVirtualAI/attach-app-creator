@@ -478,9 +478,7 @@ function mapCdrToRecording(r: any): RecordingItem {
 async function readCallRecordRows(limit = 100): Promise<any[]> {
   const me = await getMeContext();
   const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-  const extFilter = me.extension_uuid
-    ? `&extension_uuid=eq.${me.extension_uuid}`
-    : (me.extension ? `&extension=eq.${me.extension}` : '');
+  const extFilter = me.extension ? `&extension=eq.${me.extension}` : '&id=is.null';
   const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,analyzed,mos,raw_data,notes,tags${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
 
   const res = await fetch(url, {
@@ -672,9 +670,7 @@ export const ava = {
     try {
       const me = await getMeContext();
       const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-      const extFilter = me.extension_uuid
-        ? `&extension_uuid=eq.${me.extension_uuid}`
-        : (me.extension ? `&extension=eq.${me.extension}` : '');
+      const extFilter = me.extension ? `&extension=eq.${me.extension}` : '&id=is.null';
       const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
         headers: {
