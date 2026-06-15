@@ -4,6 +4,7 @@ import SetupWizard from './components/SetupWizard';
 import UpdateBanner from './components/UpdateBanner';
 import SoftphonePane from './components/SoftphonePane';
 import ConsoleLayout from './components/console/ConsoleLayout';
+import SettingsPage from './components/SettingsPage';
 import BrightnessOverlay from './components/BrightnessOverlay';
 import ResponsiveLab from './components/ResponsiveLab';
 import { useTheme } from './lib/theme';
@@ -84,6 +85,7 @@ export default function App() {
   const [creds, setCreds] = useState<Creds>(null);
   const [loading, setLoading] = useState(true);
   const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 980);
+  const [mobileSettings, setMobileSettings] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -201,7 +203,19 @@ export default function App() {
   const openSettingsMobile = () => {
     // Navigate to the settings view via the global nav bus so both ConsoleLayout
     // and the standalone SoftphonePane gear button reach the SettingsPage.
+    setMobileSettings(true);
     window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'settings' }));
+  };
+
+  const signOutDesktop = async () => {
+    try { setAuthToken(null); } catch { /* noop */ }
+    try { await supabase.auth.signOut(); } catch { /* noop */ }
+    try {
+      window.localStorage.removeItem('lemtel-desktop-auth');
+      window.sessionStorage.removeItem('lemtel-desktop-auth');
+    } catch { /* noop */ }
+    await window.electronAPI?.clearCredentials?.();
+    window.location.reload();
   };
 
 
@@ -235,6 +249,8 @@ export default function App() {
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative', zIndex: 1 }}>
         {wide && !IS_EMBED ? (
           <ConsoleLayout creds={creds} onOpenSettings={openSettingsMobile} />
+        ) : mobileSettings ? (
+          <SettingsPage creds={creds} onSignOut={signOutDesktop} onBack={() => setMobileSettings(false)} />
         ) : (
           <SoftphonePane creds={creds} onOpenSettings={openSettingsMobile} />
         )}
