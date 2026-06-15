@@ -492,9 +492,17 @@ async function readCallRecordRows(limit = 100): Promise<any[]> {
   return res.json();
 }
 
-async function bestEffortCdrSync(limit = 200) {
-  try {
-    await fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
+let cdrSyncInFlight: Promise<void> | null = null;
+let lastCdrSyncAt = 0;
+
+async function bestEffortCdrSync(limit = 200, minIntervalMs = 120_000) {
+  const now = Date.now();
+  if (cdrSyncInFlight) return cdrSyncInFlight;
+  if (now - lastCdrSyncAt < minIntervalMs) return;
+  lastCdrSyncAt = now;
+  cdrSyncInFlight = (async () => {
+    try {
+      await fetch(`${BACKEND.url}/functions/v1/fusionpbx-proxy`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -502,10 +510,14 @@ async function bestEffortCdrSync(limit = 200) {
         ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       },
       body: JSON.stringify({ action: 'sync-cdrs', limit }),
-    });
-  } catch (e) {
-    console.warn('[AVA] CDR sync failed', e);
-  }
+      });
+    } catch (e) {
+      console.warn('[AVA] CDR sync failed', e);
+    } finally {
+      cdrSyncInFlight = null;
+    }
+  })();
+  return cdrSyncInFlight;
 }
 
 async function bestEffortRecentTelephonySync(limit = 200) {
