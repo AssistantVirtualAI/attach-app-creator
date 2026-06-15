@@ -45,7 +45,7 @@ export const PBX_SOURCES = {
     id: "extensions",
     label: "Extensions",
     kind: "fusionpbx",
-    table: "pbx_extensions",
+    table: "pbx_extensions_safe",
     edgeFunction: "fusionpbx-proxy",
     description: "SIP extensions mirrored from FusionPBX per domain_uuid.",
     staleAfterSeconds: 60 * 60,
