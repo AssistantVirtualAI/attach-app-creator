@@ -1472,7 +1472,7 @@ Deno.serve(async (req) => {
           attempts.push({ url: safeUrl(url), status: 0, content_type: e?.name === "AbortError" ? "timeout" : undefined });
         }
       }
-      return json({ ok: false, error: "RECORDING_NOT_FOUND", message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.", attempts }, 200, { "X-Recording-Status": "not-found" });
+      return json({ ok: false, error: "RECORDING_NOT_FOUND", message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.", attempts, session_attempts: attemptsSession }, 200, { "X-Recording-Status": "not-found" });
     }
 
     // ---- Signed-URL recording delivery ----
