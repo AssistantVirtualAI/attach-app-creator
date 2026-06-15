@@ -248,8 +248,13 @@ export default function LemtelGateways() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8 space-y-2">
-                    <div className="font-medium text-foreground">No SIP trunks configured on FusionPBX yet.</div>
-                    <div className="text-xs">FusionPBX <code className="px-1 rounded bg-muted">/gateways</code> returned an empty list — that's normal for a fresh PBX. Click <b>Add Gateway</b> to create your first SIP trunk, or <b>Diagnostic</b> to see the raw API response.</div>
+                    <div className="font-medium text-foreground">FusionPBX returned no gateways for this API user.</div>
+                    <div className="text-xs max-w-2xl mx-auto">
+                      The PBX GUI may show global SIP trunks (e.g. <code>skyetel</code>, <code>voipms</code>), but the REST API plugin auto-scopes queries to the API user's domain
+                      (<code>WHERE domain_uuid = '...'</code>) and our API user also lacks <code>command_add</code>/<code>command_edit</code> to read them via <code>fs_cli</code>.
+                      <br />Fix in FusionPBX → <b>Advanced → Group Manager</b>: add <code>gateway_view</code>, <code>gateway_all</code>, <code>command_add</code> and <code>command_edit</code> to the API user's group, then click <b>Refresh</b>.
+                      Click <b>Diagnostic</b> for the raw API response.
+                    </div>
                   </TableCell></TableRow>
                 ) : filtered.map(g => {
                   const enabled = g.enabled === true || g.enabled === 'true';
