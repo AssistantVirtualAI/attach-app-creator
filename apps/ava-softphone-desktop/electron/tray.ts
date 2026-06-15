@@ -26,20 +26,27 @@ export function setupTray(mainWindow: BrowserWindow | null) {
       submenu: [
         {
           label: '🟢 Available',
+          accelerator: 'CmdOrCtrl+Shift+1',
           click: () =>
-            mainWindow?.webContents.send('set-status', 'available'),
+            mainWindow?.webContents.send('set-ui-status', 'available'),
         },
         {
           label: '🔴 Busy',
-          click: () => mainWindow?.webContents.send('set-status', 'busy'),
+          accelerator: 'CmdOrCtrl+Shift+2',
+          click: () =>
+            mainWindow?.webContents.send('set-ui-status', 'busy'),
         },
         {
-          label: '⛔ Do Not Disturb',
-          click: () => mainWindow?.webContents.send('set-status', 'dnd'),
+          label: '🟡 In a meeting',
+          accelerator: 'CmdOrCtrl+Shift+3',
+          click: () =>
+            mainWindow?.webContents.send('set-ui-status', 'meeting'),
         },
         {
-          label: '🟡 Away',
-          click: () => mainWindow?.webContents.send('set-status', 'away'),
+          label: '⚪ Not available',
+          accelerator: 'CmdOrCtrl+Shift+4',
+          click: () =>
+            mainWindow?.webContents.send('set-ui-status', 'away'),
         },
       ],
     },

@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  globalShortcut,
   ipcMain,
   Notification,
   session,
@@ -189,6 +190,22 @@ app.whenReady().then(() => {
   createWindow();
   setupTray(mainWindow);
 
+  // Global keyboard shortcuts for status switching (works even when hidden)
+  const statusShortcuts: [string, string][] = [
+    ['CmdOrCtrl+Shift+1', 'available'],
+    ['CmdOrCtrl+Shift+2', 'busy'],
+    ['CmdOrCtrl+Shift+3', 'meeting'],
+    ['CmdOrCtrl+Shift+4', 'away'],
+  ];
+  for (const [accel, uiStatus] of statusShortcuts) {
+    const ok = globalShortcut.register(accel, () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('set-ui-status', uiStatus);
+      }
+    });
+    if (!ok) console.warn(`[main] Failed to register global shortcut: ${accel}`);
+  }
+
   // Auto-grant media/notification permissions to our own window's session too.
   const winSession = mainWindow?.webContents.session;
   if (winSession) {
@@ -226,6 +243,10 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
 
 app.on('window-all-closed', () => {

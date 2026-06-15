@@ -51,6 +51,16 @@ export default function ProfileMenu() {
     return () => clearTimeout(t);
   }, []);
 
+  // Listen to global shortcuts / tray status changes from the main process
+  useEffect(() => {
+    const cb = (s: any) => {
+      if (STATUS_META[s as Status]) {
+        applyStatus(s as Status);
+      }
+    };
+    window.electronAPI?.onSetUiStatus?.(cb);
+  }, []);
+
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);

@@ -23,6 +23,7 @@ declare global {
       onUpdateDownloaded: (cb: (info: { version: string }) => void) => void;
       onUpdateError?: (cb: (msg: string) => void) => void;
       onSetStatus: (cb: (s: string) => void) => void;
+      onSetUiStatus: (cb: (s: 'available' | 'busy' | 'meeting' | 'away') => void) => void;
       platform: NodeJS.Platform;
     };
   }
