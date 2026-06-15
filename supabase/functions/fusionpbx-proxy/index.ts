@@ -25,6 +25,12 @@ const LEMTEL_ORG = "71755d33-ed64-4ad5-a828-61c9d2029eb7";
 type FusionSessionEntry = { cookie: string; expiresAt: number };
 const FUSION_SESSIONS = new Map<string, FusionSessionEntry>();
 
+// Cache for live SIP registrations (per domain_uuid). Short TTL to shield
+// FusionPBX from dashboard polling while still feeling realtime.
+type RegCacheEntry = { fetchedAt: number; payload: any };
+const REGISTRATIONS_CACHE = new Map<string, RegCacheEntry>();
+const REGISTRATIONS_TTL_MS = 15_000;
+
 function fusionBaseOrigin(baseUrl: string) {
   try { return new URL(baseUrl).origin.replace(/\/+$/, ""); }
   catch { return String(baseUrl || "").replace(/\/+$/, ""); }
