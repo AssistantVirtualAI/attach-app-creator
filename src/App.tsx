@@ -149,6 +149,7 @@ import ConsoleInsights from "./pages/console/ConsoleInsights";
 import ConsoleChatbot from "./pages/console/ConsoleChatbot";
 import ConsoleAudit from "./pages/console/ConsoleAudit";
 import ConsolePresence from "./pages/console/ConsolePresence";
+import ConsoleChat from "./pages/console/ConsoleChat";
 import AdminReports from "./pages/lemtel/admin/AdminReports";
 import AdminDestinations from "./pages/lemtel/admin/AdminDestinations";
 import AdminTimeConditions from "./pages/lemtel/admin/AdminTimeConditions";
