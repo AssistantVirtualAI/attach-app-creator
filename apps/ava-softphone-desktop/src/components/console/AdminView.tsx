@@ -269,7 +269,8 @@ const NAV_GROUPS: { label: string; items: { id: Section; label: string }[] }[] =
     label: 'Media',
     items: [
       { id: 'voicemails', label: 'Voicemails' },
-      { id: 'recordings', label: 'Recording Rules' },
+      { id: 'recordings', label: 'Call Recordings' },
+      { id: 'call-history', label: 'Call History' },
       { id: 'hold-music', label: 'Hold Music' },
       { id: 'conferences', label: 'Conferences' },
       { id: 'feature-codes', label: 'Feature Codes' },
