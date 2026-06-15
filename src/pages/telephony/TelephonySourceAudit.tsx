@@ -72,6 +72,21 @@ export default function TelephonySourceAudit() {
     },
   });
 
+  const backfill = useMutation({
+    mutationFn: async (action: string) => {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { organization_id: orgId, action },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (d: any, action) => {
+      toast.success(`${action}: ${JSON.stringify(d?.stats ?? d).slice(0, 120)}`);
+      refetch();
+    },
+    onError: (e: any) => toast.error(`Backfill failed: ${e?.message || e}`),
+  });
+
   return (
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
@@ -86,6 +101,22 @@ export default function TelephonySourceAudit() {
           Refresh
         </Button>
       </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2"><Download className="w-4 h-4" />Backfill from FusionPBX</CardTitle>
+          <CardDescription>Idempotent upserts stamped source='fusionpbx'. Orphans flagged, never deleted.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {['sync-extensions','sync-devices','sync-destinations','sync-ring-groups','sync-call-queues','sync-ivrs','sync-all'].map((a) => (
+            <Button key={a} size="sm" variant="outline" onClick={() => backfill.mutate(a)} disabled={backfill.isPending}>
+              {backfill.isPending && backfill.variables === a && <Loader2 className="w-3 h-3 mr-1 animate-spin" />}
+              {a}
+            </Button>
+          ))}
+        </CardContent>
+      </Card>
+
 
       {data?.resolved_domain && (
         <Card>
