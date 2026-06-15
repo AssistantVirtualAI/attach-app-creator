@@ -45,8 +45,8 @@ async function getFusionSessionCookie(baseUrl: string): Promise<string> {
   if (!username || !password) throw new Error("FUSIONPBX_PASSWORD not configured");
 
   // 1. Hit /login.php on the same host that will serve the audio to bootstrap
-  // the host-scoped PHPSESSID cookie. A cookie from portal.lemtel.tel is not
-  // valid for pbxnode.lemtel.tel, and vice versa.
+  // the host-scoped PHPSESSID cookie. Recording downloads are served by
+  // pbxnode.lemtel.tel, so the session must be created on that host.
   const bootstrap = await fetch(`${origin}/login.php`, { redirect: "manual" });
   let cookie = firstPhpSessionCookie(bootstrap.headers.get("set-cookie") || "");
   await bootstrap.body?.cancel();
@@ -165,6 +165,7 @@ Deno.serve(async (req) => {
   };
 
   let FUSIONPBX_API_URL: string, FUSIONPBX_USERNAME: string, FUSIONPBX_API_KEY: string, FUSIONPBX_DOMAIN_UUID: string;
+  const PBX_RECORDING_FILE_BASE = "https://pbxnode.lemtel.tel";
   try {
     FUSIONPBX_API_URL = required("FUSIONPBX_API_URL").replace(/\/+$/, "").replace(/\/app\/api(\/\d+)?$/, "");
     FUSIONPBX_USERNAME = required("FUSIONPBX_USERNAME");
@@ -1185,17 +1186,10 @@ Deno.serve(async (req) => {
     }
 
     function getPbxFileBases() {
-      const bases = new Set<string>();
-      const add = (value: string | null | undefined) => {
-        if (!value) return;
-        try { bases.add(new URL(value).origin.replace(/\/+$/, "")); }
-        catch { bases.add(String(value).replace(/\/+$/, "")); }
-      };
-      // The FusionPBX portal HTML serves CDR audio from /app/xml_cdr/download.php?id={cdr_uuid}.
-      // Try the configured API/UI base plus the two known Lemtel web/file hosts.
-      add("https://pbxnode.lemtel.tel");
-      add(FUSIONPBX_API_URL);
-      return [...bases];
+      // Recording audio is served by the PBX node host, not the portal host.
+      // Keep all recording download candidates on this origin so PHP sessions,
+      // direct XML CDR downloads, and static recording fallbacks hit the same PBX.
+      return [PBX_RECORDING_FILE_BASE];
     }
 
     // ---- Recording proxy ----
@@ -1292,6 +1286,15 @@ Deno.serve(async (req) => {
         };
         return visit(value);
       };
+      const normalizeRecordingDownloadUrl = (value: string) => {
+        if (/^https?:\/\//i.test(value)) {
+          const u = new URL(value);
+          u.protocol = "https:";
+          u.host = new URL(PBX_RECORDING_FILE_BASE).host;
+          return u.toString();
+        }
+        return `${PBX_RECORDING_FILE_BASE}/${value.replace(/^\/+/, "")}`;
+      };
       const attempts: { url: string; status: number; content_type?: string }[] = [];
       const tryUrls: string[] = [];
       const fileBases = getPbxFileBases();
@@ -1301,26 +1304,35 @@ Deno.serve(async (req) => {
         const looksLikeError = head.startsWith("{") || head.startsWith("[") || head.startsWith("<") || head.includes("sqlstate") || head.includes("undefined column") || head.includes("error");
         return !looksLikeError && (isAudioContentType(contentType) || head.startsWith("id3") || head.startsWith("riff") || head.startsWith("oggs") || head.includes("ftyp") || buf.byteLength > 1200);
       };
-      const audioResponse = (buf: ArrayBuffer | Uint8Array, contentType: string) => new Response(buf, {
-        headers: { ...corsHeaders, "Content-Type": isAudioContentType(contentType) ? contentType : ct, "Content-Length": String(buf.byteLength), "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=300" },
-      });
+      const audioResponse = (buf: ArrayBuffer | Uint8Array, contentType: string) => {
+        const bodyBuf: ArrayBuffer = buf instanceof Uint8Array
+          ? new Uint8Array(buf).buffer
+          : buf;
+        return new Response(bodyBuf, {
+          headers: { ...corsHeaders, "Content-Type": isAudioContentType(contentType) ? contentType : ct, "Content-Length": String(buf.byteLength), "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=300" },
+        });
+      };
       if (xml_cdr_uuid) {
         for (const fileBase of fileBases) {
           const id = encodeURIComponent(String(xml_cdr_uuid));
-          // Match the FusionPBX portal player exactly: /app/xml_cdr/download.php?id={xml_cdr_uuid}.
-          // Add API-key query auth for server-side access because the portal normally uses a PHP session cookie.
+          // Primary PBX-node fallbacks, in the order confirmed for Lemtel recordings.
+          tryUrls.push(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}&t=bin`);
+          tryUrls.push(`${fileBase}/app/xml_cdr/download.php?id=${id}`);
+          if (record_name) {
+            const n = encodeURIComponent(normalizeRecordName(record_name));
+            tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/${n}`));
+          }
+          // Additional authenticated and non-authenticated variants for older FusionPBX routes.
           tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}&t=bin`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${id}&t=bin`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${id}`));
-          tryUrls.push(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}&t=bin`);
           tryUrls.push(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}`);
           tryUrls.push(`${fileBase}/app/xml_cdr/download.php?id=${id}&t=bin`);
-          tryUrls.push(`${fileBase}/app/xml_cdr/download.php?id=${id}`);
         }
       }
       if (local_recording_url && String(local_recording_url).startsWith("http")) {
-        tryUrls.push(String(local_recording_url));
+        tryUrls.push(normalizeRecordingDownloadUrl(String(local_recording_url)));
       }
       if (record_name) {
         const rawName = normalizeRecordName(record_name);
@@ -1388,20 +1400,27 @@ Deno.serve(async (req) => {
 
       // ---- PRIMARY PATH: PHP session cookie (mirrors the FusionPBX UI) ----
       // /app/call_recordings/download.php?id=<xml_cdr_uuid> requires a logged-in
-      // PHP session — exactly how a browser plays a recording from the portal.
+      // PHP session — exactly how a browser plays a recording from the PBX node.
       const attemptsSession: { url: string; status: number; content_type?: string }[] = [];
       if (xml_cdr_uuid) {
         for (const fileBase of fileBases) {
+          const id = encodeURIComponent(String(xml_cdr_uuid));
           const sessionUrls = [
-            `${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`,
-            `${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${encodeURIComponent(xml_cdr_uuid)}`,
-            `${fileBase}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`,
-            `${fileBase}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`,
-            `${fileBase}/app/call_recordings/call_recording_download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`,
-            `${fileBase}/app/call_recordings/call_recording_download.php?id=${encodeURIComponent(xml_cdr_uuid)}`,
-            `${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`,
-            `${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`,
+            `${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}&t=bin`,
+            `${fileBase}/app/xml_cdr/download.php?id=${id}`,
           ];
+          if (record_name) {
+            const n = encodeURIComponent(normalizeRecordName(record_name));
+            sessionUrls.push(withQueryAuth(`${fileBase}/app/recordings/${n}`));
+          }
+          sessionUrls.push(
+            `${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${id}`,
+            `${fileBase}/app/xml_cdr/download.php?id=${id}&t=bin`,
+            `${fileBase}/app/call_recordings/call_recording_download.php?id=${id}&t=bin`,
+            `${fileBase}/app/call_recordings/call_recording_download.php?id=${id}`,
+            `${fileBase}/app/call_recordings/download.php?id=${id}&t=bin`,
+            `${fileBase}/app/call_recordings/download.php?id=${id}`,
+          );
           if (record_name) {
             const rawName = normalizeRecordName(record_name);
             const n = encodeURIComponent(rawName);
@@ -1485,9 +1504,7 @@ Deno.serve(async (req) => {
                 if (decoded && decoded.byteLength > 1200) return audioResponse(decoded, ct);
                 const nextUrl = extractJsonDownloadUrl(parsed);
                 if (nextUrl) {
-                  const absoluteUrl = nextUrl.startsWith("http")
-                    ? nextUrl
-                    : `${FUSIONPBX_API_URL}/${nextUrl.replace(/^\/+/, "")}`;
+                  const absoluteUrl = normalizeRecordingDownloadUrl(nextUrl);
                   if (!uniqueUrls.includes(absoluteUrl)) uniqueUrls.push(absoluteUrl);
                 }
               } catch { /* not a base64 download response */ }
