@@ -137,8 +137,8 @@ export default function ProfileMenu() {
             background: meta.color, border: '2px solid #0a1530',
           }} />
         </span>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase' }}>
-          {meta.label}
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {status === 'meeting' && meetingNote ? `Meeting · ${meetingNote}` : meta.label}
         </span>
         <span style={{ fontSize: 9, opacity: 0.6 }}>▾</span>
       </button>
