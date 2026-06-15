@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
 
     const { data: sp, error: spErr } = await supabaseAdmin
       .from("pbx_softphone_users")
-      .select("extension, organization_id, extension_id, display_name, sip_password, sip_password_encrypted, sip_domain, wss_url")
+      .select("extension, organization_id, extension_id, display_name, sip_password, sip_domain, wss_url")
       .eq("portal_user_id", user.id)
       .maybeSingle();
     if (spErr) log("lookup by portal_user_id error", spErr.message);
@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
       `wss://${sipDomain}:7443`,
     ]));
 
-    let password = await decryptSecret((sp as any).sip_password_encrypted) || await decryptSecret(sp.sip_password) || "";
+    let password = await decryptSecret(sp.sip_password) || "";
     if (!password && sp.extension_id) {
       const { data: ext } = await supabase
         .from("pbx_extensions").select("raw_data").eq("id", sp.extension_id).maybeSingle();
@@ -142,13 +142,9 @@ Deno.serve(async (req) => {
           || "";
         if (fpPwd) {
           password = fpPwd;
-          const encrypted = await encryptSecret(fpPwd);
-          const updatePayload: Record<string, unknown> = encrypted
-            ? { sip_password_encrypted: encrypted, sip_password: null }
-            : { sip_password: fpPwd };
           await supabaseAdmin
             .from("pbx_softphone_users")
-            .update(updatePayload)
+            .update({ sip_password: fpPwd })
             .eq("portal_user_id", user.id);
         }
       } catch (_e) { /* non-fatal */ }
