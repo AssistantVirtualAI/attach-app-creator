@@ -118,6 +118,32 @@ export function useSoftphone() {
     }
   }, [snap.callState, snap.remoteIdentity, snap.remoteNumber]);
 
+  // Presence: flip to on_call when active; revert to previous on end
+  const prevStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    const active = snap.callState === "active" || snap.callState === "ringing-in" || snap.callState === "ringing-out";
+    if (active && prevStatusRef.current === null) {
+      try { prevStatusRef.current = window.sessionStorage.getItem("ava.presence.prev") || userStatus; } catch { prevStatusRef.current = userStatus; }
+      try { window.sessionStorage.setItem("ava.presence.prev", prevStatusRef.current ?? "available"); } catch {}
+      (supabase.rpc as any)("upsert_user_presence", {
+        _status: prevStatusRef.current ?? "available",
+        _call_state: "on_call",
+        _platform: detectSoftphonePlatform(),
+      }).then?.(() => {});
+    }
+    if (snap.callState === "ended" && prevStatusRef.current) {
+      const prev = prevStatusRef.current;
+      prevStatusRef.current = null;
+      try { window.sessionStorage.removeItem("ava.presence.prev"); } catch {}
+      (supabase.rpc as any)("upsert_user_presence", {
+        _status: prev,
+        _call_state: "idle",
+        _platform: detectSoftphonePlatform(),
+      }).then?.(() => {});
+    }
+  }, [snap.callState, user, userStatus]);
+
   // Persist call history to pbx_call_records when a call ends
   useEffect(() => {
     if (snap.callState === "ringing-out" || snap.callState === "ringing-in" || snap.callState === "active") {

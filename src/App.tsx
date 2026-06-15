@@ -189,11 +189,13 @@ import PortalChooser from "./pages/PortalChooser";
 
 
 // Three-portal architecture (Platform / Customer / My)
-import { PlatformAdminShell, CustomerAdminShell, MyWorkspaceShell } from "./components/portals/PortalShells";
+import { PlatformAdminShell, CustomerAdminShell } from "./components/portals/PortalShells";
+import { MyWorkspaceShellSidebar } from "./components/portals/MyWorkspaceShellSidebar";
 const MyTelecomSettings = lazy(() => import("./pages/my/TelecomSettings"));
 const MyOrgChat = lazy(() => import("./pages/my/OrgChat"));
 const MyAIAssistant = lazy(() => import("./pages/my/AIAssistant"));
 const MyVoicemail = lazy(() => import("./pages/my/Voicemail"));
+const MyRecordings = lazy(() => import("./pages/my/Recordings"));
 const CustomerAdminAIChat = lazy(() => import("./pages/customer/AdminAIChat"));
 const CustomerSyncHealth = lazy(() => import("./pages/customer/SyncHealthCenter"));
 import { RolePortalGuard } from "./components/portals/RolePortalGuard";
@@ -903,14 +905,14 @@ const App = () => (
                 </Route>
 
                 {/* My Workspace — end users */}
-                <Route path="/my" element={<ProtectedRoute><RolePortalGuard portal="my"><MyWorkspaceShell /></RolePortalGuard></ProtectedRoute>}>
+                <Route path="/my" element={<ProtectedRoute><RolePortalGuard portal="my"><MyWorkspaceShellSidebar /></RolePortalGuard></ProtectedRoute>}>
                   <Route index element={<MyDashboardLanding />} />
                   <Route path="dashboard" element={<MyDashboardLanding />} />
                   <Route path="softphone" element={<TelephonyWebphone />} />
                   <Route path="calls" element={<TelephonyMediaCenter scope="mine" />} />
                   <Route path="voicemail" element={<MyVoicemail />} />
                   <Route path="messages" element={<LemtelMessages />} />
-                  <Route path="recordings" element={<AdminRecordings scope="mine" />} />
+                  <Route path="recordings" element={<MyRecordings />} />
                   <Route path="chat" element={<MyOrgChat />} />
                   <Route path="telecom" element={<MyTelecomSettings />} />
                   <Route path="ai" element={<MyAIAssistant />} />
