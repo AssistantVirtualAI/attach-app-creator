@@ -8,7 +8,7 @@ import {
 import {
   LayoutDashboard, Phone, Smartphone, Wifi, PhoneCall, FileAudio, Voicemail,
   Hash, Route as RouteIcon, ListTree, Users2, ClipboardList, Sparkles, Bot,
-  AlertTriangle,
+  AlertTriangle, CircleDot,
 } from "lucide-react";
 import { useDesktopRole } from "@/hooks/useDesktopRole";
 import { Navigate } from "react-router-dom";
@@ -28,6 +28,7 @@ const ITEMS = [
   { to: "/console/cdr", label: "CDR & Recordings", icon: FileAudio, group: "Live" },
   { to: "/console/insights", label: "AI Insights", icon: Sparkles, group: "AI" },
   { to: "/console/chatbot", label: "PBX Chatbot", icon: Bot, group: "AI" },
+  { to: "/console/presence", label: "Presence", icon: CircleDot, group: "Admin" },
   { to: "/console/audit", label: "Audit Log", icon: ClipboardList, group: "Admin" },
 ];
 

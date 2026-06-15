@@ -148,6 +148,7 @@ import {
 import ConsoleInsights from "./pages/console/ConsoleInsights";
 import ConsoleChatbot from "./pages/console/ConsoleChatbot";
 import ConsoleAudit from "./pages/console/ConsoleAudit";
+import ConsolePresence from "./pages/console/ConsolePresence";
 import AdminReports from "./pages/lemtel/admin/AdminReports";
 import AdminDestinations from "./pages/lemtel/admin/AdminDestinations";
 import AdminTimeConditions from "./pages/lemtel/admin/AdminTimeConditions";
@@ -950,6 +951,7 @@ const App = () => (
                   <Route path="insights" element={<ConsoleInsights />} />
                   <Route path="chatbot" element={<ConsoleChatbot />} />
                   <Route path="audit" element={<ConsoleAudit />} />
+                  <Route path="presence" element={<ConsolePresence />} />
                 </Route>
 
 
