@@ -15,13 +15,14 @@ const NAV_KEY: Record<string, I18nKey> = {
   contacts: 'nav.contacts', admin: 'nav.admin', settings: 'nav.settings',
   telecom: 'nav.telecom', orgchat: 'nav.orgchat', aiadmin: 'nav.aiadmin', reports: 'nav.reports',
   customers: 'nav.admin', voiceagents: 'nav.ai', pbxlive: 'nav.pbxlive',
+  audit: 'nav.admin',
 };
 
 export type ConsoleView =
   | 'home' | 'dialer' | 'calls' | 'messages' | 'voicemail'
   | 'recordings' | 'ai' | 'contacts' | 'admin' | 'settings'
   | 'telecom' | 'orgchat' | 'aiadmin' | 'reports' | 'pbxlive'
-  | 'customers' | 'voiceagents';
+  | 'customers' | 'voiceagents' | 'audit';
 
 const ICON: Record<ConsoleView, string> = {
   home: 'M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1V11z',
@@ -40,6 +41,7 @@ const ICON: Record<ConsoleView, string> = {
   pbxlive: 'M4 7h16M4 12h6m4 0h6M4 17h16M6 5v14m12-14v14',
   customers: 'M3 7h18M3 12h18M3 17h18M7 3v18',
   voiceagents: 'M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4zM5 11a7 7 0 0 0 14 0M12 18v4',
+  audit: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
   settings: 'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
 };
 
@@ -48,11 +50,11 @@ const LABEL: Record<ConsoleView, string> = {
   voicemail: 'Voicemail', recordings: 'Recordings', ai: 'AVA AI',
   contacts: 'Contacts', admin: 'Admin', settings: 'Settings',
   telecom: 'Telecom', orgchat: 'Org Chat', aiadmin: 'AI Admin', reports: 'Reports',
-  customers: 'Customers', voiceagents: 'Voice Agents', pbxlive: 'PBX Live',
+  customers: 'Customers', voiceagents: 'Voice Agents', pbxlive: 'PBX Live', audit: 'Audit',
 };
 
 const USER_ITEMS: ConsoleView[] = ['home', 'dialer', 'calls', 'messages', 'voicemail', 'recordings', 'orgchat', 'ai', 'telecom', 'contacts'];
-const ADMIN_ITEMS: ConsoleView[] = ['pbxlive', 'customers', 'voiceagents', 'reports', 'admin', 'aiadmin'];
+const ADMIN_ITEMS: ConsoleView[] = ['pbxlive', 'customers', 'voiceagents', 'reports', 'admin', 'aiadmin', 'audit'];
 
 interface Props {
   view: ConsoleView;
@@ -65,7 +67,7 @@ interface Props {
   onStartTour?: () => void;
 }
 
-const SUPER_ADMIN_EXTRAS: ConsoleView[] = ['pbxlive', 'customers', 'voiceagents', 'reports', 'admin', 'aiadmin'];
+const SUPER_ADMIN_EXTRAS: ConsoleView[] = ['pbxlive', 'customers', 'voiceagents', 'reports', 'admin', 'aiadmin', 'audit'];
 
 export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch, compact, isAdmin, isSuperAdmin, onStartTour }: Props) {
   const { t } = useTranslation();
