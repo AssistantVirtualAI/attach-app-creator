@@ -308,7 +308,7 @@ export default function AdminView() {
           </div>
         ))}
       </aside>
-      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px' }}>
+      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: (sec === 'voicemails' || sec === 'recordings' || sec === 'call-history') ? 0 : '24px 28px' }}>
         {sec === 'extensions' && <ExtensionsTable />}
         {sec === 'devices' && (
           <PbxResourceSection
