@@ -28,10 +28,10 @@ function statusBadge(c: any) {
 function today() { return new Date().toISOString().slice(0, 10); }
 function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
 
-export default function LemtelPortalCalls() {
+export default function LemtelPortalCalls({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { data: cdrs = [], isLoading } = usePbxCallRecords(100);
+  const { data: allCdrs = [], isLoading } = usePbxCallRecords(100);
   const [analyzing, setAnalyzing] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -43,6 +43,9 @@ export default function LemtelPortalCalls() {
   const [fromDate, setFromDate] = useState(daysAgo(30));
   const [toDate, setToDate] = useState(today());
   const [extFilter, setExtFilter] = useState('');
+  const cdrs = scope === 'mine'
+    ? (allCdrs as any[]).filter((c: any) => c.extension || c.destination_number || c.destination)
+    : allCdrs;
 
   const analyze = async (call: any) => {
     const call_record_id = call.id;
@@ -115,10 +118,10 @@ export default function LemtelPortalCalls() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-3xl font-bold">Call History</h1><p className="text-muted-foreground">{cdrs.length} calls</p></div>
-        <Button onClick={() => sync.mutate('cdr')} disabled={sync.isPending} variant="outline">
+        {scope === 'org' && <Button onClick={() => sync.mutate('cdr')} disabled={sync.isPending} variant="outline">
           {sync.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
           Sync CDRs
-        </Button>
+        </Button>}
       </div>
 
       {audioUrl && (
@@ -128,7 +131,7 @@ export default function LemtelPortalCalls() {
       )}
 
       {/* Date range fetcher */}
-      <Card className="p-3">
+      {scope === 'org' && <Card className="p-3">
         <Button variant="ghost" size="sm" className="w-full justify-between" onClick={() => setRangeOpen(o => !o)}>
           <span>📅 Fetch CDRs by date range</span>
           {rangeOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -144,7 +147,7 @@ export default function LemtelPortalCalls() {
             </Button>
           </div>
         )}
-      </Card>
+      </Card>}
 
       <Card className="overflow-hidden">
         {isLoading ? (
