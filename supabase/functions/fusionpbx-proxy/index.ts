@@ -1356,6 +1356,66 @@ Deno.serve(async (req) => {
         }
       }
 
+      // ---- PRIMARY PATH: PHP session cookie (mirrors the FusionPBX UI) ----
+      // /app/call_recordings/download.php?id=<xml_cdr_uuid> requires a logged-in
+      // PHP session — exactly how a browser plays a recording from the portal.
+      const attemptsSession: { url: string; status: number; content_type?: string }[] = [];
+      if (xml_cdr_uuid) {
+        for (const fileBase of fileBases) {
+          const sessionUrl = `${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`;
+          try {
+            let cookie = await getFusionSessionCookie(fileBase).catch(() => "");
+            const doFetch = async (c: string) => {
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 8000);
+              try {
+                return await fetch(sessionUrl, {
+                  headers: { Cookie: c, Accept: "*/*" },
+                  redirect: "follow",
+                  signal: controller.signal,
+                });
+              } finally { clearTimeout(timeout); }
+            };
+            let r = cookie ? await doFetch(cookie) : null;
+            // If session expired, force re-login once.
+            if (r && (r.status === 401 || r.status === 403 || r.headers.get("content-type")?.includes("text/html"))) {
+              FUSION_SESSION.cookie = ""; FUSION_SESSION.expiresAt = 0;
+              cookie = await getFusionSessionCookie(fileBase).catch(() => "");
+              if (cookie) {
+                await r.body?.cancel();
+                r = await doFetch(cookie);
+              }
+            }
+            if (r && r.ok) {
+              const buf = await r.arrayBuffer();
+              const rct = r.headers.get("content-type") || "";
+              const head = new TextDecoder().decode(buf.slice(0, Math.min(buf.byteLength, 160))).trim().toLowerCase();
+              const looksLikeAudio = head.startsWith("id3") || head.startsWith("riff") || head.startsWith("oggs") || head.includes("ftyp") || (buf.byteLength > 1200 && !head.startsWith("<") && !head.startsWith("{"));
+              if (looksLikeAudio && !rct.includes("text/html")) {
+                if (probeOnly) {
+                  return json({ ok: true, available: true, content_type: rct.startsWith("audio/") ? rct : ct }, 200, { "X-Recording-Status": "available" });
+                }
+                return new Response(buf, {
+                  headers: {
+                    ...corsHeaders,
+                    "Content-Type": rct.startsWith("audio/") ? rct : ct,
+                    "Content-Length": String(buf.byteLength),
+                    "Accept-Ranges": "bytes",
+                    "Cache-Control": "private, max-age=300",
+                  },
+                });
+              }
+              attemptsSession.push({ url: safeUrl(sessionUrl), status: r.status, content_type: rct });
+            } else if (r) {
+              attemptsSession.push({ url: safeUrl(sessionUrl), status: r.status });
+              await r.body?.cancel();
+            }
+          } catch (e: any) {
+            attemptsSession.push({ url: safeUrl(sessionUrl), status: 0, content_type: e?.message?.slice(0, 80) });
+          }
+        }
+      }
+
       const uniqueUrls = [...new Set(tryUrls)];
       for (let i = 0; i < uniqueUrls.length; i++) {
         const url = uniqueUrls[i];
