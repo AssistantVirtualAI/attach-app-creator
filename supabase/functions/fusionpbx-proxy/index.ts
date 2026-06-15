@@ -1505,21 +1505,7 @@ Deno.serve(async (req) => {
           attempts.push({ url: safeUrl(url), status: 0, content_type: e?.name === "AbortError" ? "timeout" : undefined });
         }
       }
-      const directPortalUrl = xml_cdr_uuid ? `https://portal.lemtel.tel/app/xml_cdr/download.php?id=${encodeURIComponent(String(xml_cdr_uuid))}` : null;
-      const allAttempts = [...attemptsSession, ...attempts];
-      const attemptedHosts = Array.from(new Set(allAttempts.map((a) => {
-        try { return new URL(a.url).host; } catch { return "unknown"; }
-      })));
-      const statusSummary = allAttempts.map((a) => `${a.status}${a.content_type ? ` ${a.content_type}` : ""}`).slice(0, 12);
-      return json({
-        ok: false,
-        error: "RECORDING_NOT_FOUND",
-        message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.",
-        diagnostic_message: `Tried ${allAttempts.length} PBX recording URL(s) on ${attemptedHosts.join(", ") || "no host"}. Statuses: ${statusSummary.join(" | ") || "none"}.`,
-        direct_portal_url: directPortalUrl,
-        attempts,
-        session_attempts: attemptsSession,
-      }, 200, { "X-Recording-Status": "not-found" });
+      return json({ ok: false, error: "RECORDING_NOT_FOUND", message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.", attempts, session_attempts: attemptsSession }, 200, { "X-Recording-Status": "not-found" });
     }
 
     // ---- Signed-URL recording delivery ----
@@ -1548,17 +1534,7 @@ Deno.serve(async (req) => {
         const ct = selfRes.headers.get("content-type") || "";
         if (!selfRes.ok || (!ct.startsWith("audio/") && !ct.includes("octet-stream"))) {
           const detail = await selfRes.text().catch(() => "");
-          let parsedDetail: any = null;
-          try { parsedDetail = detail ? JSON.parse(detail) : null; } catch { parsedDetail = null; }
-          return json({
-            ok: false,
-            error: "RECORDING_NOT_FOUND",
-            message: parsedDetail?.diagnostic_message || parsedDetail?.message || "Recording audio could not be fetched from PBX before signing.",
-            detail: detail.slice(0, 1200),
-            direct_portal_url: parsedDetail?.direct_portal_url || null,
-            attempts: parsedDetail?.attempts || [],
-            session_attempts: parsedDetail?.session_attempts || [],
-          }, 404);
+          return json({ ok: false, error: "RECORDING_NOT_FOUND", detail: detail.slice(0, 240) }, 404);
         }
         const bytes = new Uint8Array(await selfRes.arrayBuffer());
         if (!bytes.byteLength) return json({ ok: false, error: "RECORDING_EMPTY" }, 404);

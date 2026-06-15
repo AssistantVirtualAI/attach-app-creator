@@ -1,104 +1,85 @@
 (function() {
   'use strict';
 
-  if (window.__lemtelClickToDialLoaded) return;
-  window.__lemtelClickToDialLoaded = true;
+  const PHONE_REGEX = /(\+?1?\s*[-.]?\s*\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})/g;
 
-  const PHONE_REGEX = /(\+?1?[\s.-]?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4})/g;
+  function cleanNumber(num) {
+    return num.replace(/\D/g, '');
+  }
+
+  function formatDisplay(num) {
+    const clean = cleanNumber(num);
+    if (clean.length === 10) {
+      return `(${clean.slice(0,3)}) ${clean.slice(3,6)}-${clean.slice(6)}`;
+    }
+    if (clean.length === 11 && clean[0] === '1') {
+      return `+1 (${clean.slice(1,4)}) ${clean.slice(4,7)}-${clean.slice(7)}`;
+    }
+    return num;
+  }
+
+  const processed = new WeakSet();
+
   const SKIP_TAGS = new Set([
-    'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'SVG', 'CANVAS',
-    'INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A', 'CODE', 'PRE'
+    'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME',
+    'INPUT', 'TEXTAREA', 'SELECT', 'BUTTON',
+    'A', 'CODE', 'PRE'
   ]);
 
   const PHONE_ICON_SVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z" fill="white"/></svg>`;
 
-  function normalizePhoneNumber(value) {
-    const original = String(value || '').trim();
-    const digits = original.replace(/\D/g, '');
-    if (!digits) return null;
-    if (digits.length === 10) return `+1${digits}`;
-    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
-    if (original.startsWith('+') && digits.length >= 10 && digits.length <= 15) return `+${digits}`;
-    if (digits.length >= 10 && digits.length <= 15) return `+${digits}`;
-    return null;
-  }
-
-  function formatDisplay(value) {
-    const normalized = normalizePhoneNumber(value);
-    if (!normalized) return String(value || '');
-    const digits = normalized.replace(/\D/g, '');
-    if (digits.length === 11 && digits.startsWith('1')) {
-      return `+1 (${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`;
-    }
-    return normalized;
-  }
-
-  function shouldSkipParent(parent) {
-    if (!parent) return true;
-    if (SKIP_TAGS.has(parent.tagName)) return true;
-    if (parent.closest('.lemtel-call-btn, [contenteditable="true"]')) return true;
-    return false;
-  }
-
   function createCallButton(number) {
-    const normalized = normalizePhoneNumber(number);
-    const btn = document.createElement('button');
-    btn.type = 'button';
+    const btn = document.createElement('a');
     btn.className = 'lemtel-call-btn';
-    btn.dataset.lemtelNumber = normalized || '';
+    btn.href = `tel:${cleanNumber(number)}`;
     btn.title = `Call ${formatDisplay(number)} with Lemtel Telecom`;
     btn.innerHTML = `${PHONE_ICON_SVG}<span>${formatDisplay(number)}</span>`;
 
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (normalized) dialNumber(normalized);
+      dialNumber(cleanNumber(number));
     });
 
     return btn;
   }
 
   function dialNumber(number) {
-    const normalized = normalizePhoneNumber(number);
-    if (!normalized) return;
+    // Hand off to the background worker which triggers the OS / linked mobile
+    // phone app via tel:. Never navigate the current page (that previously
+    // ended up on avastatistic.ca as a fallback).
     try {
-      chrome.runtime.sendMessage({ type: 'DIAL', number: normalized }, () => void chrome.runtime.lastError);
-    } catch (e) {
-      window.location.href = `tel:${encodeURIComponent(normalized)}`;
-    }
-    showCallNotification(normalized);
+      chrome.runtime.sendMessage({ type: 'DIAL', number });
+    } catch (e) {}
+    showCallNotification(number);
   }
 
   function showCallNotification(number) {
-    const existing = document.querySelector('.lemtel-notification');
-    if (existing) existing.remove();
-
     const notif = document.createElement('div');
     notif.className = 'lemtel-notification';
-    notif.innerHTML = `<div class="lemtel-notif-content">${PHONE_ICON_SVG}<span>Opening phone app for ${formatDisplay(number)}…</span></div>`;
+    notif.innerHTML = `<div class="lemtel-notif-content">${PHONE_ICON_SVG}<span>Calling ${formatDisplay(number)}...</span></div>`;
     document.body.appendChild(notif);
     setTimeout(() => notif.remove(), 3000);
   }
 
   function processTextNode(node) {
-    const text = node.textContent || '';
-    if (!PHONE_REGEX.test(text)) {
-      PHONE_REGEX.lastIndex = 0;
-      return;
-    }
-    PHONE_REGEX.lastIndex = 0;
+    if (processed.has(node)) return;
+    if (!node.textContent.match(PHONE_REGEX)) return;
 
     const parent = node.parentNode;
-    if (shouldSkipParent(parent)) return;
+    if (!parent) return;
+    if (SKIP_TAGS.has(parent.tagName)) return;
+    if (parent.classList?.contains('lemtel-call-btn')) return;
+
+    processed.add(node);
 
     const fragment = document.createDocumentFragment();
     let lastIndex = 0;
     let match;
+    const text = node.textContent;
     const regex = new RegExp(PHONE_REGEX);
 
     while ((match = regex.exec(text)) !== null) {
-      const normalized = normalizePhoneNumber(match[0]);
-      if (!normalized) continue;
       if (match.index > lastIndex) {
         fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
       }
@@ -106,7 +87,6 @@
       lastIndex = regex.lastIndex;
     }
 
-    if (lastIndex === 0) return;
     if (lastIndex < text.length) {
       fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
     }
@@ -115,22 +95,16 @@
   }
 
   function processContainer(container) {
-    if (!container || !document.body) return;
-    if (container.nodeType === Node.TEXT_NODE) {
-      processTextNode(container);
-      return;
-    }
-    if (container.nodeType !== Node.ELEMENT_NODE) return;
-    if (shouldSkipParent(container)) return;
-
     const walker = document.createTreeWalker(
       container,
       NodeFilter.SHOW_TEXT,
       {
         acceptNode(node) {
           const parent = node.parentElement;
-          if (shouldSkipParent(parent)) return NodeFilter.FILTER_REJECT;
-          if (!(node.textContent || '').trim()) return NodeFilter.FILTER_SKIP;
+          if (!parent) return NodeFilter.FILTER_REJECT;
+          if (SKIP_TAGS.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
+          if (parent.closest('.lemtel-call-btn')) return NodeFilter.FILTER_REJECT;
+          if (!node.textContent.trim()) return NodeFilter.FILTER_SKIP;
           return NodeFilter.FILTER_ACCEPT;
         }
       }
@@ -144,31 +118,26 @@
 
   document.addEventListener('contextmenu', () => {
     const selection = window.getSelection()?.toString().trim();
-    if (selection && normalizePhoneNumber(selection)) {
+    if (selection && selection.match(PHONE_REGEX)) {
       try {
-        chrome.runtime.sendMessage({ type: 'SHOW_CONTEXT_MENU', number: selection }, () => void chrome.runtime.lastError);
+        chrome.runtime.sendMessage({ type: 'SHOW_CONTEXT_MENU', number: selection });
       } catch (e) {}
     }
   });
 
-  function start() {
-    if (!document.body) return;
-    processContainer(document.body);
+  processContainer(document.body);
 
-    const observer = new MutationObserver((mutations) => {
-      const added = [];
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.TEXT_NODE) added.push(node);
-        });
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          processContainer(node);
+        }
       });
-      window.requestIdleCallback
-        ? window.requestIdleCallback(() => added.forEach(processContainer), { timeout: 1500 })
-        : setTimeout(() => added.forEach(processContainer), 100);
     });
+  });
 
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
+  observer.observe(document.body, { childList: true, subtree: true });
 
   const style = document.createElement('style');
   style.textContent = `
@@ -190,8 +159,7 @@
       box-shadow: 0 2px 8px rgba(0,61,166,0.3) !important;
       transition: all 0.15s ease !important;
       white-space: nowrap !important;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif !important;
-      line-height: 1.35 !important;
+      font-family: -apple-system, sans-serif !important;
     }
     .lemtel-call-btn:hover {
       background: linear-gradient(135deg, #0052CC, #9D6FF0) !important;
@@ -219,7 +187,7 @@
       gap: 10px !important;
       color: white !important;
       font-size: 13px !important;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif !important;
+      font-family: -apple-system, sans-serif !important;
     }
     @keyframes lemtel-slide-in {
       from { transform: translateY(20px); opacity: 0; }
@@ -227,10 +195,4 @@
     }
   `;
   document.head.appendChild(style);
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', start, { once: true });
-  } else {
-    start();
-  }
 })();

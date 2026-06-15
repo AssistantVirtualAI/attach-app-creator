@@ -14,48 +14,15 @@ interface UseSoftphoneArgs {
 
 interface FetchedCreds {
   extension: string;
-  display_name?: string;
-  displayName?: string;
-  sip_domain?: string;
-  sipDomain?: string;
-  wss_url?: string;
-  wssUrl?: string;
-  password?: string;
-  sip_password?: string;
+  display_name: string;
+  sip_domain: string;
+  wss_url: string;
+  password: string;
 }
 
-class SoftphoneCredentialError extends Error {
-  status: number;
-  code: string;
-  details?: unknown;
-
-  constructor(status: number, code: string, message: string, details?: unknown) {
-    super(message);
-    this.name = 'SoftphoneCredentialError';
-    this.status = status;
-    this.code = code;
-    this.details = details;
-  }
-}
-
-function credentialErrorMessage(err: SoftphoneCredentialError): string {
-  if (err.status === 401) return 'Session expired — please sign in again.';
-  if (err.status === 404 || err.code === 'NO_SOFTPHONE_ACCOUNT') {
-    return 'No softphone account is configured for this login. Contact your administrator to assign an extension.';
-  }
-  if (err.status === 424 || err.code === 'NO_SIP_PASSWORD') {
-    return 'Your extension is missing its SIP password. Contact your administrator to resync the PBX credentials.';
-  }
-  return err.message || `Failed to load SIP credentials (${err.status || 'network'}).`;
-}
-
-async function fetchSoftphoneCredentials(accessToken: string): Promise<FetchedCreds> {
-  let payload: any = null;
-  let rawText = '';
-  let res: Response;
-
+async function fetchSoftphoneCredentials(accessToken: string): Promise<FetchedCreds | null> {
   try {
-    res = await fetch(`${SB_URL}/functions/v1/softphone-credentials`, {
+    const res = await fetch(`${SB_URL}/functions/v1/softphone-credentials`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -64,22 +31,13 @@ async function fetchSoftphoneCredentials(accessToken: string): Promise<FetchedCr
       },
       body: '{}',
     });
-  } catch (err: any) {
-    throw new SoftphoneCredentialError(0, 'NETWORK_ERROR', `Cannot reach credential service: ${err?.message || err}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.error) return null;
+    return data as FetchedCreds;
+  } catch {
+    return null;
   }
-
-  rawText = await res.text().catch(() => '');
-  if (rawText) {
-    try { payload = JSON.parse(rawText); } catch { payload = null; }
-  }
-
-  if (!res.ok || payload?.error) {
-    const code = String(payload?.error || payload?.code || `HTTP_${res.status}`);
-    const message = String(payload?.message || payload?.error_description || rawText || `softphone-credentials ${res.status}`);
-    throw new SoftphoneCredentialError(res.status, code, message, payload || rawText);
-  }
-
-  return payload as FetchedCreds;
 }
 
 export type ManualStatus = 'auto' | 'available' | 'dnd' | 'away';
@@ -117,39 +75,23 @@ export function useSoftphone(args: UseSoftphoneArgs) {
           setCredError('No session token. Re-sign-in.');
           return;
         }
-        let fetched: FetchedCreds;
-        try {
-          fetched = await fetchSoftphoneCredentials(token);
-        } catch (err: any) {
-          if (err instanceof SoftphoneCredentialError && err.status === 401 && args.refreshToken) {
-            const refreshed = await supabase.auth.refreshSession({ refresh_token: args.refreshToken }).catch(() => null);
-            const freshToken = refreshed?.data?.session?.access_token;
-            if (freshToken) {
-              fetched = await fetchSoftphoneCredentials(freshToken);
-            } else {
-              throw err;
-            }
-          } else {
-            throw err;
-          }
-        }
+        const fetched = await fetchSoftphoneCredentials(token);
         if (cancelled) return;
-        const sipPassword = fetched.password || fetched.sip_password || '';
-        if (!sipPassword) {
-          setCredError('Your extension is missing its SIP password. Contact your administrator to resync the PBX credentials.');
+        if (!fetched || !fetched.password) {
+          setCredError(fetched ? 'No SIP password on file. Contact your admin.' : 'Failed to load SIP credentials.');
           return;
         }
         const cfg: SoftphoneConfig = {
           extension: fetched.extension || args.extension,
-          displayName: fetched.display_name || fetched.displayName || args.displayName || args.extension,
-          sipDomain: fetched.sip_domain || fetched.sipDomain || args.sipDomain || 'lemtel.lemtel.tel',
-          wssUrl: fetched.wss_url || fetched.wssUrl || args.wssUrl || 'wss://lemtel.lemtel.tel:7443',
-          password: sipPassword,
+          displayName: fetched.display_name || args.displayName || args.extension,
+          sipDomain: fetched.sip_domain || args.sipDomain || 'lemtel.lemtel.tel',
+          wssUrl: fetched.wss_url || args.wssUrl || 'wss://lemtel.lemtel.tel:7443',
+          password: fetched.password,
         };
         setConfig(cfg);
         await sipProvider.init(cfg);
       } catch (e: any) {
-        setCredError(e instanceof SoftphoneCredentialError ? credentialErrorMessage(e) : String(e?.message || e));
+        setCredError(String(e?.message || e));
       } finally {
         if (!cancelled) setLoading(false);
       }

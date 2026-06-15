@@ -67,17 +67,6 @@ function mapInsightRow(callId: string, row: any): CallInsight {
 }
 
 let authToken: string | null = null;
-let lastRecordingDebug: any = null;
-
-function setLastRecordingDebug(debug: any) {
-  lastRecordingDebug = debug || null;
-  if (debug) console.warn('[avaApi] recording diagnostic:', debug);
-}
-
-export function getLastRecordingDebug() {
-  return lastRecordingDebug;
-}
-
 export function setAuthToken(token: string | null) {
   authToken = token;
   _meCache = null;
@@ -754,17 +743,9 @@ export const ava = {
           params: { xml_cdr_uuid, record_path, record_name, domain_uuid, domain_name, recorded_at, local_recording_url, expires_in: expiresInSec },
         }),
       });
-      if (!res.ok) {
-        const debug = await res.json().catch(() => ({ status: res.status }));
-        setLastRecordingDebug({ source: 'signed-url', status: res.status, recording, ...debug });
-        return null;
-      }
+      if (!res.ok) return null;
       const data = await res.json();
-      if (!data?.ok || !data?.url) {
-        setLastRecordingDebug({ source: 'signed-url', status: res.status, recording, ...data });
-        return null;
-      }
-      setLastRecordingDebug(null);
+      if (!data?.ok || !data?.url) return null;
       return { url: data.url, expiresInSec: data.expiresInSec, contentType: data.contentType };
     } catch (err) {
       console.warn('[avaApi] get-recording-signed-url failed:', err);
@@ -795,20 +776,11 @@ export const ava = {
         headers: authHeaders(),
         body: JSON.stringify({ action: 'get-recording', organization_id: recording.organization_id, params: { xml_cdr_uuid, record_path, record_name, domain_uuid, domain_name, recorded_at, local_recording_url } }),
       });
-      if (!res.ok) {
-        const msg = await res.text().catch(() => '');
-        let debug: any = null;
-        try { debug = msg ? JSON.parse(msg) : null; } catch { debug = null; }
-        setLastRecordingDebug({ source: 'stream', status: res.status, recording, ...(debug || { message: msg.slice(0, 1200) }) });
-        throw new Error(debug?.message || debug?.diagnostic_message || `Recording unavailable (${res.status})`);
-      }
+      if (!res.ok) throw new Error(`Recording unavailable (${res.status})`);
       const ct = res.headers.get('content-type') || '';
       if (!ct.startsWith('audio/') && !ct.includes('octet-stream')) {
         const msg = await res.text().catch(() => '');
-        let debug: any = null;
-        try { debug = msg ? JSON.parse(msg) : null; } catch { debug = null; }
-        setLastRecordingDebug({ source: 'stream', status: res.status, contentType: ct, recording, ...(debug || { message: msg.slice(0, 1200) }) });
-        throw new Error(debug?.diagnostic_message || debug?.message || msg.slice(0, 180) || 'PBX did not return audio');
+        throw new Error(msg.slice(0, 180) || 'PBX did not return audio');
       }
       const buf = await res.arrayBuffer();
       if (!buf.byteLength) throw new Error('Empty recording');
@@ -818,7 +790,6 @@ export const ava = {
         : lower.endsWith('.m4a') ? 'audio/mp4'
         : 'audio/wav';
       const blob = new Blob([buf], { type: ct.split(';')[0].trim() || fallbackMime });
-      setLastRecordingDebug(null);
       return URL.createObjectURL(blob);
     } catch (err) {
       console.warn('[avaApi] get-recording failed:', err);
