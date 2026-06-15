@@ -1046,6 +1046,86 @@ Deno.serve(async (req) => {
       return json({ success: errors.length === 0, stats: { ...stats, duration_ms }, errors });
     }
 
+    async function canReadCallRecording(xmlCdrUuid: string | null | undefined) {
+      if (isServiceCall || !userId) return true;
+      if (!xmlCdrUuid) return false;
+
+      const recordSelect = "id, organization_id, extension_uuid, extension";
+      const { data: byPbxUuid, error: pbxErr } = await admin
+        .from("pbx_call_records")
+        .select(recordSelect)
+        .eq("pbx_uuid", xmlCdrUuid)
+        .limit(1);
+      if (pbxErr) {
+        console.warn("recording access lookup failed:", pbxErr.message);
+        return false;
+      }
+
+      let record = byPbxUuid?.[0] || null;
+      if (!record && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(xmlCdrUuid)) {
+        const { data: byId, error: idErr } = await admin
+          .from("pbx_call_records")
+          .select(recordSelect)
+          .eq("id", xmlCdrUuid)
+          .limit(1);
+        if (idErr) {
+          console.warn("recording access id lookup failed:", idErr.message);
+          return false;
+        }
+        record = byId?.[0] || null;
+      }
+      if (!record) return false;
+
+      const { data: isLemtelAdmin } = await admin.rpc("is_lemtel_admin", { _user_id: userId });
+      if (isLemtelAdmin) return true;
+
+      const { data: orgMember } = await admin
+        .from("org_members")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("org_id", record.organization_id)
+        .in("role", ["owner", "admin"])
+        .maybeSingle();
+      if (orgMember) return true;
+
+      let softphoneQuery = admin
+        .from("pbx_softphone_users")
+        .select("id")
+        .eq("portal_user_id", userId)
+        .eq("organization_id", record.organization_id)
+        .limit(1);
+      if (record.extension_uuid) {
+        softphoneQuery = softphoneQuery.eq("extension_uuid", record.extension_uuid);
+      } else if (record.extension) {
+        softphoneQuery = softphoneQuery.eq("extension", record.extension);
+      } else {
+        return false;
+      }
+      const { data: softphoneRows, error: softphoneErr } = await softphoneQuery;
+      if (softphoneErr) {
+        console.warn("recording softphone access lookup failed:", softphoneErr.message);
+        return false;
+      }
+      return !!softphoneRows?.length;
+    }
+
+    function getPbxFileBases() {
+      const bases = new Set<string>();
+      const add = (value: string | null | undefined) => {
+        if (!value) return;
+        try { bases.add(new URL(value).origin.replace(/\/+$/, "")); }
+        catch { bases.add(String(value).replace(/\/+$/, "")); }
+      };
+      // The FusionPBX portal HTML serves CDR audio from pbxnode /app/xml_cdr/download.php?id={cdr_uuid}.
+      add("https://pbxnode.lemtel.tel");
+      add(FUSIONPBX_API_URL);
+      try {
+        const configured = new URL(FUSIONPBX_API_URL);
+        if (configured.hostname === "portal.lemtel.tel") add("https://pbxnode.lemtel.tel");
+      } catch { /* ignore malformed configured base */ }
+      return [...bases];
+    }
+
     // ---- Recording proxy ----
     if (action === "get-recording") {
       const recordingParams = { ...(params || {}) } as any;
@@ -1053,6 +1133,9 @@ Deno.serve(async (req) => {
       const { record_path, record_name, xml_cdr_uuid, domain_uuid, domain_name, local_recording_url, recorded_at } = recordingParams;
       if (!xml_cdr_uuid && !record_name && !(record_path && record_name)) {
         return json({ error: "xml_cdr_uuid, record_name, or (record_path, record_name) required" }, 400);
+      }
+      if (xml_cdr_uuid && !(await canReadCallRecording(String(xml_cdr_uuid)))) {
+        return json({ error: "Forbidden", message: "Recording is outside the signed-in user extension scope" }, 403);
       }
       const lower = String(record_name || "").toLowerCase();
       const ext = lower.endsWith(".mp3") ? "mp3"
@@ -1138,30 +1221,20 @@ Deno.serve(async (req) => {
       };
       const attempts: { url: string; status: number; content_type?: string }[] = [];
       const tryUrls: string[] = [];
-      const fileBases = [FUSIONPBX_API_URL];
+      const fileBases = getPbxFileBases();
+      if (xml_cdr_uuid) {
+        for (const fileBase of fileBases) {
+          const id = encodeURIComponent(String(xml_cdr_uuid));
+          // Match the FusionPBX portal player exactly: /app/xml_cdr/download.php?id={xml_cdr_uuid}.
+          // Add API-key query auth for server-side access because the portal normally uses a PHP session cookie.
+          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${id}&t=bin`));
+          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${id}`));
+          tryUrls.push(`${fileBase}/app/xml_cdr/download.php?id=${id}&t=bin`);
+          tryUrls.push(`${fileBase}/app/xml_cdr/download.php?id=${id}`);
+        }
+      }
       if (local_recording_url && String(local_recording_url).startsWith("http")) {
         tryUrls.push(String(local_recording_url));
-      }
-      try {
-        const base = new URL(FUSIONPBX_API_URL);
-        if (base.hostname === "portal.lemtel.tel") fileBases.push("https://pbxnode.lemtel.tel");
-      } catch { /* ignore alternate file host */ }
-      if (xml_cdr_uuid) {
-        const du = encodeURIComponent(String(domain_uuid || FUSIONPBX_DOMAIN_UUID || ""));
-        for (const fileBase of fileBases) {
-          tryUrls.push(withQueryAuth(`${fileBase}/app/api/7/call_recordings/download?domain_uuid=${du}&id=${encodeURIComponent(xml_cdr_uuid)}`));
-          tryUrls.push(withQueryAuth(`${fileBase}/app/api/7/call_recordings/${encodeURIComponent(xml_cdr_uuid)}/download?domain_uuid=${du}`));
-          tryUrls.push(withQueryAuth(`${fileBase}/app/api/7/call_recordings/${encodeURIComponent(xml_cdr_uuid)}?domain_uuid=${du}&download=true`));
-          tryUrls.push(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`);
-          tryUrls.push(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&binary`);
-          tryUrls.push(withQueryAuth(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
-          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`));
-          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
-          tryUrls.push(withQueryAuth(`${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&binary`));
-          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin&ext=${ext}`));
-          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/xml_cdr_download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin&ext=${ext}`));
-          tryUrls.push(withQueryAuth(`${fileBase}/app/xml_cdr/xml_cdr_audio.php?id=${encodeURIComponent(xml_cdr_uuid)}`));
-        }
       }
       if (record_name) {
         const rawName = normalizeRecordName(record_name);
@@ -1180,7 +1253,6 @@ Deno.serve(async (req) => {
         for (const fileBase of fileBases) {
           pushUrl(`${fileBase}/app/recordings/recording_download.php?filename=${n}`, true);
           pushUrl(`${fileBase}/app/recordings/recordings.php?a=download&filename=${n}`, true);
-          pushUrl(`${fileBase}/app/api/7/recordings/download?domain_uuid=${du}&name=${n}`, true);
           pushUrl(`${fileBase}/app/api/7/call_recordings/download?domain_uuid=${du}&record_name=${n}`, true);
           pushUrl(`${fileBase}/app/call_recordings/download.php?record_name=${n}`, true);
           pushUrl(`${fileBase}/app/xml_cdr/xml_cdr_audio.php?record_name=${n}&t=bin&ext=${ext}`, true);
@@ -1222,7 +1294,6 @@ Deno.serve(async (req) => {
             tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recordings.php?action=download&type=rec&filename=${crossDomainRel}`));
             tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/recordings.php?action=download&type=rec&t=bin&filename=${crossDomainRel}`));
           }
-          tryUrls.push(withQueryAuth(`${fileBase}/app/api/7/recordings/download?domain_uuid=${du}&path=${p}&name=${n}`));
           tryUrls.push(withQueryAuth(`${fileBase}/app/recordings/${n}`));
           tryUrls.push(`${fileBase}/${publicPath}/${n}`);
           tryUrls.push(`${fileBase}/${cleanPath}/${n}`);
