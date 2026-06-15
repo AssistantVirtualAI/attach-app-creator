@@ -1,119 +1,115 @@
-# AVA × FusionPBX — Real Data, Safe Writes, Reliable Sync
 
-Scope: backend + data layer only. No visual redesign. No AI voice agent changes. Keep all routes, glass styling, auth, Electron, tenant isolation.
+# Plan — Recordings coverage & Sync Health alignment
 
----
+Scope: backend (proxy + DB) and Media Center / Sync Health UI only. No visual redesign, no AI voice agent changes.
 
-## 1. CDR uniqueness fix (migration)
+## Part A — Recordings: full metadata + secure access
 
-**Verified DB state on `pbx_call_records`:**
-- `UNIQUE (pbx_uuid)` (global, cross-tenant — wrong)
-- `UNIQUE (organization_id, pbx_uuid) WHERE pbx_uuid IS NOT NULL` (good)
-- `UNIQUE (organization_id, sip_call_id) WHERE sip_call_id IS NOT NULL` ← **blocks transfers / legs / voicemail / retries that share a SIP call id**
+### A1. Schema (`pbx_call_recordings` + `pbx_call_records`)
+Migration to guarantee every recording-bearing CDR has a complete row in `pbx_call_recordings`:
 
-**Migration:**
-1. `DROP INDEX pbx_call_records_org_sip_call_id_uniq` — multiple legs may legitimately share `sip_call_id`.
-2. `DROP INDEX pbx_call_records_pbx_uuid_key` — replaced by the org-scoped index.
-3. Add deterministic fallback hash column `pbx_dedup_key TEXT GENERATED ALWAYS AS (...) STORED` = `md5(organization_id || coalesce(pbx_uuid, sip_call_id||'|'||start_stamp||'|'||destination_number||'|'||extension||'|'||direction||'|'||duration))`.
-4. `CREATE UNIQUE INDEX pbx_call_records_dedup_uniq ON pbx_call_records (organization_id, pbx_dedup_key)`.
-5. Replace non-unique `idx_pbx_call_records_org_start` (dup of `pbx_call_records_org_start_idx`) — drop the duplicate.
+- Add/ensure columns on `pbx_call_recordings`:
+  - `recording_name text`, `recording_path text`, `recording_url text`
+  - `recording_seconds int`, `recording_available boolean default false`
+  - `transcript_status text` (`none|pending|done|failed`), `transcribed boolean generated`
+  - `summary_status text`, `analyzed boolean generated`
+  - `sentiment text` (`positive|neutral|negative|mixed`)
+  - `summary text`, `language text`
+  - `access_status text` (`ok|forbidden|missing|stale`), `last_checked_at timestamptz`
+  - `pbx_uuid text` (FK link to CDR), `sip_call_id text`
+- Unique index `(organization_id, pbx_uuid)`.
+- Mirror flags on `pbx_call_records`: `has_recording`, `recording_id uuid`, `recording_available`, `transcribed`, `analyzed`, `sentiment` (already partially present — fill the gaps).
+- Backfill trigger so inserting/updating a `pbx_call_recordings` row updates the mirror flags on the matching `pbx_call_records`.
 
-Upserts in `fusionpbx-proxy` keep `onConflict: "organization_id,pbx_uuid"` (already correct); rows without `pbx_uuid` fall through to the generated `pbx_dedup_key` index.
+### A2. Proxy: recording resolver consolidation
+- New shared module `supabase/functions/_shared/recordingUrl.ts` (single source of truth) used by `fusionpbx-proxy`:
+  - Force host `pbxnode.lemtel.tel`.
+  - Try in order: signed FusionPBX URL → app/recordings download path → app/call_recordings path.
+  - PHPSESSID cookie auth, Basic auth fallback.
+  - Returns `{ url, available, seconds, content_length, http_status }`.
+- New proxy action `sync-recording-meta`:
+  - Walks `pbx_call_records` where `has_recording = true` AND (`recording_id IS NULL` OR `pbx_call_recordings.last_checked_at < now() - 6h`).
+  - Upserts `pbx_call_recordings` with resolver result + `access_status` (`ok|forbidden|missing`).
+  - Stamps `recording_available`, `recording_seconds`, `last_checked_at`.
+- New proxy action `get-recording-stream` (signed, short-lived redirect) for secure listen/download from the portal.
 
-## 2. Recording resolver hardening (Edge Function)
+### A3. Transcription & summary pipeline (queued, audited)
+- New table `pbx_recording_jobs` (`recording_id`, `job_type` = `transcribe|summarize`, `status`, `error`, `started_at`, `finished_at`, `requested_by`).
+- New proxy actions:
+  - `transcribe-recording` → enqueues job, calls Lovable AI Gateway (Whisper-equivalent / `google/gemini-2.5-flash` audio) using existing `LOVABLE_API_KEY`, stores transcript in `pbx_call_transcripts`, sets `transcript_status='done'`.
+  - `summarize-recording` → uses transcript → produces `summary`, `sentiment`, `language`; updates `pbx_call_recordings`.
+- Every action gated by `is_lemtel_admin()` / `has_role()` and writes to `audit_logs`.
 
-Centralize in `_shared/recordingUrl.ts`:
-- Force host = `pbxnode.lemtel.tel`; strip any `portal.lemtel.tel`.
-- Try in order, returning the first 200:
-  1. `/app/xml_cdr/xml_cdr_download.php?id={xml_cdr_uuid}&t=bin`
-  2. `/app/xml_cdr/download.php?id={xml_cdr_uuid}`
-  3. `/app/recordings/{recording_name}`
-- Use the existing PHPSESSID login flow; fall back to `Authorization: Basic <API_KEY>`.
-- `get-recording-signed-url` returns: `{ url, source, name, duration_s, size_bytes, available, attempted: [...] }`.
+### A4. Media Center UI (no redesign)
+- Reuse the existing list and badges. Wire:
+  - "Listen" → `get-recording-stream`.
+  - "Download" → same with `?download=1`.
+  - "Transcribe" / "Summarize" buttons → call the new actions, optimistic state.
+  - Filter chips: `Recorded only`, `Transcribed`, `Has summary`, `Sentiment`.
+  - Free-text search now hits `pbx_call_transcripts.content_tsv` (add tsvector + GIN index).
 
-Mirror table `pbx_call_recordings` gains: `recording_name`, `recording_path`, `recording_url`, `duration_s`, `available`, `transcript_status`, `summary_status`, `sentiment`, `last_checked_at`. Backfill from `pbx_call_records` via a new proxy action `sync-recording-meta` that walks recent CDRs with `has_recording=true`.
+## Part B — Sync Health alignment (real per-entity status)
 
-## 3. Sync Health — real per-entity status
+### B1. Per-entity proxy actions
+Add or finalize these actions in `fusionpbx-proxy` (each does list → upsert → returns `{ fetched, upserted, skipped, duration_ms }`):
 
-Today only entities that emit `pbx_sync_jobs` rows show data. Add proxy actions and matching `pbx_sync_jobs` writes so every Sync Health row resolves:
-
-| Entity | Proxy action | Notes |
+| Entity | Action | Target table |
 |---|---|---|
-| Extensions | `sync-extensions` (new) | upsert into `pbx_extensions` |
-| Devices | `sync-devices` (new) | |
-| Ring Groups | `sync-ring-groups` (new) | |
-| Call Queues / Queue Agents | `sync-queues`, `sync-queue-agents` (new) | |
-| IVRs / IVR options | existing `sync-ivr-options` + new `sync-ivrs` | |
-| Destinations | `sync-destinations` (new) | |
-| Time Conditions / Conferences / Hold Music / Gateways | `sync-*` (new, thin wrappers) | |
-| Voicemail | existing `sync-voicemail-messages` | |
-| Recordings | existing `list-recordings` → new `sync-recordings` | |
-| CDRs | existing `sync-cdrs` / `backfill-cdrs` | |
-| Registrations / Active Calls / System Health / Services | live-only (no mirror); Sync Health renders `live` badge with last poll ts | |
+| Extensions | `sync-extensions` | `pbx_extensions` |
+| Devices | `sync-devices` | `pbx_devices` |
+| Ring Groups | `sync-ring-groups` | `pbx_ring_groups` |
+| Call Queues | `sync-call-queues` | `pbx_call_queues` |
+| Queue Agents | `sync-queue-agents` | `pbx_queue_agents` |
+| IVRs / Options | `sync-ivrs` | `pbx_ivrs`, `pbx_ivr_options` |
+| Destinations | `sync-destinations` | `pbx_destinations` |
+| Time Conditions | `sync-time-conditions` | `pbx_time_conditions` |
+| Conferences | `sync-conferences` | `pbx_conferences` |
+| Hold Music | `sync-hold-music` | `pbx_hold_music` |
+| Gateways | `sync-gateways` | `pbx_gateways` |
+| Voicemail boxes | `sync-voicemail` | `pbx_voicemail_settings` |
+| Voicemail messages | `sync-voicemail-messages` | `pbx_voicemails` (exists, normalize output) |
+| Voicemail greetings | `sync-voicemail-greetings` | new column on `pbx_voicemail_settings` |
+| Recordings meta | `sync-recording-meta` | `pbx_call_recordings` |
+| CDRs | `sync-cdrs` (existing) | `pbx_call_records` |
+| CC Stats | `sync-cc-stats` | `cc_queue_stats` |
+| Contacts | `sync-contacts` | new `pbx_contacts` (created if missing) |
+| Feature codes | `sync-feature-codes` | `pbx_feature_codes` |
+| Dialplans | `sync-dialplans` | `pbx_dialplans` |
 
-`pbx_sync_jobs` gains: `fetched`, `upserted`, `skipped`, `endpoint`, `duration_ms`. Sync Health page renders all six columns + retry button (already wired to proxy actions).
+Out-of-scope for FusionPBX (no native API): fax server, email queue, event guard. These will be marked `n/a` in Sync Health rather than `unknown`.
 
-## 4. Live PBX state via short-cached polling
+### B2. `pbx_sync_jobs` enrichment
+Add columns: `endpoint text`, `fetched int`, `upserted int`, `skipped int`, `duration_ms int`, `error text`.
+`sync-all` orchestrator writes one row per entity per run with proper status (`completed | completed_with_errors | failed`).
 
-Module-scope caches in `fusionpbx-proxy` (per `domain_uuid`, TTL noted):
-- `get-registrations-live` (15 s) — already shipped.
-- `get-active-calls-live` (5 s) — wraps `commands: show channels as json`.
-- `get-system-health-live` (10 s) — uses authenticated PHPSESSID to scrape FusionPBX dashboard widget endpoints (`/app/dashboard/dashboard_widget.php?widget=…`) for CPU %, memory %, disk %, uptime, services. If a widget returns non-2xx, payload reports `{ available: false, source }` per metric — the UI shows "unavailable" instead of fabricated values.
-- `get-system-services-live` (15 s) — `sofia status` + key `commands: status` parsing.
+### B3. AdminSyncHealth UI
+- Replace the static entity list with a config-driven list aligned with B1.
+- Per row show: last job status, `fetched/upserted/skipped`, duration, last run, "Run now" + "Backfill".
+- Entities without a backing action render as `n/a` (greyed) — never `unknown`.
+- Realtime subscription on `pbx_sync_jobs` so rows update live.
 
-## 5. AdminDashboard — remove placeholders
+### B4. Voicemail / SMS / Call Center surfaces
+- Voicemail page: bind list to `pbx_voicemails`, "Mark read" via existing `mark_voicemail_read`, "Play" via `get-voicemail-stream` (mirrors A2 resolver).
+- SMS page: already reads `pbx_sms_threads`/`pbx_sms_messages` — add the same realtime hook used elsewhere, no UI change.
+- Call Center page: bind tiles to `cc_queue_stats` rows produced by `sync-cc-stats`; live agents from existing `get-active-calls-live` + `pbx_queue_agent_state`.
 
-Replace the synthesized `cpu/net/active` series in `src/pages/lemtel/admin/AdminDashboard.tsx`:
-- Active Calls chart ← real `get-active-calls-live.count` rolled into a 20-point sparkline.
-- System CPU Status ← `get-system-health-live.cpu_percent`.
-- System Network Status ← `get-system-health-live.network_rx_kbps + tx_kbps` normalized.
-- When a metric is `available: false`, render a muted "Unavailable" overlay (no fake numbers).
-- Registrations tile ← `get-registrations-live` (`registered / total`).
-- Recent/Missed Calls and Voicemails tiles already query mirrors — verified correct.
-- New Messages = unread SMS + unread voicemail (already correct).
+## Security & audit
+- All new write/sync actions: require `is_lemtel_admin()` or `has_role(_, _, 'org_admin')`.
+- Tenant scoping via `organizations.fusionpbx_domain_uuid`.
+- Every write → `audit_logs` (`resource_type`, `resource_id`, `action`, `metadata`).
+- Frontend keeps reading from `_safe` views; raw credentials never leave edge functions.
 
-## 6. Realtime mirrors
+## Files touched
+- `supabase/functions/fusionpbx-proxy/index.ts` (new actions)
+- `supabase/functions/_shared/recordingUrl.ts` (new)
+- `supabase/migrations/*` (recordings columns, `pbx_recording_jobs`, `pbx_sync_jobs` columns, transcript tsvector, optional `pbx_contacts`)
+- `src/pages/telephony/TelephonyMediaCenter.tsx` (wire new actions + filters)
+- `src/pages/lemtel/admin/AdminSyncHealth.tsx` (config-driven list + realtime)
+- Voicemail/SMS/Call Center page bindings (no visual changes)
 
-Single shared subscription hook `useOrgRealtime(table, orgId, qkeyToInvalidate)`. Enable in publication:
-`pbx_call_records, pbx_call_recordings, pbx_voicemails, pbx_extensions, pbx_devices, pbx_ring_groups, pbx_call_queues, pbx_sync_jobs, pbx_sms_messages, pbx_sms_threads, audit_logs`.
-Pages (Media Center, CDR, Recordings, Voicemails, Sync Health, Messages, AdminDashboard) subscribe via the hook and invalidate React-Query keys instead of polling. Server-cached short polling reserved for live state in §4.
+## Out of scope
+- Visual redesign, navigation changes, AI voice agent pages.
+- Host-level OS metrics (kept as "Unavailable" from previous step).
+- Fax / email queue / event guard sync (marked `n/a`).
 
-## 7. Write/Edit coverage via `pbx-write` (already present) + proxy
-
-Audit and complete CRUD for: extensions, devices, phone numbers, inbound routes, destinations, ring groups, IVRs + options, time conditions, call queues + agents, voicemail settings/messages/greetings, conferences, music-on-hold, gateways, SIP profiles, dialplans, feature codes, call forwarding, contacts, recording rules, PBX settings. For each:
-- Read via cached proxy list action, write via `pbx-write` server-side function.
-- Role gate: super_admin OR `is_lemtel_admin(auth.uid())` OR `has_role(auth.uid(), org, 'org_admin')`.
-- Tenant scoping: `domain_uuid` resolved from `organizations.fusionpbx_domain_uuid`; reject mismatched payloads.
-- Every successful write → `audit_logs` insert (`organization_id, user_id, action='pbx.<resource>.<op>', resource_type, resource_id, metadata`).
-- End-user write surface limited to: own forwarding, own voicemail settings/greetings, own devices, mark voicemail read.
-
-## 8. Media Center wiring
-
-- Sync button already routed to `fusionpbx-proxy:sync-cdrs` (shipped).
-- Add a secondary "Backfill" action (already in Admin Sync Health) callable from Media Center under an admin-only toggle.
-- Recordings tab uses the new resolver; voicemails tab subscribes to realtime.
-
-## 9. Files touched
-
-- `supabase/migrations/<ts>_cdr_uniqueness_fix.sql` (§1)
-- `supabase/migrations/<ts>_recording_meta_columns.sql` + `realtime_publication.sql` (§2, §6)
-- `supabase/functions/fusionpbx-proxy/index.ts` — new actions §3, §4, §7; sync-job stats columns
-- `supabase/functions/_shared/recordingUrl.ts` (new) and `pbx-write/index.ts` (extend CRUD coverage)
-- `src/hooks/useOrgRealtime.ts` (new) and call-site invalidation in: AdminDashboard, AdminSyncHealth, TelephonyMediaCenter, AdminRecordings, AdminVoicemails, LemtelPortalCalls
-- `src/pages/lemtel/admin/AdminDashboard.tsx` — swap placeholders for live endpoints
-- `src/pages/lemtel/admin/AdminSystemStatus.tsx` — add CPU/Mem/Disk/Services panels backed by `get-system-health-live`
-- `src/pages/lemtel/admin/AdminSyncHealth.tsx` — extend ENTITIES list + stats columns
-
-## 10. Verification
-
-- DB: insert two CDRs sharing `sip_call_id` with different `pbx_uuid` → both persist.
-- Backfill 1000 CDRs → `pbx_sync_jobs` shows fetched/upserted/duration, cursor advances and resumes.
-- AdminDashboard: registrations match FusionPBX (~1041/1314); when system-health widget 401s, panels show "Unavailable" (not "1234").
-- Sync Health: every row resolves to `completed | failed | completed_with_errors | live`; retry button triggers proxy and refreshes.
-- Tenant isolation: a non-Lemtel admin calling `pbx-write` against Lemtel domain → 403, audit row absent.
-
-## Out of scope (explicit)
-
-- No changes to AI voice agents, ElevenLabs/Retell/Vapi flows, landing page, or visual design tokens.
-- No new authentication surfaces.
-- Host-level metrics that FusionPBX itself cannot expose remain "Unavailable" rather than synthesized.
+Proceed?
