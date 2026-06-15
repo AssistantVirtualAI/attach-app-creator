@@ -23,10 +23,27 @@ export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope 
 
   // -------- Realtime invalidation --------
   useEffect(() => {
+    let lastInvalidatedAt = 0;
+    const invalidate = (queryKey: string[], payload?: any) => {
+      if (payload?.table === "pbx_call_records" && payload.eventType === "UPDATE") {
+        const oldRow = payload.old || {};
+        const newRow = payload.new || {};
+        const changed = oldRow.has_recording !== newRow.has_recording
+          || oldRow.recording_path !== newRow.recording_path
+          || oldRow.recording_name !== newRow.recording_name
+          || oldRow.start_at !== newRow.start_at
+          || oldRow.call_status !== newRow.call_status;
+        if (!changed) return;
+      }
+      const now = Date.now();
+      if (now - lastInvalidatedAt < 30_000) return;
+      lastInvalidatedAt = now;
+      qc.invalidateQueries({ queryKey });
+    };
     const ch = supabase
       .channel("media-center")
-      .on("postgres_changes", { event: "*", schema: "public", table: "pbx_call_records" }, () => qc.invalidateQueries({ queryKey: ["media", "cdr"] }))
-      .on("postgres_changes", { event: "*", schema: "public", table: "pbx_voicemails" }, () => qc.invalidateQueries({ queryKey: ["media", "vm"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "pbx_call_records" }, (payload) => invalidate(["media", "cdr"], payload))
+      .on("postgres_changes", { event: "*", schema: "public", table: "pbx_voicemails" }, () => invalidate(["media", "vm"]))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [qc]);
@@ -182,9 +199,17 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
     setWorking(id);
     try {
       await supabase.functions.invoke("ai-transcribe-call", { body: { call_record_id: id, organization_id: orgId } });
-      await supabase.functions.invoke("ai-analyze-call", { body: { call_record_id: id, organization_id: orgId } });
+      const { data } = await supabase.functions.invoke("ai-analyze-call", { body: { call_record_id: id, organization_id: orgId } });
       toast.success("Transcription terminée");
-      qc.invalidateQueries({ queryKey: ["media", "recordings"] });
+      qc.setQueriesData({ queryKey: ["media", "recordings"] }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((row) => row?.id === id ? {
+          ...row,
+          transcribed: true,
+          ai_summary: (data as any)?.summary ?? row.ai_summary,
+          ai_sentiment: (data as any)?.sentiment ?? row.ai_sentiment,
+        } : row);
+      });
     } catch (e: any) { toast.error(e?.message || "Échec"); }
     finally { setWorking(null); }
   };
