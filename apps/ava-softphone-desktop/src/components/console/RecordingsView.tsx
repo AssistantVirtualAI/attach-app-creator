@@ -86,7 +86,7 @@ export default function RecordingsView() {
 
   // Realtime: new recordings (rows on pbx_call_records with audio) trigger refetch.
   const orgId = useOrgId();
-  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, load);
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId, events: ['INSERT'], throttleMs: 30_000 }, load);
 
 
   // Helper: fetch (or reuse cached) signed audio URL for a recording, deduping concurrent calls.
