@@ -225,6 +225,7 @@ export default function ProfileMenu() {
           {status === 'meeting' && (
             <div style={{ padding: '8px 6px 4px' }}>
               <input
+                ref={meetingInputRef}
                 type="text"
                 value={meetingNote}
                 onChange={(e) => saveMeetingNote(e.target.value)}
