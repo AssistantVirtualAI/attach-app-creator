@@ -173,7 +173,7 @@ export default function OrgChatView() {
     if (!me || !orgId || otherId === me.id) return;
     const key = [me.id, otherId].sort().join(':');
     const dmName = `dm:${key}`;
-    let dm = channels.find((c) => isDmChannel(c) && c.name === dmName);
+    let dm = channels.find((c) => isDmChannel(c) && (c.name === dmName || (c.members?.includes(me.id) && c.members?.includes(otherId))));
     if (!dm) {
       const { data, error } = await supabase.functions.invoke('org-chat', { body: { action: 'ensure_dm_channel', payload: { user_id: otherId } } });
       if (error || !(data as any)?.channel) { alert('DM error: ' + ((error as any)?.message || (data as any)?.error || 'Unable to open chat')); return; }
