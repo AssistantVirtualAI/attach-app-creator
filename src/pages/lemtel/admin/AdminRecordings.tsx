@@ -312,7 +312,9 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
         <CardContent className="space-y-2">
           {filtered.length === 0 && !loading && (
             <p className="text-sm text-muted-foreground">
-              No recordings yet. Click "Sync from PBX" to pull historical data.
+              {scope === 'mine'
+                ? 'No recordings found for your extension yet. Recordings appear here once your calls are recorded by the PBX.'
+                : 'No recordings yet. Click "Sync from PBX" to pull historical data.'}
             </p>
           )}
           {filtered.map(r => (
