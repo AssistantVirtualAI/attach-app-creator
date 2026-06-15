@@ -15,17 +15,28 @@ import { StatusBadge } from '@/components/admin/StatusBadge';
 
 const toneFor = (s?: string) => s === 'success' ? 'on' : s === 'failed' ? 'err' : s === 'running' ? 'info' : 'off';
 
-const ENTITIES = [
-  { key: 'extensions', label: 'Extensions', action: 'sync-domains' },
-  { key: 'gateways', label: 'Gateways', action: 'list-gateways-merged' },
-  { key: 'ivr', label: 'IVRs', action: 'list-ivr_menus' },
-  { key: 'destinations', label: 'Destinations', action: 'list-destinations' },
-  { key: 'time-conditions', label: 'Time Conditions', action: 'list-time-conditions' },
-  { key: 'conferences', label: 'Conferences', action: 'list-conferences' },
-  { key: 'hold-music', label: 'Hold Music', action: 'list-hold-music' },
-  { key: 'voicemail', label: 'Voicemail', action: 'sync-voicemail-messages' },
-  { key: 'recordings', label: 'Recordings', action: 'list-recordings' },
-  { key: 'cdrs', label: 'Call Records', action: 'sync-cdrs' },
+type EntityDef = { key: string; label: string; action: string | null };
+
+const ENTITIES: EntityDef[] = [
+  { key: 'extensions',      label: 'Extensions',        action: 'sync-extensions' },
+  { key: 'devices',         label: 'Devices',           action: 'sync-devices' },
+  { key: 'ring-groups',     label: 'Ring Groups',       action: 'sync-ring-groups' },
+  { key: 'call-queues',     label: 'Call Queues',       action: 'sync-call-queues' },
+  { key: 'queue-agents',    label: 'Queue Agents',      action: 'sync-queue-agents' },
+  { key: 'ivrs',            label: 'IVRs',              action: 'sync-ivrs' },
+  { key: 'destinations',    label: 'Destinations',      action: 'sync-destinations' },
+  { key: 'conferences',     label: 'Conferences',       action: 'sync-conferences' },
+  { key: 'hold-music',      label: 'Hold Music',        action: 'sync-hold-music' },
+  { key: 'gateways',        label: 'Gateways',          action: 'sync-gateways' },
+  { key: 'voicemail',       label: 'Voicemail Boxes',   action: 'sync-voicemail' },
+  { key: 'voicemail-msgs',  label: 'Voicemail Messages',action: 'sync-voicemail-messages' },
+  { key: 'dialplans',       label: 'Dialplans',         action: 'sync-dialplans' },
+  { key: 'recordings',      label: 'Recordings (meta)', action: 'sync-recording-meta' },
+  { key: 'cdrs',            label: 'Call Records',      action: 'sync-cdrs' },
+  { key: 'time-conditions', label: 'Time Conditions',   action: null },
+  { key: 'fax',             label: 'Fax Server',        action: null },
+  { key: 'email-queue',     label: 'Email Queue',       action: null },
+  { key: 'event-guard',     label: 'Event Guard',       action: null },
 ];
 
 export default function AdminSyncHealth() {
@@ -36,19 +47,20 @@ export default function AdminSyncHealth() {
         .from('pbx_sync_jobs')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(200);
       if (error) throw error;
       return data || [];
     },
-    refetchInterval: 30000,
+    refetchInterval: 15000,
   });
 
-  const resync = async (entity: typeof ENTITIES[number]) => {
+  const resync = async (entity: EntityDef) => {
+    if (!entity.action) { toast.info(`${entity.label}: not available on FusionPBX`); return; }
     toast.info(`Resyncing ${entity.label}…`);
     try {
       const { error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action: entity.action } });
       if (error) throw error;
-      toast.success(`${entity.label} resync started`);
+      toast.success(`${entity.label} resync complete`);
       jobs.refetch();
     } catch (e: any) { toast.error(e?.message || 'Resync failed'); }
   };
@@ -63,10 +75,10 @@ export default function AdminSyncHealth() {
     } catch (e: any) { toast.error(e?.message || 'Sync failed'); }
   };
 
-  const lastFor = (key: string) => jobs.data?.find((j: any) =>
-    (j.job_type || '').toLowerCase().includes(key.replace('-', ''))
-    || (j.job_type || '').toLowerCase().includes(key)
-  );
+  const lastFor = (entity: EntityDef) => {
+    if (!entity.action) return null;
+    return jobs.data?.find((j: any) => j.job_type === entity.action) || null;
+  };
 
   // ---- Backfill state ----
   const [backfillPages, setBackfillPages] = useState(50);
