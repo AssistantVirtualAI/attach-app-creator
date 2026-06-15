@@ -895,8 +895,34 @@ Deno.serve(async (req) => {
       const allErrors: string[] = [];
       let firstPage: any[] = [];
 
+      // FusionPBX's xml_cdr API turns EVERY query param into a SQL `column = value`
+      // equality, so we cannot sort or filter by date — the only knobs we control are
+      // `limit` and `offset`, and the default ordering is by xml_cdr_uuid (essentially
+      // random vs. wall-clock time). To guarantee we eventually surface every CDR
+      // (including the freshest ones, which may sit anywhere in that ordering) we
+      // page through the full dataset across cron ticks using a persistent rolling
+      // offset stored in `pbx_integrations.config.sync_cursor`.
+      const fromBeginning = (params as any).from_beginning === true || b.from_beginning === true;
+      const explicitOffset = parseInt(String((params as any).start_offset ?? b.start_offset ?? "NaN"));
+      let startOffset = 0;
+      const { data: integForCursor } = await admin
+        .from("pbx_integrations")
+        .select("id, config")
+        .eq("organization_id", organization_id)
+        .maybeSingle();
+      const cursorCfg = (integForCursor?.config as any) || {};
+      if (Number.isFinite(explicitOffset)) {
+        startOffset = explicitOffset;
+      } else if (fromBeginning || isBackfill) {
+        startOffset = 0;
+      } else {
+        startOffset = Math.max(0, parseInt(String(cursorCfg.sync_cursor ?? 0)) || 0);
+      }
       for (let i = 0; i < maxPages; i++) {
-        const extra: Record<string, string> = { limit: String(pageSize), offset: String(i * pageSize) };
+        const extra: Record<string, string> = {
+          limit: String(pageSize),
+          offset: String(startOffset + i * pageSize),
+        };
         if (extension) extra.extension = extension;
         const r = await fetchCdrsWithFallback(extra);
         if (!r.ok) {
@@ -933,6 +959,17 @@ Deno.serve(async (req) => {
           else totalUpserted += count ?? rows.length;
         }
         if (cdrs.length < pageSize) break; // reached end
+      }
+
+      // Advance the persistent cursor so the next cron tick continues where we left off.
+      // When the final page came up short, we've reached the end of the FusionPBX
+      // dataset → reset to 0 so we cycle through again and catch any new tail rows.
+      if (integForCursor && !Number.isFinite(explicitOffset) && action === "sync-cdrs") {
+        const reachedEnd = totalFetched < pageSize * maxPages;
+        const nextCursor = reachedEnd ? 0 : startOffset + totalFetched;
+        await admin.from("pbx_integrations")
+          .update({ config: { ...cursorCfg, sync_cursor: nextCursor, sync_cursor_updated_at: new Date().toISOString() } })
+          .eq("id", integForCursor.id);
       }
 
       await admin.from("pbx_sync_jobs").insert({
