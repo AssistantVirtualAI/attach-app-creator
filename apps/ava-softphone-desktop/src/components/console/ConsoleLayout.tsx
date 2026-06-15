@@ -213,6 +213,7 @@ export default function ConsoleLayout({
           {view === 'customers' && <CustomersView />}
           {view === 'voiceagents' && <VoiceAgentsView />}
           {view === 'pbxlive' && <PBXLiveView />}
+          {view === 'audit' && <AuditView />}
           {view === 'settings' && (
             <SettingsPage
               creds={creds}
