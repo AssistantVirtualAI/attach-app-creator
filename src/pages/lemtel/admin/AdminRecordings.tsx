@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { RecordingWavePlayer } from '@/components/portal/RecordingWavePlayer';
-import { Download, RefreshCw, ChevronDown, Trash2, FileDown } from 'lucide-react';
+import { Download, RefreshCw, ChevronDown, Trash2, FileDown, FileText, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
