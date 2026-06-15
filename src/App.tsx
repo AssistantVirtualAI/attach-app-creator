@@ -120,6 +120,10 @@ import CallCenterWallboard from "./pages/callcenter/CallCenterWallboard";
 import CallCenterAdmin from "./pages/callcenter/CallCenterAdmin";
 import TelephonyDiagnostics from "./pages/telephony/TelephonyDiagnostics";
 import TelephonySourceAudit from "./pages/telephony/TelephonySourceAudit";
+import PhoneNumbersUnified from "./pages/telephony/PhoneNumbersUnified";
+import PbxAdminUsers from "./pages/telephony/PbxAdminUsers";
+import LiveRegistrations from "./pages/telephony/LiveRegistrations";
+import VoiceAgentsLive from "./pages/telephony/VoiceAgentsLive";
 import TelephonyAdvanced from "./pages/telephony/TelephonyAdvanced";
 import TelephonySyncHealth from "./pages/telephony/TelephonySyncHealth";
 import TelephonyChecklist from "./pages/telephony/TelephonyChecklist";
@@ -655,6 +659,10 @@ const App = () => (
                 <Route path="/org/lemtel/telephony/qa" element={<LemtelTelephonyPage><TelephonyDiagnostics /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/source-audit" element={<LemtelTelephonyPage><TelephonySourceAudit /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/_diagnostics" element={<LemtelTelephonyPage><TelephonySourceAudit /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/phone-numbers-unified" element={<LemtelTelephonyPage><PhoneNumbersUnified /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/admin-users" element={<LemtelTelephonyPage><PbxAdminUsers /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/registrations-live" element={<LemtelTelephonyPage><LiveRegistrations /></LemtelTelephonyPage>} />
+                <Route path="/org/lemtel/telephony/voice-agents-live" element={<LemtelTelephonyPage><VoiceAgentsLive /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/checklist" element={<LemtelTelephonyPage><TelephonyChecklist /></LemtelTelephonyPage>} />
                 <Route path="/org/lemtel/telephony/portal-mappings" element={<LemtelTelephonyPage><TelephonyPortalMappings /></LemtelTelephonyPage>} />
 
