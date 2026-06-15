@@ -31,6 +31,15 @@ type RegCacheEntry = { fetchedAt: number; payload: any };
 const REGISTRATIONS_CACHE = new Map<string, RegCacheEntry>();
 const REGISTRATIONS_TTL_MS = 15_000;
 
+// Cache for live active calls (per domain_uuid)
+type LiveCacheEntry = { fetchedAt: number; payload: any };
+const ACTIVE_CALLS_CACHE = new Map<string, LiveCacheEntry>();
+const ACTIVE_CALLS_TTL_MS = 5_000;
+
+// Cache for live system health (per origin)
+const SYSTEM_HEALTH_CACHE = new Map<string, LiveCacheEntry>();
+const SYSTEM_HEALTH_TTL_MS = 10_000;
+
 function fusionBaseOrigin(baseUrl: string) {
   try { return new URL(baseUrl).origin.replace(/\/+$/, ""); }
   catch { return String(baseUrl || "").replace(/\/+$/, ""); }
