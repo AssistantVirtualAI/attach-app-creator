@@ -175,9 +175,13 @@ if (isBrowser) {
   (window as any).__avaStyleGuard = { hasRuntimeStyles, recoverStyles, events: () => JSON.parse(localStorage.getItem(STYLE_EVENTS_KEY) || "[]") };
   installStylesheetErrorLogger();
 
-  const run = () => window.setTimeout(() => recoverStyles("health-check"), 900);
+  let lastRunAt = 0;
+  const run = () => {
+    const now = Date.now();
+    if (now - lastRunAt < 30_000) return; // throttle to avoid reload loops
+    lastRunAt = now;
+    window.setTimeout(() => recoverStyles("health-check"), 900);
+  };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", run, { once: true });
   else run();
-  window.addEventListener("pageshow", run);
-  window.addEventListener("focus", run);
 }
