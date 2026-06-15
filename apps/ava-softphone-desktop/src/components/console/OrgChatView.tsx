@@ -34,6 +34,12 @@ export default function OrgChatView() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const loadChannels = async (org: string) => {
+    const edge = await supabase.functions.invoke('org-chat', { body: { action: 'list_channels' } }).catch(() => ({ data: null, error: null } as any));
+    if (Array.isArray((edge.data as any)?.channels)) {
+      const channels = (edge.data as any).channels as Channel[];
+      setChannels(channels);
+      return channels;
+    }
     const { data, error } = await supabase.from('org_chat_channels')
       .select('id,name,channel_type,organization_id,members,archived_at')
       .eq('organization_id', org).is('archived_at', null)
@@ -163,10 +169,10 @@ export default function OrgChatView() {
     if (!input.trim() || !activeId || !me || !orgId) return;
     const text = input.trim();
     setInput('');
-    await supabase.from('org_chat_messages').insert({
-      organization_id: orgId, channel_id: activeId,
-      sender_id: me.id, sender_name: me.name, content: text,
+    const { error, data } = await supabase.functions.invoke('org-chat', {
+      body: { action: 'send_message', payload: { channel_id: activeId, content: text } },
     });
+    if (error || (data as any)?.error) setErrMsg(`Message error: ${((error as any)?.message || (data as any)?.error)}`);
   };
 
   const openDM = async (otherId: string, otherName: string) => {
