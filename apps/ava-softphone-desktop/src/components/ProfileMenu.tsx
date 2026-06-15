@@ -17,12 +17,15 @@ const STATUS_META: Record<Status, { label: string; color: string; manual: 'avail
 const AVATAR_KEY = 'lemtel:user-avatar';
 const STATUS_KEY = 'lemtel:user-status';
 
+const MEETING_NOTE_KEY = 'lemtel:meeting-note';
+
 export default function ProfileMenu() {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<Status>(() => (localStorage.getItem(STATUS_KEY) as Status) || 'available');
   const [avatar, setAvatar] = useState<string | null>(() => localStorage.getItem(AVATAR_KEY));
   const [email, setEmail] = useState<string>('');
   const [name, setName] = useState<string>('');
+  const [meetingNote, setMeetingNote] = useState<string>(() => localStorage.getItem(MEETING_NOTE_KEY) || '');
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -35,6 +38,17 @@ export default function ProfileMenu() {
       const remoteAvatar = (u.user_metadata as any)?.avatar_url;
       if (remoteAvatar && !localStorage.getItem(AVATAR_KEY)) setAvatar(remoteAvatar);
     });
+  }, []);
+
+  // On mount, push persisted status into the softphone so SIP state matches restored UI.
+  useEffect(() => {
+    const saved = (localStorage.getItem(STATUS_KEY) as Status) || 'available';
+    const dispatch = () => window.dispatchEvent(
+      new CustomEvent('lemtel:set-status', { detail: STATUS_META[saved].manual })
+    );
+    dispatch();
+    const t = setTimeout(dispatch, 1500); // re-apply after useSoftphone mounts
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -52,8 +66,14 @@ export default function ProfileMenu() {
     setStatus(s);
     localStorage.setItem(STATUS_KEY, s);
     window.dispatchEvent(new CustomEvent('lemtel:set-status', { detail: STATUS_META[s].manual }));
-    setOpen(false);
+    if (s !== 'meeting') setOpen(false);
   };
+
+  const saveMeetingNote = (v: string) => {
+    setMeetingNote(v);
+    try { localStorage.setItem(MEETING_NOTE_KEY, v); } catch { /* noop */ }
+  };
+
 
   const openSettings = () => {
     setOpen(false);
@@ -117,8 +137,8 @@ export default function ProfileMenu() {
             background: meta.color, border: '2px solid #0a1530',
           }} />
         </span>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase' }}>
-          {meta.label}
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {status === 'meeting' && meetingNote ? `Meeting · ${meetingNote}` : meta.label}
         </span>
         <span style={{ fontSize: 9, opacity: 0.6 }}>▾</span>
       </button>
@@ -168,7 +188,26 @@ export default function ProfileMenu() {
             );
           })}
 
+          {status === 'meeting' && (
+            <div style={{ padding: '8px 6px 4px' }}>
+              <input
+                type="text"
+                value={meetingNote}
+                onChange={(e) => saveMeetingNote(e.target.value)}
+                placeholder="Meeting note (e.g. Standup until 3pm)"
+                maxLength={80}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  background: 'rgba(255,255,255,0.05)', color: '#fff',
+                  border: `1px solid ${c.border}`, borderRadius: 8,
+                  padding: '7px 9px', fontSize: 11, outline: 'none',
+                }}
+              />
+            </div>
+          )}
+
           <div style={{ height: 1, background: c.border, margin: '8px 0' }} />
+
 
           <button onClick={openSettings} style={menuItem(false)}>
             <span aria-hidden>⚙</span>
