@@ -81,24 +81,27 @@ export default function RecordingsView() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
+    setError(null);
     try {
       const d = await ava.recordings();
       setItems(Array.isArray(d) ? d : []);
     } catch (err: any) {
-      setItems([]);
+      if (!opts?.silent) setItems([]);
       setError(err?.message || 'Unable to load recordings from the phone system.');
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, []);
 
+  const silentLoad = useCallback(() => { void load({ silent: true }); }, [load]);
+
   useEffect(() => { load(); }, [load]);
 
-  // Realtime: new recordings (rows on pbx_call_records with audio) trigger refetch.
+  // Realtime: new recordings trigger a silent refetch (no list flicker / no audio reset).
   const orgId = useOrgId();
-  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId, events: ['INSERT', 'UPDATE'], throttleMs: 30_000, shouldRefresh: isRecordingRealtimeChange }, load);
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId, events: ['INSERT', 'UPDATE'], throttleMs: 30_000, shouldRefresh: isRecordingRealtimeChange }, silentLoad);
 
 
   // Helper: fetch (or reuse cached) signed audio URL for a recording, deduping concurrent calls.
