@@ -188,7 +188,26 @@ export default function ProfileMenu() {
             );
           })}
 
+          {status === 'meeting' && (
+            <div style={{ padding: '8px 6px 4px' }}>
+              <input
+                type="text"
+                value={meetingNote}
+                onChange={(e) => saveMeetingNote(e.target.value)}
+                placeholder="Meeting note (e.g. Standup until 3pm)"
+                maxLength={80}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  background: 'rgba(255,255,255,0.05)', color: '#fff',
+                  border: `1px solid ${c.border}`, borderRadius: 8,
+                  padding: '7px 9px', fontSize: 11, outline: 'none',
+                }}
+              />
+            </div>
+          )}
+
           <div style={{ height: 1, background: c.border, margin: '8px 0' }} />
+
 
           <button onClick={openSettings} style={menuItem(false)}>
             <span aria-hidden>⚙</span>
