@@ -291,13 +291,18 @@ Deno.serve(async (req) => {
 
     if (action === "heartbeat") {
       const status = String(payload?.status ?? "available");
-      await admin.rpc("upsert_user_presence", {
-        _status: status,
-        _message: payload?.message ?? null,
-        _emoji: payload?.emoji ?? null,
-        _call_state: payload?.call_state ?? "idle",
-        _platform: payload?.platform ?? "web",
-      });
+      // Direct upsert as service role so we don't depend on auth.uid() in the function
+      await admin.from("user_presence").upsert({
+        user_id: userId,
+        organization_id: orgId,
+        status,
+        status_message: payload?.message ?? null,
+        status_emoji: payload?.emoji ?? null,
+        call_state: payload?.call_state ?? "idle",
+        platform: payload?.platform ?? "web",
+        last_seen_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" });
       return json({ ok: true });
     }
 
