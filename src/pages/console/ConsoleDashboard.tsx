@@ -6,7 +6,7 @@ import { Phone, Smartphone, Wifi, PhoneCall, FileAudio, Voicemail } from "lucide
 import { Link } from "react-router-dom";
 
 const TILES = [
-  { id: "extensions", label: "Extensions", table: "pbx_extensions", to: "/console/extensions", Icon: Phone },
+  { id: "extensions", label: "Extensions", table: "pbx_extensions_safe", to: "/console/extensions", Icon: Phone },
   { id: "devices",    label: "Devices",    table: "pbx_devices",    to: "/console/devices", Icon: Smartphone },
   { id: "ivrs",       label: "IVRs",       table: "pbx_ivrs",       to: "/console/ivrs", Icon: Wifi },
   { id: "queues",     label: "Queues",     table: "pbx_call_queues",to: "/console/queues", Icon: PhoneCall },
