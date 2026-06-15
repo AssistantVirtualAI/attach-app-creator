@@ -227,17 +227,42 @@ export default function ProfileMenu() {
           <div style={{ padding: '8px 4px 4px', fontSize: 9, fontWeight: 800, color: c.textSub, letterSpacing: 1.2, textTransform: 'uppercase' }}>
             Set status
           </div>
+          {inCall && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              margin: '4px 2px 6px', padding: '7px 9px', borderRadius: 8,
+              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.35)',
+              color: '#fecaca', fontSize: 10.5, lineHeight: 1.35,
+            }}>
+              <span aria-hidden style={{ fontSize: 13 }}>🔒</span>
+              <span>Statut verrouillé pendant un appel actif. Terminez l'appel pour le modifier.</span>
+            </div>
+          )}
+          {lockMsg && !inCall && (
+            <div style={{
+              margin: '4px 2px 6px', padding: '7px 9px', borderRadius: 8,
+              background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.4)',
+              color: '#fde68a', fontSize: 10.5,
+            }}>{lockMsg}</div>
+          )}
           {(Object.keys(STATUS_META) as Status[]).map((s) => {
             const m = STATUS_META[s];
             const active = s === status;
             return (
-              <button key={s} onClick={() => applyStatus(s)} style={menuItem(active)}>
+              <button
+                key={s}
+                onClick={() => applyStatus(s)}
+                disabled={inCall}
+                title={inCall ? "Indisponible pendant un appel actif" : ''}
+                style={{ ...menuItem(active), opacity: inCall ? 0.5 : 1, cursor: inCall ? 'not-allowed' : 'pointer' }}
+              >
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.color, boxShadow: `0 0 8px ${m.color}` }} />
                 <span style={{ flex: 1, textAlign: 'left' }}>{m.label}</span>
                 {active && <span style={{ fontSize: 11, color: m.color }}>✓</span>}
               </button>
             );
           })}
+
 
           {status === 'meeting' && (
             <div style={{ padding: '8px 6px 4px' }}>
