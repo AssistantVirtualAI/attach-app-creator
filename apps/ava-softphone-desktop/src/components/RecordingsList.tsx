@@ -38,6 +38,8 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
+  const [itemSuccess, setItemSuccess] = useState<Record<string, string>>({});
   const [audio, setAudio] = useState<Record<string, string>>({});
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [audioLoading, setAudioLoading] = useState<string | null>(null);
@@ -73,6 +75,8 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
 
   const analyze = async (r: RecordingItem) => {
     setWorking(r.id); setError(null);
+    setItemErrors((all) => { const n = { ...all }; delete n[r.id]; return n; });
+    setItemSuccess((all) => { const n = { ...all }; delete n[r.id]; return n; });
     try {
       const organization_id = r.organization_id || '71755d33-ed64-4ad5-a828-61c9d2029eb7';
       let transcript_text = String(r.transcript_text || '').trim();
@@ -109,9 +113,12 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
         sentiment: ai?.sentiment || x.sentiment,
         analyzed: true,
       } as RecordingItem : x));
+      setItemSuccess((all) => ({ ...all, [r.id]: 'Analyzed ✓' }));
       onAnalyze?.(r.id);
     } catch (e: any) {
-      setError(displayError(e));
+      const msg = displayError(e);
+      setError(msg);
+      setItemErrors((all) => ({ ...all, [r.id]: msg }));
     } finally {
       setWorking(null);
     }
@@ -236,25 +243,35 @@ autoPlay
             )}
             {audioErrors[r.id] && <div style={{ marginTop: 6, fontSize: 10, color: c.textSub, lineHeight: 1.35 }}>{audioErrors[r.id]}</div>}
 
-            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-              {!(r as any).analyzed ? (
-                <button
-                  onClick={() => analyze(r)}
-                  disabled={working === r.id}
-                  style={{
-                    flex: 1, padding: '6px 10px', borderRadius: 8,
-                    border: `1px solid ${c.borderAI}`, background: 'rgba(124,58,237,0.15)',
-                    color: c.aiLight, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                    boxShadow: working === r.id ? glow.ai : 'none',
-                  }}
-                >
-                  {working === r.id ? '✨ Analyzing…' : '✨ Transcribe & Analyze'}
-                </button>
-              ) : (
-                <span style={{
-                  fontSize: 10, padding: '4px 8px', borderRadius: 6,
-                  background: 'rgba(16,185,129,0.15)', color: c.green, fontWeight: 600,
-                }}>✓ Analyzed</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {!(r as any).analyzed ? (
+                  <button
+                    onClick={() => analyze(r)}
+                    disabled={working === r.id}
+                    style={{
+                      flex: 1, padding: '6px 10px', borderRadius: 8,
+                      border: `1px solid ${c.borderAI}`, background: 'rgba(124,58,237,0.15)',
+                      color: c.aiLight, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                      boxShadow: working === r.id ? glow.ai : 'none',
+                    }}
+                  >
+                    {working === r.id ? '✨ Analyzing…' : '✨ Transcribe & Analyze'}
+                  </button>
+                ) : (
+                  <span style={{
+                    fontSize: 10, padding: '4px 8px', borderRadius: 6,
+                    background: 'rgba(16,185,129,0.15)', color: c.green, fontWeight: 600,
+                  }}>✓ Analyzed</span>
+                )}
+              </div>
+              {itemErrors[r.id] && (
+                <div style={{ fontSize: 10, color: c.red, lineHeight: 1.35, padding: '4px 6px', background: 'rgba(239,68,68,0.08)', borderRadius: 6 }}>
+                  {itemErrors[r.id]}
+                </div>
+              )}
+              {itemSuccess[r.id] && !itemErrors[r.id] && (
+                <div style={{ fontSize: 10, color: c.green, lineHeight: 1.35 }}>{itemSuccess[r.id]}</div>
               )}
             </div>
 
