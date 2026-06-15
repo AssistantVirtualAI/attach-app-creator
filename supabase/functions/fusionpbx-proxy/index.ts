@@ -896,25 +896,27 @@ Deno.serve(async (req) => {
       let firstPage: any[] = [];
 
       // FusionPBX's xml_cdr API turns EVERY query param into a SQL `column = value`
-      // equality, so we cannot pass `order`, `order_by`, `start_stamp_begin`, etc.
-      // Default ordering is oldest-first. To always surface the freshest rows on each
-      // sync we start the offset near the tail of the PBX dataset:
-      //   start_offset = max(0, currentDbCount - pageSize)
-      // then page forward. New calls land at the very end, so this brings them in.
-      // Callers can override with `start_offset` or pass `from_beginning:true` to
-      // backfill the head.
-      const fromBeginning = (params as any).from_beginning === true || b.from_beginning === true || isBackfill;
-      let startOffset = parseInt(String((params as any).start_offset ?? b.start_offset ?? "NaN"));
-      if (!Number.isFinite(startOffset)) {
-        if (fromBeginning) {
-          startOffset = 0;
-        } else {
-          const { count: dbCount } = await admin
-            .from("pbx_call_records")
-            .select("id", { count: "exact", head: true })
-            .eq("organization_id", organization_id);
-          startOffset = Math.max(0, (dbCount ?? 0) - pageSize);
-        }
+      // equality, so we cannot sort or filter by date — the only knobs we control are
+      // `limit` and `offset`, and the default ordering is by xml_cdr_uuid (essentially
+      // random vs. wall-clock time). To guarantee we eventually surface every CDR
+      // (including the freshest ones, which may sit anywhere in that ordering) we
+      // page through the full dataset across cron ticks using a persistent rolling
+      // offset stored in `pbx_integrations.config.sync_cursor`.
+      const fromBeginning = (params as any).from_beginning === true || b.from_beginning === true;
+      const explicitOffset = parseInt(String((params as any).start_offset ?? b.start_offset ?? "NaN"));
+      let startOffset = 0;
+      const { data: integForCursor } = await admin
+        .from("pbx_integrations")
+        .select("id, config")
+        .eq("organization_id", organization_id)
+        .maybeSingle();
+      const cursorCfg = (integForCursor?.config as any) || {};
+      if (Number.isFinite(explicitOffset)) {
+        startOffset = explicitOffset;
+      } else if (fromBeginning || isBackfill) {
+        startOffset = 0;
+      } else {
+        startOffset = Math.max(0, parseInt(String(cursorCfg.sync_cursor ?? 0)) || 0);
       }
       for (let i = 0; i < maxPages; i++) {
         const extra: Record<string, string> = {
