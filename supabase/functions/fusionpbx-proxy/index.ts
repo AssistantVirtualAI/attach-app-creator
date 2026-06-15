@@ -2086,6 +2086,365 @@ Deno.serve(async (req) => {
     }
 
 
+    // ============================================================
+    // Per-entity sync wrappers (Sync Health)
+    // ============================================================
+    async function recordSyncJob(jobType: string, endpoint: string, started: number, result: { ok: boolean; fetched: number; upserted: number; skipped: number; error?: string }) {
+      try {
+        await admin.from("pbx_sync_jobs").insert({
+          organization_id,
+          job_type: jobType,
+          endpoint,
+          status: result.ok ? "completed" : "failed",
+          started_at: new Date(started).toISOString(),
+          completed_at: new Date().toISOString(),
+          fetched: result.fetched,
+          upserted: result.upserted,
+          skipped: result.skipped,
+          duration_ms: Date.now() - started,
+          error: result.error || null,
+        });
+      } catch (e) { console.warn("recordSyncJob failed", e); }
+    }
+
+    async function genericSync(opts: {
+      jobType: string; endpoint: string; collectionKey: string;
+      table: string; conflict: string;
+      mapper: (raw: any) => any | null; withDomain?: boolean;
+    }) {
+      const started = Date.now();
+      const sep = opts.endpoint.includes("?") ? "&" : "?";
+      const url = opts.withDomain === false ? `${opts.endpoint}${sep}limit=2000` : `${opts.endpoint}${sep}${domainQ}&limit=2000`;
+      const r = await pbxFetch(url);
+      if (!r.ok) {
+        const err = (r as any).message || (r as any).error || `HTTP ${(r as any).status}`;
+        await recordSyncJob(opts.jobType, opts.endpoint, started, { ok: false, fetched: 0, upserted: 0, skipped: 0, error: err });
+        return json({ ok: false, error: err }, (r as any).status || 500);
+      }
+      const items = collection(r.data, opts.collectionKey);
+      const rows = items.map(opts.mapper).filter((x: any) => x != null);
+      let upserted = 0;
+      let error: string | undefined;
+      if (rows.length) {
+        const { error: upErr, count } = await admin.from(opts.table).upsert(rows, { onConflict: opts.conflict, count: "exact" });
+        if (upErr) error = upErr.message;
+        else upserted = count ?? rows.length;
+      }
+      const result = { ok: !error, fetched: items.length, upserted, skipped: items.length - rows.length, error };
+      await recordSyncJob(opts.jobType, opts.endpoint, started, result);
+      return json({ ...result, duration_ms: Date.now() - started });
+    }
+
+    if (action === "sync-extensions") return await genericSync({
+      jobType: "sync-extensions", endpoint: "extensions", collectionKey: "extensions",
+      table: "pbx_extensions", conflict: "organization_id,pbx_uuid",
+      mapper: (e: any) => { const m = mapExtension(e); return m.pbx_uuid ? m : null; },
+    });
+    if (action === "sync-devices") return await genericSync({
+      jobType: "sync-devices", endpoint: "devices", collectionKey: "devices",
+      table: "pbx_devices", conflict: "organization_id,pbx_uuid",
+      mapper: (d: any) => { const m = mapDevice(d); return m.pbx_uuid ? m : null; },
+    });
+    if (action === "sync-ring-groups") return await genericSync({
+      jobType: "sync-ring-groups", endpoint: "ring_groups", collectionKey: "ring_groups",
+      table: "pbx_ring_groups", conflict: "organization_id,pbx_uuid",
+      mapper: (r: any) => { const m = mapRingGroup(r); return m.pbx_uuid ? m : null; },
+    });
+    if (action === "sync-call-queues" || action === "sync-queues") return await genericSync({
+      jobType: "sync-call-queues", endpoint: "call_center_queues", collectionKey: "call_center_queues",
+      table: "pbx_call_queues", conflict: "organization_id,pbx_uuid",
+      mapper: (q: any) => { const m = mapQueue(q); return m.pbx_uuid ? m : null; },
+    });
+    if (action === "sync-ivrs") return await genericSync({
+      jobType: "sync-ivrs", endpoint: "ivr_menus", collectionKey: "ivr_menus",
+      table: "pbx_ivrs", conflict: "organization_id,pbx_uuid",
+      mapper: (i: any) => { const m = mapIvr(i); return m.pbx_uuid ? m : null; },
+    });
+    if (action === "sync-gateways") return await genericSync({
+      jobType: "sync-gateways", endpoint: "gateways", collectionKey: "gateways",
+      table: "pbx_gateways", conflict: "pbx_uuid", withDomain: false,
+      mapper: (g: any) => g.gateway_uuid ? ({
+        organization_id, pbx_uuid: g.gateway_uuid,
+        name: g.gateway || g.name || "unnamed",
+        proxy: g.proxy ?? null, realm: g.realm ?? null,
+        username: g.username ?? null, from_user: g.from_user ?? null, from_domain: g.from_domain ?? null,
+        expire_seconds: g.expire_seconds ? parseInt(g.expire_seconds) : 800,
+        register: g.register === "true" || g.register === true,
+        context: g.context ?? "public", profile: g.profile ?? "external",
+        status: g.gateway_status ?? null,
+        enabled: !(g.enabled === "false" || g.enabled === false),
+        config: g, last_synced_at: new Date().toISOString(),
+      }) : null,
+    });
+    if (action === "sync-destinations") return await genericSync({
+      jobType: "sync-destinations", endpoint: "destinations", collectionKey: "destinations",
+      table: "pbx_destinations", conflict: "organization_id,pbx_uuid",
+      mapper: (d: any) => d.destination_uuid ? ({
+        organization_id, pbx_uuid: d.destination_uuid,
+        destination_number: d.destination_number ?? null,
+        destination_type: d.destination_type ?? null,
+        destination_caller_id_name: d.destination_caller_id_name ?? null,
+        destination_caller_id_number: d.destination_caller_id_number ?? null,
+        destination_actions: d.destination_actions ?? null,
+        description: d.destination_description ?? null,
+        enabled: d.destination_enabled === "true" || d.destination_enabled === true,
+        raw_data: d,
+      }) : null,
+    });
+    if (action === "sync-conferences") return await genericSync({
+      jobType: "sync-conferences", endpoint: "conference_centers", collectionKey: "conference_centers",
+      table: "pbx_conferences", conflict: "organization_id,pbx_uuid",
+      mapper: (c: any) => c.conference_center_uuid ? ({
+        organization_id, pbx_uuid: c.conference_center_uuid,
+        name: c.conference_center_name ?? "Conf",
+        extension: c.conference_center_extension ?? null,
+        greeting: c.conference_center_greeting ?? null,
+        enabled: c.conference_center_enabled === "true" || c.conference_center_enabled === true,
+        description: c.conference_center_description ?? null,
+        raw_data: c,
+      }) : null,
+    });
+    if (action === "sync-hold-music") return await genericSync({
+      jobType: "sync-hold-music", endpoint: "music_on_hold", collectionKey: "music_on_hold",
+      table: "pbx_hold_music", conflict: "organization_id,pbx_uuid",
+      mapper: (m: any) => m.music_on_hold_uuid ? ({
+        organization_id, pbx_uuid: m.music_on_hold_uuid,
+        name: m.music_on_hold_name ?? "MOH",
+        path: m.music_on_hold_path ?? null,
+        rate: m.music_on_hold_rate ?? null,
+        shuffle: m.music_on_hold_shuffle === "true",
+        enabled: m.music_on_hold_enabled === "true" || m.music_on_hold_enabled === true,
+        raw_data: m,
+      }) : null,
+    });
+    if (action === "sync-voicemail") return await genericSync({
+      jobType: "sync-voicemail", endpoint: "voicemails", collectionKey: "voicemails",
+      table: "pbx_voicemail_settings", conflict: "organization_id,pbx_uuid",
+      mapper: (v: any) => v.voicemail_uuid ? ({
+        organization_id, pbx_uuid: v.voicemail_uuid,
+        voicemail_id: v.voicemail_id ?? null,
+        mail_to: v.voicemail_mail_to ?? null,
+        attach_file: v.voicemail_attach_file === "true",
+        local_after_email: v.voicemail_local_after_email === "true",
+        enabled: v.voicemail_enabled === "true" || v.voicemail_enabled === true,
+        description: v.voicemail_description ?? null,
+        raw_data: v,
+      }) : null,
+    });
+    if (action === "sync-queue-agents") return await genericSync({
+      jobType: "sync-queue-agents", endpoint: "call_center_agents", collectionKey: "call_center_agents",
+      table: "pbx_queue_agents", conflict: "organization_id,pbx_uuid",
+      mapper: (a: any) => a.call_center_agent_uuid ? ({
+        organization_id, pbx_uuid: a.call_center_agent_uuid,
+        name: a.call_center_agent_name ?? "Agent",
+        extension: a.call_center_agent_extension ?? a.agent_extension ?? null,
+        contact: a.call_center_agent_contact ?? null,
+        status: a.call_center_agent_status ?? null,
+        type: a.call_center_agent_type ?? null,
+        raw_data: a,
+      }) : null,
+    });
+    if (action === "sync-dialplans") return await genericSync({
+      jobType: "sync-dialplans", endpoint: "dialplans", collectionKey: "dialplans",
+      table: "pbx_dialplans", conflict: "organization_id,pbx_uuid",
+      mapper: (d: any) => d.dialplan_uuid ? ({
+        organization_id, pbx_uuid: d.dialplan_uuid,
+        name: d.dialplan_name ?? "dialplan",
+        number: d.dialplan_number ?? null,
+        context: d.dialplan_context ?? null,
+        category: d.dialplan_category ?? null,
+        enabled: d.dialplan_enabled === "true" || d.dialplan_enabled === true,
+        description: d.dialplan_description ?? null,
+        raw_data: d,
+      }) : null,
+    });
+
+    // ============================================================
+    // Recording metadata sync — probes audio availability per CDR
+    // ============================================================
+    if (action === "sync-recording-meta") {
+      const started = Date.now();
+      const limit = Math.min(Number((params as any).limit ?? 100), 500);
+      const staleHours = Number((params as any).stale_hours ?? 6);
+      const staleCutoff = new Date(Date.now() - staleHours * 3600 * 1000).toISOString();
+
+      const { data: cdrs, error: cdrErr } = await admin
+        .from("pbx_call_records")
+        .select("id, pbx_uuid, recording_name, recording_path, domain_uuid, domain_name, start_at, organization_id")
+        .eq("organization_id", organization_id)
+        .eq("has_recording", true)
+        .not("pbx_uuid", "is", null)
+        .order("start_at", { ascending: false })
+        .limit(limit);
+      if (cdrErr) {
+        await recordSyncJob("sync-recording-meta", "internal", started, { ok: false, fetched: 0, upserted: 0, skipped: 0, error: cdrErr.message });
+        return json({ ok: false, error: cdrErr.message }, 500);
+      }
+
+      const { data: existing } = await admin.from("pbx_call_recordings")
+        .select("id, pbx_uuid, last_checked_at")
+        .eq("organization_id", organization_id)
+        .in("pbx_uuid", (cdrs || []).map((c: any) => c.pbx_uuid));
+      const byPbx = new Map((existing || []).map((r: any) => [r.pbx_uuid, r]));
+
+      let upserted = 0, skipped = 0;
+      for (const cdr of cdrs || []) {
+        const ex: any = byPbx.get(cdr.pbx_uuid);
+        if (ex?.last_checked_at && ex.last_checked_at > staleCutoff) { skipped++; continue; }
+
+        let available = false;
+        let accessStatus = "missing";
+        try {
+          const probeRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/fusionpbx-proxy`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, apikey: serviceKey },
+            body: JSON.stringify({
+              action: "get-recording", organization_id,
+              params: {
+                xml_cdr_uuid: cdr.pbx_uuid, record_name: cdr.recording_name, record_path: cdr.recording_path,
+                domain_uuid: cdr.domain_uuid, domain_name: cdr.domain_name, recorded_at: cdr.start_at, probe: true,
+              },
+            }),
+          });
+          if (probeRes.ok) {
+            const j = await probeRes.json().catch(() => ({}));
+            available = !!j?.available;
+            accessStatus = available ? "ok" : "missing";
+          } else {
+            accessStatus = probeRes.status === 403 ? "forbidden" : `http_${probeRes.status}`;
+            await probeRes.body?.cancel();
+          }
+        } catch (e: any) {
+          accessStatus = `error:${(e?.message || "unknown").slice(0, 60)}`;
+        }
+
+        const { error: upErr } = await admin.from("pbx_call_recordings").upsert({
+          organization_id, call_record_id: cdr.id, pbx_uuid: cdr.pbx_uuid,
+          recording_name: cdr.recording_name, recording_path: cdr.recording_path,
+          available, access_status: accessStatus, last_checked_at: new Date().toISOString(),
+        }, { onConflict: "organization_id,pbx_uuid" });
+        if (!upErr) upserted++;
+      }
+
+      const result = { ok: true, fetched: (cdrs || []).length, upserted, skipped, duration_ms: Date.now() - started };
+      await recordSyncJob("sync-recording-meta", "internal", started, result);
+      return json(result);
+    }
+
+    // ============================================================
+    // Transcription & summary via Lovable AI Gateway
+    // ============================================================
+    if (action === "transcribe-recording" || action === "summarize-recording") {
+      const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+      if (!lovableKey) return json({ error: "LOVABLE_API_KEY not configured" }, 400);
+      const recordingId = (params as any).recording_id || (body as any).recording_id;
+      if (!recordingId) return json({ error: "recording_id required" }, 400);
+
+      const { data: rec, error: recErr } = await admin
+        .from("pbx_call_recordings")
+        .select("id, organization_id, call_record_id, pbx_uuid")
+        .eq("id", recordingId).maybeSingle();
+      if (recErr || !rec) return json({ error: "recording not found" }, 404);
+
+      if (action === "transcribe-recording") {
+        await admin.from("pbx_call_recordings").update({ transcript_status: "pending" }).eq("id", recordingId);
+        const audioRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/fusionpbx-proxy`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, apikey: serviceKey },
+          body: JSON.stringify({ action: "get-recording", organization_id: rec.organization_id, params: { xml_cdr_uuid: rec.pbx_uuid } }),
+        });
+        if (!audioRes.ok) {
+          await admin.from("pbx_call_recordings").update({ transcript_status: "failed" }).eq("id", recordingId);
+          return json({ error: "audio unavailable", status: audioRes.status }, 502);
+        }
+        const audioBuf = await audioRes.arrayBuffer();
+        const bytes = new Uint8Array(audioBuf);
+        let b64 = "";
+        for (let i = 0; i < bytes.length; i += 0x8000) b64 += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + 0x8000)));
+        b64 = btoa(b64);
+
+        const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [{
+              role: "user",
+              content: [
+                { type: "text", text: "Transcribe this call recording verbatim. Detect the language. Return ONLY JSON: {\"language\":\"...\",\"transcript\":\"...\"}" },
+                { type: "input_audio", input_audio: { data: b64, format: "wav" } },
+              ],
+            }],
+          }),
+        });
+        if (!aiRes.ok) {
+          const errTxt = await aiRes.text();
+          await admin.from("pbx_call_recordings").update({ transcript_status: "failed" }).eq("id", recordingId);
+          return json({ error: "transcription failed", status: aiRes.status, message: errTxt.slice(0, 400) }, 502);
+        }
+        const aiJson = await aiRes.json();
+        const content = aiJson?.choices?.[0]?.message?.content ?? "";
+        let parsed: { language?: string; transcript?: string } = {};
+        try { parsed = JSON.parse(String(content).replace(/^```json|```$/g, "").trim()); } catch { parsed = { transcript: String(content) }; }
+
+        if (rec.call_record_id && parsed.transcript) {
+          await admin.from("pbx_call_transcripts").upsert({
+            call_record_id: rec.call_record_id,
+            organization_id: rec.organization_id,
+            content: parsed.transcript,
+            language: parsed.language || null,
+          }, { onConflict: "call_record_id" });
+        }
+        await admin.from("pbx_call_recordings").update({
+          transcript_status: "done", transcribed: true, language: parsed.language || null,
+        }).eq("id", recordingId);
+        await admin.from("audit_logs").insert({
+          organization_id: rec.organization_id, user_id: userId, action: "transcribe_recording",
+          resource_type: "pbx_call_recordings", resource_id: recordingId,
+        });
+        return json({ ok: true, transcript_length: parsed.transcript?.length ?? 0, language: parsed.language });
+      }
+
+      // summarize-recording
+      const { data: transcript } = await admin
+        .from("pbx_call_transcripts").select("content")
+        .eq("call_record_id", rec.call_record_id).maybeSingle();
+      if (!transcript?.content) return json({ error: "no transcript available; transcribe first" }, 400);
+
+      await admin.from("pbx_call_recordings").update({ summary_status: "pending" }).eq("id", recordingId);
+      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${lovableKey}` },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [{
+            role: "user",
+            content: `Summarize this call transcript in 2-3 sentences and classify sentiment as positive, neutral, negative, or mixed. Return ONLY JSON: {"summary":"...","sentiment":"..."}\n\nTRANSCRIPT:\n${String(transcript.content).slice(0, 12000)}`,
+          }],
+        }),
+      });
+      if (!aiRes.ok) {
+        const errTxt = await aiRes.text();
+        await admin.from("pbx_call_recordings").update({ summary_status: "failed" }).eq("id", recordingId);
+        return json({ error: "summary failed", status: aiRes.status, message: errTxt.slice(0, 400) }, 502);
+      }
+      const aiJson = await aiRes.json();
+      const content = aiJson?.choices?.[0]?.message?.content ?? "";
+      let parsed: { summary?: string; sentiment?: string } = {};
+      try { parsed = JSON.parse(String(content).replace(/^```json|```$/g, "").trim()); } catch { parsed = { summary: String(content) }; }
+      await admin.from("pbx_call_recordings").update({
+        summary: parsed.summary || null,
+        sentiment: parsed.sentiment || null,
+        summary_status: "done", analyzed: true,
+      }).eq("id", recordingId);
+      await admin.from("audit_logs").insert({
+        organization_id: rec.organization_id, user_id: userId, action: "summarize_recording",
+        resource_type: "pbx_call_recordings", resource_id: recordingId,
+        metadata: { sentiment: parsed.sentiment },
+      });
+      return json({ ok: true, summary: parsed.summary, sentiment: parsed.sentiment });
+    }
+
     return json({ error: "UNKNOWN_ACTION", action }, 400);
   } catch (e: any) {
     if (organization_id) {
