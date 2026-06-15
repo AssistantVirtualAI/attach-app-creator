@@ -16,6 +16,62 @@ const json = (body: unknown, status = 200, extraHeaders: Record<string, string> 
 
 const LEMTEL_ORG = "71755d33-ed64-4ad5-a828-61c9d2029eb7";
 
+// --------------------------------------------------------------------------
+// FusionPBX PHP session login cache.
+// /app/call_recordings/download.php uses PHP session cookies (not the API
+// Basic auth), so we POST to /login.php and reuse the resulting cookie for
+// up to 25 minutes per edge-runtime instance.
+// --------------------------------------------------------------------------
+const FUSION_SESSION = { cookie: "" as string, expiresAt: 0 as number };
+
+async function getFusionSessionCookie(baseUrl: string): Promise<string> {
+  const now = Date.now();
+  if (FUSION_SESSION.cookie && FUSION_SESSION.expiresAt > now) return FUSION_SESSION.cookie;
+  const username = Deno.env.get("FUSIONPBX_USERNAME") || "";
+  const password = Deno.env.get("FUSIONPBX_PASSWORD") || "";
+  if (!username || !password) throw new Error("FUSIONPBX_PASSWORD not configured");
+
+  // 1. Hit /login.php to bootstrap a PHPSESSID cookie.
+  const bootstrap = await fetch(`${baseUrl}/login.php`, { redirect: "manual" });
+  const setCookies1 = bootstrap.headers.get("set-cookie") || "";
+  await bootstrap.body?.cancel();
+  const sessionMatch = setCookies1.match(/PHPSESSID=[^;]+/i);
+  let cookie = sessionMatch ? sessionMatch[0] : "";
+
+  // 2. POST credentials. FusionPBX expects username/password form fields.
+  const form = new URLSearchParams();
+  form.set("username", username);
+  form.set("password", password);
+  form.set("path", "/");
+  const loginRes = await fetch(`${baseUrl}/login.php`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      ...(cookie ? { Cookie: cookie } : {}),
+    },
+    body: form.toString(),
+    redirect: "manual",
+  });
+  const setCookies2 = loginRes.headers.get("set-cookie") || "";
+  await loginRes.body?.cancel();
+  const sessionMatch2 = setCookies2.match(/PHPSESSID=[^;]+/i);
+  if (sessionMatch2) cookie = sessionMatch2[0];
+  if (!cookie) throw new Error("FusionPBX login did not return a session cookie");
+
+  // 3. Verify the session is authenticated by hitting a protected page.
+  const probe = await fetch(`${baseUrl}/core/user_settings/user_settings.php`, {
+    headers: { Cookie: cookie },
+    redirect: "manual",
+  });
+  const status = probe.status;
+  await probe.body?.cancel();
+  if (status >= 400) throw new Error(`FusionPBX session probe failed (${status})`);
+
+  FUSION_SESSION.cookie = cookie;
+  FUSION_SESSION.expiresAt = now + 25 * 60 * 1000;
+  return cookie;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -1300,6 +1356,66 @@ Deno.serve(async (req) => {
         }
       }
 
+      // ---- PRIMARY PATH: PHP session cookie (mirrors the FusionPBX UI) ----
+      // /app/call_recordings/download.php?id=<xml_cdr_uuid> requires a logged-in
+      // PHP session — exactly how a browser plays a recording from the portal.
+      const attemptsSession: { url: string; status: number; content_type?: string }[] = [];
+      if (xml_cdr_uuid) {
+        for (const fileBase of fileBases) {
+          const sessionUrl = `${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`;
+          try {
+            let cookie = await getFusionSessionCookie(fileBase).catch(() => "");
+            const doFetch = async (c: string) => {
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 8000);
+              try {
+                return await fetch(sessionUrl, {
+                  headers: { Cookie: c, Accept: "*/*" },
+                  redirect: "follow",
+                  signal: controller.signal,
+                });
+              } finally { clearTimeout(timeout); }
+            };
+            let r = cookie ? await doFetch(cookie) : null;
+            // If session expired, force re-login once.
+            if (r && (r.status === 401 || r.status === 403 || r.headers.get("content-type")?.includes("text/html"))) {
+              FUSION_SESSION.cookie = ""; FUSION_SESSION.expiresAt = 0;
+              cookie = await getFusionSessionCookie(fileBase).catch(() => "");
+              if (cookie) {
+                await r.body?.cancel();
+                r = await doFetch(cookie);
+              }
+            }
+            if (r && r.ok) {
+              const buf = await r.arrayBuffer();
+              const rct = r.headers.get("content-type") || "";
+              const head = new TextDecoder().decode(buf.slice(0, Math.min(buf.byteLength, 160))).trim().toLowerCase();
+              const looksLikeAudio = head.startsWith("id3") || head.startsWith("riff") || head.startsWith("oggs") || head.includes("ftyp") || (buf.byteLength > 1200 && !head.startsWith("<") && !head.startsWith("{"));
+              if (looksLikeAudio && !rct.includes("text/html")) {
+                if (probeOnly) {
+                  return json({ ok: true, available: true, content_type: rct.startsWith("audio/") ? rct : ct }, 200, { "X-Recording-Status": "available" });
+                }
+                return new Response(buf, {
+                  headers: {
+                    ...corsHeaders,
+                    "Content-Type": rct.startsWith("audio/") ? rct : ct,
+                    "Content-Length": String(buf.byteLength),
+                    "Accept-Ranges": "bytes",
+                    "Cache-Control": "private, max-age=300",
+                  },
+                });
+              }
+              attemptsSession.push({ url: safeUrl(sessionUrl), status: r.status, content_type: rct });
+            } else if (r) {
+              attemptsSession.push({ url: safeUrl(sessionUrl), status: r.status });
+              await r.body?.cancel();
+            }
+          } catch (e: any) {
+            attemptsSession.push({ url: safeUrl(sessionUrl), status: 0, content_type: e?.message?.slice(0, 80) });
+          }
+        }
+      }
+
       const uniqueUrls = [...new Set(tryUrls)];
       for (let i = 0; i < uniqueUrls.length; i++) {
         const url = uniqueUrls[i];
@@ -1356,7 +1472,7 @@ Deno.serve(async (req) => {
           attempts.push({ url: safeUrl(url), status: 0, content_type: e?.name === "AbortError" ? "timeout" : undefined });
         }
       }
-      return json({ ok: false, error: "RECORDING_NOT_FOUND", message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.", attempts }, 200, { "X-Recording-Status": "not-found" });
+      return json({ ok: false, error: "RECORDING_NOT_FOUND", message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.", attempts, session_attempts: attemptsSession }, 200, { "X-Recording-Status": "not-found" });
     }
 
     // ---- Signed-URL recording delivery ----
