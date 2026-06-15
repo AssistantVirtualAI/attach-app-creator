@@ -179,9 +179,11 @@ export default function App() {
   }, []);
 
   const openSettingsMobile = () => {
-    // On narrow viewports the console layout is hidden; just reload after clearing.
-    // The SoftphonePane keeps its own simpler settings affordance.
+    // Navigate to the settings view via the global nav bus so both ConsoleLayout
+    // and the standalone SoftphonePane gear button reach the SettingsPage.
+    window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'settings' }));
   };
+
 
   if (loading) {
     return (
