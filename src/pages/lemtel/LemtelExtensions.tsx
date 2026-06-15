@@ -140,6 +140,23 @@ export default function LemtelExtensions() {
   }, [all]);
   const syncStale = lastSync ? (Date.now() - new Date(lastSync.iso).getTime()) / 60000 > 30 : false;
 
+  // Auto-clear type filter if it accidentally hides everything
+  useEffect(() => {
+    if (typeFilter && all.length > 0) {
+      const visible = all.filter(e => getExtensionType(e).label === typeFilter).length;
+      if (visible === 0) setTypeFilter(null);
+    }
+  }, [typeFilter, all]);
+
+  // Diagnostic: fetch access info when list is empty
+  const [diag, setDiag] = useState<any>(null);
+  useEffect(() => {
+    if (!isLoading && all.length === 0) {
+      (supabase.rpc as any)('audit_my_pbx_extensions_access', { _org_id: LEMTEL_ORG })
+        .then(({ data }: any) => setDiag(data));
+    }
+  }, [isLoading, all.length]);
+
   return (
     <TooltipProvider>
     <div className="space-y-6">
@@ -152,6 +169,7 @@ export default function LemtelExtensions() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button asChild variant="outline" size="sm"><a href="/org/lemtel/admin/pbx-users">PBX Users →</a></Button>
           <PbxRefreshButton kind="config" />
           <SyncEverythingButton />
           <Button onClick={() => setProvisionOpen(true)}><Plus className="w-4 h-4 mr-2" /> New Extension</Button>
