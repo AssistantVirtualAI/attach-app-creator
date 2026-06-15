@@ -4,6 +4,9 @@ import { theme } from '../../lib/theme';
 import { ava, getMeContext } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
 import PbxResourceSection from './admin/PbxResourceSection';
+import VoicemailView from './VoicemailView';
+import RecordingsView from './RecordingsView';
+import CallsView from './CallsView';
 
 const { colors: c } = theme;
 
