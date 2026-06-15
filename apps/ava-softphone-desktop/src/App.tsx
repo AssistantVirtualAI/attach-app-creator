@@ -81,12 +81,14 @@ export default function App() {
         setCreds(null);
       } else if (saved) {
         // Refresh stored tokens in case they rotated
-        setAuthToken(session.access_token);
-        setCreds({
+        const refreshedCreds = {
           ...saved,
           accessToken: session.access_token,
           refreshToken: session.refresh_token,
-        });
+        };
+        setAuthToken(session.access_token);
+        setCreds(refreshedCreds);
+        await window.electronAPI?.saveCredentials?.(refreshedCreds).catch(() => {});
         triggerCdrSync();
       } else {
         setAuthToken(session.access_token);
@@ -113,11 +115,16 @@ export default function App() {
           triggerCdrSync();
           audit('softphone.signed_in', session.user?.id, { email: session.user?.email });
         }
-        setCreds((prev) => prev ? {
-          ...prev,
-          accessToken: session.access_token,
-          refreshToken: session.refresh_token,
-        } : prev);
+        setCreds((prev) => {
+          if (!prev) return prev;
+          const refreshedCreds = {
+            ...prev,
+            accessToken: session.access_token,
+            refreshToken: session.refresh_token,
+          };
+          window.electronAPI?.saveCredentials?.(refreshedCreds).catch(() => {});
+          return refreshedCreds;
+        });
       }
     });
 

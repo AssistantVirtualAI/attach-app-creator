@@ -15,11 +15,19 @@
           <span style="color:rgba(255,255,255,0.5);font-size:10px;letter-spacing:2px;display:block;">COMMUNICATIONS</span>
         </div>
       </div>
-      <div id="status-indicator" class="status-dot disconnected" title="Status"></div>
+      <div class="status-wrap" title="Extension status">
+        <div id="status-indicator" class="status-dot disconnected" title="Status"></div>
+        <span id="version-text" class="version-text">v—</span>
+      </div>
+    </div>
+
+    <div class="status-panel">
+      <span id="status-text" class="status-text">Checking extension status…</span>
+      <span id="last-dial-text" class="last-dial-text">Ready to open your Mac phone app with tel: links.</span>
     </div>
 
     <div id="account-info" class="ext-badge hidden">
-      <span class="ext-label">Extension</span>
+      <span class="ext-label">Calling through</span>
       <span id="ext-number" class="ext-number">—</span>
     </div>
 
@@ -42,7 +50,6 @@
         <div class="empty-state">No phone numbers detected</div>
       </div>
     </div>
-
 
     <div class="footer">
       <span>Powered by</span>

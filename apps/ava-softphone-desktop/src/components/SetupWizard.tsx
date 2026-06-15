@@ -42,18 +42,26 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
         setLoading(false);
         return;
       }
-      const { data: softphoneUser } = await supabase
+      const { data: softphoneUser, error: softphoneError } = await supabase
         .from('pbx_softphone_users')
-        .select('*')
+        .select('extension, display_name, sip_domain, wss_url')
         .eq('portal_user_id', authData.user.id)
         .maybeSingle();
+      if (softphoneError || !softphoneUser?.extension) {
+        await supabase.auth.signOut().catch(() => {});
+        await window.electronAPI?.saveCredentials?.(null).catch(() => {});
+        setAuthToken(null);
+        setError(softphoneError?.message || 'Login succeeded, but no softphone extension is assigned to this account. Ask your administrator to create a pbx_softphone_users row for this user.');
+        setLoading(false);
+        return;
+      }
       const credentials: Creds = {
         portalUrl: (portalUrl || 'https://avastatistic.ca').replace(/\/+$/, ''),
         email: authData.user.email || email,
-        extension: String(softphoneUser?.extension ?? 'N/A'),
-        displayName: softphoneUser?.display_name || email.split('@')[0],
-        sipDomain: softphoneUser?.sip_domain || 'lemtel.lemtel.tel',
-        wssUrl: softphoneUser?.wss_url || 'wss://lemtel.lemtel.tel:7443',
+        extension: String(softphoneUser.extension),
+        displayName: softphoneUser.display_name || email.split('@')[0],
+        sipDomain: softphoneUser.sip_domain || 'lemtel.lemtel.tel',
+        wssUrl: softphoneUser.wss_url || 'wss://lemtel.lemtel.tel:7443',
         userId: authData.user.id,
         accessToken: authData.session?.access_token,
         refreshToken: authData.session?.refresh_token,

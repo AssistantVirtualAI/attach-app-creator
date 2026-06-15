@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
-import { ava, RecordingItem, Feedback } from '../../lib/avaApi';
+import { ava, RecordingItem, Feedback, getLastRecordingDebug } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
 import { useRealtimeRefresh } from '../../lib/useRealtimeRefresh';
 import { useOrgId } from '../../lib/useOrgId';
@@ -42,6 +42,12 @@ function fmtSize(kb?: number | null) {
 const audioBlobCache = new Map<string, string>();
 const audioInFlight = new Map<string, Promise<string | null>>();
 
+function recordingDebugMessage(debug: any): string {
+  const msg = debug?.diagnostic_message || debug?.message || 'Recording file not available from PBX yet.';
+  const portal = debug?.direct_portal_url ? ` Portal fallback: ${debug.direct_portal_url}` : '';
+  return `${msg}${portal}`;
+}
+
 function rangeCutoff(r: Range): number {
   const ms = { '24h': 864e5, '7d': 7 * 864e5, '30d': 30 * 864e5, '90d': 90 * 864e5 } as const;
   return r === 'all' ? 0 : Date.now() - (ms as any)[r];
@@ -63,6 +69,7 @@ export default function RecordingsView() {
   const [regenLoading, setRegenLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [playbackDebug, setPlaybackDebug] = useState<any>(null);
   const [playbackLoading, setPlaybackLoading] = useState(false);
   const [transcript, setTranscript] = useState<string>('');
   const [analysis, setAnalysis] = useState<any>(null);
@@ -109,6 +116,7 @@ export default function RecordingsView() {
   // When selection changes: show cached URL immediately, otherwise fetch silently in background.
   useEffect(() => {
     setPlaybackError(null);
+    setPlaybackDebug(null);
     setAudioUrl(null);
     setTranscript(String((sel as any)?.transcript_text || (sel as any)?.raw_data?.transcript_text || ''));
     setAnalysis((sel as any)?.raw_data?.ai || null);
@@ -119,7 +127,17 @@ export default function RecordingsView() {
     let cancelled = false;
     setPlaybackLoading(true);
     fetchAudio(sel)
-      .then((u) => { if (!cancelled && u) setAudioUrl(u); })
+      .then((u) => {
+        if (cancelled) return;
+        if (u) setAudioUrl(u);
+        else {
+          const debug = getLastRecordingDebug();
+          if (debug) {
+            setPlaybackDebug(debug);
+            setPlaybackError(recordingDebugMessage(debug));
+          }
+        }
+      })
       .finally(() => { if (!cancelled) setPlaybackLoading(false); });
     return () => { cancelled = true; };
   }, [sel?.id, fetchAudio]);
@@ -179,10 +197,15 @@ export default function RecordingsView() {
   };
   const downloadSelectedRecording = async () => {
     if (!sel) return;
-    setPlaybackError(null); setPlaybackLoading(true);
+    setPlaybackError(null); setPlaybackDebug(null); setPlaybackLoading(true);
     try {
       const url = await fetchAudio(sel);
-      if (!url) { setPlaybackError('Recording file not available from PBX yet'); return; }
+      if (!url) {
+        const debug = getLastRecordingDebug();
+        setPlaybackDebug(debug);
+        setPlaybackError(debug ? recordingDebugMessage(debug) : 'Recording file not available from PBX yet');
+        return;
+      }
       const a = document.createElement('a');
       const safeName = `${(sel.recording_name || sel.callId || sel.id || 'recording').replace(/[^a-z0-9._-]+/gi, '_')}.wav`;
       a.href = url;
@@ -216,10 +239,15 @@ export default function RecordingsView() {
 
   const playSelected = async () => {
     if (!sel) return;
-    setPlaybackError(null); setPlaybackLoading(true);
+    setPlaybackError(null); setPlaybackDebug(null); setPlaybackLoading(true);
     try {
       const url = await fetchAudio(sel);
-      if (!url) { setPlaybackError('Recording file not available from PBX yet'); return; }
+      if (!url) {
+        const debug = getLastRecordingDebug();
+        setPlaybackDebug(debug);
+        setPlaybackError(debug ? recordingDebugMessage(debug) : 'Recording file not available from PBX yet');
+        return;
+      }
       setAudioUrl(url);
     } finally {
       setPlaybackLoading(false);
@@ -408,7 +436,9 @@ export default function RecordingsView() {
                   src={audioUrl}
                   style={{ width: '100%', height: 36 }}
                   onError={() => {
-                    setPlaybackError('PBX recording file is not reachable yet. Sync the phone system and try again.');
+                    const debug = getLastRecordingDebug();
+                    setPlaybackDebug(debug);
+                    setPlaybackError(debug ? recordingDebugMessage(debug) : 'PBX recording file is not reachable yet. Sync the phone system and try again.');
                     if (sel) { const u = audioBlobCache.get(sel.id); if (u) { URL.revokeObjectURL(u); audioBlobCache.delete(sel.id); } }
                     setAudioUrl(null);
                   }}
@@ -428,7 +458,25 @@ export default function RecordingsView() {
                   </div>
                 </>
               )}
-              {playbackError && <div style={{ fontSize: 11, color: c.mutedSilver, marginTop: 8 }}>{playbackError}</div>}
+              {playbackError && (
+                <div style={{ fontSize: 11, color: c.mutedSilver, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <span>{playbackError}</span>
+                  {playbackDebug && (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => navigator.clipboard?.writeText(JSON.stringify(playbackDebug, null, 2)).catch(() => {})}
+                        style={{ ...miniBtn, padding: '5px 8px', fontSize: 11 }}
+                      >Copy PBX debug info</button>
+                      {playbackDebug.direct_portal_url && (
+                        <button
+                          onClick={() => window.open(playbackDebug.direct_portal_url, '_blank')}
+                          style={{ ...miniBtn, padding: '5px 8px', fontSize: 11 }}
+                        >Open PBX portal fallback</button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>

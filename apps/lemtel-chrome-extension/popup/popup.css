@@ -1,8 +1,8 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  width: 280px;
-  min-height: 400px;
+  width: 300px;
+  min-height: 430px;
   background: #050816;
   color: white;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
@@ -20,6 +20,8 @@ body {
 }
 
 .logo { display: block; }
+.status-wrap { display: flex; align-items: center; gap: 7px; }
+.version-text { color: rgba(255,255,255,0.42); font-size: 10px; font-weight: 600; }
 
 .status-dot { width: 10px; height: 10px; border-radius: 50%; }
 .status-dot.connected {
@@ -27,9 +29,25 @@ body {
   box-shadow: 0 0 8px rgba(16,185,129,0.6);
   animation: pulse 2s infinite;
 }
+.status-dot.warning {
+  background: #F59E0B;
+  box-shadow: 0 0 8px rgba(245,158,11,0.55);
+}
 .status-dot.disconnected { background: rgba(255,255,255,0.2); }
 
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+.status-panel {
+  background: linear-gradient(135deg, rgba(0,61,166,0.18), rgba(124,58,237,0.14));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.status-text { color: #FFFFFF; font-size: 12px; font-weight: 700; }
+.last-dial-text { color: rgba(255,255,255,0.55); font-size: 11px; line-height: 1.35; }
 
 .ext-badge {
   display: flex;
@@ -41,7 +59,7 @@ body {
   padding: 8px 12px;
 }
 .ext-label { color: rgba(255,255,255,0.5); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-.ext-number { color: #FFD700; font-size: 18px; font-weight: 700; }
+.ext-number { color: #FFD700; font-size: 14px; font-weight: 700; text-align: right; }
 
 .section { display: flex; flex-direction: column; gap: 8px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
@@ -82,6 +100,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  color: white;
+  font-weight: 800;
   box-shadow: 0 4px 12px rgba(16,185,129,0.4);
   transition: all 0.2s;
   flex-shrink: 0;
@@ -89,7 +109,7 @@ body {
 .call-btn:hover:not(:disabled) { transform: scale(1.05); box-shadow: 0 6px 16px rgba(16,185,129,0.6); }
 .call-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 
-.numbers-list { max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.numbers-list { max-height: 128px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 
 .number-item {
   display: flex;
@@ -119,30 +139,6 @@ body {
 .number-call-btn:hover { transform: scale(1.1); }
 
 .empty-state { color: rgba(255,255,255,0.3); font-size: 12px; text-align: center; padding: 16px 0; }
-
-.url-input {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 8px;
-  color: white;
-  padding: 8px 12px;
-  font-size: 12px;
-  outline: none;
-  width: 100%;
-}
-
-.save-btn {
-  background: rgba(255,215,0,0.1);
-  border: 1px solid rgba(255,215,0,0.3);
-  border-radius: 8px;
-  color: #FFD700;
-  padding: 7px;
-  font-size: 12px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-.save-btn:hover { background: rgba(255,215,0,0.2); }
 
 .footer {
   display: flex;
