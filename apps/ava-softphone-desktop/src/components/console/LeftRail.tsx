@@ -50,11 +50,11 @@ const LABEL: Record<ConsoleView, string> = {
   voicemail: 'Voicemail', recordings: 'Recordings', ai: 'AVA AI',
   contacts: 'Contacts', admin: 'Admin', settings: 'Settings',
   telecom: 'Telecom', orgchat: 'Org Chat', aiadmin: 'AI Admin', reports: 'Reports',
-  customers: 'Customers', voiceagents: 'Voice Agents', pbxlive: 'PBX Live',
+  customers: 'Customers', voiceagents: 'Voice Agents', pbxlive: 'PBX Live', audit: 'Audit',
 };
 
 const USER_ITEMS: ConsoleView[] = ['home', 'dialer', 'calls', 'messages', 'voicemail', 'recordings', 'orgchat', 'ai', 'telecom', 'contacts'];
-const ADMIN_ITEMS: ConsoleView[] = ['pbxlive', 'customers', 'voiceagents', 'reports', 'admin', 'aiadmin'];
+const ADMIN_ITEMS: ConsoleView[] = ['pbxlive', 'customers', 'voiceagents', 'reports', 'admin', 'aiadmin', 'audit'];
 
 interface Props {
   view: ConsoleView;
