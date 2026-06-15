@@ -78,9 +78,7 @@ export default function LemtelCustomers() {
   const { data: orgs = [] } = useQuery({
     queryKey: ['organizations', 'fpbx-map'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('organizations')
-        .select('id,name,fusionpbx_domain_uuid');
+      const { data, error } = await (supabase as any).rpc('get_org_pbx_mapping');
       if (error) throw error;
       return data || [];
     },
