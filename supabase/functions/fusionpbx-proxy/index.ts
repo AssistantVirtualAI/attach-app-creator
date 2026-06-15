@@ -1150,9 +1150,7 @@ Deno.serve(async (req) => {
         .eq("portal_user_id", userId)
         .eq("organization_id", record.organization_id)
         .limit(1);
-      if (record.extension_uuid) {
-        softphoneQuery = softphoneQuery.eq("extension_uuid", record.extension_uuid);
-      } else if (record.extension) {
+      if (record.extension) {
         softphoneQuery = softphoneQuery.eq("extension", record.extension);
       } else {
         return false;
