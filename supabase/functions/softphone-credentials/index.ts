@@ -84,17 +84,42 @@ Deno.serve(async (req) => {
     }
     log("authenticated user", { id: user.id, email: user.email });
 
-    const { data: sp, error: spErr } = await supabaseAdmin
-      .from("pbx_softphone_users")
-      .select("extension, organization_id, extension_id, display_name, sip_password, sip_domain, wss_url")
-      .eq("portal_user_id", user.id)
-      .maybeSingle();
+    // Retry the lookup — PostgREST occasionally returns transient
+    // "schema cache" errors during DB restarts which must NOT be treated as
+    // "no softphone account" (that would wrongly tell the user to contact admin).
+    let sp: any = null;
+    let spErr: any = null;
+    let lastErrIsTransient = false;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const res = await supabaseAdmin
+        .from("pbx_softphone_users")
+        .select("extension, organization_id, extension_id, display_name, sip_password, sip_domain, wss_url")
+        .eq("portal_user_id", user.id)
+        .maybeSingle();
+      sp = res.data;
+      spErr = res.error;
+      if (sp) { spErr = null; break; }
+      const msg = String(spErr?.message || "").toLowerCase();
+      lastErrIsTransient = /schema cache|timeout|temporar|connection|shutting down|try again|fetch failed/.test(msg);
+      if (spErr && !lastErrIsTransient) break;
+      if (!spErr) break; // no row, no error → genuinely missing
+      log(`lookup retry ${attempt + 1} after transient error`, spErr.message);
+      await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+    }
     if (spErr) log("lookup by portal_user_id error", spErr.message);
     log("lookup by portal_user_id", { found: !!sp, extension: sp?.extension });
 
     // SECURITY: removed extension-300 fallback that leaked SIP credentials to unrelated users.
 
     if (!sp) {
+      if (spErr && lastErrIsTransient) {
+        log("transient DB error, asking client to retry");
+        return json({
+          error: "DB_UNAVAILABLE",
+          message: "Database is temporarily unavailable. Please retry in a moment.",
+          retryable: true,
+        }, 503);
+      }
       log("NO_SOFTPHONE_ACCOUNT");
       return json({ error: "NO_SOFTPHONE_ACCOUNT", message: "Contact your administrator to enable softphone" }, 404);
     }
