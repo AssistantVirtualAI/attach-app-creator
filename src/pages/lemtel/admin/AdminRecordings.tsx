@@ -326,12 +326,30 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
                     Ext {r.extension ?? '—'} · {fmtDur(r.duration_seconds)} · {format(new Date(r.start_at), 'dd MMM yyyy hh:mm:ss a')} · {r.direction ?? '—'}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Badge variant="outline">{r.recording_name?.split('.').pop() ?? 'wav'}</Badge>
+                  {r.sentiment && (
+                    <Badge variant="outline" className={
+                      r.sentiment === 'positive' ? 'bg-green-500/15 text-green-600 border-green-500/30' :
+                      r.sentiment === 'negative' ? 'bg-red-500/15 text-red-600 border-red-500/30' :
+                      'bg-blue-500/15 text-blue-600 border-blue-500/30'
+                    }>{r.sentiment}</Badge>
+                  )}
+                  {r.transcribed && <Badge variant="outline" className="bg-purple-500/15 text-purple-600 border-purple-500/30">Transcribed</Badge>}
                   <Button size="sm" variant="outline" disabled={loadingRow === r.id} onClick={async () => {
                     const u = await fetchRecording(r);
-                    if (u) setExpandedId(expandedId === r.id ? null : r.id);
+                    if (u) { setExpandedId(expandedId === r.id ? null : r.id); if (!metaById[r.id]) loadMeta(r); }
                   }}>{loadingRow === r.id ? 'Loading…' : expandedId === r.id ? 'Hide' : 'Play'}</Button>
+                  <Button size="sm" variant="outline" disabled={aiBusy === r.id}
+                    onClick={() => transcribe(r)}>
+                    {aiBusy === r.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />}
+                    {r.transcribed ? 'Re-transcribe' : 'Transcribe'}
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={aiBusy === r.id}
+                    onClick={() => analyze(r)}>
+                    {aiBusy === r.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                    {r.analyzed ? 'Re-analyze' : 'AI Insights'}
+                  </Button>
                   {urls[r.id] && (
                     <Button size="icon" variant="outline" asChild>
                       <a href={urls[r.id]} download={r.recording_name ?? `${r.id}.wav`}><Download className="h-4 w-4" /></a>
@@ -361,6 +379,22 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
                 </div>
               </div>
               {expandedId === r.id && urls[r.id] && <RecordingWavePlayer url={urls[r.id]} />}
+              {(metaById[r.id]?.summary || r.summary || metaById[r.id]?.transcript) && (
+                <div className="rounded-md border bg-muted/20 p-3 space-y-2 text-sm">
+                  {(metaById[r.id]?.summary || r.summary) && (
+                    <div>
+                      <div className="font-semibold flex items-center gap-1"><Sparkles className="h-3.5 w-3.5" /> Summary{metaById[r.id]?.language ? ` · ${metaById[r.id].language}` : ''}</div>
+                      <div className="text-muted-foreground whitespace-pre-wrap">{metaById[r.id]?.summary || r.summary}</div>
+                    </div>
+                  )}
+                  {metaById[r.id]?.transcript && (
+                    <details>
+                      <summary className="cursor-pointer text-xs font-semibold">Transcript</summary>
+                      <div className="text-xs text-muted-foreground whitespace-pre-wrap mt-1 max-h-64 overflow-y-auto">{metaById[r.id].transcript}</div>
+                    </details>
+                  )}
+                </div>
+              )}
             </div>
           ))}
           {hasMore && !q && (
