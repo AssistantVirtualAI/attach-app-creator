@@ -202,37 +202,29 @@ function EditExtensionModal({ ext, saving, onClose, onSave }: { ext: any; saving
   const [voicemail, setVoicemail] = useState(!!ext.voicemail_enabled);
   const [enabled, setEnabled] = useState(ext.enabled !== false);
   return (
-    <div onClick={onClose} style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50,
-      display: 'grid', placeItems: 'center',
-    }}>
-      <div onClick={(e) => e.stopPropagation()} style={{
-        width: 380, background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 14, padding: 20,
-      }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: c.textIce, marginBottom: 12 }}>Edit Extension {ext.extension}</div>
-        <Label>Display name</Label>
-        <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={inputStyle} />
-        <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12 }}>
-            <input type="checkbox" checked={voicemail} onChange={(e) => setVoicemail(e.target.checked)} /> Voicemail
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12 }}>
-            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
-          </label>
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={() => onSave({
-            effective_caller_id_name: displayName,
-            voicemail_enabled: voicemail ? 'true' : 'false',
-            enabled: enabled ? 'true' : 'false',
-          })} disabled={saving} style={{
-            padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer',
-            background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1,
-          }}>{saving ? 'Saving…' : 'Save'}</button>
-        </div>
+    <ModalShell title={`Edit Extension ${ext.extension}`} onClose={onClose} width={420}>
+      <Label>Display name</Label>
+      <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={inputStyle} />
+      <div style={{ display: 'flex', gap: 16, marginTop: 14 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12 }}>
+          <input type="checkbox" checked={voicemail} onChange={(e) => setVoicemail(e.target.checked)} /> Voicemail
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12 }}>
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
+        </label>
       </div>
-    </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 22, justifyContent: 'flex-end' }}>
+        <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+        <button onClick={() => onSave({
+          effective_caller_id_name: displayName,
+          voicemail_enabled: voicemail ? 'true' : 'false',
+          enabled: enabled ? 'true' : 'false',
+        })} disabled={saving} style={{
+          padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer',
+          background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1,
+        }}>{saving ? 'Saving…' : 'Save & sync to PBX'}</button>
+      </div>
+    </ModalShell>
   );
 }
 
