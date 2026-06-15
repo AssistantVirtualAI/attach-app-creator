@@ -961,6 +961,17 @@ Deno.serve(async (req) => {
         if (cdrs.length < pageSize) break; // reached end
       }
 
+      // Advance the persistent cursor so the next cron tick continues where we left off.
+      // When the final page came up short, we've reached the end of the FusionPBX
+      // dataset → reset to 0 so we cycle through again and catch any new tail rows.
+      if (integForCursor && !Number.isFinite(explicitOffset) && action === "sync-cdrs") {
+        const reachedEnd = totalFetched < pageSize * maxPages;
+        const nextCursor = reachedEnd ? 0 : startOffset + totalFetched;
+        await admin.from("pbx_integrations")
+          .update({ config: { ...cursorCfg, sync_cursor: nextCursor, sync_cursor_updated_at: new Date().toISOString() } })
+          .eq("id", integForCursor.id);
+      }
+
       await admin.from("pbx_sync_jobs").insert({
         organization_id, job_type: action,
         status: allErrors.length ? "completed_with_errors" : "completed",
