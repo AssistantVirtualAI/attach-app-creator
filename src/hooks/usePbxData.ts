@@ -21,7 +21,7 @@ function usePbxTable<T = any>(table: string, opts?: { order?: string; ascending?
   });
 }
 
-export const usePbxExtensions = () => usePbxTable('pbx_extensions', { order: 'extension', ascending: true });
+export const usePbxExtensions = () => usePbxTable('pbx_extensions_safe', { order: 'extension', ascending: true });
 export const usePbxDevices = () => usePbxTable('pbx_devices', { order: 'created_at' });
 export const usePbxIvrs = () => usePbxTable('pbx_ivrs', { order: 'name', ascending: true });
 export const usePbxIvrOptions = (ivrId: string | null) => useQuery({
