@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
     }
     if (!organization_id) {
       const { data: sp } = await admin.from("pbx_softphone_users")
-        .select("organization_id, extension, extension_uuid")
+        .select("organization_id, extension")
         .eq("portal_user_id", user.id)
         .maybeSingle();
       if (sp?.organization_id) {
