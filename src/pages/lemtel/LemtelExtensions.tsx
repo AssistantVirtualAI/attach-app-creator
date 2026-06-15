@@ -205,6 +205,14 @@ export default function LemtelExtensions() {
                   ? <>Last <code>{lastExtJob.job_type}</code> job: <strong>{lastExtJob.status}</strong> · fetched {lastExtJob.fetched ?? 0} · upserted {lastExtJob.upserted ?? 0}{lastExtJob.error && <> · <span className="text-red-600">{String(lastExtJob.error).slice(0,200)}</span></>}</>
                   : 'No recent sync job found.'}
               </div>
+              {diag && (
+                <div className="text-xs mt-2 text-muted-foreground">
+                  Signed in as <strong>{diag.email}</strong> · super_admin={String(diag.is_super_admin)} · lemtel_admin={String(diag.is_lemtel_admin)} · lemtel_member={String(diag.is_lemtel_member)} · rows in org: <strong>{diag.total_in_org}</strong> · visible to you: <strong>{diag.visible_to_me}</strong>
+                  {diag.total_in_org > 0 && diag.visible_to_me === 0 && (
+                    <div className="text-red-600 mt-1">⚠ Rows exist but RLS blocks you — your account isn't a Lemtel member.</div>
+                  )}
+                </div>
+              )}
             </div>
             <Button onClick={runManualSync} disabled={autoSyncing}>
               <RefreshCw className={`w-4 h-4 mr-2 ${autoSyncing ? 'animate-spin' : ''}`} />
