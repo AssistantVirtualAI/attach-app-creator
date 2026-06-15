@@ -1479,18 +1479,11 @@ Deno.serve(async (req) => {
           if (r.ok) {
             const buf = await r.arrayBuffer();
             const rct = r.headers.get("content-type") || "";
-            const head = new TextDecoder().decode(buf.slice(0, Math.min(buf.byteLength, 160))).trim().toLowerCase();
-            const looksLikeError = head.startsWith("{") || head.startsWith("[") || head.startsWith("<") || head.includes("sqlstate") || head.includes("undefined column") || head.includes("error");
-            const looksLikeAudio = head.startsWith("id3") || head.startsWith("riff") || head.startsWith("oggs") || head.includes("ftyp") || (buf.byteLength > 1200 && !looksLikeError);
             if (rct.includes("application/json")) {
               try {
                 const parsed = JSON.parse(new TextDecoder().decode(buf));
                 const decoded = decodeJsonDownload(parsed);
-                if (decoded && decoded.byteLength > 1200) {
-                  return new Response(decoded, {
-                    headers: { ...corsHeaders, "Content-Type": ct, "Content-Length": String(decoded.byteLength), "Accept-Ranges": "bytes", "Cache-Control": "private, max-age=300" },
-                  });
-                }
+                if (decoded && decoded.byteLength > 1200) return audioResponse(decoded, ct);
                 const nextUrl = extractJsonDownloadUrl(parsed);
                 if (nextUrl) {
                   const absoluteUrl = nextUrl.startsWith("http")
@@ -1501,19 +1494,11 @@ Deno.serve(async (req) => {
               } catch { /* not a base64 download response */ }
             }
             // Reject HTML/JSON/PBX error pages masquerading as successful audio.
-            if (rct.includes("text/html") || rct.includes("application/json") || looksLikeError || !looksLikeAudio) {
+            if (rct.includes("text/html") || rct.includes("application/json") || !looksLikeAudioBytes(buf, rct)) {
                attempts.push({ url: safeUrl(url), status: r.status, content_type: rct || undefined });
               continue;
             }
-            return new Response(buf, {
-              headers: {
-                ...corsHeaders,
-                "Content-Type": rct.startsWith("audio/") ? rct : ct,
-                "Content-Length": String(buf.byteLength),
-                "Accept-Ranges": "bytes",
-                "Cache-Control": "private, max-age=300",
-              },
-            });
+            return audioResponse(buf, rct);
           }
           attempts.push({ url: safeUrl(url), status: r.status, content_type: r.headers.get("content-type") || undefined });
         } catch (e: any) {
