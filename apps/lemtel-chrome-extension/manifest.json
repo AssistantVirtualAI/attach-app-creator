@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Lemtel Telecom",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Click-to-dial for Lemtel Telecom. Detect phone numbers on any webpage and call with one click through the desktop phone app.",
   "author": "AVA AI - assistantvirtualai.com",
   "icons": {
