@@ -22,28 +22,41 @@ const LEMTEL_ORG = "71755d33-ed64-4ad5-a828-61c9d2029eb7";
 // Basic auth), so we POST to /login.php and reuse the resulting cookie for
 // up to 25 minutes per edge-runtime instance.
 // --------------------------------------------------------------------------
-const FUSION_SESSION = { cookie: "" as string, expiresAt: 0 as number };
+type FusionSessionEntry = { cookie: string; expiresAt: number };
+const FUSION_SESSIONS = new Map<string, FusionSessionEntry>();
+
+function fusionBaseOrigin(baseUrl: string) {
+  try { return new URL(baseUrl).origin.replace(/\/+$/, ""); }
+  catch { return String(baseUrl || "").replace(/\/+$/, ""); }
+}
+
+function firstPhpSessionCookie(setCookieHeader: string) {
+  return (setCookieHeader || "").match(/PHPSESSID=[^;]+/i)?.[0] || "";
+}
 
 async function getFusionSessionCookie(baseUrl: string): Promise<string> {
   const now = Date.now();
-  if (FUSION_SESSION.cookie && FUSION_SESSION.expiresAt > now) return FUSION_SESSION.cookie;
+  const origin = fusionBaseOrigin(baseUrl);
+  const cached = FUSION_SESSIONS.get(origin);
+  if (cached?.cookie && cached.expiresAt > now) return cached.cookie;
+
   const username = Deno.env.get("FUSIONPBX_USERNAME") || "";
   const password = Deno.env.get("FUSIONPBX_PASSWORD") || "";
   if (!username || !password) throw new Error("FUSIONPBX_PASSWORD not configured");
 
-  // 1. Hit /login.php to bootstrap a PHPSESSID cookie.
-  const bootstrap = await fetch(`${baseUrl}/login.php`, { redirect: "manual" });
-  const setCookies1 = bootstrap.headers.get("set-cookie") || "";
+  // 1. Hit /login.php on the same host that will serve the audio to bootstrap
+  // the host-scoped PHPSESSID cookie. A cookie from portal.lemtel.tel is not
+  // valid for pbxnode.lemtel.tel, and vice versa.
+  const bootstrap = await fetch(`${origin}/login.php`, { redirect: "manual" });
+  let cookie = firstPhpSessionCookie(bootstrap.headers.get("set-cookie") || "");
   await bootstrap.body?.cancel();
-  const sessionMatch = setCookies1.match(/PHPSESSID=[^;]+/i);
-  let cookie = sessionMatch ? sessionMatch[0] : "";
 
   // 2. POST credentials. FusionPBX expects username/password form fields.
   const form = new URLSearchParams();
   form.set("username", username);
   form.set("password", password);
   form.set("path", "/");
-  const loginRes = await fetch(`${baseUrl}/login.php`, {
+  const loginRes = await fetch(`${origin}/login.php`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -52,23 +65,31 @@ async function getFusionSessionCookie(baseUrl: string): Promise<string> {
     body: form.toString(),
     redirect: "manual",
   });
-  const setCookies2 = loginRes.headers.get("set-cookie") || "";
+  const loginLocation = loginRes.headers.get("location") || "";
+  const sessionMatch2 = firstPhpSessionCookie(loginRes.headers.get("set-cookie") || "");
+  if (sessionMatch2) cookie = sessionMatch2;
+  const loginStatus = loginRes.status;
   await loginRes.body?.cancel();
-  const sessionMatch2 = setCookies2.match(/PHPSESSID=[^;]+/i);
-  if (sessionMatch2) cookie = sessionMatch2[0];
-  if (!cookie) throw new Error("FusionPBX login did not return a session cookie");
+  if (!cookie) throw new Error(`FusionPBX login did not return a session cookie for ${origin}`);
+  if (loginStatus >= 400) throw new Error(`FusionPBX login failed for ${origin} (${loginStatus})`);
+  if (/login\.php/i.test(loginLocation) && loginStatus >= 300 && loginStatus < 400) {
+    throw new Error(`FusionPBX login redirected back to login for ${origin}`);
+  }
 
-  // 3. Verify the session is authenticated by hitting a protected page.
-  const probe = await fetch(`${baseUrl}/core/user_settings/user_settings.php`, {
+  // 3. Verify the session is authenticated by hitting a protected page without
+  // following redirects. A redirect to login means the cookie is not authenticated.
+  const probe = await fetch(`${origin}/core/user_settings/user_settings.php`, {
     headers: { Cookie: cookie },
     redirect: "manual",
   });
   const status = probe.status;
+  const location = probe.headers.get("location") || "";
   await probe.body?.cancel();
-  if (status >= 400) throw new Error(`FusionPBX session probe failed (${status})`);
+  if (status >= 400 || (status >= 300 && status < 400 && /login\.php/i.test(location))) {
+    throw new Error(`FusionPBX session probe failed for ${origin} (${status})`);
+  }
 
-  FUSION_SESSION.cookie = cookie;
-  FUSION_SESSION.expiresAt = now + 25 * 60 * 1000;
+  FUSION_SESSIONS.set(origin, { cookie, expiresAt: now + 25 * 60 * 1000 });
   return cookie;
 }
 
@@ -1170,13 +1191,11 @@ Deno.serve(async (req) => {
         try { bases.add(new URL(value).origin.replace(/\/+$/, "")); }
         catch { bases.add(String(value).replace(/\/+$/, "")); }
       };
-      // The FusionPBX portal HTML serves CDR audio from pbxnode /app/xml_cdr/download.php?id={cdr_uuid}.
-      add("https://pbxnode.lemtel.tel");
+      // The FusionPBX portal HTML serves CDR audio from /app/xml_cdr/download.php?id={cdr_uuid}.
+      // Try the configured API/UI base plus the two known Lemtel web/file hosts.
       add(FUSIONPBX_API_URL);
-      try {
-        const configured = new URL(FUSIONPBX_API_URL);
-        if (configured.hostname === "portal.lemtel.tel") add("https://pbxnode.lemtel.tel");
-      } catch { /* ignore malformed configured base */ }
+      add("https://portal.lemtel.tel");
+      add("https://pbxnode.lemtel.tel");
       return [...bases];
     }
 
@@ -1185,6 +1204,7 @@ Deno.serve(async (req) => {
       const recordingParams = { ...(params || {}) } as any;
       if (!recordingParams.xml_cdr_uuid) recordingParams.xml_cdr_uuid = body.xml_cdr_uuid || body.id;
       const { record_path, record_name, xml_cdr_uuid, domain_uuid, domain_name, local_recording_url, recorded_at } = recordingParams;
+      const probeOnly = recordingParams.probe === true || recordingParams.probe === "true";
       if (!xml_cdr_uuid && !record_name && !(record_path && record_name)) {
         return json({ error: "xml_cdr_uuid, record_name, or (record_path, record_name) required" }, 400);
       }
@@ -1382,7 +1402,7 @@ Deno.serve(async (req) => {
             let r = cookie ? await doFetch(cookie) : null;
             // If session expired, force re-login once.
             if (r && (r.status === 401 || r.status === 403 || r.headers.get("content-type")?.includes("text/html"))) {
-              FUSION_SESSION.cookie = ""; FUSION_SESSION.expiresAt = 0;
+              FUSION_SESSIONS.delete(fusionBaseOrigin(fileBase));
               cookie = await getFusionSessionCookie(fileBase).catch(() => "");
               if (cookie) {
                 await r.body?.cancel();
