@@ -10,7 +10,7 @@ import {
 
 /* ---------------------- shared bits ---------------------- */
 
-const fadeUp = {
+const fadeUp: any = {
   hidden: { opacity: 0, y: 24 },
   show: (i = 0) => ({
     opacity: 1, y: 0,
