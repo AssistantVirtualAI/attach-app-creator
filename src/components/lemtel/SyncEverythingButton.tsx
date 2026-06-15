@@ -10,7 +10,7 @@ export function SyncEverythingButton({ size = 'sm' }: { size?: 'sm' | 'default' 
       onClick={() =>
         sync.mutate({
           kind: 'all',
-          resources: ['extensions', 'devices', 'ivr_menus', 'call_center_queues', 'ring_groups', 'phone_numbers', 'cdrs', 'recordings'],
+          resources: ['extensions', 'users', 'devices', 'ivr_menus', 'call_center_queues', 'ring_groups', 'phone_numbers', 'cdrs', 'recordings'],
         })
       }
       disabled={sync.isPending}
