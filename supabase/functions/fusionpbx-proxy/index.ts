@@ -1193,9 +1193,8 @@ Deno.serve(async (req) => {
       };
       // The FusionPBX portal HTML serves CDR audio from /app/xml_cdr/download.php?id={cdr_uuid}.
       // Try the configured API/UI base plus the two known Lemtel web/file hosts.
-      add(FUSIONPBX_API_URL);
-      add("https://portal.lemtel.tel");
       add("https://pbxnode.lemtel.tel");
+      add(FUSIONPBX_API_URL);
       return [...bases];
     }
 
