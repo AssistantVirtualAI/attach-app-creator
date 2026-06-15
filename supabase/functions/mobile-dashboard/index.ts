@@ -29,6 +29,7 @@ Deno.serve(async (req) => {
       .eq("portal_user_id", u.user.id)
       .maybeSingle();
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
+    if (!sp.extension) return json({ error: "NO_EXTENSION_ASSIGNED" }, 403);
 
     const orgId = sp.organization_id;
     const since = new Date(Date.now() - 24 * 36e5).toISOString();
@@ -49,17 +50,15 @@ Deno.serve(async (req) => {
       .eq("organization_id", orgId)
       .eq("call_status", "voicemail");
 
-    if (sp.extension) {
-      callsQ = callsQ.eq("extension", sp.extension);
-      vmQ = vmQ.eq("extension", sp.extension);
-    }
+    callsQ = callsQ.eq("extension", sp.extension);
+    vmQ = vmQ.eq("extension", sp.extension);
 
     let smsQ = sb.from("pbx_sms_threads")
       .select("id, contact_name, contact_phone, unread_count, last_message_at, extension_uuid, extension")
       .eq("organization_id", orgId)
       .order("last_message_at", { ascending: false })
       .limit(20);
-    if (sp.extension) smsQ = smsQ.eq("extension", sp.extension);
+    smsQ = smsQ.eq("extension", sp.extension);
 
     const [{ data: calls }, { data: threads }, { data: vmails }] = await Promise.all([
       callsQ.order("start_at", { ascending: false }).limit(100),
