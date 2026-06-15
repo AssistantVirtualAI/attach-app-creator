@@ -187,6 +187,18 @@ export function useSoftphone(args: UseSoftphoneArgs) {
     if (snap.callState !== 'active' && snap.callState !== 'held') setRecording(false);
   }, [snap.callState]);
 
+  // Allow external UI (tray menu, profile menu) to change manual status
+  useEffect(() => {
+    const onSet = (e: Event) => {
+      const v = (e as CustomEvent).detail;
+      if (v === 'auto' || v === 'available' || v === 'dnd' || v === 'away') {
+        setManualStatus(v as ManualStatus);
+      }
+    };
+    window.addEventListener('lemtel:set-status', onSet as EventListener);
+    return () => window.removeEventListener('lemtel:set-status', onSet as EventListener);
+  }, []);
+
   return {
     snap,
     config,
