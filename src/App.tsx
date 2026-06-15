@@ -923,6 +923,25 @@ const App = () => (
                   <Route path="settings" element={<MySettings />} />
                 </Route>
 
+                {/* PBX Command Center (desktop admin shell) */}
+                <Route path="/console" element={<ProtectedRoute><ConsoleShell /></ProtectedRoute>}>
+                  <Route index element={<ConsoleDashboard />} />
+                  <Route path="extensions" element={<ConsoleExtensions />} />
+                  <Route path="devices" element={<ConsoleDevices />} />
+                  <Route path="ivrs" element={<ConsoleIVRs />} />
+                  <Route path="ring-groups" element={<ConsoleRingGroups />} />
+                  <Route path="queues" element={<ConsoleQueues />} />
+                  <Route path="dids" element={<ConsoleDIDs />} />
+                  <Route path="inbound-routes" element={<ConsoleInboundRoutes />} />
+                  <Route path="voicemail" element={<ConsoleVoicemail />} />
+                  <Route path="registrations" element={<ConsoleRegistrations />} />
+                  <Route path="active-calls" element={<ConsoleActiveCalls />} />
+                  <Route path="cdr" element={<ConsoleCdr />} />
+                  <Route path="insights" element={<ConsoleInsights />} />
+                  <Route path="chatbot" element={<ConsoleChatbot />} />
+                  <Route path="audit" element={<ConsoleAudit />} />
+                </Route>
+
 
                 {/* Legacy /admin/* redirects → /platform/* */}
                 <Route path="/admin" element={<Navigate to="/platform" replace />} />
