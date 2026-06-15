@@ -1,6 +1,6 @@
 {
   "name": "lemtel-softphone",
-  "version": "2.3.7",
+  "version": "2.3.10",
   "description": "Lemtel Telecom — AI-Powered Business Communications",
   "main": "electron-compiled/main.js",
   "homepage": "https://assistantvirtualai.com",
@@ -27,7 +27,8 @@
     "electron-updater": "^6.1.7",
     "jssip": "^3.13.8",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
