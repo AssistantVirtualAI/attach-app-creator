@@ -1,46 +1,73 @@
 
-## What's actually happening
+Gros chantier — découpé en 4 phases pour livrer chaque page utilisable indépendamment. Aucun changement visuel global (on garde glass/cyberpunk, navigation, agents IA intacts).
 
-I verified the database directly:
+## État actuel (vérifié)
 
-- **21 Lemtel extensions exist** in `pbx_extensions` for org `71755d33…2029eb7`.
-- The `sync-extensions` job has run 3 times in the last 2h — all `completed`, fetched 19 / upserted 19.
-- In parallel, the cron is firing `sync-cdrs` every ~3 seconds and every single one fails with:
-  `there is no unique or exclusion constraint matching the ON CONFLICT specification`.
-  → 371 failed CDR job rows in 2h, completely burying extension/IVR/queue jobs in the diagnostics list.
+| Page | Données en base | Problème |
+|---|---|---|
+| IVR | 2 IVR, 0 options, 0 audio | Les options & fichiers TTS chargés depuis `pbx_ivr_options`/`pbx_ivr_audio` ne se synchronisent pas, pas de upload audio du PBX |
+| Ring Groups | 0 lignes | Jamais synchronisé depuis FusionPBX; dialog texte brut sans picker visuel |
+| Call Forwarding | 0 lignes (table par-utilisateur) | Page admin ne lit que la table locale; rien n'est tiré du dialplan FusionPBX |
+| Queue Agents | 9 dans `pbx_queue_agents` (sans `organization_id`) | Sous-onglet "Agents" de Queues n'expose ni picker d'extensions ni write-back vers FusionPBX |
 
-So two things are broken:
+## Phase 1 — IVR Menus complets (audio + options + sync)
 
-1. The UI banner only looks at the **last 5 sync jobs**, and those 5 are always `sync-cdrs`. That's why it says *"No recent sync job found"*.
-2. The empty extensions list itself is a **read-side RLS problem**: the SELECT policy on `pbx_extensions` requires either `is_super_admin(auth.uid())` or membership via `get_user_organization_ids` (which only checks `organization_members` + `org_members`). Lemtel operators logged in via the portal who aren't in those exact tables get an empty array even though the data is there — but they *can* still invoke the edge function (which uses the service role), which is exactly the contradiction you're seeing.
+- Lancer `sync-ivrs` + `sync-ivr-options` automatiquement si la table sélectionnée est vide (déjà côté proxy, à brancher dans `LemtelIVR.tsx`).
+- Ajouter une action proxy `download-ivr-audio` qui télécharge le `greet_long`/`greet_short` du PBX (`v_ivr_menus.ivr_menu_greet_long`) vers le bucket `lemtel-ivr-audio` et upsert dans `pbx_ivr_audio` (organization, ivr_id, type, storage_path, url, durée).
+- Panneau IVR détaillé:
+  - Sous-onglet **Audio** : liste les fichiers existants (greet long/short + custom), bouton Play (signed URL), Upload nouveau .wav/.mp3 → enregistre via `upload-ivr-audio`, puis push au PBX via `update-ivr` (champ `ivr_menu_greet_long`).
+  - Sous-onglet **Options** : table digit/destination/description, déjà câblée via `create-ivr-option`/`update-ivr-option` — ajouter delete et un picker visuel pour `destination` (extension, queue, ring-group, voicemail, hangup, autre IVR).
+  - Sous-onglet **TTS** : génère un audio via ElevenLabs et le pousse au PBX en un clic (déjà partiel, à finaliser).
+- Bouton "Resync IVR from PBX" qui appelle `sync-ivrs` + `sync-ivr-options` + `sync-ivr-audio` séquentiellement.
 
-## Plan
+## Phase 2 — Ring Groups réellement connectés
 
-### 1. Fix the CDR cron flood (root cause of banner noise)
-- Add a unique index on `pbx_call_records(organization_id, pbx_uuid)` and on `(organization_id, pbx_dedup_key)` so the `sync-cdrs` upsert's `onConflict` actually matches.
-- Until the index exists, change `sync-cdrs` in `fusionpbx-proxy` to fall back to insert-with-skip on conflict-name-missing instead of looping the same error.
-- One-shot cleanup: delete the 300+ failed `sync-cdrs` job rows older than 1h so the diagnostics panel reflects real activity.
+- Resync auto au premier rendu si `pbx_ring_groups` vide (mêmes patterns que Phase 1 sur Extensions).
+- Dans le `RingGroupDialog`:
+  - Remplacer le `Textarea` de destinations par un **multi-select avec recherche** alimenté par `usePbxExtensions()`: badges sélectionnés, avec icône statut SIP, possibilité d'ajouter aussi un **ring group**, un **queue**, ou un numéro externe libre.
+  - Ajouter Drag-handle pour réordonner (l'ordre = ordre d'appel en stratégie "sequence").
+  - Champ **timeout par destination** (suffixe `@30`), supporté par FusionPBX.
+  - Onglet "Avancé": Caller ID prefix, distinctive ring, music on hold (dropdown des MOH du PBX), follow-me, missed call alert email.
+  - Aperçu visuel du flux (extension principale → membres → fallback) en haut du dialog.
+- Bouton "Test Ring Group" qui appelle le numéro pilote via le proxy (`originate` vers `extension`).
+- Realtime déjà branché — ajouter toasts différentiels.
 
-### 2. Make extensions readable for every Lemtel operator
-- Extend the SELECT policy on `pbx_extensions`, `pbx_softphone_users`, `pbx_call_records`, `pbx_call_recordings`, `pbx_voicemails`, `pbx_call_queues`, `pbx_ring_groups`, `pbx_ivrs`, `pbx_devices`, `pbx_sync_jobs` to also allow `public.is_lemtel_admin(auth.uid())` and `public.is_lemtel_member(auth.uid())`. These helpers already exist and cover staff enrolled via `org_members` or via the global Lemtel org.
-- No change to write policies — those stay scoped to org_admin / super_admin / lemtel_admin where they already are.
+## Phase 3 — Call Forwarding lue depuis le PBX
 
-### 3. Make the empty-state banner honest
-- In `LemtelExtensions.tsx`, change `usePbxSyncJobs(5)` → `usePbxSyncJobs(50)` and filter by `job_type ILIKE '%extensions%'` so the panel always finds the real last extension job.
-- Show the actual job timestamp + fetched/upserted counts and a "View all jobs" link to Sync Health.
-- If the SELECT returns rows but the banner condition was previously true, it disappears on its own.
+- Nouvelle action proxy `sync-call-forwarding` qui parcourt `v_extensions` (champs `forward_all_*`, `forward_busy_*`, `forward_no_answer_*`, `do_not_disturb`, `follow_me_*`) et upsert dans une nouvelle table `pbx_extension_forwarding` (org, extension_id, always/busy/no_answer/dnd/follow_me) — distincte de la table per-portal-user existante.
+- Refondre `AdminCallForwarding.tsx`:
+  - Onglet "Extensions PBX" : liste toutes les extensions Lemtel, montre les règles actuelles, dialog d'édition qui écrit via `update-extension` (nouveaux params `forward_all_destination`, etc.) puis re-sync.
+  - Onglet "Utilisateurs portail" : la table actuelle `pbx_call_forwarding` (DND, no-answer, allow_from).
+  - Bouton "New Rule" qui ouvre un wizard : extension cible → condition (always/busy/no-answer/dnd) → destination (picker extension/RG/queue/numéro).
+- Affichage clair de la source de vérité (PBX vs portail) avec badge.
 
-### 4. Edits + desktop/mobile app access already wired — keep behavior, just refresh after write
-- `ExtensionEditDialog` already calls `update-extension` and `set-app-access` through the proxy. Add a `queryClient.invalidateQueries(['pbx'])` + a follow-up `sync-extensions` after save so the row in the table reflects PBX truth within a couple seconds.
-- Grant/revoke desktop & mobile access continues to seed `pbx_softphone_users` from the existing FusionPBX `v_extensions.password` (no password reset), so users keep their current PBX credentials on the desktop and mobile apps.
+## Phase 4 — Queue Agents full management
 
-### Technical details
-- Migration: add the two unique indexes on `pbx_call_records`, broaden 10 SELECT policies, leave write policies untouched.
-- Edge function: in `sync-cdrs`, detect Postgres error code `42P10` ("no unique constraint") once and downgrade subsequent pages to plain `insert(..., { ignoreDuplicates: true })` for the remainder of that run; record the fallback in the job stats so we can see it.
-- Frontend: only `src/pages/lemtel/LemtelExtensions.tsx` and `src/hooks/usePbxData.ts` change. No visual redesign, no AI-voice-agent changes.
+- Migration: ajouter `organization_id uuid` à `pbx_queue_agents` + index, le populer via `queue_id` → `pbx_call_queues.organization_id`. Étendre RLS Lemtel.
+- Compléter `sync-queue-agents` pour qu'il remplisse `organization_id`, `extension_id` (lookup par numéro), `tier_level`, `tier_position`, `wrap_up_time`, `agent_name`, `status`.
+- Sous-onglet "Agents & Supervisors" du `LemtelQueues.tsx`:
+  - Liste agents actuels avec extension, tier, statut (Available/On break/On call), wrap-up timer.
+  - Bouton "Add Agent" → dialog avec picker d'extensions disponibles (filtre les déjà-membres), tier, position, wrap-up.
+  - Inline edit tier/position + drag pour réordonner; bouton remove.
+  - Toggle pause/unpause par agent (déjà supporté par `toggle_queue_pause` RPC, ajouter UI).
+  - Section "Supervisors" séparée (agent role `supervisor`) avec mêmes actions.
+- Toutes les écritures passent par `create-queue-agent`/`update-queue-agent`/`delete-queue-agent` du proxy puis re-sync queue + agents pour réafficher la vérité PBX.
+- Onglet "Live" : table temps réel (`pbx_queue_agent_state` + Realtime déjà actif) montrant statut/calls handled/avg-wrap, plus boutons "Force logout" et "Listen-in" (proxy `monitor-call`).
 
-### Out of scope
-- Any UI redesign, AI-voice-agent edits, or password resets.
-- Changing the FusionPBX schema — we only adjust how the portal reads/writes.
+## Détails techniques (refs)
 
-After this, the extensions page will list all 21 Lemtel extensions for any Lemtel admin/operator, the banner will only appear when truly empty and will show the real last `sync-extensions` job, and the CDR cron will stop spamming `pbx_sync_jobs` with conflict errors.
+- Front: 4 fichiers principalement (`LemtelIVR.tsx`, `TelephonyRingGroups.tsx`, `AdminCallForwarding.tsx`, `LemtelQueues.tsx`) + 2 hooks (`usePbxIvrAudio`, `usePbxQueueAgents`).
+- Backend: 5 nouvelles actions dans `fusionpbx-proxy`: `download-ivr-audio`, `upload-ivr-audio`, `sync-call-forwarding`, `delete-queue-agent`, `originate-test`.
+- Migrations: 1 colonne (`organization_id` sur `pbx_queue_agents`), 1 nouvelle table (`pbx_extension_forwarding`), GRANTs + policies Lemtel.
+- Realtime: ajouter `pbx_ivr_audio` et `pbx_extension_forwarding` à la publication.
+- Aucune modif aux pages d'agents vocaux IA, ni au design system, ni au landing.
+
+## Hors scope
+- Refonte visuelle, agents vocaux IA, traduction de tout le portail.
+- Édition du SIP/RTP, des passwords PBX, ou de la config FreeSWITCH bas-niveau.
+
+## Ordre de livraison proposé
+Phase 1 (IVR) → 2 (Ring Groups) → 4 (Queue Agents) → 3 (Call Forwarding).
+Raison : 1+2+4 utilisent des patterns proches (sync → table → dialog avec picker → write-back via proxy). Phase 3 nécessite la nouvelle table + colonnes PBX, plus longue, livrée en dernier.
+
+Confirme l'ordre (ou demande un ordre différent) et je commence Phase 1.
