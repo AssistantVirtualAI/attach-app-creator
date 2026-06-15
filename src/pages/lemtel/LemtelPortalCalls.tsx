@@ -31,7 +31,6 @@ function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); 
 export default function LemtelPortalCalls({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { data: allCdrs = [], isLoading } = usePbxCallRecords(100);
   const [analyzing, setAnalyzing] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -54,9 +53,10 @@ export default function LemtelPortalCalls({ scope = 'org' }: { scope?: 'org' | '
       return data?.extension ?? null;
     },
   });
-  const cdrs = scope === 'mine'
-    ? (allCdrs as any[]).filter((c: any) => myExt && c.extension === myExt)
-    : allCdrs;
+  const { data: cdrs = [], isLoading } = usePbxCallRecords(100, {
+    extension: scope === 'mine' ? myExt : undefined,
+    enabled: scope !== 'mine' || !!myExt,
+  });
 
   const analyze = async (call: any) => {
     const call_record_id = call.id;
