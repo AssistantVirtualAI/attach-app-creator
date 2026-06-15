@@ -561,6 +561,59 @@ Deno.serve(async (req) => {
       return json({ ok: true, data: collection(r.data, "registrations") });
     }
 
+    // Live registrations with normalization + short-TTL cache.
+    // Resolves domain_uuid from the org when not provided.
+    if (action === "get-registrations-live") {
+      let domainUuid: string = body.domain_uuid || params.domain_uuid || "";
+      if (!domainUuid && organization_id) {
+        const { data: org } = await admin
+          .from("organizations")
+          .select("fusionpbx_domain_uuid")
+          .eq("id", organization_id)
+          .maybeSingle();
+        domainUuid = (org as any)?.fusionpbx_domain_uuid || FUSIONPBX_DOMAIN_UUID;
+      }
+      if (!domainUuid) domainUuid = FUSIONPBX_DOMAIN_UUID;
+
+      const now = Date.now();
+      const force = body.force === true || params.force === true;
+      const cached = REGISTRATIONS_CACHE.get(domainUuid);
+      if (!force && cached && now - cached.fetchedAt < REGISTRATIONS_TTL_MS) {
+        return json({ ...cached.payload, cached: true });
+      }
+
+      const r = await pbxFetch(`registrations?domain_uuid=${domainUuid}`);
+      if (!r.ok) return json(r, r.status || 500);
+      const raw = collection(r.data, "registrations");
+      const norm = (raw || []).map((x: any) => {
+        const ext = String(x.user || x.aor || x.extension || x.reg_user || "").split("@")[0] || "";
+        return {
+          extension: ext,
+          user: x.user || x.aor || ext,
+          contact: x.contact || x.url || x.sip_contact || "",
+          agent: x.agent || x.user_agent || x.useragent || "",
+          status: x.status || "registered",
+          expires: x.expires || x.expire || x.expiration || "",
+          hostname: x.hostname || x.host || "",
+          network_ip: x.network_ip || x.network_addr || x.src_ip || x.network_address || "",
+          network_port: x.network_port || x.src_port || "",
+          user_agent: x.user_agent || x.agent || "",
+          sip_profile: x.profile_name || x.sip_profile || x.profile || "internal",
+          ts: x.last_register || x.ts || null,
+        };
+      });
+      const payload = {
+        ok: true,
+        domain_uuid: domainUuid,
+        count: norm.length,
+        registered: norm.filter((r: any) => (r.status || "registered").toLowerCase() === "registered").length,
+        data: norm,
+        cached: false,
+        fetched_at: new Date(now).toISOString(),
+      };
+      REGISTRATIONS_CACHE.set(domainUuid, { fetchedAt: now, payload });
+      return json(payload);
+    }
 
     if (action === "get-extension") {
       const id = body.extension_uuid || params.extension_uuid;
