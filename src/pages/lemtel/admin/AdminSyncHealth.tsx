@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Activity, RefreshCw, Loader2, Play } from 'lucide-react';
+import { Activity, RefreshCw, Loader2, Play, Database } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
@@ -65,6 +68,51 @@ export default function AdminSyncHealth() {
     || (j.job_type || '').toLowerCase().includes(key)
   );
 
+  // ---- Backfill state ----
+  const [backfillPages, setBackfillPages] = useState(50);
+  const [backfillPageSize, setBackfillPageSize] = useState(500);
+  const [backfillRunning, setBackfillRunning] = useState(false);
+  const [backfillResult, setBackfillResult] = useState<any>(null);
+
+  const integration = useQuery({
+    queryKey: ['pbx-integration-cursor'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('pbx_integrations')
+        .select('id, organization_id, config, last_sync_at')
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    refetchInterval: backfillRunning ? 3000 : 30000,
+  });
+
+  const cursor = (integration.data as any)?.config?.sync_cursor ?? 0;
+  const cursorAt = (integration.data as any)?.config?.sync_cursor_updated_at;
+
+  const runBackfill = async (fromBeginning: boolean) => {
+    setBackfillRunning(true);
+    setBackfillResult(null);
+    toast.info(fromBeginning ? 'Starting backfill from offset 0…' : 'Resuming backfill from cursor…');
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: {
+          action: 'backfill-cdrs',
+          params: { page_size: backfillPageSize, max_pages: backfillPages, from_beginning: fromBeginning },
+        },
+      });
+      if (error) throw error;
+      setBackfillResult(data);
+      toast.success(`Backfill complete: ${(data as any)?.stats?.cdrs ?? 0} upserted`);
+      jobs.refetch();
+      integration.refetch();
+    } catch (e: any) {
+      toast.error(e?.message || 'Backfill failed');
+    } finally {
+      setBackfillRunning(false);
+    }
+  };
+
   return (
     <div className="space-y-4 w-full min-w-0">
       <AdminPageHeader
@@ -78,6 +126,46 @@ export default function AdminSyncHealth() {
           </>
         }
       />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Database className="w-4 h-4" /> CDR Backfill</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+            <div>
+              <Label className="text-xs">Page size</Label>
+              <Input type="number" min={50} max={1000} value={backfillPageSize}
+                onChange={(e) => setBackfillPageSize(Math.max(50, Math.min(1000, parseInt(e.target.value) || 500)))} />
+            </div>
+            <div>
+              <Label className="text-xs">Max pages / run</Label>
+              <Input type="number" min={1} max={500} value={backfillPages}
+                onChange={(e) => setBackfillPages(Math.max(1, Math.min(500, parseInt(e.target.value) || 50)))} />
+            </div>
+            <div className="text-xs text-muted-foreground">
+              <div>Current cursor: <span className="font-mono">{cursor}</span></div>
+              <div>Updated: {cursorAt ? formatDistanceToNow(new Date(cursorAt), { addSuffix: true }) : '—'}</div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => runBackfill(false)} disabled={backfillRunning}>
+                {backfillRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+                Resume
+              </Button>
+              <Button onClick={() => runBackfill(true)} disabled={backfillRunning}>
+                {backfillRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+                From beginning
+              </Button>
+            </div>
+          </div>
+          {backfillResult && (
+            <div className="text-xs font-mono bg-muted/40 rounded p-3 overflow-auto">
+              upserted={backfillResult?.stats?.cdrs ?? 0} · fetched={backfillResult?.stats?.fetched ?? 0} · pages={backfillResult?.stats?.pages ?? 0}
+              {backfillResult?.errors?.length ? <div className="text-destructive mt-1">{backfillResult.errors.join('; ')}</div> : null}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle>Entities</CardTitle></CardHeader>

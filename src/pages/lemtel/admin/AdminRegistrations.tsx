@@ -12,35 +12,42 @@ import { Wifi, RefreshCw, Search } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 
 type Reg = {
+  extension?: string;
   user?: string;
   contact?: string;
   agent?: string;
-  host?: string;
+  user_agent?: string;
+  hostname?: string;
   network_ip?: string;
   network_port?: string;
   expires?: string;
   status?: string;
-  profile_name?: string;
+  sip_profile?: string;
 };
 
 export default function AdminRegistrations() {
   const [q, setQ] = useState('');
 
   const { data, isLoading, refetch, dataUpdatedAt, isFetching } = useQuery({
-    queryKey: ['fpbx', 'registrations'],
+    queryKey: ['fpbx', 'registrations-live'],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'get-registrations' },
+        body: { action: 'get-registrations-live' },
       });
       if (error) throw error;
-      return (data?.data || []) as Reg[];
+      return {
+        rows: ((data as any)?.data || []) as Reg[],
+        count: (data as any)?.count ?? 0,
+        registered: (data as any)?.registered ?? 0,
+        cached: !!(data as any)?.cached,
+      };
     },
-    refetchInterval: 10000,
+    refetchInterval: 15000,
   });
 
-  const rows = data || [];
+  const rows = data?.rows || [];
   const filtered = useMemo(() => rows.filter(r =>
-    !q || `${r.user ?? ''} ${r.contact ?? ''} ${r.agent ?? ''} ${r.network_ip ?? ''}`.toLowerCase().includes(q.toLowerCase())
+    !q || `${r.extension ?? ''} ${r.user ?? ''} ${r.contact ?? ''} ${r.agent ?? ''} ${r.user_agent ?? ''} ${r.network_ip ?? ''} ${r.hostname ?? ''}`.toLowerCase().includes(q.toLowerCase())
   ), [rows, q]);
 
   return (
@@ -95,7 +102,7 @@ export default function AdminRegistrations() {
                 ) : filtered.map((r, i) => (
                   <TableRow key={`${r.user}-${r.contact}-${i}`} className="hover:bg-muted/40 transition-colors">
                     <TableCell className="font-mono text-xs">{r.user || '—'}</TableCell>
-                    <TableCell className="text-xs">{r.profile_name || 'internal'}</TableCell>
+                    <TableCell className="text-xs">{r.sip_profile || 'internal'}</TableCell>
                     <TableCell className="text-xs truncate max-w-[220px]">{r.agent || '—'}</TableCell>
                     <TableCell className="font-mono text-xs truncate max-w-[260px]">{r.contact || '—'}</TableCell>
                     <TableCell className="font-mono text-xs">{r.network_ip ? `${r.network_ip}${r.network_port ? ':' + r.network_port : ''}` : '—'}</TableCell>

@@ -930,13 +930,13 @@ function LiveRegistrationsTable() {
     const me = await getMeContext().catch(() => null);
     const orgId = me?.organization_id || LEMTEL_ORG;
     const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
-      body: { action: 'get-registrations', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN } },
+      body: { action: 'get-registrations-live', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN } },
     });
     if (error) throw error;
-    return (data as any)?.data || (data as any)?.registrations || [];
+    return (data as any)?.data || [];
   }, []);
   const { rows, loading, error, reload } = useTableLoader(loader);
-  return <SimpleSection title="Live Registrations" headers={['User', 'Contact', 'Agent', 'Status', 'Expires']}
-    rows={rows.map((r: any) => [r.user || r.aor || '—', r.contact || '—', r.agent || '—', r.status || 'registered', r.expires || '—'])}
+  return <SimpleSection title="Live Registrations" headers={['Ext', 'Contact', 'Agent', 'Network', 'Hostname', 'Status', 'Expires']}
+    rows={rows.map((r: any) => [r.extension || r.user || '—', r.contact || '—', r.user_agent || r.agent || '—', r.network_ip ? `${r.network_ip}${r.network_port ? ':' + r.network_port : ''}` : '—', r.hostname || '—', r.status || 'registered', r.expires || '—'])}
     loading={loading} error={error} onRefresh={reload} />;
 }

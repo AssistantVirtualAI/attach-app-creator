@@ -84,7 +84,7 @@ export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope 
           <Input placeholder="Rechercher numéro, nom, transcription…" value={q} onChange={(e) => setQ(e.target.value)} className="max-w-sm" />
           <Button variant="outline" size="sm" onClick={async () => {
             toast.info("Synchronisation en cours…");
-            await supabase.functions.invoke("fusionpbx-sync-cdr", { body: { organization_id: orgId } }).catch(() => {});
+            await supabase.functions.invoke("fusionpbx-proxy", { body: { action: "sync-cdrs", organization_id: orgId } }).catch(() => {});
             await supabase.functions.invoke("voicemail-sync", { body: { organization_id: orgId } }).catch(() => {});
             qc.invalidateQueries({ queryKey: ["media"] });
             toast.success("Synchronisé");

@@ -1,60 +1,55 @@
-# Phase 8 — Portail AVA Statistic: temps réel téléphonie
+# CDR Sync + Live SIP Registrations — Hardening Plan
 
-3 nouvelles pages admin temps-réel branchées sur FusionPBX via `fusionpbx-proxy`.
+## 1. CDR sync — switch all callers to the modern proxy
 
-## 1. Edge function — nouvelles actions
+**Verified state**
+- Legacy unique constraint `pbx_call_records_org_sip_call_id_uniq` is **no longer present**. Current uniqueness is `UNIQUE (pbx_uuid)`. No DB migration required for the duplicate-key error described — the offending constraint is already gone. (If duplicates still surface in Sync Health, the cause is upstream code paths inserting rows without `pbx_uuid`.)
+- `supabase/functions/fusionpbx-sync-cdr/index.ts` is mock-only and explicitly returns `"live CDR sync not yet wired to FusionPBX endpoint"`.
+- Modern `fusionpbx-proxy` already exposes `list-cdrs`, `get-cdrs`, `sync-cdrs`, `backfill-cdrs`, all keyed on `xml_cdr_uuid` → upserted to `pbx_call_records.pbx_uuid`.
+- Remaining frontend caller of the legacy function: `src/pages/telephony/TelephonyMediaCenter.tsx:87`.
 
-`supabase/functions/fusionpbx-proxy/index.ts` ajout de:
+**Changes**
+1. **Replace legacy call site** in `TelephonyMediaCenter.tsx`:
+   - Swap `functions.invoke("fusionpbx-sync-cdr", …)` → `functions.invoke("fusionpbx-proxy", { body: { action: "sync-cdrs", organization_id: orgId } })`.
+2. **Neutralize `fusionpbx-sync-cdr`**: turn it into a thin wrapper that forwards to `fusionpbx-proxy` action `sync-cdrs`, preserving the existing `pbx_sync_jobs` row lifecycle (mock branch removed). Keeps backward compatibility for any external scheduler still hitting it.
+3. **Standardize CDR id everywhere**: audit any insert/upsert into `pbx_call_records` that omits `pbx_uuid` (e.g. softphone-side `log_softphone_call`) and ensure callers pass the FusionPBX `xml_cdr_uuid` whenever available. The `pbx_uuid` UNIQUE index then guarantees idempotent upserts.
+4. **Backfill UI** in Admin → Sync Health:
+   - "Backfill historical CDRs" button → calls proxy action `backfill-cdrs` with `from` / `to` window.
+   - Shows live progress (current offset, total inserted, last error) by polling `pbx_integrations.config.sync_cursor` and the most recent `pbx_sync_jobs` row.
+   - Resumable: button re-uses the stored cursor so a re-click continues from where it stopped.
 
-- **`list-active-calls`** — `GET /api/index.php?type=cmd&cmd=show+channels+as+json` (mod_commands FreeSWITCH). Parse JSON `{rows: [{uuid, name, cid_name, cid_num, dest, application, read_codec, secure, hostname, created}]}`. Retourne `{ok:true, data:rows}`.
-- **`kill-active-call`** — `uuidkill <uuid>` (admin-only, audité).
-- **`system-status`** — agrège `status` + `sofia status` (compte profiles/gateways UP/DOWN). Retourne `{uptime, version, sessions:{active,peak,total}, sofia:[{profile,state,calls}]}`.
-- Ajout dans `readOnly` whitelist: `list-active-calls`, `system-status`.
+## 2. Live SIP registrations endpoint
 
-## 2. Nouvelles pages admin
+**Verified state**
+- Proxy already has `action: "get-registrations"` hitting `…/registrations?domain_uuid=…` live.
+- Admin desktop (`AdminView.tsx:933`) calls it with `domain_uuid`; web `AdminRegistrations.tsx:33` calls it **without** `domain_uuid`, so FusionPBX returns global/empty data → "0 / 0".
 
-| Page | Route | Données | Refresh |
-|---|---|---|---|
-| AdminActiveCalls | `/org/lemtel/admin/active-calls` | `list-active-calls` | 5s (polling) |
-| AdminRegistrations | `/org/lemtel/admin/registrations` | `get-registrations` existant | 10s |
-| AdminSystemStatus | `/org/lemtel/admin/system-status` | `system-status` + `sync-status` | 15s |
+**Changes**
+1. **New proxy action** `get-registrations-live` in `fusionpbx-proxy/index.ts`:
+   - Resolves `domain_uuid` from the org (`organizations.fusionpbx_domain_uuid`) when not provided.
+   - Fetches `/registrations?domain_uuid=…` from FusionPBX.
+   - **Normalizes** each row to: `{ extension, user, contact, agent, status, expires, hostname, network_ip, user_agent, sip_profile, ts }`.
+   - **In-memory cache** keyed by `domain_uuid`, TTL 15 s (configurable 10–30 s), to shield the PBX from dashboard polling.
+   - Returns `{ ok: true, count, registered, data: [...] , cached, fetched_at }`.
+2. **Wire frontend**:
+   - `src/pages/lemtel/admin/AdminRegistrations.tsx` → call `get-registrations-live` (sends `organization_id`, no manual domain).
+   - `apps/ava-softphone-desktop/src/components/console/AdminView.tsx LiveRegistrationsTable` → same action; render the new normalized fields (add columns: Hostname, Network IP, User Agent).
+   - Auto-refresh every 15 s; show `fetched_at` and a "Live" pulse.
 
-Style: cohérent avec autres pages admin (Card + Table + AdminPageHeader + StatusBadge). Tables denses, recherche locale, bouton refresh manuel + indicateur "last updated".
+## 3. Verification
 
-### AdminActiveCalls
-Colonnes: UUID (court), Caller (cid_name/cid_num), Destination, Application, Durée (now - created), Codec, Profile.
-Action par ligne: **Hang up** (confirme + appelle `kill-active-call`, audité via `log-audit-event`).
+- Click Sync in Media Center → confirm `pbx_sync_jobs` row marked `completed`, new rows in `pbx_call_records`, no duplicate errors.
+- Trigger backfill over last 7 days → progress increments, resumable on stop.
+- Open Registrations page on web + desktop → counts match FusionPBX (≈1041 / 1314), refresh every 15 s.
 
-### AdminRegistrations
-Colonnes: User (utilisateur SIP), Agent (user-agent), Contact (IP:port), Expires, Status.
-Groupe par profile SIP. Bouton "Re-register" → flush registrations (action future).
+## Technical notes
 
-### AdminSystemStatus
-Cards: Uptime, Active sessions, Peak sessions, Sessions/sec.
-Tableau Sofia profiles: nom, état (running/down), calls, REGs. Action restart par profile (réutilise `restart-sip-profile` existant).
-Section "Sync jobs" (réutilise composant de `AdminSyncHealth`).
-
-## 3. Routes + sidebar
-
-- `src/App.tsx`: 3 nouvelles routes sous `<LemtelAdminPage>`.
-- `src/components/sidebar/sidebarConfig.ts` + `cockpitNavConfig.ts`: ajouter entrées dans le groupe "Monitoring" (sous PBX Sync Health):
-  - Active Calls (icon `PhoneCall`)
-  - Registrations (icon `Wifi`)
-  - System Status (icon `Activity`)
-
-## 4. Sécurité & audit
-
-- Hang-up et restart-profile = `is_lemtel_admin` requis (déjà en place via proxy).
-- Audit log chaque action destructive: `pbx.call_killed`, `pbx.profile_restarted`.
-- RLS inchangée (lectures via proxy, pas de tables).
-
-## Hors scope (phases suivantes)
-
-- Call Block réel, SMS admin org, polish drawers admin → Phase 9.
-- Test Playwright des écrans temps-réel.
-
-## Livrables
-
-- 3 nouvelles actions edge function.
-- 3 nouvelles pages React.
-- 3 nouvelles routes + entrées sidebar.
+- **No DB migration required.** The cited unique constraint already does not exist; do not recreate one on `(organization_id, sip_call_id)`. If a future composite fallback is needed it must be `(organization_id, sip_call_id) WHERE pbx_uuid IS NULL` (partial index) — flag-only, not in this plan.
+- Cache for live registrations lives in the edge-function module scope (per-instance). Acceptable because freshness window is short and PBX load is the concern, not strict cross-instance coherence.
+- Files touched:
+  - `supabase/functions/fusionpbx-proxy/index.ts` (new action + helper)
+  - `supabase/functions/fusionpbx-sync-cdr/index.ts` (wrap modern proxy)
+  - `src/pages/telephony/TelephonyMediaCenter.tsx`
+  - `src/pages/lemtel/admin/AdminSyncHealth.tsx` (backfill UI)
+  - `src/pages/lemtel/admin/AdminRegistrations.tsx`
+  - `apps/ava-softphone-desktop/src/components/console/AdminView.tsx`
