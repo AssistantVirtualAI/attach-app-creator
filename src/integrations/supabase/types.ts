@@ -6178,6 +6178,13 @@ export type Database = {
             referencedRelation: "pbx_softphone_users"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pbx_softphone_portal_audit_softphone_user_id_fkey"
+            columns: ["softphone_user_id"]
+            isOneToOne: false
+            referencedRelation: "pbx_softphone_users_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       pbx_softphone_users: {
@@ -9259,6 +9266,203 @@ export type Database = {
           sip_domain: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pbx_softphone_users_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pbx_softphone_users_safe: {
+        Row: {
+          account_status: string | null
+          active_platforms: string[] | null
+          app_access_enabled: boolean | null
+          cc_avg_handle_time: number | null
+          cc_calls_today: number | null
+          cc_logged_in_at: string | null
+          cc_pause_reason: string | null
+          cc_queues: string[] | null
+          cc_role: string | null
+          cc_skills: string[] | null
+          cc_status: string | null
+          client_id: string | null
+          created_at: string | null
+          custom_status: string | null
+          desktop_access_enabled: boolean | null
+          device_type: string | null
+          display_name: string | null
+          dnd_enabled: boolean | null
+          domain_uuid: string | null
+          extension: string | null
+          extension_id: string | null
+          forward_enabled: boolean | null
+          forward_to: string | null
+          id: string | null
+          is_demo: boolean | null
+          last_pbx_seen_at: string | null
+          last_seen_android: string | null
+          last_seen_at: string | null
+          last_seen_ios: string | null
+          last_seen_linux: string | null
+          last_seen_mac: string | null
+          last_seen_web: string | null
+          last_seen_windows: string | null
+          mobile_access_enabled: boolean | null
+          organization_id: string | null
+          out_of_office_until: string | null
+          pbx_uuid: string | null
+          portal_user_id: string | null
+          sip_domain: string | null
+          source: string | null
+          status: string | null
+          status_emoji: string | null
+          sync_status: string | null
+          total_calls: number | null
+          updated_at: string | null
+          wss_url: string | null
+        }
+        Insert: {
+          account_status?: string | null
+          active_platforms?: string[] | null
+          app_access_enabled?: boolean | null
+          cc_avg_handle_time?: number | null
+          cc_calls_today?: number | null
+          cc_logged_in_at?: string | null
+          cc_pause_reason?: string | null
+          cc_queues?: string[] | null
+          cc_role?: string | null
+          cc_skills?: string[] | null
+          cc_status?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          custom_status?: string | null
+          desktop_access_enabled?: boolean | null
+          device_type?: string | null
+          display_name?: string | null
+          dnd_enabled?: boolean | null
+          domain_uuid?: string | null
+          extension?: string | null
+          extension_id?: string | null
+          forward_enabled?: boolean | null
+          forward_to?: string | null
+          id?: string | null
+          is_demo?: boolean | null
+          last_pbx_seen_at?: string | null
+          last_seen_android?: string | null
+          last_seen_at?: string | null
+          last_seen_ios?: string | null
+          last_seen_linux?: string | null
+          last_seen_mac?: string | null
+          last_seen_web?: string | null
+          last_seen_windows?: string | null
+          mobile_access_enabled?: boolean | null
+          organization_id?: string | null
+          out_of_office_until?: string | null
+          pbx_uuid?: string | null
+          portal_user_id?: string | null
+          sip_domain?: string | null
+          source?: string | null
+          status?: string | null
+          status_emoji?: string | null
+          sync_status?: string | null
+          total_calls?: number | null
+          updated_at?: string | null
+          wss_url?: string | null
+        }
+        Update: {
+          account_status?: string | null
+          active_platforms?: string[] | null
+          app_access_enabled?: boolean | null
+          cc_avg_handle_time?: number | null
+          cc_calls_today?: number | null
+          cc_logged_in_at?: string | null
+          cc_pause_reason?: string | null
+          cc_queues?: string[] | null
+          cc_role?: string | null
+          cc_skills?: string[] | null
+          cc_status?: string | null
+          client_id?: string | null
+          created_at?: string | null
+          custom_status?: string | null
+          desktop_access_enabled?: boolean | null
+          device_type?: string | null
+          display_name?: string | null
+          dnd_enabled?: boolean | null
+          domain_uuid?: string | null
+          extension?: string | null
+          extension_id?: string | null
+          forward_enabled?: boolean | null
+          forward_to?: string | null
+          id?: string | null
+          is_demo?: boolean | null
+          last_pbx_seen_at?: string | null
+          last_seen_android?: string | null
+          last_seen_at?: string | null
+          last_seen_ios?: string | null
+          last_seen_linux?: string | null
+          last_seen_mac?: string | null
+          last_seen_web?: string | null
+          last_seen_windows?: string | null
+          mobile_access_enabled?: boolean | null
+          organization_id?: string | null
+          out_of_office_until?: string | null
+          pbx_uuid?: string | null
+          portal_user_id?: string | null
+          sip_domain?: string | null
+          source?: string | null
+          status?: string | null
+          status_emoji?: string | null
+          sync_status?: string | null
+          total_calls?: number | null
+          updated_at?: string | null
+          wss_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pbx_softphone_users_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_softphone_users_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_softphone_users_extension_id_fkey"
+            columns: ["extension_id"]
+            isOneToOne: false
+            referencedRelation: "pbx_extensions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_softphone_users_extension_id_fkey"
+            columns: ["extension_id"]
+            isOneToOne: false
+            referencedRelation: "pbx_extensions_real"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_softphone_users_extension_id_fkey"
+            columns: ["extension_id"]
+            isOneToOne: false
+            referencedRelation: "pbx_extensions_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_softphone_users_extension_id_fkey"
+            columns: ["extension_id"]
+            isOneToOne: false
+            referencedRelation: "telecom_extensions_v"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pbx_softphone_users_organization_id_fkey"
             columns: ["organization_id"]
