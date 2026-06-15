@@ -1,10 +1,21 @@
 import React from 'react';
 import { theme } from '../../lib/theme';
 import { useTenant } from '../../hooks/useTenant';
-import { useDashboardStats } from '../../hooks/useDashboardStats';
+import { useDashboardStats, AttentionItem } from '../../hooks/useDashboardStats';
 import { useSyncStatus, formatAge } from '../../hooks/useSyncStatus';
 
 const { colors: c } = theme;
+
+function fmtRelative(iso: string | null) {
+  if (!iso) return 'No CDR yet';
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return 'No CDR yet';
+  const mins = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  return hours < 24 ? `${hours}h ago` : new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
 
 function Stat({ label, value, accent, hint }: { label: string; value: string | number; accent: string; hint?: string }) {
   return (
@@ -23,6 +34,13 @@ function Stat({ label, value, accent, hint }: { label: string; value: string | n
   );
 }
 
+function attentionColor(item: AttentionItem) {
+  if (item.tone === 'danger') return c.danger;
+  if (item.tone === 'warn') return c.signalGold;
+  if (item.tone === 'success') return c.success;
+  return c.avaCyan;
+}
+
 export default function HomeDashboard({
   displayName, extension, onQuickDial,
 }: { displayName: string; extension: string; onQuickDial: () => void }) {
@@ -31,9 +49,10 @@ export default function HomeDashboard({
   const { orgId, orgName, extension: tenantExt } = useTenant();
   const stats = useDashboardStats(orgId, tenantExt || extension);
   const { pbx, syncConnected, lastEvent, ageMs, healthy } = useSyncStatus();
+  const freshnessAccent = stats.cdrFreshness === 'live' ? c.success : stats.cdrFreshness === 'stale' ? c.signalGold : c.mutedSilver;
 
   return (
-    <div style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto', animation: 'fadeIn .3s ease-out' }}>
+    <div style={{ padding: '28px 32px', maxWidth: 1180, margin: '0 auto', animation: 'fadeIn .3s ease-out' }}>
       <header style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, fontWeight: 700, letterSpacing: 2, color: c.signalGold, textTransform: 'uppercase' }}>
           <span>Command Center</span>
@@ -51,96 +70,91 @@ export default function HomeDashboard({
           {greeting}, {displayName.split(' ')[0] || 'there'}
         </h1>
         <p style={{ fontSize: 13, color: c.mutedSilver, margin: 0 }}>
-          Ext {extension} · Your day at a glance, powered by AVA AI
+          Ext {extension} · Live CDR, recordings, voicemail, and AVA insights for your own extension.
         </p>
       </header>
 
-      {/* AVA daily brief */}
-      <div style={{
-        background: `linear-gradient(135deg, rgba(122,76,255,0.10), rgba(35,214,255,0.06))`,
+      <section style={{
+        background: `linear-gradient(135deg, rgba(255,230,0,0.12), rgba(35,214,255,0.07), rgba(122,76,255,0.08))`,
         border: `1px solid ${c.borderAI}`,
-        borderRadius: 16, padding: '18px 20px', marginBottom: 22,
-        display: 'flex', gap: 16, alignItems: 'flex-start',
-        boxShadow: '0 8px 32px -16px rgba(122,76,255,0.4)',
+        borderRadius: 18, padding: '20px 22px', marginBottom: 22,
+        display: 'grid', gridTemplateColumns: '1.4fr 0.8fr', gap: 20, alignItems: 'center',
+        boxShadow: '0 18px 48px -28px rgba(35,214,255,0.55)',
       }}>
-        <div style={{
-          width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-          background: `linear-gradient(135deg, ${c.avaViolet}, ${c.avaCyan})`,
-          display: 'grid', placeItems: 'center', color: '#fff',
-          fontWeight: 800, fontSize: 14, letterSpacing: 0.5,
-        }}>AI</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: c.avaCyan, textTransform: 'uppercase', marginBottom: 4 }}>
-            AVA Daily Brief
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.8, color: c.avaCyan, textTransform: 'uppercase', marginBottom: 6 }}>
+            Live Phone-System Brief
           </div>
-          <div style={{ fontSize: 13.5, color: c.textIce, lineHeight: 1.55 }}>
-            {stats.loading ? 'Loading your day…' : (
-              <>You have <strong style={{ color: c.signalGold }}>{stats.missedToday} missed call{stats.missedToday === 1 ? '' : 's'}</strong> and <strong style={{ color: c.signalGold }}>{stats.unreadVoicemail} unread voicemail{stats.unreadVoicemail === 1 ? '' : 's'}</strong> today. {stats.unreadSms > 0 ? `${stats.unreadSms} unread message${stats.unreadSms === 1 ? '' : 's'} waiting.` : 'Inbox is clear on SMS.'}</>
+          <div style={{ fontSize: 14.5, color: c.textIce, lineHeight: 1.55 }}>
+            {stats.loading ? 'Loading the live PBX picture…' : (
+              <>Today: <strong style={{ color: c.signalGold }}>{stats.totalCallsToday} call{stats.totalCallsToday === 1 ? '' : 's'}</strong>, <strong style={{ color: c.success }}>{stats.answeredToday} answered</strong>, <strong style={{ color: c.danger }}>{stats.missedToday} missed</strong>, and <strong style={{ color: c.avaCyan }}>{stats.recordingsToday} recording{stats.recordingsToday === 1 ? '' : 's'}</strong>. The latest CDR is {fmtRelative(stats.lastCallAt)}.</>
             )}
           </div>
         </div>
-      </div>
+        <div style={{ borderLeft: `1px solid ${c.borderAI}`, paddingLeft: 18, display: 'grid', gap: 9 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: c.mutedSilver }}><span>CDR freshness</span><strong style={{ color: freshnessAccent }}>{stats.cdrFreshness.toUpperCase()}</strong></div>
+          <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}><div style={{ width: stats.cdrFreshness === 'live' ? '100%' : stats.cdrFreshness === 'stale' ? '58%' : '18%', height: '100%', background: freshnessAccent }} /></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: c.mutedSilver }}><span>Recording coverage</span><strong style={{ color: c.signalGold }}>{stats.recordingCoveragePct}%</strong></div>
+          <div style={{ height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}><div style={{ width: `${Math.max(4, stats.recordingCoveragePct)}%`, height: '100%', background: c.signalGold }} /></div>
+        </div>
+      </section>
 
-      {/* Stat grid — live from realtime sync */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14, marginBottom: 24 }}>
+        <Stat label="Calls Today" value={stats.totalCallsToday} accent={c.avaCyan} hint="Scoped to extension" />
         <Stat label="Missed Calls" value={stats.missedToday} accent={c.danger} hint="Today" />
         <Stat label="Answered" value={stats.answeredToday} accent={c.success} hint="Today" />
+        <Stat label="Recordings" value={stats.recordingsToday} accent={c.signalGold} hint={stats.lastRecordingAt ? `Latest ${fmtRelative(stats.lastRecordingAt)}` : 'None today'} />
         <Stat label="Unread SMS" value={stats.unreadSms} accent={c.signalGold} hint="All threads" />
-        <Stat label="Voicemail" value={stats.unreadVoicemail} accent={c.avaCyan} hint="New" />
-        <Stat label="Live Calls" value={stats.liveCalls} accent={c.avaViolet} hint="In progress" />
-        <Stat label="Extensions" value={stats.extensionsTotal} accent={c.lemtelBlue} hint="Provisioned" />
-        <Stat label="Sync" value={syncConnected ? 'Live' : 'Off'} accent={syncConnected ? c.avaCyan : c.mutedSilver} hint={lastEvent ? formatAge(ageMs) : 'Idle'} />
-        <Stat label="PBX Health" value={pbx === 'registered' ? 'OK' : pbx === 'error' ? 'Down' : '…'} accent={pbx === 'registered' ? c.success : pbx === 'error' ? c.danger : c.mutedSilver} hint={pbx === 'registered' ? 'SIP registered' : pbx} />
+        <Stat label="Voicemail" value={stats.unreadVoicemail} accent={c.avaViolet} hint="Needs review" />
+        <Stat label="Live Calls" value={stats.liveCalls} accent={c.lemtelBlue} hint="In progress" />
+        <Stat label="Realtime" value={syncConnected ? 'Live' : 'Off'} accent={syncConnected ? c.avaCyan : c.mutedSilver} hint={lastEvent ? formatAge(ageMs) : 'Idle'} />
       </div>
 
-      {/* Quick actions */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 10 }}>
           Quick Actions
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={onQuickDial} style={quickBtn(c.signalGold)}>📞 New Call</button>
-          <button style={quickBtn(c.avaCyan)}>💬 New Message</button>
-          <button style={quickBtn(c.avaViolet)}>✨ Ask AVA</button>
-          <button style={quickBtn(c.mutedSilver)}>🎙 Create Greeting</button>
-          <button style={quickBtn(c.mutedSilver)}>↪ Set Forwarding</button>
+          <button onClick={onQuickDial} style={quickBtn(c.signalGold)}>New Call</button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'calls' }))} style={quickBtn(c.avaCyan)}>Open Call History</button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'recordings' }))} style={quickBtn(c.avaViolet)}>Review Recordings</button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'messages' }))} style={quickBtn(c.success)}>Messages</button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'pbxlive' }))} style={quickBtn(c.mutedSilver)}>PBX Live</button>
         </div>
       </div>
 
-      {/* Needs attention */}
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 10 }}>
           Needs Attention
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[
-            { who: 'Marie Tremblay', why: 'Promised callback by 3 PM', tag: 'Callback' },
-            { who: 'Acme Corp (514-555-0182)', why: 'Renewal mentioned in last call', tag: 'Sales' },
-            { who: 'Voicemail — Unknown', why: 'Urgent tone detected', tag: 'AI Flagged' },
-          ].map((it, i) => (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center', gap: 14,
-              padding: '12px 14px', background: c.bgCard,
-              border: `1px solid ${c.border}`, borderRadius: 12,
-            }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 10,
-                background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
-                display: 'grid', placeItems: 'center', color: '#fff',
-                fontWeight: 700, fontSize: 13,
-              }}>{it.who.charAt(0)}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: c.textIce }}>{it.who}</div>
-                <div style={{ fontSize: 11.5, color: c.mutedSilver, marginTop: 2 }}>{it.why}</div>
+          {stats.attention.map((it, i) => {
+            const accent = attentionColor(it);
+            return (
+              <div key={`${it.tag}-${i}`} style={{
+                display: 'flex', alignItems: 'center', gap: 14,
+                padding: '12px 14px', background: c.bgCard,
+                border: `1px solid ${c.border}`, borderRadius: 12,
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: `linear-gradient(135deg, ${accent}, ${c.deepPanel})`,
+                  display: 'grid', placeItems: 'center', color: '#fff',
+                  fontWeight: 800, fontSize: 13,
+                }}>{it.tag.charAt(0)}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: c.textIce }}>{it.title}</div>
+                  <div style={{ fontSize: 11.5, color: c.mutedSilver, marginTop: 2 }}>{it.detail}</div>
+                </div>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: 0.8,
+                  padding: '4px 9px', borderRadius: 999,
+                  background: `${accent}18`, color: accent,
+                  border: `1px solid ${accent}55`,
+                }}>{it.tag}</span>
               </div>
-              <span style={{
-                fontSize: 10, fontWeight: 700, letterSpacing: 0.8,
-                padding: '4px 9px', borderRadius: 999,
-                background: 'rgba(255,230,0,0.10)', color: c.signalGold,
-                border: `1px solid ${c.borderGold}`,
-              }}>{it.tag}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
