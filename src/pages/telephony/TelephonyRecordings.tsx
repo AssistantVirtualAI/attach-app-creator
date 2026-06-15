@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Disc, Loader2, Play, Pause, ChevronDown, Sparkles } from 'lucide-react';
 import { usePbxCallRecords, LEMTEL_ORG } from '@/hooks/usePbxData';
+import { usePbxRealtime } from '@/hooks/usePbxRealtime';
 import { SyncEverythingButton } from '@/components/lemtel/SyncEverythingButton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -19,6 +20,7 @@ function sentimentBadge(s?: string) {
 
 export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
   const qc = useQueryClient();
+  usePbxRealtime(['pbx_call_records', 'pbx_call_recordings'], ['pbx']);
   const { data: myExt } = useQuery({
     queryKey: ['recordings-my-extension'],
     enabled: scope === 'mine',
