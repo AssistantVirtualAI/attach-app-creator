@@ -93,8 +93,17 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
         },
       });
       if (r2.error) throw r2.error;
+      const ai = (r2.data as any)?.analysis || (r2.data as any) || null;
+      // Optimistic local update — avoid full reload that causes list flicker.
+      setItems((all) => all.map((x) => x.id === r.id ? {
+        ...x,
+        transcript_text,
+        summary: ai?.summary || x.summary,
+        topics: ai?.topics || x.topics,
+        sentiment: ai?.sentiment || x.sentiment,
+        analyzed: true,
+      } as RecordingItem : x));
       onAnalyze?.(r.id);
-      await load();
     } catch (e: any) {
       setError(displayError(e));
     } finally {
