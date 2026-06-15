@@ -75,14 +75,13 @@ export function setAuthToken(token: string | null) {
 type MeContext = {
   organization_id: string | null;
   extension: string | null;
-  extension_uuid: string | null;
   display_name: string | null;
   user_id: string | null;
 };
 let _meCache: MeContext | null = null;
 let _meInflight: Promise<MeContext> | null = null;
 
-const EMPTY_ME: MeContext = { organization_id: null, extension: null, extension_uuid: null, display_name: null, user_id: null };
+const EMPTY_ME: MeContext = { organization_id: null, extension: null, display_name: null, user_id: null };
 
 export async function getMeContext(): Promise<MeContext> {
   if (_meCache) return _meCache;
@@ -97,7 +96,7 @@ export async function getMeContext(): Promise<MeContext> {
         uid = payload?.sub ?? null;
       } catch {}
       const filter = uid ? `portal_user_id=eq.${uid}` : `limit=1`;
-      const url = `${BACKEND.url}/rest/v1/pbx_softphone_users?select=organization_id,extension,extension_uuid,display_name,portal_user_id&${filter}&limit=1`;
+      const url = `${BACKEND.url}/rest/v1/pbx_softphone_users?select=organization_id,extension,display_name,portal_user_id&${filter}&limit=1`;
       const r = await fetch(url, { headers: authHeaders() });
       if (!r.ok) return EMPTY_ME;
       const rows = await r.json();
@@ -116,7 +115,6 @@ export async function getMeContext(): Promise<MeContext> {
       _meCache = {
         organization_id: row.organization_id ?? null,
         extension: row.extension ?? null,
-        extension_uuid: row.extension_uuid ?? null,
         display_name: row.display_name ?? null,
         user_id: row.portal_user_id ?? uid,
       };
