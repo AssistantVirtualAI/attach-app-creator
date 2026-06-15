@@ -42,21 +42,22 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [audioLoading, setAudioLoading] = useState<string | null>(null);
 
-  const load = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!opts?.silent) setLoading(true);
-    setError(null);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setLoading(true); setError(null); }
     try {
       const data = await ava.recordings();
       setItems(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      setError(e?.message || 'Unable to load recordings.');
-      if (!opts?.silent) setItems([]);
+      if (!silent) {
+        setError(e?.message || 'Unable to load recordings.');
+        setItems([]);
+      }
     } finally {
-      if (!opts?.silent) setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
-  const silentLoad = useCallback(() => { void load({ silent: true }); }, [load]);
+  const silentLoad = useCallback(() => { void load(true); }, [load]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -168,7 +169,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
         <div style={{ fontSize: 11, color: c.textSub, letterSpacing: 1, textTransform: 'uppercase' }}>
           {items.length} recording{items.length !== 1 ? 's' : ''}
         </div>
-        <button onClick={load} style={{
+        <button onClick={() => load()} style={{
           background: 'rgba(255,255,255,0.05)', border: `1px solid ${c.border}`,
           color: c.text, padding: '4px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
         }}>↻ Refresh</button>

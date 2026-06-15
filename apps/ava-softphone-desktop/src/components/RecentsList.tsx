@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabaseClient';
 import { ava, CallRecord } from '@/lib/avaApi';
 import { ArrowUpRight, ArrowDownLeft, PhoneMissed, PhoneCall } from './RowIcons';
+import { useRealtimeRefresh } from '@/lib/useRealtimeRefresh';
+import { useOrgId } from '@/lib/useOrgId';
 
 interface Props {
   extension: string;
@@ -30,42 +31,36 @@ export default function RecentsList({ extension, onCall }: Props) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setErr(null);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setLoading(true); setErr(null); }
     try {
       const data = await ava.calls(50);
       setRows(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      setErr(e?.message || 'Unable to load live call records.');
-      setRows([]);
+      if (!silent) {
+        setErr(e?.message || 'Unable to load live call records.');
+        setRows([]);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [extension]);
 
+  const silentLoad = useCallback(() => { void load(true); }, [load]);
+
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    const onSync = () => { void load(); };
+    const onSync = () => { void load(true); };
     window.addEventListener('lemtel:phone-sync-complete', onSync);
     return () => window.removeEventListener('lemtel:phone-sync-complete', onSync);
   }, [load]);
 
   // Realtime: refresh on new CDR rows
-  useEffect(() => {
-    const ch = supabase
-      .channel(`cdr-${extension}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'pbx_call_records' },
-        () => { void load(); },
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [extension, load]);
+  const orgId = useOrgId();
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId, events: ['INSERT'] }, silentLoad);
 
   if (loading) return <div style={center}>Loading recents…</div>;
-  if (err) return <div style={{ ...center, color: '#ff8a8a' }}>{err}<br /><button onClick={load} style={refreshBtn}>Retry</button></div>;
+  if (err) return <div style={{ ...center, color: '#ff8a8a' }}>{err}<br /><button onClick={() => load()} style={refreshBtn}>Retry</button></div>;
   if (rows.length === 0) return <div style={center}>No recent calls</div>;
 
   return (
@@ -74,7 +69,7 @@ export default function RecentsList({ extension, onCall }: Props) {
         <span style={{ fontSize: 10, opacity: 0.5, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: 600 }}>
           {rows.length} call{rows.length > 1 ? 's' : ''}
         </span>
-        <button onClick={load} style={refreshBtn} title="Refresh">↻</button>
+        <button onClick={() => load()} style={refreshBtn} title="Refresh">↻</button>
       </div>
       {rows.map((r) => {
         const outbound = r.direction === 'out';
