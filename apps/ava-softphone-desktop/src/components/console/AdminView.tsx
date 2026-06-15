@@ -454,8 +454,9 @@ export default function AdminView() {
           />
         )}
         {sec === 'feature-codes' && <FeatureCodesTable />}
-        {sec === 'voicemails' && <VoicemailsTable />}
-        {sec === 'recordings' && <RecordingRulesTable />}
+        {sec === 'voicemails' && <VoicemailView />}
+        {sec === 'recordings' && <RecordingsView />}
+        {sec === 'call-history' && <CallsView />}
         {sec === 'registrations' && <LiveRegistrationsTable />}
         {sec === 'sync' && <SyncStatus />}
       </div>
