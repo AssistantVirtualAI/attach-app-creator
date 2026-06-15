@@ -137,7 +137,7 @@ const ORG_GROUPS: NavGroup[] = [
     id: 'org-analytics', labelKey: '📈 Analytics', icon: BarChart3, scope: 'org', lemtelOnly: true,
     items: [
       { nameKey: 'Media Center', href: '/org/lemtel/telephony/media', icon: Disc },
-      { nameKey: 'Call History', href: '/org/lemtel/telephony/calls', icon: PhoneCall },
+      { nameKey: 'Call History', href: '/org/lemtel/admin/calls', icon: PhoneCall },
       { nameKey: 'Recordings', href: '/org/lemtel/admin/recordings', icon: Disc },
       { nameKey: 'AI Insights', href: '/org/lemtel/telephony/ai', icon: Brain },
       { nameKey: 'Reports', href: '/org/lemtel/admin/reports', icon: FileQuestion },
