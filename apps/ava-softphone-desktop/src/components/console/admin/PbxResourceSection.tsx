@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { theme } from '../../../lib/theme';
 import { supabase } from '../../../lib/supabaseClient';
 import { getMeContext } from '../../../lib/avaApi';
@@ -214,13 +215,14 @@ function EditDrawer({
   title, fields, initial, saving, onCancel, onSave,
 }: { title: string; fields: FieldDef[]; initial: any; saving: boolean; onCancel: () => void; onSave: (r: any) => void }) {
   const [form, setForm] = useState<any>(initial);
-  return (
+  return createPortal(
     <div onClick={onCancel} style={{
-      position: 'fixed', inset: 0, background: 'rgba(5,6,13,0.66)', backdropFilter: 'blur(6px)',
-      zIndex: 200, display: 'flex', justifyContent: 'flex-end',
+      position: 'fixed', inset: 0, background: 'rgba(2,6,20,0.78)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+      zIndex: 9999, display: 'flex', justifyContent: 'flex-end',
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        width: 'min(520px, 100%)', height: '100%', background: c.deepPanel,
+        width: 'min(560px, 100%)', height: '100%', background: '#0c1733',
+        backgroundImage: 'linear-gradient(160deg, rgba(35,214,255,0.06), rgba(122,76,255,0.05))',
         borderLeft: `1px solid ${c.border}`, padding: 28, overflowY: 'auto',
         boxShadow: '-20px 0 60px rgba(0,0,0,0.5)',
       }}>
@@ -257,6 +259,7 @@ function EditDrawer({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

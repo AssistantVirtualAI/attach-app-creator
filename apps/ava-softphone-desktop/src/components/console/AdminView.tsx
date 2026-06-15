@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { theme } from '../../lib/theme';
 import { ava, getMeContext } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
@@ -8,6 +9,57 @@ const { colors: c } = theme;
 
 const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 const LEMTEL_DOMAIN = '2936594e-17b7-42a9-9165-95be48627923';
+
+/**
+ * Shared modal shell — rendered via portal so ancestor `transform`, `filter`,
+ * `overflow:hidden`, or backdrop-filter ancestors (e.g. the animated console
+ * page wrapper) can't trap the overlay or bleed table text through it.
+ * Uses a fully opaque panel background so edit forms read cleanly.
+ */
+function ModalShell({ title, onClose, width = 460, children }: { title: string; onClose: () => void; width?: number; children: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
+  }, [onClose]);
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(2,6,20,0.78)',
+        backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+        display: 'grid', placeItems: 'center', padding: 24,
+        animation: 'fadeIn 140ms ease-out',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: width, maxHeight: '88vh', overflowY: 'auto',
+          background: '#0c1733',
+          backgroundImage: 'linear-gradient(160deg, rgba(35,214,255,0.06), rgba(122,76,255,0.05))',
+          border: `1px solid ${(c as any).borderAI || c.border}`,
+          borderRadius: 16, padding: 22,
+          boxShadow: '0 30px 80px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(35,214,255,0.08)',
+          color: c.textIce,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${c.border}` }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: c.textIce, letterSpacing: 0.2 }}>{title}</div>
+          <button onClick={onClose} aria-label="Close" style={{
+            width: 28, height: 28, borderRadius: 8, border: `1px solid ${c.border}`,
+            background: 'rgba(255,255,255,0.04)', color: c.mutedSilver, cursor: 'pointer', fontSize: 14,
+          }}>✕</button>
+        </div>
+        {children}
+      </div>
+    </div>,
+    document.body,
+  );
+}
 
 function ExtensionsTable() {
   const [data, setData] = useState<any[]>([]);
@@ -150,37 +202,29 @@ function EditExtensionModal({ ext, saving, onClose, onSave }: { ext: any; saving
   const [voicemail, setVoicemail] = useState(!!ext.voicemail_enabled);
   const [enabled, setEnabled] = useState(ext.enabled !== false);
   return (
-    <div onClick={onClose} style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50,
-      display: 'grid', placeItems: 'center',
-    }}>
-      <div onClick={(e) => e.stopPropagation()} style={{
-        width: 380, background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 14, padding: 20,
-      }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: c.textIce, marginBottom: 12 }}>Edit Extension {ext.extension}</div>
-        <Label>Display name</Label>
-        <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={inputStyle} />
-        <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12 }}>
-            <input type="checkbox" checked={voicemail} onChange={(e) => setVoicemail(e.target.checked)} /> Voicemail
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12 }}>
-            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
-          </label>
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={() => onSave({
-            effective_caller_id_name: displayName,
-            voicemail_enabled: voicemail ? 'true' : 'false',
-            enabled: enabled ? 'true' : 'false',
-          })} disabled={saving} style={{
-            padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer',
-            background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1,
-          }}>{saving ? 'Saving…' : 'Save'}</button>
-        </div>
+    <ModalShell title={`Edit Extension ${ext.extension}`} onClose={onClose} width={420}>
+      <Label>Display name</Label>
+      <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={inputStyle} />
+      <div style={{ display: 'flex', gap: 16, marginTop: 14 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12 }}>
+          <input type="checkbox" checked={voicemail} onChange={(e) => setVoicemail(e.target.checked)} /> Voicemail
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12 }}>
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
+        </label>
       </div>
-    </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 22, justifyContent: 'flex-end' }}>
+        <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+        <button onClick={() => onSave({
+          effective_caller_id_name: displayName,
+          voicemail_enabled: voicemail ? 'true' : 'false',
+          enabled: enabled ? 'true' : 'false',
+        })} disabled={saving} style={{
+          padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer',
+          background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1,
+        }}>{saving ? 'Saving…' : 'Save & sync to PBX'}</button>
+      </div>
+    </ModalShell>
   );
 }
 
@@ -597,31 +641,28 @@ function EditIvrModal({ ivr, saving, onClose, onSave }: { ivr: any; saving: bool
   const [timeout, setTimeoutMs] = useState(ivr.timeout_ms || 3000);
   const [enabled, setEnabled] = useState(ivr.enabled !== false);
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'grid', placeItems: 'center' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 460, background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 14, padding: 20 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: c.textIce, marginBottom: 12 }}>Edit IVR · {ivr.name}</div>
-        <Label>Name</Label><input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-        <div style={{ height: 10 }} />
-        <Label>Extension</Label><input value={extension} onChange={(e) => setExtension(e.target.value)} style={inputStyle} />
-        <div style={{ height: 10 }} />
-        <Label>Greeting (long)</Label><textarea value={greet} onChange={(e) => setGreet(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
-        <div style={{ height: 10 }} />
-        <Label>Timeout (ms)</Label><input type="number" value={timeout} onChange={(e) => setTimeoutMs(Number(e.target.value))} style={inputStyle} />
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12, marginTop: 12 }}>
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
-        </label>
-        <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={() => onSave({
-            ivr_menu_name: name,
-            ivr_menu_extension: extension,
-            ivr_menu_greet_long: greet,
-            ivr_menu_timeout: timeout,
-            ivr_menu_enabled: enabled ? 'true' : 'false',
-          })} disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save'}</button>
-        </div>
+    <ModalShell title={`Edit IVR · ${ivr.name}`} onClose={onClose} width={500}>
+      <Label>Name</Label><input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+      <div style={{ height: 12 }} />
+      <Label>Extension</Label><input value={extension} onChange={(e) => setExtension(e.target.value)} style={inputStyle} />
+      <div style={{ height: 12 }} />
+      <Label>Greeting (long)</Label><textarea value={greet} onChange={(e) => setGreet(e.target.value)} rows={4} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+      <div style={{ height: 12 }} />
+      <Label>Timeout (ms)</Label><input type="number" value={timeout} onChange={(e) => setTimeoutMs(Number(e.target.value))} style={inputStyle} />
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12, marginTop: 14 }}>
+        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
+      </label>
+      <div style={{ display: 'flex', gap: 8, marginTop: 22, justifyContent: 'flex-end' }}>
+        <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+        <button onClick={() => onSave({
+          ivr_menu_name: name,
+          ivr_menu_extension: extension,
+          ivr_menu_greet_long: greet,
+          ivr_menu_timeout: timeout,
+          ivr_menu_enabled: enabled ? 'true' : 'false',
+        })} disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save & sync to PBX'}</button>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -744,46 +785,43 @@ function EditQueueModal({ queue, saving, onClose, onSave }: { queue: any; saving
   }, [queue.id]);
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'grid', placeItems: 'center' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 520, maxHeight: '90vh', overflowY: 'auto', background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 14, padding: 20 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: c.textIce, marginBottom: 12 }}>Edit Queue · {queue.name}</div>
-        <Label>Name</Label><input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-        <div style={{ height: 10 }} />
-        <Label>Strategy</Label>
-        <select value={strategy} onChange={(e) => setStrategy(e.target.value)} style={inputStyle}>
-          {STRATEGIES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <div style={{ height: 10 }} />
-        <Label>Max wait time (seconds)</Label><input type="number" value={maxWait} onChange={(e) => setMaxWait(Number(e.target.value))} style={inputStyle} />
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12, marginTop: 12 }}>
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
-        </label>
+    <ModalShell title={`Edit Queue · ${queue.name}`} onClose={onClose} width={560}>
+      <Label>Name</Label><input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+      <div style={{ height: 12 }} />
+      <Label>Strategy</Label>
+      <select value={strategy} onChange={(e) => setStrategy(e.target.value)} style={inputStyle}>
+        {STRATEGIES.map((s) => <option key={s} value={s}>{s}</option>)}
+      </select>
+      <div style={{ height: 12 }} />
+      <Label>Max wait time (seconds)</Label><input type="number" value={maxWait} onChange={(e) => setMaxWait(Number(e.target.value))} style={inputStyle} />
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12, marginTop: 14 }}>
+        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
+      </label>
 
-        <div style={{ marginTop: 18 }}>
-          <Label>Agents ({agents?.length ?? '…'})</Label>
-          <div style={{ border: `1px solid ${c.border}`, borderRadius: 8, maxHeight: 180, overflowY: 'auto' }}>
-            {agents === null && <div style={{ padding: 12, color: c.mutedSilver, fontSize: 12 }}>Loading…</div>}
-            {agents && agents.length === 0 && <div style={{ padding: 12, color: c.mutedSilver, fontSize: 12 }}>No agents in this queue.</div>}
-            {agents && agents.map((a: any) => (
-              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: `1px solid ${c.border}`, fontSize: 12, color: c.textIce }}>
-                <span>{a.agent_name || a.agent_id || `Ext ${a.pbx_extensions?.extension ?? '?'}`}</span>
-                <span style={{ color: c.mutedSilver }}>Tier {a.tier_level} · {a.status}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={() => onSave({
-            queue_name: name,
-            queue_strategy: strategy,
-            queue_max_wait_time: String(maxWait),
-            queue_enabled: enabled ? 'true' : 'false',
-          })} disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save'}</button>
+      <div style={{ marginTop: 18 }}>
+        <Label>Agents ({agents?.length ?? '…'})</Label>
+        <div style={{ border: `1px solid ${c.border}`, borderRadius: 8, maxHeight: 200, overflowY: 'auto', background: 'rgba(0,0,0,0.25)' }}>
+          {agents === null && <div style={{ padding: 12, color: c.mutedSilver, fontSize: 12 }}>Loading…</div>}
+          {agents && agents.length === 0 && <div style={{ padding: 12, color: c.mutedSilver, fontSize: 12 }}>No agents in this queue.</div>}
+          {agents && agents.map((a: any) => (
+            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: `1px solid ${c.border}`, fontSize: 12, color: c.textIce }}>
+              <span>{a.agent_name || a.agent_id || `Ext ${a.pbx_extensions?.extension ?? '?'}`}</span>
+              <span style={{ color: c.mutedSilver }}>Tier {a.tier_level} · {a.status}</span>
+            </div>
+          ))}
         </div>
       </div>
-    </div>
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 22, justifyContent: 'flex-end' }}>
+        <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+        <button onClick={() => onSave({
+          queue_name: name,
+          queue_strategy: strategy,
+          queue_max_wait_time: String(maxWait),
+          queue_enabled: enabled ? 'true' : 'false',
+        })} disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save & sync to PBX'}</button>
+      </div>
+    </ModalShell>
   );
 }
 
