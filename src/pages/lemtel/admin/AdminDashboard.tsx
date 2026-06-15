@@ -92,14 +92,11 @@ export default function AdminDashboard() {
     refetchInterval: 30_000,
     queryFn: async () => {
       const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
-      const [calls, exts, vms, sms] = await Promise.all([
+      const [calls, vms, sms] = await Promise.all([
         (supabase as any).from('pbx_call_records')
           .select('id,call_status,missed_call,start_at')
           .eq('organization_id', LEMTEL_ORG_ID)
           .gte('start_at', startOfDay.toISOString()),
-        (supabase as any).from('pbx_softphone_users')
-          .select('id,status,enabled')
-          .eq('organization_id', LEMTEL_ORG_ID),
         (supabase as any).from('pbx_voicemails')
           .select('id,read_at', { count: 'exact', head: true })
           .eq('organization_id', LEMTEL_ORG_ID).is('read_at', null),
@@ -108,49 +105,77 @@ export default function AdminDashboard() {
           .eq('organization_id', LEMTEL_ORG_ID),
       ]);
       const callRows = (calls.data ?? []) as any[];
-      const extRows = (exts.data ?? []) as any[];
       const smsRows = (sms.data ?? []) as any[];
       return {
         callsToday: callRows.length,
         missed: callRows.filter((r) => r.missed_call).length,
-        registered: extRows.filter((e) => e.status === 'online').length,
-        totalExts: extRows.length,
         newVoicemails: (vms as any).count ?? 0,
         unreadSms: smsRows.reduce((s, t) => s + (t.unread_count || 0), 0),
       };
     },
   });
 
+  // Live registrations from FusionPBX (15s server-side cache)
+  const { data: regs } = useQuery({
+    queryKey: ['admin-dashboard-registrations', LEMTEL_ORG_ID],
+    refetchInterval: 15_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'get-registrations-live', organization_id: LEMTEL_ORG_ID },
+      });
+      if (error) throw error;
+      return { registered: (data as any)?.registered ?? 0, total: (data as any)?.count ?? 0 };
+    },
+  });
+
+  // Live active calls (5s server-side cache)
+  const { data: activeCalls } = useQuery({
+    queryKey: ['admin-dashboard-active-calls', LEMTEL_ORG_ID],
+    refetchInterval: 5_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'get-active-calls-live', organization_id: LEMTEL_ORG_ID },
+      });
+      if (error) throw error;
+      return (data as any)?.count ?? 0;
+    },
+  });
+
+  // Live system health (10s server-side cache). Returns null fields when unavailable.
+  const { data: health } = useQuery({
+    queryKey: ['admin-dashboard-system-health', LEMTEL_ORG_ID],
+    refetchInterval: 10_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'get-system-health-live', organization_id: LEMTEL_ORG_ID },
+      });
+      if (error) throw error;
+      return (data as any)?.data ?? null;
+    },
+  });
+
   const callsToday = stats?.callsToday ?? 0;
   const missed = stats?.missed ?? 0;
-  const reg = `${stats?.registered ?? 0} / ${stats?.totalExts ?? 0}`;
+  const reg = `${regs?.registered ?? 0} / ${regs?.total ?? 0}`;
   const newMsgs = (stats?.newVoicemails ?? 0) + (stats?.unreadSms ?? 0);
 
-  // Live status series sourced from real telecom signals
+  // Rolling 20-point sparklines fed from real metrics
   const [cpu, setCpu] = useState<any[]>(Array.from({ length: 20 }, (_, i) => ({ t: i, v: 0 })));
   const [net, setNet] = useState<any[]>(Array.from({ length: 20 }, (_, i) => ({ t: i, v: 0 })));
   const [active, setActive] = useState<any[]>(Array.from({ length: 20 }, (_, i) => ({ t: i, v: 0 })));
 
   useEffect(() => {
-    let cancelled = false;
-    const tick = async () => {
-      const [liveRes, healthRes, jobsRes] = await Promise.all([
-        (supabase as any).from('telecom_live_calls').select('id', { count: 'exact', head: true }).eq('organization_id', LEMTEL_ORG_ID),
-        (supabase as any).from('telecom_sync_health').select('latency_ms,error_rate').eq('organization_id', LEMTEL_ORG_ID).order('checked_at', { ascending: false }).limit(1).maybeSingle(),
-        (supabase as any).from('pbx_sync_jobs').select('duration_ms').eq('organization_id', LEMTEL_ORG_ID).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-      ]);
-      if (cancelled) return;
-      const activeCount = (liveRes as any).count ?? 0;
-      const latency = (healthRes.data?.latency_ms as number | undefined) ?? (jobsRes.data?.duration_ms as number | undefined) ?? 0;
-      const errRate = ((healthRes.data?.error_rate as number | undefined) ?? 0) * 100;
-      setActive((p) => [...p.slice(1), { t: p.length, v: activeCount }]);
-      setNet((p) => [...p.slice(1), { t: p.length, v: Math.min(100, latency / 20) }]);
-      setCpu((p) => [...p.slice(1), { t: p.length, v: Math.min(100, errRate + activeCount * 5) }]);
-    };
-    tick();
-    const id = setInterval(tick, 5000);
-    return () => { cancelled = true; clearInterval(id); };
-  }, []);
+    setActive((p) => [...p.slice(1), { t: p.length, v: activeCalls ?? 0 }]);
+  }, [activeCalls]);
+
+  useEffect(() => {
+    if (health?.cpu_percent != null) {
+      setCpu((p) => [...p.slice(1), { t: p.length, v: Number(health.cpu_percent) }]);
+    }
+    if (health?.memory_percent != null) {
+      setNet((p) => [...p.slice(1), { t: p.length, v: Number(health.memory_percent) }]);
+    }
+  }, [health]);
 
   const triggerSoftphone = () => {
     window.dispatchEvent(new CustomEvent('softphone:open'));
@@ -221,10 +246,19 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatusChart title="System CPU Status" data={cpu} stroke="hsl(217 91% 60%)" />
-        <StatusChart title="System Network Status" data={net} stroke="hsl(142 71% 45%)" />
-        <StatusChart title="Active Calls" data={active} stroke="hsl(199 89% 48%)" />
+        <StatusChart
+          title={`System CPU${health?.metrics_available?.cpu === false ? ' (Unavailable)' : health?.cpu_percent != null ? ` — ${Math.round(Number(health.cpu_percent))}%` : ''}`}
+          data={cpu}
+          stroke="hsl(217 91% 60%)"
+        />
+        <StatusChart
+          title={`Memory${health?.metrics_available?.memory === false ? ' (Unavailable)' : health?.memory_percent != null ? ` — ${Math.round(Number(health.memory_percent))}%` : ''}`}
+          data={net}
+          stroke="hsl(142 71% 45%)"
+        />
+        <StatusChart title={`Active Calls — ${activeCalls ?? 0}`} data={active} stroke="hsl(199 89% 48%)" />
       </div>
+
     </div>
   );
 }

@@ -3987,6 +3987,7 @@ export type Database = {
       }
       pbx_call_recordings: {
         Row: {
+          available: boolean | null
           call_record_id: string | null
           client_id: string | null
           created_at: string | null
@@ -3994,14 +3995,21 @@ export type Database = {
           duration_seconds: number | null
           file_url: string | null
           id: string
+          last_checked_at: string | null
           organization_id: string
           pbx_uuid: string | null
           raw_data: Json | null
           recorded_at: string | null
+          recording_name: string | null
+          recording_path: string | null
+          recording_url: string | null
+          sentiment: string | null
           storage_path: string | null
+          summary_status: string | null
           transcription_status: string | null
         }
         Insert: {
+          available?: boolean | null
           call_record_id?: string | null
           client_id?: string | null
           created_at?: string | null
@@ -4009,14 +4017,21 @@ export type Database = {
           duration_seconds?: number | null
           file_url?: string | null
           id?: string
+          last_checked_at?: string | null
           organization_id: string
           pbx_uuid?: string | null
           raw_data?: Json | null
           recorded_at?: string | null
+          recording_name?: string | null
+          recording_path?: string | null
+          recording_url?: string | null
+          sentiment?: string | null
           storage_path?: string | null
+          summary_status?: string | null
           transcription_status?: string | null
         }
         Update: {
+          available?: boolean | null
           call_record_id?: string | null
           client_id?: string | null
           created_at?: string | null
@@ -4024,11 +4039,17 @@ export type Database = {
           duration_seconds?: number | null
           file_url?: string | null
           id?: string
+          last_checked_at?: string | null
           organization_id?: string
           pbx_uuid?: string | null
           raw_data?: Json | null
           recorded_at?: string | null
+          recording_name?: string | null
+          recording_path?: string | null
+          recording_url?: string | null
+          sentiment?: string | null
           storage_path?: string | null
+          summary_status?: string | null
           transcription_status?: string | null
         }
         Relationships: [
@@ -4099,6 +4120,7 @@ export type Database = {
           mos: number | null
           notes: string | null
           organization_id: string
+          pbx_dedup_key: string | null
           pbx_uuid: string | null
           pdd: number | null
           pdd_ms: number | null
@@ -4145,6 +4167,7 @@ export type Database = {
           mos?: number | null
           notes?: string | null
           organization_id: string
+          pbx_dedup_key?: string | null
           pbx_uuid?: string | null
           pdd?: number | null
           pdd_ms?: number | null
@@ -4191,6 +4214,7 @@ export type Database = {
           mos?: number | null
           notes?: string | null
           organization_id?: string
+          pbx_dedup_key?: string | null
           pbx_uuid?: string | null
           pdd?: number | null
           pdd_ms?: number | null
@@ -5994,35 +6018,50 @@ export type Database = {
         Row: {
           completed_at: string | null
           created_at: string | null
+          duration_ms: number | null
+          endpoint: string | null
           error: string | null
+          fetched: number | null
           id: string
           job_type: string
           organization_id: string
+          skipped: number | null
           started_at: string | null
           stats: Json | null
           status: string | null
+          upserted: number | null
         }
         Insert: {
           completed_at?: string | null
           created_at?: string | null
+          duration_ms?: number | null
+          endpoint?: string | null
           error?: string | null
+          fetched?: number | null
           id?: string
           job_type: string
           organization_id: string
+          skipped?: number | null
           started_at?: string | null
           stats?: Json | null
           status?: string | null
+          upserted?: number | null
         }
         Update: {
           completed_at?: string | null
           created_at?: string | null
+          duration_ms?: number | null
+          endpoint?: string | null
           error?: string | null
+          fetched?: number | null
           id?: string
           job_type?: string
           organization_id?: string
+          skipped?: number | null
           started_at?: string | null
           stats?: Json | null
           status?: string | null
+          upserted?: number | null
         }
         Relationships: [
           {
