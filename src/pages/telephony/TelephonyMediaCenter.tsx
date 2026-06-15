@@ -182,7 +182,7 @@ function RecordingsTab({ orgId, extension, search }: { orgId: string; extension:
       let q = (supabase as any).from("pbx_call_records")
         .select("id,organization_id,start_at,duration_seconds,caller_number,destination_number,extension,recording_path,recording_name,recording_url,transcript,ai_summary,ai_sentiment,transcribed,pbx_uuid,domain_uuid,domain_name")
         .eq("organization_id", orgId).not("recording_path", "is", null).order("start_at", { ascending: false }).limit(150);
-      if (extension) q = q.eq("extension", extension);
+      if (extension) q = q.or(`extension.eq.${extension},caller_number.eq.${extension},destination_number.eq.${extension},source_number.eq.${extension}`);
       const { data } = await q;
       return (data || []) as any[];
     },
