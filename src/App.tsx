@@ -953,6 +953,7 @@ const App = () => (
                   <Route path="chatbot" element={<ConsoleChatbot />} />
                   <Route path="audit" element={<ConsoleAudit />} />
                   <Route path="presence" element={<ConsolePresence />} />
+                  <Route path="chat" element={<ConsoleChat />} />
                 </Route>
 
 
