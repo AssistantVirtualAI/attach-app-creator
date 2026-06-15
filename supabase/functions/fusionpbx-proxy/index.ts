@@ -1514,6 +1514,11 @@ Deno.serve(async (req) => {
     // signed URL (default 300s). Every issuance is written to audit_logs.
     if (action === "get-recording-signed-url") {
       try {
+        const signedParams = { ...(params || {}) } as any;
+        const signedXmlCdrUuid = signedParams.xml_cdr_uuid || body.xml_cdr_uuid || body.id || null;
+        if (signedXmlCdrUuid && !(await canReadCallRecording(String(signedXmlCdrUuid)))) {
+          return json({ error: "Forbidden", message: "Recording is outside the signed-in user extension scope" }, 403);
+        }
         // Reuse the proven byte-fetch path by self-invoking get-recording.
         const selfBody = { ...body, action: "get-recording" };
         const selfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/fusionpbx-proxy`;
