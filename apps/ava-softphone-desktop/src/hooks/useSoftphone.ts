@@ -72,6 +72,37 @@ export function useSoftphone(args: UseSoftphoneArgs) {
   const [manualStatus, setManualStatus] = useState<ManualStatus>('auto');
   const [retryTick, setRetryTick] = useState(0);
   const [recording, setRecording] = useState(false);
+  const [healedKey, setHealedKey] = useState<string>('');
+
+  // Auto-heal: if PBX rejects registration (401/403/auth), force local password
+  // into PBX once per (cause) so the saved password becomes the source of truth.
+  useEffect(() => {
+    if (snap.status !== 'error') return;
+    const cause = snap.errorCause || '';
+    if (!/401|403|forbidden|unauth|reject|auth/i.test(cause)) return;
+    const key = `${args.extension}:${cause}`;
+    if (healedKey === key) return;
+    setHealedKey(key);
+    (async () => {
+      try {
+        const { data: sess } = await supabase.auth.getSession();
+        const token = sess.session?.access_token || args.accessToken;
+        if (!token) return;
+        const res = await fetch(`${SB_URL}/functions/v1/softphone-sync-password`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            apikey: SB_KEY,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ force_local_to_pbx: true }),
+        });
+        if (!res.ok) return;
+        // Re-fetch creds and re-init SIP with the now-aligned password.
+        setRetryTick((n) => n + 1);
+      } catch { /* noop */ }
+    })();
+  }, [snap.status, snap.errorCause, args.extension, args.accessToken, healedKey]);
 
   useEffect(() => {
     const unsub = sipProvider.subscribe(setSnap);
