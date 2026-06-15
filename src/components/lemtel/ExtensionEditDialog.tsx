@@ -32,6 +32,10 @@ export function ExtensionEditDialog({ open, onOpenChange, extension }: Props) {
   const [showQR, setShowQR] = useState(false);
   const [assignEmail, setAssignEmail] = useState('');
   const [assigning, setAssigning] = useState(false);
+  const [softphone, setSoftphone] = useState<any>(null);
+  const [desktopAccess, setDesktopAccess] = useState(true);
+  const [mobileAccess, setMobileAccess] = useState(true);
+  const [savingAccess, setSavingAccess] = useState(false);
 
   useEffect(() => {
     if (!open || !extension) return;
