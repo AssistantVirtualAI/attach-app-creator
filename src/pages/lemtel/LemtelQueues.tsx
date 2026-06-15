@@ -536,6 +536,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
         </div>
       )}
 
+      {loading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div> : (
     <div className="grid md:grid-cols-2 gap-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
