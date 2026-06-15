@@ -99,12 +99,33 @@ export default function App() {
       } else if (saved) {
         // Refresh stored tokens in case they rotated
         setAuthToken(session.access_token);
+        // Re-fetch the latest pbx_softphone_users row so extension/display name reflect current DB state
+        // (saved Electron credentials may be stale, e.g. extension stored as 'N/A' from a prior login).
+        let refreshed = { ...saved };
+        try {
+          const { data: row } = await supabase
+            .from('pbx_softphone_users')
+            .select('extension, display_name, sip_domain, wss_url')
+            .eq('portal_user_id', session.user.id)
+            .maybeSingle();
+          if (row?.extension) {
+            refreshed = {
+              ...refreshed,
+              extension: String(row.extension),
+              displayName: row.display_name || refreshed.displayName,
+              sipDomain: row.sip_domain || refreshed.sipDomain,
+              wssUrl: row.wss_url || refreshed.wssUrl,
+            };
+            try { await window.electronAPI?.saveCredentials?.(refreshed); } catch { /* noop */ }
+          }
+        } catch { /* noop */ }
         setCreds({
-          ...saved,
+          ...refreshed,
           accessToken: session.access_token,
           refreshToken: session.refresh_token,
         });
         triggerCdrSync();
+
       } else {
         // A browser-local Supabase session without Electron credentials is stale for the packaged app.
         await clearDesktopAuthState();
