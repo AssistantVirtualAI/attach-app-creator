@@ -1270,6 +1270,7 @@ Deno.serve(async (req) => {
       if (want("ring_groups"))  tasks.push(pbxFetch(`ring_groups?${domainQ}`).then((r) => ({ k: "ring_groups", r })));
       // Gateways are global in FusionPBX (no domain filter) — query without domain_uuid.
       if (want("gateways"))     tasks.push(pbxFetch(`gateways`).then((r) => ({ k: "gateways", r })));
+      if (want("users") || want("domain_users")) tasks.push(pbxFetch(`users?${domainQ}`).then((r) => ({ k: "users", r })));
       const results = await Promise.all(tasks);
       const cdrResult = want("cdrs") ? await fetchCdrsWithFallback({ limit: "200" }) : null;
       const stats: Record<string, number> = {};
