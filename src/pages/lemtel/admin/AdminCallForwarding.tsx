@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,13 +8,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Router, RefreshCw, Loader2, Save, Search } from 'lucide-react';
+import { Router, RefreshCw, Loader2, Save, Search, X, ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { AdminSkeletonRows, AdminEmptyState } from '@/components/admin/AdminSkeletonRows';
 import { LEMTEL_ORG } from '@/hooks/usePbxData';
 
 type DestKind = 'custom' | 'voicemail' | 'extension' | 'ring_group' | 'queue';
+const PAGE_SIZE = 25;
+
+function useDebounced<T>(value: T, delay = 250): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setV(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return v;
+}
 
 function DestinationPicker({
   value, onChange, extensions, ringGroups, queues, placeholder,
@@ -23,7 +33,6 @@ function DestinationPicker({
   extensions: any[]; ringGroups: any[]; queues: any[];
   placeholder?: string;
 }) {
-  // Detect kind by prefix or membership.
   const detect = (): DestKind => {
     if (!value) return 'custom';
     if (value.startsWith('*97') || value.startsWith('voicemail:')) return 'voicemail';
@@ -33,6 +42,10 @@ function DestinationPicker({
     return 'custom';
   };
   const kind = detect();
+  const list = kind === 'extension' ? extensions : kind === 'ring_group' ? ringGroups : kind === 'queue' ? queues : [];
+  const emptyLabel = kind === 'extension' ? 'No extensions synced'
+    : kind === 'ring_group' ? 'No ring groups synced'
+    : kind === 'queue' ? 'No queues synced' : '';
 
   return (
     <div className="flex gap-1 items-center">
@@ -40,7 +53,7 @@ function DestinationPicker({
         value={kind}
         onValueChange={(k: DestKind) => {
           if (k === 'voicemail') onChange('*97');
-          else if (k === 'custom') onChange(value || '');
+          else if (k === 'custom') onChange(value && !['*97'].includes(value) ? value : '');
           else onChange('');
         }}
       >
@@ -53,26 +66,27 @@ function DestinationPicker({
           <SelectItem value="queue">Queue</SelectItem>
         </SelectContent>
       </Select>
-      {kind === 'extension' || kind === 'ring_group' || kind === 'queue' ? (
-        <Select value={value} onValueChange={onChange}>
-          <SelectTrigger className="w-32 h-8 text-xs"><SelectValue placeholder="Pick…" /></SelectTrigger>
-          <SelectContent>
-            {(kind === 'extension' ? extensions
-              : kind === 'ring_group' ? ringGroups
-              : queues
-            ).map((o: any) => (
-              <SelectItem key={o.id} value={o.extension || ''}>
-                {o.extension} {o.name || o.display_name ? `— ${o.name || o.display_name}` : ''}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {(kind === 'extension' || kind === 'ring_group' || kind === 'queue') ? (
+        list.length === 0 ? (
+          <span className="text-[10px] text-muted-foreground italic px-1">{emptyLabel}</span>
+        ) : (
+          <Select value={value} onValueChange={onChange}>
+            <SelectTrigger className="w-32 h-8 text-xs"><SelectValue placeholder="Pick…" /></SelectTrigger>
+            <SelectContent>
+              {list.map((o: any) => (
+                <SelectItem key={o.id} value={o.extension || ''}>
+                  {o.extension} {o.name || o.display_name ? `— ${o.name || o.display_name}` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )
       ) : (
         <Input
           className="w-28 h-8 font-mono text-xs"
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
+          placeholder={placeholder || (kind === 'voicemail' ? '*97' : 'Number…')}
           disabled={kind === 'voicemail'}
         />
       )}
@@ -83,9 +97,13 @@ function DestinationPicker({
 export default function AdminCallForwarding() {
   const [edits, setEdits] = useState<Record<string, any>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const search = useDebounced(searchInput, 250);
+  const [page, setPage] = useState(0);
 
-  const { data: rows = [], isLoading, refetch } = useQuery({
+  useEffect(() => { setPage(0); }, [search]);
+
+  const { data: rows = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['pbx-call-forwarding-admin'],
     queryFn: async () => {
       const { data, error } = await supabase.from('pbx_call_forwarding').select('*').order('updated_at', { ascending: false });
@@ -117,6 +135,7 @@ export default function AdminCallForwarding() {
       const { data } = await supabase.from('pbx_extensions').select('id, extension, display_name').eq('organization_id', LEMTEL_ORG).order('extension');
       return data || [];
     },
+    staleTime: 60_000,
   });
   const { data: ringGroups = [] } = useQuery({
     queryKey: ['cf-ring-groups'],
@@ -124,6 +143,7 @@ export default function AdminCallForwarding() {
       const { data } = await supabase.from('pbx_ring_groups').select('id, extension, name').eq('organization_id', LEMTEL_ORG).order('extension');
       return data || [];
     },
+    staleTime: 60_000,
   });
   const { data: queues = [] } = useQuery({
     queryKey: ['cf-queues'],
@@ -131,6 +151,7 @@ export default function AdminCallForwarding() {
       const { data } = await supabase.from('pbx_call_queues').select('id, extension, name').eq('organization_id', LEMTEL_ORG).order('extension');
       return data || [];
     },
+    staleTime: 60_000,
   });
 
   const val = (r: any, k: string) => edits[r.user_id]?.[k] ?? r[k];
@@ -165,6 +186,9 @@ export default function AdminCallForwarding() {
     });
   }, [rows, directory, search]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
   return (
     <div className="space-y-4 w-full min-w-0">
       <AdminPageHeader
@@ -175,15 +199,50 @@ export default function AdminCallForwarding() {
           <div className="flex gap-2 items-center">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search user, ext…" className="pl-8 w-48 h-9" />
+              <Input
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
+                placeholder="Search name, email, ext…"
+                className="pl-8 pr-8 w-56 h-9"
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={() => setSearchInput('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
-            <Button variant="outline" onClick={() => refetch()}><RefreshCw className="w-4 h-4 mr-2" /> Refresh</Button>
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+              {isFetching ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />} Refresh
+            </Button>
           </div>
         }
       />
 
       <Card>
-        <CardHeader><CardTitle>{filtered.length} rule{filtered.length === 1 ? '' : 's'}</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
+          <CardTitle>
+            {filtered.length} rule{filtered.length === 1 ? '' : 's'}
+            {search && rows.length !== filtered.length && (
+              <span className="text-sm font-normal text-muted-foreground ml-2">(of {rows.length})</span>
+            )}
+          </CardTitle>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2 text-sm">
+              <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-muted-foreground">Page {page + 1} / {totalPages}</span>
+              <Button size="sm" variant="outline" disabled={page + 1 >= totalPages} onClick={() => setPage(p => p + 1)}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+        </CardHeader>
         <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader><TableRow>
@@ -197,8 +256,21 @@ export default function AdminCallForwarding() {
             </TableRow></TableHeader>
             <TableBody>
               {isLoading ? <AdminSkeletonRows rows={5} cols={11} /> :
-                filtered.length === 0 ? <TableRow><TableCell colSpan={11}><AdminEmptyState title="No forwarding rules" hint="Users haven't configured call forwarding yet." /></TableCell></TableRow> :
-                filtered.map((r: any) => {
+                filtered.length === 0 ? (
+                  <TableRow><TableCell colSpan={11}>
+                    {search ? (
+                      <div className="text-center py-10 space-y-2">
+                        <Inbox className="w-10 h-10 mx-auto text-muted-foreground/60" />
+                        <div className="font-medium">No matches for "{search}"</div>
+                        <div className="text-sm text-muted-foreground">Try a different name, email, or extension.</div>
+                        <Button size="sm" variant="outline" onClick={() => setSearchInput('')}>Clear search</Button>
+                      </div>
+                    ) : (
+                      <AdminEmptyState title="No forwarding rules" hint="Users haven't configured call forwarding yet." />
+                    )}
+                  </TableCell></TableRow>
+                ) :
+                paged.map((r: any) => {
                   const d = directory[r.user_id] || {};
                   return (
                   <TableRow key={r.user_id} className="hover:bg-muted/40">
