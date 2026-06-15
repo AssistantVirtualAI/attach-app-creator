@@ -25,6 +25,7 @@ type Options = {
 
 export function useRealtimeRefresh(opts: Options, refresh: () => void) {
   const { table, organizationId, events = ['INSERT', 'UPDATE'], debounceMs = 600, throttleMs = 10_000, shouldRefresh } = opts;
+  const eventsKey = events.join(',');
   const refreshRef = useRef(refresh);
   const lastRefreshAtRef = useRef(0);
   refreshRef.current = refresh;
@@ -45,7 +46,8 @@ export function useRealtimeRefresh(opts: Options, refresh: () => void) {
     };
 
     const channel = supabase.channel(`rt-${table}-${organizationId}`);
-    for (const ev of events) {
+    const activeEvents = eventsKey.split(',') as Array<'INSERT' | 'UPDATE' | 'DELETE'>;
+    for (const ev of activeEvents) {
       channel.on(
         // @ts-expect-error — supabase-js types for postgres_changes
         'postgres_changes',
@@ -61,5 +63,5 @@ export function useRealtimeRefresh(opts: Options, refresh: () => void) {
       if (pending) clearTimeout(pending);
       try { supabase.removeChannel(channel); } catch { /* noop */ }
     };
-  }, [table, organizationId, debounceMs, throttleMs, shouldRefresh, events.join(',')]);
+  }, [table, organizationId, debounceMs, throttleMs, shouldRefresh, eventsKey]);
 }
