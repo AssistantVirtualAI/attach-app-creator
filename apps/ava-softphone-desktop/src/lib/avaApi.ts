@@ -478,7 +478,9 @@ function mapCdrToRecording(r: any): RecordingItem {
 async function readCallRecordRows(limit = 100): Promise<any[]> {
   const me = await getMeContext();
   const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-  const extFilter = me.extension ? `&extension=eq.${me.extension}` : '&id=is.null';
+  const extFilter = me.extension
+    ? `&or=(extension.eq.${me.extension},caller_number.eq.${me.extension},destination_number.eq.${me.extension},source_number.eq.${me.extension})`
+    : '&id=is.null';
   const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,analyzed,mos,raw_data,notes,tags${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
 
   const res = await fetch(url, {
