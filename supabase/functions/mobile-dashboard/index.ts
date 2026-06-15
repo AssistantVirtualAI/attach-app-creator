@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
 
     const { data: sp } = await sb
       .from("pbx_softphone_users")
-      .select("organization_id, extension, extension_uuid, sip_domain, display_name, status, status_updated_at, updated_at, forward_enabled, forward_to, dnd_enabled")
+      .select("organization_id, extension, sip_domain, display_name, status, status_updated_at, updated_at, forward_enabled, forward_to, dnd_enabled")
       .eq("portal_user_id", u.user.id)
       .maybeSingle();
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
@@ -49,10 +49,7 @@ Deno.serve(async (req) => {
       .eq("organization_id", orgId)
       .eq("call_status", "voicemail");
 
-    if (sp.extension_uuid) {
-      callsQ = callsQ.eq("extension_uuid", sp.extension_uuid);
-      vmQ = vmQ.eq("extension_uuid", sp.extension_uuid);
-    } else if (sp.extension) {
+    if (sp.extension) {
       callsQ = callsQ.eq("extension", sp.extension);
       vmQ = vmQ.eq("extension", sp.extension);
     }
@@ -62,8 +59,7 @@ Deno.serve(async (req) => {
       .eq("organization_id", orgId)
       .order("last_message_at", { ascending: false })
       .limit(20);
-    if (sp.extension_uuid) smsQ = smsQ.eq("extension_uuid", sp.extension_uuid);
-    else if (sp.extension) smsQ = smsQ.eq("extension", sp.extension);
+    if (sp.extension) smsQ = smsQ.eq("extension", sp.extension);
 
     const [{ data: calls }, { data: threads }, { data: vmails }] = await Promise.all([
       callsQ.order("start_at", { ascending: false }).limit(100),
