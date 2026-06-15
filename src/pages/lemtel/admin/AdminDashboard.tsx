@@ -319,6 +319,78 @@ export default function AdminDashboard() {
         <StatusChart title={`Active Calls — ${activeCalls ?? 0}`} data={active} stroke="hsl(199 89% 48%)" />
       </div>
 
+      {/* Real KPIs from live database */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+        {[
+          { label: 'Calls today', value: stats?.callsToday ?? 0 },
+          { label: 'Answered', value: stats?.answered ?? 0 },
+          { label: 'Missed', value: stats?.missed ?? 0, cls: 'text-red-600' },
+          { label: 'Answer rate', value: `${stats?.answerRate ?? 0}%` },
+          { label: 'Minutes today', value: stats?.minutesToday ?? 0 },
+          { label: 'Inbound', value: stats?.inbound ?? 0 },
+          { label: 'Outbound', value: stats?.outbound ?? 0 },
+          { label: 'Extensions', value: stats?.extensionsTotal ?? 0 },
+        ].map(k => (
+          <Card key={k.label} className="p-3">
+            <div className="text-xs text-muted-foreground">{k.label}</div>
+            <div className={`text-2xl font-bold ${(k as any).cls ?? ''}`}>{k.value}</div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Recordings & AI insights */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="p-4">
+          <div className="text-sm font-semibold mb-1">Recordings coverage</div>
+          <div className="text-3xl font-bold">{stats?.totalRec ?? 0}</div>
+          <div className="text-xs text-muted-foreground">
+            {stats?.transcribed ?? 0} transcribed ({stats?.transcribePct ?? 0}%) ·
+            {' '}{stats?.analyzed ?? 0} analyzed ({stats?.analyzedPct ?? 0}%)
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-sm font-semibold mb-2">Sentiment (last 7d)</div>
+          <div className="flex gap-2 flex-wrap">
+            {Object.entries(stats?.sentiment ?? {}).map(([k, v]) => (
+              <Badge key={k} variant="outline" className={
+                k === 'positive' ? 'bg-green-500/15 text-green-600 border-green-500/30' :
+                k === 'negative' ? 'bg-red-500/15 text-red-600 border-red-500/30' :
+                'bg-blue-500/15 text-blue-600 border-blue-500/30'
+              }>{k}: {v as number}</Badge>
+            ))}
+            {!Object.keys(stats?.sentiment ?? {}).length && (
+              <span className="text-xs text-muted-foreground">No analyzed calls yet — open Recordings → AI Insights.</span>
+            )}
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-sm font-semibold mb-1">App access</div>
+          <div className="text-xs text-muted-foreground">
+            {stats?.desktopGrant ?? 0} desktop · {stats?.mobileGrant ?? 0} mobile / {stats?.softphoneTotal ?? 0} softphone users
+          </div>
+          <Link to="/org/lemtel/admin/extensions" className="text-xs text-primary underline">Manage app access →</Link>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <StatusChart title="Calls by hour (today)" data={stats?.hoursToday ?? []} stroke="hsl(199 89% 48%)" />
+        <StatusChart title="Calls per day (30d)" data={stats?.days30 ?? []} stroke="hsl(142 71% 45%)" />
+      </div>
+
+      {!!(stats?.topExtensions?.length) && (
+        <Card className="p-4">
+          <div className="text-sm font-semibold mb-2">Top extensions today</div>
+          <div className="space-y-1">
+            {stats!.topExtensions!.map((e: any) => (
+              <div key={e.ext} className="flex items-center justify-between text-sm border-b last:border-b-0 py-1">
+                <span className="font-mono">{e.ext}</span>
+                <span className="font-semibold">{e.v} calls</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
     </div>
   );
 }
