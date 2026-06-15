@@ -1360,9 +1360,14 @@ Deno.serve(async (req) => {
       const attemptsSession: { url: string; status: number; content_type?: string }[] = [];
       if (xml_cdr_uuid) {
         for (const fileBase of fileBases) {
-          const sessionUrl = `${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`;
-          try {
-            let cookie = await getFusionSessionCookie(fileBase).catch(() => "");
+          const sessionUrls = [
+            `${fileBase}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`,
+            `${fileBase}/app/xml_cdr/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`,
+            `${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}&t=bin`,
+            `${fileBase}/app/call_recordings/download.php?id=${encodeURIComponent(xml_cdr_uuid)}`,
+          ];
+          let cookie = await getFusionSessionCookie(fileBase).catch(() => "");
+          for (const sessionUrl of sessionUrls) try {
             const doFetch = async (c: string) => {
               const controller = new AbortController();
               const timeout = setTimeout(() => controller.abort(), 8000);
