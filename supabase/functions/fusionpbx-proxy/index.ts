@@ -381,9 +381,27 @@ Deno.serve(async (req) => {
     }
 
     if (action === "debug-raw") {
+      // Restricted to lemtel/super admins only — exposes raw FusionPBX
+      // responses which may contain SIP passwords and other secrets.
+      const { data: isAdmin } = await admin.rpc("is_lemtel_admin", { _user_id: userId });
+      const { data: isSuper } = await admin.rpc("is_super_admin", { _user_id: userId });
+      if (!isAdmin && !isSuper) return json({ error: "forbidden" }, 403);
       const p = params.path || "gateways";
       const r = await pbxFetch(p);
-      return json({ ok: r.ok, status: r.status, raw: r.data, latency_ms: r.latency_ms });
+      // Strip well-known secret fields from any object before returning.
+      const SECRET_KEYS = new Set(["password", "sip_password", "voicemail_password", "secret", "api_key", "auth_token"]);
+      const scrub = (val: any): any => {
+        if (Array.isArray(val)) return val.map(scrub);
+        if (val && typeof val === "object") {
+          const out: Record<string, any> = {};
+          for (const [k, v] of Object.entries(val)) {
+            out[k] = SECRET_KEYS.has(k.toLowerCase()) ? "***" : scrub(v);
+          }
+          return out;
+        }
+        return val;
+      };
+      return json({ ok: r.ok, status: r.status, raw: scrub(r.data), latency_ms: r.latency_ms });
     }
 
     if (action === "desktop-audit") {
