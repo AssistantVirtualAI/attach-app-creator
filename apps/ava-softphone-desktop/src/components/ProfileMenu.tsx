@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { theme } from '../lib/theme';
 import { supabase } from '../lib/supabaseClient';
 import { setAuthToken } from '../lib/avaApi';
+import { useCallBus } from '../hooks/useCallBus';
+
 
 const { colors: c } = theme;
 
@@ -26,13 +28,19 @@ export default function ProfileMenu() {
   const [email, setEmail] = useState<string>('');
   const [name, setName] = useState<string>('');
   const [meetingNote, setMeetingNote] = useState<string>(() => localStorage.getItem(MEETING_NOTE_KEY) || '');
+  const [lockMsg, setLockMsg] = useState<string>('');
+  const { call } = useCallBus();
+  const inCall = !!call && call.status !== 'ended' && call.status !== 'idle';
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const meetingInputRef = useRef<HTMLInputElement>(null);
   const statusRef = useRef<Status>(status);
   const openRef = useRef<boolean>(open);
+  const inCallRef = useRef<boolean>(inCall);
   statusRef.current = status;
   openRef.current = open;
+  inCallRef.current = inCall;
+
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -97,11 +105,20 @@ export default function ProfileMenu() {
   const initials = (name || email || '?').slice(0, 2).toUpperCase();
 
   const applyStatus = (s: Status) => {
+    if (inCallRef.current) {
+      const msg = "Vous êtes en appel — votre statut est verrouillé jusqu'à la fin de l'appel.";
+      setLockMsg(msg);
+      setOpen(true);
+      try { window.electronAPI?.showNotification?.('Statut verrouillé', msg, { tag: 'lemtel-status-lock' }); } catch { /* noop */ }
+      setTimeout(() => setLockMsg(''), 4000);
+      return;
+    }
     setStatus(s);
     localStorage.setItem(STATUS_KEY, s);
     window.dispatchEvent(new CustomEvent('lemtel:set-status', { detail: STATUS_META[s].manual }));
     if (s !== 'meeting') setOpen(false);
   };
+
 
   const saveMeetingNote = (v: string) => {
     setMeetingNote(v);
