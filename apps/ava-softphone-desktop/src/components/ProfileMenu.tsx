@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { theme } from '../lib/theme';
 import { supabase } from '../lib/supabaseClient';
 import { setAuthToken } from '../lib/avaApi';
+import { useCallBus } from '../hooks/useCallBus';
+
 
 const { colors: c } = theme;
 
@@ -26,13 +28,19 @@ export default function ProfileMenu() {
   const [email, setEmail] = useState<string>('');
   const [name, setName] = useState<string>('');
   const [meetingNote, setMeetingNote] = useState<string>(() => localStorage.getItem(MEETING_NOTE_KEY) || '');
+  const [lockMsg, setLockMsg] = useState<string>('');
+  const { call } = useCallBus();
+  const inCall = !!call && call.status !== 'ended' && call.status !== 'idle';
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const meetingInputRef = useRef<HTMLInputElement>(null);
   const statusRef = useRef<Status>(status);
   const openRef = useRef<boolean>(open);
+  const inCallRef = useRef<boolean>(inCall);
   statusRef.current = status;
   openRef.current = open;
+  inCallRef.current = inCall;
+
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -97,11 +105,20 @@ export default function ProfileMenu() {
   const initials = (name || email || '?').slice(0, 2).toUpperCase();
 
   const applyStatus = (s: Status) => {
+    if (inCallRef.current) {
+      const msg = "Vous êtes en appel — votre statut est verrouillé jusqu'à la fin de l'appel.";
+      setLockMsg(msg);
+      setOpen(true);
+      try { window.electronAPI?.showNotification?.('Statut verrouillé', msg, { tag: 'lemtel-status-lock' }); } catch { /* noop */ }
+      setTimeout(() => setLockMsg(''), 4000);
+      return;
+    }
     setStatus(s);
     localStorage.setItem(STATUS_KEY, s);
     window.dispatchEvent(new CustomEvent('lemtel:set-status', { detail: STATUS_META[s].manual }));
     if (s !== 'meeting') setOpen(false);
   };
+
 
   const saveMeetingNote = (v: string) => {
     setMeetingNote(v);
@@ -210,17 +227,42 @@ export default function ProfileMenu() {
           <div style={{ padding: '8px 4px 4px', fontSize: 9, fontWeight: 800, color: c.textSub, letterSpacing: 1.2, textTransform: 'uppercase' }}>
             Set status
           </div>
+          {inCall && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              margin: '4px 2px 6px', padding: '7px 9px', borderRadius: 8,
+              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.35)',
+              color: '#fecaca', fontSize: 10.5, lineHeight: 1.35,
+            }}>
+              <span aria-hidden style={{ fontSize: 13 }}>🔒</span>
+              <span>Statut verrouillé pendant un appel actif. Terminez l'appel pour le modifier.</span>
+            </div>
+          )}
+          {lockMsg && !inCall && (
+            <div style={{
+              margin: '4px 2px 6px', padding: '7px 9px', borderRadius: 8,
+              background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.4)',
+              color: '#fde68a', fontSize: 10.5,
+            }}>{lockMsg}</div>
+          )}
           {(Object.keys(STATUS_META) as Status[]).map((s) => {
             const m = STATUS_META[s];
             const active = s === status;
             return (
-              <button key={s} onClick={() => applyStatus(s)} style={menuItem(active)}>
+              <button
+                key={s}
+                onClick={() => applyStatus(s)}
+                disabled={inCall}
+                title={inCall ? "Indisponible pendant un appel actif" : ''}
+                style={{ ...menuItem(active), opacity: inCall ? 0.5 : 1, cursor: inCall ? 'not-allowed' : 'pointer' }}
+              >
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.color, boxShadow: `0 0 8px ${m.color}` }} />
                 <span style={{ flex: 1, textAlign: 'left' }}>{m.label}</span>
                 {active && <span style={{ fontSize: 11, color: m.color }}>✓</span>}
               </button>
             );
           })}
+
 
           {status === 'meeting' && (
             <div style={{ padding: '8px 6px 4px' }}>
