@@ -97,7 +97,7 @@ export default function LemtelExtensions() {
       });
       if (error) throw error;
       toast({ title: 'Extension deleted' });
-      queryClient.invalidateQueries({ queryKey: ['pbx_extensions'] });
+      queryClient.invalidateQueries({ queryKey: ['pbx'] });
     } catch (err: any) {
       toast({ title: 'Delete failed', description: err?.message || String(err), variant: 'destructive' });
     } finally {
