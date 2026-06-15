@@ -9,6 +9,9 @@ interface Props {
   onCall: (n: string) => void;
 }
 
+// Module-level cache: survives unmount/remount when navigating between pages.
+const voicemailAudioCache = new Map<string, string>();
+
 function fmtTime(iso: string | null) {
   if (!iso) return '';
   const d = new Date(iso);
