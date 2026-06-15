@@ -4824,6 +4824,63 @@ export type Database = {
         }
         Relationships: []
       }
+      pbx_domain_users: {
+        Row: {
+          api_key: string | null
+          created_at: string
+          domain_uuid: string | null
+          email: string | null
+          groups: Json | null
+          id: string
+          last_login_at: string | null
+          last_synced_at: string | null
+          organization_id: string
+          pbx_uuid: string | null
+          raw_data: Json | null
+          sync_status: string | null
+          updated_at: string
+          user_enabled: boolean | null
+          user_status: string | null
+          username: string
+        }
+        Insert: {
+          api_key?: string | null
+          created_at?: string
+          domain_uuid?: string | null
+          email?: string | null
+          groups?: Json | null
+          id?: string
+          last_login_at?: string | null
+          last_synced_at?: string | null
+          organization_id: string
+          pbx_uuid?: string | null
+          raw_data?: Json | null
+          sync_status?: string | null
+          updated_at?: string
+          user_enabled?: boolean | null
+          user_status?: string | null
+          username: string
+        }
+        Update: {
+          api_key?: string | null
+          created_at?: string
+          domain_uuid?: string | null
+          email?: string | null
+          groups?: Json | null
+          id?: string
+          last_login_at?: string | null
+          last_synced_at?: string | null
+          organization_id?: string
+          pbx_uuid?: string | null
+          raw_data?: Json | null
+          sync_status?: string | null
+          updated_at?: string
+          user_enabled?: boolean | null
+          user_status?: string | null
+          username?: string
+        }
+        Relationships: []
+      }
       pbx_domains: {
         Row: {
           client_id: string | null
@@ -9485,6 +9542,10 @@ export type Database = {
       }
       admin_link_softphone_by_extension_email: {
         Args: { _email: string; _extension: string; _org_id: string }
+        Returns: Json
+      }
+      audit_my_pbx_extensions_access: {
+        Args: { _org_id?: string }
         Returns: Json
       }
       audit_my_recordings_access: { Args: never; Returns: Json }
