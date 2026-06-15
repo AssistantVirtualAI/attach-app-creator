@@ -1022,7 +1022,7 @@ Deno.serve(async (req) => {
               if (!row.extension && row.extension_uuid) row.extension = byUuid.get(row.extension_uuid) || null;
             });
           }
-          const { error, count } = await admin.from("pbx_call_records").upsert(rows, { onConflict: "pbx_uuid", count: "exact" });
+          const { error, count } = await admin.from("pbx_call_records").upsert(rows, { onConflict: "organization_id,pbx_uuid", count: "exact", ignoreDuplicates: false });
           if (error) allErrors.push(`upsert page ${i}: ${error.message}`);
           else totalUpserted += count ?? rows.length;
         }
