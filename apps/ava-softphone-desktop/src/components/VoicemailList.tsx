@@ -22,31 +22,34 @@ export default function VoicemailList({ extension, onCall }: Props) {
   const [playing, setPlaying] = useState<string | null>(null);
   const [audio, setAudio] = useState<Record<string, string>>({});
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setErr(null);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setLoading(true); setErr(null); }
     try {
       const data = await ava.voicemails(50);
       setRows(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      setErr(e?.message || 'Unable to load voicemail.');
-      setRows([]);
+      if (!silent) {
+        setErr(e?.message || 'Unable to load voicemail.');
+        setRows([]);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [extension]);
 
+  const silentLoad = useCallback(() => { void load(true); }, [load]);
+
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    const onSync = () => { void load(); };
+    const onSync = () => { void load(true); };
     window.addEventListener('lemtel:phone-sync-complete', onSync);
     return () => window.removeEventListener('lemtel:phone-sync-complete', onSync);
   }, [load]);
 
   // Realtime: new voicemails for this tenant trigger a refetch.
   const orgId = useOrgId();
-  useRealtimeRefresh({ table: 'pbx_voicemails', organizationId: orgId }, load);
-  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, load);
+  useRealtimeRefresh({ table: 'pbx_voicemails', organizationId: orgId }, silentLoad);
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, silentLoad);
 
 
   const togglePlay = async (r: VoicemailItem) => {
@@ -62,14 +65,14 @@ export default function VoicemailList({ extension, onCall }: Props) {
   };
 
   if (loading) return <div style={center}>Loading voicemail…</div>;
-  if (err) return <div style={{ ...center, color: '#ff8a8a' }}>{err}<br /><button onClick={load} style={refreshBtn}>Retry</button></div>;
+  if (err) return <div style={{ ...center, color: '#ff8a8a' }}>{err}<br /><button onClick={() => load()} style={refreshBtn}>Retry</button></div>;
   if (rows.length === 0) return <div style={center}>No voicemail</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
         <span style={{ fontSize: 11, opacity: 0.6 }}>{rows.length} message{rows.length > 1 ? 's' : ''}</span>
-        <button onClick={load} style={refreshBtn}>↻</button>
+        <button onClick={() => load()} style={refreshBtn}>↻</button>
       </div>
       {rows.map((r) => {
         const peer = r.from || '?';

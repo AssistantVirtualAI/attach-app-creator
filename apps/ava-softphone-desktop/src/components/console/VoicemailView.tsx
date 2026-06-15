@@ -42,25 +42,29 @@ export default function VoicemailView() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setLoading(true); setError(null); }
     try {
       const d = await ava.voicemails();
       setItems(Array.isArray(d) ? d : []);
     } catch (err: any) {
-      setItems([]);
-      setError(err?.message || 'Unable to load voicemail from the phone system.');
+      if (!silent) {
+        setItems([]);
+        setError(err?.message || 'Unable to load voicemail from the phone system.');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
+
+  const silentLoad = useCallback(() => { void load(true); }, [load]);
 
   useEffect(() => { load(); }, [load]);
 
   // Realtime: refresh on new voicemail / call rows for this tenant.
   const orgId = useOrgId();
-  useRealtimeRefresh({ table: 'pbx_voicemails', organizationId: orgId }, load);
-  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, load);
+  useRealtimeRefresh({ table: 'pbx_voicemails', organizationId: orgId }, silentLoad);
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, silentLoad);
 
 
   // Reset playback when selection changes
