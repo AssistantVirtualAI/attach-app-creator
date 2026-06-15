@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     if (!u?.user) return json({ error: "unauthorized" }, 401);
 
     const { data: sp } = await sb.from("pbx_softphone_users")
-      .select("organization_id, extension, extension_uuid")
+      .select("organization_id, extension")
       .eq("portal_user_id", u.user.id).maybeSingle();
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
 
@@ -48,8 +48,7 @@ Deno.serve(async (req) => {
       let detailQ = sb.from("pbx_call_records").select("*")
         .eq("id", id).eq("organization_id", sp.organization_id);
       // Scope per-extension so two users in the same org cannot see each other's records.
-      if (sp.extension_uuid) detailQ = detailQ.eq("extension_uuid", sp.extension_uuid);
-      else if (sp.extension) detailQ = detailQ.eq("extension", sp.extension);
+      if (sp.extension) detailQ = detailQ.eq("extension", sp.extension);
       const { data: r } = await detailQ.maybeSingle();
       if (!r) return json({ error: "not_found" }, 404);
 
@@ -88,8 +87,7 @@ Deno.serve(async (req) => {
     let listQ = sb.from("pbx_call_records")
       .select("id, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, transcribed")
       .eq("organization_id", sp.organization_id);
-    if (sp.extension_uuid) listQ = listQ.eq("extension_uuid", sp.extension_uuid);
-    else if (sp.extension) listQ = listQ.eq("extension", sp.extension);
+    if (sp.extension) listQ = listQ.eq("extension", sp.extension);
     const { data: rows, error } = await listQ
       .order("start_at", { ascending: false }).limit(limit);
     if (error) throw error;
