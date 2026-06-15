@@ -246,10 +246,19 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatusChart title="System CPU Status" data={cpu} stroke="hsl(217 91% 60%)" />
-        <StatusChart title="System Network Status" data={net} stroke="hsl(142 71% 45%)" />
-        <StatusChart title="Active Calls" data={active} stroke="hsl(199 89% 48%)" />
+        <StatusChart
+          title={`System CPU${health?.metrics_available?.cpu === false ? ' (Unavailable)' : health?.cpu_percent != null ? ` — ${Math.round(Number(health.cpu_percent))}%` : ''}`}
+          data={cpu}
+          stroke="hsl(217 91% 60%)"
+        />
+        <StatusChart
+          title={`Memory${health?.metrics_available?.memory === false ? ' (Unavailable)' : health?.memory_percent != null ? ` — ${Math.round(Number(health.memory_percent))}%` : ''}`}
+          data={net}
+          stroke="hsl(142 71% 45%)"
+        />
+        <StatusChart title={`Active Calls — ${activeCalls ?? 0}`} data={active} stroke="hsl(199 89% 48%)" />
       </div>
+
     </div>
   );
 }
