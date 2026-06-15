@@ -951,6 +951,7 @@ const App = () => (
                   <Route path="insights" element={<ConsoleInsights />} />
                   <Route path="chatbot" element={<ConsoleChatbot />} />
                   <Route path="audit" element={<ConsoleAudit />} />
+                  <Route path="presence" element={<ConsolePresence />} />
                 </Route>
 
 
