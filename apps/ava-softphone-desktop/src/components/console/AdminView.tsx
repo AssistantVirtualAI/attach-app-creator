@@ -4,6 +4,9 @@ import { theme } from '../../lib/theme';
 import { ava, getMeContext } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
 import PbxResourceSection from './admin/PbxResourceSection';
+import VoicemailView from './VoicemailView';
+import RecordingsView from './RecordingsView';
+import CallsView from './CallsView';
 
 const { colors: c } = theme;
 
@@ -239,8 +242,8 @@ function Label({ children }: { children: React.ReactNode }) {
 type Section =
   | 'extensions' | 'devices' | 'numbers' | 'ivrs' | 'queues' | 'ringgroups'
   | 'gateways' | 'sip-profiles' | 'conferences' | 'hold-music' | 'dialplans'
-  | 'time-conditions' | 'registrations' | 'voicemails' | 'recordings' | 'feature-codes'
-  | 'sync';
+  | 'time-conditions' | 'registrations' | 'voicemails' | 'recordings'
+  | 'call-history' | 'feature-codes' | 'sync';
 
 const NAV_GROUPS: { label: string; items: { id: Section; label: string }[] }[] = [
   {
@@ -266,7 +269,8 @@ const NAV_GROUPS: { label: string; items: { id: Section; label: string }[] }[] =
     label: 'Media',
     items: [
       { id: 'voicemails', label: 'Voicemails' },
-      { id: 'recordings', label: 'Recording Rules' },
+      { id: 'recordings', label: 'Call Recordings' },
+      { id: 'call-history', label: 'Call History' },
       { id: 'hold-music', label: 'Hold Music' },
       { id: 'conferences', label: 'Conferences' },
       { id: 'feature-codes', label: 'Feature Codes' },
@@ -304,7 +308,7 @@ export default function AdminView() {
           </div>
         ))}
       </aside>
-      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px' }}>
+      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: (sec === 'voicemails' || sec === 'recordings' || sec === 'call-history') ? 0 : '24px 28px' }}>
         {sec === 'extensions' && <ExtensionsTable />}
         {sec === 'devices' && (
           <PbxResourceSection
@@ -450,8 +454,9 @@ export default function AdminView() {
           />
         )}
         {sec === 'feature-codes' && <FeatureCodesTable />}
-        {sec === 'voicemails' && <VoicemailsTable />}
-        {sec === 'recordings' && <RecordingRulesTable />}
+        {sec === 'voicemails' && <VoicemailView />}
+        {sec === 'recordings' && <RecordingsView />}
+        {sec === 'call-history' && <CallsView />}
         {sec === 'registrations' && <LiveRegistrationsTable />}
         {sec === 'sync' && <SyncStatus />}
       </div>
