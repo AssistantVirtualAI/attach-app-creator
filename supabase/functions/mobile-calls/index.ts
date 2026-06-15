@@ -40,6 +40,7 @@ Deno.serve(async (req) => {
       .select("organization_id, extension")
       .eq("portal_user_id", u.user.id).maybeSingle();
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
+    if (!sp.extension) return json({ error: "NO_EXTENSION_ASSIGNED" }, 403);
 
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
@@ -48,7 +49,7 @@ Deno.serve(async (req) => {
       let detailQ = sb.from("pbx_call_records").select("*")
         .eq("id", id).eq("organization_id", sp.organization_id);
       // Scope per-extension so two users in the same org cannot see each other's records.
-      if (sp.extension) detailQ = detailQ.eq("extension", sp.extension);
+      detailQ = detailQ.eq("extension", sp.extension);
       const { data: r } = await detailQ.maybeSingle();
       if (!r) return json({ error: "not_found" }, 404);
 
@@ -87,7 +88,7 @@ Deno.serve(async (req) => {
     let listQ = sb.from("pbx_call_records")
       .select("id, direction, call_status, caller_name, caller_number, source_number, destination, destination_number, extension, start_at, duration_seconds, missed_call, has_recording, transcribed")
       .eq("organization_id", sp.organization_id);
-    if (sp.extension) listQ = listQ.eq("extension", sp.extension);
+    listQ = listQ.eq("extension", sp.extension);
     const { data: rows, error } = await listQ
       .order("start_at", { ascending: false }).limit(limit);
     if (error) throw error;
