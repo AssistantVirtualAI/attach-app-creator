@@ -89,7 +89,20 @@ export default function ConsoleChatbot() {
               placeholder="Show me extension health, sync status, users, queues, IVRs…"
               className="min-h-32"
             />
-            <Button onClick={ask} disabled={busy || !message.trim()}>
+            <div className="flex flex-wrap gap-2">
+              {QUICK_ACTIONS.map((qa) => (
+                <Button
+                  key={qa.label}
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => ask(qa.prompt)}
+                >
+                  {qa.label}
+                </Button>
+              ))}
+            </div>
+            <Button onClick={() => ask()} disabled={busy || !message.trim()}>
               <Send className="h-4 w-4 mr-2" /> {busy ? "Asking…" : "Ask"}
             </Button>
             {result && (
