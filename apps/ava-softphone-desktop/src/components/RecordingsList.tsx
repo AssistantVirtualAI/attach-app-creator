@@ -131,7 +131,11 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   const play = async (r: RecordingItem) => {
     setError(null);
     setAudioErrors((all) => { const next = { ...all }; delete next[r.id]; return next; });
-    if (audio[r.id]) return;
+    if (audio[r.id] || audioCache.has(r.id)) {
+      const cached = audio[r.id] || audioCache.get(r.id)!;
+      if (!audio[r.id]) setAudio((a) => ({ ...a, [r.id]: cached }));
+      return;
+    }
     setAudioLoading(r.id);
     try {
       // Prefer short-lived signed URL (no client download); fallback to proxy blob.
@@ -144,6 +148,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
         }));
         return;
       }
+      audioCache.set(r.id, url);
       setAudio((a) => ({ ...a, [r.id]: url }));
       audit('recording.played', r.callId || r.id, { recording_name: r.recording_name });
     } finally {
