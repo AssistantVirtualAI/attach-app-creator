@@ -66,6 +66,25 @@ export default function ProfileMenu() {
     window.electronAPI?.onSetUiStatus?.(cb);
   }, []);
 
+  // Global shortcut: focus / toggle meeting note field
+  useEffect(() => {
+    const cb = () => {
+      if (statusRef.current !== 'meeting') {
+        applyStatus('meeting');
+      }
+      setTimeout(() => {
+        if (openRef.current && meetingInputRef.current === document.activeElement) {
+          setOpen(false);
+        } else {
+          setOpen(true);
+          meetingInputRef.current?.focus();
+          meetingInputRef.current?.select();
+        }
+      }, 10);
+    };
+    window.electronAPI?.onFocusMeetingNote?.(cb);
+  }, []);
+
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
