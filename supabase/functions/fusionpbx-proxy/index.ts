@@ -213,9 +213,30 @@ Deno.serve(async (req) => {
   // confirmed-working pattern: Basic <FUSIONPBX_API_KEY>.
   const basicHeader = `Basic ${FUSIONPBX_API_KEY}`;
 
-  // Per-request domain override (each list/action can target any tenant domain)
-  const requestedDomain: string = body.domain_uuid || params.domain_uuid || FUSIONPBX_DOMAIN_UUID;
+  // ─── Phase 1: Normalized org → domain_uuid resolution ──────────────────
+  // Priority: explicit body.domain_uuid > params.domain_uuid > org lookup > vault fallback.
+  // Resolving from organization_id ensures every list-*/sync-*/get-* action targets
+  // the correct tenant domain instead of silently using the global vault default.
+  async function resolveDomain(): Promise<{ domain: string; source: string; org_id: string | null }> {
+    if (body.domain_uuid) return { domain: body.domain_uuid, source: "body", org_id: organization_id || null };
+    if (params.domain_uuid) return { domain: params.domain_uuid, source: "params", org_id: organization_id || null };
+    if (organization_id) {
+      const { data: org } = await admin
+        .from("organizations")
+        .select("fusionpbx_domain_uuid")
+        .eq("id", organization_id)
+        .maybeSingle();
+      const du = (org as any)?.fusionpbx_domain_uuid;
+      if (du) return { domain: du, source: "organization", org_id: organization_id };
+      console.warn(`[fusionpbx-proxy] org ${organization_id} has no fusionpbx_domain_uuid; falling back to vault default`);
+    }
+    return { domain: FUSIONPBX_DOMAIN_UUID, source: "vault", org_id: organization_id || null };
+  }
+  const _resolved = await resolveDomain();
+  const requestedDomain: string = _resolved.domain;
   const domainQ = `domain_uuid=${requestedDomain}`;
+  // Expose for debug actions
+  (body as any)._resolvedDomain = _resolved;
 
   async function pbxFetch(path: string, init: RequestInit = {}) {
     const url = `${FUSIONPBX_API_URL}/app/api/7/${path}`;
