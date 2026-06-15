@@ -120,6 +120,8 @@ export default function HomeDashboard({
           <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'recordings' }))} style={quickBtn(c.avaViolet)}>Review Recordings</button>
           <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'messages' }))} style={quickBtn(c.success)}>Messages</button>
           <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'pbxlive' }))} style={quickBtn(c.mutedSilver)}>PBX Live</button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'admin' }))} style={quickBtn(c.lemtelBlue)}>Edit PBX Admin</button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'aiadmin' }))} style={quickBtn(c.avaViolet)}>AI Stats Assistant</button>
         </div>
       </div>
 

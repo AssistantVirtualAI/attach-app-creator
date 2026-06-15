@@ -53,7 +53,7 @@ export default function CustomerDetail() {
     enabled: !!domain,
     queryFn: async () => {
       const { data } = await (supabase as any).from('pbx_softphone_users')
-        .select('id,extension,display_name,sip_domain,status,app_access_enabled,portal_user_id,account_status')
+        .select('id,extension,display_name,sip_domain,status,app_access_enabled,desktop_access_enabled,mobile_access_enabled,portal_user_id,account_status')
         .ilike('sip_domain', `%${domain.domain_name}%`)
         .order('extension');
       return data || [];
@@ -102,10 +102,11 @@ export default function CustomerDetail() {
     enabled: tab === 'recordings',
   });
 
-  const toggleAppAccess = async (id: string, enabled: boolean) => {
-    const { error } = await (supabase as any).rpc('set_softphone_app_access', { _softphone_id: id, _enabled: enabled });
+  const togglePlatformAccess = async (id: string, platform: 'app' | 'desktop' | 'mobile', enabled: boolean) => {
+    const { error } = await (supabase as any).rpc('set_softphone_platform_access', { _softphone_id: id, _platform: platform, _enabled: enabled });
     if (error) return toast.error(error.message);
-    toast.success(enabled ? 'App access enabled' : 'App access revoked');
+    const label = platform === 'app' ? 'App' : platform === 'desktop' ? 'Desktop' : 'Mobile';
+    toast.success(enabled ? `${label} access enabled` : `${label} access revoked`);
     refetchSP();
   };
 
@@ -179,10 +180,10 @@ export default function CustomerDetail() {
             <Table>
               <TableHeader><TableRow>
                 <TableHead>Ext</TableHead><TableHead>Name</TableHead><TableHead>SIP Domain</TableHead>
-                <TableHead>Status</TableHead><TableHead className="text-right">App Access</TableHead>
+                <TableHead>Status</TableHead><TableHead className="text-right">App</TableHead><TableHead className="text-right">Desktop</TableHead><TableHead className="text-right">Mobile</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {spUsers.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No users. Run Sync.</TableCell></TableRow>}
+                {spUsers.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">No users. Run Sync.</TableCell></TableRow>}
                 {spUsers.map((u: any) => (
                   <TableRow key={u.id}>
                     <TableCell className="font-mono">{u.extension}</TableCell>
@@ -190,7 +191,13 @@ export default function CustomerDetail() {
                     <TableCell className="font-mono text-xs">{u.sip_domain}</TableCell>
                     <TableCell><Badge variant={u.status === 'online' ? 'default' : 'secondary'}>{u.status || 'offline'}</Badge></TableCell>
                     <TableCell className="text-right">
-                      <Switch checked={u.app_access_enabled !== false} onCheckedChange={(v) => toggleAppAccess(u.id, v)} />
+                      <Switch checked={u.app_access_enabled !== false} onCheckedChange={(v) => togglePlatformAccess(u.id, 'app', v)} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Switch checked={u.desktop_access_enabled !== false} disabled={u.app_access_enabled === false} onCheckedChange={(v) => togglePlatformAccess(u.id, 'desktop', v)} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Switch checked={u.mobile_access_enabled !== false} disabled={u.app_access_enabled === false} onCheckedChange={(v) => togglePlatformAccess(u.id, 'mobile', v)} />
                     </TableCell>
                   </TableRow>
                 ))}

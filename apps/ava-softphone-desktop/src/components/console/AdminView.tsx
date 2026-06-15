@@ -13,6 +13,21 @@ const { colors: c } = theme;
 const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 const LEMTEL_DOMAIN = '2936594e-17b7-42a9-9165-95be48627923';
 
+async function resolveDesktopTenantScope() {
+  const me = await getMeContext().catch(() => null);
+  const organization_id = me?.organization_id || LEMTEL_ORG;
+  let domain_uuid = (me as any)?.domain_uuid || null;
+  if (!domain_uuid && organization_id) {
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('fusionpbx_domain_uuid')
+      .eq('id', organization_id)
+      .maybeSingle();
+    domain_uuid = (org as any)?.fusionpbx_domain_uuid || null;
+  }
+  return { organization_id, domain_uuid: domain_uuid || LEMTEL_DOMAIN };
+}
+
 /**
  * Shared modal shell — rendered via portal so ancestor `transform`, `filter`,
  * `overflow:hidden`, or backdrop-filter ancestors (e.g. the animated console
@@ -101,13 +116,14 @@ function ExtensionsTable() {
   const reload = useCallback(async (forceSync = false) => {
     setLoading(true); setError(null);
     try {
-      const me = await getMeContext();
-      const orgId = me.organization_id || LEMTEL_ORG;
+      const scope = await resolveDesktopTenantScope();
+      const orgId = scope.organization_id;
+      const domainUuid = scope.domain_uuid;
       // Trigger FusionPBX sync so all PBX extensions (not just registered softphones) land in the table.
       if (forceSync) {
         setSyncing(true);
         const { error: syncErr } = await supabase.functions.invoke('fusionpbx-proxy', {
-          body: { action: 'sync-all', resources: ['extensions'], organization_id: orgId, domain_uuid: LEMTEL_DOMAIN },
+          body: { action: 'sync-all', resources: ['extensions'], organization_id: orgId, domain_uuid: domainUuid },
         });
         if (syncErr) console.warn('sync-extensions failed:', syncErr.message);
         setSyncing(false);
@@ -133,8 +149,8 @@ function ExtensionsTable() {
       const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: {
           action: 'update-extension',
-          organization_id: LEMTEL_ORG,
-          params: { extension_uuid: ext.extension_uuid, domain_uuid: LEMTEL_DOMAIN, ...changes },
+          organization_id: (await resolveDesktopTenantScope()).organization_id,
+          params: { extension_uuid: ext.extension_uuid, domain_uuid: (await resolveDesktopTenantScope()).domain_uuid, ...changes },
         },
       });
       if (err) throw err;

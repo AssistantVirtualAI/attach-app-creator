@@ -15,10 +15,30 @@ import { sipProvider } from './lib/sip/jssipProvider';
 
 const LEMTEL_ORG_ID = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 
+async function resolveCurrentOrganizationId() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return LEMTEL_ORG_ID;
+  const { data: softphoneUser } = await supabase
+    .from('pbx_softphone_users')
+    .select('organization_id')
+    .eq('portal_user_id', user.id)
+    .limit(1)
+    .maybeSingle();
+  if (softphoneUser?.organization_id) return softphoneUser.organization_id;
+  const { data: member } = await supabase
+    .from('organization_members')
+    .select('organization_id')
+    .eq('user_id', user.id)
+    .limit(1)
+    .maybeSingle();
+  return member?.organization_id || LEMTEL_ORG_ID;
+}
+
 async function triggerCdrSync() {
   try {
+    const organizationId = await resolveCurrentOrganizationId();
     const { data } = await supabase.functions.invoke('fusionpbx-proxy', {
-      body: { action: 'sync-cdrs', organization_id: LEMTEL_ORG_ID, limit: 200 },
+      body: { action: 'sync-cdrs', organization_id: organizationId, limit: 200 },
     });
     console.log('CDR sync triggered:', data);
   } catch (err) {

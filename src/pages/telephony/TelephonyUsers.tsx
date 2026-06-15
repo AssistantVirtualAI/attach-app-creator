@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import {
   Users, Plus, Mail, KeyRound, Settings as SettingsIcon, Trash2, RefreshCw,
   Loader2, ShieldAlert, CheckCircle2, AlertCircle, Smartphone, Apple, Monitor,
-  Globe,
+  Globe, Laptop,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -58,6 +58,8 @@ interface UserRow {
   account_status: string | null;
   total_calls: number | null;
   app_access_enabled?: boolean | null;
+  desktop_access_enabled?: boolean | null;
+  mobile_access_enabled?: boolean | null;
   email?: string | null;
 }
 
@@ -67,7 +69,7 @@ function useSoftphoneUsers() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('pbx_softphone_users' as any)
-        .select('id, portal_user_id, extension, display_name, status, last_seen_at, active_platforms, account_status, total_calls, app_access_enabled')
+        .select('id, portal_user_id, extension, display_name, status, last_seen_at, active_platforms, account_status, total_calls, app_access_enabled, desktop_access_enabled, mobile_access_enabled')
         .eq('organization_id', LEMTEL_ORG)
         .order('extension');
       if (error) throw error;
@@ -159,14 +161,15 @@ export default function TelephonyUsers() {
     }
   };
 
-  const toggleAppAccess = async (u: UserRow, enabled: boolean) => {
-    const { data, error } = await supabase.rpc('set_softphone_app_access' as any, {
-      _softphone_id: u.id, _enabled: enabled,
+  const togglePlatformAccess = async (u: UserRow, platform: 'app' | 'desktop' | 'mobile', enabled: boolean) => {
+    const { data, error } = await supabase.rpc('set_softphone_platform_access' as any, {
+      _softphone_id: u.id, _platform: platform, _enabled: enabled,
     });
     if (error || (data as any)?.ok === false) {
       toast.error(error?.message || 'Failed to update access');
     } else {
-      toast.success(enabled ? 'App access enabled' : 'App access disabled');
+      const label = platform === 'app' ? 'App' : platform === 'desktop' ? 'Desktop' : 'Mobile';
+      toast.success(enabled ? `${label} access enabled` : `${label} access disabled`);
       qc.invalidateQueries({ queryKey: ['lemtel', 'softphone-users'] });
     }
   };
@@ -242,7 +245,9 @@ export default function TelephonyUsers() {
                   <TableHead>Extension</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Platforms</TableHead>
-                  <TableHead>App access</TableHead>
+                  <TableHead>App</TableHead>
+                  <TableHead><span className="inline-flex items-center gap-1"><Laptop className="w-3.5 h-3.5" />Desktop</span></TableHead>
+                  <TableHead><span className="inline-flex items-center gap-1"><Smartphone className="w-3.5 h-3.5" />Mobile</span></TableHead>
                   <TableHead>Last seen</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -273,7 +278,21 @@ export default function TelephonyUsers() {
                       <Switch
                         checked={u.app_access_enabled !== false}
                         disabled={!isAdmin}
-                        onCheckedChange={(v) => toggleAppAccess(u, v)}
+                        onCheckedChange={(v) => togglePlatformAccess(u, 'app', v)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Switch
+                        checked={u.desktop_access_enabled !== false}
+                        disabled={!isAdmin || u.app_access_enabled === false}
+                        onCheckedChange={(v) => togglePlatformAccess(u, 'desktop', v)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Switch
+                        checked={u.mobile_access_enabled !== false}
+                        disabled={!isAdmin || u.app_access_enabled === false}
+                        onCheckedChange={(v) => togglePlatformAccess(u, 'mobile', v)}
                       />
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
@@ -290,7 +309,7 @@ export default function TelephonyUsers() {
                   </TableRow>
                 ))}
                 {!filtered.length && (
-                  <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No users yet — click <b>Add User</b> to provision one.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">No users yet — click <b>Add User</b> to provision one.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

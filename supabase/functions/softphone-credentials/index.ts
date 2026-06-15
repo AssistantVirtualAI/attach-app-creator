@@ -84,6 +84,14 @@ Deno.serve(async (req) => {
     }
     log("authenticated user", { id: user.id, email: user.email });
 
+    const url = new URL(req.url);
+    let requestedPlatform = (url.searchParams.get("platform") || req.headers.get("x-ava-platform") || "app").toLowerCase();
+    if (req.method !== "GET") {
+      const body = await req.clone().json().catch(() => ({}));
+      requestedPlatform = String((body as any)?.platform || requestedPlatform).toLowerCase();
+    }
+    const platform = ["desktop", "mobile"].includes(requestedPlatform) ? requestedPlatform : "app";
+
     // Retry the lookup — PostgREST occasionally returns transient
     // "schema cache" errors during DB restarts which must NOT be treated as
     // "no softphone account" (that would wrongly tell the user to contact admin).
@@ -93,7 +101,7 @@ Deno.serve(async (req) => {
     for (let attempt = 0; attempt < 4; attempt++) {
       const res = await supabaseAdmin
         .from("pbx_softphone_users")
-        .select("extension, organization_id, extension_id, display_name, sip_password, sip_domain, wss_url")
+        .select("extension, organization_id, extension_id, display_name, sip_password, sip_domain, wss_url, app_access_enabled, desktop_access_enabled, mobile_access_enabled")
         .eq("portal_user_id", user.id)
         .maybeSingle();
       sp = res.data;
@@ -122,6 +130,18 @@ Deno.serve(async (req) => {
       }
       log("NO_SOFTPHONE_ACCOUNT");
       return json({ error: "NO_SOFTPHONE_ACCOUNT", message: "Contact your administrator to enable softphone" }, 404);
+    }
+
+    const platformAllowed = sp.app_access_enabled !== false
+      && (platform !== "desktop" || sp.desktop_access_enabled !== false)
+      && (platform !== "mobile" || sp.mobile_access_enabled !== false);
+    if (!platformAllowed) {
+      log("SOFTPHONE_ACCESS_DISABLED", { platform, extension: sp.extension });
+      return json({
+        error: "SOFTPHONE_ACCESS_DISABLED",
+        platform,
+        message: "Your administrator has disabled access to this app on this platform.",
+      }, 403);
     }
 
     const { data: org } = await supabaseAdmin
@@ -205,6 +225,10 @@ Deno.serve(async (req) => {
       sip_password: password,
       password,
       // App config
+      platform,
+      app_access_enabled: sp.app_access_enabled !== false,
+      desktop_access_enabled: sp.desktop_access_enabled !== false,
+      mobile_access_enabled: sp.mobile_access_enabled !== false,
       portal_url: Deno.env.get("AVA_PORTAL_URL") || "https://avastatistic.ca",
       organization_id: sp.organization_id,
       organization_name: org?.name || undefined,

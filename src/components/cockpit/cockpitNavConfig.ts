@@ -122,7 +122,7 @@ export const COCKPIT_NAV: CockpitNavGroup[] = [
     icon: Shield,
     roles: ["super_admin", "org_admin"],
     items: [
-      { labelKey: "cockpit.nav.users", href: "/team", icon: Users },
+      { labelKey: "cockpit.nav.users", href: "/org/lemtel/telephony/users", icon: Users },
       { labelKey: "cockpit.nav.organizations", href: "/platform/organizations", icon: Building2, roles: ["super_admin"] },
       { labelKey: "cockpit.nav.permissions", href: "/platform/settings", icon: Key },
       { labelKey: "cockpit.nav.integrations", href: "/integrations", icon: Plug },

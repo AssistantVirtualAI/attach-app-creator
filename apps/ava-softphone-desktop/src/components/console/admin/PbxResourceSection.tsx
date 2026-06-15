@@ -8,6 +8,23 @@ const { colors: c } = theme;
 const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 const LEMTEL_DOMAIN = '2936594e-17b7-42a9-9165-95be48627923';
 
+async function resolveDesktopTenantScope() {
+  const me = await getMeContext().catch(() => null);
+  const organization_id = me?.organization_id || LEMTEL_ORG;
+  let domain_uuid = (me as any)?.domain_uuid || null;
+
+  if (!domain_uuid && organization_id) {
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('fusionpbx_domain_uuid')
+      .eq('id', organization_id)
+      .maybeSingle();
+    domain_uuid = (org as any)?.fusionpbx_domain_uuid || null;
+  }
+
+  return { organization_id, domain_uuid: domain_uuid || LEMTEL_DOMAIN };
+}
+
 export interface ColDef {
   key: string;
   label: string;
@@ -35,7 +52,7 @@ interface Props {
   /** Action verb to extract or augment row (extra reads, transforms). */
   transform?: (rows: any[]) => any[];
   /** Custom row actions besides edit/delete (e.g. restart) */
-  rowActions?: { label: string; run: (row: any, helpers: { reload: () => void; orgId: string }) => Promise<void> | void }[];
+  rowActions?: { label: string; run: (row: any, helpers: { reload: () => void; orgId: string; domainUuid: string | null }) => Promise<void> | void }[];
   /** Whether resource is global (no domain_uuid) — informs new-record defaults only. */
   global?: boolean;
   /** Allow create button. */
@@ -58,7 +75,7 @@ const btnDanger: React.CSSProperties = {
 };
 
 export default function PbxResourceSection({
-  kind, actionKind, title, uuidField, cols, fields = [], transform, rowActions = [], canCreate = true,
+  kind, actionKind, title, uuidField, cols, fields = [], transform, rowActions = [], global = false, canCreate = true,
 }: Props) {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,16 +84,19 @@ export default function PbxResourceSection({
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [orgId, setOrgId] = useState<string>(LEMTEL_ORG);
+  const [domainUuid, setDomainUuid] = useState<string | null>(LEMTEL_DOMAIN);
   const [search, setSearch] = useState('');
 
   const reload = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const me = await getMeContext().catch(() => null);
-      const oid = me?.organization_id || LEMTEL_ORG;
+      const scope = await resolveDesktopTenantScope();
+      const oid = scope.organization_id;
       setOrgId(oid);
+      setDomainUuid(scope.domain_uuid);
+      const params = global ? {} : { domain_uuid: scope.domain_uuid };
       const { data, error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: `list-${kind}`, organization_id: oid, params: { domain_uuid: LEMTEL_DOMAIN } },
+        body: { action: `list-${kind}`, organization_id: oid, params },
       });
       if (err) throw err;
       const list = Array.isArray((data as any)?.data) ? (data as any).data : [];
@@ -84,7 +104,7 @@ export default function PbxResourceSection({
     } catch (e: any) {
       setError(e?.message || 'Failed to load');
     } finally { setLoading(false); }
-  }, [kind, transform]);
+  }, [kind, transform, global]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -97,7 +117,7 @@ export default function PbxResourceSection({
         body: {
           action: isUpdate ? `update-${writeKind}` : `create-${writeKind}`,
           organization_id: orgId,
-          params: { domain_uuid: LEMTEL_DOMAIN, ...record },
+          params: { ...(global ? {} : { domain_uuid: domainUuid }), ...record },
         },
       });
       if (err) throw err;
@@ -116,7 +136,7 @@ export default function PbxResourceSection({
         body: {
           action: `delete-${writeKind}`,
           organization_id: orgId,
-          params: { [uuidField]: row[uuidField], domain_uuid: LEMTEL_DOMAIN },
+          params: { [uuidField]: row[uuidField], ...(global ? {} : { domain_uuid: domainUuid }) },
         },
       });
       if (err) throw err;
@@ -181,7 +201,7 @@ export default function PbxResourceSection({
                     ))}
                     <td style={{ padding: '8px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                       {rowActions.map((a) => (
-                        <button key={a.label} onClick={async () => { await a.run(row, { reload, orgId }); }}
+                        <button key={a.label} onClick={async () => { await a.run(row, { reload, orgId, domainUuid }); }}
                           style={{ ...btnGhost, padding: '6px 10px', fontSize: 11, marginRight: 6 }}>{a.label}</button>
                       ))}
                       {fields.length > 0 && (

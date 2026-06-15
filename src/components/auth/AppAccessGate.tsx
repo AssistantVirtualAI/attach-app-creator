@@ -8,11 +8,21 @@ import { supabase } from '@/integrations/supabase/client';
  * Defaults to ALLOWED while loading or if the user has no extension at all
  * (back-office users without a softphone are unaffected).
  */
-export function AppAccessGate({ children }: { children: ReactNode }) {
+function detectAccessPlatform(): 'app' | 'desktop' | 'mobile' {
+  if (typeof window === 'undefined') return 'app';
+  const w = window as any;
+  const ua = navigator.userAgent || '';
+  if (w.electron || w.__TAURI__ || /Electron|Tauri|AVA Desktop/i.test(ua)) return 'desktop';
+  if (w.Capacitor || w.cordova || /Capacitor|Cordova|ReactNative|AVA Mobile/i.test(ua)) return 'mobile';
+  return 'app';
+}
+
+export function AppAccessGate({ children, platform }: { children: ReactNode; platform?: 'app' | 'desktop' | 'mobile' }) {
+  const effectivePlatform = platform || detectAccessPlatform();
   const { data: allowed = true } = useQuery({
-    queryKey: ['app-access-allowed'],
+    queryKey: ['app-access-allowed', effectivePlatform],
     queryFn: async () => {
-      const { data } = await (supabase as any).rpc('my_app_access_allowed');
+      const { data } = await (supabase as any).rpc('my_platform_access_allowed', { _platform: effectivePlatform });
       return data !== false;
     },
     staleTime: 60_000,
