@@ -49,13 +49,29 @@ async function getFusionSessionCookie(baseUrl: string): Promise<string> {
   // pbxnode.lemtel.tel, so the session must be created on that host.
   const bootstrap = await fetch(`${origin}/login.php`, { redirect: "manual" });
   let cookie = firstPhpSessionCookie(bootstrap.headers.get("set-cookie") || "");
-  await bootstrap.body?.cancel();
+  const loginHtml = await bootstrap.text().catch(() => "");
 
-  // 2. POST credentials. FusionPBX expects username/password form fields.
+  // Extract CSRF hidden inputs. FusionPBX renders one or more hidden inputs
+  // with hex-string names AND hex-string values that must be echoed back.
+  const csrfFields: Array<[string, string]> = [];
+  const inputRegex = /<input\b[^>]*type=["']hidden["'][^>]*>/gi;
+  for (const tag of loginHtml.match(inputRegex) || []) {
+    const nameMatch = tag.match(/\bname=["']([^"']+)["']/i);
+    const valueMatch = tag.match(/\bvalue=["']([^"']*)["']/i);
+    if (!nameMatch || !valueMatch) continue;
+    const name = nameMatch[1];
+    const value = valueMatch[1];
+    // Skip well-known non-CSRF fields
+    if (/^(username|password|path|persistent)$/i.test(name)) continue;
+    csrfFields.push([name, value]);
+  }
+
+  // 2. POST credentials with CSRF fields echoed back.
   const form = new URLSearchParams();
   form.set("username", username);
   form.set("password", password);
   form.set("path", "/");
+  for (const [n, v] of csrfFields) form.set(n, v);
   const loginRes = await fetch(`${origin}/login.php`, {
     method: "POST",
     headers: {
@@ -71,10 +87,11 @@ async function getFusionSessionCookie(baseUrl: string): Promise<string> {
   const loginStatus = loginRes.status;
   await loginRes.body?.cancel();
   if (!cookie) throw new Error(`FusionPBX login did not return a session cookie for ${origin}`);
-  if (loginStatus >= 400) throw new Error(`FusionPBX login failed for ${origin} (${loginStatus})`);
+  if (loginStatus >= 400) throw new Error(`FusionPBX login failed for ${origin} (${loginStatus}, csrf=${csrfFields.length})`);
   if (/login\.php/i.test(loginLocation) && loginStatus >= 300 && loginStatus < 400) {
-    throw new Error(`FusionPBX login redirected back to login for ${origin}`);
+    throw new Error(`FusionPBX login redirected back to login for ${origin} (csrf=${csrfFields.length})`);
   }
+
 
   // 3. Verify the session is authenticated by hitting a protected page without
   // following redirects. A redirect to login means the cookie is not authenticated.
