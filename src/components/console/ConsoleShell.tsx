@@ -8,7 +8,7 @@ import {
 import {
   LayoutDashboard, Phone, Smartphone, Wifi, PhoneCall, FileAudio, Voicemail,
   Hash, Route as RouteIcon, ListTree, Users2, ClipboardList, Sparkles, Bot,
-  AlertTriangle, CircleDot,
+  AlertTriangle, CircleDot, MessageSquare,
 } from "lucide-react";
 import { useDesktopRole } from "@/hooks/useDesktopRole";
 import { Navigate } from "react-router-dom";
