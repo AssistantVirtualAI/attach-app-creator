@@ -37,29 +37,31 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [audioLoading, setAudioLoading] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
+    setError(null);
     try {
       const data = await ava.recordings();
       setItems(Array.isArray(data) ? data : []);
     } catch (e: any) {
       setError(e?.message || 'Unable to load recordings.');
-      setItems([]);
+      if (!opts?.silent) setItems([]);
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, []);
 
+  const silentLoad = useCallback(() => { void load({ silent: true }); }, [load]);
+
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    const onSync = () => { void load(); };
-    window.addEventListener('lemtel:phone-sync-complete', onSync);
-    return () => window.removeEventListener('lemtel:phone-sync-complete', onSync);
-  }, [load]);
+    window.addEventListener('lemtel:phone-sync-complete', silentLoad);
+    return () => window.removeEventListener('lemtel:phone-sync-complete', silentLoad);
+  }, [silentLoad]);
 
-  // Realtime: new/updated call records with recordings trigger a refetch.
+  // Realtime: new/updated call records with recordings trigger a silent refetch (no flicker).
   const orgId = useOrgId();
-  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId, events: ['INSERT', 'UPDATE'], throttleMs: 30_000, shouldRefresh: isRecordingRealtimeChange }, load);
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId, events: ['INSERT', 'UPDATE'], throttleMs: 30_000, shouldRefresh: isRecordingRealtimeChange }, silentLoad);
 
 
 
