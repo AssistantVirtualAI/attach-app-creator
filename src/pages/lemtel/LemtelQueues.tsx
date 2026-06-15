@@ -425,6 +425,16 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
   if (loading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
 
   return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="text-sm text-muted-foreground">
+          Queue <span className="font-medium text-foreground">{queue.name}</span> · {agents.length} member{agents.length === 1 ? '' : 's'}
+          {syncMsg && <Badge variant="outline" className="ml-2"><CheckCircle2 className="w-3 h-3 mr-1 text-green-600" />{syncMsg}</Badge>}
+        </div>
+        <Button size="sm" variant="outline" onClick={resyncTiers} disabled={syncing}>
+          {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />} Resync from PBX
+        </Button>
+      </div>
     <div className="grid md:grid-cols-2 gap-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
