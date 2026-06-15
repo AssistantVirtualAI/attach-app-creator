@@ -42,7 +42,7 @@ export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope 
     };
     const ch = supabase
       .channel("media-center")
-      .on("postgres_changes", { event: "*", schema: "public", table: "pbx_call_records" }, (payload) => invalidate(["media", "cdr"], payload))
+      .on("postgres_changes", { event: "*", schema: "public", table: "pbx_call_records" }, (payload) => invalidate(["media"], payload))
       .on("postgres_changes", { event: "*", schema: "public", table: "pbx_voicemails" }, () => invalidate(["media", "vm"]))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
