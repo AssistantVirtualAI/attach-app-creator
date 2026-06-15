@@ -253,15 +253,30 @@ export default function LemtelExtensions() {
                     </TableCell>
                     <TableCell>{e.voicemail_enabled ? <Badge variant="secondary">On</Badge> : <Badge variant="outline">Off</Badge>}</TableCell>
                     <TableCell>
-                      {softphoneByExt.has(String(e.extension)) ? (
-                        <Badge variant="outline" className="bg-green-500/15 text-green-600 border-green-500/30">✅ Active</Badge>
-                      ) : (
-                        <EnableSoftphonePopover
-                          extensionId={e.id}
-                          extension={String(e.extension)}
-                          defaultDisplayName={e.effective_cid_name || e.description || ''}
-                        />
-                      )}
+                      {(() => {
+                        const sp = softphoneByExt.get(String(e.extension));
+                        if (!sp) {
+                          return (
+                            <EnableSoftphonePopover
+                              extensionId={e.id}
+                              extension={String(e.extension)}
+                              defaultDisplayName={e.effective_cid_name || e.description || ''}
+                            />
+                          );
+                        }
+                        const d = sp.desktop_access_enabled !== false;
+                        const m = sp.mobile_access_enabled !== false;
+                        return (
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant="outline" className={d ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-muted text-muted-foreground'}>
+                              <Monitor className="w-3 h-3 mr-1" />{d ? 'Desktop' : 'Desktop off'}
+                            </Badge>
+                            <Badge variant="outline" className={m ? 'bg-green-500/15 text-green-600 border-green-500/30' : 'bg-muted text-muted-foreground'}>
+                              <Smartphone className="w-3 h-3 mr-1" />{m ? 'Mobile' : 'Mobile off'}
+                            </Badge>
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <span className="inline-flex items-center gap-1 text-sm">
