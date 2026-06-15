@@ -16,6 +16,62 @@ const json = (body: unknown, status = 200, extraHeaders: Record<string, string> 
 
 const LEMTEL_ORG = "71755d33-ed64-4ad5-a828-61c9d2029eb7";
 
+// --------------------------------------------------------------------------
+// FusionPBX PHP session login cache.
+// /app/call_recordings/download.php uses PHP session cookies (not the API
+// Basic auth), so we POST to /login.php and reuse the resulting cookie for
+// up to 25 minutes per edge-runtime instance.
+// --------------------------------------------------------------------------
+const FUSION_SESSION = { cookie: "" as string, expiresAt: 0 as number };
+
+async function getFusionSessionCookie(baseUrl: string): Promise<string> {
+  const now = Date.now();
+  if (FUSION_SESSION.cookie && FUSION_SESSION.expiresAt > now) return FUSION_SESSION.cookie;
+  const username = Deno.env.get("FUSIONPBX_USERNAME") || "";
+  const password = Deno.env.get("FUSIONPBX_PASSWORD") || "";
+  if (!username || !password) throw new Error("FUSIONPBX_PASSWORD not configured");
+
+  // 1. Hit /login.php to bootstrap a PHPSESSID cookie.
+  const bootstrap = await fetch(`${baseUrl}/login.php`, { redirect: "manual" });
+  const setCookies1 = bootstrap.headers.get("set-cookie") || "";
+  await bootstrap.body?.cancel();
+  const sessionMatch = setCookies1.match(/PHPSESSID=[^;]+/i);
+  let cookie = sessionMatch ? sessionMatch[0] : "";
+
+  // 2. POST credentials. FusionPBX expects username/password form fields.
+  const form = new URLSearchParams();
+  form.set("username", username);
+  form.set("password", password);
+  form.set("path", "/");
+  const loginRes = await fetch(`${baseUrl}/login.php`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      ...(cookie ? { Cookie: cookie } : {}),
+    },
+    body: form.toString(),
+    redirect: "manual",
+  });
+  const setCookies2 = loginRes.headers.get("set-cookie") || "";
+  await loginRes.body?.cancel();
+  const sessionMatch2 = setCookies2.match(/PHPSESSID=[^;]+/i);
+  if (sessionMatch2) cookie = sessionMatch2[0];
+  if (!cookie) throw new Error("FusionPBX login did not return a session cookie");
+
+  // 3. Verify the session is authenticated by hitting a protected page.
+  const probe = await fetch(`${baseUrl}/core/user_settings/user_settings.php`, {
+    headers: { Cookie: cookie },
+    redirect: "manual",
+  });
+  const status = probe.status;
+  await probe.body?.cancel();
+  if (status >= 400) throw new Error(`FusionPBX session probe failed (${status})`);
+
+  FUSION_SESSION.cookie = cookie;
+  FUSION_SESSION.expiresAt = now + 25 * 60 * 1000;
+  return cookie;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
