@@ -895,18 +895,31 @@ Deno.serve(async (req) => {
       const allErrors: string[] = [];
       let firstPage: any[] = [];
 
-      // FusionPBX's xml_cdr API injects any query param as a WHERE clause, so we cannot
-      // pass `order` / `order_by` / `order_type` — they crash the handler. Instead we
-      // restrict the window to the last N days so each sync surfaces the freshest CDRs
-      // even though FusionPBX returns oldest-first within the window.
-      const sinceDays = parseInt(String((params as any).since_days ?? b.since_days ?? 14));
-      const sinceDate = new Date(Date.now() - sinceDays * 86400_000)
-        .toISOString().replace("T", " ").slice(0, 19);
+      // FusionPBX's xml_cdr API turns EVERY query param into a SQL `column = value`
+      // equality, so we cannot pass `order`, `order_by`, `start_stamp_begin`, etc.
+      // Default ordering is oldest-first. To always surface the freshest rows on each
+      // sync we start the offset near the tail of the PBX dataset:
+      //   start_offset = max(0, currentDbCount - pageSize)
+      // then page forward. New calls land at the very end, so this brings them in.
+      // Callers can override with `start_offset` or pass `from_beginning:true` to
+      // backfill the head.
+      const fromBeginning = (params as any).from_beginning === true || b.from_beginning === true || isBackfill;
+      let startOffset = parseInt(String((params as any).start_offset ?? b.start_offset ?? "NaN"));
+      if (!Number.isFinite(startOffset)) {
+        if (fromBeginning) {
+          startOffset = 0;
+        } else {
+          const { count: dbCount } = await admin
+            .from("pbx_call_records")
+            .select("id", { count: "exact", head: true })
+            .eq("organization_id", organization_id);
+          startOffset = Math.max(0, (dbCount ?? 0) - pageSize);
+        }
+      }
       for (let i = 0; i < maxPages; i++) {
         const extra: Record<string, string> = {
           limit: String(pageSize),
-          offset: String(i * pageSize),
-          start_stamp_begin: sinceDate,
+          offset: String(startOffset + i * pageSize),
         };
         if (extension) extra.extension = extension;
         const r = await fetchCdrsWithFallback(extra);
