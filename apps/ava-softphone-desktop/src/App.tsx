@@ -30,6 +30,15 @@ const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.s
 const IS_LAB = qs?.get('lab') === 'responsive';
 const IS_EMBED = qs?.get('embed') === '1';
 
+async function clearDesktopAuthState() {
+  try { await supabase.auth.signOut(); } catch { /* noop */ }
+  try {
+    window.localStorage.removeItem('lemtel-desktop-auth');
+    window.sessionStorage.removeItem('lemtel-desktop-auth');
+  } catch { /* noop */ }
+  try { await window.electronAPI?.saveCredentials?.(null); } catch { /* noop */ }
+  setAuthToken(null);
+}
 
 type Creds = {
   portalUrl: string;
@@ -74,10 +83,18 @@ export default function App() {
 
       if (cancelled) return;
 
-      if (!session) {
-        // No valid session → force login wizard
-        if (saved) await window.electronAPI?.saveCredentials?.(null).catch(() => {});
-        setAuthToken(null);
+      const sessionEmail = session?.user?.email?.toLowerCase() || '';
+      const savedEmail = saved?.email?.toLowerCase?.() || '';
+      const savedUserId = saved?.userId || '';
+      const sessionUserId = session?.user?.id || '';
+      const mismatchedSavedSession = !!saved && !!session && (
+        (!!savedUserId && savedUserId !== sessionUserId) ||
+        (!!savedEmail && !!sessionEmail && savedEmail !== sessionEmail)
+      );
+
+      if (!session || mismatchedSavedSession) {
+        // No valid session, or Electron credentials belong to a different Supabase user → force login wizard.
+        await clearDesktopAuthState();
         setCreds(null);
       } else if (saved) {
         // Refresh stored tokens in case they rotated
@@ -89,7 +106,8 @@ export default function App() {
         });
         triggerCdrSync();
       } else {
-        setAuthToken(session.access_token);
+        // A browser-local Supabase session without Electron credentials is stale for the packaged app.
+        await clearDesktopAuthState();
         setCreds(null);
       }
       setLoading(false);

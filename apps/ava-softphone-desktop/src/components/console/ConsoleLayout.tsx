@@ -29,7 +29,8 @@ import { useDesktopRole } from '../../hooks/useDesktopRole';
 import { useTenant } from '../../hooks/useTenant';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
 import { theme } from '../../lib/theme';
-import { ava } from '../../lib/avaApi';
+import { ava, setAuthToken } from '../../lib/avaApi';
+import { supabase } from '../../lib/supabaseClient';
 
 const { colors: c } = theme;
 
@@ -215,6 +216,12 @@ export default function ConsoleLayout({
             <SettingsPage
               creds={creds}
               onSignOut={async () => {
+                try { setAuthToken(null); } catch { /* noop */ }
+                try { await supabase.auth.signOut(); } catch { /* noop */ }
+                try {
+                  window.localStorage.removeItem('lemtel-desktop-auth');
+                  window.sessionStorage.removeItem('lemtel-desktop-auth');
+                } catch { /* noop */ }
                 await window.electronAPI?.clearCredentials?.();
                 window.location.reload();
               }}
