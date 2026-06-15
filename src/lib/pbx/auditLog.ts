@@ -23,7 +23,7 @@ export interface LogAdminActionInput {
  */
 export async function logAdminAction(input: LogAdminActionInput) {
   const { data: { user } } = await supabase.auth.getUser();
-  const { data, error } = await supabase.from("pbx_admin_actions").insert({
+  const row = {
     organization_id: input.organizationId,
     domain_uuid: input.domainUuid ?? null,
     actor_user_id: user?.id ?? null,
@@ -40,7 +40,10 @@ export async function logAdminAction(input: LogAdminActionInput) {
     error: input.error ?? null,
     rollback_of: input.rollbackOf ?? null,
     metadata: input.metadata ?? {},
-  }).select("id").maybeSingle();
+  };
+  // Cast through any: types regenerate after migration; insert at runtime regardless.
+  const { data, error } = await (supabase.from("pbx_admin_actions") as any)
+    .insert(row).select("id").maybeSingle();
   if (error) console.warn("[auditLog] insert failed", error);
   return data?.id ?? null;
 }
