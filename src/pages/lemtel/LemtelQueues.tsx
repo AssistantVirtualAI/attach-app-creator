@@ -492,19 +492,50 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
   const regularAgents = agents.filter((a) => a.tier_level !== 1);
   const availableExt = extensions.filter((e) => !agents.some((a) => a.extension_id === e.id));
 
-  if (loading) return <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div>;
+  const syncing = status.state === 'running';
+  const statusTone =
+    status.state === 'success' ? 'border-green-500/40 bg-green-500/10 text-green-700 dark:text-green-400'
+    : status.state === 'partial' ? 'border-yellow-500/40 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
+    : status.state === 'error' ? 'border-destructive/40 bg-destructive/10 text-destructive'
+    : status.state === 'running' ? 'border-primary/40 bg-primary/10 text-primary'
+    : 'border-border bg-muted/40 text-muted-foreground';
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-sm text-muted-foreground">
           Queue <span className="font-medium text-foreground">{queue.name}</span> · {agents.length} member{agents.length === 1 ? '' : 's'}
-          {syncMsg && <Badge variant="outline" className="ml-2"><CheckCircle2 className="w-3 h-3 mr-1 text-green-600" />{syncMsg}</Badge>}
         </div>
         <Button size="sm" variant="outline" onClick={resyncTiers} disabled={syncing}>
           {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />} Resync from PBX
         </Button>
       </div>
+
+      {status.state !== 'idle' && (
+        <div className={`rounded-md border px-3 py-2 text-xs flex items-start gap-2 ${statusTone}`}>
+          {status.state === 'running' && <Loader2 className="w-4 h-4 mt-0.5 animate-spin shrink-0" />}
+          {status.state === 'success' && <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />}
+          {status.state === 'partial' && <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />}
+          {status.state === 'error' && <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />}
+          <div className="flex-1 min-w-0">
+            <div className="font-medium">{status.message}</div>
+            {status.details && <div className="font-mono opacity-80 break-all mt-0.5">{status.details}</div>}
+            <div className="opacity-70 mt-0.5 flex flex-wrap gap-x-3">
+              {typeof status.pulled === 'number' && <span>pulled: {status.pulled}</span>}
+              {typeof status.upserted === 'number' && <span>upserted: {status.upserted}</span>}
+              {typeof status.failed === 'number' && status.failed > 0 && <span>failed: {status.failed}</span>}
+              {status.attempts && status.attempts > 1 && <span>attempts: {status.attempts}</span>}
+              {status.at && <span>at {new Date(status.at).toLocaleTimeString()}</span>}
+            </div>
+            {(status.state === 'error' || status.state === 'partial') && (
+              <Button size="sm" variant="outline" className="mt-2 h-7" onClick={resyncTiers} disabled={syncing}>
+                <RefreshCw className="w-3 h-3 mr-1" /> Retry
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
     <div className="grid md:grid-cols-2 gap-4">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
