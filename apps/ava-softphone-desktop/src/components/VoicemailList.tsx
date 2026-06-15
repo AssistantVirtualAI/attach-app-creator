@@ -9,6 +9,9 @@ interface Props {
   onCall: (n: string) => void;
 }
 
+// Module-level cache: survives unmount/remount when navigating between pages.
+const voicemailAudioCache = new Map<string, string>();
+
 function fmtTime(iso: string | null) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -20,7 +23,11 @@ export default function VoicemailList({ extension, onCall }: Props) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
-  const [audio, setAudio] = useState<Record<string, string>>({});
+  const [audio, setAudio] = useState<Record<string, string>>(() => {
+    const cached: Record<string, string> = {};
+    voicemailAudioCache.forEach((url, id) => { cached[id] = url; });
+    return cached;
+  });
 
   const load = useCallback(async (silent = false) => {
     if (!silent) { setLoading(true); setErr(null); }
@@ -54,14 +61,24 @@ export default function VoicemailList({ extension, onCall }: Props) {
 
   const togglePlay = async (r: VoicemailItem) => {
     if (playing === r.id) { setPlaying(null); return; }
-    if (!audio[r.id]) {
+    if (audio[r.id] || voicemailAudioCache.has(r.id)) {
+      const cached = audio[r.id] || voicemailAudioCache.get(r.id)!;
+      if (!audio[r.id]) setAudio((a) => ({ ...a, [r.id]: cached }));
+      audit('voicemail.played', r.id, { from: r.from, duration: r.durationSec });
+      setPlaying(r.id);
+      return;
+    }
+    try {
       const signed = await ava.getRecordingSignedUrl(r);
       const url = signed?.url || (await ava.getRecordingAudioUrl(r));
       if (!url) { setErr('No voicemail audio available yet'); return; }
+      voicemailAudioCache.set(r.id, url);
       setAudio((a) => ({ ...a, [r.id]: url }));
+      audit('voicemail.played', r.id, { from: r.from, duration: r.durationSec });
+      setPlaying(r.id);
+    } catch (e: any) {
+      setErr(e?.message || 'Failed to load voicemail audio.');
     }
-    audit('voicemail.played', r.id, { from: r.from, duration: r.durationSec });
-    setPlaying(r.id);
   };
 
   if (loading) return <div style={center}>Loading voicemail…</div>;
