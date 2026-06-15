@@ -8575,6 +8575,7 @@ export type Database = {
         Args: { _name: string; _slug: string }
         Returns: string
       }
+      current_user_internal_org_ids: { Args: never; Returns: string[] }
       current_user_org_ids: { Args: never; Returns: string[] }
       ensure_general_channel: {
         Args: { _org_id: string; _user_id: string }
