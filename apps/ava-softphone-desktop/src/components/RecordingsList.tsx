@@ -157,6 +157,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   };
 
   const recoverAudio = async (r: RecordingItem) => {
+    audioCache.delete(r.id);
     setAudio((a) => {
       const next = { ...a };
       delete next[r.id];
@@ -167,6 +168,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
     try {
       const url = await ava.getRecordingAudioUrl(r);
       if (url) {
+        audioCache.set(r.id, url);
         setAudio((a) => ({ ...a, [r.id]: url }));
         return;
       }
