@@ -904,7 +904,7 @@ const App = () => (
                 </Route>
 
                 {/* My Workspace — end users */}
-                <Route path="/my" element={<ProtectedRoute><RolePortalGuard portal="my"><MyWorkspaceShell /></RolePortalGuard></ProtectedRoute>}>
+                <Route path="/my" element={<ProtectedRoute><RolePortalGuard portal="my"><MyWorkspaceShellSidebar /></RolePortalGuard></ProtectedRoute>}>
                   <Route index element={<MyDashboardLanding />} />
                   <Route path="dashboard" element={<MyDashboardLanding />} />
                   <Route path="softphone" element={<TelephonyWebphone />} />
