@@ -9959,6 +9959,7 @@ export type Database = {
       }
       reconcile_pbx_call_records: { Args: { _org_id: string }; Returns: Json }
       relink_my_softphone_user: { Args: never; Returns: Json }
+      rollback_admin_action: { Args: { _action_id: string }; Returns: Json }
       run_security_audit: { Args: { _org_id: string }; Returns: Json }
       set_call_notes: {
         Args: { _call_id: string; _notes: string; _tags?: string[] }
