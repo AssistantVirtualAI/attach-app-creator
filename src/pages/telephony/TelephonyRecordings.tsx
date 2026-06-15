@@ -20,6 +20,7 @@ function sentimentBadge(s?: string) {
 
 export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
   const qc = useQueryClient();
+  usePbxRealtime(['pbx_call_records', 'pbx_call_recordings'], ['pbx']);
   const { data: myExt } = useQuery({
     queryKey: ['recordings-my-extension'],
     enabled: scope === 'mine',
