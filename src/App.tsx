@@ -710,7 +710,7 @@ const App = () => (
                 {/* v3.0 User Portal (/org/lemtel/my/*) */}
                 <Route path="/org/lemtel/my" element={<Navigate to="/org/lemtel/my/dashboard" replace />} />
                 <Route path="/org/lemtel/my/dashboard" element={<LemtelUserPage><MyDashboard /></LemtelUserPage>} />
-                <Route path="/org/lemtel/my/calls" element={<LemtelUserPage><LemtelPortalCalls /></LemtelUserPage>} />
+                <Route path="/org/lemtel/my/calls" element={<LemtelUserPage><LemtelPortalCalls scope="mine" /></LemtelUserPage>} />
                 <Route path="/org/lemtel/my/recordings" element={<LemtelUserPage><AdminRecordings scope="mine" /></LemtelUserPage>} />
                 <Route path="/org/lemtel/my/voicemail" element={<LemtelUserPage><AdminVoicemail scope="mine" /></LemtelUserPage>} />
                 <Route path="/org/lemtel/my/sms" element={<LemtelUserPage><LemtelMessages /></LemtelUserPage>} />
@@ -725,8 +725,8 @@ const App = () => (
                 <Route path="/org/lemtel/portal/diagnostic" element={<ProtectedRoute><PortalDiagnostic /></ProtectedRoute>} />
                 <Route path="/org/lemtel/portal/dashboard" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><LemtelPortalDashboard /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/portal/extensions" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><LemtelExtensions /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/portal/calls" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><LemtelPortalCalls /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
-                <Route path="/org/lemtel/portal/recordings" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><TelephonyRecordings /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/portal/calls" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><LemtelPortalCalls scope="mine" /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
+                <Route path="/org/lemtel/portal/recordings" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><TelephonyRecordings scope="mine" /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/portal/media" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><TelephonyMediaCenter scope="mine" /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/portal/ivr" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><LemtelIVR /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />
                 <Route path="/org/lemtel/portal/queues" element={<ProtectedRoute><LemtelGuard><PortalGuard><TelephonyLayout portal><LemtelQueues /></TelephonyLayout></PortalGuard></LemtelGuard></ProtectedRoute>} />

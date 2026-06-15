@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { usePbxCallRecords, usePbxSync, usePbxTestCdrEndpoint, LEMTEL_ORG } from '@/hooks/usePbxData';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
 
 function statusBadge(c: any) {
@@ -28,10 +28,9 @@ function statusBadge(c: any) {
 function today() { return new Date().toISOString().slice(0, 10); }
 function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
 
-export default function LemtelPortalCalls() {
+export default function LemtelPortalCalls({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const { data: cdrs = [], isLoading } = usePbxCallRecords(100);
   const [analyzing, setAnalyzing] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -43,6 +42,21 @@ export default function LemtelPortalCalls() {
   const [fromDate, setFromDate] = useState(daysAgo(30));
   const [toDate, setToDate] = useState(today());
   const [extFilter, setExtFilter] = useState('');
+  const { data: myExt } = useQuery({
+    queryKey: ['portal-calls-my-extension'],
+    enabled: scope === 'mine',
+    queryFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return null;
+      const { data } = await (supabase as any).from('pbx_softphone_users')
+        .select('extension').eq('portal_user_id', auth.user.id).maybeSingle();
+      return data?.extension ?? null;
+    },
+  });
+  const { data: cdrs = [], isLoading } = usePbxCallRecords(100, {
+    extension: scope === 'mine' ? myExt : undefined,
+    enabled: scope !== 'mine' || !!myExt,
+  });
 
   const analyze = async (call: any) => {
     const call_record_id = call.id;
@@ -115,10 +129,10 @@ export default function LemtelPortalCalls() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-3xl font-bold">Call History</h1><p className="text-muted-foreground">{cdrs.length} calls</p></div>
-        <Button onClick={() => sync.mutate('cdr')} disabled={sync.isPending} variant="outline">
+        {scope === 'org' && <Button onClick={() => sync.mutate('cdr')} disabled={sync.isPending} variant="outline">
           {sync.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
           Sync CDRs
-        </Button>
+        </Button>}
       </div>
 
       {audioUrl && (
@@ -128,7 +142,7 @@ export default function LemtelPortalCalls() {
       )}
 
       {/* Date range fetcher */}
-      <Card className="p-3">
+      {scope === 'org' && <Card className="p-3">
         <Button variant="ghost" size="sm" className="w-full justify-between" onClick={() => setRangeOpen(o => !o)}>
           <span>📅 Fetch CDRs by date range</span>
           {rangeOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -144,7 +158,7 @@ export default function LemtelPortalCalls() {
             </Button>
           </div>
         )}
-      </Card>
+      </Card>}
 
       <Card className="overflow-hidden">
         {isLoading ? (

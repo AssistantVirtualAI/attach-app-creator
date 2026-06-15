@@ -75,14 +75,13 @@ export function setAuthToken(token: string | null) {
 type MeContext = {
   organization_id: string | null;
   extension: string | null;
-  extension_uuid: string | null;
   display_name: string | null;
   user_id: string | null;
 };
 let _meCache: MeContext | null = null;
 let _meInflight: Promise<MeContext> | null = null;
 
-const EMPTY_ME: MeContext = { organization_id: null, extension: null, extension_uuid: null, display_name: null, user_id: null };
+const EMPTY_ME: MeContext = { organization_id: null, extension: null, display_name: null, user_id: null };
 
 export async function getMeContext(): Promise<MeContext> {
   if (_meCache) return _meCache;
@@ -97,7 +96,7 @@ export async function getMeContext(): Promise<MeContext> {
         uid = payload?.sub ?? null;
       } catch {}
       const filter = uid ? `portal_user_id=eq.${uid}` : `limit=1`;
-      const url = `${BACKEND.url}/rest/v1/pbx_softphone_users?select=organization_id,extension,extension_uuid,display_name,portal_user_id&${filter}&limit=1`;
+      const url = `${BACKEND.url}/rest/v1/pbx_softphone_users?select=organization_id,extension,display_name,portal_user_id&${filter}&limit=1`;
       const r = await fetch(url, { headers: authHeaders() });
       if (!r.ok) return EMPTY_ME;
       const rows = await r.json();
@@ -116,7 +115,6 @@ export async function getMeContext(): Promise<MeContext> {
       _meCache = {
         organization_id: row.organization_id ?? null,
         extension: row.extension ?? null,
-        extension_uuid: row.extension_uuid ?? null,
         display_name: row.display_name ?? null,
         user_id: row.portal_user_id ?? uid,
       };
@@ -480,9 +478,7 @@ function mapCdrToRecording(r: any): RecordingItem {
 async function readCallRecordRows(limit = 100): Promise<any[]> {
   const me = await getMeContext();
   const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-  const extFilter = me.extension_uuid
-    ? `&extension_uuid=eq.${me.extension_uuid}`
-    : (me.extension ? `&extension=eq.${me.extension}` : '');
+  const extFilter = me.extension ? `&extension=eq.${me.extension}` : '&id=is.null';
   const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,analyzed,mos,raw_data,notes,tags${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
 
   const res = await fetch(url, {
@@ -674,9 +670,7 @@ export const ava = {
     try {
       const me = await getMeContext();
       const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-      const extFilter = me.extension_uuid
-        ? `&extension_uuid=eq.${me.extension_uuid}`
-        : (me.extension ? `&extension=eq.${me.extension}` : '');
+      const extFilter = me.extension ? `&extension=eq.${me.extension}` : '&id=is.null';
       const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
         headers: {
