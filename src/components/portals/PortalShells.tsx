@@ -6,6 +6,7 @@ import {
   Server, Activity, Sliders, Sparkles, Bot,
 } from "lucide-react";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
+import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtras";
 
 type NavItem = { label: string; to: string; icon: React.ComponentType<{ className?: string }> };
 
@@ -47,6 +48,7 @@ function Shell({ title, badge, accent, items }: {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <NotificationCenter />
+          <WorkspaceHeaderExtras />
         </div>
       </div>
       <main className="flex-1 overflow-x-hidden cockpit-scope">

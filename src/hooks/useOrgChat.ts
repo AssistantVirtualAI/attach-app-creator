@@ -160,3 +160,43 @@ export function useChatSearch() {
   });
 }
 
+export type DirectoryMember = {
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  extension: string | null;
+  status: "available" | "busy" | "in_meeting" | "on_call" | "away" | "offline" | string;
+  status_message: string | null;
+  is_self: boolean;
+};
+
+export function useDirectory() {
+  return useQuery<{ members: DirectoryMember[] }>({
+    queryKey: ["org-chat-directory"],
+    queryFn: () => invoke("list_directory"),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useEnsureDmChannel() {
+  return useMutation({
+    mutationFn: (user_id: string) => invoke("ensure_dm_channel", { user_id }),
+  });
+}
+
+export function useChatHeartbeat() {
+  useEffect(() => {
+    let mounted = true;
+    const beat = () => {
+      if (!mounted) return;
+      invoke("heartbeat", { status: "available", platform: "web" }).catch(() => {});
+    };
+    beat();
+    const id = setInterval(beat, 30_000);
+    const onVis = () => { if (document.visibilityState === "visible") beat(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { mounted = false; clearInterval(id); document.removeEventListener("visibilitychange", onVis); };
+  }, []);
+}
+

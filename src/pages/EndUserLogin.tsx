@@ -32,8 +32,8 @@ export default function EndUserLogin() {
         password,
       });
       if (err || !data.user) throw err || new Error('Invalid credentials');
-      // End-user always lands directly on their personal workspace (softphone)
-      navigate('/my/webphone', { replace: true });
+      // Route through PostLoginRedirect so admins/super_admins land on the right portal
+      navigate('/post-login', { replace: true });
     } catch (e: any) {
       setError(e?.message || 'Login failed');
     } finally {

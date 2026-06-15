@@ -8,10 +8,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Hash, Lock, Plus, Send, Paperclip, Smile, Trash2, MessageSquare } from "lucide-react";
+import { Hash, Lock, Plus, Send, Paperclip, Smile, Trash2, MessageSquare, Users as UsersIcon } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThreadPanel } from "@/components/chat/ThreadPanel";
 import { ChatSearchBar } from "@/components/chat/ChatSearchBar";
-import { useChannels, useChatMessages, type Channel } from "@/hooks/useOrgChat";
+import { useChannels, useChatMessages, useDirectory, useEnsureDmChannel, useChatHeartbeat, type Channel, type DirectoryMember } from "@/hooks/useOrgChat";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -24,15 +25,31 @@ export default function OrgChat() {
   const lang: "en" | "fr" = language === "fr" ? "fr" : "en";
   const t = (en: string, fr: string) => (lang === "fr" ? fr : en);
   const { user } = useAuth();
+  useChatHeartbeat();
 
   const { query: channelsQ, create } = useChannels();
   const channels = channelsQ.data?.channels ?? [];
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = channels.find((c) => c.id === activeId) || null;
 
+  const directoryQ = useDirectory();
+  const ensureDm = useEnsureDmChannel();
+
   useEffect(() => {
     if (!activeId && channels.length) setActiveId(channels[0].id);
   }, [channels, activeId]);
+
+  const openDm = async (m: DirectoryMember) => {
+    try {
+      const r: any = await ensureDm.mutateAsync(m.user_id);
+      if (r?.channel?.id) {
+        await channelsQ.refetch();
+        setActiveId(r.channel.id);
+      }
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to open DM");
+    }
+  };
 
   return (
     <div className="h-[calc(100vh-4rem)] flex">
@@ -55,11 +72,99 @@ export default function OrgChat() {
           <ChannelView channel={active} userId={user?.id ?? ""} t={t} />
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
-            {channelsQ.isLoading ? <Skeleton className="h-6 w-32" /> : t("Select a channel", "Sélectionnez un canal")}
+            {channelsQ.isLoading ? <Skeleton className="h-6 w-32" /> : t("Select a channel or a teammate", "Sélectionnez un canal ou un coéquipier")}
           </div>
         )}
       </div>
+      <DirectoryPanel members={directoryQ.data?.members ?? []} loading={directoryQ.isLoading} onOpenDm={openDm} t={t} />
     </div>
+  );
+}
+
+function statusColor(s: string) {
+  switch (s) {
+    case "available": return "bg-emerald-500";
+    case "busy": return "bg-red-500";
+    case "in_meeting": return "bg-amber-500";
+    case "on_call": return "bg-blue-500";
+    case "away": return "bg-yellow-500";
+    default: return "bg-muted-foreground/40";
+  }
+}
+
+function statusLabel(s: string, t: (en: string, fr: string) => string) {
+  switch (s) {
+    case "available": return t("Available", "Disponible");
+    case "busy": return t("Busy", "Occupé");
+    case "in_meeting": return t("In a meeting", "En réunion");
+    case "on_call": return t("On a call", "En appel");
+    case "away": return t("Away", "Absent");
+    case "offline": return t("Offline", "Hors ligne");
+    default: return s;
+  }
+}
+
+function DirectoryPanel({ members, loading, onOpenDm, t }: {
+  members: DirectoryMember[];
+  loading: boolean;
+  onOpenDm: (m: DirectoryMember) => void;
+  t: (en: string, fr: string) => string;
+}) {
+  const [q, setQ] = useState("");
+  const filtered = members.filter((m) => {
+    if (!q.trim()) return true;
+    const s = q.toLowerCase();
+    return (
+      (m.full_name || "").toLowerCase().includes(s) ||
+      (m.email || "").toLowerCase().includes(s) ||
+      (m.extension || "").toLowerCase().includes(s)
+    );
+  });
+  return (
+    <aside className="hidden md:flex w-64 border-l bg-muted/20 flex-col">
+      <div className="p-3 border-b flex items-center gap-2">
+        <UsersIcon className="h-4 w-4" />
+        <h3 className="text-sm font-semibold">{t("People", "Personnes")}</h3>
+        <Badge variant="outline" className="ml-auto text-[10px]">{members.length}</Badge>
+      </div>
+      <div className="p-2">
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Search…", "Rechercher…")} className="h-8 text-xs" />
+      </div>
+      <ScrollArea className="flex-1">
+        <div className="p-2 space-y-1">
+          {loading && Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+          {!loading && filtered.length === 0 && (
+            <div className="text-xs text-muted-foreground text-center py-6">{t("No teammates yet", "Aucun coéquipier")}</div>
+          )}
+          {filtered.map((m) => {
+            const initials = (m.full_name || m.email || "?").split(/\s|@/).filter(Boolean).map((x) => x[0]).join("").slice(0, 2).toUpperCase();
+            return (
+              <button
+                key={m.user_id}
+                onClick={() => !m.is_self && onOpenDm(m)}
+                disabled={m.is_self}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent text-left disabled:opacity-60 disabled:cursor-default"
+                title={statusLabel(m.status, t)}
+              >
+                <div className="relative">
+                  <Avatar className="h-7 w-7">
+                    <AvatarImage src={m.avatar_url ?? undefined} />
+                    <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
+                  </Avatar>
+                  <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background ${statusColor(m.status)}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium truncate">{m.full_name || m.email}{m.is_self && <span className="text-muted-foreground"> ({t("you", "vous")})</span>}</div>
+                  <div className="text-[10px] text-muted-foreground truncate">
+                    {m.extension ? `Ext ${m.extension} · ` : ""}{statusLabel(m.status, t)}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </ScrollArea>
+    </aside>
   );
 }
 
