@@ -321,6 +321,8 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
   const [agents, setAgents] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const { toast } = useToast();
 
   const load = async () => {
@@ -330,8 +332,54 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
       supabase.from('pbx_extensions').select('id, extension, display_name').eq('organization_id', LEMTEL_ORG).order('extension'),
     ]);
     setAgents(a || []); setExtensions(e || []); setLoading(false);
+    return (a || []).length;
   };
-  useEffect(() => { load(); }, [queue.id]);
+
+  const resyncTiers = async () => {
+    setSyncing(true); setSyncMsg(null);
+    try {
+      await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { organization_id: LEMTEL_ORG, action: 'sync-queue-agents' },
+      });
+      const { data: tiersResp } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { organization_id: LEMTEL_ORG, action: 'list-queue-tiers' },
+      });
+      const tiers: any[] = (tiersResp as any)?.data || [];
+      const mine = tiers.filter((t) => t.call_center_queue_uuid === queue.pbx_uuid);
+      const { data: extFresh = [] } = await supabase.from('pbx_extensions')
+        .select('id, extension, display_name').eq('organization_id', LEMTEL_ORG);
+
+      let upserted = 0;
+      for (const t of mine) {
+        const agentExt = (t.tier_agent || '').toString().split('@')[0];
+        const ext = (extFresh as any[]).find((x) => x.extension === agentExt);
+        const { error } = await supabase.from('pbx_queue_agents').upsert({
+          organization_id: LEMTEL_ORG,
+          queue_id: queue.id,
+          extension_id: ext?.id || null,
+          agent_id: agentExt,
+          agent_name: ext?.display_name || agentExt,
+          tier_level: parseInt(t.tier_level) || 2,
+          tier_position: parseInt(t.tier_position) || 1,
+          pbx_uuid: t.call_center_tier_uuid,
+          raw_data: t,
+        } as any, { onConflict: 'pbx_uuid' });
+        if (!error) upserted++;
+      }
+      setSyncMsg(`${upserted} tier${upserted === 1 ? '' : 's'} synced from FusionPBX`);
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Resync failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+    } finally { setSyncing(false); }
+  };
+
+  useEffect(() => {
+    (async () => {
+      const count = await load();
+      if (count === 0 && queue.pbx_uuid) resyncTiers();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queue.id]);
 
   const addAgent = async (extensionId: string, role: 'agent' | 'supervisor') => {
     if (!perms.canAssign) { toast({ title: 'Forbidden', description: 'Supervisor or admin required', variant: 'destructive' }); return; }
