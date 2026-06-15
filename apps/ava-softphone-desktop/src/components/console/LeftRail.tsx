@@ -67,7 +67,7 @@ interface Props {
   onStartTour?: () => void;
 }
 
-const SUPER_ADMIN_EXTRAS: ConsoleView[] = ['pbxlive', 'customers', 'voiceagents', 'reports', 'admin', 'aiadmin'];
+const SUPER_ADMIN_EXTRAS: ConsoleView[] = ['pbxlive', 'customers', 'voiceagents', 'reports', 'admin', 'aiadmin', 'audit'];
 
 export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch, compact, isAdmin, isSuperAdmin, onStartTour }: Props) {
   const { t } = useTranslation();
