@@ -20,20 +20,29 @@ Deno.serve(async (req) => {
 
   const t0 = Date.now();
   try {
-    const r = await fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
+    const callProxy = async (payload: Record<string, unknown>) => fetch(`${SUPABASE_URL}/functions/v1/fusionpbx-proxy`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${SERVICE_ROLE}`,
         apikey: SERVICE_ROLE,
       },
-      body: JSON.stringify({ action: "sync-all", organization_id: orgId }),
+      body: JSON.stringify({ organization_id: orgId, ...payload }),
     });
-    const text = await r.text();
-    let data: unknown = text;
-    try { data = JSON.parse(text); } catch { /* keep raw */ }
-    return new Response(JSON.stringify({ ok: r.ok, status: r.status, duration_ms: Date.now() - t0, data }), {
-      status: r.ok ? 200 : r.status,
+
+    const [cdrRes, vmRes] = await Promise.all([
+      callProxy({ action: "sync-cdrs", limit: 250 }),
+      callProxy({ action: "sync-voicemail-messages", params: { page_size: 250, max_pages: 1 } }),
+    ]);
+    const parse = async (r: Response) => {
+      const text = await r.text();
+      try { return { ok: r.ok, status: r.status, data: JSON.parse(text) }; }
+      catch { return { ok: r.ok, status: r.status, data: text.slice(0, 500) }; }
+    };
+    const data = { cdrs: await parse(cdrRes), voicemails: await parse(vmRes) };
+    const ok = data.cdrs.ok && data.voicemails.ok;
+    return new Response(JSON.stringify({ ok, duration_ms: Date.now() - t0, data }), {
+      status: ok ? 200 : 502,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
