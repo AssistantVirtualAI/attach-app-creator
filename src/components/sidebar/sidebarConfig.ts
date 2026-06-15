@@ -100,6 +100,7 @@ const ORG_GROUPS: NavGroup[] = [
     id: 'org-phone-system', labelKey: '📞 Phone System', icon: PhoneCall, scope: 'org', lemtelOnly: true,
     items: [
       { nameKey: 'Extensions', href: '/org/lemtel/admin/extensions', icon: Smartphone },
+      { nameKey: 'PBX Users', href: '/org/lemtel/admin/pbx-users', icon: Users },
       { nameKey: 'Devices', href: '/org/lemtel/admin/devices', icon: Router },
       { nameKey: 'Phone Numbers', href: '/org/lemtel/admin/dids', icon: Phone },
       { nameKey: 'Inbound Routes', href: '/org/lemtel/admin/destinations', icon: Phone },

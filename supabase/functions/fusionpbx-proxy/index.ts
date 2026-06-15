@@ -278,10 +278,13 @@ Deno.serve(async (req) => {
   }
 
   function mapExtension(e: any) {
+    const ext = String(e.extension ?? "").trim();
+    if (!ext) return { pbx_uuid: null } as any;
+    const nowIso = new Date().toISOString();
     return {
       organization_id,
       pbx_uuid: e.extension_uuid,
-      extension: String(e.extension ?? ""),
+      extension: ext,
       effective_cid_name: e.effective_caller_id_name ?? null,
       effective_cid_number: e.effective_caller_id_number ?? null,
       call_group: e.call_group ?? null,
@@ -292,7 +295,31 @@ Deno.serve(async (req) => {
       enabled: e.enabled === "true" || e.enabled === true || e.enabled === undefined,
       description: e.description ?? null,
       raw_data: e,
-      synced_at: new Date().toISOString(),
+      synced_at: nowIso,
+      last_synced_at: nowIso,
+      sync_status: "synced",
+      pbx_source: "fusionpbx",
+    };
+  }
+
+  function mapDomainUser(u: any) {
+    const username = String(u.username ?? u.user_email ?? u.user ?? "").trim();
+    if (!u.user_uuid || !username) return null;
+    const nowIso = new Date().toISOString();
+    return {
+      organization_id,
+      pbx_uuid: u.user_uuid,
+      domain_uuid: u.domain_uuid ?? null,
+      username,
+      email: u.user_email ?? (username.includes("@") ? username : null),
+      user_status: u.user_status ?? null,
+      user_enabled: !(u.user_enabled === "false" || u.user_enabled === false),
+      api_key: u.api_key ?? null,
+      groups: Array.isArray(u.groups) ? u.groups : (u.user_groups ?? []),
+      last_login_at: u.last_login ?? null,
+      raw_data: u,
+      sync_status: "synced",
+      last_synced_at: nowIso,
     };
   }
 
@@ -1243,6 +1270,7 @@ Deno.serve(async (req) => {
       if (want("ring_groups"))  tasks.push(pbxFetch(`ring_groups?${domainQ}`).then((r) => ({ k: "ring_groups", r })));
       // Gateways are global in FusionPBX (no domain filter) — query without domain_uuid.
       if (want("gateways"))     tasks.push(pbxFetch(`gateways`).then((r) => ({ k: "gateways", r })));
+      if (want("users") || want("domain_users")) tasks.push(pbxFetch(`users?${domainQ}`).then((r) => ({ k: "users", r })));
       const results = await Promise.all(tasks);
       const cdrResult = want("cdrs") ? await fetchCdrsWithFallback({ limit: "200" }) : null;
       const stats: Record<string, number> = {};
@@ -1291,6 +1319,9 @@ Deno.serve(async (req) => {
             last_synced_at: new Date().toISOString(),
           })).filter((x: any) => x.pbx_uuid);
           await doUpsert("pbx_gateways", rows, "pbx_uuid", "gateways");
+        } else if (k === "users") {
+          const rows = list.map(mapDomainUser).filter((x: any) => x && x.pbx_uuid);
+          await doUpsert("pbx_domain_users", rows, "organization_id,pbx_uuid", "users");
         }
       }
       if (cdrResult?.ok) {
@@ -2220,6 +2251,11 @@ Deno.serve(async (req) => {
       jobType: "sync-call-queues", endpoint: "call_center_queues", collectionKey: "call_center_queues",
       table: "pbx_call_queues", conflict: "organization_id,pbx_uuid",
       mapper: (q: any) => { const m = mapQueue(q); return m.pbx_uuid ? m : null; },
+    });
+    if (action === "sync-users" || action === "sync-domain-users") return await genericSync({
+      jobType: "sync-users", endpoint: "users", collectionKey: "users",
+      table: "pbx_domain_users", conflict: "organization_id,pbx_uuid",
+      mapper: (u: any) => mapDomainUser(u),
     });
     if (action === "sync-ivrs") return await genericSync({
       jobType: "sync-ivrs", endpoint: "ivr_menus", collectionKey: "ivr_menus",
