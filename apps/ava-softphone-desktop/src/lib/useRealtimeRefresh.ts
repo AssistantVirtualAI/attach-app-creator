@@ -16,7 +16,7 @@ type Options = {
   organizationId?: string | null;
   /** Only react to these events. Defaults to INSERT + UPDATE. */
   events?: Array<'INSERT' | 'UPDATE' | 'DELETE'>;
-  /** Debounce window (ms). Defaults to 600 to coalesce bursts. */
+  /** Debounce window (ms). Defaults to 5s to coalesce bursts without visible reload loops. */
   debounceMs?: number;
   /** Minimum time between refresh executions. Defaults to 10s to prevent sync feedback loops. */
   throttleMs?: number;
@@ -24,7 +24,7 @@ type Options = {
 };
 
 export function useRealtimeRefresh(opts: Options, refresh: () => void) {
-  const { table, organizationId, events = ['INSERT', 'UPDATE'], debounceMs = 600, throttleMs = 10_000, shouldRefresh } = opts;
+  const { table, organizationId, events = ['INSERT', 'UPDATE'], debounceMs = 5_000, throttleMs = 10_000, shouldRefresh } = opts;
   const eventsKey = events.join(',');
   const refreshRef = useRef(refresh);
   const lastRefreshAtRef = useRef(0);

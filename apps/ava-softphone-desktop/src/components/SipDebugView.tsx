@@ -31,7 +31,7 @@ export default function SipDebugView() {
   const failure = sipProvider.getLastFailure();
 
   useEffect(() => {
-    const id = setInterval(() => setTick((n) => n + 1), 2000);
+    const id = setInterval(() => setTick((n) => n + 1), 30000);
     return () => clearInterval(id);
   }, []);
 

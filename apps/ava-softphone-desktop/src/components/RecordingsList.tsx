@@ -61,7 +61,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
 
   // Realtime: new/updated call records with recordings trigger a silent refetch (no flicker).
   const orgId = useOrgId();
-  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId, events: ['INSERT', 'UPDATE'], throttleMs: 30_000, shouldRefresh: isRecordingRealtimeChange }, silentLoad);
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId, events: ['INSERT', 'UPDATE'], debounceMs: 10_000, throttleMs: 30_000, shouldRefresh: isRecordingRealtimeChange }, silentLoad);
 
 
 
