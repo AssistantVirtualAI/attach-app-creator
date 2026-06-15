@@ -46,6 +46,7 @@ export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope 
 
   const orgId = (myExt as any)?.organization_id ?? LEMTEL_ORG;
   const filterExt: string | null = scope === "mine" ? (myExt as any)?.extension ?? null : null;
+  const mineReady = scope !== "mine" || !!filterExt;
 
   return (
     <div className="space-y-4">
@@ -78,13 +79,13 @@ export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope 
         </TabsList>
 
         <TabsContent value="cdr" className="mt-4">
-          <CdrTab orgId={orgId} extension={filterExt} search={q} />
+          {mineReady ? <CdrTab orgId={orgId} extension={filterExt} search={q} /> : <Card><CardContent className="py-8 text-sm text-muted-foreground">Aucune extension liée à votre compte.</CardContent></Card>}
         </TabsContent>
         <TabsContent value="recordings" className="mt-4">
-          <RecordingsTab orgId={orgId} extension={filterExt} search={q} />
+          {mineReady ? <RecordingsTab orgId={orgId} extension={filterExt} search={q} /> : <Card><CardContent className="py-8 text-sm text-muted-foreground">Aucune extension liée à votre compte.</CardContent></Card>}
         </TabsContent>
         <TabsContent value="voicemail" className="mt-4">
-          <VoicemailTab orgId={orgId} extension={filterExt} search={q} />
+          {mineReady ? <VoicemailTab orgId={orgId} extension={filterExt} search={q} /> : <Card><CardContent className="py-8 text-sm text-muted-foreground">Aucune extension liée à votre compte.</CardContent></Card>}
         </TabsContent>
       </Tabs>
     </div>
