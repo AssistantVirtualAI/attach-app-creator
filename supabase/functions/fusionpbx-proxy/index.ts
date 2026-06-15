@@ -896,7 +896,16 @@ Deno.serve(async (req) => {
       let firstPage: any[] = [];
 
       for (let i = 0; i < maxPages; i++) {
-        const extra: Record<string, string> = { limit: String(pageSize), offset: String(i * pageSize) };
+        // IMPORTANT: FusionPBX returns CDRs oldest-first by default. Without an explicit
+        // sort, sync-cdrs keeps re-ingesting the same historical rows and never reaches
+        // recent calls. `order_by` + `order_type` are accepted (only the bare param name
+        // `order` conflicts with the PG reserved word inside FusionPBX's API handler).
+        const extra: Record<string, string> = {
+          limit: String(pageSize),
+          offset: String(i * pageSize),
+          order_by: "start_stamp",
+          order_type: "desc",
+        };
         if (extension) extra.extension = extension;
         const r = await fetchCdrsWithFallback(extra);
         if (!r.ok) {
