@@ -22,9 +22,10 @@ Deno.serve(async (req) => {
     if (!u?.user) return json({ error: "unauthorized" }, 401);
 
     const { data: sp } = await sb.from("pbx_softphone_users")
-      .select("organization_id, extension, extension_uuid")
+      .select("organization_id, extension")
       .eq("portal_user_id", u.user.id).maybeSingle();
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
+    if (!sp.extension) return json({ error: "NO_EXTENSION_ASSIGNED" }, 403);
 
     let q = sb.from("pbx_call_records")
       .select(`
@@ -36,8 +37,7 @@ Deno.serve(async (req) => {
       .eq("organization_id", sp.organization_id)
       .eq("call_status", "voicemail");
     // Per-user scoping — never leak voicemails across extensions in the same org.
-    if (sp.extension_uuid) q = q.eq("extension_uuid", sp.extension_uuid);
-    else if (sp.extension) q = q.eq("extension", sp.extension);
+    q = q.eq("extension", sp.extension);
 
     const { data: rows } = await q.order("start_at", { ascending: false }).limit(60);
 
