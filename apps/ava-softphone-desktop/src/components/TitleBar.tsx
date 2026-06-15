@@ -27,6 +27,8 @@ export default function TitleBar(_props: Props = {}) {
         justifyContent: 'space-between',
         padding: '0 14px',
         position: 'relative',
+        zIndex: 1000,
+        overflow: 'visible',
         backdropFilter: 'blur(14px)',
         ...dragStyle,
       }}

@@ -31,11 +31,22 @@ Deno.serve(async (req) => {
       .select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle();
     const { data: orgMember } = member ? { data: null } : await admin.from("org_members")
       .select("org_id").eq("user_id", user.id).eq("org_id", organization_id).maybeSingle();
-    if (!member && !orgMember) return json({ error: "Forbidden" }, 403);
+    const { data: softphoneMember } = (member || orgMember) ? { data: null } : await admin.from("pbx_softphone_users")
+      .select("organization_id").eq("portal_user_id", user.id).eq("organization_id", organization_id).maybeSingle();
+    const { data: roleMember } = (member || orgMember || softphoneMember) ? { data: null } : await admin.from("user_roles")
+      .select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle();
+    if (!member && !orgMember && !softphoneMember && !roleMember) return json({ error: "Forbidden" }, 403);
 
-    const { data: call } = await admin.from("pbx_call_records")
+    let { data: call } = await admin.from("pbx_call_records")
       .select("caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, recording_url, voicemail_message")
       .eq("id", call_record_id).eq("organization_id", organization_id).maybeSingle();
+    if (!call) {
+      const { data: rec } = await admin.from("pbx_call_recordings")
+        .select("call_record_id, recording_url, recording_path, recording_name, direction, recorded_at, duration_seconds")
+        .eq("id", call_record_id).eq("organization_id", organization_id).maybeSingle();
+      if (rec?.call_record_id) call_record_id = rec.call_record_id;
+      call = rec ? { ...rec, start_at: rec.recorded_at } : null;
+    }
     const sourceUrl = recording_url || (call as any)?.recording_url || null;
     const fallbackTranscript = [
       `Call ${call?.direction || "unknown"} from ${call?.caller_name || call?.caller_number || "unknown caller"} to ${call?.destination_number || call?.destination || "unknown destination"}.`,

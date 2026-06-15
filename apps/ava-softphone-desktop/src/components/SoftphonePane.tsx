@@ -9,6 +9,7 @@ import LemtelLogo from './LemtelLogo';
 import BrandTagline from './BrandTagline';
 import RecordingsList from './RecordingsList';
 import AIInsights from './AIInsights';
+import ProfileMenu from './ProfileMenu';
 import { AppErrorBoundary } from './AppErrorBoundary';
 import { theme } from '../lib/theme';
 import { ava } from '../lib/avaApi';
@@ -400,6 +401,7 @@ export default function SoftphonePane({
             <option value="dnd">DND</option>
             <option value="away">Away</option>
           </select>
+          {!compact && <ProfileMenu />}
           <button
             onClick={syncPhoneSystem}
             disabled={syncingPhone}

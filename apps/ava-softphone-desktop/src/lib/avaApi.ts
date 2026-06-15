@@ -679,8 +679,29 @@ export const ava = {
       text: `Thank you for calling Lemtel Communications. ${prompt}. Please hold while we connect you to the right team.`,
     }),
   /* Admin */
-  extensions: () => call<any>(`/db/${TABLES.extensions}?select=*&order=extension.asc`, {}, MOCK_EXT)
-    .then((raw: any) => MOCK ? raw as Extension[] : asArray(raw).map((e: any) => ({ id: e.id, extension: e.extension, displayName: e.effective_cid_name || e.extension, user: e.effective_cid_number || undefined, voicemailEnabled: !!e.voicemail_enabled, enabled: e.enabled !== false }))),
+  extensions: async () => {
+    if (MOCK) return MOCK_EXT as Extension[];
+    const me = await getMeContext();
+    const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
+    const raw = await call<any>(`/db/telecom_extensions_v?select=id,extension,effective_cid_name,effective_cid_number,directory_first_name,directory_last_name,description,voicemail_enabled,enabled,do_not_disturb,portal_user_id,softphone_display_name,softphone_status,softphone_last_seen_at${orgFilter}&order=extension.asc&limit=500`, {}, []);
+    return asArray(raw)
+      .filter((e: any) => e.extension)
+      .map((e: any) => {
+        const directoryName = cleanText(`${cleanText(e.directory_first_name)} ${cleanText(e.directory_last_name)}`);
+        return {
+          id: e.id,
+          extension: String(e.extension),
+          displayName: cleanText(e.softphone_display_name) || cleanText(e.effective_cid_name) || directoryName || cleanText(e.description) || `Ext ${e.extension}`,
+          user: cleanText(e.effective_cid_number) || undefined,
+          voicemailEnabled: !!e.voicemail_enabled,
+          enabled: e.enabled !== false,
+          doNotDisturb: !!e.do_not_disturb,
+          status: cleanText(e.softphone_status) || 'offline',
+          lastSeenAt: e.softphone_last_seen_at ?? null,
+          portalUserId: e.portal_user_id ?? null,
+        } as Extension & Record<string, any>;
+      });
+  },
   devices: () => call<any>(`/db/pbx_devices?select=*&order=label.asc`, {}, MOCK_DEV)
     .then((raw: any) => MOCK ? raw as Device[] : asArray(raw).map((d: any) => ({ id: d.id, vendor: d.vendor || 'Device', mac: d.mac_address || '—', template: d.template || '—', registered: !!d.enabled, assignedTo: d.label || undefined }))),
   phoneNumbers: () => call<any>(`/db/pbx_phone_number_assignments?select=*&limit=100`, {}, MOCK_NUM)

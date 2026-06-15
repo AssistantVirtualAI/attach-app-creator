@@ -51,8 +51,8 @@ export default function ContactsView() {
       lastInteraction: new Date().toISOString(),
       totalCalls: 0, totalMessages: 0,
       sentiment: 'neutral',
-      aiNote: e.enabled ? 'Active extension' : 'Disabled extension',
-      tags: ['internal'], favorite: false, interactions: [],
+      aiNote: `${e.enabled ? 'Active' : 'Disabled'} domain extension${e.status ? ` · ${e.status}` : ''}`,
+      tags: ['internal', e.status || 'offline'].filter(Boolean), favorite: false, interactions: [],
     }));
     let manual: ContactItem[] = [];
     try { manual = JSON.parse(localStorage.getItem(LS_MANUAL) || '[]'); } catch {}
@@ -179,7 +179,7 @@ export default function ContactsView() {
             <button key={f} onClick={() => setFilter(f)} style={chip(filter === f)}>{f.toUpperCase()}</button>
           ))}
           <span style={{ marginLeft: 'auto', fontSize: 11, color: c.mutedSilver, alignSelf: 'center' }}>
-            {filtered.length} of {items.length}
+              {filtered.filter((x) => x.tags.includes('internal')).length} extensions · {filtered.length} of {items.length}
           </span>
         </div>
 

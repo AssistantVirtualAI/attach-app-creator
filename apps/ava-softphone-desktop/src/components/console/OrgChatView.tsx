@@ -16,6 +16,8 @@ const STATUS_COLOR: Record<string, string> = {
   offline: '#6b7280',
 };
 
+const isDmChannel = (ch: Channel) => ch.channel_type === 'dm' || ch.name.startsWith('dm:');
+
 export default function OrgChatView() {
   const { t } = useTranslation();
   const [channels, setChannels] = useState<Channel[]>([]);
@@ -32,6 +34,12 @@ export default function OrgChatView() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const loadChannels = async (org: string) => {
+    const edge = await supabase.functions.invoke('org-chat', { body: { action: 'list_channels' } }).catch(() => ({ data: null, error: null } as any));
+    if (Array.isArray((edge.data as any)?.channels)) {
+      const channels = (edge.data as any).channels as Channel[];
+      setChannels(channels);
+      return channels;
+    }
     const { data, error } = await supabase.from('org_chat_channels')
       .select('id,name,channel_type,organization_id,members,archived_at')
       .eq('organization_id', org).is('archived_at', null)
@@ -42,6 +50,17 @@ export default function OrgChatView() {
   };
 
   const loadMembers = async (org: string) => {
+    const { data: dir } = await supabase.functions.invoke('org-chat', { body: { action: 'list_directory' } }).catch(() => ({ data: null } as any));
+    if (Array.isArray((dir as any)?.members)) {
+      setMembers((dir as any).members.map((m: any) => ({
+        user_id: m.user_id,
+        display_name: m.full_name || m.email || `Ext ${m.extension || ''}`,
+        extension: m.extension,
+        status: m.status || 'offline',
+        call_state: m.call_state || null,
+      })));
+      return;
+    }
     const { data: spus } = await supabase.from('pbx_softphone_users')
       .select('portal_user_id, display_name, extension')
       .eq('organization_id', org)
@@ -90,7 +109,7 @@ export default function OrgChatView() {
         await supabase.rpc('ensure_general_channel', { _org_id: org, _user_id: u.user.id });
 
         const chs = await loadChannels(org);
-        const first = chs.find((c) => c.channel_type !== 'direct');
+        const first = chs.find((c) => !isDmChannel(c));
         if (first) setActiveId(first.id);
 
         await loadMembers(org);
@@ -150,25 +169,21 @@ export default function OrgChatView() {
     if (!input.trim() || !activeId || !me || !orgId) return;
     const text = input.trim();
     setInput('');
-    await supabase.from('org_chat_messages').insert({
-      organization_id: orgId, channel_id: activeId,
-      sender_id: me.id, sender_name: me.name, content: text,
+    const { error, data } = await supabase.functions.invoke('org-chat', {
+      body: { action: 'send_message', payload: { channel_id: activeId, content: text } },
     });
+    if (error || (data as any)?.error) setErrMsg(`Message error: ${((error as any)?.message || (data as any)?.error)}`);
   };
 
   const openDM = async (otherId: string, otherName: string) => {
     if (!me || !orgId || otherId === me.id) return;
     const key = [me.id, otherId].sort().join(':');
     const dmName = `dm:${key}`;
-    // Find existing
-    let dm = channels.find((c) => c.channel_type === 'direct' && c.name === dmName);
+    let dm = channels.find((c) => isDmChannel(c) && (c.name === dmName || (c.members?.includes(me.id) && c.members?.includes(otherId))));
     if (!dm) {
-      const { data, error } = await supabase.from('org_chat_channels').insert({
-        organization_id: orgId, name: dmName, description: `DM with ${otherName}`,
-        channel_type: 'direct', created_by: me.id, members: [me.id, otherId],
-      }).select('*').single();
-      if (error) { alert('DM error: ' + error.message); return; }
-      dm = data as Channel;
+      const { data, error } = await supabase.functions.invoke('org-chat', { body: { action: 'ensure_dm_channel', payload: { user_id: otherId } } });
+      if (error || !(data as any)?.channel) { alert('DM error: ' + ((error as any)?.message || (data as any)?.error || 'Unable to open chat')); return; }
+      dm = (data as any).channel as Channel;
       setChannels((cs) => [...cs, dm!]);
     }
     setActiveId(dm.id);
@@ -193,12 +208,12 @@ export default function OrgChatView() {
   }, [messages, search]);
 
   const dmNameFor = (ch: Channel) => {
-    if (!me || ch.channel_type !== 'direct' || !ch.members) return ch.name;
+    if (!me || !isDmChannel(ch) || !ch.members) return ch.name;
     const other = ch.members.find((id) => id !== me.id);
     return members.find((m) => m.user_id === other)?.display_name || 'Direct message';
   };
 
-  const visibleChannels = channels.filter((c) => c.channel_type !== 'direct');
+  const visibleChannels = channels.filter((c) => !isDmChannel(c));
   const activeChannel = channels.find((ch) => ch.id === activeId);
 
   return (
@@ -255,7 +270,7 @@ export default function OrgChatView() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <header style={{ padding: '12px 18px', borderBottom: `1px solid ${c.border}`, display: 'flex', gap: 12, alignItems: 'center' }}>
           <h2 style={{ margin: 0, fontSize: 15, color: c.textIce }}>
-            {activeChannel ? (activeChannel.channel_type === 'direct' ? '@ ' + dmNameFor(activeChannel) : (activeChannel.channel_type === 'private' ? '🔒 ' : '# ') + activeChannel.name) : '—'}
+            {activeChannel ? (isDmChannel(activeChannel) ? '@ ' + dmNameFor(activeChannel) : (activeChannel.channel_type === 'private' ? '🔒 ' : '# ') + activeChannel.name) : '—'}
           </h2>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('orgchat.searchPlaceholder')}
             style={{ marginLeft: 'auto', padding: '6px 10px', borderRadius: 8, border: `1px solid ${c.border}`, background: 'rgba(140,180,255,0.06)', color: c.textIce, fontSize: 12, minWidth: 200 }} />
