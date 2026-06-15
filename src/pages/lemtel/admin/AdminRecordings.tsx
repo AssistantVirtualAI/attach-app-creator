@@ -59,6 +59,8 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
   const [syncing, setSyncing] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [total, setTotal] = useState<number | null>(null);
+  const [metaById, setMetaById] = useState<Record<string, RecMeta>>({});
+  const [aiBusy, setAiBusy] = useState<string | null>(null);
 
   const loadPage = useCallback(async (pageNum: number, reset = false) => {
     setLoading(true);
