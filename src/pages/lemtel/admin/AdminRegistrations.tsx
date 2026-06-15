@@ -102,7 +102,7 @@ export default function AdminRegistrations() {
                 ) : filtered.map((r, i) => (
                   <TableRow key={`${r.user}-${r.contact}-${i}`} className="hover:bg-muted/40 transition-colors">
                     <TableCell className="font-mono text-xs">{r.user || '—'}</TableCell>
-                    <TableCell className="text-xs">{r.profile_name || 'internal'}</TableCell>
+                    <TableCell className="text-xs">{r.sip_profile || 'internal'}</TableCell>
                     <TableCell className="text-xs truncate max-w-[220px]">{r.agent || '—'}</TableCell>
                     <TableCell className="font-mono text-xs truncate max-w-[260px]">{r.contact || '—'}</TableCell>
                     <TableCell className="font-mono text-xs">{r.network_ip ? `${r.network_ip}${r.network_port ? ':' + r.network_port : ''}` : '—'}</TableCell>
