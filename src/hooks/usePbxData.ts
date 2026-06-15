@@ -4,13 +4,14 @@ import { toast } from 'sonner';
 
 export const LEMTEL_ORG = '71755d33-ed64-4ad5-a828-61c9d2029eb7';
 
-function usePbxTable<T = any>(table: string, opts?: { order?: string; ascending?: boolean; limit?: number; filters?: Record<string, string | number | boolean>; enabled?: boolean }) {
+function usePbxTable<T = any>(table: string, opts?: { order?: string; ascending?: boolean; limit?: number; filters?: Record<string, string | number | boolean>; orFilter?: string; enabled?: boolean }) {
   return useQuery({
     queryKey: ['pbx', table, opts],
     enabled: opts?.enabled ?? true,
     queryFn: async () => {
       let q = supabase.from(table as any).select('*').eq('organization_id', LEMTEL_ORG);
       Object.entries(opts?.filters || {}).forEach(([key, value]) => { q = q.eq(key, value as any); });
+      if (opts?.orFilter) q = q.or(opts.orFilter);
       if (opts?.order) q = q.order(opts.order, { ascending: opts.ascending ?? false });
       if (opts?.limit) q = q.limit(opts.limit);
       const { data, error } = await q;
@@ -39,7 +40,9 @@ export const usePbxCallRecords = (limit = 100, opts?: { extension?: string | nul
   order: 'start_at',
   limit,
   enabled: opts?.enabled,
-  filters: opts?.extension ? { extension: opts.extension } : undefined,
+  orFilter: opts?.extension
+    ? `extension.eq.${opts.extension},caller_number.eq.${opts.extension},destination_number.eq.${opts.extension},source_number.eq.${opts.extension}`
+    : undefined,
 });
 export const usePbxSmsThreads = () => usePbxTable('pbx_sms_threads', { order: 'last_message_at' });
 export const usePbxSmsMessages = (threadId: string | null) => useQuery({
