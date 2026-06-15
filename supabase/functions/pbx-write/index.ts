@@ -119,10 +119,44 @@ Deno.serve(async (req) => {
       }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Mirror upsert
+    // Mirror upsert — strict allowlist of mirror targets to prevent
+    // arbitrary service-role writes that would bypass RLS.
+    const MIRROR_TABLE_ALLOWLIST = new Set<string>([
+      "pbx_extensions",
+      "pbx_domains",
+      "pbx_gateways",
+      "pbx_dialplans",
+      "pbx_destinations",
+      "pbx_conferences",
+      "pbx_ivrs",
+      "pbx_ivr_options",
+      "pbx_ring_groups",
+      "pbx_call_queues",
+      "pbx_queue_agents",
+      "pbx_time_conditions",
+      "pbx_feature_codes",
+      "pbx_hold_music",
+      "pbx_sip_profiles",
+      "pbx_devices",
+      "pbx_voicemail_settings",
+      "pbx_call_forwarding",
+      "pbx_call_recording_rules",
+    ]);
+
     let mirrorResult: unknown = null;
     if (mirror?.table) {
-      const row = { ...mirror.row, organization_id: organizationId, last_synced_at: new Date().toISOString() };
+      if (!MIRROR_TABLE_ALLOWLIST.has(mirror.table)) {
+        return new Response(JSON.stringify({ error: "mirror_table_not_allowed", table: mirror.table }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Strip any attempt to override identity/security columns from the caller payload.
+      const FORBIDDEN_KEYS = new Set(["id", "organization_id", "client_id", "user_id", "portal_user_id", "created_by", "owner_id", "role"]);
+      const safeRow: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(mirror.row || {})) {
+        if (!FORBIDDEN_KEYS.has(k)) safeRow[k] = v;
+      }
+      const row = { ...safeRow, organization_id: organizationId, last_synced_at: new Date().toISOString() };
       const q = admin.from(mirror.table).upsert(row, mirror.onConflict ? { onConflict: mirror.onConflict } : undefined).select();
       const { data, error } = await q;
       if (error) mirrorResult = { error: error.message };

@@ -220,22 +220,25 @@ serve(async (req) => {
       const user_id = body?.user_id as string | undefined;
       if (!user_id) return json(400, { error: "user_id is required" });
 
-      // Caller must share at least one org with target (or be super admin)
-      if (!isSuperAdmin) {
-        const { data: shared } = await supabase
-          .from("organization_members")
-          .select("organization_id")
-          .eq("user_id", callingUser.id);
-        const sharedIds = (shared ?? []).map((s) => s.organization_id);
-        if (!sharedIds.length) return json(403, { error: "Forbidden" });
-      }
-
-      const { data: memberships } = await supabase
+      // Caller must actually share an org with the target user (or be super admin).
+      // Always restrict returned orgs to the intersection of caller ∩ target memberships.
+      const { data: targetMemberships } = await supabase
         .from("organization_members")
         .select("organization_id")
         .eq("user_id", user_id);
-      const orgIds = (memberships ?? []).map((m) => m.organization_id);
-      if (!orgIds.length) return json(200, { organizations: [] });
+      const targetOrgIds = (targetMemberships ?? []).map((m) => m.organization_id);
+      if (!targetOrgIds.length) return json(200, { organizations: [] });
+
+      let orgIds = targetOrgIds;
+      if (!isSuperAdmin) {
+        const { data: callerShared } = await supabase
+          .from("organization_members")
+          .select("organization_id")
+          .eq("user_id", callingUser.id)
+          .in("organization_id", targetOrgIds);
+        orgIds = (callerShared ?? []).map((s) => s.organization_id);
+        if (!orgIds.length) return json(403, { error: "Forbidden" });
+      }
 
       const [orgsRes, rolesRes] = await Promise.all([
         supabase.from("organizations").select("id, name, slug").in("id", orgIds),
