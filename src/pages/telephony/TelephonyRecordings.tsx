@@ -18,7 +18,6 @@ function sentimentBadge(s?: string) {
 }
 
 export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
-  const { data: allCdrs = [], isLoading } = usePbxCallRecords(200);
   const qc = useQueryClient();
   const { data: myExt } = useQuery({
     queryKey: ['recordings-my-extension'],
@@ -31,8 +30,11 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
       return data?.extension ?? null;
     },
   });
-  const scopedCdrs = scope === 'mine' ? (allCdrs as any[]).filter((c: any) => myExt && c.extension === myExt) : allCdrs;
-  const recordings = (scopedCdrs as any[]).filter(c => c.has_recording || c.recording_url);
+  const { data: cdrs = [], isLoading } = usePbxCallRecords(200, {
+    extension: scope === 'mine' ? myExt : undefined,
+    enabled: scope !== 'mine' || !!myExt,
+  });
+  const recordings = (cdrs as any[]).filter(c => c.has_recording || c.recording_url);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
