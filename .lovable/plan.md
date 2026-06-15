@@ -1,5 +1,7 @@
 # Command Center — Phases 1 to 5
 
+Status: Phase 4 and Phase 5 continued. Extensions now read from `pbx_extensions_safe`, the safe view excludes PBX credentials/raw payloads, `pbx-admin-chatbot` is deployed, and audit rollback drafting is wired through `rollback_admin_action`.
+
 Phase 0 is shipped (audit table, sync columns, sources registry, SourceBadge, WriteScopeButton, usePlatformAccess, logAdminAction). This plan covers everything left from the master plan.
 
 ## Phase 1 — Desktop shell (Command Center)
