@@ -33,6 +33,10 @@ function displayError(e: any) {
   return text;
 }
 
+// Module-level cache: survives unmount/remount when navigating between pages,
+// so users don't have to re-download the same PBX audio every time they revisit.
+const audioCache = new Map<string, string>();
+
 export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string) => void }) {
   const [items, setItems] = useState<RecordingItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +44,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
   const [error, setError] = useState<string | null>(null);
   const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
   const [itemSuccess, setItemSuccess] = useState<Record<string, string>>({});
-  const [audio, setAudio] = useState<Record<string, string>>({});
+  const [audio, setAudio] = useState<Record<string, string>>(() => Object.fromEntries(audioCache));
   const [audioErrors, setAudioErrors] = useState<Record<string, string>>({});
   const [audioLoading, setAudioLoading] = useState<string | null>(null);
 
