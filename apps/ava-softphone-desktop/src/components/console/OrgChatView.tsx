@@ -44,6 +44,17 @@ export default function OrgChatView() {
   };
 
   const loadMembers = async (org: string) => {
+    const { data: dir } = await supabase.functions.invoke('org-chat', { body: { action: 'list_directory' } }).catch(() => ({ data: null } as any));
+    if (Array.isArray((dir as any)?.members)) {
+      setMembers((dir as any).members.map((m: any) => ({
+        user_id: m.user_id,
+        display_name: m.full_name || m.email || `Ext ${m.extension || ''}`,
+        extension: m.extension,
+        status: m.status || 'offline',
+        call_state: m.call_state || null,
+      })));
+      return;
+    }
     const { data: spus } = await supabase.from('pbx_softphone_users')
       .select('portal_user_id, display_name, extension')
       .eq('organization_id', org)
@@ -162,15 +173,11 @@ export default function OrgChatView() {
     if (!me || !orgId || otherId === me.id) return;
     const key = [me.id, otherId].sort().join(':');
     const dmName = `dm:${key}`;
-    // Find existing
     let dm = channels.find((c) => isDmChannel(c) && c.name === dmName);
     if (!dm) {
-      const { data, error } = await supabase.from('org_chat_channels').insert({
-        organization_id: orgId, name: dmName, description: `DM with ${otherName}`,
-        channel_type: 'dm', created_by: me.id, members: [me.id, otherId],
-      }).select('*').single();
-      if (error) { alert('DM error: ' + error.message); return; }
-      dm = data as Channel;
+      const { data, error } = await supabase.functions.invoke('org-chat', { body: { action: 'ensure_dm_channel', payload: { user_id: otherId } } });
+      if (error || !(data as any)?.channel) { alert('DM error: ' + ((error as any)?.message || (data as any)?.error || 'Unable to open chat')); return; }
+      dm = (data as any).channel as Channel;
       setChannels((cs) => [...cs, dm!]);
     }
     setActiveId(dm.id);

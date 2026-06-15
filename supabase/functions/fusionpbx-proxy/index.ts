@@ -2457,7 +2457,7 @@ Deno.serve(async (req) => {
           await admin.from("pbx_call_transcripts").upsert({
             call_record_id: rec.call_record_id,
             organization_id: rec.organization_id,
-            content: parsed.transcript,
+            transcript_text: parsed.transcript,
             language: parsed.language || null,
           }, { onConflict: "call_record_id" });
         }

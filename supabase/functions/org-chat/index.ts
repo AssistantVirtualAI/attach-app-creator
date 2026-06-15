@@ -28,9 +28,12 @@ Deno.serve(async (req) => {
     const { action, payload } = await req.json().catch(() => ({}));
     if (!action) return json({ error: "missing_action" }, 400);
 
-    // org of caller (first membership)
+    // org of caller (single workspace; support admin, portal and softphone users)
     const { data: m } = await admin.from("organization_members").select("organization_id").eq("user_id", userId).limit(1).maybeSingle();
-    const orgId: string | null = m?.organization_id ?? null;
+    const { data: m2 } = m?.organization_id ? { data: null } : await admin.from("org_members").select("org_id").eq("user_id", userId).limit(1).maybeSingle();
+    const { data: sp } = (m?.organization_id || m2?.org_id) ? { data: null } : await admin.from("pbx_softphone_users").select("organization_id").eq("portal_user_id", userId).limit(1).maybeSingle();
+    const { data: role } = (m?.organization_id || m2?.org_id || sp?.organization_id) ? { data: null } : await admin.from("user_roles").select("organization_id").eq("user_id", userId).limit(1).maybeSingle();
+    const orgId: string | null = m?.organization_id ?? m2?.org_id ?? sp?.organization_id ?? role?.organization_id ?? null;
     if (!orgId) return json({ error: "no_org" }, 400);
 
     // profile (sender_name)
@@ -279,7 +282,7 @@ Deno.serve(async (req) => {
           organization_id: orgId,
           name: dmKey,
           description: "Direct message",
-          channel_type: "private",
+          channel_type: "dm",
           created_by: userId,
           members: pair,
         })
