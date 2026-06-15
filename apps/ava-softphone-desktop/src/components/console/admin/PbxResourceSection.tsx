@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { theme } from '../../../lib/theme';
 import { supabase } from '../../../lib/supabaseClient';
 import { getMeContext } from '../../../lib/avaApi';
