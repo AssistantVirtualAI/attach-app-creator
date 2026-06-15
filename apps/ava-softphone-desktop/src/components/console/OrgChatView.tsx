@@ -90,7 +90,7 @@ export default function OrgChatView() {
         await supabase.rpc('ensure_general_channel', { _org_id: org, _user_id: u.user.id });
 
         const chs = await loadChannels(org);
-        const first = chs.find((c) => c.channel_type !== 'direct');
+        const first = chs.find((c) => c.channel_type !== 'dm');
         if (first) setActiveId(first.id);
 
         await loadMembers(org);
@@ -161,11 +161,11 @@ export default function OrgChatView() {
     const key = [me.id, otherId].sort().join(':');
     const dmName = `dm:${key}`;
     // Find existing
-    let dm = channels.find((c) => c.channel_type === 'direct' && c.name === dmName);
+    let dm = channels.find((c) => c.channel_type === 'dm' && c.name === dmName);
     if (!dm) {
       const { data, error } = await supabase.from('org_chat_channels').insert({
         organization_id: orgId, name: dmName, description: `DM with ${otherName}`,
-        channel_type: 'direct', created_by: me.id, members: [me.id, otherId],
+        channel_type: 'dm', created_by: me.id, members: [me.id, otherId],
       }).select('*').single();
       if (error) { alert('DM error: ' + error.message); return; }
       dm = data as Channel;
@@ -193,12 +193,12 @@ export default function OrgChatView() {
   }, [messages, search]);
 
   const dmNameFor = (ch: Channel) => {
-    if (!me || ch.channel_type !== 'direct' || !ch.members) return ch.name;
+    if (!me || ch.channel_type !== 'dm' || !ch.members) return ch.name;
     const other = ch.members.find((id) => id !== me.id);
     return members.find((m) => m.user_id === other)?.display_name || 'Direct message';
   };
 
-  const visibleChannels = channels.filter((c) => c.channel_type !== 'direct');
+  const visibleChannels = channels.filter((c) => c.channel_type !== 'dm');
   const activeChannel = channels.find((ch) => ch.id === activeId);
 
   return (
@@ -255,7 +255,7 @@ export default function OrgChatView() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <header style={{ padding: '12px 18px', borderBottom: `1px solid ${c.border}`, display: 'flex', gap: 12, alignItems: 'center' }}>
           <h2 style={{ margin: 0, fontSize: 15, color: c.textIce }}>
-            {activeChannel ? (activeChannel.channel_type === 'direct' ? '@ ' + dmNameFor(activeChannel) : (activeChannel.channel_type === 'private' ? '🔒 ' : '# ') + activeChannel.name) : '—'}
+            {activeChannel ? (activeChannel.channel_type === 'dm' ? '@ ' + dmNameFor(activeChannel) : (activeChannel.channel_type === 'private' ? '🔒 ' : '# ') + activeChannel.name) : '—'}
           </h2>
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('orgchat.searchPlaceholder')}
             style={{ marginLeft: 'auto', padding: '6px 10px', borderRadius: 8, border: `1px solid ${c.border}`, background: 'rgba(140,180,255,0.06)', color: c.textIce, fontSize: 12, minWidth: 200 }} />
