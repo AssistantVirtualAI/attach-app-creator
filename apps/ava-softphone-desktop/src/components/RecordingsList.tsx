@@ -8,6 +8,18 @@ import { audit } from '../lib/audit';
 
 const { colors: c, glow } = theme;
 
+function isRecordingRealtimeChange(payload: unknown) {
+  const p = payload as { eventType?: string; new?: Record<string, unknown>; old?: Record<string, unknown> };
+  const next = p.new || {};
+  const prev = p.old || {};
+  if (p.eventType === 'INSERT') return next.has_recording === true || Boolean(next.recording_path || next.recording_name);
+  return next.has_recording === true && (
+    prev.has_recording !== true ||
+    next.recording_path !== prev.recording_path ||
+    next.recording_name !== prev.recording_name
+  );
+}
+
 function displayError(e: any) {
   const text = String(e?.context?.error || e?.message || e?.details || e?.error || 'Analysis failed');
   if (/MISSING_SECRET/i.test(text)) return 'AI analysis is not configured yet.';
@@ -47,7 +59,7 @@ export default function RecordingsList({ onAnalyze }: { onAnalyze?: (id: string)
 
   // Realtime: new/updated call records with recordings trigger a refetch.
   const orgId = useOrgId();
-  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, load);
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId, events: ['INSERT', 'UPDATE'], throttleMs: 30_000, shouldRefresh: isRecordingRealtimeChange }, load);
 
 
 

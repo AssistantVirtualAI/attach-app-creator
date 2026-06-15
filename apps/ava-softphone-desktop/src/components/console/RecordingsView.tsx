@@ -23,6 +23,18 @@ type Sent = 'all' | 'positive' | 'neutral' | 'negative';
 type Sort = 'recent' | 'oldest' | 'longest' | 'quality_desc' | 'quality_asc';
 type Range = 'all' | '24h' | '7d' | '30d' | '90d';
 
+function isRecordingRealtimeChange(payload: unknown) {
+  const p = payload as { eventType?: string; new?: Record<string, unknown>; old?: Record<string, unknown> };
+  const next = p.new || {};
+  const prev = p.old || {};
+  if (p.eventType === 'INSERT') return next.has_recording === true || Boolean(next.recording_path || next.recording_name);
+  return next.has_recording === true && (
+    prev.has_recording !== true ||
+    next.recording_path !== prev.recording_path ||
+    next.recording_name !== prev.recording_name
+  );
+}
+
 function fmtDate(iso?: string | null) {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -86,7 +98,7 @@ export default function RecordingsView() {
 
   // Realtime: new recordings (rows on pbx_call_records with audio) trigger refetch.
   const orgId = useOrgId();
-  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId }, load);
+  useRealtimeRefresh({ table: 'pbx_call_records', organizationId: orgId, events: ['INSERT', 'UPDATE'], throttleMs: 30_000, shouldRefresh: isRecordingRealtimeChange }, load);
 
 
   // Helper: fetch (or reuse cached) signed audio URL for a recording, deduping concurrent calls.
