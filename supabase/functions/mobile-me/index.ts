@@ -29,12 +29,15 @@ Deno.serve(async (req) => {
     const [{ data: profile }, { data: sp }] = await Promise.all([
       sb.from("profiles").select("full_name, email, avatar_url").eq("id", u.user.id).maybeSingle(),
       sb.from("pbx_softphone_users")
-        .select("organization_id, client_id, extension_id, extension, sip_domain, display_name, forward_enabled, forward_to, dnd_enabled, status, status_updated_at, updated_at, wss_url")
+        .select("organization_id, client_id, extension_id, extension, sip_domain, display_name, forward_enabled, forward_to, dnd_enabled, status, status_updated_at, updated_at, wss_url, app_access_enabled, mobile_access_enabled")
         .eq("portal_user_id", u.user.id)
         .maybeSingle(),
     ]);
 
     if (!sp) return json({ error: "NO_SOFTPHONE_ACCOUNT" }, 404);
+    if (sp.app_access_enabled === false || sp.mobile_access_enabled === false) {
+      return json({ error: "MOBILE_ACCESS_DISABLED", message: "Your administrator has disabled access to the mobile app." }, 403);
+    }
 
     const { data: org } = await admin.from("organizations").select("name, sip_domain, fusionpbx_domain_uuid").eq("id", sp.organization_id).maybeSingle();
     const { data: client } = sp.client_id
@@ -67,6 +70,7 @@ Deno.serve(async (req) => {
       client: client ? { id: client.id, name: client.name } : undefined,
       domain: { organizationId: sp.organization_id, sipDomain, fusionpbxDomainUuid: org?.fusionpbx_domain_uuid || undefined, portalUrl, wssUrl: sp.wss_url || undefined },
       extension: { number: sp.extension, displayName: sp.display_name || "", sipDomain, id: sp.extension_id || undefined },
+      access: { app: sp.app_access_enabled !== false, mobile: sp.mobile_access_enabled !== false },
       role,
       dataScope: isDomainAdmin ? "domain_admin" : "extension_user",
       permissions: { admin: isDomainAdmin, canManageNumbers: isDomainAdmin, canManageAgents: isDomainAdmin, canManageUsers: role === "org_admin" || role === "super_admin", canManageRouting, canViewDomainReports: isDomainAdmin },

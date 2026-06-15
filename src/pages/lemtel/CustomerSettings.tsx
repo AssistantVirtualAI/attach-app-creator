@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Palette, Phone, Users, CreditCard, Save, UserPlus, Globe, Copy, CheckCircle2 } from "lucide-react";
+import { Palette, Phone, Users, CreditCard, Save, UserPlus, Globe, Copy, CheckCircle2, Laptop, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { InviteUserDialog } from "@/components/portal/InviteUserDialog";
+import { Switch } from "@/components/ui/switch";
 
 export default function CustomerSettings() {
   const { slug } = useParams();
@@ -75,14 +76,43 @@ export default function CustomerSettings() {
     toast.success("Copied");
   };
 
-  const { data: members = [] } = useQuery({
+  const { data: members = [], refetch: refetchMembers } = useQuery({
     queryKey: ["org-members-list", org?.id],
     enabled: !!org?.id,
     queryFn: async () => {
-      const { data } = await (supabase as any).from("org_members").select("*").eq("org_id", org.id);
+      const { data, error } = await supabase.functions.invoke("manage-org-roles", {
+        body: { action: "list", organization_id: org.id },
+      });
+      if (error) throw error;
+      return ((data as any)?.members || []) as any[];
+    },
+  });
+
+  const { data: softphoneUsers = [], refetch: refetchSoftphones } = useQuery({
+    queryKey: ["org-softphone-access", org?.id],
+    enabled: !!org?.id,
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from("pbx_softphone_users")
+        .select("id, portal_user_id, extension, display_name, app_access_enabled, desktop_access_enabled, mobile_access_enabled, account_status")
+        .eq("organization_id", org.id)
+        .order("extension");
       return (data || []) as any[];
     },
   });
+
+  const softphoneByUser = new Map(softphoneUsers.filter((u: any) => u.portal_user_id).map((u: any) => [u.portal_user_id, u]));
+
+  const togglePlatformAccess = async (softphoneId: string, platform: 'app' | 'desktop' | 'mobile', enabled: boolean) => {
+    const { error } = await (supabase as any).rpc("set_softphone_platform_access", {
+      _softphone_id: softphoneId,
+      _platform: platform,
+      _enabled: enabled,
+    });
+    if (error) return toast.error(error.message);
+    toast.success(`${platform === 'app' ? 'App' : platform === 'desktop' ? 'Desktop' : 'Mobile'} access ${enabled ? 'enabled' : 'blocked'}`);
+    refetchSoftphones();
+  };
 
   const { data: dids = [] } = useQuery({
     queryKey: ["org-dids", org?.id],
@@ -207,15 +237,31 @@ export default function CustomerSettings() {
                 <p className="text-sm text-muted-foreground">No members yet. Click "Invite user" to add one.</p>
               ) : (
                 <table className="w-full text-sm">
-                  <thead className="border-b"><tr className="text-left"><th className="p-2">User</th><th className="p-2">Role</th><th className="p-2">Permissions</th></tr></thead>
+                  <thead className="border-b">
+                    <tr className="text-left">
+                      <th className="p-2">User</th>
+                      <th className="p-2">Role</th>
+                      <th className="p-2">Extension</th>
+                      <th className="p-2 text-right">App</th>
+                      <th className="p-2 text-right"><span className="inline-flex items-center justify-end gap-1"><Laptop className="h-3 w-3" />Desktop</span></th>
+                      <th className="p-2 text-right"><span className="inline-flex items-center justify-end gap-1"><Smartphone className="h-3 w-3" />Mobile</span></th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {members.map((m: any) => {
-                      const perms = Object.entries(m).filter(([k, v]) => k.startsWith("can_") && v === true).map(([k]) => k.replace("can_", ""));
+                      const profile = m.profile || {};
+                      const softphone = softphoneByUser.get(m.user_id);
                       return (
-                        <tr key={m.id} className="border-b">
-                          <td className="p-2 font-mono text-xs">{m.user_id?.slice(0, 12)}</td>
-                          <td className="p-2"><Badge variant="outline">{m.role}</Badge></td>
-                          <td className="p-2 text-xs">{perms.length ? perms.join(", ") : <span className="text-muted-foreground">—</span>}</td>
+                        <tr key={m.user_id} className="border-b">
+                          <td className="p-2">
+                            <div className="font-medium">{profile.full_name || profile.email || m.user_id?.slice(0, 12)}</div>
+                            <div className="text-xs text-muted-foreground">{profile.email || m.user_id}</div>
+                          </td>
+                          <td className="p-2"><Badge variant="outline">{m.role || "viewer"}</Badge></td>
+                          <td className="p-2">{softphone ? <Badge variant="secondary" className="font-mono">{softphone.extension}</Badge> : <span className="text-xs text-muted-foreground">No softphone</span>}</td>
+                          <td className="p-2 text-right">{softphone ? <Switch checked={softphone.app_access_enabled !== false} onCheckedChange={(v) => togglePlatformAccess(softphone.id, 'app', v)} /> : <span className="text-muted-foreground">—</span>}</td>
+                          <td className="p-2 text-right">{softphone ? <Switch checked={softphone.desktop_access_enabled !== false} disabled={softphone.app_access_enabled === false} onCheckedChange={(v) => togglePlatformAccess(softphone.id, 'desktop', v)} /> : <span className="text-muted-foreground">—</span>}</td>
+                          <td className="p-2 text-right">{softphone ? <Switch checked={softphone.mobile_access_enabled !== false} disabled={softphone.app_access_enabled === false} onCheckedChange={(v) => togglePlatformAccess(softphone.id, 'mobile', v)} /> : <span className="text-muted-foreground">—</span>}</td>
                         </tr>
                       );
                     })}
@@ -229,7 +275,7 @@ export default function CustomerSettings() {
               open={inviteOpen}
               onOpenChange={setInviteOpen}
               organizationId={org.id}
-              onInvited={() => qc.invalidateQueries({ queryKey: ["org-members-list", org.id] })}
+              onInvited={() => { qc.invalidateQueries({ queryKey: ["org-members-list", org.id] }); refetchMembers(); }}
             />
           )}
         </TabsContent>

@@ -10,6 +10,15 @@ export type UserStatus = "available" | "busy" | "dnd" | "away";
 let passwordHealInFlight = false;
 let lastPasswordHealKey = "";
 
+function detectSoftphonePlatform(): "app" | "desktop" | "mobile" {
+  if (typeof window === "undefined") return "app";
+  const w = window as any;
+  const ua = navigator.userAgent || "";
+  if (w.electron || w.__TAURI__ || /Electron|Tauri|AVA Desktop/i.test(ua)) return "desktop";
+  if (w.Capacitor || w.cordova || /Capacitor|Cordova|ReactNative|AVA Mobile/i.test(ua)) return "mobile";
+  return "app";
+}
+
 function buildConfig(raw: any): SoftphoneConfig {
   return {
     extension: raw.extension,
@@ -44,7 +53,7 @@ export function useSoftphone() {
     (async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase.functions.invoke("softphone-credentials");
+        const { data, error } = await supabase.functions.invoke("softphone-credentials", { body: { platform: detectSoftphonePlatform() } });
         if (cancelled) return;
         if (error || !data || (data as any).error) {
           setConfig(null);
@@ -74,7 +83,7 @@ export function useSoftphone() {
           body: { force_local_to_pbx: true },
         });
         if (error || (data as any)?.error) throw new Error(error?.message || (data as any)?.message || (data as any)?.error);
-        const creds = await supabase.functions.invoke("softphone-credentials");
+        const creds = await supabase.functions.invoke("softphone-credentials", { body: { platform: detectSoftphonePlatform() } });
         if (creds.error || !creds.data || (creds.data as any)?.error) throw new Error(creds.error?.message || (creds.data as any)?.message || "Credential refresh failed");
         const cfg = buildConfig(creds.data as any);
         setConfig(cfg);

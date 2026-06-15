@@ -53,7 +53,18 @@ Deno.serve(async (req) => {
       created = true;
     }
 
-    // Upsert org_members with permissions
+    const legacyRole = String(role || "user");
+    const modernRole = ["master_admin", "ava_admin"].includes(legacyRole)
+      ? "super_admin"
+      : ["customer_admin", "reseller_admin", "admin"].includes(legacyRole)
+        ? "org_admin"
+        : legacyRole === "manager"
+          ? "manager"
+          : legacyRole === "agent"
+            ? "agent"
+            : "viewer";
+
+    // Upsert org_members with legacy permissions for backward compatibility.
     const member: any = {
       user_id: userId,
       org_id: organization_id,
@@ -63,11 +74,30 @@ Deno.serve(async (req) => {
     const { error: memErr } = await admin.from("org_members").upsert(member, { onConflict: "user_id,org_id" });
     if (memErr) return json({ error: "MEMBER_UPSERT_FAILED", details: memErr.message }, 400);
 
-    // Also legacy organization_members for backwards compatibility
-    await admin.from("organization_members").upsert(
+    // Mirror to the modern organization/user_roles model used by the AVA portal user list.
+    const { error: modernMemberErr } = await admin.from("organization_members").upsert(
       { user_id: userId, organization_id, accepted_at: new Date().toISOString() },
       { onConflict: "user_id,organization_id" },
     );
+    if (modernMemberErr) return json({ error: "ORG_MEMBER_UPSERT_FAILED", details: modernMemberErr.message }, 400);
+
+    const { data: currentRoleRow } = await admin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("organization_id", organization_id)
+      .maybeSingle();
+
+    const { error: roleErr } = currentRoleRow
+      ? await admin
+          .from("user_roles")
+          .update({ role: modernRole })
+          .eq("user_id", userId)
+          .eq("organization_id", organization_id)
+      : await admin
+          .from("user_roles")
+          .insert({ user_id: userId, organization_id, role: modernRole });
+    if (roleErr) return json({ error: "USER_ROLE_UPSERT_FAILED", details: roleErr.message }, 400);
 
     // Generate invite/magic link
     let actionLink: string | null = null;
