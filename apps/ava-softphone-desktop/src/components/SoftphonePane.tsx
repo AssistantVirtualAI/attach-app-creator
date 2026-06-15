@@ -71,6 +71,7 @@ export default function SoftphonePane({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const prevCallStateRef = useRef(false);
+  const syncAfterCallRef = useRef(false);
   const [tab, setTab] = useState<Tab>('dial');
   const [dial, setDial] = useState('');
   const [timer, setTimer] = useState(0);
@@ -222,6 +223,21 @@ export default function SoftphonePane({
     }
     prevCallStateRef.current = isInCall;
   }, [sp.snap.callState, autoResetOutput]);
+
+  // When a call ends, pull fresh CDRs/voicemails/recording metadata in a short burst.
+  useEffect(() => {
+    const isInCall = sp.snap.callState === 'active' || sp.snap.callState === 'held' || sp.snap.callState === 'ringing-in' || sp.snap.callState === 'ringing-out';
+    if (syncAfterCallRef.current && !isInCall) {
+      const delays = [1200, 6000, 18000];
+      const timers = delays.map((delay) => window.setTimeout(async () => {
+        await ava.syncPhoneSystemRecent(250);
+        window.dispatchEvent(new Event('lemtel:phone-sync-complete'));
+      }, delay));
+      syncAfterCallRef.current = false;
+      return () => timers.forEach((id) => window.clearTimeout(id));
+    }
+    syncAfterCallRef.current = isInCall;
+  }, [sp.snap.callState]);
 
   const dotColor =
     sp.snap.status === 'registered' ? c.green :
