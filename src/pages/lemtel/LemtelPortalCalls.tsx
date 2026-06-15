@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { usePbxCallRecords, usePbxSync, usePbxTestCdrEndpoint, LEMTEL_ORG } from '@/hooks/usePbxData';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
 
 function statusBadge(c: any) {
@@ -43,8 +43,19 @@ export default function LemtelPortalCalls({ scope = 'org' }: { scope?: 'org' | '
   const [fromDate, setFromDate] = useState(daysAgo(30));
   const [toDate, setToDate] = useState(today());
   const [extFilter, setExtFilter] = useState('');
+  const { data: myExt } = useQuery({
+    queryKey: ['portal-calls-my-extension'],
+    enabled: scope === 'mine',
+    queryFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return null;
+      const { data } = await (supabase as any).from('pbx_softphone_users')
+        .select('extension').eq('portal_user_id', auth.user.id).maybeSingle();
+      return data?.extension ?? null;
+    },
+  });
   const cdrs = scope === 'mine'
-    ? (allCdrs as any[]).filter((c: any) => c.extension || c.destination_number || c.destination)
+    ? (allCdrs as any[]).filter((c: any) => myExt && c.extension === myExt)
     : allCdrs;
 
   const analyze = async (call: any) => {
