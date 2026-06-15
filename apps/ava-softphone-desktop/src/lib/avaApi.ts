@@ -89,7 +89,7 @@ function scopedCdrFilter(me: MeContext): string {
   if (me.extension_uuid) parts.push(`extension_uuid.eq.${me.extension_uuid}`);
   if (me.extension) {
     const ext = encodeURIComponent(me.extension);
-    parts.push(`extension.eq.${ext}`, `caller_number.eq.${ext}`, `destination_number.eq.${ext}`, `source_number.eq.${ext}`);
+    parts.push(`extension.eq.${ext}`, `caller_number.eq.${ext}`, `destination_number.eq.${ext}`, `destination.eq.${ext}`, `source_number.eq.${ext}`);
   }
   return parts.length ? `&or=(${parts.join(',')})` : '&id=eq.__no_softphone_extension__';
 }
@@ -103,7 +103,7 @@ function scopedThreadFilter(me: MeContext): string {
 export function applyMyExtensionScope(query: any, me: MeContext): any {
   const parts: string[] = [];
   if (me.extension_uuid) parts.push(`extension_uuid.eq.${me.extension_uuid}`);
-  if (me.extension) parts.push(`extension.eq.${me.extension}`, `caller_number.eq.${me.extension}`, `destination_number.eq.${me.extension}`, `source_number.eq.${me.extension}`);
+  if (me.extension) parts.push(`extension.eq.${me.extension}`, `caller_number.eq.${me.extension}`, `destination_number.eq.${me.extension}`, `destination.eq.${me.extension}`, `source_number.eq.${me.extension}`);
   return parts.length ? query.or(parts.join(',')) : query.eq('id', '__no_softphone_extension__');
 }
 
@@ -119,7 +119,7 @@ export async function getMeContext(): Promise<MeContext> {
         uid = payload?.sub ?? null;
       } catch {}
       const filter = uid ? `portal_user_id=eq.${uid}` : `limit=1`;
-      const url = `${BACKEND.url}/rest/v1/pbx_softphone_users?select=organization_id,extension,display_name,portal_user_id&${filter}&limit=1`;
+      const url = `${BACKEND.url}/rest/v1/pbx_softphone_users?select=organization_id,extension,extension_id,display_name,portal_user_id&${filter}&limit=1`;
       const r = await fetch(url, { headers: authHeaders() });
       if (!r.ok) return EMPTY_ME;
       const rows = await r.json();
@@ -137,7 +137,7 @@ export async function getMeContext(): Promise<MeContext> {
       const ctx: MeContext = {
         organization_id: row.organization_id ?? null,
         extension: row.extension ?? null,
-        extension_uuid: row.extension_uuid ?? null,
+        extension_uuid: row.extension_uuid ?? row.extension_id ?? null,
         display_name: row.display_name ?? null,
         user_id: row.portal_user_id ?? uid,
       };
