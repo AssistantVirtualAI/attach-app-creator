@@ -1521,7 +1521,30 @@ Deno.serve(async (req) => {
           attempts.push({ url: safeUrl(url), status: 0, content_type: e?.name === "AbortError" ? "timeout" : undefined });
         }
       }
-      return json({ ok: false, error: "RECORDING_NOT_FOUND", message: "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.", attempts, session_attempts: attemptsSession }, 200, { "X-Recording-Status": "not-found" });
+      // Determine whether session login actually succeeded so the client can
+      // distinguish "PHPSESSID login failed" from "file truly missing on PBX disk".
+      const fileMissing = attemptsSession.some(a =>
+        (a.status === 404) ||
+        (a.status === 200 && !(a.content_type || "").includes("text/html"))
+      );
+      const sessionLoggedIn = FUSION_SESSIONS.size > 0;
+      console.log("[get-recording] RECORDING_NOT_FOUND", JSON.stringify({
+        xml_cdr_uuid, record_name, session_logged_in: sessionLoggedIn,
+        file_missing_signal: fileMissing,
+        session_attempts: attemptsSession.slice(0, 8),
+        legacy_attempts: attempts.slice(0, 4),
+      }));
+      return json({
+        ok: false,
+        error: "RECORDING_NOT_FOUND",
+        message: fileMissing
+          ? "FusionPBX session authenticated successfully, but the recording file is missing from PBX storage (the .mp3/.wav is no longer on disk)."
+          : "The PBX has CDR metadata for this call, but the recording file is not reachable on the PBX storage path.",
+        session_logged_in: sessionLoggedIn,
+        file_missing: fileMissing,
+        attempts,
+        session_attempts: attemptsSession,
+      }, 200, { "X-Recording-Status": "not-found" });
     }
 
     // ---- Signed-URL recording delivery ----
