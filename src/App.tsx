@@ -138,6 +138,16 @@ import AdminDashboard from "./pages/lemtel/admin/AdminDashboard";
 import MyDashboard from "./pages/lemtel/my/MyDashboard";
 import AdminRecordings from "./pages/lemtel/admin/AdminRecordings";
 import AdminVoicemail from "./pages/lemtel/admin/AdminVoicemail";
+import { ConsoleShell } from "./components/console/ConsoleShell";
+import ConsoleDashboard from "./pages/console/ConsoleDashboard";
+import ConsoleExtensions from "./pages/console/ConsoleExtensions";
+import {
+  ConsoleDevices, ConsoleIVRs, ConsoleQueues, ConsoleRingGroups, ConsoleDIDs,
+  ConsoleInboundRoutes, ConsoleVoicemail, ConsoleRegistrations, ConsoleActiveCalls, ConsoleCdr,
+} from "./pages/console/ConsoleWrappers";
+import ConsoleInsights from "./pages/console/ConsoleInsights";
+import ConsoleChatbot from "./pages/console/ConsoleChatbot";
+import ConsoleAudit from "./pages/console/ConsoleAudit";
 import AdminReports from "./pages/lemtel/admin/AdminReports";
 import AdminDestinations from "./pages/lemtel/admin/AdminDestinations";
 import AdminTimeConditions from "./pages/lemtel/admin/AdminTimeConditions";
