@@ -68,6 +68,51 @@ export default function AdminSyncHealth() {
     || (j.job_type || '').toLowerCase().includes(key)
   );
 
+  // ---- Backfill state ----
+  const [backfillPages, setBackfillPages] = useState(50);
+  const [backfillPageSize, setBackfillPageSize] = useState(500);
+  const [backfillRunning, setBackfillRunning] = useState(false);
+  const [backfillResult, setBackfillResult] = useState<any>(null);
+
+  const integration = useQuery({
+    queryKey: ['pbx-integration-cursor'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('pbx_integrations')
+        .select('id, organization_id, config, last_sync_at')
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    refetchInterval: backfillRunning ? 3000 : 30000,
+  });
+
+  const cursor = (integration.data as any)?.config?.sync_cursor ?? 0;
+  const cursorAt = (integration.data as any)?.config?.sync_cursor_updated_at;
+
+  const runBackfill = async (fromBeginning: boolean) => {
+    setBackfillRunning(true);
+    setBackfillResult(null);
+    toast.info(fromBeginning ? 'Starting backfill from offset 0…' : 'Resuming backfill from cursor…');
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: {
+          action: 'backfill-cdrs',
+          params: { page_size: backfillPageSize, max_pages: backfillPages, from_beginning: fromBeginning },
+        },
+      });
+      if (error) throw error;
+      setBackfillResult(data);
+      toast.success(`Backfill complete: ${(data as any)?.stats?.cdrs ?? 0} upserted`);
+      jobs.refetch();
+      integration.refetch();
+    } catch (e: any) {
+      toast.error(e?.message || 'Backfill failed');
+    } finally {
+      setBackfillRunning(false);
+    }
+  };
+
   return (
     <div className="space-y-4 w-full min-w-0">
       <AdminPageHeader
