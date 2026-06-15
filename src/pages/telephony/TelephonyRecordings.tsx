@@ -7,7 +7,7 @@ import { usePbxCallRecords, LEMTEL_ORG } from '@/hooks/usePbxData';
 import { SyncEverythingButton } from '@/components/lemtel/SyncEverythingButton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 function sentimentBadge(s?: string) {
   if (!s) return null;
@@ -17,10 +17,22 @@ function sentimentBadge(s?: string) {
   return <Badge className="bg-yellow-500/15 text-yellow-700 dark:text-yellow-400">🟡 Neutral</Badge>;
 }
 
-export default function TelephonyRecordings() {
-  const { data: cdrs = [], isLoading } = usePbxCallRecords(200);
+export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
+  const { data: allCdrs = [], isLoading } = usePbxCallRecords(200);
   const qc = useQueryClient();
-  const recordings = (cdrs as any[]).filter(c => c.has_recording || c.recording_url);
+  const { data: myExt } = useQuery({
+    queryKey: ['recordings-my-extension'],
+    enabled: scope === 'mine',
+    queryFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return null;
+      const { data } = await (supabase as any).from('pbx_softphone_users')
+        .select('extension').eq('portal_user_id', auth.user.id).maybeSingle();
+      return data?.extension ?? null;
+    },
+  });
+  const scopedCdrs = scope === 'mine' ? (allCdrs as any[]).filter((c: any) => myExt && c.extension === myExt) : allCdrs;
+  const recordings = (scopedCdrs as any[]).filter(c => c.has_recording || c.recording_url);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
