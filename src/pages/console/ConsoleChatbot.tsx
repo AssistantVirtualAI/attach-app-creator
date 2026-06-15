@@ -16,6 +16,13 @@ type ChatResult = {
   proposal?: { label: string; action: string; body: Record<string, unknown>; risk?: string } | null;
 };
 
+const QUICK_ACTIONS: { label: string; prompt: string }[] = [
+  { label: "How many extensions?", prompt: "How many extensions are currently synced for the Lemtel domain? Break the total down by enabled vs disabled." },
+  { label: "Last sync time", prompt: "When were the extensions last synced? Show the most recent last_synced_at timestamp and how stale it is." },
+  { label: "Missing sources", prompt: "Which extensions are missing a source/origin tag or have no last_synced_at value? List up to 10 by extension number." },
+  { label: "Recently updated", prompt: "Show the 5 extensions with the most recent last_synced_at and their effective_caller_id_name." },
+];
+
 export default function ConsoleChatbot() {
   const [message, setMessage] = useState("");
   const [result, setResult] = useState<ChatResult | null>(null);
@@ -23,12 +30,14 @@ export default function ConsoleChatbot() {
   const [executing, setExecuting] = useState(false);
   const { toast } = useToast();
 
-  const ask = async () => {
-    if (!message.trim()) return;
+  const ask = async (overridePrompt?: string) => {
+    const prompt = (overridePrompt ?? message).trim();
+    if (!prompt) return;
+    if (overridePrompt) setMessage(overridePrompt);
     setBusy(true);
     try {
       const { data, error } = await supabase.functions.invoke("pbx-admin-chatbot", {
-        body: { message, organization_id: LEMTEL_ORG },
+        body: { message: prompt, organization_id: LEMTEL_ORG },
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
@@ -80,7 +89,20 @@ export default function ConsoleChatbot() {
               placeholder="Show me extension health, sync status, users, queues, IVRs…"
               className="min-h-32"
             />
-            <Button onClick={ask} disabled={busy || !message.trim()}>
+            <div className="flex flex-wrap gap-2">
+              {QUICK_ACTIONS.map((qa) => (
+                <Button
+                  key={qa.label}
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => ask(qa.prompt)}
+                >
+                  {qa.label}
+                </Button>
+              ))}
+            </div>
+            <Button onClick={() => ask()} disabled={busy || !message.trim()}>
               <Send className="h-4 w-4 mr-2" /> {busy ? "Asking…" : "Ask"}
             </Button>
             {result && (
