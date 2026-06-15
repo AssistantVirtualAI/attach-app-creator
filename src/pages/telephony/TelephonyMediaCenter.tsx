@@ -28,6 +28,12 @@ export default function TelephonyMediaCenter({ scope = "org" }: { scope?: Scope 
       if (payload?.table === "pbx_call_records" && payload.eventType === "UPDATE") {
         const oldRow = payload.old || {};
         const newRow = payload.new || {};
+        const hasComparableOldRow = Object.prototype.hasOwnProperty.call(oldRow, "has_recording")
+          || Object.prototype.hasOwnProperty.call(oldRow, "recording_path")
+          || Object.prototype.hasOwnProperty.call(oldRow, "recording_name")
+          || Object.prototype.hasOwnProperty.call(oldRow, "start_at")
+          || Object.prototype.hasOwnProperty.call(oldRow, "call_status");
+        if (!hasComparableOldRow) return;
         const changed = oldRow.has_recording !== newRow.has_recording
           || oldRow.recording_path !== newRow.recording_path
           || oldRow.recording_name !== newRow.recording_name

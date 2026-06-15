@@ -14,6 +14,11 @@ const isRecordingListChange = (payload: any) => {
   if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') return true;
   const oldRow = payload.old || {};
   const newRow = payload.new || {};
+  const hasComparableOldRow = Object.prototype.hasOwnProperty.call(oldRow, 'has_recording')
+    || Object.prototype.hasOwnProperty.call(oldRow, 'recording_url')
+    || Object.prototype.hasOwnProperty.call(oldRow, 'recording_path')
+    || Object.prototype.hasOwnProperty.call(oldRow, 'recording_name');
+  if (!hasComparableOldRow) return false;
   return oldRow.has_recording !== newRow.has_recording
     || oldRow.recording_url !== newRow.recording_url
     || oldRow.recording_path !== newRow.recording_path

@@ -13,6 +13,11 @@ function isRecordingRealtimeChange(payload: unknown) {
   const next = p.new || {};
   const prev = p.old || {};
   if (p.eventType === 'INSERT') return next.has_recording === true || Boolean(next.recording_path || next.recording_name);
+  if (p.eventType !== 'UPDATE') return false;
+  const hasComparableOldRow = Object.prototype.hasOwnProperty.call(prev, 'has_recording')
+    || Object.prototype.hasOwnProperty.call(prev, 'recording_path')
+    || Object.prototype.hasOwnProperty.call(prev, 'recording_name');
+  if (!hasComparableOldRow) return false;
   return next.has_recording === true && (
     prev.has_recording !== true ||
     next.recording_path !== prev.recording_path ||
