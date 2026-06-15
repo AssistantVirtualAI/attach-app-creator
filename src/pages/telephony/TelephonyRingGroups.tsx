@@ -59,7 +59,7 @@ const copy = {
     missedAlert: 'Email d’alerte appel manqué', forwardType: 'Renvoyer vers', none: 'Aucun', voicemail: 'Messagerie', ext: 'Extension', ringGroup: 'Groupe d’appel', queue: 'File', custom: 'Personnalisé',
     createFirst: 'Créer votre premier groupe',
   },
-} as const;
+};
 
 export default function TelephonyRingGroups() {
   const { data: groups = [], isLoading } = usePbxRingGroups();
