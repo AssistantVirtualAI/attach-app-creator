@@ -189,7 +189,8 @@ import PortalChooser from "./pages/PortalChooser";
 
 
 // Three-portal architecture (Platform / Customer / My)
-import { PlatformAdminShell, CustomerAdminShell, MyWorkspaceShell } from "./components/portals/PortalShells";
+import { PlatformAdminShell, CustomerAdminShell } from "./components/portals/PortalShells";
+import { MyWorkspaceShellSidebar } from "./components/portals/MyWorkspaceShellSidebar";
 const MyTelecomSettings = lazy(() => import("./pages/my/TelecomSettings"));
 const MyOrgChat = lazy(() => import("./pages/my/OrgChat"));
 const MyAIAssistant = lazy(() => import("./pages/my/AIAssistant"));
