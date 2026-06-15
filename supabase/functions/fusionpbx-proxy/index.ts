@@ -2445,6 +2445,73 @@ Deno.serve(async (req) => {
       return json({ ok: true, summary: parsed.summary, sentiment: parsed.sentiment });
     }
 
+    // ============================================================
+    // Desktop / mobile app access toggle for an extension.
+    // Reads the current FusionPBX password and seeds the softphone
+    // row so the user keeps signing in with their existing PBX
+    // password — no rotation, no new credentials.
+    // ============================================================
+    if (action === "set-app-access") {
+      const extNum = body.extension || params.extension;
+      const extUuid = body.extension_uuid || params.extension_uuid;
+      const desktop = body.desktop !== false;
+      const mobile = body.mobile !== false;
+      if (!extNum) return json({ error: "extension required" }, 400);
+
+      // Fetch FusionPBX extension (includes password)
+      let url: URL;
+      if (extUuid) url = new URL(`${FUSIONPBX_API_URL}/app/api/7/extensions/${extUuid}`);
+      else {
+        url = new URL(`${FUSIONPBX_API_URL}/app/api/7/extensions`);
+        url.searchParams.set("extension", String(extNum));
+        url.searchParams.set("domain_uuid", requestedDomain);
+      }
+      url.searchParams.set("key", FUSIONPBX_API_KEY);
+      url.searchParams.set("username", FUSIONPBX_USERNAME);
+      let pbxExt: any = null;
+      try {
+        const r = await fetch(url.toString(), { headers: { Authorization: basicHeader, Accept: "application/json" } });
+        const t = await r.text();
+        const j: any = t ? JSON.parse(t) : {};
+        pbxExt = j?.extensions?.[0] || j?.extension || j;
+      } catch (e) { console.warn("set-app-access: get-extension failed", e); }
+
+      const sipPassword: string | null = pbxExt?.password ?? pbxExt?.user_password ?? null;
+      const displayName: string | null = pbxExt?.effective_caller_id_name ?? pbxExt?.description ?? null;
+      const sipDomain: string = pbxExt?.user_context ?? pbxExt?.domain_name ?? Deno.env.get("FUSIONPBX_SIP_DOMAIN") ?? "lemtel.lemtel.tel";
+      const wssUrl: string = Deno.env.get("FUSIONPBX_WSS_URL") ?? "wss://lemtel.lemtel.tel:7443";
+
+      const payload: any = {
+        organization_id, extension: String(extNum), sip_domain: sipDomain,
+        wss_url: wssUrl,
+        display_name: displayName,
+        desktop_access_enabled: !!desktop,
+        mobile_access_enabled: !!mobile,
+        app_access_enabled: !!(desktop || mobile),
+        account_status: (desktop || mobile) ? "active" : "suspended",
+      };
+      if (sipPassword) payload.sip_password = sipPassword;
+
+      const { data: row, error: upErr } = await admin
+        .from("pbx_softphone_users")
+        .upsert(payload, { onConflict: "organization_id,extension" })
+        .select("id, portal_user_id")
+        .maybeSingle();
+      if (upErr) return json({ error: upErr.message }, 500);
+
+      await admin.from("audit_logs").insert({
+        organization_id, user_id: userId, action: "set_app_access",
+        resource_type: "pbx_softphone_users", resource_id: row?.id,
+        metadata: { extension: String(extNum), desktop, mobile, password_preserved: !!sipPassword },
+      });
+
+      return json({
+        ok: true, softphone_id: row?.id, desktop_access_enabled: desktop,
+        mobile_access_enabled: mobile, password_preserved: !!sipPassword,
+        portal_user_linked: !!row?.portal_user_id,
+      });
+    }
+
     return json({ error: "UNKNOWN_ACTION", action }, 400);
   } catch (e: any) {
     if (organization_id) {
