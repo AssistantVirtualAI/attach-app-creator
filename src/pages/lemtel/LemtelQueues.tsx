@@ -572,6 +572,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
         </CardContent>
       </Card>
     </div>
+      )}
     </div>
   );
 }
