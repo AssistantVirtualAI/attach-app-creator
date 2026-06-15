@@ -82,7 +82,47 @@ export function ExtensionEditDialog({ open, onOpenChange, extension }: Props) {
         .catch((e) => console.warn('get-extension failed', e))
         .finally(() => setLoading(false));
     }
+    // Load softphone row (app access state)
+    (async () => {
+      const { data } = await (supabase as any).from('pbx_softphone_users')
+        .select('id, portal_user_id, desktop_access_enabled, mobile_access_enabled, app_access_enabled')
+        .eq('organization_id', extension.organization_id)
+        .eq('extension', String(extension.extension))
+        .maybeSingle();
+      setSoftphone(data || null);
+      setDesktopAccess(data?.desktop_access_enabled ?? true);
+      setMobileAccess(data?.mobile_access_enabled ?? true);
+    })();
   }, [open, extension]);
+
+  const saveAppAccess = async (desktop: boolean, mobile: boolean) => {
+    if (!extension) return;
+    setSavingAccess(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: {
+          action: 'set-app-access',
+          extension: String(extension.extension),
+          extension_uuid: extension.pbx_uuid,
+          desktop, mobile,
+        },
+      });
+      if (error) throw error;
+      setDesktopAccess(desktop); setMobileAccess(mobile);
+      setSoftphone((s: any) => ({ ...(s || {}), desktop_access_enabled: desktop, mobile_access_enabled: mobile, app_access_enabled: desktop || mobile, id: (data as any)?.softphone_id ?? s?.id }));
+      toast({
+        title: desktop || mobile ? 'App access updated' : 'App access revoked',
+        description: (data as any)?.password_preserved
+          ? 'User signs in with their existing extension password.'
+          : 'Saved. No PBX password change.',
+      });
+      qc.invalidateQueries({ queryKey: ['pbx', 'pbx_softphone_users'] });
+    } catch (e: any) {
+      toast({ title: 'Update failed', description: e?.message || String(e), variant: 'destructive' });
+    } finally {
+      setSavingAccess(false);
+    }
+  };
 
   const set = (k: string, v: any) => setForm((f: any) => ({ ...f, [k]: v }));
 
