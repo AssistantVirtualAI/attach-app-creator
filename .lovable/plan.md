@@ -1,54 +1,46 @@
-# Plan — Real Lemtel data on every admin page
 
-## 1. Fix "no extensions" on `/org/lemtel/admin/extensions`
+## What's actually happening
 
-The 21 Lemtel extensions exist in the database, so this is a data-loading / RLS / sync issue, not missing data. I'll:
+I verified the database directly:
 
-- Add a diagnostic banner on the page when the query returns zero rows: shows whether it's an auth issue, an org-membership issue, or a stale sync, with a one-click "Resync from PBX" button that calls `sync-extensions` on the proxy.
-- Trigger an immediate `sync-extensions` on first load when no rows are present so the table is repopulated from FusionPBX (`v_extensions`) without manual action.
-- Surface the underlying `pbx_sync_jobs` row (last error, fetched count) inline so we can see exactly why a sync produced 0 rows.
-- Add `pbx_extensions` and `pbx_softphone_users` to realtime so the table updates the moment a sync finishes.
+- **21 Lemtel extensions exist** in `pbx_extensions` for org `71755d33…2029eb7`.
+- The `sync-extensions` job has run 3 times in the last 2h — all `completed`, fetched 19 / upserted 19.
+- In parallel, the cron is firing `sync-cdrs` every ~3 seconds and every single one fails with:
+  `there is no unique or exclusion constraint matching the ON CONFLICT specification`.
+  → 371 failed CDR job rows in 2h, completely burying extension/IVR/queue jobs in the diagnostics list.
 
-## 2. Edit existing users + grant/revoke desktop & mobile app access
+So two things are broken:
 
-Extend the existing **Edit** dialog so an admin can act on any extension the same way they would in FusionPBX, **without changing the user's current SIP password**:
+1. The UI banner only looks at the **last 5 sync jobs**, and those 5 are always `sync-cdrs`. That's why it says *"No recent sync job found"*.
+2. The empty extensions list itself is a **read-side RLS problem**: the SELECT policy on `pbx_extensions` requires either `is_super_admin(auth.uid())` or membership via `get_user_organization_ids` (which only checks `organization_members` + `org_members`). Lemtel operators logged in via the portal who aren't in those exact tables get an empty array even though the data is there — but they *can* still invoke the edge function (which uses the service role), which is exactly the contradiction you're seeing.
 
-- Editable fields written back to FusionPBX through `update-extension`: display name, caller ID name + number, voicemail on/off + PIN, Do-Not-Disturb, call forwarding, outbound CID, user/group, enabled/disabled, description.
-- "App access" section per extension:
-  - Toggle **Desktop app access** and **Mobile app access** (stored in `pbx_softphone_users.app_access_enabled`, with a new `desktop_access_enabled` / `mobile_access_enabled` split so each can be controlled independently).
-  - When access is granted, the softphone row is created/linked and `sip_password` is **kept exactly as it is in FusionPBX** (read from `v_extensions.password` via proxy). The user signs in to the desktop and mobile app with their existing extension number + existing PBX password. No password reset, no new credential to remember.
-  - When access is revoked, both toggles flip off, active sessions are invalidated (audit-logged), and the apps' login flow refuses the user until access is re-granted.
-- All changes write an `audit_logs` entry (who, when, what changed).
+## Plan
 
-## 3. Recordings — transcription + AI insights
+### 1. Fix the CDR cron flood (root cause of banner noise)
+- Add a unique index on `pbx_call_records(organization_id, pbx_uuid)` and on `(organization_id, pbx_dedup_key)` so the `sync-cdrs` upsert's `onConflict` actually matches.
+- Until the index exists, change `sync-cdrs` in `fusionpbx-proxy` to fall back to insert-with-skip on conflict-name-missing instead of looping the same error.
+- One-shot cleanup: delete the 300+ failed `sync-cdrs` job rows older than 1h so the diagnostics panel reflects real activity.
 
-On `AdminRecordings.tsx` and on the Call History row detail:
+### 2. Make extensions readable for every Lemtel operator
+- Extend the SELECT policy on `pbx_extensions`, `pbx_softphone_users`, `pbx_call_records`, `pbx_call_recordings`, `pbx_voicemails`, `pbx_call_queues`, `pbx_ring_groups`, `pbx_ivrs`, `pbx_devices`, `pbx_sync_jobs` to also allow `public.is_lemtel_admin(auth.uid())` and `public.is_lemtel_member(auth.uid())`. These helpers already exist and cover staff enrolled via `org_members` or via the global Lemtel org.
+- No change to write policies — those stay scoped to org_admin / super_admin / lemtel_admin where they already are.
 
-- Add **Transcribe** and **Analyze** buttons per recording. They call the existing `transcribe-recording` and `summarize-recording` actions on `fusionpbx-proxy` (Lovable AI Gateway, Gemini 2.5 Flash).
-- Display the resulting transcript, summary, sentiment, language, key topics, and action items inline. Status chips: `pending / running / done / failed`.
-- Add a bulk "Transcribe + analyze last 24h" button gated to Lemtel admins.
-- On the Call History page, each row with `has_recording=true` gets the same panel (collapsible) so insights live next to the call.
-- All AI results persist in `pbx_call_recordings` (`summary`, `sentiment`, `language`, `transcribed`, `analyzed`) and `pbx_call_transcripts` — already present, so no schema change beyond adding `topics jsonb` and `action_items jsonb` columns.
+### 3. Make the empty-state banner honest
+- In `LemtelExtensions.tsx`, change `usePbxSyncJobs(5)` → `usePbxSyncJobs(50)` and filter by `job_type ILIKE '%extensions%'` so the panel always finds the real last extension job.
+- Show the actual job timestamp + fetched/upserted counts and a "View all jobs" link to Sync Health.
+- If the SELECT returns rows but the banner condition was previously true, it disappears on its own.
 
-## 4. Dashboard — fully real data + AI insights + more stats
+### 4. Edits + desktop/mobile app access already wired — keep behavior, just refresh after write
+- `ExtensionEditDialog` already calls `update-extension` and `set-app-access` through the proxy. Add a `queryClient.invalidateQueries(['pbx'])` + a follow-up `sync-extensions` after save so the row in the table reflects PBX truth within a couple seconds.
+- Grant/revoke desktop & mobile access continues to seed `pbx_softphone_users` from the existing FusionPBX `v_extensions.password` (no password reset), so users keep their current PBX credentials on the desktop and mobile apps.
 
-Rework `AdminDashboard.tsx` so every widget reads real Lemtel data (no placeholders):
+### Technical details
+- Migration: add the two unique indexes on `pbx_call_records`, broaden 10 SELECT policies, leave write policies untouched.
+- Edge function: in `sync-cdrs`, detect Postgres error code `42P10` ("no unique constraint") once and downgrade subsequent pages to plain `insert(..., { ignoreDuplicates: true })` for the remainder of that run; record the fallback in the job stats so we can see it.
+- Frontend: only `src/pages/lemtel/LemtelExtensions.tsx` and `src/hooks/usePbxData.ts` change. No visual redesign, no AI-voice-agent changes.
 
-- **Live tiles** (5–10s refresh via the existing `get-system-health-live` and `get-active-calls-live` proxy actions): active calls, registered extensions vs total, CPU / memory / disk, trunk status, today's inbound/outbound/missed, today's minutes.
-- **Historical charts** (from `pbx_call_records`): calls per hour today, calls per day last 30d, answer rate, average handle time, missed-call rate, top extensions, top destinations, busiest hours heatmap.
-- **Recordings & AI**: total recordings, % transcribed, % analyzed, sentiment distribution (positive / neutral / negative), top conversation topics across the last 7 days (aggregated from `pbx_call_recordings.summary` + topics).
-- **AI insights card** (new): one daily call to Lovable AI Gateway that summarizes the last 24h of PBX activity — anomalies (spike in missed calls, queue overflow, extension offline > N hours), recommended actions, sentiment trend. Cached for 1h in `pbx_ai_insights`.
-- **Quick links** to Active Calls, Recordings, Sync Health, Extensions with the same live counts.
+### Out of scope
+- Any UI redesign, AI-voice-agent edits, or password resets.
+- Changing the FusionPBX schema — we only adjust how the portal reads/writes.
 
-## Technical notes
-
-- New proxy actions: `update-extension-app-access`, `get-extension-secret` (admin-only, returns existing FusionPBX `password` to seed the softphone row at grant time without ever exposing it to the frontend — it's stored encrypted into `pbx_softphone_users.sip_password` via the edge function).
-- Migration: add `desktop_access_enabled boolean default true`, `mobile_access_enabled boolean default true` to `pbx_softphone_users`; add `topics jsonb`, `action_items jsonb` to `pbx_call_recordings`; enable realtime on `pbx_extensions`, `pbx_softphone_users`, `pbx_call_recordings`.
-- All writes gated by `is_lemtel_admin()` / `has_role(_, _, 'org_admin')` and logged to `audit_logs`.
-- No visual redesign, no changes to AI voice agent pages.
-
-## Out of scope
-
-- Resetting / rotating user PBX passwords (explicitly preserved).
-- Visual redesign of any page.
-- AI voice agent configuration.
+After this, the extensions page will list all 21 Lemtel extensions for any Lemtel admin/operator, the banner will only appear when truly empty and will show the real last `sync-extensions` job, and the CDR cron will stop spamming `pbx_sync_jobs` with conflict errors.
