@@ -785,46 +785,43 @@ function EditQueueModal({ queue, saving, onClose, onSave }: { queue: any; saving
   }, [queue.id]);
 
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 50, display: 'grid', placeItems: 'center' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 520, maxHeight: '90vh', overflowY: 'auto', background: c.bgCard, border: `1px solid ${c.border}`, borderRadius: 14, padding: 20 }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: c.textIce, marginBottom: 12 }}>Edit Queue · {queue.name}</div>
-        <Label>Name</Label><input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-        <div style={{ height: 10 }} />
-        <Label>Strategy</Label>
-        <select value={strategy} onChange={(e) => setStrategy(e.target.value)} style={inputStyle}>
-          {STRATEGIES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <div style={{ height: 10 }} />
-        <Label>Max wait time (seconds)</Label><input type="number" value={maxWait} onChange={(e) => setMaxWait(Number(e.target.value))} style={inputStyle} />
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12, marginTop: 12 }}>
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
-        </label>
+    <ModalShell title={`Edit Queue · ${queue.name}`} onClose={onClose} width={560}>
+      <Label>Name</Label><input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+      <div style={{ height: 12 }} />
+      <Label>Strategy</Label>
+      <select value={strategy} onChange={(e) => setStrategy(e.target.value)} style={inputStyle}>
+        {STRATEGIES.map((s) => <option key={s} value={s}>{s}</option>)}
+      </select>
+      <div style={{ height: 12 }} />
+      <Label>Max wait time (seconds)</Label><input type="number" value={maxWait} onChange={(e) => setMaxWait(Number(e.target.value))} style={inputStyle} />
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12, marginTop: 14 }}>
+        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
+      </label>
 
-        <div style={{ marginTop: 18 }}>
-          <Label>Agents ({agents?.length ?? '…'})</Label>
-          <div style={{ border: `1px solid ${c.border}`, borderRadius: 8, maxHeight: 180, overflowY: 'auto' }}>
-            {agents === null && <div style={{ padding: 12, color: c.mutedSilver, fontSize: 12 }}>Loading…</div>}
-            {agents && agents.length === 0 && <div style={{ padding: 12, color: c.mutedSilver, fontSize: 12 }}>No agents in this queue.</div>}
-            {agents && agents.map((a: any) => (
-              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: `1px solid ${c.border}`, fontSize: 12, color: c.textIce }}>
-                <span>{a.agent_name || a.agent_id || `Ext ${a.pbx_extensions?.extension ?? '?'}`}</span>
-                <span style={{ color: c.mutedSilver }}>Tier {a.tier_level} · {a.status}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-          <button onClick={() => onSave({
-            queue_name: name,
-            queue_strategy: strategy,
-            queue_max_wait_time: String(maxWait),
-            queue_enabled: enabled ? 'true' : 'false',
-          })} disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save'}</button>
+      <div style={{ marginTop: 18 }}>
+        <Label>Agents ({agents?.length ?? '…'})</Label>
+        <div style={{ border: `1px solid ${c.border}`, borderRadius: 8, maxHeight: 200, overflowY: 'auto', background: 'rgba(0,0,0,0.25)' }}>
+          {agents === null && <div style={{ padding: 12, color: c.mutedSilver, fontSize: 12 }}>Loading…</div>}
+          {agents && agents.length === 0 && <div style={{ padding: 12, color: c.mutedSilver, fontSize: 12 }}>No agents in this queue.</div>}
+          {agents && agents.map((a: any) => (
+            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: `1px solid ${c.border}`, fontSize: 12, color: c.textIce }}>
+              <span>{a.agent_name || a.agent_id || `Ext ${a.pbx_extensions?.extension ?? '?'}`}</span>
+              <span style={{ color: c.mutedSilver }}>Tier {a.tier_level} · {a.status}</span>
+            </div>
+          ))}
         </div>
       </div>
-    </div>
+
+      <div style={{ display: 'flex', gap: 8, marginTop: 22, justifyContent: 'flex-end' }}>
+        <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
+        <button onClick={() => onSave({
+          queue_name: name,
+          queue_strategy: strategy,
+          queue_max_wait_time: String(maxWait),
+          queue_enabled: enabled ? 'true' : 'false',
+        })} disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save & sync to PBX'}</button>
+      </div>
+    </ModalShell>
   );
 }
 
