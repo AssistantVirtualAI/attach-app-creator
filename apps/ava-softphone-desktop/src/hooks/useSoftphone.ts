@@ -31,7 +31,7 @@ async function fetchSoftphoneCredentials(accessToken: string): Promise<FetchedCr
           apikey: SB_KEY,
           'Content-Type': 'application/json',
         },
-        body: '{}',
+        body: JSON.stringify({ platform: 'desktop' }),
       });
       if (res.status === 503 || res.status === 502 || res.status === 504) {
         await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));

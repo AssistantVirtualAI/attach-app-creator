@@ -9,6 +9,8 @@ export function useTenant() {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
   const [extension, setExtension] = useState<string | null>(null);
+  const [domainUuid, setDomainUuid] = useState<string | null>(null);
+  const [domainName, setDomainName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -17,7 +19,7 @@ export function useTenant() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          if (!cancelled) { setOrgId(null); setLoading(false); }
+          if (!cancelled) { setOrgId(null); setDomainUuid(null); setDomainName(null); setLoading(false); }
           return;
         }
 
@@ -45,19 +47,22 @@ export function useTenant() {
         if (resolvedOrg) {
           const { data: org } = await supabase
             .from('organizations')
-            .select('name')
+            .select('name,fusionpbx_domain_uuid')
             .eq('id', resolvedOrg)
             .maybeSingle();
-          if (!cancelled) setOrgName(org?.name ?? null);
+          if (!cancelled) {
+            setOrgName(org?.name ?? null);
+            if (!spu?.domain_uuid && org?.fusionpbx_domain_uuid) setDomainUuid(org.fusionpbx_domain_uuid);
+          }
         }
 
         if (!cancelled) { setOrgId(resolvedOrg); setLoading(false); }
       } catch {
-        if (!cancelled) { setOrgId(null); setLoading(false); }
+        if (!cancelled) { setOrgId(null); setDomainUuid(null); setDomainName(null); setLoading(false); }
       }
     })();
     return () => { cancelled = true; };
   }, []);
 
-  return { orgId, orgName, extension, loading };
+  return { orgId, orgName, extension, domainUuid, domainName, loading };
 }
