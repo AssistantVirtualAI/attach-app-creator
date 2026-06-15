@@ -49,8 +49,8 @@ export default function LemtelExtensions() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: extensions = [], isLoading, refetch } = usePbxExtensions();
   const { data: softphones = [] } = usePbxSoftphoneUsers();
-  const { data: recentJobs = [] } = usePbxSyncJobs(5);
-  const lastExtJob = (recentJobs as any[]).find(j => String(j.job_type || '').includes('extensions'));
+  const { data: recentJobs = [] } = usePbxSyncJobs(50);
+  const lastExtJob = (recentJobs as any[]).find(j => String(j.job_type || '').toLowerCase().includes('extension'));
   const [autoSyncing, setAutoSyncing] = useState(false);
   const softphoneByExt = useMemo(() => {
     const m = new Map<string, any>();
