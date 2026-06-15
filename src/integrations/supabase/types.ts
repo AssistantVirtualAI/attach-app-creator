@@ -3987,6 +3987,8 @@ export type Database = {
       }
       pbx_call_recordings: {
         Row: {
+          access_status: string | null
+          analyzed: boolean | null
           available: boolean | null
           call_record_id: string | null
           client_id: string | null
@@ -3995,6 +3997,7 @@ export type Database = {
           duration_seconds: number | null
           file_url: string | null
           id: string
+          language: string | null
           last_checked_at: string | null
           organization_id: string
           pbx_uuid: string | null
@@ -4002,13 +4005,20 @@ export type Database = {
           recorded_at: string | null
           recording_name: string | null
           recording_path: string | null
+          recording_seconds: number | null
           recording_url: string | null
           sentiment: string | null
+          sip_call_id: string | null
           storage_path: string | null
+          summary: string | null
           summary_status: string | null
+          transcribed: boolean | null
+          transcript_status: string | null
           transcription_status: string | null
         }
         Insert: {
+          access_status?: string | null
+          analyzed?: boolean | null
           available?: boolean | null
           call_record_id?: string | null
           client_id?: string | null
@@ -4017,6 +4027,7 @@ export type Database = {
           duration_seconds?: number | null
           file_url?: string | null
           id?: string
+          language?: string | null
           last_checked_at?: string | null
           organization_id: string
           pbx_uuid?: string | null
@@ -4024,13 +4035,20 @@ export type Database = {
           recorded_at?: string | null
           recording_name?: string | null
           recording_path?: string | null
+          recording_seconds?: number | null
           recording_url?: string | null
           sentiment?: string | null
+          sip_call_id?: string | null
           storage_path?: string | null
+          summary?: string | null
           summary_status?: string | null
+          transcribed?: boolean | null
+          transcript_status?: string | null
           transcription_status?: string | null
         }
         Update: {
+          access_status?: string | null
+          analyzed?: boolean | null
           available?: boolean | null
           call_record_id?: string | null
           client_id?: string | null
@@ -4039,6 +4057,7 @@ export type Database = {
           duration_seconds?: number | null
           file_url?: string | null
           id?: string
+          language?: string | null
           last_checked_at?: string | null
           organization_id?: string
           pbx_uuid?: string | null
@@ -4046,10 +4065,15 @@ export type Database = {
           recorded_at?: string | null
           recording_name?: string | null
           recording_path?: string | null
+          recording_seconds?: number | null
           recording_url?: string | null
           sentiment?: string | null
+          sip_call_id?: string | null
           storage_path?: string | null
+          summary?: string | null
           summary_status?: string | null
+          transcribed?: boolean | null
+          transcript_status?: string | null
           transcription_status?: string | null
         }
         Relationships: [
@@ -4125,6 +4149,7 @@ export type Database = {
           pdd: number | null
           pdd_ms: number | null
           raw_data: Json | null
+          recording_id: string | null
           recording_name: string | null
           recording_path: string | null
           recording_url: string | null
@@ -4172,6 +4197,7 @@ export type Database = {
           pdd?: number | null
           pdd_ms?: number | null
           raw_data?: Json | null
+          recording_id?: string | null
           recording_name?: string | null
           recording_path?: string | null
           recording_url?: string | null
@@ -4219,6 +4245,7 @@ export type Database = {
           pdd?: number | null
           pdd_ms?: number | null
           raw_data?: Json | null
+          recording_id?: string | null
           recording_name?: string | null
           recording_path?: string | null
           recording_url?: string | null
