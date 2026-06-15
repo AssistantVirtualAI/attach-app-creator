@@ -128,6 +128,46 @@ export default function AdminSyncHealth() {
       />
 
       <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Database className="w-4 h-4" /> CDR Backfill</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+            <div>
+              <Label className="text-xs">Page size</Label>
+              <Input type="number" min={50} max={1000} value={backfillPageSize}
+                onChange={(e) => setBackfillPageSize(Math.max(50, Math.min(1000, parseInt(e.target.value) || 500)))} />
+            </div>
+            <div>
+              <Label className="text-xs">Max pages / run</Label>
+              <Input type="number" min={1} max={500} value={backfillPages}
+                onChange={(e) => setBackfillPages(Math.max(1, Math.min(500, parseInt(e.target.value) || 50)))} />
+            </div>
+            <div className="text-xs text-muted-foreground">
+              <div>Current cursor: <span className="font-mono">{cursor}</span></div>
+              <div>Updated: {cursorAt ? formatDistanceToNow(new Date(cursorAt), { addSuffix: true }) : '—'}</div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => runBackfill(false)} disabled={backfillRunning}>
+                {backfillRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+                Resume
+              </Button>
+              <Button onClick={() => runBackfill(true)} disabled={backfillRunning}>
+                {backfillRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+                From beginning
+              </Button>
+            </div>
+          </div>
+          {backfillResult && (
+            <div className="text-xs font-mono bg-muted/40 rounded p-3 overflow-auto">
+              upserted={backfillResult?.stats?.cdrs ?? 0} · fetched={backfillResult?.stats?.fetched ?? 0} · pages={backfillResult?.stats?.pages ?? 0}
+              {backfillResult?.errors?.length ? <div className="text-destructive mt-1">{backfillResult.errors.join('; ')}</div> : null}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader><CardTitle>Entities</CardTitle></CardHeader>
         <CardContent>
           <Table>
