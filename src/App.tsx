@@ -138,6 +138,16 @@ import AdminDashboard from "./pages/lemtel/admin/AdminDashboard";
 import MyDashboard from "./pages/lemtel/my/MyDashboard";
 import AdminRecordings from "./pages/lemtel/admin/AdminRecordings";
 import AdminVoicemail from "./pages/lemtel/admin/AdminVoicemail";
+import { ConsoleShell } from "./components/console/ConsoleShell";
+import ConsoleDashboard from "./pages/console/ConsoleDashboard";
+import ConsoleExtensions from "./pages/console/ConsoleExtensions";
+import {
+  ConsoleDevices, ConsoleIVRs, ConsoleQueues, ConsoleRingGroups, ConsoleDIDs,
+  ConsoleInboundRoutes, ConsoleVoicemail, ConsoleRegistrations, ConsoleActiveCalls, ConsoleCdr,
+} from "./pages/console/ConsoleWrappers";
+import ConsoleInsights from "./pages/console/ConsoleInsights";
+import ConsoleChatbot from "./pages/console/ConsoleChatbot";
+import ConsoleAudit from "./pages/console/ConsoleAudit";
 import AdminReports from "./pages/lemtel/admin/AdminReports";
 import AdminDestinations from "./pages/lemtel/admin/AdminDestinations";
 import AdminTimeConditions from "./pages/lemtel/admin/AdminTimeConditions";
@@ -921,6 +931,25 @@ const App = () => (
                   <Route path="downloads" element={<DownloadCenter personalize />} />
                   <Route path="profile" element={<Profile />} />
                   <Route path="settings" element={<MySettings />} />
+                </Route>
+
+                {/* PBX Command Center (desktop admin shell) */}
+                <Route path="/console" element={<ProtectedRoute><ConsoleShell /></ProtectedRoute>}>
+                  <Route index element={<ConsoleDashboard />} />
+                  <Route path="extensions" element={<ConsoleExtensions />} />
+                  <Route path="devices" element={<ConsoleDevices />} />
+                  <Route path="ivrs" element={<ConsoleIVRs />} />
+                  <Route path="ring-groups" element={<ConsoleRingGroups />} />
+                  <Route path="queues" element={<ConsoleQueues />} />
+                  <Route path="dids" element={<ConsoleDIDs />} />
+                  <Route path="inbound-routes" element={<ConsoleInboundRoutes />} />
+                  <Route path="voicemail" element={<ConsoleVoicemail />} />
+                  <Route path="registrations" element={<ConsoleRegistrations />} />
+                  <Route path="active-calls" element={<ConsoleActiveCalls />} />
+                  <Route path="cdr" element={<ConsoleCdr />} />
+                  <Route path="insights" element={<ConsoleInsights />} />
+                  <Route path="chatbot" element={<ConsoleChatbot />} />
+                  <Route path="audit" element={<ConsoleAudit />} />
                 </Route>
 
 

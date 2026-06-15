@@ -1956,7 +1956,7 @@ Deno.serve(async (req) => {
       return json({ ok: true, data: rows, count: rows.length, latency_ms: r?.latency_ms });
     }
 
-    if (action === "kill-active-call") {
+    if (action === "kill-active-call" || action === "hangup-call") {
       const uuid = body.uuid || params.uuid;
       if (!uuid) return json({ error: "uuid required" }, 400);
       const r = await pbxWrite(`commands`, "POST", {
@@ -1964,9 +1964,48 @@ Deno.serve(async (req) => {
       });
       if (organization_id) {
         await admin.from("audit_logs").insert({
-          organization_id, user_id: userId, action: "pbx.call_killed",
+          organization_id, user_id: userId, action: "pbx.call_hangup",
           resource_type: "active_call", resource_id: uuid,
           metadata: { uuid, ok: r?.ok },
+        });
+      }
+      return json(r, r?.ok ? 200 : 500);
+    }
+
+    if (action === "transfer-call") {
+      const uuid = body.uuid || params.uuid;
+      const destination = body.destination || params.destination;
+      const context = body.context || params.context || "default";
+      if (!uuid || !destination) return json({ error: "uuid and destination required" }, 400);
+      const r = await pbxWrite(`commands`, "POST", {
+        commands: [{ command: "uuid_transfer", arguments: `${uuid} ${destination} XML ${context}` }],
+      });
+      if (organization_id) {
+        await admin.from("audit_logs").insert({
+          organization_id, user_id: userId, action: "pbx.call_transferred",
+          resource_type: "active_call", resource_id: uuid,
+          metadata: { uuid, destination, context, ok: r?.ok },
+        });
+      }
+      return json(r, r?.ok ? 200 : 500);
+    }
+
+    if (action === "eavesdrop-call") {
+      const uuid = body.uuid || params.uuid;
+      const extension = body.extension || params.extension;
+      const mode = body.mode || params.mode || "listen"; // listen | whisper | barge
+      if (!uuid || !extension) return json({ error: "uuid and extension required" }, 400);
+      // Use originate to bridge admin extension to eavesdrop application
+      const eavesdropFlag = mode === "barge" ? "3" : mode === "whisper" ? "2" : "0";
+      const args = `{eavesdrop_indicate_failed=false,eavesdrop_bridge_aleg=true}user/${extension} &eavesdrop(${uuid} ${eavesdropFlag})`;
+      const r = await pbxWrite(`commands`, "POST", {
+        commands: [{ command: "originate", arguments: args }],
+      });
+      if (organization_id) {
+        await admin.from("audit_logs").insert({
+          organization_id, user_id: userId, action: "pbx.call_eavesdrop",
+          resource_type: "active_call", resource_id: uuid,
+          metadata: { uuid, extension, mode, ok: r?.ok },
         });
       }
       return json(r, r?.ok ? 200 : 500);
