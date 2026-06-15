@@ -47,6 +47,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('set-status', (_e, status) => cb(status)),
   onSetUiStatus: (cb: (status: 'available' | 'busy' | 'meeting' | 'away') => void) =>
     ipcRenderer.on('set-ui-status', (_e, status) => cb(status)),
+  onFocusMeetingNote: (cb: () => void) =>
+    ipcRenderer.on('focus-meeting-note', () => cb()),
 
   // Custom protocol (lemtel://call/<number>)
   onProtocolCall: (cb: (data: { number: string }) => void) =>
