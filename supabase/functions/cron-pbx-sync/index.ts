@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     });
 
     const [cdrRes, vmRes] = await Promise.all([
-      callProxy({ action: "sync-cdrs", limit: 250 }),
+      callProxy({ action: "sync-cdrs", page_size: 250, max_pages: 4 }),
       callProxy({ action: "sync-voicemail-messages", params: { page_size: 250, max_pages: 1 } }),
     ]);
     const parse = async (r: Response) => {
