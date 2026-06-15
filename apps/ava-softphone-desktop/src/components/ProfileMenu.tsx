@@ -28,6 +28,11 @@ export default function ProfileMenu() {
   const [meetingNote, setMeetingNote] = useState<string>(() => localStorage.getItem(MEETING_NOTE_KEY) || '');
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const meetingInputRef = useRef<HTMLInputElement>(null);
+  const statusRef = useRef<Status>(status);
+  const openRef = useRef<boolean>(open);
+  statusRef.current = status;
+  openRef.current = open;
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
