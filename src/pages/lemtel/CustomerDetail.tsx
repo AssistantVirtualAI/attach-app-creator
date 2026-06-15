@@ -42,9 +42,8 @@ export default function CustomerDetail() {
   const { data: org } = useQuery({
     queryKey: ['org', 'by-domain', domainUuid],
     queryFn: async () => {
-      const { data } = await supabase.from('organizations')
-        .select('id,name').eq('fusionpbx_domain_uuid', domainUuid).maybeSingle();
-      return data;
+      const { data } = await (supabase as any).rpc('get_org_by_fusionpbx_domain', { _domain_uuid: domainUuid });
+      return Array.isArray(data) ? data[0] : data;
     },
   });
 

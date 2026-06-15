@@ -8585,6 +8585,21 @@ export type Database = {
       generate_unique_username: { Args: { base_name: string }; Returns: string }
       get_accessible_org_ids: { Args: { _user_id: string }; Returns: string[] }
       get_my_extension_summary: { Args: never; Returns: Json }
+      get_org_by_fusionpbx_domain: {
+        Args: { _domain_uuid: string }
+        Returns: {
+          id: string
+          name: string
+        }[]
+      }
+      get_org_pbx_mapping: {
+        Args: never
+        Returns: {
+          fusionpbx_domain_uuid: string
+          id: string
+          name: string
+        }[]
+      }
       get_user_organization_ids: {
         Args: { _user_id: string }
         Returns: string[]
