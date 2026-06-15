@@ -77,13 +77,6 @@ Deno.serve(async (req) => {
     });
     await admin.from("pbx_call_records").update({ transcribed: true }).eq("id", call_record_id);
 
-    // Trigger analyze
-    fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/ai-analyze-call`, {
-      method: "POST",
-      headers: { Authorization: authHeader, "Content-Type": "application/json" },
-      body: JSON.stringify({ call_record_id, transcript_text, organization_id }),
-    }).catch(() => {});
-
     return json({ transcript_text });
   } catch (e: any) {
     return json({ error: e.message }, 500);

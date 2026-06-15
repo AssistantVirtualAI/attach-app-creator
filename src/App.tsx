@@ -672,6 +672,8 @@ const App = () => (
                 <Route path="/org/lemtel/admin/customers/:domainUuid" element={<LemtelAdminPage><CustomerDetail /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/gateways" element={<LemtelAdminPage><LemtelGateways /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/voice-gateways" element={<LemtelAdminPage><LemtelVoiceGateways /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/calls" element={<LemtelAdminPage><TelephonyMediaCenter scope="org" /></LemtelAdminPage>} />
+                <Route path="/org/lemtel/admin/cdrs" element={<Navigate to="/org/lemtel/admin/calls" replace />} />
                 <Route path="/org/lemtel/admin/recordings" element={<LemtelAdminPage><AdminRecordings /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/voicemail" element={<LemtelAdminPage><AdminVoicemail /></LemtelAdminPage>} />
                 <Route path="/org/lemtel/admin/reports" element={<LemtelAdminPage><AdminReports /></LemtelAdminPage>} />
@@ -710,7 +712,7 @@ const App = () => (
                 {/* v3.0 User Portal (/org/lemtel/my/*) */}
                 <Route path="/org/lemtel/my" element={<Navigate to="/org/lemtel/my/dashboard" replace />} />
                 <Route path="/org/lemtel/my/dashboard" element={<LemtelUserPage><MyDashboard /></LemtelUserPage>} />
-                <Route path="/org/lemtel/my/calls" element={<LemtelUserPage><LemtelPortalCalls scope="mine" /></LemtelUserPage>} />
+                <Route path="/org/lemtel/my/calls" element={<LemtelUserPage><TelephonyMediaCenter scope="mine" /></LemtelUserPage>} />
                 <Route path="/org/lemtel/my/recordings" element={<LemtelUserPage><AdminRecordings scope="mine" /></LemtelUserPage>} />
                 <Route path="/org/lemtel/my/voicemail" element={<LemtelUserPage><AdminVoicemail scope="mine" /></LemtelUserPage>} />
                 <Route path="/org/lemtel/my/sms" element={<LemtelUserPage><LemtelMessages /></LemtelUserPage>} />
@@ -878,7 +880,9 @@ const App = () => (
                   <Route path="queues" element={<LemtelQueues />} />
                   <Route path="ivr" element={<LemtelIVR />} />
                   <Route path="numbers" element={<PhoneNumbers />} />
-                  <Route path="calls" element={<LemtelPortalCalls />} />
+                  <Route path="calls" element={<TelephonyMediaCenter scope="org" />} />
+                  <Route path="cdrs" element={<LemtelPortalCalls />} />
+                  <Route path="recordings" element={<AdminRecordings />} />
                   <Route path="analytics" element={<LemtelAnalytics />} />
                   <Route path="knowledge" element={<KnowledgeBase />} />
                   <Route path="billing" element={<StripeBilling />} />
@@ -894,7 +898,7 @@ const App = () => (
                   <Route index element={<MyDashboardLanding />} />
                   <Route path="dashboard" element={<MyDashboardLanding />} />
                   <Route path="softphone" element={<TelephonyWebphone />} />
-                  <Route path="calls" element={<LemtelPortalCalls />} />
+                  <Route path="calls" element={<TelephonyMediaCenter scope="mine" />} />
                   <Route path="voicemail" element={<MyVoicemail />} />
                   <Route path="messages" element={<LemtelMessages />} />
                   <Route path="recordings" element={<AdminRecordings scope="mine" />} />

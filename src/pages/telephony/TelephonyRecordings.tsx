@@ -10,6 +10,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
+const isRecordingListChange = (payload: any) => {
+  if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') return true;
+  const oldRow = payload.old || {};
+  const newRow = payload.new || {};
+  return oldRow.has_recording !== newRow.has_recording
+    || oldRow.recording_url !== newRow.recording_url
+    || oldRow.recording_path !== newRow.recording_path
+    || oldRow.recording_name !== newRow.recording_name;
+};
+
 function sentimentBadge(s?: string) {
   if (!s) return null;
   const v = s.toLowerCase();
@@ -20,7 +30,10 @@ function sentimentBadge(s?: string) {
 
 export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' | 'mine' }) {
   const qc = useQueryClient();
-  usePbxRealtime(['pbx_call_records', 'pbx_call_recordings'], ['pbx']);
+  usePbxRealtime(['pbx_call_records', 'pbx_call_recordings'], ['pbx'], {
+    throttleMs: 30_000,
+    shouldInvalidate: isRecordingListChange,
+  });
   const { data: myExt } = useQuery({
     queryKey: ['recordings-my-extension'],
     enabled: scope === 'mine',
@@ -48,12 +61,20 @@ export default function TelephonyRecordings({ scope = 'org' }: { scope?: 'org' |
         body: { call_record_id: id, organization_id: LEMTEL_ORG },
       });
       if (e1) throw e1;
-      const { error: e2 } = await supabase.functions.invoke('ai-analyze-call', {
+      const { data: analysis, error: e2 } = await supabase.functions.invoke('ai-analyze-call', {
         body: { call_record_id: id, organization_id: LEMTEL_ORG },
       });
       if (e2) throw e2;
       toast.success('Transcribed and analyzed');
-      qc.invalidateQueries({ queryKey: ['pbx'] });
+      qc.setQueriesData({ queryKey: ['pbx'] }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((row) => row?.id === id ? {
+          ...row,
+          transcribed: true,
+          analyzed: true,
+          raw_data: { ...(row.raw_data || {}), ai: (analysis as any)?.insights || analysis },
+        } : row);
+      });
     } catch (e: any) {
       toast.error(e?.message || 'Failed');
     } finally { setWorking(null); }
