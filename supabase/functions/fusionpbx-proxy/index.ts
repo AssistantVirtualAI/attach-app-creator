@@ -278,10 +278,13 @@ Deno.serve(async (req) => {
   }
 
   function mapExtension(e: any) {
+    const ext = String(e.extension ?? "").trim();
+    if (!ext) return { pbx_uuid: null } as any;
+    const nowIso = new Date().toISOString();
     return {
       organization_id,
       pbx_uuid: e.extension_uuid,
-      extension: String(e.extension ?? ""),
+      extension: ext,
       effective_cid_name: e.effective_caller_id_name ?? null,
       effective_cid_number: e.effective_caller_id_number ?? null,
       call_group: e.call_group ?? null,
@@ -292,7 +295,31 @@ Deno.serve(async (req) => {
       enabled: e.enabled === "true" || e.enabled === true || e.enabled === undefined,
       description: e.description ?? null,
       raw_data: e,
-      synced_at: new Date().toISOString(),
+      synced_at: nowIso,
+      last_synced_at: nowIso,
+      sync_status: "synced",
+      pbx_source: "fusionpbx",
+    };
+  }
+
+  function mapDomainUser(u: any) {
+    const username = String(u.username ?? u.user_email ?? u.user ?? "").trim();
+    if (!u.user_uuid || !username) return null;
+    const nowIso = new Date().toISOString();
+    return {
+      organization_id,
+      pbx_uuid: u.user_uuid,
+      domain_uuid: u.domain_uuid ?? null,
+      username,
+      email: u.user_email ?? (username.includes("@") ? username : null),
+      user_status: u.user_status ?? null,
+      user_enabled: !(u.user_enabled === "false" || u.user_enabled === false),
+      api_key: u.api_key ?? null,
+      groups: Array.isArray(u.groups) ? u.groups : (u.user_groups ?? []),
+      last_login_at: u.last_login ?? null,
+      raw_data: u,
+      sync_status: "synced",
+      last_synced_at: nowIso,
     };
   }
 
