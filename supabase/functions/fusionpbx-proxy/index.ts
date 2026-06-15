@@ -2248,6 +2248,11 @@ Deno.serve(async (req) => {
       table: "pbx_call_queues", conflict: "organization_id,pbx_uuid",
       mapper: (q: any) => { const m = mapQueue(q); return m.pbx_uuid ? m : null; },
     });
+    if (action === "sync-users" || action === "sync-domain-users") return await genericSync({
+      jobType: "sync-users", endpoint: "users", collectionKey: "users",
+      table: "pbx_domain_users", conflict: "organization_id,pbx_uuid",
+      mapper: (u: any) => mapDomainUser(u),
+    });
     if (action === "sync-ivrs") return await genericSync({
       jobType: "sync-ivrs", endpoint: "ivr_menus", collectionKey: "ivr_menus",
       table: "pbx_ivrs", conflict: "organization_id,pbx_uuid",
