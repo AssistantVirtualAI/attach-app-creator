@@ -75,12 +75,12 @@ Deno.serve(async (req) => {
       const recordPath = String(p.record_path || "").trim();
       const recordName = String(p.record_name || "").trim();
       const { data: sp } = await admin.from("pbx_softphone_users")
-        .select("organization_id, extension, extension_uuid")
+        .select("organization_id, extension, extension_id")
         .eq("portal_user_id", userId)
         .maybeSingle();
-      if (sp?.organization_id && (sp.extension || sp.extension_uuid) && (xml || (recordPath && recordName))) {
+      if (sp?.organization_id && (sp.extension || sp.extension_id) && (xml || (recordPath && recordName))) {
         let recQ = admin.from("pbx_call_records")
-          .select("id,pbx_uuid,organization_id,extension,extension_uuid,caller_number,destination_number,source_number,recording_path,recording_name")
+          .select("id,pbx_uuid,organization_id,extension,extension_uuid,caller_number,destination_number,destination,source_number,recording_path,recording_name")
           .eq("organization_id", sp.organization_id)
           .limit(5);
         if (xml) {
@@ -90,8 +90,8 @@ Deno.serve(async (req) => {
         }
         const { data: recs } = await recQ;
         permitted = !!(recs || []).some((r: any) =>
-          (sp.extension_uuid && r.extension_uuid === sp.extension_uuid) ||
-          (sp.extension && [r.extension, r.caller_number, r.destination_number, r.source_number].map(String).includes(String(sp.extension)))
+          (sp.extension_id && r.extension_uuid === sp.extension_id) ||
+          (sp.extension && [r.extension, r.caller_number, r.destination_number, r.destination, r.source_number].map(String).includes(String(sp.extension)))
         );
       }
     }

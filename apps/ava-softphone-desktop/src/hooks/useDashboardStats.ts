@@ -31,7 +31,7 @@ export function useDashboardStats(orgId: string | null, extension: string | null
       .select('id, missed_call, call_status, hangup_cause, voicemail_message', { count: 'exact', head: false })
       .eq('organization_id', orgId)
       .gte('start_at', since)
-      .or(extension ? `extension.eq.${extension},caller_number.eq.${extension},destination_number.eq.${extension},source_number.eq.${extension}` : 'id.eq.__no_softphone_extension__');
+      .or(extension ? `extension.eq.${extension},caller_number.eq.${extension},destination_number.eq.${extension},destination.eq.${extension},source_number.eq.${extension}` : 'id.eq.__no_softphone_extension__');
 
     const smsQ = supabase.from('pbx_sms_threads')
       .select('unread_count')

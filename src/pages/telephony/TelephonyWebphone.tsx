@@ -8,6 +8,16 @@ import { Input } from '@/components/ui/input';
 import { useState } from 'react';
 import { DesktopDownloadCard } from '@/components/telephony/DesktopDownloadCard';
 
+async function getMyExtension() {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return null;
+  const { data } = await (supabase as any).from('pbx_softphone_users')
+    .select('extension')
+    .eq('portal_user_id', auth.user.id)
+    .maybeSingle();
+  return (data as any)?.extension || null;
+}
+
 export default function TelephonyWebphone() {
   const [search, setSearch] = useState('');
 
@@ -26,10 +36,16 @@ export default function TelephonyWebphone() {
   const { data: recents = [] } = useQuery({
     queryKey: ['webphone-recents'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const extension = await getMyExtension();
+      let query = supabase
         .from('pbx_call_records')
         .select('id, direction, caller_number, destination_number, duration_seconds, start_at, missed_call')
-        .order('start_at', { ascending: false }).limit(30);
+        .order('start_at', { ascending: false })
+        .limit(30);
+      query = extension
+        ? query.or(`extension.eq.${extension},caller_number.eq.${extension},destination_number.eq.${extension},destination.eq.${extension},source_number.eq.${extension}`)
+        : query.eq('id', '__no_softphone_extension__');
+      const { data, error } = await query;
       if (error) console.warn('[webphone-recents] query failed:', error.message);
       return data || [];
     },

@@ -8606,16 +8606,40 @@ export type Database = {
       is_lemtel_admin: { Args: { _user_id: string }; Returns: boolean }
       is_lemtel_member: { Args: { _user_id: string }; Returns: boolean }
       is_master_admin: { Args: { _user_id: string }; Returns: boolean }
-      is_my_extension_call: {
-        Args: {
-          _caller: string
-          _destination: string
-          _extension: string
-          _org_id: string
-          _source: string
-        }
-        Returns: boolean
-      }
+      is_my_extension_call:
+        | {
+            Args: {
+              _caller: string
+              _destination: string
+              _extension: string
+              _org_id: string
+              _source: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              _caller: string
+              _destination: string
+              _destination_number: string
+              _extension: string
+              _org_id: string
+              _source: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              _caller: string
+              _destination: string
+              _destination_number: string
+              _extension: string
+              _extension_uuid: string
+              _org_id: string
+              _source: string
+            }
+            Returns: boolean
+          }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       log_agent_access: {
         Args: { _action: string; _metadata?: Json; _org_id: string }
