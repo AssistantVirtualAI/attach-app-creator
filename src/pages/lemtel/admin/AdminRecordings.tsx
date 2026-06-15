@@ -171,6 +171,77 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
     }
   };
 
+  // Ensure a pbx_call_recordings row exists for this CDR; returns its id.
+  const ensureRecordingRow = async (r: Rec): Promise<string | null> => {
+    if (r.recording_id) return r.recording_id;
+    const { data: existing } = await (supabase as any).from('pbx_call_recordings')
+      .select('id').eq('organization_id', LEMTEL_ORG_ID).eq('pbx_uuid', r.pbx_uuid).maybeSingle();
+    if (existing?.id) return existing.id;
+    const { data: ins, error } = await (supabase as any).from('pbx_call_recordings').insert({
+      organization_id: LEMTEL_ORG_ID, pbx_uuid: r.pbx_uuid, call_record_id: r.id,
+      recording_name: r.recording_name, recording_path: r.recording_path,
+      recording_seconds: r.duration_seconds, available: true,
+    }).select('id').maybeSingle();
+    if (error) { toast.error('Cannot prepare recording row: ' + error.message); return null; }
+    return ins?.id ?? null;
+  };
+
+  const loadMeta = async (r: Rec) => {
+    const recId = await ensureRecordingRow(r);
+    if (!recId) return;
+    const [{ data: rec }, { data: tr }] = await Promise.all([
+      (supabase as any).from('pbx_call_recordings')
+        .select('summary,sentiment,language,transcript_status,summary_status').eq('id', recId).maybeSingle(),
+      (supabase as any).from('pbx_call_transcripts')
+        .select('content,language').eq('call_record_id', r.id).maybeSingle(),
+    ]);
+    setMetaById(s => ({ ...s, [r.id]: {
+      recording_id: recId,
+      transcript: tr?.content ?? null,
+      summary: rec?.summary ?? null,
+      sentiment: rec?.sentiment ?? null,
+      language: rec?.language ?? tr?.language ?? null,
+      transcript_status: rec?.transcript_status ?? null,
+      summary_status: rec?.summary_status ?? null,
+    }}));
+  };
+
+  const transcribe = async (r: Rec) => {
+    const recId = await ensureRecordingRow(r);
+    if (!recId) return;
+    setAiBusy(r.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'transcribe-recording', organization_id: LEMTEL_ORG_ID, recording_id: recId },
+      });
+      if (error || (data as any)?.error) throw new Error((data as any)?.message || error?.message || 'failed');
+      toast.success('Transcript ready');
+      await loadMeta(r);
+      setRows(prev => prev.map(x => x.id === r.id ? { ...x, transcribed: true } : x));
+    } catch (e: any) {
+      toast.error('Transcription failed: ' + (e?.message || 'unknown'));
+    } finally { setAiBusy(null); }
+  };
+
+  const analyze = async (r: Rec) => {
+    const recId = await ensureRecordingRow(r);
+    if (!recId) return;
+    setAiBusy(r.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'summarize-recording', organization_id: LEMTEL_ORG_ID, recording_id: recId },
+      });
+      if (error || (data as any)?.error) throw new Error((data as any)?.message || error?.message || 'failed');
+      toast.success('AI insights ready');
+      await loadMeta(r);
+      setRows(prev => prev.map(x => x.id === r.id ? { ...x, analyzed: true, sentiment: (data as any)?.sentiment ?? x.sentiment, summary: (data as any)?.summary ?? x.summary } : x));
+    } catch (e: any) {
+      toast.error('Analysis failed: ' + (e?.message || 'unknown'));
+    } finally { setAiBusy(null); }
+  };
+
+
+
   const exportCsv = () => {
     const headers = ['date','direction','extension','caller_name','caller_number','destination','duration_seconds'];
     const csv = [headers.join(',')].concat(
