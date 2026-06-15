@@ -28,6 +28,11 @@ export default function ProfileMenu() {
   const [meetingNote, setMeetingNote] = useState<string>(() => localStorage.getItem(MEETING_NOTE_KEY) || '');
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const meetingInputRef = useRef<HTMLInputElement>(null);
+  const statusRef = useRef<Status>(status);
+  const openRef = useRef<boolean>(open);
+  statusRef.current = status;
+  openRef.current = open;
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -59,6 +64,25 @@ export default function ProfileMenu() {
       }
     };
     window.electronAPI?.onSetUiStatus?.(cb);
+  }, []);
+
+  // Global shortcut: focus / toggle meeting note field
+  useEffect(() => {
+    const cb = () => {
+      if (statusRef.current !== 'meeting') {
+        applyStatus('meeting');
+      }
+      setTimeout(() => {
+        if (openRef.current && meetingInputRef.current === document.activeElement) {
+          setOpen(false);
+        } else {
+          setOpen(true);
+          meetingInputRef.current?.focus();
+          meetingInputRef.current?.select();
+        }
+      }, 10);
+    };
+    window.electronAPI?.onFocusMeetingNote?.(cb);
   }, []);
 
   useEffect(() => {
@@ -201,6 +225,7 @@ export default function ProfileMenu() {
           {status === 'meeting' && (
             <div style={{ padding: '8px 6px 4px' }}>
               <input
+                ref={meetingInputRef}
                 type="text"
                 value={meetingNote}
                 onChange={(e) => saveMeetingNote(e.target.value)}

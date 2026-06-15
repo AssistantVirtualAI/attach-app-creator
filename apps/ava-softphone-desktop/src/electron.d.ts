@@ -24,6 +24,7 @@ declare global {
       onUpdateError?: (cb: (msg: string) => void) => void;
       onSetStatus: (cb: (s: string) => void) => void;
       onSetUiStatus: (cb: (s: 'available' | 'busy' | 'meeting' | 'away') => void) => void;
+      onFocusMeetingNote: (cb: () => void) => void;
       platform: NodeJS.Platform;
     };
   }

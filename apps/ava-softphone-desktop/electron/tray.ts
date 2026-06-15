@@ -43,6 +43,15 @@ export function setupTray(mainWindow: BrowserWindow | null) {
             mainWindow?.webContents.send('set-ui-status', 'meeting'),
         },
         {
+          label: '✏️ Edit meeting note',
+          accelerator: 'CmdOrCtrl+Shift+M',
+          click: () => {
+            mainWindow?.show();
+            mainWindow?.focus();
+            mainWindow?.webContents.send('focus-meeting-note');
+          },
+        },
+        {
           label: '⚪ Not available',
           accelerator: 'CmdOrCtrl+Shift+4',
           click: () =>
