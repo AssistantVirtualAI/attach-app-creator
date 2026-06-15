@@ -68,7 +68,11 @@ export default function AdminRecordings({ scope = 'org' }: { scope?: 'org' | 'mi
         const { data: auth } = await supabase.auth.getUser();
         const { data: spu } = await (supabase as any).from('pbx_softphone_users')
           .select('extension').eq('portal_user_id', auth.user?.id).maybeSingle();
-        if (spu?.extension) query = query.eq('extension', spu.extension);
+        if (!spu?.extension) {
+          setRows([]); setTotal(0); setHasMore(false); setPage(pageNum);
+          return;
+        }
+        query = query.eq('extension', spu.extension);
       }
       const { data, count, error } = await query;
       if (error) throw error;
