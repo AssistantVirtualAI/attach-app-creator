@@ -15,13 +15,14 @@ const NAV_KEY: Record<string, I18nKey> = {
   contacts: 'nav.contacts', admin: 'nav.admin', settings: 'nav.settings',
   telecom: 'nav.telecom', orgchat: 'nav.orgchat', aiadmin: 'nav.aiadmin', reports: 'nav.reports',
   customers: 'nav.admin', voiceagents: 'nav.ai', pbxlive: 'nav.pbxlive',
+  audit: 'nav.admin',
 };
 
 export type ConsoleView =
   | 'home' | 'dialer' | 'calls' | 'messages' | 'voicemail'
   | 'recordings' | 'ai' | 'contacts' | 'admin' | 'settings'
   | 'telecom' | 'orgchat' | 'aiadmin' | 'reports' | 'pbxlive'
-  | 'customers' | 'voiceagents';
+  | 'customers' | 'voiceagents' | 'audit';
 
 const ICON: Record<ConsoleView, string> = {
   home: 'M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1V11z',
