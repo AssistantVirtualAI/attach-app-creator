@@ -176,6 +176,19 @@ export default function ProfileMenu() {
   const meta = STATUS_META[status];
   const initials = (name || email || '?').slice(0, 2).toUpperCase();
 
+  const persistPresence = async (s: Status, note?: string) => {
+    const m = STATUS_META[s];
+    try {
+      await supabase.rpc('upsert_user_presence', {
+        _status: s,
+        _message: s === 'meeting' ? (note ?? meetingNote ?? null) : null,
+        _emoji: m.icon,
+        _call_state: 'idle',
+        _platform: 'desktop',
+      });
+    } catch (e) { /* offline / noop */ }
+  };
+
   const applyStatus = (s: Status) => {
     if (inCallRef.current) {
       const msg = "Vous êtes en appel — votre statut est verrouillé jusqu'à la fin de l'appel.";
@@ -188,6 +201,7 @@ export default function ProfileMenu() {
     setStatus(s);
     localStorage.setItem(STATUS_KEY, s);
     window.dispatchEvent(new CustomEvent('lemtel:set-status', { detail: STATUS_META[s].manual }));
+    void persistPresence(s);
     if (s !== 'meeting') setOpen(false);
   };
 
@@ -195,6 +209,7 @@ export default function ProfileMenu() {
   const saveMeetingNote = (v: string) => {
     setMeetingNote(v);
     try { localStorage.setItem(MEETING_NOTE_KEY, v); } catch { /* noop */ }
+    void persistPresence(statusRef.current, v);
   };
 
 
