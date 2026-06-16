@@ -5769,37 +5769,61 @@ export type Database = {
         Row: {
           agent_id: string | null
           agent_name: string | null
+          contact: string | null
+          created_at: string
+          extension: string | null
           extension_id: string | null
           id: string
-          queue_id: string
+          name: string | null
+          organization_id: string | null
+          pbx_uuid: string | null
+          queue_id: string | null
           raw_data: Json | null
           status: string | null
           tier_level: number | null
           tier_position: number | null
+          type: string | null
+          updated_at: string
           wrap_up_time: number | null
         }
         Insert: {
           agent_id?: string | null
           agent_name?: string | null
+          contact?: string | null
+          created_at?: string
+          extension?: string | null
           extension_id?: string | null
           id?: string
-          queue_id: string
+          name?: string | null
+          organization_id?: string | null
+          pbx_uuid?: string | null
+          queue_id?: string | null
           raw_data?: Json | null
           status?: string | null
           tier_level?: number | null
           tier_position?: number | null
+          type?: string | null
+          updated_at?: string
           wrap_up_time?: number | null
         }
         Update: {
           agent_id?: string | null
           agent_name?: string | null
+          contact?: string | null
+          created_at?: string
+          extension?: string | null
           extension_id?: string | null
           id?: string
-          queue_id?: string
+          name?: string | null
+          organization_id?: string | null
+          pbx_uuid?: string | null
+          queue_id?: string | null
           raw_data?: Json | null
           status?: string | null
           tier_level?: number | null
           tier_position?: number | null
+          type?: string | null
+          updated_at?: string
           wrap_up_time?: number | null
         }
         Relationships: [
@@ -5832,6 +5856,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "pbx_queue_agents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "pbx_queue_agents_queue_id_fkey"
             columns: ["queue_id"]
             isOneToOne: false
@@ -5842,6 +5873,64 @@ export type Database = {
             foreignKeyName: "pbx_queue_agents_queue_id_fkey"
             columns: ["queue_id"]
             isOneToOne: false
+            referencedRelation: "telecom_queues_v"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pbx_queue_recording_rules: {
+        Row: {
+          announce: boolean
+          created_at: string
+          enabled: boolean
+          id: string
+          mode: string
+          organization_id: string
+          queue_id: string
+          retention_days: number
+          updated_at: string
+        }
+        Insert: {
+          announce?: boolean
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          mode?: string
+          organization_id: string
+          queue_id: string
+          retention_days?: number
+          updated_at?: string
+        }
+        Update: {
+          announce?: boolean
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          mode?: string
+          organization_id?: string
+          queue_id?: string
+          retention_days?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pbx_queue_recording_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_queue_recording_rules_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: true
+            referencedRelation: "pbx_call_queues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_queue_recording_rules_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: true
             referencedRelation: "telecom_queues_v"
             referencedColumns: ["id"]
           },
