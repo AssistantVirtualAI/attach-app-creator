@@ -171,6 +171,29 @@ function loadPersistedRange(): { range: RangeKey; customFrom: string; customTo: 
   } catch { return null; }
 }
 
+function readUrlState(): { range?: RangeKey; from?: string; to?: string; metric?: MetricKey } {
+  if (typeof window === 'undefined') return {};
+  const sp = new URLSearchParams(window.location.search);
+  const r = sp.get('range') || undefined;
+  const m = sp.get('metric') || undefined;
+  return {
+    range: r && VALID_RANGES.has(r) ? (r as RangeKey) : undefined,
+    from: sp.get('from') || undefined,
+    to: sp.get('to') || undefined,
+    metric: m && VALID_METRICS.has(m) ? (m as MetricKey) : undefined,
+  };
+}
+
+const METRIC_TITLES: Record<MetricKey, string> = {
+  calls: 'All calls', missed: 'Missed calls', answered: 'Answered calls',
+  recordings: 'Recordings', voicemail: 'Voicemails',
+  sms: 'Unread SMS threads', live: 'Live calls right now', realtime: 'Realtime sync status',
+};
+const METRIC_TONE_KEY: Record<MetricKey, keyof typeof tones> = {
+  calls: 'cyan', missed: 'red', answered: 'green', recordings: 'gold',
+  voicemail: 'violet', sms: 'pink', live: 'blue', realtime: 'cyan',
+};
+
 export default function HomeDashboard({
   displayName, extension, onQuickDial,
 }: { displayName: string; extension: string; onQuickDial: () => void }) {
@@ -181,10 +204,22 @@ export default function HomeDashboard({
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const weekAgo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10); }, []);
 
-  const persisted = useMemo(() => loadPersistedRange(), []);
-  const [range, setRange] = useState<RangeKey>(persisted?.range ?? 'today');
-  const [customFrom, setCustomFrom] = useState<string>(persisted?.customFrom || weekAgo);
-  const [customTo, setCustomTo] = useState<string>(persisted?.customTo || today);
+  // URL params take priority over localStorage so deep-links are restorable.
+  const initial = useMemo(() => {
+    const url = readUrlState();
+    const persisted = loadPersistedRange();
+    return {
+      range: (url.range ?? persisted?.range ?? 'today') as RangeKey,
+      customFrom: url.from || persisted?.customFrom || weekAgo,
+      customTo: url.to || persisted?.customTo || today,
+      metric: url.metric as MetricKey | undefined,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [range, setRange] = useState<RangeKey>(initial.range);
+  const [customFrom, setCustomFrom] = useState<string>(initial.customFrom);
+  const [customTo, setCustomTo] = useState<string>(initial.customTo);
 
   useEffect(() => {
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ range, customFrom, customTo })); } catch { /* noop */ }
@@ -195,8 +230,46 @@ export default function HomeDashboard({
   const freshnessAccent = stats.cdrFreshness === 'live' ? c.success : stats.cdrFreshness === 'stale' ? c.signalGold : c.mutedSilver;
   const rangeLabel = range === 'today' ? 'Today' : range === 'week' ? 'Last 7 days' : range === 'month' ? 'Last 30 days' : `${customFrom} → ${customTo}`;
 
-  const [detail, setDetail] = useState<null | { metric: MetricKey; title: string; tone: Tone }>(null);
-  const openDetail = (metric: MetricKey, title: string, tone: Tone) => setDetail({ metric, title, tone });
+  const [detail, setDetail] = useState<null | { metric: MetricKey; title: string; tone: Tone }>(
+    initial.metric ? { metric: initial.metric, title: `${METRIC_TITLES[initial.metric]}`, tone: tones[METRIC_TONE_KEY[initial.metric]] } : null
+  );
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+  const openDetail = (metric: MetricKey, title: string, tone: Tone) => {
+    lastFocusedRef.current = (document.activeElement as HTMLElement) || null;
+    setDetail({ metric, title, tone });
+  };
+  const closeDetail = () => {
+    setDetail(null);
+    // Return focus to the tile that opened the drawer
+    setTimeout(() => lastFocusedRef.current?.focus?.(), 0);
+  };
+
+  // Sync URL with current state (range + optional metric) so links are shareable/restorable.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    sp.set('range', range);
+    if (range === 'custom') { sp.set('from', customFrom); sp.set('to', customTo); }
+    else { sp.delete('from'); sp.delete('to'); }
+    if (detail?.metric) sp.set('metric', detail.metric); else sp.delete('metric');
+    const next = `${window.location.pathname}?${sp.toString()}${window.location.hash}`;
+    window.history.replaceState(null, '', next);
+  }, [range, customFrom, customTo, detail]);
+
+  // Listen to back/forward (and external) URL changes
+  useEffect(() => {
+    const onPop = () => {
+      const url = readUrlState();
+      if (url.range) setRange(url.range);
+      if (url.from) setCustomFrom(url.from);
+      if (url.to) setCustomTo(url.to);
+      if (url.metric) setDetail({ metric: url.metric, title: METRIC_TITLES[url.metric], tone: tones[METRIC_TONE_KEY[url.metric]] });
+      else setDetail(null);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
 
   return (
     <div className="ava-page" style={{ padding: '28px 32px', maxWidth: 1240, margin: '0 auto', animation: 'fadeIn .3s ease-out' }}>
