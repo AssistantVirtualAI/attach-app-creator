@@ -491,3 +491,59 @@ function NewGroupModal({ members, onClose, onCreate }: { members: Member[]; onCl
     </div>
   );
 }
+
+function MessageRow({ m, meId, onReact, emojiOpen, onToggleEmoji, getSigned }: {
+  m: Message; meId?: string; onReact: (e: string) => void; emojiOpen: boolean; onToggleEmoji: () => void;
+  getSigned: (path: string) => Promise<string>;
+}) {
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    (m.attachments ?? []).forEach(async (a: any) => {
+      if (!urls[a.path]) { try { const u = await getSigned(a.path); setUrls((p) => ({ ...p, [a.path]: u })); } catch {} }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [m.id]);
+
+  if (m.message_type === 'deleted') return <div style={{ fontSize: 11, fontStyle: 'italic', color: c.mutedSilver, marginBottom: 12 }}>— message deleted</div>;
+
+  const reactions = m.reactions || {};
+  return (
+    <div style={{ marginBottom: 14, position: 'relative' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+        <strong style={{ color: c.textIce, fontSize: 12.5 }}>{m.sender_name ?? 'User'}</strong>
+        <span style={{ color: c.mutedSilver, fontSize: 10, fontFamily: 'JetBrains Mono, monospace' }}>
+          {new Date(m.created_at).toLocaleString()}{m.edited_at ? ' (edited)' : ''}
+        </span>
+        <button onClick={onToggleEmoji} title="React" style={{
+          marginLeft: 'auto', background: 'transparent', border: 'none', color: c.mutedSilver, cursor: 'pointer', fontSize: 13,
+        }}>😊</button>
+      </div>
+      {m.content && <div style={{ color: c.textIce, fontSize: 13, lineHeight: 1.5, marginTop: 2, whiteSpace: 'pre-wrap' }}>{m.content}</div>}
+      {(m.attachments ?? []).map((a: any) => (
+        <div key={a.path} style={{ marginTop: 6 }}>
+          {a.mime?.startsWith('image/') && urls[a.path]
+            ? <img src={urls[a.path]} alt={a.name} style={{ maxHeight: 240, borderRadius: 8, border: `1px solid ${c.border}` }} />
+            : <a href={urls[a.path]} target="_blank" rel="noreferrer" style={{ color: c.lemtelBlue, fontSize: 12 }}>📎 {a.name}</a>
+          }
+        </div>
+      ))}
+      {Object.keys(reactions).length > 0 && (
+        <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+          {Object.entries(reactions).map(([e, uids]) => (
+            <button key={e} onClick={() => onReact(e)} style={{
+              background: (uids as string[]).includes(meId || '') ? 'rgba(122,76,255,0.25)' : 'rgba(140,180,255,0.08)',
+              border: `1px solid ${c.border}`, color: c.textIce, fontSize: 11, padding: '1px 7px', borderRadius: 10, cursor: 'pointer',
+            }}>{e} {(uids as string[]).length}</button>
+          ))}
+        </div>
+      )}
+      {emojiOpen && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 6, padding: '4px 8px', background: c.deepPanel, border: `1px solid ${c.border}`, borderRadius: 8, width: 'fit-content' }}>
+          {EMOJIS.map((e) => (
+            <button key={e} onClick={() => onReact(e)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16 }}>{e}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
