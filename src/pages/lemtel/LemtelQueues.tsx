@@ -1165,7 +1165,6 @@ function BulkAddBtn({ queueId, extensions, onAdd }: { queueId: string; extension
     </>
   );
 }
-}
 
 // ---------- Live stats ----------
 function LiveStatsPanel({ queues }: { queues: any[] }) {
