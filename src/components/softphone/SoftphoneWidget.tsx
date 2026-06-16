@@ -197,8 +197,8 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
         "bg-gradient-to-br from-primary to-primary/70",
         inCall && "animate-pulse",
       )}
-      aria-label={`AVA Softphone — Ext. ${ext}`}
-      title={`AVA Softphone — Ext. ${ext}`}
+      aria-label={`AVA Softphone — Ext. ${extLabel}`}
+      title={`AVA Softphone — Ext. ${extLabel}`}
     >
       <Phone className="w-6 h-6" />
       <span className={cn(
@@ -208,7 +208,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
     </button>
   );
 
-  const hasExtension = ext && ext !== "—";
+  const hasExtension = !!ext;
   const sipLabel =
     sipStatus === "registered" ? "Registered"
     : sipStatus === "connecting" || sipStatus === "connected" ? "Connecting"
