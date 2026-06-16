@@ -59,8 +59,8 @@ export function AddAgentModal({ open, onOpenChange, onSuccess }: AddAgentModalPr
       if (!user) return [];
 
       // Strict tenant isolation: only use integrations owned by the selected organization.
-      const baseQuery = supabase
-        .from('organization_integrations')
+      const baseQuery = (supabase as any)
+        .from('organization_integrations_safe')
         .select('*')
         .eq('platform', selectedPlatform)
         .eq('is_active', true);
