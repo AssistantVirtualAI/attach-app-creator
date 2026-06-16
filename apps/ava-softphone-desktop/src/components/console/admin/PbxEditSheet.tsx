@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { theme } from '../../../lib/theme';
 import { supabase } from '../../../lib/supabaseClient';
+import { validateRecord, type RuleMap } from '../../../lib/pbxValidators';
 
 const { colors: c } = theme;
 
