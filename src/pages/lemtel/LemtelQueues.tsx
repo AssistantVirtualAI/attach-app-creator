@@ -102,7 +102,7 @@ export default function LemtelQueues() {
         </Alert>
       )}
 
-      <Tabs defaultValue="queues" className="w-full">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="w-full">
         <TabsList>
           <TabsTrigger value="queues"><Headphones className="w-4 h-4 mr-1" /> Queues</TabsTrigger>
           <TabsTrigger value="agents" disabled={!selected}><Users className="w-4 h-4 mr-1" /> Agents & Supervisors</TabsTrigger>
