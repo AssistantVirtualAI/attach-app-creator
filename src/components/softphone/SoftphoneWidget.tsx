@@ -91,16 +91,22 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
     if (sp.snap.callState === "ringing-in") setExpanded(true);
   }, [sp.snap.callState]);
 
-  // Recent calls
+  // Recent calls — admin can switch to "all org" view
+  const ext = sp.config?.extension || null;
+  const showAllCalls = isAdmin && recentsScope === "all";
   const { data: recents = [] } = useQuery({
-    queryKey: ["softphone-recents", sp.config?.extension],
-    enabled: !!sp.config?.extension,
+    queryKey: ["softphone-recents", ext, showAllCalls],
+    enabled: !!ext || showAllCalls,
     queryFn: async () => {
-      const { data } = await supabase
+      let q = (supabase as any)
         .from("pbx_call_records")
-        .select("id, direction, caller_number, destination_number, duration_seconds, start_at")
+        .select("id, direction, caller_number, destination_number, duration_seconds, start_at, extension, has_recording, recording_path, domain_name")
         .order("start_at", { ascending: false })
-        .limit(20);
+        .limit(showAllCalls ? 100 : 30);
+      if (!showAllCalls && ext) {
+        q = q.or(`extension.eq.${ext},caller_number.eq.${ext},destination_number.eq.${ext}`);
+      }
+      const { data } = await q;
       return data || [];
     },
   });
