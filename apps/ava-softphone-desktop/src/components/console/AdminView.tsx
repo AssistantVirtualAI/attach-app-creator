@@ -14,7 +14,9 @@ import { EXTENSION_RULES, IVR_RULES, QUEUE_RULES } from '../../lib/pbxValidators
 import { useDesktopRole } from '../../hooks/useDesktopRole';
 import { toast } from '../../lib/toast';
 import { audit } from '../../lib/audit';
-import { runCreatePbxResourceFlow } from '../../lib/pbxCreateFlow';
+import { runCreatePbxResourceFlow, generateIdempotencyKey } from '../../lib/pbxCreateFlow';
+import ConflictResolutionModal, { type ConflictKind } from './admin/ConflictResolutionModal';
+import AuditTrail from './admin/AuditTrail';
 import VoicemailView from './VoicemailView';
 import RecordingsView from './RecordingsView';
 import CallsView from './CallsView';
