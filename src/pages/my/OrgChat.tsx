@@ -409,7 +409,13 @@ function ChannelView({ channel, userId, userName, directory, t }: { channel: Cha
         <h2 className="font-semibold">{headerTitle}</h2>
         {channel.description && !isDm && <span className="text-sm text-muted-foreground hidden md:inline">— {channel.description}</span>}
         <div className="ml-auto flex items-center gap-2">
-          <div className="w-56 hidden lg:block"><ChatSearchBar /></div>
+          <div className="w-72 hidden lg:block">
+            <GlobalChatSearch
+              onPickMessage={(m) => { /* TODO: jump to message */ toast.message(`Found in channel ${m.channel_id.slice(0,6)}`); }}
+              onPickUser={() => toast.message("Open DM from sidebar")}
+            />
+          </div>
+          <ReportsPanel />
           {!isDm && <Badge variant="outline" className="text-xs">{channel.members?.length ?? 0} {t("members", "membres")}</Badge>}
           {canCall && (
             <Button size="sm" variant="outline" className="gap-1.5" onClick={handleCall}>
