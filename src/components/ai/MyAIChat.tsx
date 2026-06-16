@@ -67,12 +67,23 @@ const SUGGESTIONS = [
   "Analyze my recent call sentiment",
 ];
 
-export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; onClose?: () => void }) {
+export function MyAIChat({
+  embedded = false,
+  onClose,
+  initialPrompt,
+  onPromptConsumed,
+}: {
+  embedded?: boolean;
+  onClose?: () => void;
+  initialPrompt?: string | null;
+  onPromptConsumed?: () => void;
+}) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pageContext = usePageContext();
+  const [autoAnswer, setAutoAnswer] = useAutoAnswerSetting();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
