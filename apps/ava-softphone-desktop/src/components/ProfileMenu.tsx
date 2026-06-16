@@ -82,6 +82,12 @@ export default function ProfileMenu() {
   const [meetingNote, setMeetingNote] = useState<string>(() => localStorage.getItem(MEETING_NOTE_KEY) || '');
   const [lockMsg, setLockMsg] = useState<string>('');
   const [profileOpen, setProfileOpen] = useState(false);
+  const [expiryAt, setExpiryAt] = useState<number | null>(() => {
+    const raw = localStorage.getItem(EXPIRY_KEY);
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > Date.now() ? n : null;
+  });
+  const [pendingStatus, setPendingStatus] = useState<Status | null>(null);
   const { call } = useCallBus();
   const inCall = !!call && call.status !== 'ended' && call.status !== 'idle';
   const rootRef = useRef<HTMLDivElement>(null);
@@ -90,6 +96,7 @@ export default function ProfileMenu() {
   const statusRef = useRef<Status>(status);
   const openRef = useRef<boolean>(open);
   const inCallRef = useRef<boolean>(inCall);
+  const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   statusRef.current = status;
   openRef.current = open;
   inCallRef.current = inCall;
