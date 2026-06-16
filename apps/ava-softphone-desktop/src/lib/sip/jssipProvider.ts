@@ -244,6 +244,17 @@ class JsSipProvider {
   private config: SoftphoneConfig | null = null;
   private listeners = new Set<Listener>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  // Keep-alive + silent reconnect bookkeeping
+  private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
+  private statusGraceTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastStableStatus: SipStatus = 'idle';
+  private windowListenersBound = false;
+  private onOnline = () => this.kickReconnect('network online');
+  private onVisible = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      this.kickReconnect('tab visible');
+    }
+  };
   private snap: SoftphoneSnapshot = {
     status: 'idle',
     callState: 'idle',
@@ -298,6 +309,81 @@ class JsSipProvider {
     this.listeners.forEach((l) => l(this.snap));
   }
 
+  /**
+   * Silent-reconnect-aware status setter. If we already reached a healthy
+   * state (registered/connected) and we briefly drop into connecting/
+   * disconnected, defer the public emission so quick recoveries never flash
+   * a "reconnecting…" banner in the UI. Healthy/error transitions emit
+   * immediately and cancel any pending grace.
+   */
+  private setStatus(next: SipStatus, errorCause?: string) {
+    const healthy = next === 'registered' || next === 'connected';
+    const wasHealthy = this.lastStableStatus === 'registered' || this.lastStableStatus === 'connected';
+
+    if (healthy || next === 'error') {
+      if (this.statusGraceTimer) { clearTimeout(this.statusGraceTimer); this.statusGraceTimer = null; }
+      this.lastStableStatus = next;
+      this.update({ status: next, errorCause: healthy ? undefined : errorCause });
+      return;
+    }
+
+    if (wasHealthy) {
+      if (this.statusGraceTimer) clearTimeout(this.statusGraceTimer);
+      this.statusGraceTimer = setTimeout(() => {
+        this.statusGraceTimer = null;
+        this.lastStableStatus = next;
+        this.update({ status: next, errorCause });
+      }, 3500);
+      return;
+    }
+
+    this.lastStableStatus = next;
+    this.update({ status: next, errorCause });
+  }
+
+  private bindWindowListeners() {
+    if (this.windowListenersBound || typeof window === 'undefined') return;
+    this.windowListenersBound = true;
+    window.addEventListener('online', this.onOnline);
+    document.addEventListener('visibilitychange', this.onVisible);
+  }
+  private unbindWindowListeners() {
+    if (!this.windowListenersBound || typeof window === 'undefined') return;
+    this.windowListenersBound = false;
+    window.removeEventListener('online', this.onOnline);
+    document.removeEventListener('visibilitychange', this.onVisible);
+  }
+
+  private kickReconnect(why: string) {
+    if (!this.ua) return;
+    try {
+      const connected = this.ua.isConnected?.() ?? false;
+      const registered = this.ua.isRegistered?.() ?? false;
+      if (connected) {
+        if (!registered) {
+          this.logEvent('info', `Keep-alive: re-register (${why})`);
+          try { this.ua.register(); } catch { /* noop */ }
+        }
+        return;
+      }
+    } catch { /* noop */ }
+    this.logEvent('info', `Keep-alive: forcing reconnect (${why})`);
+    try { this.ua.start(); } catch { /* noop */ }
+  }
+
+  private startKeepAlive() {
+    if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
+    this.keepAliveTimer = setInterval(() => {
+      if (!this.ua) return;
+      try {
+        const connected = this.ua.isConnected?.() ?? false;
+        const registered = this.ua.isRegistered?.() ?? false;
+        if (!connected) this.kickReconnect('heartbeat: socket down');
+        else if (!registered) this.kickReconnect('heartbeat: not registered');
+      } catch { /* noop */ }
+    }, 25_000);
+  }
+
   private logEvent(level: SipEvent['level'], message: string) {
     const next = [...this.snap.events, { at: Date.now(), level, message }].slice(-50);
     // eslint-disable-next-line no-console
@@ -333,7 +419,10 @@ class JsSipProvider {
     if (this.ua && this.sameConfig(cfg)) {
       this.config = cfg;
       this.logEvent('info', 'SIP already initialized — keeping existing registration');
-      this.update({ status: this.snap.status });
+      // Re-broadcast snapshot so freshly-mounted subscribers get current state.
+      this.listeners.forEach((l) => l(this.snap));
+      // Opportunistic heal in case socket dropped while UI was unmounted.
+      this.kickReconnect('init() with matching config');
       return;
     }
     if (this.ua) this.stop();
@@ -341,9 +430,10 @@ class JsSipProvider {
 
     if (cfg.mock || !cfg.password) {
       this.logEvent('warn', cfg.mock ? 'Mock mode — skipping JsSIP init' : 'No SIP password — skipping JsSIP init');
-      this.update({ status: 'registered' });
+      this.setStatus('registered');
       return;
     }
+
 
     if (!JSSIP_MODULE_INFO.loaded) {
       const msg = `JsSIP module failed to load: ${JSSIP_MODULE_INFO['error' as keyof typeof JSSIP_MODULE_INFO] || 'no UA export'}`;
@@ -397,35 +487,37 @@ class JsSipProvider {
 
       ua.on('connecting', () => {
         this.logEvent('info', 'WebSocket connecting…');
-        this.update({ status: 'connecting' });
+        this.setStatus('connecting');
       });
       ua.on('connected', () => {
         this.logEvent('info', 'WebSocket connected ✓');
-        this.update({ status: 'connected' });
+        this.setStatus('connected');
       });
       ua.on('disconnected', (e: any) => {
         const cause = e?.code ? `code=${e.code} reason=${e.reason || ''}` : (e?.reason || 'unknown');
-        this.logEvent('warn', `Disconnected (${cause}) — reconnecting in 5s`);
-        this.update({ status: 'disconnected', errorCause: cause });
+        this.logEvent('warn', `Disconnected (${cause}) — silent reconnect in 1s`);
+        this.setStatus('disconnected', cause);
         if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
         this.reconnectTimer = setTimeout(() => {
           this.logEvent('info', 'Reconnect attempt…');
           try { ua.start(); } catch { /* noop */ }
-        }, 5000);
+        }, 1000);
       });
       ua.on('registered', () => {
         this.logEvent('info', 'Registered ✓');
-        this.update({ status: 'registered', errorCause: undefined });
+        this.setStatus('registered');
       });
       ua.on('unregistered', () => {
-        this.logEvent('warn', 'Unregistered');
+        this.logEvent('warn', 'Unregistered — keep-alive will re-register');
+        // Don't downgrade status; keep-alive will re-register on the next tick.
+        try { ua.register(); } catch { /* noop */ }
       });
       ua.on('registrationFailed', (e: any) => {
         const code = e?.response?.status_code;
         const reason = e?.response?.reason_phrase || e?.cause || 'registration failed';
         const detail = code ? `${code} ${reason}` : reason;
         this.logEvent('error', `Registration failed: ${detail}`);
-        this.update({ status: 'error', errorCause: detail });
+        this.setStatus('error', detail);
       });
       ua.on('newRTCSession', (e: any) => this.attachSession(e.session, e.originator));
 
@@ -437,10 +529,12 @@ class JsSipProvider {
         throw startErr;
       }
       this.ua = ua;
-      this.update({ status: 'connecting' });
+      this.setStatus('connecting');
+      this.bindWindowListeners();
+      this.startKeepAlive();
     } catch (err: any) {
       this.logEvent('error', `Init exception: ${String(err?.message || err)}`);
-      this.update({ status: 'error', errorCause: String(err?.message || err) });
+      this.setStatus('error', String(err?.message || err));
     }
   }
 
@@ -795,10 +889,16 @@ class JsSipProvider {
   stop() {
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
+    if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
+    this.keepAliveTimer = null;
+    if (this.statusGraceTimer) clearTimeout(this.statusGraceTimer);
+    this.statusGraceTimer = null;
+    this.unbindWindowListeners();
     try { this.ua?.stop(); } catch { /* noop */ }
     this.ua = null;
     this.session = null;
     this.secondSession = null;
+    this.lastStableStatus = 'disconnected';
     this.update({ status: 'disconnected', callState: 'idle', direction: null, startedAt: null });
   }
 }
