@@ -11,9 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Headphones, Plus, Loader2, Pencil, Trash2, Users, RefreshCw, Shield, UserPlus, Activity,
-  Download, Upload, AlertTriangle, CheckCircle2, Clock, Lock,
+  Download, Upload, AlertTriangle, CheckCircle2, Clock, Lock, Search,
 } from 'lucide-react';
 import { usePbxQueues, LEMTEL_ORG, usePbxSync, usePbxSyncJobs } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
@@ -673,6 +674,51 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
     } catch (e: any) { toast({ title: 'Failed', description: e.message, variant: 'destructive' }); }
   };
 
+  const bulkAdd = async (extensionIds: string[], role: 'agent' | 'supervisor') => {
+    if (!perms.canAssign) { toast({ title: 'Forbidden', variant: 'destructive' }); return; }
+    const tier_level = role === 'supervisor' ? 1 : 2;
+    let basePos = agents.filter((a) => a.tier_level === tier_level).length;
+    let ok = 0, fail = 0;
+    for (const id of extensionIds) {
+      const ext = extensions.find((x) => x.id === id);
+      if (!ext) { fail++; continue; }
+      basePos += 1;
+      try {
+        const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+          body: { organization_id: LEMTEL_ORG, action: 'add-queue-tier', params: {
+            call_center_queue_uuid: queue.pbx_uuid, tier_agent: ext.extension,
+            tier_level, tier_position: basePos,
+          }},
+        });
+        if (error || data?.ok === false) throw new Error(data?.message || error?.message || 'Failed');
+        await supabase.from('pbx_queue_agents').insert({
+          queue_id: queue.id, extension_id: ext.id, agent_id: ext.extension,
+          agent_name: ext.display_name || ext.extension, tier_level, tier_position: basePos,
+        });
+        ok++;
+      } catch { fail++; }
+    }
+    toast({ title: `Added ${ok}${fail ? ` · ${fail} failed` : ''}`, variant: fail ? 'destructive' : 'default' });
+    load();
+  };
+
+  const bulkRemove = async (rows: any[]) => {
+    if (!perms.canAssign) { toast({ title: 'Forbidden', variant: 'destructive' }); return; }
+    if (!confirm(`Remove ${rows.length} member${rows.length === 1 ? '' : 's'} from ${queue.name}?`)) return;
+    let ok = 0, fail = 0;
+    for (const a of rows) {
+      try {
+        if (a.raw_data?.call_center_tier_uuid) {
+          await supabase.functions.invoke('fusionpbx-proxy', { body: { organization_id: LEMTEL_ORG, action: 'remove-queue-tier', params: { call_center_tier_uuid: a.raw_data.call_center_tier_uuid }}});
+        }
+        await supabase.from('pbx_queue_agents').delete().eq('id', a.id);
+        ok++;
+      } catch { fail++; }
+    }
+    toast({ title: `Removed ${ok}${fail ? ` · ${fail} failed` : ''}`, variant: fail ? 'destructive' : 'default' });
+    load();
+  };
+
   const supervisors = agents.filter((a) => a.tier_level === 1);
   const regularAgents = agents.filter((a) => a.tier_level !== 1);
   const availableExt = extensions.filter((e) => !agents.some((a) => a.extension_id === e.id));
@@ -691,9 +737,12 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
         <div className="text-sm text-muted-foreground">
           Queue <span className="font-medium text-foreground">{queue.name}</span> · {agents.length} member{agents.length === 1 ? '' : 's'}
         </div>
-        <Button size="sm" variant="outline" onClick={resyncTiers} disabled={syncing}>
-          {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />} Resync from PBX
-        </Button>
+        <div className="flex gap-2">
+          {perms.canAssign && <BulkAddBtn extensions={availableExt} onAdd={bulkAdd} />}
+          <Button size="sm" variant="outline" onClick={resyncTiers} disabled={syncing}>
+            {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />} Resync from PBX
+          </Button>
+        </div>
       </div>
 
       {status.state !== 'idle' && (
@@ -705,13 +754,6 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
           <div className="flex-1 min-w-0">
             <div className="font-medium">{status.message}</div>
             {status.details && <div className="font-mono opacity-80 break-all mt-0.5">{status.details}</div>}
-            <div className="opacity-70 mt-0.5 flex flex-wrap gap-x-3">
-              {typeof status.pulled === 'number' && <span>pulled: {status.pulled}</span>}
-              {typeof status.upserted === 'number' && <span>upserted: {status.upserted}</span>}
-              {typeof status.failed === 'number' && status.failed > 0 && <span>failed: {status.failed}</span>}
-              {status.attempts && status.attempts > 1 && <span>attempts: {status.attempts}</span>}
-              {status.at && <span>at {new Date(status.at).toLocaleTimeString()}</span>}
-            </div>
             {(status.state === 'error' || status.state === 'partial') && (
               <Button size="sm" variant="outline" className="mt-2 h-7" onClick={resyncTiers} disabled={syncing}>
                 <RefreshCw className="w-3 h-3 mr-1" /> Retry
@@ -722,61 +764,206 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
       )}
 
       {loading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div> : (
-    <div className="grid md:grid-cols-2 gap-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div><CardTitle className="flex items-center gap-2"><Shield className="w-4 h-4" /> Supervisors</CardTitle><CardDescription>Tier 1 — receive calls first / monitor agents</CardDescription></div>
-          {perms.canAssign && <AddAgentBtn extensions={availableExt} onAdd={(id) => addAgent(id, 'supervisor')} role="supervisor" />}
-        </CardHeader>
-        <CardContent>
-          {supervisors.length === 0 ? <p className="text-sm text-muted-foreground">{txt.noSup}</p> : (
-            <div className="space-y-1">{supervisors.map((a) => (
-              <div key={a.id} className="flex items-center justify-between p-2 border rounded">
-                <div><div className="font-medium">{a.agent_name}</div><div className="text-xs text-muted-foreground font-mono">Ext {a.agent_id} · pos {a.tier_position}</div></div>
-                {perms.canAssign && <Button size="sm" variant="ghost" onClick={() => removeAgent(a)}><Trash2 className="w-4 h-4 text-destructive" /></Button>}
-              </div>
-            ))}</div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div><CardTitle className="flex items-center gap-2"><Users className="w-4 h-4" /> Agents</CardTitle><CardDescription>Tier 2 — handle queue calls</CardDescription></div>
-          {perms.canAssign && <AddAgentBtn extensions={availableExt} onAdd={(id) => addAgent(id, 'agent')} role="agent" />}
-        </CardHeader>
-        <CardContent>
-          {regularAgents.length === 0 ? <p className="text-sm text-muted-foreground">{txt.noAgents}</p> : (
-            <div className="space-y-1">{regularAgents.map((a) => (
-              <div key={a.id} className="flex items-center justify-between p-2 border rounded">
-                <div><div className="font-medium">{a.agent_name}</div><div className="text-xs text-muted-foreground font-mono">Ext {a.agent_id} · {a.status}</div></div>
-                {perms.canAssign && <Button size="sm" variant="ghost" onClick={() => removeAgent(a)}><Trash2 className="w-4 h-4 text-destructive" /></Button>}
-              </div>
-            ))}</div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+        <MembersTable
+          supervisors={supervisors}
+          agents={regularAgents}
+          canAssign={perms.canAssign}
+          onRemoveOne={removeAgent}
+          onBulkRemove={bulkRemove}
+          txt={txt}
+        />
       )}
     </div>
   );
 }
 
-function AddAgentBtn({ extensions, onAdd, role }: { extensions: any[]; onAdd: (extId: string) => void; role: string }) {
-  const [open, setOpen] = useState(false);
-  const [sel, setSel] = useState('');
+function MembersTable({ supervisors, agents, canAssign, onRemoveOne, onBulkRemove, txt }: any) {
+  const [query, setQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'supervisor' | 'agent'>('all');
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+
+  const all = useMemo(() => {
+    const sup = supervisors.map((a: any) => ({ ...a, _role: 'supervisor' }));
+    const ag = agents.map((a: any) => ({ ...a, _role: 'agent' }));
+    return [...sup, ...ag];
+  }, [supervisors, agents]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return all.filter((a) => {
+      if (roleFilter !== 'all' && a._role !== roleFilter) return false;
+      if (!q) return true;
+      return (a.agent_name || '').toLowerCase().includes(q)
+        || (a.agent_id || '').toString().toLowerCase().includes(q);
+    });
+  }, [all, query, roleFilter]);
+
+  const allSelected = filtered.length > 0 && filtered.every((a) => selected[a.id]);
+  const selectedRows = filtered.filter((a) => selected[a.id]);
+
+  const toggleAll = () => {
+    if (allSelected) {
+      const next = { ...selected }; filtered.forEach((a) => delete next[a.id]); setSelected(next);
+    } else {
+      const next = { ...selected }; filtered.forEach((a) => { next[a.id] = true; }); setSelected(next);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm"><UserPlus className="w-4 h-4 mr-1" /> Add</Button></DialogTrigger>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Add {role}</DialogTitle><DialogDescription>Pick an extension to assign to this queue.</DialogDescription></DialogHeader>
-        <Select value={sel} onValueChange={setSel}>
-          <SelectTrigger><SelectValue placeholder="Choose extension" /></SelectTrigger>
-          <SelectContent>{extensions.map((e) => <SelectItem key={e.id} value={e.id}>{e.extension} — {e.display_name || '—'}</SelectItem>)}</SelectContent>
-        </Select>
+    <Card>
+      <CardHeader className="gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input placeholder="Search by name or extension…" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-8 h-9" />
+            </div>
+            <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)}>
+              <SelectTrigger className="w-40 h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All members</SelectItem>
+                <SelectItem value="supervisor">Supervisors</SelectItem>
+                <SelectItem value="agent">Agents</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {canAssign && selectedRows.length > 0 && (
+            <Button size="sm" variant="destructive" onClick={() => { onBulkRemove(selectedRows); setSelected({}); }}>
+              <Trash2 className="w-4 h-4 mr-1" /> Remove {selectedRows.length}
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">
+            {all.length === 0 ? `${txt.noAgents}` : 'No members match your filter.'}
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {canAssign && <TableHead className="w-8"><Checkbox checked={allSelected} onCheckedChange={toggleAll} /></TableHead>}
+                <TableHead>Name</TableHead>
+                <TableHead>Extension</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Tier / Pos</TableHead>
+                {canAssign && <TableHead className="w-16"></TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((a: any) => (
+                <TableRow key={a.id} data-state={selected[a.id] ? 'selected' : undefined}>
+                  {canAssign && (
+                    <TableCell><Checkbox checked={!!selected[a.id]} onCheckedChange={(v) => setSelected({ ...selected, [a.id]: !!v })} /></TableCell>
+                  )}
+                  <TableCell className="font-medium">{a.agent_name}</TableCell>
+                  <TableCell className="font-mono text-xs">{a.agent_id}</TableCell>
+                  <TableCell>
+                    <Badge variant={a._role === 'supervisor' ? 'default' : 'secondary'}>
+                      {a._role === 'supervisor' ? <Shield className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />}
+                      {a._role}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">T{a.tier_level} · #{a.tier_position}</TableCell>
+                  {canAssign && (
+                    <TableCell>
+                      <Button size="sm" variant="ghost" onClick={() => onRemoveOne(a)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function BulkAddBtn({ extensions, onAdd }: { extensions: any[]; onAdd: (ids: string[], role: 'agent' | 'supervisor') => void }) {
+  const [open, setOpen] = useState(false);
+  const [role, setRole] = useState<'agent' | 'supervisor'>('agent');
+  const [query, setQuery] = useState('');
+  const [sel, setSel] = useState<Record<string, boolean>>({});
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return extensions;
+    return extensions.filter((e) =>
+      (e.extension || '').toLowerCase().includes(q)
+      || (e.display_name || '').toLowerCase().includes(q));
+  }, [extensions, query]);
+
+  const selectedIds = Object.keys(sel).filter((k) => sel[k]);
+  const allSelected = filtered.length > 0 && filtered.every((e) => sel[e.id]);
+  const toggleAll = () => {
+    if (allSelected) {
+      const next = { ...sel }; filtered.forEach((e) => delete next[e.id]); setSel(next);
+    } else {
+      const next = { ...sel }; filtered.forEach((e) => { next[e.id] = true; }); setSel(next);
+    }
+  };
+
+  const submit = () => {
+    if (selectedIds.length === 0) return;
+    onAdd(selectedIds, role);
+    setSel({}); setQuery(''); setOpen(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setSel({}); setQuery(''); } }}>
+      <DialogTrigger asChild><Button size="sm"><UserPlus className="w-4 h-4 mr-1" /> Add members</Button></DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Add members to queue</DialogTitle>
+          <DialogDescription>Select one or many extensions. Choose whether to add them as agents or supervisors.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Select value={role} onValueChange={(v: any) => setRole(v)}>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="agent">Add as Agent (T2)</SelectItem>
+                <SelectItem value="supervisor">Add as Supervisor (T1)</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input placeholder="Search extension or name…" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-8" />
+            </div>
+          </div>
+          <div className="border rounded-md max-h-[360px] overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No available extensions match.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8"><Checkbox checked={allSelected} onCheckedChange={toggleAll} /></TableHead>
+                    <TableHead>Extension</TableHead>
+                    <TableHead>Display name</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((e) => (
+                    <TableRow key={e.id} data-state={sel[e.id] ? 'selected' : undefined} className="cursor-pointer" onClick={() => setSel({ ...sel, [e.id]: !sel[e.id] })}>
+                      <TableCell><Checkbox checked={!!sel[e.id]} onCheckedChange={(v) => setSel({ ...sel, [e.id]: !!v })} /></TableCell>
+                      <TableCell className="font-mono">{e.extension}</TableCell>
+                      <TableCell>{e.display_name || '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </div>
         <DialogFooter>
+          <div className="text-xs text-muted-foreground mr-auto self-center">{selectedIds.length} selected</div>
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button disabled={!sel} onClick={() => { onAdd(sel); setSel(''); setOpen(false); }}>Add</Button>
+          <Button disabled={selectedIds.length === 0} onClick={submit}>
+            <UserPlus className="w-4 h-4 mr-1" /> Add {selectedIds.length || ''} {role === 'supervisor' ? 'supervisor(s)' : 'agent(s)'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
