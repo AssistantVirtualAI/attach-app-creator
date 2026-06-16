@@ -91,6 +91,7 @@ function ExtensionsTable() {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const loadFromDb = useCallback(async (orgId: string | null) => {
