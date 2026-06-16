@@ -300,7 +300,11 @@ export default function HomeDashboard({
         {RANGES.map((r) => {
           const active = range === r.key;
           return (
-            <button key={r.key} onClick={() => setRange(r.key)} style={{
+            <button key={r.key} onClick={() => setRange(r.key)}
+              className="ava-range-btn"
+              aria-pressed={active}
+              aria-label={`Set range to ${r.label}`}
+              style={{
               padding: '7px 14px',
               borderRadius: 999,
               border: active ? '1px solid transparent' : `1px solid ${c.border}`,
