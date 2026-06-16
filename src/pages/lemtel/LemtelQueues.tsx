@@ -815,6 +815,8 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
 
       {loading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div> : (
         <MembersTable
+          queueId={queue.id}
+          queueName={queue.name}
           supervisors={supervisors}
           agents={regularAgents}
           canAssign={perms.canAssign}
