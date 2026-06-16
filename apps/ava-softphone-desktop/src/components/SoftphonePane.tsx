@@ -9,7 +9,7 @@ import LemtelLogo from './LemtelLogo';
 import BrandTagline from './BrandTagline';
 import RecordingsList from './RecordingsList';
 import AIInsights from './AIInsights';
-import ProfileMenu from './ProfileMenu';
+// ProfileMenu is rendered globally in TitleBar — no longer duplicated here.
 import { AppErrorBoundary } from './AppErrorBoundary';
 import { theme } from '../lib/theme';
 import { ava } from '../lib/avaApi';
