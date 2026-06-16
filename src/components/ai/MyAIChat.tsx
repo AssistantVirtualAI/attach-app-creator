@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,33 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type Msg = { role: "user" | "assistant"; content: string };
+type PageContext = {
+  path: string;
+  page: "voicemail" | "calls" | "recordings" | "other";
+  voicemail_id?: string;
+  call_id?: string;
+  recording_id?: string;
+};
+
+function usePageContext(): PageContext {
+  const loc = useLocation();
+  return useMemo(() => {
+    const params = new URLSearchParams(loc.search);
+    const path = loc.pathname;
+    let page: PageContext["page"] = "other";
+    if (path.includes("/voicemail")) page = "voicemail";
+    else if (path.includes("/calls")) page = "calls";
+    else if (path.includes("/recordings")) page = "recordings";
+    return {
+      path,
+      page,
+      voicemail_id: params.get("vm") ?? undefined,
+      call_id: params.get("call") ?? undefined,
+      recording_id: params.get("rec") ?? undefined,
+    };
+  }, [loc.pathname, loc.search]);
+}
+
 
 const SUGGESTIONS = [
   "Summarize my calls today",
@@ -22,10 +50,29 @@ export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; on
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const pageContext = usePageContext();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
+
+  const contextSuggestions = useMemo(() => {
+    if (pageContext.page === "voicemail" && pageContext.voicemail_id) {
+      return [
+        "Summarize this voicemail",
+        "Transcribe this voicemail",
+        "What does the caller want?",
+        "Draft a reply for this voicemail",
+      ];
+    }
+    if (pageContext.page === "calls" && pageContext.call_id) {
+      return ["Summarize this call", "What was the sentiment?", "List action items from this call"];
+    }
+    if (pageContext.page === "recordings" && pageContext.recording_id) {
+      return ["Summarize this recording", "Transcribe this recording", "Key topics in this recording"];
+    }
+    return SUGGESTIONS;
+  }, [pageContext]);
 
   const send = useCallback(async (textOverride?: string) => {
     const text = (textOverride ?? input).trim();
@@ -36,7 +83,7 @@ export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; on
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("my-ai-assistant", {
-        body: { messages: newMsgs },
+        body: { messages: newMsgs, pageContext },
       });
       if (error) throw error;
       if (data?.error === "rate_limited") { toast.error("Rate limit reached. Try again in a moment."); return; }
@@ -46,7 +93,8 @@ export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; on
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to reach assistant");
     } finally { setLoading(false); }
-  }, [input, loading, messages]);
+  }, [input, loading, messages, pageContext]);
+
 
   return (
     <Card className={cn("flex flex-col bg-background/95 backdrop-blur", embedded ? "h-[600px]" : "h-full")}>
@@ -69,6 +117,15 @@ export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; on
         </div>
       </header>
 
+      {(pageContext.voicemail_id || pageContext.call_id || pageContext.recording_id) && (
+        <div className="px-4 py-1.5 text-[11px] text-primary bg-primary/5 border-b flex items-center gap-1.5">
+          <Sparkles className="h-3 w-3" />
+          Context: {pageContext.page}
+          {pageContext.voicemail_id && ` · vm ${pageContext.voicemail_id.slice(0, 8)}`}
+          {pageContext.call_id && ` · call ${pageContext.call_id.slice(0, 8)}`}
+          {pageContext.recording_id && ` · rec ${pageContext.recording_id.slice(0, 8)}`}
+        </div>
+      )}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 && (
           <div className="space-y-3">
@@ -76,7 +133,7 @@ export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; on
               Hi! I can summarize your calls, manage your voicemail greeting, and analyze recent activity. Try:
             </p>
             <div className="flex flex-col gap-1.5">
-              {SUGGESTIONS.map((s) => (
+              {contextSuggestions.map((s) => (
                 <button key={s} onClick={() => send(s)}
                   className="text-left text-xs p-2 rounded border hover:border-primary/50 hover:bg-accent transition">
                   {s}

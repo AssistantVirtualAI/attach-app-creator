@@ -138,6 +138,128 @@ Deno.serve(async (req) => {
       return json({ url: data.signedUrl });
     }
 
+    // ============= GREETINGS LIBRARY =============
+
+    if (action === "list_greetings") {
+      const { data, error } = await admin
+        .from("pbx_voicemail_greetings")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      const greetings = await Promise.all((data ?? []).map(async (g: any) => {
+        const { data: s } = await admin.storage.from("voicemail-greetings").createSignedUrl(g.storage_path, 3600);
+        return { ...g, audio_url: s?.signedUrl ?? null };
+      }));
+      const { data: exts } = await admin
+        .from("pbx_softphone_users")
+        .select("extension, display_name")
+        .eq("portal_user_id", userId);
+      return json({ greetings, extensions: exts ?? [], voices: TOP_VOICES });
+    }
+
+    if (action === "create_greeting") {
+      if (!spu) return json({ error: "no_extension" }, 400);
+      const name: string = String(payload?.name ?? "").trim() || "Untitled greeting";
+      const text: string = String(payload?.text ?? "").trim();
+      const voiceId: string = String(payload?.voice_id ?? "EXAVITQu4vr4xnSDxMaL");
+      const extension: string | null = payload?.extension ?? null;
+      if (!text) return json({ error: "missing_text" }, 400);
+      if (text.length > 2000) return json({ error: "text_too_long" }, 400);
+      const audio = await ttsToBlob(text, voiceId);
+      const path = `${spu.organization_id}/${userId}/lib-${Date.now()}.mp3`;
+      const { error: upErr } = await admin.storage
+        .from("voicemail-greetings")
+        .upload(path, new Uint8Array(audio), { contentType: "audio/mpeg", upsert: true });
+      if (upErr) throw upErr;
+      const voiceName = TOP_VOICES.find((v) => v.id === voiceId)?.name ?? null;
+      const { data: row, error } = await admin
+        .from("pbx_voicemail_greetings")
+        .insert({
+          user_id: userId,
+          organization_id: spu.organization_id,
+          extension,
+          name,
+          source: "tts",
+          text_script: text,
+          voice_id: voiceId,
+          voice_name: voiceName,
+          storage_path: path,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      const { data: signed } = await admin.storage.from("voicemail-greetings").createSignedUrl(path, 3600);
+      return json({ greeting: { ...row, audio_url: signed?.signedUrl ?? null } });
+    }
+
+    if (action === "delete_greeting") {
+      const id: string = payload?.id;
+      if (!id) return json({ error: "missing_id" }, 400);
+      const { data: g } = await admin
+        .from("pbx_voicemail_greetings")
+        .select("storage_path,user_id")
+        .eq("id", id)
+        .maybeSingle();
+      if (!g || g.user_id !== userId) return json({ error: "forbidden" }, 403);
+      await admin.storage.from("voicemail-greetings").remove([g.storage_path]).catch(() => {});
+      await admin.from("pbx_voicemail_greetings").delete().eq("id", id);
+      return json({ ok: true });
+    }
+
+    if (action === "activate_greeting") {
+      if (!spu) return json({ error: "no_extension" }, 400);
+      const id: string = payload?.id;
+      if (!id) return json({ error: "missing_id" }, 400);
+      const { data: g } = await admin
+        .from("pbx_voicemail_greetings")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      if (!g || g.user_id !== userId) return json({ error: "forbidden" }, 403);
+      let q = admin.from("pbx_voicemail_greetings").update({ is_active: false }).eq("user_id", userId);
+      q = g.extension ? q.eq("extension", g.extension) : q.is("extension", null);
+      await q;
+      await admin.from("pbx_voicemail_greetings").update({ is_active: true }).eq("id", id);
+      const { data: signed } = await admin.storage
+        .from("voicemail-greetings")
+        .createSignedUrl(g.storage_path, 3600);
+      await admin.from("pbx_voicemail_settings").upsert({
+        user_id: userId,
+        organization_id: spu.organization_id,
+        greeting_type: "tts",
+        greeting_tts_text: g.text_script,
+        greeting_voice_id: g.voice_id,
+        greeting_voice_name: g.voice_name,
+        greeting_storage_path: g.storage_path,
+        greeting_audio_url: signed?.signedUrl ?? null,
+        greeting_updated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id" });
+      await admin.from("audit_logs").insert({
+        organization_id: spu.organization_id,
+        user_id: userId,
+        action: "voicemail_greeting_activated",
+        resource_type: "pbx_voicemail_greetings",
+        resource_id: id,
+        metadata: { extension: g.extension, name: g.name },
+      });
+      return json({ ok: true, audio_url: signed?.signedUrl ?? null });
+    }
+
+    if (action === "rename_greeting") {
+      const id: string = payload?.id;
+      const name: string = String(payload?.name ?? "").trim();
+      if (!id || !name) return json({ error: "missing_fields" }, 400);
+      const { error } = await admin
+        .from("pbx_voicemail_greetings")
+        .update({ name })
+        .eq("id", id)
+        .eq("user_id", userId);
+      if (error) throw error;
+      return json({ ok: true });
+    }
+
     return json({ error: "unknown_action" }, 400);
   } catch (e) {
     return json({ error: String(e?.message ?? e) }, 500);

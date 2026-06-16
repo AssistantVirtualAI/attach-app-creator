@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Phone, FileText, Voicemail, MessageSquare, Headphones,
-  Sliders, Sparkles, Download, User, Settings, Users,
+  Sliders, Sparkles, Download, User, Settings, Users, PlayCircle,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -15,6 +15,7 @@ const WORKSPACE: Item[] = [
   { label: "Softphone",  to: "/my/softphone",  icon: Phone },
   { label: "Calls",      to: "/my/calls",      icon: FileText },
   { label: "Voicemail",  to: "/my/voicemail",  icon: Voicemail },
+  { label: "Greetings",  to: "/my/greetings",  icon: PlayCircle },
   { label: "Recordings", to: "/my/recordings", icon: Headphones },
   { label: "Messages",   to: "/my/messages",   icon: MessageSquare },
 ];

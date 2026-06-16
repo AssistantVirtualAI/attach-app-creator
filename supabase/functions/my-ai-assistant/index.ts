@@ -132,6 +132,45 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_voicemail_detail",
+      description: "Get full details for one voicemail (caller, transcript, AI summary, signed audio URL). Use when the user is on the voicemail page or asks about a specific voicemail.",
+      parameters: {
+        type: "object",
+        properties: { voicemail_id: { type: "string" } },
+        required: ["voicemail_id"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_call_detail",
+      description: "Get full details for one call (numbers, duration, status, transcript, AI summary, recording reference).",
+      parameters: {
+        type: "object",
+        properties: { call_id: { type: "string" } },
+        required: ["call_id"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_recording_detail",
+      description: "Get full details for a call recording (signed audio URL, transcript snippet, AI analysis).",
+      parameters: {
+        type: "object",
+        properties: { recording_id: { type: "string" } },
+        required: ["recording_id"],
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 async function elevenTts(text: string, voiceId: string): Promise<ArrayBuffer> {
@@ -312,6 +351,64 @@ async function execTool(
     return { insights: data ?? [] };
   }
 
+  if (name === "get_voicemail_detail") {
+    const id: string = args?.voicemail_id;
+    if (!id) return { error: "missing_voicemail_id" };
+    const { data: vm } = await admin
+      .from("pbx_voicemails")
+      .select("id, organization_id, extension, caller_number, caller_name, received_at, duration_seconds, transcript, ai_summary, ai_tags, read_at, audio_storage_path")
+      .eq("id", id)
+      .maybeSingle();
+    if (!vm || vm.organization_id !== spu.organization_id || vm.extension !== spu.extension)
+      return { error: "forbidden" };
+    let audio_url: string | null = null;
+    if (vm.audio_storage_path) {
+      const { data: s } = await admin.storage.from("voicemails").createSignedUrl(vm.audio_storage_path, 3600);
+      audio_url = s?.signedUrl ?? null;
+    }
+    return { voicemail: { ...vm, audio_url } };
+  }
+
+  if (name === "get_call_detail") {
+    const id: string = args?.call_id;
+    if (!id) return { error: "missing_call_id" };
+    const { data: c } = await admin
+      .from("pbx_call_records")
+      .select("id, organization_id, extension, direction, caller_number, destination_number, start_at, duration_seconds, call_status, hangup_cause, sentiment, ai_summary")
+      .eq("id", id)
+      .maybeSingle();
+    if (!c || c.organization_id !== spu.organization_id || c.extension !== spu.extension)
+      return { error: "forbidden" };
+    const { data: tr } = await admin
+      .from("pbx_call_transcripts")
+      .select("content, speaker_segments")
+      .eq("call_record_id", id)
+      .maybeSingle();
+    const { data: rec } = await admin
+      .from("pbx_call_recordings")
+      .select("id, duration_seconds, recording_name")
+      .eq("call_record_id", id)
+      .maybeSingle();
+    return { call: c, transcript: tr ?? null, recording: rec ?? null };
+  }
+
+  if (name === "get_recording_detail") {
+    const id: string = args?.recording_id;
+    if (!id) return { error: "missing_recording_id" };
+    const { data: r } = await admin
+      .from("pbx_call_recordings")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (!r || r.organization_id !== spu.organization_id) return { error: "forbidden" };
+    let audio_url: string | null = null;
+    if (r.storage_path) {
+      const { data: s } = await admin.storage.from("recordings").createSignedUrl(r.storage_path, 3600).catch(() => ({ data: null } as any));
+      audio_url = s?.signedUrl ?? null;
+    }
+    return { recording: { ...r, audio_url } };
+  }
+
   return { error: "unknown_tool" };
 }
 
@@ -341,6 +438,18 @@ Deno.serve(async (req) => {
       .eq("portal_user_id", userId)
       .maybeSingle();
 
+    const pageContext = body.pageContext ?? null;
+    const contextLines: string[] = [];
+    if (pageContext) {
+      contextLines.push(`Current page: ${pageContext.page} (${pageContext.path}).`);
+      if (pageContext.voicemail_id)
+        contextLines.push(`The user is viewing voicemail id ${pageContext.voicemail_id}. When they ask about "this voicemail" / "this message", call get_voicemail_detail with that id and use its transcript / summary.`);
+      if (pageContext.call_id)
+        contextLines.push(`The user is viewing call id ${pageContext.call_id}. When they ask about "this call", call get_call_detail with that id and use its transcript.`);
+      if (pageContext.recording_id)
+        contextLines.push(`The user is viewing recording id ${pageContext.recording_id}. Use get_recording_detail.`);
+    }
+
     const system = {
       role: "system",
       content: [
@@ -351,6 +460,8 @@ Deno.serve(async (req) => {
           : "User has no SIP extension linked yet — for telephony actions tell them to ask their admin.",
         "Use the provided tools to fetch real data; never invent statistics or call ids.",
         "When the user asks to update / record / program their voicemail greeting, call set_voicemail_greeting with the exact script they want. Confirm the script back to them before generating if it's unclear.",
+        "If page context references a voicemail / call / recording id, automatically pull its details with the matching tool before answering.",
+        ...contextLines,
         "Be concise and answer in the language the user writes in (French or English).",
         "Format answers in Markdown with short headings, bullets, and bold key numbers.",
       ].join("\n"),
