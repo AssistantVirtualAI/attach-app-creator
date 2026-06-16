@@ -193,8 +193,13 @@ export function useDashboardStats(
       attention: attention.slice(0, 3),
       pbxHealth: 'ok',
       series,
+      error: null,
       loading: false,
     });
+    } catch (e: any) {
+      const msg = e?.message || e?.error_description || 'Failed to load stats';
+      setStats((s) => ({ ...s, loading: false, error: String(msg).slice(0, 240) }));
+    }
   }, [orgId, extension, range, customFrom, customTo]);
 
   useEffect(() => { refresh(); }, [refresh]);
