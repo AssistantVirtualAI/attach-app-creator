@@ -1141,19 +1141,34 @@ function BulkAddBtn({ queueId, queueName, extensions, supCount, agCount, onAdd }
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle>Add {selectedIds.length} {role === 'supervisor' ? 'supervisor' : 'agent'}{selectedIds.length === 1 ? '' : 's'}?</AlertDialogTitle>
+            <AlertDialogTitle>Add {selectedIds.length} {role === 'supervisor' ? 'supervisor' : 'agent'}{selectedIds.length === 1 ? '' : 's'} to {queueName}?</AlertDialogTitle>
             <AlertDialogDescription>
-              These extensions will be assigned to the queue on FusionPBX. You can undo from the toast.
+              Will be assigned as <b>{role === 'supervisor' ? 'Supervisor (T1)' : 'Agent (T2)'}</b>, starting at position <b>#{(role === 'supervisor' ? supCount : agCount) + 1}</b>. Undo available from the toast.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="border rounded max-h-56 overflow-y-auto text-sm divide-y">
-            {selectedExts.slice(0, 50).map((e: any) => (
-              <div key={e.id} className="px-3 py-1.5 flex items-center justify-between">
-                <span className="truncate">{extName(e) || "—"}</span>
-                <span className="font-mono text-xs text-muted-foreground">{e.extension}</span>
-              </div>
-            ))}
-            {selectedExts.length > 50 && <div className="px-3 py-1.5 text-xs text-muted-foreground">…and {selectedExts.length - 50} more</div>}
+          <div className="border rounded max-h-64 overflow-y-auto text-sm divide-y">
+            <div className="px-3 py-1.5 grid grid-cols-12 gap-2 text-[10px] uppercase tracking-wide text-muted-foreground bg-muted/40 sticky top-0">
+              <span className="col-span-5">Name</span>
+              <span className="col-span-3">Extension</span>
+              <span className="col-span-2">Role</span>
+              <span className="col-span-2 text-right">→ Pos</span>
+            </div>
+            {selectedExts.slice(0, 100).map((e: any, i: number) => {
+              const pos = (role === 'supervisor' ? supCount : agCount) + i + 1;
+              return (
+                <div key={e.id} className="px-3 py-1.5 grid grid-cols-12 gap-2 items-center">
+                  <span className="col-span-5 truncate">{extName(e) || "—"}</span>
+                  <span className="col-span-3 font-mono text-xs text-muted-foreground">{e.extension}</span>
+                  <span className="col-span-2"><Badge variant={role === 'supervisor' ? 'default' : 'secondary'} className="text-[10px]">
+                    {role === 'supervisor' ? <Shield className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />}{role}
+                  </Badge></span>
+                  <span className="col-span-2 text-xs font-mono text-right flex items-center justify-end gap-1 text-muted-foreground">
+                    <ArrowRight className="w-3 h-3" />#{pos}
+                  </span>
+                </div>
+              );
+            })}
+            {selectedExts.length > 100 && <div className="px-3 py-1.5 text-xs text-muted-foreground">…and {selectedExts.length - 100} more</div>}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Back</AlertDialogCancel>
