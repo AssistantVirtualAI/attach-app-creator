@@ -656,14 +656,14 @@ function MetricDetailDrawer(props: {
             }}>Close</button>
         </div>
 
-        <div style={{ padding: '10px 18px', background: '#fff', borderBottom: `1px solid ${c.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ padding: '10px 18px', background: c.bgCard, borderBottom: `1px solid ${c.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 11, color: c.mutedSilver, fontWeight: 600 }}>Shareable link</span>
           <input readOnly value={shareUrl} aria-label="Shareable URL for this metric view"
-            style={{ flex: 1, fontSize: 11, padding: '5px 8px', border: `1px solid ${c.border}`, borderRadius: 6, background: '#f8fafc', color: c.textIce, fontFamily: 'monospace' }} />
+            style={{ flex: 1, fontSize: 11, padding: '5px 8px', border: `1px solid ${c.border}`, borderRadius: 6, background: c.bgElev, color: c.textIce, fontFamily: 'monospace' }} />
           <button onClick={() => { try { navigator.clipboard?.writeText(shareUrl); } catch { /* noop */ } }}
             className="ava-drawer-close"
             aria-label="Copy shareable link to clipboard"
-            style={{ fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 6, border: `1px solid ${tone.ring}`, background: '#fff', color: tone.from, cursor: 'pointer' }}>
+            style={{ fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 6, border: `1px solid ${tone.ring}`, background: c.bgCard, color: tone.from, cursor: 'pointer' }}>
             Copy
           </button>
         </div>
