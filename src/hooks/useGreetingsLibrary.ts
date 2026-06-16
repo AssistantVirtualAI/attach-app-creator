@@ -12,6 +12,10 @@ export type LibraryGreeting = {
   storage_path: string;
   audio_url: string | null;
   is_active: boolean;
+  status: "ready" | "generating" | "failed";
+  error_message: string | null;
+  attempts: number;
+  last_attempt_at: string | null;
   created_at: string;
 };
 
