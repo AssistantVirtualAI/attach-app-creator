@@ -1,5 +1,6 @@
 import React from 'react';
 import { theme } from '../lib/theme';
+import avaStatisticsLogo from '../assets/ava-statistic-logo.png';
 
 type Size = 'sm' | 'md' | 'lg';
 
