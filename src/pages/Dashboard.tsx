@@ -52,6 +52,10 @@ const Dashboard = () => {
   // Fetch reports data for report generator
   const { data: reportsData } = useAgentReports(selectedAgentId || undefined, dateRange);
 
+  // Unified overview across all data sources (voice, leads, campaigns, etc.)
+  const { data: overview, isLoading: isLoadingOverview } = useDashboardOverview(dateRange);
+
+
   useEffect(() => {
     setSelectedAgentId(null);
   }, [selectedOrgId]);
