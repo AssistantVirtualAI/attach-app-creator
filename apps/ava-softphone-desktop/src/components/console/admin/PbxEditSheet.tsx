@@ -34,6 +34,8 @@ interface Props {
   title: string;
   groups: FieldGroup[];
   initial: any;
+  /** Snapshot at sheet open — used by parent for optimistic-concurrency conflict detection. */
+  baseline?: any;
   saving?: boolean;
   width?: number;
   onCancel: () => void;
@@ -245,12 +247,24 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
 }
 
 export default function PbxEditSheet({
-  title, groups, initial, saving, width = 620, onCancel, onSave,
+  title, groups, initial, baseline, saving, width = 620, onCancel, onSave,
 }: Props) {
   const [form, setForm] = useState<any>(initial || {});
   const [dirty, setDirty] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [narrow, setNarrow] = useState(false);
+
+  // Parity check: any schema field absent from the baseline row returned by FusionPBX
+  // would mean the portal form / proxy mapping is out of sync. Surface them as a warning.
+  const missingFields = useMemo(() => {
+    if (!baseline || typeof baseline !== 'object') return [];
+    const out: { key: string; label: string; section: string }[] = [];
+    for (const g of groups) for (const f of g.fields) {
+      if (f.type === 'tts-greeting') continue;
+      if (!(f.key in baseline)) out.push({ key: f.key, label: f.label, section: g.section });
+    }
+    return out;
+  }, [groups, baseline]);
 
   const tryClose = React.useCallback(() => {
     if (dirty) {
@@ -351,6 +365,24 @@ export default function PbxEditSheet({
         </header>
 
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '18px 22px', WebkitOverflowScrolling: 'touch', background: panelBg }}>
+          {missingFields.length > 0 && (
+            <div role="alert" style={{
+              marginBottom: 16, padding: '10px 12px', borderRadius: 10,
+              background: 'rgba(220,38,38,0.08)', border: `1px solid ${c.danger}`,
+              color: c.text, fontSize: 12, lineHeight: 1.5,
+            }}>
+              <strong style={{ color: c.danger }}>⚠ Schema mismatch — {missingFields.length} field{missingFields.length > 1 ? 's' : ''} missing from PBX response.</strong>
+              <div style={{ marginTop: 4, color: c.textSub, fontSize: 11 }}>
+                The portal form expects these fields but FusionPBX did not return them. They may have been removed or the proxy mapping is stale:
+              </div>
+              <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: 11, color: c.textSub }}>
+                {missingFields.slice(0, 8).map((m) => (
+                  <li key={m.key}><code style={{ color: c.text }}>{m.key}</code> — {m.label} <em>({m.section})</em></li>
+                ))}
+                {missingFields.length > 8 && <li>…and {missingFields.length - 8} more</li>}
+              </ul>
+            </div>
+          )}
           {groups.map((g) => (
             <section key={g.section} style={{ marginBottom: 22 }}>
               <div style={{
@@ -403,7 +435,6 @@ export default function PbxEditSheet({
           <button onClick={handleSave} disabled={saving} style={{
             padding: '9px 20px', borderRadius: 10, border: 'none',
             color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer',
-            background: c.gradients ? undefined : `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
             backgroundImage: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
             opacity: saving ? 0.6 : 1,
             boxShadow: '0 8px 24px -10px rgba(0,35,230,0.45)',

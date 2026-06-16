@@ -123,11 +123,61 @@ export default function PbxResourceSection({
     };
   }, [reload]);
 
-  const save = async (record: any) => {
+  const fetchLatest = useCallback(async (uuidValue: string): Promise<any | null> => {
+    try {
+      const params = global ? {} : { domain_uuid: domainUuid };
+      const { data } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: `list-${kind}`, organization_id: orgId, params },
+      });
+      const list = Array.isArray((data as any)?.data) ? (data as any).data : [];
+      const transformed = transform ? transform(list) : list;
+      return transformed.find((r: any) => r[uuidField] === uuidValue) || null;
+    } catch { return null; }
+  }, [kind, orgId, domainUuid, global, transform, uuidField]);
+
+  const save = async (record: any, baseline?: any) => {
     setSaving(true);
     try {
       const isUpdate = !!record[uuidField];
       const writeKind = actionKind || kind;
+
+      // Conflict detection (optimistic concurrency): compare latest remote vs baseline snapshot.
+      if (isUpdate && baseline) {
+        const latest = await fetchLatest(record[uuidField]);
+        if (latest) {
+          const userChanged = Object.keys(record).filter(
+            (k) => JSON.stringify(record[k] ?? '') !== JSON.stringify(baseline[k] ?? ''),
+          );
+          const remoteChanged = Object.keys(latest).filter(
+            (k) => JSON.stringify(latest[k] ?? '') !== JSON.stringify(baseline[k] ?? ''),
+          );
+          const collisions = userChanged.filter((k) => remoteChanged.includes(k));
+          const remoteOnly = remoteChanged.filter((k) => !userChanged.includes(k));
+
+          if (collisions.length > 0) {
+            const lines = collisions.map((k) => {
+              const mine = String(record[k] ?? '');
+              const theirs = String(latest[k] ?? '');
+              return `• ${k}\n   yours:   ${mine.slice(0, 80)}\n   portal:  ${theirs.slice(0, 80)}`;
+            }).join('\n\n');
+            const choice = window.prompt(
+              `⚠ Conflict — portal changed ${collisions.length} field(s) while you were editing.\n\n${lines}\n\n` +
+              'Type:\n  KEEP    to overwrite portal with your values\n  THEIRS  to discard your edits & reload\n  CANCEL  to keep editing',
+              'KEEP',
+            );
+            if (!choice || choice.toUpperCase() === 'CANCEL') { setSaving(false); return; }
+            if (choice.toUpperCase() === 'THEIRS') {
+              setEditing(latest); setSaving(false); return;
+            }
+            // KEEP → fall through to write
+          }
+          // Auto-merge fields the portal changed that the user didn't touch.
+          if (remoteOnly.length > 0) {
+            for (const k of remoteOnly) record[k] = latest[k];
+          }
+        }
+      }
+
       const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: {
           action: isUpdate ? `update-${writeKind}` : `create-${writeKind}`,
@@ -239,10 +289,11 @@ export default function PbxResourceSection({
             ? fieldGroups
             : [{ section: 'Fields', fields: fields as any }]}
           initial={editing || {}}
+          baseline={editing || null}
           saving={saving}
           width={sheetWidth}
           onCancel={() => { setEditing(null); setCreating(false); }}
-          onSave={save}
+          onSave={(rec) => save(rec, editing || undefined)}
         />
       )}
     </>

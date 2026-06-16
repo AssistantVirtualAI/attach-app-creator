@@ -83,10 +83,17 @@ export const QUEUE_GROUPS: FieldGroup[] = [
     fields: [
       { key: 'queue_max_wait_time', label: 'Max Wait (s)', type: 'number', cols: 1 },
       { key: 'queue_max_wait_time_with_no_agent', label: 'Max wait w/ no agent (s)', type: 'number', cols: 1 },
+      { key: 'queue_max_wait_time_with_no_agent_time_reached', label: 'No-agent time reached (s)', type: 'number', cols: 1 },
+      { key: 'queue_wrap_up_time', label: 'Wrap-up Time (s)', type: 'number', cols: 1 },
+      { key: 'queue_agent_no_answer_delay_time', label: 'Agent No-Answer Delay (s)', type: 'number', cols: 1 },
       { key: 'queue_tier_rules_apply', label: 'Tier Rules Apply', type: 'select', options: BOOL, cols: 1 },
       { key: 'queue_tier_rule_wait_second', label: 'Tier Rule Wait (s)', type: 'number', cols: 1 },
+      { key: 'queue_tier_rule_wait_multiply_level', label: 'Multiply by tier level', type: 'select', options: BOOL, cols: 1 },
+      { key: 'queue_tier_rule_no_agent_no_wait', label: 'No agent → no wait', type: 'select', options: BOOL, cols: 1 },
       { key: 'queue_abandoned_resume_allowed', label: 'Resume After Abandon', type: 'select', options: BOOL, cols: 1 },
       { key: 'queue_discard_abandoned_after', label: 'Discard Abandoned After (s)', type: 'number', cols: 1 },
+      { key: 'queue_timeout_action', label: 'Timeout Action', placeholder: 'transfer:200 XML default' },
+      { key: 'queue_cid_prefix', label: 'Caller ID Prefix', cols: 1, placeholder: '[Sales]' },
     ],
   },
   {
@@ -178,7 +185,8 @@ export const RING_GROUP_GROUPS: FieldGroup[] = [
       { key: 'ring_group_forward_enabled', label: 'Forward Enabled', type: 'select', options: BOOL, cols: 1 },
       { key: 'ring_group_forward_destination', label: 'Forward Destination', cols: 1 },
       { key: 'ring_group_missed_call_app', label: 'Missed Call App', cols: 1, placeholder: 'email' },
-      { key: 'ring_group_missed_call_data', label: 'Missed Call Data', cols: 1 },
+      { key: 'ring_group_missed_call_data', label: 'Missed Call Email/Data', cols: 1, placeholder: 'alerts@example.com' },
+      { key: 'ring_group_moh_sound', label: 'Music on Hold', placeholder: 'local_stream://default' },
     ],
   },
 ];
