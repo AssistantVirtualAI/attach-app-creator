@@ -1,38 +1,45 @@
-## Issues
+## Goal
+Let admins **create new** Extensions, IVRs, Call Queues (and confirm Ring Groups/Devices/etc) directly from the desktop admin console — not just edit existing ones.
 
-1. **AVA logo broken on desktop** — `BrandTagline` (and a couple of other desktop screens) reference `/ava-statistics-logo.png` as an absolute path. The desktop app builds with Vite `base: './'` and runs under Electron `file://`, so absolute root paths don't resolve and the image shows as a broken placeholder.
-2. **SIP password field is unclear** — users don't know which password to type. It's the same password defined on the extension in FusionPBX / portal (verified by `extension-signin` against `pbx_softphone_users.sip_password`). No backend change needed — only a clearer hint and label.
+## Current state
+- `PbxResourceSection` already supports full CRUD (`+ New`, edit, delete) and routes through `fusionpbx-proxy` `create-${kind}` / `update-${kind}` / `delete-${kind}`. Devices, Phone Numbers, Ring Groups, Conferences, Hold Music, Dialplans, Time Conditions, Gateways already use it — so they already have "+ New".
+- `fusionpbx-proxy` already implements `create-extension`, `create-ivr`, `create-ivr-option`, `create-queue`, `create-queue-agent`, plus update/delete counterparts.
+- `pbxFieldSchemas.ts` already exposes `EXTENSION_GROUPS`, `IVR_GROUPS`, `QUEUE_GROUPS`, `RING_GROUP_GROUPS` (portal-parity).
+- BUT: Extensions, IVRs, and Call Queues currently render through bespoke read-only-ish components (`ExtensionsTable`, `IvrsTable`, `QueuesTable` in `AdminView.tsx`) that don't expose a create button.
 
-## Changes
+## Changes (desktop app only)
 
-### 1. Logo — switch to a bundled Vite asset (sweep)
-- Import the PNG once via a shared module (e.g. `apps/ava-softphone-desktop/src/assets/avaStatisticsLogo.ts` re-exporting `import logo from './ava-statistics-logo.png'`).
-- Move `ava-statistics-logo.png` from `public/` into `apps/ava-softphone-desktop/src/assets/` so Vite hashes and resolves it relative to the built `index.html` (works under `file://`).
-- Replace every `src="/ava-statistics-logo.png"` (and `/ava-statistic-logo.png`, `/ava-logo.png`) reference in the desktop app with the imported asset. Files touched:
-  - `src/components/BrandTagline.tsx`
-  - `src/components/SoftphonePane.tsx`
-  - `src/components/SetupWizard.tsx`
-  - `src/components/SettingsPage.tsx`
-  - `src/components/console/LeftRail.tsx`
-  - `src/components/console/AIWorkspace.tsx`
-  - `src/components/console/ConsoleLayout.tsx`
-  - `src/lib/theme.tsx` (if it embeds a logo URL)
-  - `index.html` (if it preloads the logo)
-- Add `onError` fallback hiding the `<img>` so a future missing asset never shows a broken icon.
+### 1. Extensions — replace `ExtensionsTable` with `PbxResourceSection`
+- `kind="extensions"` `actionKind="extension"` `uuidField="extension_uuid"`
+- `fieldGroups={EXTENSION_GROUPS}` `rules={EXTENSION_RULES}` (already defined)
+- Columns: Extension, Effective Caller-ID, User Context, Enabled.
+- Keep any existing row actions worth preserving (e.g., "Reset password", "View devices") by passing `rowActions`. If the legacy table only had Edit, drop it.
 
-### 2. Login screen — clearer SIP password guidance
-In the desktop auth screen (Extension tab):
-- Relabel hint under the form to:  
-  *"Use the same SIP password defined on your extension in the portal (or in FusionPBX). If you don't have one, ask your administrator to set it on your extension."*
-- Add a small inline help tooltip (?) next to the **SIP PASSWORD** label with the same text.
-- No change to the auth flow or `extension-signin` edge function — current behavior already validates against the extension's SIP password.
+### 2. IVRs — replace `IvrsTable` with `PbxResourceSection`
+- `kind="ivr-menus"` `actionKind="ivr"` `uuidField="ivr_menu_uuid"`
+- `fieldGroups={IVR_GROUPS}`.
+- Preserve "Manage Options" / TTS greeting row actions from the old component (call the same `create-ivr-option` / TTS endpoints).
+
+### 3. Call Queues — replace `QueuesTable` with `PbxResourceSection`
+- `kind="call-queues"` `actionKind="queue"` `uuidField="queue_uuid"`
+- `fieldGroups={QUEUE_GROUPS}` `sheetWidth={720}`.
+- Preserve "Agents" row action (opens existing agent picker that uses `create-queue-agent`).
+
+### 4. Guard rails
+- All three new sections inherit the existing conflict-merge dialog, audit log writes, validation, schema-mismatch banner, and theme-aware styling already in `PbxResourceSection` / `PbxEditSheet`.
+- `canCreate` defaults to `true`; only render the "+ New" button when the user has admin role (existing `useDesktopRole` check around the AdminView shell — confirm it already gates the section).
+- New records POST via `fusionpbx-proxy` exactly like the portal does, so portal ↔ desktop parity is preserved.
+
+### 5. Remove dead code
+- Delete the three legacy local components (`ExtensionsTable`, `IvrsTable`, `QueuesTable`) plus any helpers used only by them.
 
 ## Verification
-- Run `bun run build` for the desktop app and confirm the AVA logo asset is emitted with a hashed filename and referenced from the bundle.
-- Visually confirm the logo renders on the login screen, console header, AI workspace, settings, and left rail.
-- Confirm the new hint text appears under the SIP password field.
+- Build the desktop app (`bun run build` in `apps/ava-softphone-desktop`).
+- In the running app: open Admin → Extensions / IVRs / Queues, click **+ New**, fill required fields, save → confirm row appears, then edit & delete also work.
+- Confirm record shows up in the portal table for the same org (auto-sync event fires).
+- Existing tests in `pbxSchemaParity.test.ts` continue to pass.
 
 ## Out of scope
-- Generating/emailing per-user softphone passwords.
-- Any portal-side password UI changes.
-- Changes to FusionPBX provisioning.
+- New fields beyond what the schema groups already cover.
+- Portal-side changes.
+- Backend / fusionpbx-proxy changes (all needed actions already exist).
