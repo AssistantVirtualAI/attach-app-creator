@@ -3,6 +3,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { WorkspaceSidebar } from "@/components/portals/WorkspaceSidebar";
 import { WorkspaceHeaderExtras } from "@/components/portals/WorkspaceHeaderExtras";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
+import { MyAIChatLauncher } from "@/components/ai/MyAIChat";
 
 const STORAGE_KEY = "ava.sidebar.workspace.open";
 
@@ -38,6 +39,7 @@ export function MyWorkspaceShellSidebar() {
             <Outlet />
           </main>
         </div>
+        <MyAIChatLauncher />
       </div>
     </SidebarProvider>
   );
