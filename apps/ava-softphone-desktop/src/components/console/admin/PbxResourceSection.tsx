@@ -289,10 +289,11 @@ export default function PbxResourceSection({
             ? fieldGroups
             : [{ section: 'Fields', fields: fields as any }]}
           initial={editing || {}}
+          baseline={editing || null}
           saving={saving}
           width={sheetWidth}
           onCancel={() => { setEditing(null); setCreating(false); }}
-          onSave={save}
+          onSave={(rec) => save(rec, editing || undefined)}
         />
       )}
     </>
