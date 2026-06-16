@@ -177,48 +177,52 @@ function ExtensionsTable() {
   };
 
   const createExtension = async (form: any) => {
-    if (!isAdmin) { toast.error('Admin role required to create extensions.'); return; }
     setSaving(true);
     try {
       const scope = await resolveDesktopTenantScope();
-      // Duplicate / conflict pre-check: existing extension with same number?
       const ext = String(form.extension || '').trim();
-      if (ext) {
-        const { data: dup } = await supabase
-          .from('pbx_extensions')
-          .select('id, extension, enabled')
-          .eq('organization_id', scope.organization_id)
-          .eq('extension', ext)
-          .maybeSingle();
-        if (dup) {
-          const choice = window.confirm(
-            `Extension ${ext} already exists on this PBX.\n\nClick OK to OPEN the existing record for editing instead, or Cancel to abort.`,
-          );
-          setSaving(false);
-          if (choice) {
-            setCreating(false);
-            await reload(false);
-            const match = data.find((r) => String(r.extension) === ext);
-            if (match) setEditing(match);
-          }
-          return;
-        }
-      }
       const out: any = { ...form };
       ['voicemail_enabled', 'enabled', 'voicemail_attach_file',
        'voicemail_local_after_email', 'do_not_disturb',
        'forward_all_enabled', 'forward_busy_enabled', 'forward_no_answer_enabled']
         .forEach((k) => { if (typeof out[k] === 'boolean') out[k] = out[k] ? 'true' : 'false'; });
-      const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'create-extension', organization_id: scope.organization_id, params: { domain_uuid: scope.domain_uuid, ...out } },
-      });
-      if (err) throw err;
-      setCreating(false);
-      await reload(true);
-      window.dispatchEvent(new Event('ava:pbx-resource-saved'));
-      toast.success(`Extension ${ext} created and synced.`);
-    } catch (e: any) {
-      toast.error('Create failed: ' + (e?.message || 'unknown'));
+
+      await runCreatePbxResourceFlow({
+        isAdmin,
+        resourceKind: 'extension',
+        identifier: ext || '(unnamed)',
+        findDuplicate: async () => {
+          if (!ext) return null;
+          const { data: dup } = await supabase
+            .from('pbx_extensions')
+            .select('id, pbx_uuid, extension, enabled, updated_at')
+            .eq('organization_id', scope.organization_id)
+            .eq('extension', ext)
+            .maybeSingle();
+          return dup || null;
+        },
+        confirmConflict: () => window.confirm(
+          `Extension ${ext} already exists on this PBX.\n\nClick OK to OPEN the existing record for editing instead, or Cancel to abort.`,
+        ),
+        openForEdit: async (existing) => {
+          setCreating(false);
+          await reload(false);
+          const match = data.find((r) => String(r.extension) === ext) || existing;
+          if (match) setEditing(match);
+        },
+        submit: async () => {
+          const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
+            body: { action: 'create-extension', organization_id: scope.organization_id, params: { domain_uuid: scope.domain_uuid, ...out } },
+          });
+          if (err) throw err;
+          setCreating(false);
+        },
+        reload: (force) => reload(force),
+        dispatchSaved: () => window.dispatchEvent(new Event('ava:pbx-resource-saved')),
+        toastSuccess: toast.success,
+        toastError: toast.error,
+        audit: (action, metadata) => audit(action, null, metadata),
+      }, `Extension ${ext} created and synced.`);
     } finally { setSaving(false); }
   };
 
