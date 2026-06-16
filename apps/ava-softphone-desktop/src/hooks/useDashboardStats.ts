@@ -96,11 +96,13 @@ export function useDashboardStats(
     unreadSms: 0, unreadVoicemail: 0, extensionsTotal: 0,
     liveCalls: 0, lastCallAt: null, lastRecordingAt: null,
     cdrFreshness: 'idle', attention: [], pbxHealth: 'ok',
-    series: emptySeries, loading: true,
+    series: emptySeries, error: null, loading: true,
   });
 
   const refresh = useCallback(async () => {
     if (!orgId) { setStats((s) => ({ ...s, loading: false, cdrFreshness: 'idle' })); return; }
+    setStats((s) => ({ ...s, loading: true, error: null }));
+    try {
     const { from, to } = rangeBounds(range, customFrom, customTo);
 
     let callsQ = supabase.from('pbx_call_records')
