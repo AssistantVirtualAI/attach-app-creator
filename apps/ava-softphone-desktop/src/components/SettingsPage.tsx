@@ -193,6 +193,7 @@ export default function SettingsPage({
               })}
             </div>
 
+            <ThemePreview t={t} mode={mode} />
           </div>
 
           <div>
