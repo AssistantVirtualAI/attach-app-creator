@@ -692,6 +692,27 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
     } catch (e: any) { toast({ title: 'Failed', description: e.message, variant: 'destructive' }); }
   };
 
+  const updateAgent = async (a: any, next: { role: 'agent' | 'supervisor'; tier_position: number }) => {
+    if (!perms.canAssign) { toast({ title: 'Forbidden', variant: 'destructive' }); return; }
+    const tier_level = next.role === 'supervisor' ? 1 : 2;
+    const tier_position = Math.max(1, Math.floor(next.tier_position) || 1);
+    const tierUuid = a.pbx_uuid || a.raw_data?.call_center_tier_uuid;
+    try {
+      if (tierUuid) {
+        const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+          body: { organization_id: LEMTEL_ORG, action: 'update-queue-tier', params: {
+            call_center_tier_uuid: tierUuid,
+            tier_level, tier_position,
+          }},
+        });
+        if (error || data?.ok === false) throw new Error(data?.message || error?.message || 'Failed');
+      }
+      await supabase.from('pbx_queue_agents').update({ tier_level, tier_position }).eq('id', a.id);
+      toast({ title: 'Updated' });
+      load();
+    } catch (e: any) { toast({ title: 'Failed', description: e.message, variant: 'destructive' }); }
+  };
+
   // returns array of newly inserted rows so caller can offer undo
   const bulkAddRaw = async (extensionIds: string[], role: 'agent' | 'supervisor') => {
     if (!perms.canAssign) { toast({ title: 'Forbidden', variant: 'destructive' }); return [] as any[]; }
@@ -835,6 +856,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
           canAssign={perms.canAssign}
           onRemoveOne={removeAgent}
           onBulkRemove={bulkRemove}
+          onEditOne={updateAgent}
           txt={txt}
         />
       )}
@@ -855,7 +877,7 @@ function usePersistedState<T>(key: string, initial: T): [T, (v: T) => void] {
 type SortKey = 'name' | 'extension' | 'role' | 'tier';
 type SortDir = 'asc' | 'desc';
 
-function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRemoveOne, onBulkRemove, txt }: any) {
+function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRemoveOne, onBulkRemove, onEditOne, txt }: any) {
   const baseKey = `qa:${queueId}`;
   const [query, setQuery] = usePersistedState<string>(`${baseKey}:q`, '');
   const [roleFilter, setRoleFilter] = usePersistedState<'all' | 'supervisor' | 'agent'>(`${baseKey}:role`, 'all');
@@ -963,6 +985,9 @@ function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRe
               selected={selected}
               setSelected={setSelected}
               onRemoveOne={onRemoveOne}
+              onEditOne={onEditOne}
+              supCount={supervisors.length}
+              agCount={agents.length}
               allSelected={allSelected}
               toggleAll={toggleAll}
               sortKey={sortKey}
@@ -1030,8 +1055,9 @@ function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRe
   );
 }
 
-function VirtualMembersTable({ rows, canAssign, selected, setSelected, onRemoveOne, allSelected, toggleAll, sortKey, sortDir, toggleSort, sortIcon }: any) {
+function VirtualMembersTable({ rows, canAssign, selected, setSelected, onRemoveOne, onEditOne, supCount, agCount, allSelected, toggleAll, sortKey, sortDir, toggleSort, sortIcon }: any) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const [editing, setEditing] = useState<any | null>(null);
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
@@ -1043,7 +1069,7 @@ function VirtualMembersTable({ rows, canAssign, selected, setSelected, onRemoveO
 
   return (
     <div className="border rounded-md">
-      <div className="grid grid-cols-[2rem_2fr_1fr_1fr_1fr_3rem] gap-2 px-3 py-2 text-xs font-medium border-b bg-muted/40 select-none">
+      <div className="grid grid-cols-[2rem_2fr_1fr_1fr_1fr_5rem] gap-2 px-3 py-2 text-xs font-medium border-b bg-muted/40 select-none">
         {canAssign ? <Checkbox checked={allSelected} onCheckedChange={toggleAll} /> : <span />}
         <span className="cursor-pointer" onClick={() => toggleSort('name')}>Name{sortIcon('name')}</span>
         <span className="cursor-pointer" onClick={() => toggleSort('extension')}>Extension{sortIcon('extension')}</span>
@@ -1060,7 +1086,7 @@ function VirtualMembersTable({ rows, canAssign, selected, setSelected, onRemoveO
               <div
                 key={a.id}
                 data-state={selected[a.id] ? 'selected' : undefined}
-                className="grid grid-cols-[2rem_2fr_1fr_1fr_1fr_3rem] gap-2 px-3 items-center border-b text-sm data-[state=selected]:bg-muted/50 hover:bg-muted/30"
+                className="grid grid-cols-[2rem_2fr_1fr_1fr_1fr_5rem] gap-2 px-3 items-center border-b text-sm data-[state=selected]:bg-muted/50 hover:bg-muted/30"
                 style={{ position: 'absolute', top: 0, left: 0, right: 0, height: vi.size, transform: `translateY(${vi.start}px)` }}
               >
                 {canAssign ? (
@@ -1076,18 +1102,124 @@ function VirtualMembersTable({ rows, canAssign, selected, setSelected, onRemoveO
                 </span>
                 <span className="text-xs text-muted-foreground">T{a.tier_level} · #{a.tier_position}</span>
                 {canAssign ? (
-                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onRemoveOne(a)}>
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
+                  <div className="flex gap-0.5 justify-end">
+                    {onEditOne && (
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditing(a)} title="Edit role / position">
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                    )}
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onRemoveOne(a)} title="Remove">
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
                 ) : <span />}
               </div>
             );
           })}
         </div>
       </div>
+
+      {onEditOne && (
+        <EditAgentDialog
+          member={editing}
+          onClose={() => setEditing(null)}
+          supCount={supCount || 0}
+          agCount={agCount || 0}
+          onSave={async (next) => { await onEditOne(editing, next); setEditing(null); }}
+        />
+      )}
     </div>
   );
 }
+
+function EditAgentDialog({ member, onClose, onSave, supCount, agCount }: {
+  member: any | null;
+  onClose: () => void;
+  onSave: (next: { role: 'agent' | 'supervisor'; tier_position: number }) => void | Promise<void>;
+  supCount: number;
+  agCount: number;
+}) {
+  const [role, setRole] = useState<'agent' | 'supervisor'>('agent');
+  const [pos, setPos] = useState<number>(1);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (member) {
+      setRole(member._role === 'supervisor' || member.tier_level === 1 ? 'supervisor' : 'agent');
+      setPos(member.tier_position || 1);
+    }
+  }, [member?.id]);
+
+  const open = !!member;
+  const origRole: 'agent' | 'supervisor' = member?._role === 'supervisor' || member?.tier_level === 1 ? 'supervisor' : 'agent';
+  const origPos = member?.tier_position || 1;
+  const dirty = role !== origRole || pos !== origPos;
+  const maxPos = role === 'supervisor'
+    ? Math.max(1, supCount + (origRole === 'supervisor' ? 0 : 1))
+    : Math.max(1, agCount + (origRole === 'agent' ? 0 : 1));
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit member</DialogTitle>
+          <DialogDescription>
+            {member?.agent_name} <span className="font-mono text-xs opacity-70">· ext {member?.agent_id}</span>
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>Role</Label>
+            <Select value={role} onValueChange={(v) => setRole(v as any)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="agent">Agent (tier 2)</SelectItem>
+                <SelectItem value="supervisor">Supervisor (tier 1)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Tier position</Label>
+            <Input
+              type="number"
+              min={1}
+              max={maxPos}
+              value={pos}
+              onChange={(e) => setPos(Math.max(1, parseInt(e.target.value) || 1))}
+            />
+            <p className="text-xs text-muted-foreground">
+              Lower numbers are tried first. Range 1–{maxPos}.
+            </p>
+          </div>
+
+          {dirty && (
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs space-y-1">
+              <div className="font-medium">Preview</div>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-[10px]">T{origRole === 'supervisor' ? 1 : 2} · #{origPos}</Badge>
+                <ArrowRight className="w-3 h-3" />
+                <Badge className="text-[10px]">T{role === 'supervisor' ? 1 : 2} · #{pos}</Badge>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button
+            disabled={!dirty || saving}
+            onClick={async () => { setSaving(true); try { await onSave({ role, tier_position: pos }); } finally { setSaving(false); } }}
+          >
+            {saving && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 function BulkAddBtn({ queueId, queueName, extensions, supCount, agCount, onAdd }: { queueId: string; queueName: string; extensions: any[]; supCount: number; agCount: number; onAdd: (ids: string[], role: 'agent' | 'supervisor') => void }) {
   const baseKey = `qa:${queueId}:add`;
