@@ -2853,6 +2853,24 @@ export type Database = {
           },
         ]
       }
+      org_chat_blocks: {
+        Row: {
+          blocked_user_id: string
+          blocker_id: string
+          created_at: string
+        }
+        Insert: {
+          blocked_user_id: string
+          blocker_id: string
+          created_at?: string
+        }
+        Update: {
+          blocked_user_id?: string
+          blocker_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       org_chat_channels: {
         Row: {
           archived_at: string | null
@@ -2894,6 +2912,41 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      org_chat_message_edits: {
+        Row: {
+          edited_at: string
+          edited_by: string | null
+          id: string
+          message_id: string
+          new_content: string | null
+          previous_content: string | null
+        }
+        Insert: {
+          edited_at?: string
+          edited_by?: string | null
+          id?: string
+          message_id: string
+          new_content?: string | null
+          previous_content?: string | null
+        }
+        Update: {
+          edited_at?: string
+          edited_by?: string | null
+          id?: string
+          message_id?: string
+          new_content?: string | null
+          previous_content?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_chat_message_edits_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "org_chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       org_chat_message_pins: {
         Row: {
@@ -2937,14 +2990,48 @@ export type Database = {
           },
         ]
       }
+      org_chat_message_receipts: {
+        Row: {
+          channel_id: string
+          message_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          message_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          message_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_chat_message_receipts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "org_chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_chat_messages: {
         Row: {
           attachments: Json
           channel_id: string | null
           content: string
           created_at: string
+          edit_count: number
           edited_at: string | null
+          hidden_at: string | null
+          hidden_by: string | null
+          hidden_reason: string | null
           id: string
+          is_hidden: boolean
           last_reply_at: string | null
           message_type: string
           organization_id: string
@@ -2964,8 +3051,13 @@ export type Database = {
           channel_id?: string | null
           content: string
           created_at?: string
+          edit_count?: number
           edited_at?: string | null
+          hidden_at?: string | null
+          hidden_by?: string | null
+          hidden_reason?: string | null
           id?: string
+          is_hidden?: boolean
           last_reply_at?: string | null
           message_type?: string
           organization_id: string
@@ -2985,8 +3077,13 @@ export type Database = {
           channel_id?: string | null
           content?: string
           created_at?: string
+          edit_count?: number
           edited_at?: string | null
+          hidden_at?: string | null
+          hidden_by?: string | null
+          hidden_reason?: string | null
           id?: string
+          is_hidden?: boolean
           last_reply_at?: string | null
           message_type?: string
           organization_id?: string
@@ -3040,6 +3137,63 @@ export type Database = {
             columns: ["channel_id"]
             isOneToOne: false
             referencedRelation: "org_chat_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_chat_reports: {
+        Row: {
+          channel_id: string
+          created_at: string
+          id: string
+          message_id: string
+          organization_id: string
+          reason: string
+          reporter_id: string
+          resolution: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          id?: string
+          message_id: string
+          organization_id: string
+          reason: string
+          reporter_id: string
+          resolution?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          id?: string
+          message_id?: string
+          organization_id?: string
+          reason?: string
+          reporter_id?: string
+          resolution?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_chat_reports_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "org_chat_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_chat_reports_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "org_chat_messages"
             referencedColumns: ["id"]
           },
         ]
@@ -10284,6 +10438,26 @@ export type Database = {
       generate_api_key: { Args: never; Returns: string }
       generate_unique_username: { Args: { base_name: string }; Returns: string }
       get_accessible_org_ids: { Args: { _user_id: string }; Returns: string[] }
+      get_message_edit_history: {
+        Args: { _message_id: string }
+        Returns: {
+          edited_at: string
+          edited_by: string
+          editor_name: string
+          id: string
+          new_content: string
+          previous_content: string
+        }[]
+      }
+      get_message_receipts: {
+        Args: { _message_id: string }
+        Returns: {
+          avatar_url: string
+          full_name: string
+          read_at: string
+          user_id: string
+        }[]
+      }
       get_my_extension_summary: { Args: never; Returns: Json }
       get_org_by_fusionpbx_domain: {
         Args: { _domain_uuid: string }
@@ -10323,6 +10497,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      hide_chat_message: {
+        Args: { _message_id: string; _reason: string }
+        Returns: undefined
       }
       increment_sms_unread: { Args: { thread_id: string }; Returns: undefined }
       is_cc_supervisor: { Args: { _user_id: string }; Returns: boolean }
@@ -10382,6 +10560,10 @@ export type Database = {
         Returns: string
       }
       mark_channel_read: { Args: { _channel_id: string }; Returns: undefined }
+      mark_messages_read: {
+        Args: { _channel_id: string; _up_to?: string }
+        Returns: number
+      }
       mark_voicemail_read: { Args: { _id: string }; Returns: undefined }
       my_app_access_allowed: { Args: never; Returns: boolean }
       my_platform_access_allowed: {
@@ -10402,6 +10584,30 @@ export type Database = {
       }
       rollback_admin_action: { Args: { _action_id: string }; Returns: Json }
       run_security_audit: { Args: { _org_id: string }; Returns: Json }
+      search_chat: {
+        Args: { _limit?: number; _q: string }
+        Returns: {
+          channel_id: string
+          channel_name: string
+          channel_type: string
+          content: string
+          created_at: string
+          id: string
+          sender_id: string
+          sender_name: string
+          snippet: string
+        }[]
+      }
+      search_chat_users: {
+        Args: { _limit?: number; _q: string }
+        Returns: {
+          avatar_url: string
+          email: string
+          extension: string
+          full_name: string
+          user_id: string
+        }[]
+      }
       set_call_notes: {
         Args: { _call_id: string; _notes: string; _tags?: string[] }
         Returns: undefined
@@ -10432,6 +10638,7 @@ export type Database = {
         Args: { _paused: boolean; _queue_id: string }
         Returns: undefined
       }
+      unhide_chat_message: { Args: { _message_id: string }; Returns: undefined }
       unpin_chat_message: { Args: { _message_id: string }; Returns: undefined }
       update_platform_seen: { Args: { p_platform: string }; Returns: undefined }
       upsert_user_presence: {
