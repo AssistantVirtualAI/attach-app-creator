@@ -1030,6 +1030,65 @@ function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRe
   );
 }
 
+function VirtualMembersTable({ rows, canAssign, selected, setSelected, onRemoveOne, allSelected, toggleAll, sortKey, sortDir, toggleSort, sortIcon }: any) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 44,
+    overscan: 8,
+  });
+  const items = virtualizer.getVirtualItems();
+  const total = virtualizer.getTotalSize();
+
+  return (
+    <div className="border rounded-md">
+      <div className="grid grid-cols-[2rem_2fr_1fr_1fr_1fr_3rem] gap-2 px-3 py-2 text-xs font-medium border-b bg-muted/40 select-none">
+        {canAssign ? <Checkbox checked={allSelected} onCheckedChange={toggleAll} /> : <span />}
+        <span className="cursor-pointer" onClick={() => toggleSort('name')}>Name{sortIcon('name')}</span>
+        <span className="cursor-pointer" onClick={() => toggleSort('extension')}>Extension{sortIcon('extension')}</span>
+        <span className="cursor-pointer" onClick={() => toggleSort('role')}>Role{sortIcon('role')}</span>
+        <span className="cursor-pointer" onClick={() => toggleSort('tier')}>Tier / Pos{sortIcon('tier')}</span>
+        <span />
+      </div>
+      <div ref={parentRef} className="overflow-auto" style={{ maxHeight: 480 }}>
+        <div style={{ height: total, position: 'relative', width: '100%' }}>
+          {items.map((vi) => {
+            const a = rows[vi.index];
+            if (!a) return null;
+            return (
+              <div
+                key={a.id}
+                data-state={selected[a.id] ? 'selected' : undefined}
+                className="grid grid-cols-[2rem_2fr_1fr_1fr_1fr_3rem] gap-2 px-3 items-center border-b text-sm data-[state=selected]:bg-muted/50 hover:bg-muted/30"
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, height: vi.size, transform: `translateY(${vi.start}px)` }}
+              >
+                {canAssign ? (
+                  <Checkbox checked={!!selected[a.id]} onCheckedChange={(v) => setSelected({ ...selected, [a.id]: !!v })} />
+                ) : <span />}
+                <span className="font-medium truncate">{a.agent_name}</span>
+                <span className="font-mono text-xs">{a.agent_id}</span>
+                <span>
+                  <Badge variant={a._role === 'supervisor' ? 'default' : 'secondary'} className="text-[10px]">
+                    {a._role === 'supervisor' ? <Shield className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />}
+                    {a._role}
+                  </Badge>
+                </span>
+                <span className="text-xs text-muted-foreground">T{a.tier_level} · #{a.tier_position}</span>
+                {canAssign ? (
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onRemoveOne(a)}>
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                ) : <span />}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BulkAddBtn({ queueId, queueName, extensions, supCount, agCount, onAdd }: { queueId: string; queueName: string; extensions: any[]; supCount: number; agCount: number; onAdd: (ids: string[], role: 'agent' | 'supervisor') => void }) {
   const baseKey = `qa:${queueId}:add`;
   const [open, setOpen] = useState(false);
