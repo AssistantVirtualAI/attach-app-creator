@@ -368,8 +368,23 @@ function ProfileEditor({
   const [name, setName] = useState(initialName);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+
+  // Password flow state
+  type PwStep = 'form' | 'confirm' | 'success';
+  const [pwStep, setPwStep] = useState<PwStep>('form');
+  const [currentPw, setCurrentPw] = useState('');
   const [pw1, setPw1] = useState('');
   const [pw2, setPw2] = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ current?: string; pw1?: string; pw2?: string }>({});
+
+  // Email reset flow state
+  type EmStep = 'idle' | 'confirm' | 'sent';
+  const [emStep, setEmStep] = useState<EmStep>('idle');
+  const [emError, setEmError] = useState<string | null>(null);
+
   const initials = (initialName || email || '?').slice(0, 2).toUpperCase();
 
   const save = async () => {
@@ -384,31 +399,82 @@ function ProfileEditor({
     } finally { setSaving(false); }
   };
 
-  const changePassword = async () => {
-    if (pw1.length < 8) { setMsg({ kind: 'err', text: 'Password must be at least 8 characters.' }); return; }
-    if (pw1 !== pw2) { setMsg({ kind: 'err', text: 'Passwords do not match.' }); return; }
-    setSaving(true); setMsg(null);
+  // ---- Password strength (0-4) ----
+  const strength = (() => {
+    let s = 0;
+    if (pw1.length >= 8) s++;
+    if (pw1.length >= 12) s++;
+    if (/[A-Z]/.test(pw1) && /[a-z]/.test(pw1)) s++;
+    if (/\d/.test(pw1) && /[^A-Za-z0-9]/.test(pw1)) s++;
+    return s;
+  })();
+  const strengthLabel = ['Too weak', 'Weak', 'Fair', 'Strong', 'Very strong'][strength];
+  const strengthColor = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#16a34a'][strength];
+
+  const validatePwForm = (): boolean => {
+    const fe: typeof fieldErrors = {};
+    if (!currentPw) fe.current = 'Enter your current password.';
+    if (pw1.length < 8) fe.pw1 = 'At least 8 characters required.';
+    else if (!/[A-Za-z]/.test(pw1) || !/\d/.test(pw1)) fe.pw1 = 'Use letters and at least one number.';
+    else if (pw1 === currentPw) fe.pw1 = 'New password must differ from current.';
+    if (pw2 !== pw1) fe.pw2 = 'Passwords do not match.';
+    setFieldErrors(fe);
+    return Object.keys(fe).length === 0;
+  };
+
+  const mapAuthError = (e: any): string => {
+    const m = (e?.message || '').toLowerCase();
+    if (m.includes('invalid login') || m.includes('invalid credentials')) return 'Current password is incorrect.';
+    if (m.includes('same') && m.includes('password')) return 'New password must differ from your current one.';
+    if (m.includes('weak') || m.includes('pwned') || m.includes('compromised')) return 'This password has been found in a breach. Choose a different one.';
+    if (m.includes('rate') || m.includes('too many')) return 'Too many attempts. Please wait a moment and try again.';
+    if (m.includes('network') || m.includes('fetch')) return 'Network error. Check your connection and retry.';
+    if (m.includes('session') || m.includes('jwt')) return 'Your session expired. Please sign in again.';
+    return e?.message || 'Something went wrong. Please try again.';
+  };
+
+  const goToConfirm = () => {
+    setPwError(null);
+    if (!validatePwForm()) return;
+    setPwStep('confirm');
+  };
+
+  const confirmPasswordChange = async () => {
+    setSaving(true); setPwError(null);
     try {
-      const { error } = await supabase.auth.updateUser({ password: pw1 });
-      if (error) throw error;
-      setPw1(''); setPw2('');
-      setMsg({ kind: 'ok', text: 'Password updated successfully.' });
+      // 1. Re-auth with current password
+      const { error: signErr } = await supabase.auth.signInWithPassword({ email, password: currentPw });
+      if (signErr) throw signErr;
+      // 2. Apply new password
+      const { error: updErr } = await supabase.auth.updateUser({ password: pw1 });
+      if (updErr) throw updErr;
+      setPwStep('success');
+      setCurrentPw(''); setPw1(''); setPw2('');
     } catch (e: any) {
-      setMsg({ kind: 'err', text: e?.message || 'Failed to update password.' });
+      setPwError(mapAuthError(e));
+      setPwStep('form');
     } finally { setSaving(false); }
   };
 
-  const sendResetEmail = async () => {
-    if (!email) return;
-    setSaving(true); setMsg(null);
+  const resetPwFlow = () => {
+    setPwStep('form'); setPwError(null); setFieldErrors({});
+    setCurrentPw(''); setPw1(''); setPw2('');
+  };
+
+  const requestEmailReset = () => { setEmError(null); setEmStep('confirm'); };
+
+  const confirmEmailReset = async () => {
+    if (!email) { setEmError('No email on file.'); return; }
+    setSaving(true); setEmError(null);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
       if (error) throw error;
-      setMsg({ kind: 'ok', text: `Reset link sent to ${email}.` });
+      setEmStep('sent');
     } catch (e: any) {
-      setMsg({ kind: 'err', text: e?.message || 'Failed to send reset email.' });
+      setEmError(mapAuthError(e));
+      setEmStep('idle');
     } finally { setSaving(false); }
   };
 
@@ -423,7 +489,7 @@ function ProfileEditor({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 'min(440px, 92vw)', maxHeight: '88vh', overflowY: 'auto',
+          width: 'min(460px, 92vw)', maxHeight: '90vh', overflowY: 'auto',
           background: '#ffffff', border: `1px solid ${c.border}`, borderRadius: 14,
           boxShadow: '0 24px 60px -12px rgba(0,0,0,0.55)', padding: 18,
         }}
@@ -457,27 +523,146 @@ function ProfileEditor({
           {saving ? 'Saving…' : 'Save changes'}
         </button>
 
-        <div style={{ height: 1, background: c.border, margin: '18px 0' }} />
-
-        <div style={{ fontSize: 11, fontWeight: 800, color: c.textSub, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>
-          Password
-        </div>
-        <label style={lbl}>New password</label>
-        <input type="password" value={pw1} onChange={(e) => setPw1(e.target.value)} placeholder="At least 8 characters" style={input} />
-        <label style={lbl}>Confirm password</label>
-        <input type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} style={input} />
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          <button onClick={changePassword} disabled={saving} style={{ ...primaryBtn, flex: 1 }}>Update password</button>
-          <button onClick={sendResetEmail} disabled={saving} style={{ ...ghostBtn, flex: 1 }}>Email reset link</button>
-        </div>
-
         {msg && (
           <div style={{
-            marginTop: 14, padding: '8px 10px', borderRadius: 8, fontSize: 11.5,
+            marginTop: 12, padding: '8px 10px', borderRadius: 8, fontSize: 11.5,
             background: msg.kind === 'ok' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
             border: `1px solid ${msg.kind === 'ok' ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)'}`,
             color: msg.kind === 'ok' ? '#15803d' : '#b91c1c',
           }}>{msg.text}</div>
+        )}
+
+        <div style={{ height: 1, background: c.border, margin: '18px 0' }} />
+
+        <div style={{ fontSize: 11, fontWeight: 800, color: c.textSub, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10 }}>
+          Password & Security
+        </div>
+
+        {/* ===== Password change flow ===== */}
+        {pwStep === 'form' && (
+          <div>
+            <label style={lbl}>Current password</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showCurrent ? 'text' : 'password'}
+                value={currentPw}
+                onChange={(e) => { setCurrentPw(e.target.value); setFieldErrors((f) => ({ ...f, current: undefined })); }}
+                placeholder="Enter your current password"
+                style={{ ...input, paddingRight: 56, borderColor: fieldErrors.current ? '#ef4444' : (input.borderColor as any) }}
+              />
+              <button type="button" onClick={() => setShowCurrent((v) => !v)} style={eyeBtn}>{showCurrent ? 'Hide' : 'Show'}</button>
+            </div>
+            {fieldErrors.current && <div style={fieldErr}>{fieldErrors.current}</div>}
+
+            <label style={lbl}>New password</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showNew ? 'text' : 'password'}
+                value={pw1}
+                onChange={(e) => { setPw1(e.target.value); setFieldErrors((f) => ({ ...f, pw1: undefined })); }}
+                placeholder="At least 8 characters, with a number"
+                style={{ ...input, paddingRight: 56, borderColor: fieldErrors.pw1 ? '#ef4444' : (input.borderColor as any) }}
+              />
+              <button type="button" onClick={() => setShowNew((v) => !v)} style={eyeBtn}>{showNew ? 'Hide' : 'Show'}</button>
+            </div>
+            {pw1 && (
+              <div style={{ marginTop: 6 }}>
+                <div style={{ display: 'flex', gap: 3 }}>
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} style={{
+                      flex: 1, height: 4, borderRadius: 2,
+                      background: i < strength ? strengthColor : '#e2e8f0',
+                    }} />
+                  ))}
+                </div>
+                <div style={{ fontSize: 10, color: strengthColor, fontWeight: 700, marginTop: 4 }}>{strengthLabel}</div>
+              </div>
+            )}
+            {fieldErrors.pw1 && <div style={fieldErr}>{fieldErrors.pw1}</div>}
+
+            <label style={lbl}>Confirm new password</label>
+            <input
+              type={showNew ? 'text' : 'password'}
+              value={pw2}
+              onChange={(e) => { setPw2(e.target.value); setFieldErrors((f) => ({ ...f, pw2: undefined })); }}
+              placeholder="Re-enter new password"
+              style={{ ...input, borderColor: fieldErrors.pw2 ? '#ef4444' : (input.borderColor as any) }}
+            />
+            {fieldErrors.pw2 && <div style={fieldErr}>{fieldErrors.pw2}</div>}
+
+            {pwError && (
+              <div style={errBox}>
+                <strong style={{ display: 'block', marginBottom: 2 }}>Couldn't update password</strong>
+                {pwError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button onClick={goToConfirm} disabled={saving} style={{ ...primaryBtn, flex: 1 }}>Continue</button>
+              <button onClick={requestEmailReset} disabled={saving} style={{ ...ghostBtn, flex: 1 }}>Forgot? Email link</button>
+            </div>
+          </div>
+        )}
+
+        {pwStep === 'confirm' && (
+          <div>
+            <div style={{ padding: 12, background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 10, marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#78350f', marginBottom: 4 }}>⚠ Confirm password change</div>
+              <div style={{ fontSize: 11.5, color: '#78350f', lineHeight: 1.45 }}>
+                You're about to change the password for <strong>{email}</strong>. You'll stay signed in on this device, but other sessions may be revoked. This action cannot be undone.
+              </div>
+            </div>
+            {pwError && <div style={errBox}>{pwError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setPwStep('form')} disabled={saving} style={{ ...ghostBtn, flex: 1 }}>Back</button>
+              <button onClick={confirmPasswordChange} disabled={saving} style={{ ...primaryBtn, flex: 1 }}>
+                {saving ? 'Updating…' : 'Yes, change password'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {pwStep === 'success' && (
+          <div style={{ textAlign: 'center', padding: '8px 4px' }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: '50%', margin: '0 auto 12px',
+              background: 'rgba(34,197,94,0.15)', border: '2px solid #22c55e',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 28, color: '#16a34a',
+            }}>✓</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>Password updated</div>
+            <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 14, lineHeight: 1.5 }}>
+              Your password has been changed successfully. Use it next time you sign in.
+            </div>
+            <button onClick={resetPwFlow} style={{ ...primaryBtn, width: '100%' }}>Done</button>
+          </div>
+        )}
+
+        {/* ===== Email reset confirmation ===== */}
+        {emStep === 'confirm' && (
+          <div style={{ marginTop: 14, padding: 12, background: '#f1f5f9', border: `1px solid ${c.border}`, borderRadius: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>Send reset link?</div>
+            <div style={{ fontSize: 11, color: '#475569', marginBottom: 10, lineHeight: 1.45 }}>
+              We'll email a one-time reset link to <strong>{email}</strong>. It expires in 1 hour.
+            </div>
+            {emError && <div style={{ ...errBox, marginTop: 0, marginBottom: 8 }}>{emError}</div>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setEmStep('idle')} disabled={saving} style={{ ...ghostBtn, flex: 1 }}>Cancel</button>
+              <button onClick={confirmEmailReset} disabled={saving} style={{ ...primaryBtn, flex: 1 }}>
+                {saving ? 'Sending…' : 'Send link'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {emStep === 'sent' && (
+          <div style={{ marginTop: 14, padding: 12, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.4)', borderRadius: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#15803d', marginBottom: 4 }}>✉ Check your inbox</div>
+            <div style={{ fontSize: 11, color: '#166534', lineHeight: 1.45, marginBottom: 8 }}>
+              A reset link was sent to <strong>{email}</strong>. If you don't see it within a minute, check your spam folder.
+            </div>
+            <button onClick={() => setEmStep('idle')} style={{ ...ghostBtn, width: '100%' }}>Close</button>
+          </div>
         )}
       </div>
     </div>
@@ -512,6 +697,23 @@ const ghostBtn: React.CSSProperties = {
   padding: '8px 12px', borderRadius: 8,
   background: 'transparent', border: `1px solid ${c.border}`,
   color: '#0f172a', fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
+};
+
+const eyeBtn: React.CSSProperties = {
+  position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+  fontSize: 10, padding: '4px 8px', borderRadius: 6,
+  background: 'rgba(15,23,42,0.06)', border: `1px solid ${c.border}`,
+  color: '#0f172a', cursor: 'pointer', fontWeight: 700,
+};
+
+const fieldErr: React.CSSProperties = {
+  fontSize: 10.5, color: '#b91c1c', marginTop: 4, fontWeight: 600,
+};
+
+const errBox: React.CSSProperties = {
+  marginTop: 10, padding: '9px 11px', borderRadius: 8, fontSize: 11.5,
+  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.4)',
+  color: '#b91c1c', lineHeight: 1.45,
 };
 
 function menuItem(active: boolean): React.CSSProperties {
