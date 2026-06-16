@@ -471,7 +471,7 @@ export default function HomeDashboard({
           customFrom={customFrom}
           customTo={customTo}
           series={stats.series}
-          onClose={() => setDetail(null)}
+          onClose={closeDetail}
         />
       )}
     </div>
