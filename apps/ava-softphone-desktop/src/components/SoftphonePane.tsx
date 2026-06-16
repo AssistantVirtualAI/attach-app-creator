@@ -337,9 +337,9 @@ export default function SoftphonePane({
       <div style={{
         position: 'relative', zIndex: 1,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: compact ? 6 : 10,
-        padding: compact ? '8px 10px' : '10px 14px',
-        height: compact ? 46 : 52, boxSizing: 'border-box',
+        gap: ultraCompact ? 4 : compact ? 6 : 10,
+        padding: ultraCompact ? '6px 8px' : compact ? '7px 10px' : '10px 14px',
+        height: ultraCompact ? 42 : compact ? 46 : 52, boxSizing: 'border-box',
         background: 'rgba(0,0,0,0.3)',
         borderBottom: `1px solid ${c.border}`,
         backdropFilter: 'blur(12px)',
@@ -355,9 +355,9 @@ export default function SoftphonePane({
           Ext {creds.extension}
         </div>
 
-        {!ultraCompact && (
+        {!compact && (
           <div style={{
-            fontSize: compact ? 11 : 12, fontWeight: 500, color: c.text, opacity: 0.85,
+            fontSize: 12, fontWeight: 500, color: c.text, opacity: 0.85,
             flex: 1, minWidth: 0, textAlign: 'center',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
@@ -365,7 +365,7 @@ export default function SoftphonePane({
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 5 : 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 5 : 8, flexShrink: 0, marginLeft: compact ? 'auto' : 0 }}>
           {/* Compact SIP indicator only — full status & profile live in TitleBar */}
           <span
             title={sp.snap.errorCause || `SIP: ${sp.snap.status}`}
@@ -623,17 +623,19 @@ export default function SoftphonePane({
 
       {/* BOTTOM TABS */}
       {!inCall && !ringing && !hideTabs && (
-        <div className={compact ? 'lemtel-tabbar-wrap' : undefined} style={{
+        <div style={{
           position: 'relative', zIndex: 1, flexShrink: 0,
           background: 'linear-gradient(180deg, rgba(15,15,30,0.6) 0%, rgba(8,8,18,0.95) 100%)',
           borderTop: `1px solid ${c.border}`,
           backdropFilter: 'blur(14px)',
         }}>
-          <div className={compact ? 'lemtel-tabbar' : undefined} style={{
+          <div style={{
             display: 'flex',
-            height: ultraCompact ? 58 : compact ? 64 : 68,
+            height: ultraCompact ? 54 : compact ? 60 : 68,
             minWidth: 0,
-            ...(compact ? {} : { width: '100%' }),
+            width: '100%',
+            paddingLeft: compact ? 4 : 0,
+            paddingRight: compact ? 4 : 0,
           }}>
             {(['dial', 'recents', 'contacts', 'voicemail', 'sms', 'recordings', 'ai'] as Tab[]).map((tk) => {
               const active = tab === tk;
@@ -651,9 +653,8 @@ export default function SoftphonePane({
                   aria-label={label}
                   className={`lemtel-glass${isAI ? ' lemtel-glass--ai' : ''}`}
                   style={{
-                    ...(compact
-                      ? { flex: '0 0 auto', minWidth: ultraCompact ? 58 : 70, padding: '6px 6px' }
-                      : { flex: 1, minWidth: 48, padding: '4px 4px 0' }),
+                    flex: 1, minWidth: 0,
+                    padding: ultraCompact ? '4px 2px' : compact ? '5px 3px' : '4px 4px 0',
 
                     background: active
                       ? (isAI
@@ -663,8 +664,8 @@ export default function SoftphonePane({
                     border: active
                       ? `1px solid ${isAI ? 'rgba(201,178,255,0.72)' : 'rgba(255,215,0,0.78)'}`
                       : '1px solid rgba(235,240,255,0.20)',
-                    borderRadius: 12,
-                    margin: compact ? '6px 3px 6px' : '6px 3px',
+                    borderRadius: 10,
+                    margin: compact ? '5px 2px' : '6px 3px',
                     color: active ? activeColor : inactiveColor,
                     textShadow: active
                       ? `0 0 10px ${isAI ? 'rgba(157,111,240,0.55)' : 'rgba(255,215,0,0.55)'}`
@@ -694,7 +695,7 @@ export default function SoftphonePane({
                   }}
                 >
                   {active && <span className={`lemtel-tab-dot${isAI ? ' lemtel-tab-dot--ai' : ''}`} />}
-                  <Icon size={compact ? 19 : 20} color={active ? activeColor : 'currentColor'} />
+                  <Icon size={ultraCompact ? 17 : compact ? 18 : 20} color={active ? activeColor : 'currentColor'} />
                   {!ultraCompact && (
                     <span style={{
                       fontSize: compact ? 9 : 10,
@@ -832,8 +833,11 @@ function Dialer({
 
       {/* Dialpad */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: compact ? 8 : 14,
-        width: 'min(100%, 296px)', margin: compact ? '0 auto 20px' : '0 auto 26px',
+        display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+        gap: ultraCompact ? 6 : compact ? 8 : 14,
+        width: ultraCompact ? 'min(100%, 248px)' : 'min(100%, 296px)',
+        margin: compact ? '0 auto 16px' : '0 auto 26px',
+        padding: ultraCompact ? '0 4px' : 0, boxSizing: 'border-box',
       }}>
         {dialKeys.map(([key, sub]) => (
           <button
@@ -841,9 +845,9 @@ function Dialer({
             className="lemtel-key lemtel-glass"
             onClick={() => setDial((p) => p + key)}
             style={{
-              height: compact ? 58 : 72, display: 'flex', flexDirection: 'column',
+              height: ultraCompact ? 50 : compact ? 58 : 72, display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center', gap: 2,
-              borderRadius: 16,
+              borderRadius: 14,
               background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
               border: `1px solid ${c.border}`,
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
@@ -851,8 +855,8 @@ function Dialer({
               willChange: 'transform',
             }}
           >
-            <span className="ava-display-num" style={{ fontSize: compact ? 23 : 26, fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1 }}>{key}</span>
-            {sub && <span style={{ fontSize: 8.5, color: 'rgba(159,179,214,0.72)', letterSpacing: '0.22em', fontWeight: 700, marginTop: 2 }}>{sub}</span>}
+            <span className="ava-display-num" style={{ fontSize: ultraCompact ? 20 : compact ? 23 : 26, fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1 }}>{key}</span>
+            {sub && !ultraCompact && <span style={{ fontSize: 8.5, color: 'rgba(159,179,214,0.72)', letterSpacing: '0.22em', fontWeight: 700, marginTop: 2 }}>{sub}</span>}
           </button>
         ))}
       </div>
