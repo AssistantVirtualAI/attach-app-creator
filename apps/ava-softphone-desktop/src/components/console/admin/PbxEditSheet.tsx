@@ -185,45 +185,96 @@ export default function PbxEditSheet({
   title, groups, initial, saving, width = 620, onCancel, onSave,
 }: Props) {
   const [form, setForm] = useState<any>(initial || {});
+  const [dirty, setDirty] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [narrow, setNarrow] = useState(false);
+
+  const tryClose = React.useCallback(() => {
+    if (dirty) {
+      const ok = window.confirm('You have unsaved changes. Discard and close?');
+      if (!ok) return;
+    }
+    onCancel();
+  }, [dirty, onCancel]);
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') tryClose(); };
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
-  }, [onCancel]);
+    const onResize = () => setNarrow(window.innerWidth < 640);
+    onResize();
+    window.addEventListener('resize', onResize);
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (dirty) { e.preventDefault(); e.returnValue = ''; }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, [tryClose, dirty]);
+
+  const update = (k: string, v: any) => {
+    setForm((f: any) => ({ ...f, [k]: v }));
+    setDirty(true);
+    if (errors[k]) setErrors((e) => { const n = { ...e }; delete n[k]; return n; });
+  };
+
+  const validate = () => {
+    const next: Record<string, string> = {};
+    for (const g of groups) for (const f of g.fields) {
+      const v = form[f.key];
+      if (f.required && (v === undefined || v === null || String(v).trim() === '')) {
+        next[f.key] = 'Required';
+      }
+      if (f.type === 'number' && v !== undefined && v !== null && v !== '' && Number.isNaN(Number(v))) {
+        next[f.key] = 'Must be a number';
+      }
+    }
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const handleSave = () => {
+    if (!validate()) return;
+    setDirty(false);
+    onSave(form);
+  };
 
   return createPortal(
-    <div onClick={onCancel} style={{
+    <div onClick={tryClose} style={{
       position: 'fixed', inset: 0, zIndex: 10000,
       background: 'rgba(2,6,20,0.72)',
       display: 'flex', justifyContent: 'flex-end',
       animation: 'fadeIn 140ms ease-out',
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        width: `min(${width}px, 100%)`, height: '100%',
-        background: '#0c1733',                       // OPAQUE
+        width: `min(${width}px, 100%)`, height: '100%', maxWidth: '100vw',
+        background: '#0c1733',
         borderLeft: `1px solid ${c.border}`,
         display: 'flex', flexDirection: 'column',
         boxShadow: '-30px 0 80px rgba(0,0,0,0.6)',
         animation: 'slideInRight 180ms cubic-bezier(.2,.8,.2,1)',
       }}>
-        {/* Sticky header */}
         <header style={{
           position: 'sticky', top: 0, zIndex: 2,
           padding: '16px 22px', borderBottom: `1px solid ${c.border}`,
           background: '#0c1733',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
         }}>
-          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: c.textIce, letterSpacing: 0.2 }}>{title}</h2>
-          <button onClick={onCancel} aria-label="Close" style={{
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: c.textIce, letterSpacing: 0.2, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {title}{dirty && <span style={{ color: c.signalGold, marginLeft: 8, fontSize: 11 }}>● unsaved</span>}
+          </h2>
+          <button onClick={tryClose} aria-label="Close" style={{
             width: 30, height: 30, borderRadius: 8, border: `1px solid ${c.border}`,
-            background: 'transparent', color: c.mutedSilver, cursor: 'pointer', fontSize: 14,
+            background: 'transparent', color: c.mutedSilver, cursor: 'pointer', fontSize: 14, flexShrink: 0,
           }}>✕</button>
         </header>
 
-        {/* Scrollable body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 22px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '18px 22px', WebkitOverflowScrolling: 'touch' }}>
           {groups.map((g) => (
             <section key={g.section} style={{ marginBottom: 22 }}>
               <div style={{
@@ -235,14 +286,19 @@ export default function PbxEditSheet({
                 <div style={{ fontSize: 11, color: c.mutedSilver, marginBottom: 12 }}>{g.description}</div>
               )}
               <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14,
+                display: 'grid',
+                gridTemplateColumns: narrow ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+                gap: 14,
               }}>
                 {g.fields.map((f) => (
-                  <div key={f.key} style={{ gridColumn: (f.cols === 1) ? 'span 1' : 'span 2' }}>
+                  <div key={f.key} style={{ gridColumn: narrow ? 'span 1' : (f.cols === 1 ? 'span 1' : 'span 2'), minWidth: 0 }}>
                     <div style={labelStyle}>{f.label}{f.required && <span style={{ color: c.danger }}> *</span>}</div>
                     <FieldRenderer f={f} value={form[f.key]} fullForm={form}
-                      onChange={(v) => setForm({ ...form, [f.key]: v })} />
-                    {f.hint && f.type !== 'checkbox' && (
+                      onChange={(v) => update(f.key, v)} />
+                    {errors[f.key] && (
+                      <div style={{ fontSize: 10, color: c.danger, marginTop: 4 }}>{errors[f.key]}</div>
+                    )}
+                    {f.hint && f.type !== 'checkbox' && !errors[f.key] && (
                       <div style={{ fontSize: 10, color: c.mutedSilver, marginTop: 4 }}>{f.hint}</div>
                     )}
                   </div>
@@ -252,19 +308,23 @@ export default function PbxEditSheet({
           ))}
         </div>
 
-        {/* Sticky footer */}
         <footer style={{
           position: 'sticky', bottom: 0, zIndex: 2,
           padding: '14px 22px', borderTop: `1px solid ${c.border}`,
           background: '#0c1733',
-          display: 'flex', gap: 10, justifyContent: 'flex-end',
+          display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap',
         }}>
-          <button onClick={onCancel} style={{
+          {Object.keys(errors).length > 0 && (
+            <div style={{ marginRight: 'auto', color: c.danger, fontSize: 11, alignSelf: 'center' }}>
+              Fix {Object.keys(errors).length} field{Object.keys(errors).length > 1 ? 's' : ''} before saving
+            </div>
+          )}
+          <button onClick={tryClose} style={{
             padding: '9px 16px', borderRadius: 10, background: 'transparent',
             border: `1px solid ${c.border}`, color: c.textIce,
             fontSize: 12, fontWeight: 700, cursor: 'pointer',
           }}>Cancel</button>
-          <button onClick={() => onSave(form)} disabled={saving} style={{
+          <button onClick={handleSave} disabled={saving} style={{
             padding: '9px 20px', borderRadius: 10, border: 'none',
             color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer',
             background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
