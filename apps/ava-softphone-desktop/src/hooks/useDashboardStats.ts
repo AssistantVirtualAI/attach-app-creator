@@ -32,13 +32,10 @@ export type DashboardStats = {
   attention: AttentionItem[];
   pbxHealth: 'ok' | 'warn' | 'down';
   series: DailySeries;
-  loading: boolean;
-  series: DailySeries;
   error: string | null;
   loading: boolean;
 };
 
-// (DashboardStats closed above; legacy line kept for replace alignment) export type _unused = never;
 
 const startOfDay = () => {
   const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString();
