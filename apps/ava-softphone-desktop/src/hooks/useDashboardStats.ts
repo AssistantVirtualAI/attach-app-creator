@@ -141,6 +141,37 @@ export function useDashboardStats(
     if (cdrFreshness === 'stale') attention.push({ title: 'CDR feed looks stale', detail: `Last synced call was ${formatRelative(lastCallAt)}. Run Phone System Sync if you just completed a call.`, tag: 'Sync', tone: 'info' });
     if (attention.length === 0) attention.push({ title: 'Phone system is current', detail: `Last CDR ${formatRelative(lastCallAt)}. No urgent items detected ${rangeLabel}.`, tag: 'Live', tone: 'success' });
 
+    // Daily bucket series for sparklines
+    const fromDate = new Date(from); fromDate.setHours(0, 0, 0, 0);
+    const toDate = new Date(to); toDate.setHours(0, 0, 0, 0);
+    const dayMs = 86400000;
+    const totalDays = Math.max(1, Math.min(60, Math.round((toDate.getTime() - fromDate.getTime()) / dayMs) + 1));
+    const dates: string[] = [];
+    const byDay = new Map<string, { c: number; m: number; a: number; r: number }>();
+    for (let i = 0; i < totalDays; i++) {
+      const d = new Date(fromDate.getTime() + i * dayMs);
+      const key = d.toISOString().slice(0, 10);
+      dates.push(key);
+      byDay.set(key, { c: 0, m: 0, a: 0, r: 0 });
+    }
+    for (const r of calls) {
+      if (!r.start_at) continue;
+      const key = String(r.start_at).slice(0, 10);
+      const slot = byDay.get(key);
+      if (!slot) continue;
+      slot.c += 1;
+      const isMissed = r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER';
+      if (isMissed) slot.m += 1; else slot.a += 1;
+      if (r.has_recording || r.recording_name || r.recording_path) slot.r += 1;
+    }
+    const series: DailySeries = {
+      dates,
+      calls: dates.map((d) => byDay.get(d)!.c),
+      missed: dates.map((d) => byDay.get(d)!.m),
+      answered: dates.map((d) => byDay.get(d)!.a),
+      recordings: dates.map((d) => byDay.get(d)!.r),
+    };
+
     setStats({
       missedToday: missed,
       answeredToday: answered,
@@ -156,6 +187,7 @@ export function useDashboardStats(
       cdrFreshness,
       attention: attention.slice(0, 3),
       pbxHealth: 'ok',
+      series,
       loading: false,
     });
   }, [orgId, extension, range, customFrom, customTo]);
