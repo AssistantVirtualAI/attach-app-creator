@@ -355,25 +355,50 @@ export default function HomeDashboard({
         </div>
       </section>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 26 }}>
+      {stats.error && (
+        <div role="alert" style={{
+          marginBottom: 14, padding: '10px 14px',
+          background: 'linear-gradient(135deg, rgba(185,28,28,0.12), rgba(220,38,38,0.08))',
+          border: `1px solid ${tones.red.ring}`, borderRadius: 12,
+          color: c.danger, fontSize: 12.5, fontWeight: 600,
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span aria-hidden>⚠</span>
+          <span style={{ flex: 1 }}>Could not load stats: {stats.error}</span>
+          <button onClick={() => stats.refresh()} className="ava-range-btn" style={{
+            padding: '6px 12px', borderRadius: 8, border: `1px solid ${tones.red.ring}`,
+            background: '#fff', color: c.danger, fontWeight: 700, fontSize: 12, cursor: 'pointer',
+          }}>Retry</button>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 26 }}
+        aria-busy={stats.loading} aria-live="polite">
         <Stat label={`Calls · ${rangeLabel}`} value={stats.totalCallsToday} tone={tones.cyan}
           series={stats.series.calls} hint="Scoped to extension"
+          loading={stats.loading} error={stats.error}
           onClick={() => openDetail('calls', `All calls — ${rangeLabel}`, tones.cyan)} />
         <Stat label="Missed" value={stats.missedToday} tone={tones.red}
           series={stats.series.missed} hint={rangeLabel}
+          loading={stats.loading} error={stats.error}
           onClick={() => openDetail('missed', `Missed calls — ${rangeLabel}`, tones.red)} />
         <Stat label="Answered" value={stats.answeredToday} tone={tones.green}
           series={stats.series.answered} hint={rangeLabel}
+          loading={stats.loading} error={stats.error}
           onClick={() => openDetail('answered', `Answered calls — ${rangeLabel}`, tones.green)} />
         <Stat label="Recordings" value={stats.recordingsToday} tone={tones.gold}
           series={stats.series.recordings}
           hint={stats.lastRecordingAt ? `Latest ${fmtRelative(stats.lastRecordingAt)}` : 'None in range'}
+          loading={stats.loading} error={stats.error}
           onClick={() => openDetail('recordings', `Recordings — ${rangeLabel}`, tones.gold)} />
         <Stat label="Unread SMS" value={stats.unreadSms} tone={tones.pink} hint="All threads"
+          loading={stats.loading} error={stats.error}
           onClick={() => openDetail('sms', 'Unread SMS threads', tones.pink)} />
         <Stat label="Voicemail" value={stats.unreadVoicemail} tone={tones.violet} hint="Needs review"
+          loading={stats.loading} error={stats.error}
           onClick={() => openDetail('voicemail', `Voicemails — ${rangeLabel}`, tones.violet)} />
         <Stat label="Live Calls" value={stats.liveCalls} tone={tones.blue} hint="In progress"
+          loading={stats.loading} error={stats.error}
           onClick={() => openDetail('live', 'Live calls right now', tones.blue)} />
         <Stat label="Realtime" value={syncConnected ? 'Live' : 'Off'} tone={syncConnected ? tones.cyan : tones.slate}
           hint={lastEvent ? formatAge(ageMs) : 'Idle'}
