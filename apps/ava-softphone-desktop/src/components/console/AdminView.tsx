@@ -788,10 +788,11 @@ function IvrsTable() {
           rules={IVR_RULES}
           saving={saving}
           width={680}
-          onCancel={() => setCreating(false)}
+          onCancel={() => setCreating(null)}
           onSave={create}
         />
       )}
+      {ivrConflictModal}
     </>
   );
 }
