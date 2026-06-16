@@ -121,25 +121,25 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
     return (
       <button
         onClick={onToggle}
-        title="Open AVA assistant (⌘J)"
-        aria-label="Open AVA assistant"
+        title="Open LET chat (⌘J)"
+        aria-label="Open LET chat"
         style={{
           position: 'fixed', bottom: 24, right: 24, zIndex: 60,
-          width: 60, height: 60, borderRadius: '50%',
+          height: 48, padding: '0 18px 0 14px', borderRadius: 999,
           background: `linear-gradient(135deg, ${c.avaViolet}, ${c.avaCyan})`,
-          border: '2px solid rgba(255,255,255,0.25)', cursor: 'pointer', color: '#fff',
-          fontSize: 13, fontWeight: 800, letterSpacing: 0.5,
-          boxShadow: '0 12px 32px -8px rgba(122,76,255,0.65), 0 0 0 6px rgba(122,76,255,0.10)',
-          display: 'grid', placeItems: 'center',
-          transition: 'transform 180ms ease',
+          border: '1px solid rgba(255,255,255,0.22)', cursor: 'pointer', color: '#fff',
+          fontSize: 13, fontWeight: 800, letterSpacing: 0.6,
+          boxShadow: '0 14px 36px -10px rgba(122,76,255,0.65), 0 0 0 6px rgba(122,76,255,0.10)',
+          display: 'inline-flex', alignItems: 'center', gap: 9,
+          transition: 'transform 180ms ease, box-shadow 180ms ease',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.06)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px) scale(1.03)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0) scale(1)'; }}
       >
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
         </svg>
-        <span style={{ position: 'absolute', bottom: -2, right: -2, background: c.signalGold, color: '#0b1530', fontSize: 8, fontWeight: 900, padding: '2px 5px', borderRadius: 6, letterSpacing: 0.5 }}>AVA</span>
+        <span style={{ textTransform: 'uppercase' }}>LET Chat</span>
       </button>
     );
   }
@@ -171,9 +171,9 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
             display: 'grid', placeItems: 'center', color: '#fff',
             fontWeight: 800, fontSize: 11,
             boxShadow: '0 0 18px -4px rgba(122,76,255,0.55)',
-          }}>AI</div>
+          }}>LET</div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: c.textIce }}>AVA Assistant</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: c.textIce }}>LET Chat</div>
             <div style={{ fontSize: 9.5, color: authed === false ? c.warning : c.avaCyan, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700 }}>
               {authed === null ? 'Connecting…' : !authed ? 'Sign in required' : isAdmin ? 'Admin · Live' : 'My calls'}
             </div>

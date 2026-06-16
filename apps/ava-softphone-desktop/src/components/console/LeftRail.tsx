@@ -78,7 +78,7 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
   const { mode } = useTheme();
   const isDark = mode === 'dark' || mode === 'midnight';
   const { pbx, syncConnected, lastEvent, ageMs, healthy } = useSyncStatus();
-  const { extension: myExtension } = useTenant();
+  const { extension: myExtension, loading: tenantLoading } = useTenant();
 
   // Super admins see admin items in the Platform group below, not duplicated above
   const ITEMS: ConsoleView[] = isSuperAdmin ? USER_ITEMS : isAdmin ? [...USER_ITEMS, ...ADMIN_ITEMS] : USER_ITEMS;
@@ -166,9 +166,17 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
             <path d="M3 5h4l2 5-2.5 1.5a11 11 0 0 0 6 6L14 15l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 7a2 2 0 0 1 2-2"/>
           </svg>
           <span style={{ fontSize: 9.5, fontWeight: 800, color: c.avaCyan, letterSpacing: 1.2, textTransform: 'uppercase' }}>Ext</span>
-          <span style={{ fontSize: 12, fontWeight: 800, color: c.textIce, letterSpacing: 0.4, fontFamily: "'Space Grotesk', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {myExtension || '—'}
-          </span>
+          {tenantLoading ? (
+            <span aria-label="Loading extension" className="ava-skeleton" style={{
+              display: 'inline-block', width: 36, height: 12, borderRadius: 4,
+              background: 'linear-gradient(90deg, rgba(255,255,255,0.08), rgba(255,255,255,0.18), rgba(255,255,255,0.08))',
+              backgroundSize: '200% 100%', animation: 'avaShimmer 1.2s linear infinite',
+            }} />
+          ) : (
+            <span style={{ fontSize: 12, fontWeight: 800, color: c.textIce, letterSpacing: 0.4, fontFamily: "'Space Grotesk', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {myExtension || 'N/A'}
+            </span>
+          )}
         </div>
       </div>
 
