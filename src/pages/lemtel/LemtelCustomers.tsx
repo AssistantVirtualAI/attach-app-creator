@@ -363,25 +363,36 @@ export default function LemtelCustomers() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
-                          variant="ghost" size="sm"
+                          variant="ghost" size="sm" title="Manage as this customer"
+                          onClick={(e) => { e.stopPropagation(); manageAs(d); }}
+                        >
+                          <LogIn className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="sm" title="Copy portal link"
+                          onClick={(e) => { e.stopPropagation(); copyPortalLink(d); }}
+                        >
+                          <Link2 className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="sm" title="Sync from PBX"
                           onClick={(e) => { e.stopPropagation(); syncDomain(d); }}
                           disabled={syncing === d.domain_uuid}
                         >
-                          {syncing === d.domain_uuid ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
-                          Sync
+                          {syncing === d.domain_uuid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(d); }}>
+                        <Button variant="ghost" size="sm" title="Edit" onClick={(e) => { e.stopPropagation(); openEdit(d); }}>
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
                         <Button
-                          variant="ghost" size="sm"
+                          variant="ghost" size="sm" title="Delete domain"
                           onClick={(e) => { e.stopPropagation(); deleteDomain(d); }}
                           disabled={deleting === d.domain_uuid}
                         >
                           {deleting === d.domain_uuid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 text-destructive" />}
                         </Button>
                         <Button asChild variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                          <Link to={`/org/lemtel/admin/customers/${d.domain_uuid}`}>Manage</Link>
+                          <Link to={`/org/lemtel/admin/customers/${d.domain_uuid}`}>Open</Link>
                         </Button>
                       </TableCell>
                     </TableRow>
