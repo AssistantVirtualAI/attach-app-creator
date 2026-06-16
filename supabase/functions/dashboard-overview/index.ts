@@ -1,10 +1,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-);
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
 interface Body {
   organizationId: string;
@@ -37,6 +38,47 @@ async function countRange(
   const { count, error } = await q;
   if (error) return 0;
   return count || 0;
+}
+
+// Verify the caller is authenticated AND belongs to the requested org.
+// This is the critical tenant-isolation gate: without it, any authenticated
+// user could pass any organizationId in the body and read another tenant's data.
+async function assertOrgAccess(req: Request, orgId: string): Promise<string> {
+  const authHeader = req.headers.get("Authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) throw new Error("unauthorized");
+  const token = authHeader.replace("Bearer ", "");
+
+  const userClient = createClient(SUPABASE_URL, ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: claims, error: claimsError } = await userClient.auth.getClaims(token);
+  if (claimsError || !claims?.claims?.sub) throw new Error("unauthorized");
+  const userId = claims.claims.sub as string;
+
+  // Super admin bypass (kept consistent with the rest of the project)
+  const { data: isSuper } = await supabase.rpc("is_super_admin", { _user_id: userId });
+  if (isSuper === true) return userId;
+
+  // Reuse the project's canonical org-membership function. It already
+  // unions organization_members, org_members, and pbx_softphone_users.
+  const { data: orgIds, error: orgsError } = await supabase.rpc("get_user_organization_ids", {
+    _user_id: userId,
+  });
+  if (orgsError) throw new Error("unauthorized");
+  const allowed = Array.isArray(orgIds)
+    ? orgIds.map((r: any) => (typeof r === "string" ? r : r?.get_user_organization_ids))
+    : [];
+  if (!allowed.includes(orgId)) {
+    // Fallback: also accept pbx_softphone_users link, just in case
+    const { data: sp } = await supabase
+      .from("pbx_softphone_users")
+      .select("organization_id")
+      .eq("portal_user_id", userId)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+    if (!sp) throw new Error("forbidden");
+  }
+  return userId;
 }
 
 Deno.serve(async (req) => {
