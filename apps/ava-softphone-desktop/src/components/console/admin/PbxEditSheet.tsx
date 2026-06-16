@@ -170,9 +170,10 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
 
   return (
     <div style={{
-      border: `1px solid ${c.border}`, borderRadius: 10, padding: 12,
-      background: 'rgba(11,181,214,0.04)', display: 'grid', gap: 10,
+      border: `1px solid ${c.borderStrong}`, borderRadius: 10, padding: 12,
+      background: c.primarySoft, display: 'grid', gap: 10,
     }}>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 8 }}>
         <input value={value ?? ''} onChange={(e) => onChange(e.target.value)}
           placeholder="Filename on PBX (e.g. welcome.mp3)"
