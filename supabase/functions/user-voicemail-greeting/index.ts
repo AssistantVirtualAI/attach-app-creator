@@ -24,22 +24,165 @@ const TOP_VOICES = [
   { id: "Xb7hH8MSUJpSbSDYk0k2", name: "Alice" },
 ];
 
-async function ttsToBlob(text: string, voiceId: string): Promise<ArrayBuffer> {
-  if (!ELEVEN_KEY) throw new Error("missing_elevenlabs_key");
-  const r = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
-    {
-      method: "POST",
-      headers: { "xi-api-key": ELEVEN_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text,
-        model_id: "eleven_multilingual_v2",
-        voice_settings: { stability: 0.5, similarity_boost: 0.75, use_speaker_boost: true },
-      }),
-    },
-  );
-  if (!r.ok) throw new Error("tts_failed: " + (await r.text()));
-  return r.arrayBuffer();
+const MAX_CONCURRENT_PER_USER = 2;
+
+type TtsResult = {
+  ok: boolean;
+  audio?: ArrayBuffer;
+  request_id: string | null;
+  http_status: number | null;
+  error_message?: string;
+  error_payload?: any;
+  duration_ms: number;
+};
+
+async function ttsCall(text: string, voiceId: string, signal?: AbortSignal): Promise<TtsResult> {
+  const start = Date.now();
+  if (!ELEVEN_KEY) {
+    return { ok: false, request_id: null, http_status: null, error_message: "missing_elevenlabs_key", duration_ms: 0 };
+  }
+  try {
+    const r = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
+      {
+        method: "POST",
+        headers: { "xi-api-key": ELEVEN_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          model_id: "eleven_multilingual_v2",
+          voice_settings: { stability: 0.5, similarity_boost: 0.75, use_speaker_boost: true },
+        }),
+        signal,
+      },
+    );
+    const reqId = r.headers.get("request-id") ?? r.headers.get("x-request-id") ?? null;
+    const httpStatus = r.status;
+    if (!r.ok) {
+      const text = await r.text();
+      let payload: any = text;
+      try { payload = JSON.parse(text); } catch { /* keep as string */ }
+      return {
+        ok: false,
+        request_id: reqId,
+        http_status: httpStatus,
+        error_message: typeof payload === "object" ? (payload?.detail?.message ?? payload?.detail?.status ?? text.slice(0, 300)) : text.slice(0, 300),
+        error_payload: payload,
+        duration_ms: Date.now() - start,
+      };
+    }
+    const audio = await r.arrayBuffer();
+    return { ok: true, audio, request_id: reqId, http_status: httpStatus, duration_ms: Date.now() - start };
+  } catch (e: any) {
+    return {
+      ok: false,
+      request_id: null,
+      http_status: null,
+      error_message: String(e?.message ?? e).slice(0, 500),
+      error_payload: { name: e?.name, message: String(e?.message ?? e) },
+      duration_ms: Date.now() - start,
+    };
+  }
+}
+
+async function logAttempt(admin: any, g: any, attemptNumber: number, r: TtsResult, status: "succeeded" | "failed" | "canceled") {
+  await admin.from("pbx_voicemail_greeting_attempts").insert({
+    greeting_id: g.id,
+    user_id: g.user_id,
+    organization_id: g.organization_id,
+    attempt_number: attemptNumber,
+    status,
+    request_id: r.request_id,
+    http_status: r.http_status,
+    error_message: r.error_message ?? null,
+    error_payload: r.error_payload ?? null,
+    voice_id: g.voice_id,
+    duration_ms: r.duration_ms,
+    finished_at: new Date().toISOString(),
+  });
+}
+
+async function processGeneration(admin: any, greetingId: string) {
+  const { data: g } = await admin
+    .from("pbx_voicemail_greetings")
+    .select("*")
+    .eq("id", greetingId)
+    .maybeSingle();
+  if (!g) return { ok: false, error: "not_found" };
+  if (g.status === "canceled") return { ok: false, error: "canceled" };
+
+  await admin
+    .from("pbx_voicemail_greetings")
+    .update({ status: "generating", error_message: null, last_attempt_at: new Date().toISOString() })
+    .eq("id", greetingId);
+
+  const result = await ttsCall(g.text_script, g.voice_id ?? "EXAVITQu4vr4xnSDxMaL");
+  const attemptNumber = g.attempts ?? 1;
+
+  // Check if canceled mid-flight.
+  const { data: fresh } = await admin
+    .from("pbx_voicemail_greetings")
+    .select("status")
+    .eq("id", greetingId)
+    .maybeSingle();
+  if (fresh?.status === "canceled") {
+    await logAttempt(admin, g, attemptNumber, result, "canceled");
+    return { ok: false, error: "canceled" };
+  }
+
+  if (!result.ok) {
+    await logAttempt(admin, g, attemptNumber, result, "failed");
+    await admin
+      .from("pbx_voicemail_greetings")
+      .update({ status: "failed", error_message: result.error_message ?? "tts_failed" })
+      .eq("id", greetingId);
+    return { ok: false, error: result.error_message ?? "tts_failed" };
+  }
+
+  const path = `${g.organization_id}/${g.user_id}/lib-${g.id}.mp3`;
+  const { error: upErr } = await admin.storage
+    .from("voicemail-greetings")
+    .upload(path, new Uint8Array(result.audio!), { contentType: "audio/mpeg", upsert: true });
+  if (upErr) {
+    const r2 = { ...result, ok: false, error_message: String(upErr.message ?? upErr), error_payload: upErr };
+    await logAttempt(admin, g, attemptNumber, r2, "failed");
+    await admin
+      .from("pbx_voicemail_greetings")
+      .update({ status: "failed", error_message: r2.error_message })
+      .eq("id", greetingId);
+    return { ok: false, error: r2.error_message };
+  }
+
+  await logAttempt(admin, g, attemptNumber, result, "succeeded");
+  const { data: row } = await admin
+    .from("pbx_voicemail_greetings")
+    .update({ storage_path: path, status: "ready", error_message: null })
+    .eq("id", greetingId)
+    .select()
+    .single();
+  const { data: signed } = await admin.storage.from("voicemail-greetings").createSignedUrl(path, 3600);
+  return { ok: true, greeting: { ...row, audio_url: signed?.signedUrl ?? null } };
+}
+
+async function dequeueNext(admin: any, userId: string) {
+  const { count } = await admin
+    .from("pbx_voicemail_greetings")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("status", "generating");
+  if ((count ?? 0) >= MAX_CONCURRENT_PER_USER) return;
+  const { data: next } = await admin
+    .from("pbx_voicemail_greetings")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("status", "queued")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!next) return;
+  // Fire & wait — Deno handles single request lifecycle; running inline is fine.
+  await processGeneration(admin, next.id);
+  // Cascade
+  await dequeueNext(admin, userId);
 }
 
 Deno.serve(async (req) => {
