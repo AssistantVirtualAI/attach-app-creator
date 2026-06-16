@@ -245,6 +245,16 @@ function ExtensionsTable() {
           onSave={(changes) => updateExtension(editing, changes)}
         />
       )}
+      {creating && (
+        <PbxEditSheet
+          title="New Extension"
+          groups={EXTENSION_GROUPS}
+          initial={{ enabled: true, voicemail_enabled: true, user_context: 'default' }}
+          saving={saving}
+          onCancel={() => setCreating(false)}
+          onSave={createExtension}
+        />
+      )}
     </>
   );
 }
