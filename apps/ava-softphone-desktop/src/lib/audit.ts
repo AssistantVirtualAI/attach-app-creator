@@ -13,7 +13,11 @@ export type AuditAction =
   | 'call.originated'
   | 'call.transferred'
   | 'softphone.signed_in'
-  | 'softphone.signed_out';
+  | 'softphone.signed_out'
+  | 'pbx.create_denied_non_admin'
+  | 'pbx.create_duplicate_detected'
+  | 'pbx.create_conflict_resolved'
+  | 'pbx.create_succeeded';
 
 export function audit(action: AuditAction, resourceId?: string | null, metadata?: Record<string, unknown>): void {
   if (isMockMode()) return;
