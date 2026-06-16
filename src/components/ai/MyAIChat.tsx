@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useLocation } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,33 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type Msg = { role: "user" | "assistant"; content: string };
+type PageContext = {
+  path: string;
+  page: "voicemail" | "calls" | "recordings" | "other";
+  voicemail_id?: string;
+  call_id?: string;
+  recording_id?: string;
+};
+
+function usePageContext(): PageContext {
+  const loc = useLocation();
+  return useMemo(() => {
+    const params = new URLSearchParams(loc.search);
+    const path = loc.pathname;
+    let page: PageContext["page"] = "other";
+    if (path.includes("/voicemail")) page = "voicemail";
+    else if (path.includes("/calls")) page = "calls";
+    else if (path.includes("/recordings")) page = "recordings";
+    return {
+      path,
+      page,
+      voicemail_id: params.get("vm") ?? undefined,
+      call_id: params.get("call") ?? undefined,
+      recording_id: params.get("rec") ?? undefined,
+    };
+  }, [loc.pathname, loc.search]);
+}
+
 
 const SUGGESTIONS = [
   "Summarize my calls today",
