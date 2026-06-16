@@ -634,6 +634,11 @@ function MessageBubble({
             ))}
           </div>
         )}
+        {isOwn && !hidden && (
+          <div className="mt-1">
+            <MessageReceipts messageId={msg.id} ownerId={msg.sender_id} currentUserId={currentUserId} />
+          </div>
+        )}
       </div>
     </div>
   );
