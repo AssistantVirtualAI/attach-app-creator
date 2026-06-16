@@ -17,6 +17,7 @@ import ReportsView from './ReportsView';
 import CustomersView from './CustomersView';
 import VoiceAgentsView from './VoiceAgentsView';
 import PBXLiveView from './PBXLiveView';
+import QueuesView from './QueuesView';
 import AuditView from './AuditView';
 import SoftphonePane from '../SoftphonePane';
 import SettingsPage from '../SettingsPage';
