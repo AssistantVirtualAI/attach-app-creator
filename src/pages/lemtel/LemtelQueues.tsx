@@ -73,8 +73,10 @@ export default function LemtelQueues() {
   const { language } = useLanguage();
   const txt = qCopy[language];
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tab, setTab] = useState<'queues' | 'agents' | 'live'>('queues');
   const perms = usePerms();
   const selected = (queues as any[]).find((q) => q.id === selectedId) || null;
+  const openAgents = (id: string) => { setSelectedId(id); setTab('agents'); };
 
   return (
     <div className="space-y-6">
