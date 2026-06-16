@@ -294,7 +294,6 @@ Deno.serve(async (req) => {
 
     if (action === "heartbeat") {
       const status = String(payload?.status ?? "available");
-      // Direct upsert as service role so we don't depend on auth.uid() in the function
       await admin.from("user_presence").upsert({
         user_id: userId,
         organization_id: orgId,
@@ -306,6 +305,54 @@ Deno.serve(async (req) => {
         last_seen_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }, { onConflict: "user_id" });
+      return json({ ok: true });
+    }
+
+    if (action === "create_group") {
+      const name = String(payload?.name ?? "").trim() || "group";
+      const memberIds: string[] = Array.isArray(payload?.member_ids) ? payload.member_ids : [];
+      const { data, error } = await admin.rpc("create_group_chat", { _name: name, _member_ids: memberIds });
+      if (error) throw error;
+      return json({ channel: data });
+    }
+
+    if (action === "mark_read") {
+      const channelId = payload?.channel_id;
+      if (!channelId) return json({ error: "missing_channel" }, 400);
+      await admin.from("org_chat_reads").upsert({
+        user_id: userId, channel_id: channelId, last_read_at: new Date().toISOString(),
+      }, { onConflict: "user_id,channel_id" });
+      return json({ ok: true });
+    }
+
+    if (action === "unread_counts") {
+      const { data, error } = await admin.rpc("get_unread_counts");
+      if (error) throw error;
+      return json({ counts: data ?? [] });
+    }
+
+    if (action === "list_pins") {
+      const channelId = payload?.channel_id;
+      if (!channelId) return json({ error: "missing_channel" }, 400);
+      const access = await isMember(channelId);
+      if (!access.ok) return json({ error: "forbidden" }, 403);
+      const { data: pins } = await admin.from("org_chat_message_pins")
+        .select("message_id, pinned_by, pinned_at").eq("channel_id", channelId).order("pinned_at", { ascending: false });
+      const ids = (pins ?? []).map((p: any) => p.message_id);
+      if (ids.length === 0) return json({ pins: [], messages: [] });
+      const { data: msgs } = await admin.from("org_chat_messages").select("*").in("id", ids);
+      return json({ pins: pins ?? [], messages: msgs ?? [] });
+    }
+
+    if (action === "pin_message") {
+      const { error } = await admin.rpc("pin_chat_message", { _message_id: payload?.id });
+      if (error) throw error;
+      return json({ ok: true });
+    }
+
+    if (action === "unpin_message") {
+      const { error } = await admin.rpc("unpin_chat_message", { _message_id: payload?.id });
+      if (error) throw error;
       return json({ ok: true });
     }
 
