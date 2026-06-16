@@ -839,26 +839,57 @@ function Dialer({
         margin: compact ? '0 auto 16px' : '0 auto 26px',
         padding: ultraCompact ? '0 4px' : 0, boxSizing: 'border-box',
       }}>
-        {dialKeys.map(([key, sub]) => (
-          <button
-            key={key}
-            className="lemtel-key lemtel-glass"
-            onClick={() => setDial((p) => p + key)}
-            style={{
-              height: ultraCompact ? 50 : compact ? 58 : 72, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 2,
-              borderRadius: 14,
-              background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
-              border: `1px solid ${c.border}`,
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
-              cursor: 'pointer', color: c.textIce,
-              willChange: 'transform',
-            }}
-          >
-            <span className="ava-display-num" style={{ fontSize: ultraCompact ? 20 : compact ? 23 : 26, fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1 }}>{key}</span>
-            {sub && !ultraCompact && <span style={{ fontSize: 8.5, color: 'rgba(159,179,214,0.72)', letterSpacing: '0.22em', fontWeight: 700, marginTop: 2 }}>{sub}</span>}
-          </button>
-        ))}
+        {dialKeys.map(([key, sub]) => {
+          // Dedicated 2-row grid: fixed digit row + fixed sub-letter row so the
+          // digit baseline and sub-letter baseline land at the same Y across
+          // every theme (font-size never shifts, only weight/color/shadow do).
+          const digitRow = ultraCompact ? 22 : compact ? 26 : 30;
+          const subRow = ultraCompact ? 0 : 12;
+          return (
+            <button
+              key={key}
+              className="lemtel-key lemtel-glass"
+              onClick={() => setDial((p) => p + key)}
+              style={{
+                height: ultraCompact ? 50 : compact ? 58 : 72,
+                display: 'grid',
+                gridTemplateRows: ultraCompact ? `${digitRow}px` : `${digitRow}px ${subRow}px`,
+                rowGap: ultraCompact ? 0 : 4,
+                justifyItems: 'center', alignContent: 'center',
+                borderRadius: 14,
+                background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
+                border: `1px solid ${c.border}`,
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+                cursor: 'pointer', color: c.textIce,
+                willChange: 'transform',
+                padding: 0,
+              }}
+            >
+              <span
+                className="ava-display-num"
+                style={{
+                  gridRow: 1,
+                  height: digitRow, lineHeight: `${digitRow}px`,
+                  fontSize: ultraCompact ? 20 : compact ? 23 : 26,
+                  fontWeight: 600, letterSpacing: '-0.01em',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >{key}</span>
+              {!ultraCompact && (
+                <span
+                  style={{
+                    gridRow: 2,
+                    height: subRow, lineHeight: `${subRow}px`,
+                    fontSize: 8.5, color: 'rgba(159,179,214,0.72)',
+                    letterSpacing: '0.22em', fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    minWidth: '2.4em',
+                  }}
+                >{sub || ''}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* Action row */}
