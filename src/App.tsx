@@ -94,6 +94,7 @@ import LemtelPortalCalls from "./pages/lemtel/LemtelPortalCalls";
 import LemtelStub from "./pages/lemtel/LemtelStub";
 import LemtelCustomers from "./pages/lemtel/LemtelCustomers";
 import CustomerDetail from "./pages/lemtel/CustomerDetail";
+import CustomerPortalGate from "./pages/CustomerPortalGate";
 import LemtelGateways from "./pages/lemtel/LemtelGateways";
 import LemtelVoiceGateways from "./pages/lemtel/LemtelVoiceGateways";
 import LemtelExtensions from "./pages/lemtel/LemtelExtensions";
