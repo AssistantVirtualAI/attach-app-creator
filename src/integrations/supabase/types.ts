@@ -10498,6 +10498,7 @@ export type Database = {
         Args: { _email: string; _extension: string; _org_id: string }
         Returns: Json
       }
+      audit_my_extension_isolation: { Args: never; Returns: Json }
       audit_my_pbx_extensions_access: {
         Args: { _org_id?: string }
         Returns: Json
