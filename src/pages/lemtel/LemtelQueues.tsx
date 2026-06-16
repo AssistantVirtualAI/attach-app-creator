@@ -19,7 +19,18 @@ import {
 import {
   Headphones, Plus, Loader2, Pencil, Trash2, Users, RefreshCw, Shield, UserPlus, Activity,
   Download, Upload, AlertTriangle, CheckCircle2, Clock, Lock, Search, ArrowUpDown, ChevronLeft, ChevronRight,
+  ArrowRight,
 } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+
+// Extension display helper — pbx_extensions doesn't have a display_name column
+const extName = (e: any) =>
+  e?.effective_cid_name
+  || [e?.directory_first_name, e?.directory_last_name].filter(Boolean).join(' ').trim()
+  || e?.description
+  || e?.extension
+  || '';
+const EXT_COLS = 'id, extension, effective_cid_name, directory_first_name, directory_last_name, description';
 import { usePbxQueues, LEMTEL_ORG, usePbxSync, usePbxSyncJobs } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
 import { supabase } from '@/integrations/supabase/client';
@@ -62,8 +73,10 @@ export default function LemtelQueues() {
   const { language } = useLanguage();
   const txt = qCopy[language];
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tab, setTab] = useState<'queues' | 'agents' | 'live'>('queues');
   const perms = usePerms();
   const selected = (queues as any[]).find((q) => q.id === selectedId) || null;
+  const openAgents = (id: string) => { setSelectedId(id); setTab('agents'); };
 
   return (
     <div className="space-y-6">
@@ -89,7 +102,7 @@ export default function LemtelQueues() {
         </Alert>
       )}
 
-      <Tabs defaultValue="queues" className="w-full">
+      <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="w-full">
         <TabsList>
           <TabsTrigger value="queues"><Headphones className="w-4 h-4 mr-1" /> Queues</TabsTrigger>
           <TabsTrigger value="agents" disabled={!selected}><Users className="w-4 h-4 mr-1" /> Agents & Supervisors</TabsTrigger>
@@ -109,7 +122,7 @@ export default function LemtelQueues() {
                   </TableRow></TableHeader>
                   <TableBody>
                     {(queues as any[]).map((q: any) => (
-                      <TableRow key={q.id} className={selectedId === q.id ? 'bg-muted/50' : 'cursor-pointer'} onClick={() => setSelectedId(q.id)}>
+                      <TableRow key={q.id} className={selectedId === q.id ? 'bg-muted/50' : 'cursor-pointer'} onClick={() => openAgents(q.id)}>
                         <TableCell className="font-medium">{q.name}</TableCell>
                         <TableCell className="font-mono">{q.extension || '-'}</TableCell>
                         <TableCell><Badge variant="outline">{q.strategy}</Badge></TableCell>
@@ -118,7 +131,7 @@ export default function LemtelQueues() {
                         <TableCell>{q.enabled ? <Badge>Enabled</Badge> : <Badge variant="outline">Disabled</Badge>}</TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-1.5 justify-end flex-wrap">
-                            <Button size="sm" variant="outline" onClick={() => setSelectedId(q.id)} title="Manage agents">
+                            <Button size="sm" variant="outline" onClick={() => openAgents(q.id)} title="Manage agents">
                               <Users className="w-3.5 h-3.5 mr-1" /> Agents
                             </Button>
                             {perms.canManage && <QueueDialog mode="edit" queue={q} trigger={
@@ -551,7 +564,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
     setLoading(true);
     const [{ data: a }, { data: e }] = await Promise.all([
       supabase.from('pbx_queue_agents').select('*').eq('queue_id', queue.id),
-      supabase.from('pbx_extensions').select('id, extension, display_name').eq('organization_id', LEMTEL_ORG).order('extension'),
+      supabase.from('pbx_extensions').select(EXT_COLS).eq('organization_id', LEMTEL_ORG).order('extension'),
     ]);
     setAgents(a || []); setExtensions(e || []); setLoading(false);
     return (a || []).length;
@@ -579,7 +592,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
       // Step 3: upsert local rows
       setStatus({ state: 'running', step: 'upsert', message: `Upserting ${mine.length} tier${mine.length === 1 ? '' : 's'}…`, pulled: mine.length, attempts: totalAttempts });
       const { data: extFresh = [] } = await supabase.from('pbx_extensions')
-        .select('id, extension, display_name').eq('organization_id', LEMTEL_ORG);
+        .select(EXT_COLS).eq('organization_id', LEMTEL_ORG);
 
       let upserted = 0;
       const upsertErrors: string[] = [];
@@ -591,7 +604,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
           queue_id: queue.id,
           extension_id: ext?.id || null,
           agent_id: agentExt,
-          agent_name: ext?.display_name || agentExt,
+          agent_name: extName(ext) || agentExt,
           tier_level: parseInt(t.tier_level) || 2,
           tier_position: parseInt(t.tier_position) || 1,
           pbx_uuid: t.call_center_tier_uuid,
@@ -659,7 +672,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
       if (error || data?.ok === false) throw new Error(data?.message || error?.message || 'Failed');
       await supabase.from('pbx_queue_agents').insert({
         queue_id: queue.id, extension_id: ext.id, agent_id: ext.extension,
-        agent_name: ext.display_name || ext.extension, tier_level, tier_position,
+        agent_name: extName(ext) || ext.extension, tier_level, tier_position,
       });
       toast({ title: `${role === 'supervisor' ? 'Supervisor' : 'Agent'} added` });
       load();
@@ -701,7 +714,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
         const tierUuid = (data as any)?.data?.call_center_tier_uuid || (data as any)?.call_center_tier_uuid || null;
         const { data: inserted } = await supabase.from('pbx_queue_agents').insert({
           queue_id: queue.id, extension_id: ext.id, agent_id: ext.extension,
-          agent_name: ext.display_name || ext.extension, tier_level, tier_position: basePos,
+          agent_name: extName(ext) || ext.extension, tier_level, tier_position: basePos,
           pbx_uuid: tierUuid, raw_data: tierUuid ? { call_center_tier_uuid: tierUuid } : null,
         } as any).select().maybeSingle();
         if (inserted) added.push(inserted);
@@ -788,7 +801,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
           Queue <span className="font-medium text-foreground">{queue.name}</span> · {agents.length} member{agents.length === 1 ? '' : 's'}
         </div>
         <div className="flex gap-2">
-          {perms.canAssign && <BulkAddBtn queueId={queue.id} extensions={availableExt} onAdd={bulkAdd} />}
+          {perms.canAssign && <BulkAddBtn queueId={queue.id} queueName={queue.name} extensions={availableExt} supCount={supervisors.length} agCount={regularAgents.length} onAdd={bulkAdd} />}
           <Button size="sm" variant="outline" onClick={resyncTiers} disabled={syncing}>
             {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />} Resync from PBX
           </Button>
@@ -944,48 +957,26 @@ function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRe
           </p>
         ) : (
           <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {canAssign && <TableHead className="w-8"><Checkbox checked={allSelected} onCheckedChange={toggleAll} /></TableHead>}
-                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('name')}>Name{sortIcon('name')}</TableHead>
-                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('extension')}>Extension{sortIcon('extension')}</TableHead>
-                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('role')}>Role{sortIcon('role')}</TableHead>
-                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('tier')}>Tier / Pos{sortIcon('tier')}</TableHead>
-                  {canAssign && <TableHead className="w-16"></TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paged.map((a: any) => (
-                  <TableRow key={a.id} data-state={selected[a.id] ? 'selected' : undefined}>
-                    {canAssign && (
-                      <TableCell><Checkbox checked={!!selected[a.id]} onCheckedChange={(v) => setSelected({ ...selected, [a.id]: !!v })} /></TableCell>
-                    )}
-                    <TableCell className="font-medium">{a.agent_name}</TableCell>
-                    <TableCell className="font-mono text-xs">{a.agent_id}</TableCell>
-                    <TableCell>
-                      <Badge variant={a._role === 'supervisor' ? 'default' : 'secondary'}>
-                        {a._role === 'supervisor' ? <Shield className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />}
-                        {a._role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">T{a.tier_level} · #{a.tier_position}</TableCell>
-                    {canAssign && (
-                      <TableCell>
-                        <Button size="sm" variant="ghost" onClick={() => onRemoveOne(a)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <VirtualMembersTable
+              rows={paged}
+              canAssign={canAssign}
+              selected={selected}
+              setSelected={setSelected}
+              onRemoveOne={onRemoveOne}
+              allSelected={allSelected}
+              toggleAll={toggleAll}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              toggleSort={toggleSort}
+              sortIcon={sortIcon}
+            />
             <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground flex-wrap gap-2">
-              <div>{filtered.length} member{filtered.length === 1 ? '' : 's'} · page {curPage + 1}/{totalPages}</div>
+              <div>{filtered.length} member{filtered.length === 1 ? '' : 's'} · page {curPage + 1}/{totalPages} <span className="opacity-60">(virtualized)</span></div>
               <div className="flex items-center gap-2">
                 <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(0); }}>
                   <SelectTrigger className="h-8 w-20"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {[10, 25, 50, 100].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
+                    {[10, 25, 50, 100, 250, 500].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Button size="sm" variant="outline" className="h-8" disabled={curPage === 0} onClick={() => setPage(curPage - 1)}><ChevronLeft className="w-4 h-4" /></Button>
@@ -1008,14 +999,24 @@ function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRe
               {' '}will be unassigned on FusionPBX. You can undo from the toast.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="border rounded max-h-56 overflow-y-auto text-sm divide-y">
-            {selectedRows.slice(0, 50).map((r: any) => (
-              <div key={r.id} className="px-3 py-1.5 flex items-center justify-between">
-                <span className="truncate">{r.agent_name} <span className="font-mono text-xs text-muted-foreground">· {r.agent_id}</span></span>
-                <Badge variant={r._role === 'supervisor' ? 'default' : 'secondary'} className="text-[10px]">{r._role}</Badge>
+          <div className="border rounded max-h-64 overflow-y-auto text-sm divide-y">
+            <div className="px-3 py-1.5 grid grid-cols-12 gap-2 text-[10px] uppercase tracking-wide text-muted-foreground bg-muted/40 sticky top-0">
+              <span className="col-span-5">Name</span>
+              <span className="col-span-3">Role</span>
+              <span className="col-span-2">Tier</span>
+              <span className="col-span-2 text-right">Pos</span>
+            </div>
+            {selectedRows.slice(0, 100).map((r: any) => (
+              <div key={r.id} className="px-3 py-1.5 grid grid-cols-12 gap-2 items-center">
+                <span className="col-span-5 truncate">{r.agent_name} <span className="font-mono text-[10px] text-muted-foreground">· {r.agent_id}</span></span>
+                <span className="col-span-3"><Badge variant={r._role === 'supervisor' ? 'default' : 'secondary'} className="text-[10px]">
+                  {r._role === 'supervisor' ? <Shield className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />}{r._role}
+                </Badge></span>
+                <span className="col-span-2 text-xs text-muted-foreground">T{r.tier_level}</span>
+                <span className="col-span-2 text-xs font-mono text-right text-muted-foreground">#{r.tier_position}</span>
               </div>
             ))}
-            {selectedRows.length > 50 && <div className="px-3 py-1.5 text-xs text-muted-foreground">…and {selectedRows.length - 50} more</div>}
+            {selectedRows.length > 100 && <div className="px-3 py-1.5 text-xs text-muted-foreground">…and {selectedRows.length - 100} more</div>}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -1029,7 +1030,66 @@ function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRe
   );
 }
 
-function BulkAddBtn({ queueId, extensions, onAdd }: { queueId: string; extensions: any[]; onAdd: (ids: string[], role: 'agent' | 'supervisor') => void }) {
+function VirtualMembersTable({ rows, canAssign, selected, setSelected, onRemoveOne, allSelected, toggleAll, sortKey, sortDir, toggleSort, sortIcon }: any) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 44,
+    overscan: 8,
+  });
+  const items = virtualizer.getVirtualItems();
+  const total = virtualizer.getTotalSize();
+
+  return (
+    <div className="border rounded-md">
+      <div className="grid grid-cols-[2rem_2fr_1fr_1fr_1fr_3rem] gap-2 px-3 py-2 text-xs font-medium border-b bg-muted/40 select-none">
+        {canAssign ? <Checkbox checked={allSelected} onCheckedChange={toggleAll} /> : <span />}
+        <span className="cursor-pointer" onClick={() => toggleSort('name')}>Name{sortIcon('name')}</span>
+        <span className="cursor-pointer" onClick={() => toggleSort('extension')}>Extension{sortIcon('extension')}</span>
+        <span className="cursor-pointer" onClick={() => toggleSort('role')}>Role{sortIcon('role')}</span>
+        <span className="cursor-pointer" onClick={() => toggleSort('tier')}>Tier / Pos{sortIcon('tier')}</span>
+        <span />
+      </div>
+      <div ref={parentRef} className="overflow-auto" style={{ maxHeight: 480 }}>
+        <div style={{ height: total, position: 'relative', width: '100%' }}>
+          {items.map((vi) => {
+            const a = rows[vi.index];
+            if (!a) return null;
+            return (
+              <div
+                key={a.id}
+                data-state={selected[a.id] ? 'selected' : undefined}
+                className="grid grid-cols-[2rem_2fr_1fr_1fr_1fr_3rem] gap-2 px-3 items-center border-b text-sm data-[state=selected]:bg-muted/50 hover:bg-muted/30"
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, height: vi.size, transform: `translateY(${vi.start}px)` }}
+              >
+                {canAssign ? (
+                  <Checkbox checked={!!selected[a.id]} onCheckedChange={(v) => setSelected({ ...selected, [a.id]: !!v })} />
+                ) : <span />}
+                <span className="font-medium truncate">{a.agent_name}</span>
+                <span className="font-mono text-xs">{a.agent_id}</span>
+                <span>
+                  <Badge variant={a._role === 'supervisor' ? 'default' : 'secondary'} className="text-[10px]">
+                    {a._role === 'supervisor' ? <Shield className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />}
+                    {a._role}
+                  </Badge>
+                </span>
+                <span className="text-xs text-muted-foreground">T{a.tier_level} · #{a.tier_position}</span>
+                {canAssign ? (
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onRemoveOne(a)}>
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                ) : <span />}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BulkAddBtn({ queueId, queueName, extensions, supCount, agCount, onAdd }: { queueId: string; queueName: string; extensions: any[]; supCount: number; agCount: number; onAdd: (ids: string[], role: 'agent' | 'supervisor') => void }) {
   const baseKey = `qa:${queueId}:add`;
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -1044,7 +1104,7 @@ function BulkAddBtn({ queueId, extensions, onAdd }: { queueId: string; extension
     if (!q) return extensions;
     return extensions.filter((e) =>
       (e.extension || '').toLowerCase().includes(q)
-      || (e.display_name || '').toLowerCase().includes(q));
+      || extName(e).toLowerCase().includes(q));
   }, [extensions, query]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE));
@@ -1109,7 +1169,7 @@ function BulkAddBtn({ queueId, extensions, onAdd }: { queueId: string; extension
                       <TableRow key={e.id} data-state={sel[e.id] ? 'selected' : undefined} className="cursor-pointer" onClick={() => setSel({ ...sel, [e.id]: !sel[e.id] })}>
                         <TableCell><Checkbox checked={!!sel[e.id]} onCheckedChange={(v) => setSel({ ...sel, [e.id]: !!v })} /></TableCell>
                         <TableCell className="font-mono">{e.extension}</TableCell>
-                        <TableCell>{e.display_name || '—'}</TableCell>
+                        <TableCell>{extName(e) || "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1140,19 +1200,34 @@ function BulkAddBtn({ queueId, extensions, onAdd }: { queueId: string; extension
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle>Add {selectedIds.length} {role === 'supervisor' ? 'supervisor' : 'agent'}{selectedIds.length === 1 ? '' : 's'}?</AlertDialogTitle>
+            <AlertDialogTitle>Add {selectedIds.length} {role === 'supervisor' ? 'supervisor' : 'agent'}{selectedIds.length === 1 ? '' : 's'} to {queueName}?</AlertDialogTitle>
             <AlertDialogDescription>
-              These extensions will be assigned to the queue on FusionPBX. You can undo from the toast.
+              Will be assigned as <b>{role === 'supervisor' ? 'Supervisor (T1)' : 'Agent (T2)'}</b>, starting at position <b>#{(role === 'supervisor' ? supCount : agCount) + 1}</b>. Undo available from the toast.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="border rounded max-h-56 overflow-y-auto text-sm divide-y">
-            {selectedExts.slice(0, 50).map((e: any) => (
-              <div key={e.id} className="px-3 py-1.5 flex items-center justify-between">
-                <span className="truncate">{e.display_name || '—'}</span>
-                <span className="font-mono text-xs text-muted-foreground">{e.extension}</span>
-              </div>
-            ))}
-            {selectedExts.length > 50 && <div className="px-3 py-1.5 text-xs text-muted-foreground">…and {selectedExts.length - 50} more</div>}
+          <div className="border rounded max-h-64 overflow-y-auto text-sm divide-y">
+            <div className="px-3 py-1.5 grid grid-cols-12 gap-2 text-[10px] uppercase tracking-wide text-muted-foreground bg-muted/40 sticky top-0">
+              <span className="col-span-5">Name</span>
+              <span className="col-span-3">Extension</span>
+              <span className="col-span-2">Role</span>
+              <span className="col-span-2 text-right">→ Pos</span>
+            </div>
+            {selectedExts.slice(0, 100).map((e: any, i: number) => {
+              const pos = (role === 'supervisor' ? supCount : agCount) + i + 1;
+              return (
+                <div key={e.id} className="px-3 py-1.5 grid grid-cols-12 gap-2 items-center">
+                  <span className="col-span-5 truncate">{extName(e) || "—"}</span>
+                  <span className="col-span-3 font-mono text-xs text-muted-foreground">{e.extension}</span>
+                  <span className="col-span-2"><Badge variant={role === 'supervisor' ? 'default' : 'secondary'} className="text-[10px]">
+                    {role === 'supervisor' ? <Shield className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />}{role}
+                  </Badge></span>
+                  <span className="col-span-2 text-xs font-mono text-right flex items-center justify-end gap-1 text-muted-foreground">
+                    <ArrowRight className="w-3 h-3" />#{pos}
+                  </span>
+                </div>
+              );
+            })}
+            {selectedExts.length > 100 && <div className="px-3 py-1.5 text-xs text-muted-foreground">…and {selectedExts.length - 100} more</div>}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Back</AlertDialogCancel>
