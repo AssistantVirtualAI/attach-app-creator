@@ -91,6 +91,7 @@ function ExtensionsTable() {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const loadFromDb = useCallback(async (orgId: string | null) => {
@@ -169,12 +170,38 @@ function ExtensionsTable() {
     }
   };
 
+  const createExtension = async (form: any) => {
+    setSaving(true);
+    try {
+      const scope = await resolveDesktopTenantScope();
+      const out: any = { ...form };
+      ['voicemail_enabled', 'enabled', 'voicemail_attach_file',
+       'voicemail_local_after_email', 'do_not_disturb',
+       'forward_all_enabled', 'forward_busy_enabled', 'forward_no_answer_enabled']
+        .forEach((k) => { if (typeof out[k] === 'boolean') out[k] = out[k] ? 'true' : 'false'; });
+      const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'create-extension', organization_id: scope.organization_id, params: { domain_uuid: scope.domain_uuid, ...out } },
+      });
+      if (err) throw err;
+      setCreating(false);
+      await reload(true);
+      window.dispatchEvent(new Event('ava:pbx-resource-saved'));
+    } catch (e: any) {
+      alert('Create failed: ' + (e?.message || 'unknown'));
+    } finally { setSaving(false); }
+  };
+
   const cols = ['Ext', 'Display Name', 'User', 'Voicemail', 'Status', ''];
   return (
     <>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Extensions <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500 }}>({data.length})</span></h1>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setCreating(true)} style={{
+            padding: '8px 14px', borderRadius: 9,
+            background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
+            border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4,
+          }}>＋ New Extension</button>
           <button onClick={() => reload(true)} disabled={syncing} style={{
             padding: '8px 14px', borderRadius: 9, background: 'transparent',
             border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer',
@@ -216,6 +243,16 @@ function ExtensionsTable() {
           saving={saving}
           onClose={() => setEditing(null)}
           onSave={(changes) => updateExtension(editing, changes)}
+        />
+      )}
+      {creating && (
+        <PbxEditSheet
+          title="New Extension"
+          groups={EXTENSION_GROUPS}
+          initial={{ enabled: true, voicemail_enabled: true, user_context: 'default' }}
+          saving={saving}
+          onCancel={() => setCreating(false)}
+          onSave={createExtension}
         />
       )}
     </>
@@ -542,6 +579,7 @@ function IvrsTable() {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const reload = useCallback(async (forceSync = false) => {
@@ -593,12 +631,30 @@ function IvrsTable() {
     }
   };
 
+  const create = async (form: any) => {
+    setSaving(true);
+    try {
+      const me = await getMeContext();
+      const orgId = me.organization_id || LEMTEL_ORG;
+      const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'create-ivr', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN, ...form } },
+      });
+      if (err) throw err;
+      setCreating(false);
+      await reload(true);
+      window.dispatchEvent(new Event('ava:pbx-resource-saved'));
+    } catch (e: any) {
+      alert('Create failed: ' + (e?.message || 'unknown'));
+    } finally { setSaving(false); }
+  };
+
   const cols = ['Name', 'Ext', 'Greeting', 'Timeout', 'Status', ''];
   return (
     <>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Auto-Attendants <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500 }}>({data.length})</span></h1>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setCreating(true)} style={{ padding: '8px 14px', borderRadius: 9, background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4 }}>＋ New Auto-Attendant</button>
           <button onClick={() => reload(true)} disabled={syncing} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: syncing ? 0.6 : 1 }}>{syncing ? 'Syncing…' : '↻ Sync from PBX'}</button>
           <button onClick={() => reload(false)} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Reload</button>
         </div>
@@ -622,6 +678,17 @@ function IvrsTable() {
         {!loading && error && <div style={{ padding: 28, textAlign: 'center', color: c.danger, fontSize: 12 }}>{error}</div>}
       </div>
       {editing && <EditIvrModal ivr={editing} saving={saving} onClose={() => setEditing(null)} onSave={(changes) => save(editing, changes)} />}
+      {creating && (
+        <PbxEditSheet
+          title="New Auto-Attendant"
+          groups={IVR_GROUPS}
+          initial={{ ivr_menu_enabled: 'true', ivr_menu_timeout: 3000, ivr_menu_exit_action: 'hangup' }}
+          saving={saving}
+          width={680}
+          onCancel={() => setCreating(false)}
+          onSave={create}
+        />
+      )}
     </>
   );
 }
@@ -660,6 +727,7 @@ function QueuesTable() {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
+  const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const reload = useCallback(async (forceSync = false) => {
@@ -716,12 +784,32 @@ function QueuesTable() {
     }
   };
 
+  const create = async (form: any) => {
+    setSaving(true);
+    try {
+      const me = await getMeContext();
+      const orgId = me.organization_id || LEMTEL_ORG;
+      const out: any = { ...form };
+      if (out.queue_max_wait_time !== undefined) out.queue_max_wait_time = String(out.queue_max_wait_time);
+      const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'create-queue', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN, ...out } },
+      });
+      if (err) throw err;
+      setCreating(false);
+      await reload(true);
+      window.dispatchEvent(new Event('ava:pbx-resource-saved'));
+    } catch (e: any) {
+      alert('Create failed: ' + (e?.message || 'unknown'));
+    } finally { setSaving(false); }
+  };
+
   const cols = ['Name', 'Ext', 'Strategy', 'Agents', 'Max wait', 'Status', ''];
   return (
     <>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Call Queues <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500 }}>({data.length})</span></h1>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setCreating(true)} style={{ padding: '8px 14px', borderRadius: 9, background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4 }}>＋ New Queue</button>
           <button onClick={() => reload(true)} disabled={syncing} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: syncing ? 0.6 : 1 }}>{syncing ? 'Syncing…' : '↻ Sync from PBX'}</button>
           <button onClick={() => reload(false)} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Reload</button>
         </div>
@@ -746,6 +834,17 @@ function QueuesTable() {
         {!loading && error && <div style={{ padding: 28, textAlign: 'center', color: c.danger, fontSize: 12 }}>{error}</div>}
       </div>
       {editing && <EditQueueModal queue={editing} saving={saving} onClose={() => setEditing(null)} onSave={(changes) => save(editing, changes)} />}
+      {creating && (
+        <PbxEditSheet
+          title="New Call Queue"
+          groups={QUEUE_GROUPS}
+          initial={{ queue_enabled: 'true', queue_strategy: 'ring-all', queue_max_wait_time: 60 }}
+          saving={saving}
+          width={680}
+          onCancel={() => setCreating(false)}
+          onSave={create}
+        />
+      )}
     </>
   );
 }
