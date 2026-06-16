@@ -17,12 +17,14 @@ export default function MyVoicemail() {
   const { list, markRead, remove, getAudioUrl, transcribe, summarize } = useMyVoicemails();
   const [selected, setSelected] = useState<Voicemail | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const t = (en: string, fr: string) => (lang === "fr" ? fr : en);
 
   const handlePlay = async (vm: Voicemail) => {
     setSelected(vm);
     setAudioUrl(null);
+    setSearchParams((p) => { p.set("vm", vm.id); return p; }, { replace: true });
     if (!vm.read_at) markRead.mutate(vm.id);
     try {
       const { url } = await getAudioUrl(vm.id);
@@ -33,6 +35,17 @@ export default function MyVoicemail() {
   };
 
   const vms = list.data?.voicemails ?? [];
+
+  // Auto-select from ?vm= when arriving via direct link or AI deep-link
+  useEffect(() => {
+    const id = searchParams.get("vm");
+    if (id && vms.length && (!selected || selected.id !== id)) {
+      const found = vms.find((v) => v.id === id);
+      if (found) handlePlay(found);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, vms.length]);
+
 
   return (
     <div className="p-6 space-y-6 max-w-6xl">
