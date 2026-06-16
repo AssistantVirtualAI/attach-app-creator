@@ -162,6 +162,21 @@ export default function ProfileMenu() {
             const next = (payload.new?.status || payload.old?.status) as Status | undefined;
             if (!next || !STATUS_META[next]) return;
             if (next === statusRef.current) return;
+            // Remote device changed status — drop any local auto-revert timer and pending picker.
+            if (expiryTimerRef.current) { clearTimeout(expiryTimerRef.current); expiryTimerRef.current = null; }
+            setExpiryAt(null);
+            setPendingStatus(null);
+            try { localStorage.removeItem(EXPIRY_KEY); } catch { /* noop */ }
+            // Parse "until:<iso>" from message to re-arm local timer if present.
+            const msg = payload.new?.status_message as string | undefined;
+            if (msg && msg.startsWith('until:')) {
+              const ts = Date.parse(msg.slice(6));
+              if (Number.isFinite(ts) && ts > Date.now()) {
+                setExpiryAt(ts);
+                try { localStorage.setItem(EXPIRY_KEY, String(ts)); } catch { /* noop */ }
+                scheduleAutoRevert(ts);
+              }
+            }
             setStatus(next);
             try { localStorage.setItem(STATUS_KEY, next); } catch { /* noop */ }
             window.dispatchEvent(new CustomEvent('lemtel:set-status', { detail: STATUS_META[next].manual }));
