@@ -102,7 +102,14 @@ export default function ConsoleLayout({
   };
 
   useEffect(() => {
-    const onResize = () => setCompact(window.innerWidth < 640);
+    const onResize = () => {
+      setCompact(window.innerWidth < 640);
+      // Auto-collapse the right-side AI panel on narrower desktop widths so
+      // the main work area never gets squeezed under ~1180 px.
+      if (window.innerWidth < 1180) setAiOpen(false);
+      else if (window.innerWidth >= 1360) setAiOpen(true);
+    };
+    onResize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);

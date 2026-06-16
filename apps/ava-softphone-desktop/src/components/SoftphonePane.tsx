@@ -833,8 +833,11 @@ function Dialer({
 
       {/* Dialpad */}
       <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: compact ? 8 : 14,
-        width: 'min(100%, 296px)', margin: compact ? '0 auto 20px' : '0 auto 26px',
+        display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+        gap: ultraCompact ? 6 : compact ? 8 : 14,
+        width: ultraCompact ? 'min(100%, 248px)' : 'min(100%, 296px)',
+        margin: compact ? '0 auto 16px' : '0 auto 26px',
+        padding: ultraCompact ? '0 4px' : 0, boxSizing: 'border-box',
       }}>
         {dialKeys.map(([key, sub]) => (
           <button
@@ -842,9 +845,9 @@ function Dialer({
             className="lemtel-key lemtel-glass"
             onClick={() => setDial((p) => p + key)}
             style={{
-              height: compact ? 58 : 72, display: 'flex', flexDirection: 'column',
+              height: ultraCompact ? 50 : compact ? 58 : 72, display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center', gap: 2,
-              borderRadius: 16,
+              borderRadius: 14,
               background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
               border: `1px solid ${c.border}`,
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
@@ -852,8 +855,8 @@ function Dialer({
               willChange: 'transform',
             }}
           >
-            <span className="ava-display-num" style={{ fontSize: compact ? 23 : 26, fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1 }}>{key}</span>
-            {sub && <span style={{ fontSize: 8.5, color: 'rgba(159,179,214,0.72)', letterSpacing: '0.22em', fontWeight: 700, marginTop: 2 }}>{sub}</span>}
+            <span className="ava-display-num" style={{ fontSize: ultraCompact ? 20 : compact ? 23 : 26, fontWeight: 600, letterSpacing: '-0.01em', lineHeight: 1 }}>{key}</span>
+            {sub && !ultraCompact && <span style={{ fontSize: 8.5, color: 'rgba(159,179,214,0.72)', letterSpacing: '0.22em', fontWeight: 700, marginTop: 2 }}>{sub}</span>}
           </button>
         ))}
       </div>
