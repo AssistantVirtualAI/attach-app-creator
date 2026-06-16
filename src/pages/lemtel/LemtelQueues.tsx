@@ -1030,7 +1030,7 @@ function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRe
   );
 }
 
-function BulkAddBtn({ queueId, extensions, onAdd }: { queueId: string; extensions: any[]; onAdd: (ids: string[], role: 'agent' | 'supervisor') => void }) {
+function BulkAddBtn({ queueId, queueName, extensions, supCount, agCount, onAdd }: { queueId: string; queueName: string; extensions: any[]; supCount: number; agCount: number; onAdd: (ids: string[], role: 'agent' | 'supervisor') => void }) {
   const baseKey = `qa:${queueId}:add`;
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
