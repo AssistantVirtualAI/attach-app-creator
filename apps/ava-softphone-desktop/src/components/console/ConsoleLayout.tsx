@@ -76,9 +76,10 @@ export default function ConsoleLayout({
   const [tourOpen, setTourOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const isAuditChild = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('audit') === 'child';
-  const { orgId, orgName } = useTenant();
+  const { orgId, orgName, extension: myExtension } = useTenant();
   const { isAdmin, isSuperAdmin, isSupervisor } = useDesktopRole(orgId);
   useRealtimeSync(orgId);
+  useExtensionDataSync(orgId, myExtension || creds.extension);
 
   // Redirect non-admins away from admin-only views
   useEffect(() => {
