@@ -284,8 +284,13 @@ const Dashboard = () => {
         {/* Charts */}
         <ConversationsChart metrics={currentMetrics} />
 
+        {/* Unified overview across all data sources */}
+        <DashboardOverviewGrid data={overview} isLoading={isLoadingOverview} />
+
         {/* Phone System overview (Lemtel members) */}
         <TelephonyStatsCard />
+
+
 
 
         {/* Priority Actions + Alerts */}
