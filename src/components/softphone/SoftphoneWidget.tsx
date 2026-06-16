@@ -65,6 +65,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
   const { isMember } = useLemtelAccess();
   const { user } = useAuth();
   const sp = useSoftphone();
+  const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [expanded, setExpanded] = useState(variant === "full");
   const [tab, setTab] = useState<Tab>("dial");
@@ -74,6 +75,8 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
   const [transferTarget, setTransferTarget] = useState("");
   const [tick, setTick] = useState(0);
   const [shake, setShake] = useState(false);
+  const [relinking, setRelinking] = useState(false);
+  const [showInsights, setShowInsights] = useState(true);
 
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
 
