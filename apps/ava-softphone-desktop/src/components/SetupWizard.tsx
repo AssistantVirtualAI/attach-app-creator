@@ -239,7 +239,7 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
 
             <div style={{ fontSize: 10.5, color: colors.textDim, lineHeight: 1.5, textAlign: 'center', marginTop: 2 }}>
               {mode === 'extension'
-                ? 'Use your SIP extension and password — your account will be created automatically.'
+                ? 'Use the same SIP password defined on your extension in the portal (or in FusionPBX). If you don\u2019t have one, ask your administrator to set it on your extension.'
                 : 'Sign in with the email and password tied to your Lemtel portal account.'}
             </div>
           </div>
