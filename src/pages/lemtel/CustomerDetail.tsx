@@ -29,10 +29,18 @@ async function pbxList(action: string, domain_uuid: string) {
 export default function CustomerDetail() {
   const { domainUuid = '' } = useParams();
   const qc = useQueryClient();
+  const impersonation = useImpersonation();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState('users');
   const [recUrls, setRecUrls] = useState<Record<string, string>>({});
   const [recLoading, setRecLoading] = useState<string | null>(null);
   const [expandedRec, setExpandedRec] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState<any>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({ extension: '', name: '', email: '' });
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
 
   // Domain info + tenant org
   const { data: domain } = useQuery({
