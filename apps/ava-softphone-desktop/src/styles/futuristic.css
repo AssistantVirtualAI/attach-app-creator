@@ -468,3 +468,47 @@ html[data-ava-theme="midnight"] {
   --ava-focus-outer: #a8bcff;
   --ava-focus-glow: rgba(168,188,255,0.48);
 }
+
+/* ============================================================
+   Readable labels & table headers — light/dark + zoom safe.
+   Uses theme tokens so contrast holds in every mode, and clamps
+   font sizes in rem so browser zoom / user font-size scale them.
+   ============================================================ */
+:where([data-ava-theme]) th,
+:where([data-ava-theme]) thead td,
+:where([data-ava-theme]) .ava-label,
+:where([data-ava-theme]) label {
+  color: var(--ava-text, #0b1530) !important;
+  font-size: clamp(0.75rem, 0.7rem + 0.15vw, 0.9rem) !important;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+}
+
+/* Uppercase eyebrow labels (e.g. table headers) keep their style
+   but still meet AA contrast in light & dark by leaning on text token. */
+:where([data-ava-theme]) th[style*="uppercase"],
+:where([data-ava-theme]) .ava-eyebrow,
+:where([data-ava-theme]) [style*="text-transform: uppercase"][style*="font-size"] {
+  color: var(--ava-text-muted, #3b4a6b) !important;
+}
+
+:where([data-ava-theme="dark"]) th[style*="uppercase"],
+:where([data-ava-theme="midnight"]) th[style*="uppercase"],
+:where([data-ava-theme="dark"]) .ava-eyebrow,
+:where([data-ava-theme="midnight"]) .ava-eyebrow {
+  color: rgba(234,240,255,0.85) !important;
+}
+
+/* Table body cells — ensure body text never falls below body token. */
+:where([data-ava-theme]) tbody td {
+  color: var(--ava-text, #0b1530);
+  font-size: clamp(0.8125rem, 0.78rem + 0.15vw, 0.95rem);
+}
+
+/* Generic small "muted" inline copy — clamp so it scales with zoom. */
+:where([data-ava-theme]) small,
+:where([data-ava-theme]) .ava-muted-text {
+  color: var(--ava-text-muted, #3b4a6b);
+  font-size: clamp(0.75rem, 0.72rem + 0.1vw, 0.85rem);
+}
