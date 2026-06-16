@@ -143,6 +143,7 @@ export function useSoftphone(args: UseSoftphoneArgs) {
           sipDomain: fetched.sip_domain || args.sipDomain || 'lemtel.lemtel.tel',
           wssUrl: fetched.wss_url || args.wssUrl || 'wss://lemtel.lemtel.tel:7443',
           password: fetched.password,
+          authUsername: fetched.auth_username || fetched.authUsername || fetched.extension || args.extension,
         };
         setConfig(cfg);
         await sipProvider.init(cfg);
