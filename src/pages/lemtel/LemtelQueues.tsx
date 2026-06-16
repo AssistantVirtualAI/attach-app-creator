@@ -13,13 +13,18 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Headphones, Plus, Loader2, Pencil, Trash2, Users, RefreshCw, Shield, UserPlus, Activity,
-  Download, Upload, AlertTriangle, CheckCircle2, Clock, Lock, Search,
+  Download, Upload, AlertTriangle, CheckCircle2, Clock, Lock, Search, ArrowUpDown, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { usePbxQueues, LEMTEL_ORG, usePbxSync, usePbxSyncJobs } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { toast as sonner } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallCenterRole } from '@/hooks/useCallCenterRole';
 import { formatDistanceToNow } from 'date-fns';
@@ -674,10 +679,12 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
     } catch (e: any) { toast({ title: 'Failed', description: e.message, variant: 'destructive' }); }
   };
 
-  const bulkAdd = async (extensionIds: string[], role: 'agent' | 'supervisor') => {
-    if (!perms.canAssign) { toast({ title: 'Forbidden', variant: 'destructive' }); return; }
+  // returns array of newly inserted rows so caller can offer undo
+  const bulkAddRaw = async (extensionIds: string[], role: 'agent' | 'supervisor') => {
+    if (!perms.canAssign) { toast({ title: 'Forbidden', variant: 'destructive' }); return [] as any[]; }
     const tier_level = role === 'supervisor' ? 1 : 2;
     let basePos = agents.filter((a) => a.tier_level === tier_level).length;
+    const added: any[] = [];
     let ok = 0, fail = 0;
     for (const id of extensionIds) {
       const ext = extensions.find((x) => x.id === id);
@@ -691,20 +698,23 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
           }},
         });
         if (error || data?.ok === false) throw new Error(data?.message || error?.message || 'Failed');
-        await supabase.from('pbx_queue_agents').insert({
+        const tierUuid = (data as any)?.data?.call_center_tier_uuid || (data as any)?.call_center_tier_uuid || null;
+        const { data: inserted } = await supabase.from('pbx_queue_agents').insert({
           queue_id: queue.id, extension_id: ext.id, agent_id: ext.extension,
           agent_name: ext.display_name || ext.extension, tier_level, tier_position: basePos,
-        });
+          pbx_uuid: tierUuid, raw_data: tierUuid ? { call_center_tier_uuid: tierUuid } : null,
+        } as any).select().maybeSingle();
+        if (inserted) added.push(inserted);
         ok++;
       } catch { fail++; }
     }
-    toast({ title: `Added ${ok}${fail ? ` · ${fail} failed` : ''}`, variant: fail ? 'destructive' : 'default' });
-    load();
+    await load();
+    return { added, ok, fail };
   };
 
-  const bulkRemove = async (rows: any[]) => {
-    if (!perms.canAssign) { toast({ title: 'Forbidden', variant: 'destructive' }); return; }
-    if (!confirm(`Remove ${rows.length} member${rows.length === 1 ? '' : 's'} from ${queue.name}?`)) return;
+  const bulkRemoveRaw = async (rows: any[]) => {
+    if (!perms.canAssign) { toast({ title: 'Forbidden', variant: 'destructive' }); return { removed: [], ok: 0, fail: 0 }; }
+    const removed: any[] = [];
     let ok = 0, fail = 0;
     for (const a of rows) {
       try {
@@ -712,11 +722,51 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
           await supabase.functions.invoke('fusionpbx-proxy', { body: { organization_id: LEMTEL_ORG, action: 'remove-queue-tier', params: { call_center_tier_uuid: a.raw_data.call_center_tier_uuid }}});
         }
         await supabase.from('pbx_queue_agents').delete().eq('id', a.id);
+        removed.push(a);
         ok++;
       } catch { fail++; }
     }
-    toast({ title: `Removed ${ok}${fail ? ` · ${fail} failed` : ''}`, variant: fail ? 'destructive' : 'default' });
-    load();
+    await load();
+    return { removed, ok, fail };
+  };
+
+  // Confirmed bulk add (called from preview dialog) + undo toast
+  const bulkAdd = async (extensionIds: string[], role: 'agent' | 'supervisor') => {
+    const res: any = await bulkAddRaw(extensionIds, role);
+    if (!res) return;
+    sonner.success(`Added ${res.ok} member${res.ok === 1 ? '' : 's'}${res.fail ? ` · ${res.fail} failed` : ''}`, {
+      action: res.added.length ? {
+        label: 'Undo',
+        onClick: async () => {
+          const r2 = await bulkRemoveRaw(res.added);
+          sonner.info(`Undo: removed ${r2.ok}${r2.fail ? ` · ${r2.fail} failed` : ''}`);
+        },
+      } : undefined,
+      duration: 8000,
+    });
+  };
+
+  // Confirmed bulk remove (called from preview dialog) + undo toast
+  const bulkRemove = async (rows: any[]) => {
+    const res = await bulkRemoveRaw(rows);
+    sonner.success(`Removed ${res.ok} member${res.ok === 1 ? '' : 's'}${res.fail ? ` · ${res.fail} failed` : ''}`, {
+      action: res.removed.length ? {
+        label: 'Undo',
+        onClick: async () => {
+          // group by tier_level then re-add
+          const groups = { 1: [] as string[], 2: [] as string[] } as Record<number, string[]>;
+          for (const r of res.removed) {
+            const lvl = r.tier_level === 1 ? 1 : 2;
+            if (r.extension_id) groups[lvl].push(r.extension_id);
+          }
+          let ok = 0;
+          if (groups[1].length) { const r1: any = await bulkAddRaw(groups[1], 'supervisor'); ok += r1?.ok || 0; }
+          if (groups[2].length) { const r2: any = await bulkAddRaw(groups[2], 'agent'); ok += r2?.ok || 0; }
+          sonner.info(`Undo: restored ${ok} member${ok === 1 ? '' : 's'}`);
+        },
+      } : undefined,
+      duration: 10000,
+    });
   };
 
   const supervisors = agents.filter((a) => a.tier_level === 1);
@@ -738,7 +788,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
           Queue <span className="font-medium text-foreground">{queue.name}</span> · {agents.length} member{agents.length === 1 ? '' : 's'}
         </div>
         <div className="flex gap-2">
-          {perms.canAssign && <BulkAddBtn extensions={availableExt} onAdd={bulkAdd} />}
+          {perms.canAssign && <BulkAddBtn queueId={queue.id} extensions={availableExt} onAdd={bulkAdd} />}
           <Button size="sm" variant="outline" onClick={resyncTiers} disabled={syncing}>
             {syncing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />} Resync from PBX
           </Button>
@@ -765,6 +815,8 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
 
       {loading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin" /></div> : (
         <MembersTable
+          queueId={queue.id}
+          queueName={queue.name}
           supervisors={supervisors}
           agents={regularAgents}
           canAssign={perms.canAssign}
@@ -777,10 +829,29 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
   );
 }
 
-function MembersTable({ supervisors, agents, canAssign, onRemoveOne, onBulkRemove, txt }: any) {
-  const [query, setQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'supervisor' | 'agent'>('all');
+// localStorage-backed state hook
+function usePersistedState<T>(key: string, initial: T): [T, (v: T) => void] {
+  const [val, setVal] = useState<T>(() => {
+    try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : initial; }
+    catch { return initial; }
+  });
+  const set = (v: T) => { setVal(v); try { localStorage.setItem(key, JSON.stringify(v)); } catch {} };
+  return [val, set];
+}
+
+type SortKey = 'name' | 'extension' | 'role' | 'tier';
+type SortDir = 'asc' | 'desc';
+
+function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRemoveOne, onBulkRemove, txt }: any) {
+  const baseKey = `qa:${queueId}`;
+  const [query, setQuery] = usePersistedState<string>(`${baseKey}:q`, '');
+  const [roleFilter, setRoleFilter] = usePersistedState<'all' | 'supervisor' | 'agent'>(`${baseKey}:role`, 'all');
+  const [sortKey, setSortKey] = usePersistedState<SortKey>(`${baseKey}:sk`, 'name');
+  const [sortDir, setSortDir] = usePersistedState<SortDir>(`${baseKey}:sd`, 'asc');
+  const [page, setPage] = usePersistedState<number>(`${baseKey}:pg`, 0);
+  const [pageSize, setPageSize] = usePersistedState<number>(`${baseKey}:ps`, 25);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const all = useMemo(() => {
     const sup = supervisors.map((a: any) => ({ ...a, _role: 'supervisor' }));
@@ -790,24 +861,53 @@ function MembersTable({ supervisors, agents, canAssign, onRemoveOne, onBulkRemov
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return all.filter((a) => {
+    const out = all.filter((a) => {
       if (roleFilter !== 'all' && a._role !== roleFilter) return false;
       if (!q) return true;
       return (a.agent_name || '').toLowerCase().includes(q)
         || (a.agent_id || '').toString().toLowerCase().includes(q);
     });
-  }, [all, query, roleFilter]);
+    const dir = sortDir === 'asc' ? 1 : -1;
+    out.sort((a: any, b: any) => {
+      let av: any, bv: any;
+      switch (sortKey) {
+        case 'extension': av = a.agent_id || ''; bv = b.agent_id || ''; break;
+        case 'role': av = a._role; bv = b._role; break;
+        case 'tier': av = (a.tier_level || 0) * 1000 + (a.tier_position || 0); bv = (b.tier_level || 0) * 1000 + (b.tier_position || 0); break;
+        default: av = (a.agent_name || '').toLowerCase(); bv = (b.agent_name || '').toLowerCase();
+      }
+      return av < bv ? -dir : av > bv ? dir : 0;
+    });
+    return out;
+  }, [all, query, roleFilter, sortKey, sortDir]);
 
-  const allSelected = filtered.length > 0 && filtered.every((a) => selected[a.id]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const curPage = Math.min(page, totalPages - 1);
+  const paged = filtered.slice(curPage * pageSize, (curPage + 1) * pageSize);
+
+  const allSelected = paged.length > 0 && paged.every((a) => selected[a.id]);
   const selectedRows = filtered.filter((a) => selected[a.id]);
 
   const toggleAll = () => {
-    if (allSelected) {
-      const next = { ...selected }; filtered.forEach((a) => delete next[a.id]); setSelected(next);
-    } else {
-      const next = { ...selected }; filtered.forEach((a) => { next[a.id] = true; }); setSelected(next);
-    }
+    const next = { ...selected };
+    if (allSelected) paged.forEach((a) => delete next[a.id]);
+    else paged.forEach((a) => { next[a.id] = true; });
+    setSelected(next);
   };
+
+  const toggleSort = (k: SortKey) => {
+    if (sortKey === k) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(k); setSortDir('asc'); }
+  };
+
+  const sortIcon = (k: SortKey) => sortKey === k
+    ? <ArrowUpDown className={`w-3 h-3 ml-1 inline ${sortDir === 'desc' ? 'rotate-180' : ''} transition-transform`} />
+    : <ArrowUpDown className="w-3 h-3 ml-1 inline opacity-30" />;
+
+  const supCount = selectedRows.filter((r) => r._role === 'supervisor').length;
+  const agCount = selectedRows.length - supCount;
+
+  const resetFilters = () => { setQuery(''); setRoleFilter('all'); setSortKey('name'); setSortDir('asc'); setPage(0); };
 
   return (
     <Card>
@@ -816,9 +916,9 @@ function MembersTable({ supervisors, agents, canAssign, onRemoveOne, onBulkRemov
           <div className="flex items-center gap-2 flex-1 min-w-[200px]">
             <div className="relative flex-1 max-w-sm">
               <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Search by name or extension…" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-8 h-9" />
+              <Input placeholder="Search by name or extension…" value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} className="pl-8 h-9" />
             </div>
-            <Select value={roleFilter} onValueChange={(v: any) => setRoleFilter(v)}>
+            <Select value={roleFilter} onValueChange={(v: any) => { setRoleFilter(v); setPage(0); }}>
               <SelectTrigger className="w-40 h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All members</SelectItem>
@@ -826,9 +926,12 @@ function MembersTable({ supervisors, agents, canAssign, onRemoveOne, onBulkRemov
                 <SelectItem value="agent">Agents</SelectItem>
               </SelectContent>
             </Select>
+            {(query || roleFilter !== 'all' || sortKey !== 'name' || sortDir !== 'asc') && (
+              <Button size="sm" variant="ghost" className="h-9" onClick={resetFilters}>Reset</Button>
+            )}
           </div>
           {canAssign && selectedRows.length > 0 && (
-            <Button size="sm" variant="destructive" onClick={() => { onBulkRemove(selectedRows); setSelected({}); }}>
+            <Button size="sm" variant="destructive" onClick={() => setConfirmOpen(true)}>
               <Trash2 className="w-4 h-4 mr-1" /> Remove {selectedRows.length}
             </Button>
           )}
@@ -840,52 +943,101 @@ function MembersTable({ supervisors, agents, canAssign, onRemoveOne, onBulkRemov
             {all.length === 0 ? `${txt.noAgents}` : 'No members match your filter.'}
           </p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {canAssign && <TableHead className="w-8"><Checkbox checked={allSelected} onCheckedChange={toggleAll} /></TableHead>}
-                <TableHead>Name</TableHead>
-                <TableHead>Extension</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Tier / Pos</TableHead>
-                {canAssign && <TableHead className="w-16"></TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((a: any) => (
-                <TableRow key={a.id} data-state={selected[a.id] ? 'selected' : undefined}>
-                  {canAssign && (
-                    <TableCell><Checkbox checked={!!selected[a.id]} onCheckedChange={(v) => setSelected({ ...selected, [a.id]: !!v })} /></TableCell>
-                  )}
-                  <TableCell className="font-medium">{a.agent_name}</TableCell>
-                  <TableCell className="font-mono text-xs">{a.agent_id}</TableCell>
-                  <TableCell>
-                    <Badge variant={a._role === 'supervisor' ? 'default' : 'secondary'}>
-                      {a._role === 'supervisor' ? <Shield className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />}
-                      {a._role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">T{a.tier_level} · #{a.tier_position}</TableCell>
-                  {canAssign && (
-                    <TableCell>
-                      <Button size="sm" variant="ghost" onClick={() => onRemoveOne(a)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                    </TableCell>
-                  )}
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {canAssign && <TableHead className="w-8"><Checkbox checked={allSelected} onCheckedChange={toggleAll} /></TableHead>}
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('name')}>Name{sortIcon('name')}</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('extension')}>Extension{sortIcon('extension')}</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('role')}>Role{sortIcon('role')}</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort('tier')}>Tier / Pos{sortIcon('tier')}</TableHead>
+                  {canAssign && <TableHead className="w-16"></TableHead>}
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {paged.map((a: any) => (
+                  <TableRow key={a.id} data-state={selected[a.id] ? 'selected' : undefined}>
+                    {canAssign && (
+                      <TableCell><Checkbox checked={!!selected[a.id]} onCheckedChange={(v) => setSelected({ ...selected, [a.id]: !!v })} /></TableCell>
+                    )}
+                    <TableCell className="font-medium">{a.agent_name}</TableCell>
+                    <TableCell className="font-mono text-xs">{a.agent_id}</TableCell>
+                    <TableCell>
+                      <Badge variant={a._role === 'supervisor' ? 'default' : 'secondary'}>
+                        {a._role === 'supervisor' ? <Shield className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />}
+                        {a._role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">T{a.tier_level} · #{a.tier_position}</TableCell>
+                    {canAssign && (
+                      <TableCell>
+                        <Button size="sm" variant="ghost" onClick={() => onRemoveOne(a)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground flex-wrap gap-2">
+              <div>{filtered.length} member{filtered.length === 1 ? '' : 's'} · page {curPage + 1}/{totalPages}</div>
+              <div className="flex items-center gap-2">
+                <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(0); }}>
+                  <SelectTrigger className="h-8 w-20"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[10, 25, 50, 100].map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button size="sm" variant="outline" className="h-8" disabled={curPage === 0} onClick={() => setPage(curPage - 1)}><ChevronLeft className="w-4 h-4" /></Button>
+                <Button size="sm" variant="outline" className="h-8" disabled={curPage >= totalPages - 1} onClick={() => setPage(curPage + 1)}><ChevronRight className="w-4 h-4" /></Button>
+              </div>
+            </div>
+          </>
         )}
       </CardContent>
+
+      {/* Bulk remove preview + confirm */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {selectedRows.length} member{selectedRows.length === 1 ? '' : 's'} from {queueName}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {supCount > 0 && <span><b>{supCount}</b> supervisor{supCount === 1 ? '' : 's'}</span>}
+              {supCount > 0 && agCount > 0 && ' · '}
+              {agCount > 0 && <span><b>{agCount}</b> agent{agCount === 1 ? '' : 's'}</span>}
+              {' '}will be unassigned on FusionPBX. You can undo from the toast.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="border rounded max-h-56 overflow-y-auto text-sm divide-y">
+            {selectedRows.slice(0, 50).map((r: any) => (
+              <div key={r.id} className="px-3 py-1.5 flex items-center justify-between">
+                <span className="truncate">{r.agent_name} <span className="font-mono text-xs text-muted-foreground">· {r.agent_id}</span></span>
+                <Badge variant={r._role === 'supervisor' ? 'default' : 'secondary'} className="text-[10px]">{r._role}</Badge>
+              </div>
+            ))}
+            {selectedRows.length > 50 && <div className="px-3 py-1.5 text-xs text-muted-foreground">…and {selectedRows.length - 50} more</div>}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { onBulkRemove(selectedRows); setSelected({}); setConfirmOpen(false); }}>
+              Remove {selectedRows.length}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
 
-function BulkAddBtn({ extensions, onAdd }: { extensions: any[]; onAdd: (ids: string[], role: 'agent' | 'supervisor') => void }) {
+function BulkAddBtn({ queueId, extensions, onAdd }: { queueId: string; extensions: any[]; onAdd: (ids: string[], role: 'agent' | 'supervisor') => void }) {
+  const baseKey = `qa:${queueId}:add`;
   const [open, setOpen] = useState(false);
-  const [role, setRole] = useState<'agent' | 'supervisor'>('agent');
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [role, setRole] = usePersistedState<'agent' | 'supervisor'>(`${baseKey}:role`, 'agent');
   const [query, setQuery] = useState('');
   const [sel, setSel] = useState<Record<string, boolean>>({});
+  const [page, setPage] = useState(0);
+  const PAGE = 50;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -895,78 +1047,122 @@ function BulkAddBtn({ extensions, onAdd }: { extensions: any[]; onAdd: (ids: str
       || (e.display_name || '').toLowerCase().includes(q));
   }, [extensions, query]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE));
+  const curPage = Math.min(page, totalPages - 1);
+  const paged = filtered.slice(curPage * PAGE, (curPage + 1) * PAGE);
+
   const selectedIds = Object.keys(sel).filter((k) => sel[k]);
-  const allSelected = filtered.length > 0 && filtered.every((e) => sel[e.id]);
+  const selectedExts = extensions.filter((e) => sel[e.id]);
+  const allSelected = paged.length > 0 && paged.every((e) => sel[e.id]);
   const toggleAll = () => {
-    if (allSelected) {
-      const next = { ...sel }; filtered.forEach((e) => delete next[e.id]); setSel(next);
-    } else {
-      const next = { ...sel }; filtered.forEach((e) => { next[e.id] = true; }); setSel(next);
-    }
+    const next = { ...sel };
+    if (allSelected) paged.forEach((e) => delete next[e.id]);
+    else paged.forEach((e) => { next[e.id] = true; });
+    setSel(next);
   };
 
-  const submit = () => {
-    if (selectedIds.length === 0) return;
+  const reset = () => { setSel({}); setQuery(''); setPage(0); };
+  const handleClose = (v: boolean) => { setOpen(v); if (!v) reset(); };
+
+  const doSubmit = () => {
     onAdd(selectedIds, role);
-    setSel({}); setQuery(''); setOpen(false);
+    setConfirmOpen(false); setOpen(false); reset();
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setSel({}); setQuery(''); } }}>
-      <DialogTrigger asChild><Button size="sm"><UserPlus className="w-4 h-4 mr-1" /> Add members</Button></DialogTrigger>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Add members to queue</DialogTitle>
-          <DialogDescription>Select one or many extensions. Choose whether to add them as agents or supervisors.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Select value={role} onValueChange={(v: any) => setRole(v)}>
-              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="agent">Add as Agent (T2)</SelectItem>
-                <SelectItem value="supervisor">Add as Supervisor (T1)</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input placeholder="Search extension or name…" value={query} onChange={(e) => setQuery(e.target.value)} className="pl-8" />
+    <>
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogTrigger asChild><Button size="sm"><UserPlus className="w-4 h-4 mr-1" /> Add members</Button></DialogTrigger>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add members to queue</DialogTitle>
+            <DialogDescription>Select one or many extensions. Choose whether to add them as agents or supervisors.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Select value={role} onValueChange={(v: any) => setRole(v)}>
+                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="agent">Add as Agent (T2)</SelectItem>
+                  <SelectItem value="supervisor">Add as Supervisor (T1)</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input placeholder="Search extension or name…" value={query} onChange={(e) => { setQuery(e.target.value); setPage(0); }} className="pl-8" />
+              </div>
             </div>
-          </div>
-          <div className="border rounded-md max-h-[360px] overflow-y-auto">
-            {filtered.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">No available extensions match.</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-8"><Checkbox checked={allSelected} onCheckedChange={toggleAll} /></TableHead>
-                    <TableHead>Extension</TableHead>
-                    <TableHead>Display name</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((e) => (
-                    <TableRow key={e.id} data-state={sel[e.id] ? 'selected' : undefined} className="cursor-pointer" onClick={() => setSel({ ...sel, [e.id]: !sel[e.id] })}>
-                      <TableCell><Checkbox checked={!!sel[e.id]} onCheckedChange={(v) => setSel({ ...sel, [e.id]: !!v })} /></TableCell>
-                      <TableCell className="font-mono">{e.extension}</TableCell>
-                      <TableCell>{e.display_name || '—'}</TableCell>
+            <div className="border rounded-md max-h-[360px] overflow-y-auto">
+              {filtered.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No available extensions match.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-8"><Checkbox checked={allSelected} onCheckedChange={toggleAll} /></TableHead>
+                      <TableHead>Extension</TableHead>
+                      <TableHead>Display name</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {paged.map((e) => (
+                      <TableRow key={e.id} data-state={sel[e.id] ? 'selected' : undefined} className="cursor-pointer" onClick={() => setSel({ ...sel, [e.id]: !sel[e.id] })}>
+                        <TableCell><Checkbox checked={!!sel[e.id]} onCheckedChange={(v) => setSel({ ...sel, [e.id]: !!v })} /></TableCell>
+                        <TableCell className="font-mono">{e.extension}</TableCell>
+                        <TableCell>{e.display_name || '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+            {totalPages > 1 && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <div>{filtered.length} extensions · page {curPage + 1}/{totalPages}</div>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" className="h-7" disabled={curPage === 0} onClick={() => setPage(curPage - 1)}><ChevronLeft className="w-3 h-3" /></Button>
+                  <Button size="sm" variant="outline" className="h-7" disabled={curPage >= totalPages - 1} onClick={() => setPage(curPage + 1)}><ChevronRight className="w-3 h-3" /></Button>
+                </div>
+              </div>
             )}
           </div>
-        </div>
-        <DialogFooter>
-          <div className="text-xs text-muted-foreground mr-auto self-center">{selectedIds.length} selected</div>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button disabled={selectedIds.length === 0} onClick={submit}>
-            <UserPlus className="w-4 h-4 mr-1" /> Add {selectedIds.length || ''} {role === 'supervisor' ? 'supervisor(s)' : 'agent(s)'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter>
+            <div className="text-xs text-muted-foreground mr-auto self-center">{selectedIds.length} selected</div>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button disabled={selectedIds.length === 0} onClick={() => setConfirmOpen(true)}>
+              <UserPlus className="w-4 h-4 mr-1" /> Review & add {selectedIds.length || ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk add preview + confirm */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Add {selectedIds.length} {role === 'supervisor' ? 'supervisor' : 'agent'}{selectedIds.length === 1 ? '' : 's'}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              These extensions will be assigned to the queue on FusionPBX. You can undo from the toast.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="border rounded max-h-56 overflow-y-auto text-sm divide-y">
+            {selectedExts.slice(0, 50).map((e: any) => (
+              <div key={e.id} className="px-3 py-1.5 flex items-center justify-between">
+                <span className="truncate">{e.display_name || '—'}</span>
+                <span className="font-mono text-xs text-muted-foreground">{e.extension}</span>
+              </div>
+            ))}
+            {selectedExts.length > 50 && <div className="px-3 py-1.5 text-xs text-muted-foreground">…and {selectedExts.length - 50} more</div>}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Back</AlertDialogCancel>
+            <AlertDialogAction onClick={doSubmit}>
+              Confirm add
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
