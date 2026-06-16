@@ -629,7 +629,8 @@ function MetricDetailDrawer(props: {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 'min(560px, 100%)', height: '100dvh', background: '#f6f8fd',
+          width: 'min(560px, 100%)', height: '100dvh', background: c.bg,
+          color: c.text,
           borderLeft: `1px solid ${c.border}`,
           display: 'flex', flexDirection: 'column',
           boxShadow: '-20px 0 50px -20px rgba(8,14,32,0.45)',
