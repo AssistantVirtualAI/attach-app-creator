@@ -450,15 +450,18 @@ function ChannelView({ channel, userId, userName, directory, t }: { channel: Cha
             {t("No messages yet. Say hi 👋", "Aucun message. Lance la discussion 👋")}
           </div>
         )}
-        {messages.filter((m: any) => !m.parent_message_id).map((m) => {
+        {messages.filter((m: any) => !m.parent_message_id && !blockedIds.has(m.sender_id)).map((m) => {
           const isPinned = pinnedMsgs.some((p: any) => p.id === m.id);
           return (
             <MessageBubble
               key={m.id}
               msg={m}
               isOwn={m.sender_id === userId}
+              currentUserId={userId}
               isPinned={isPinned}
+              isAdmin={isAdmin}
               onDelete={() => remove.mutate(m.id)}
+              onEdit={(content) => edit.mutate({ id: m.id, content })}
               onReact={(emoji) => react.mutate({ id: m.id, emoji })}
               onOpenThread={() => setThreadParent(m)}
               onTogglePin={() => isPinned ? unpin.mutate(m.id) : pin.mutate(m.id)}
