@@ -4,6 +4,12 @@ import { theme } from '../../lib/theme';
 import { ava, getMeContext } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
 import PbxResourceSection from './admin/PbxResourceSection';
+import PbxEditSheet from './admin/PbxEditSheet';
+import {
+  EXTENSION_GROUPS, IVR_GROUPS, QUEUE_GROUPS, RING_GROUP_GROUPS,
+  TIME_CONDITION_GROUPS, CONFERENCE_GROUPS, HOLD_MUSIC_GROUPS,
+  GATEWAY_GROUPS, DIALPLAN_GROUPS,
+} from '../../lib/pbxFieldSchemas';
 import VoicemailView from './VoicemailView';
 import RecordingsView from './RecordingsView';
 import CallsView from './CallsView';
@@ -217,33 +223,29 @@ function ExtensionsTable() {
 }
 
 function EditExtensionModal({ ext, saving, onClose, onSave }: { ext: any; saving: boolean; onClose: () => void; onSave: (changes: any) => void }) {
-  const [displayName, setDisplayName] = useState(ext.display_name === '—' ? '' : ext.display_name || '');
-  const [voicemail, setVoicemail] = useState(!!ext.voicemail_enabled);
-  const [enabled, setEnabled] = useState(ext.enabled !== false);
+  const initial = {
+    ...ext,
+    effective_caller_id_name: ext.display_name === '—' ? '' : ext.display_name || '',
+    voicemail_enabled: !!ext.voicemail_enabled,
+    enabled: ext.enabled !== false,
+  };
   return (
-    <ModalShell title={`Edit Extension ${ext.extension}`} onClose={onClose} width={420}>
-      <Label>Display name</Label>
-      <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={inputStyle} />
-      <div style={{ display: 'flex', gap: 16, marginTop: 14 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12 }}>
-          <input type="checkbox" checked={voicemail} onChange={(e) => setVoicemail(e.target.checked)} /> Voicemail
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12 }}>
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
-        </label>
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginTop: 22, justifyContent: 'flex-end' }}>
-        <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-        <button onClick={() => onSave({
-          effective_caller_id_name: displayName,
-          voicemail_enabled: voicemail ? 'true' : 'false',
-          enabled: enabled ? 'true' : 'false',
-        })} disabled={saving} style={{
-          padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer',
-          background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1,
-        }}>{saving ? 'Saving…' : 'Save & sync to PBX'}</button>
-      </div>
-    </ModalShell>
+    <PbxEditSheet
+      title={`Edit Extension ${ext.extension}`}
+      groups={EXTENSION_GROUPS}
+      initial={initial}
+      saving={saving}
+      onCancel={onClose}
+      onSave={(form) => {
+        // Booleans → 'true'/'false' strings expected by FusionPBX
+        const out: any = { ...form };
+        ['voicemail_enabled', 'enabled', 'voicemail_attach_file',
+         'voicemail_local_after_email', 'do_not_disturb',
+         'forward_all_enabled', 'forward_busy_enabled', 'forward_no_answer_enabled']
+          .forEach((k) => { if (typeof out[k] === 'boolean') out[k] = out[k] ? 'true' : 'false'; });
+        onSave(out);
+      }}
+    />
   );
 }
 
@@ -346,7 +348,8 @@ export default function AdminView() {
           <PbxResourceSection
             kind="ring-groups" actionKind="ring-group" title="Ring Groups" uuidField="ring_group_uuid"
             cols={[{ key: 'ring_group_name', label: 'Name' }, { key: 'ring_group_extension', label: 'Extension' }, { key: 'ring_group_strategy', label: 'Strategy' }, { key: 'ring_group_enabled', label: 'Enabled' }]}
-            fields={[{ key: 'ring_group_name', label: 'Name' }, { key: 'ring_group_extension', label: 'Extension' }, { key: 'ring_group_strategy', label: 'Strategy', type: 'select', options: ['simultaneous', 'sequence', 'enterprise'] }, { key: 'ring_group_timeout_app', label: 'Timeout App' }, { key: 'ring_group_forward_destination', label: 'Forwarding / fallback' }, { key: 'ring_group_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] }, { key: 'ring_group_description', label: 'Description', type: 'textarea' }]}
+            fieldGroups={RING_GROUP_GROUPS}
+            sheetWidth={680}
           />
         )}
         {sec === 'gateways' && (
@@ -359,15 +362,7 @@ export default function AdminView() {
               { key: 'enabled', label: 'Enabled', render: (v) => (String(v) === 'true' ? '✓' : '—') },
               { key: 'register', label: 'Register' },
             ]}
-            fields={[
-              { key: 'gateway', label: 'Name' },
-              { key: 'username', label: 'Username' },
-              { key: 'password', label: 'Password' },
-              { key: 'proxy', label: 'Proxy (host[:port])' },
-              { key: 'realm', label: 'Realm' },
-              { key: 'register', label: 'Register', type: 'select', options: ['true', 'false'] },
-              { key: 'enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
-            ]}
+            fieldGroups={GATEWAY_GROUPS}
             rowActions={[{
               label: 'Restart',
               run: async (row, { orgId }) => {
@@ -405,13 +400,7 @@ export default function AdminView() {
               { key: 'conference_room_pin', label: 'PIN' },
               { key: 'conference_room_enabled', label: 'Enabled' },
             ]}
-            fields={[
-              { key: 'conference_room_name', label: 'Name' },
-              { key: 'conference_room_extension', label: 'Extension' },
-              { key: 'conference_room_pin', label: 'PIN' },
-              { key: 'conference_room_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
-              { key: 'conference_room_description', label: 'Description', type: 'textarea' },
-            ]}
+            fieldGroups={CONFERENCE_GROUPS}
           />
         )}
         {sec === 'hold-music' && (
@@ -423,12 +412,7 @@ export default function AdminView() {
               { key: 'music_on_hold_rate', label: 'Rate' },
               { key: 'music_on_hold_enabled', label: 'Enabled' },
             ]}
-            fields={[
-              { key: 'music_on_hold_name', label: 'Name' },
-              { key: 'music_on_hold_path', label: 'Path' },
-              { key: 'music_on_hold_rate', label: 'Rate', type: 'select', options: ['8000', '16000', '32000', '48000'] },
-              { key: 'music_on_hold_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
-            ]}
+            fieldGroups={HOLD_MUSIC_GROUPS}
           />
         )}
         {sec === 'dialplans' && (
@@ -441,16 +425,8 @@ export default function AdminView() {
               { key: 'dialplan_continue', label: 'Continue' },
               { key: 'dialplan_enabled', label: 'Enabled' },
             ]}
-            fields={[
-              { key: 'dialplan_name', label: 'Name' },
-              { key: 'dialplan_number', label: 'Number' },
-              { key: 'dialplan_context', label: 'Context' },
-              { key: 'dialplan_order', label: 'Order', type: 'number' },
-              { key: 'dialplan_continue', label: 'Continue', type: 'select', options: ['true', 'false'] },
-              { key: 'dialplan_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
-              { key: 'dialplan_xml', label: 'XML', type: 'textarea' },
-              { key: 'dialplan_description', label: 'Description' },
-            ]}
+            fieldGroups={DIALPLAN_GROUPS}
+            sheetWidth={720}
           />
         )}
         {sec === 'time-conditions' && (
@@ -461,12 +437,7 @@ export default function AdminView() {
               { key: 'dialplan_number', label: 'Match' },
               { key: 'dialplan_enabled', label: 'Enabled' },
             ]}
-            fields={[
-              { key: 'dialplan_name', label: 'Name' },
-              { key: 'dialplan_number', label: 'Match expression' },
-              { key: 'dialplan_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
-              { key: 'dialplan_description', label: 'Description' },
-            ]}
+            fieldGroups={TIME_CONDITION_GROUPS}
           />
         )}
         {sec === 'feature-codes' && <FeatureCodesTable />}
@@ -656,34 +627,25 @@ function IvrsTable() {
 }
 
 function EditIvrModal({ ivr, saving, onClose, onSave }: { ivr: any; saving: boolean; onClose: () => void; onSave: (changes: any) => void }) {
-  const [name, setName] = useState(ivr.name || '');
-  const [extension, setExtension] = useState(ivr.extension || '');
-  const [greet, setGreet] = useState(ivr.greet_long || '');
-  const [timeout, setTimeoutMs] = useState(ivr.timeout_ms || 3000);
-  const [enabled, setEnabled] = useState(ivr.enabled !== false);
+  const initial = {
+    ivr_menu_name: ivr.name || '',
+    ivr_menu_extension: ivr.extension || '',
+    ivr_menu_greet_long: ivr.greet_long || '',
+    ivr_menu_greet_short: ivr.greet_short || '',
+    ivr_menu_timeout: ivr.timeout_ms || 3000,
+    ivr_menu_enabled: ivr.enabled !== false ? 'true' : 'false',
+    ivr_menu_exit_action: ivr.exit_action || 'hangup',
+  };
   return (
-    <ModalShell title={`Edit IVR · ${ivr.name}`} onClose={onClose} width={500}>
-      <Label>Name</Label><input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-      <div style={{ height: 12 }} />
-      <Label>Extension</Label><input value={extension} onChange={(e) => setExtension(e.target.value)} style={inputStyle} />
-      <div style={{ height: 12 }} />
-      <Label>Greeting (long)</Label><textarea value={greet} onChange={(e) => setGreet(e.target.value)} rows={4} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
-      <div style={{ height: 12 }} />
-      <Label>Timeout (ms)</Label><input type="number" value={timeout} onChange={(e) => setTimeoutMs(Number(e.target.value))} style={inputStyle} />
-      <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12, marginTop: 14 }}>
-        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
-      </label>
-      <div style={{ display: 'flex', gap: 8, marginTop: 22, justifyContent: 'flex-end' }}>
-        <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-        <button onClick={() => onSave({
-          ivr_menu_name: name,
-          ivr_menu_extension: extension,
-          ivr_menu_greet_long: greet,
-          ivr_menu_timeout: timeout,
-          ivr_menu_enabled: enabled ? 'true' : 'false',
-        })} disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save & sync to PBX'}</button>
-      </div>
-    </ModalShell>
+    <PbxEditSheet
+      title={`Edit IVR · ${ivr.name}`}
+      groups={IVR_GROUPS}
+      initial={initial}
+      saving={saving}
+      width={680}
+      onCancel={onClose}
+      onSave={onSave}
+    />
   );
 }
 
@@ -789,60 +751,27 @@ function QueuesTable() {
 }
 
 function EditQueueModal({ queue, saving, onClose, onSave }: { queue: any; saving: boolean; onClose: () => void; onSave: (changes: any) => void }) {
-  const [name, setName] = useState(queue.name || '');
-  const [strategy, setStrategy] = useState(queue.strategy || 'ring-all');
-  const [maxWait, setMaxWait] = useState(queue.max_wait_time || 60);
-  const [enabled, setEnabled] = useState(queue.enabled !== false);
-  const [agents, setAgents] = useState<any[] | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      const { data: rows } = await supabase
-        .from('pbx_queue_agents')
-        .select('id, agent_name, agent_id, tier_level, status, extension_id, pbx_extensions(extension)')
-        .eq('queue_id', queue.id);
-      setAgents(rows || []);
-    })();
-  }, [queue.id]);
-
+  const initial = {
+    queue_name: queue.name || '',
+    queue_extension: queue.extension || '',
+    queue_strategy: queue.strategy || 'ring-all',
+    queue_max_wait_time: queue.max_wait_time || 60,
+    queue_enabled: queue.enabled !== false ? 'true' : 'false',
+  };
   return (
-    <ModalShell title={`Edit Queue · ${queue.name}`} onClose={onClose} width={560}>
-      <Label>Name</Label><input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-      <div style={{ height: 12 }} />
-      <Label>Strategy</Label>
-      <select value={strategy} onChange={(e) => setStrategy(e.target.value)} style={inputStyle}>
-        {STRATEGIES.map((s) => <option key={s} value={s}>{s}</option>)}
-      </select>
-      <div style={{ height: 12 }} />
-      <Label>Max wait time (seconds)</Label><input type="number" value={maxWait} onChange={(e) => setMaxWait(Number(e.target.value))} style={inputStyle} />
-      <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12, marginTop: 14 }}>
-        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
-      </label>
-
-      <div style={{ marginTop: 18 }}>
-        <Label>Agents ({agents?.length ?? '…'})</Label>
-        <div style={{ border: `1px solid ${c.border}`, borderRadius: 8, maxHeight: 200, overflowY: 'auto', background: 'rgba(0,0,0,0.25)' }}>
-          {agents === null && <div style={{ padding: 12, color: c.mutedSilver, fontSize: 12 }}>Loading…</div>}
-          {agents && agents.length === 0 && <div style={{ padding: 12, color: c.mutedSilver, fontSize: 12 }}>No agents in this queue.</div>}
-          {agents && agents.map((a: any) => (
-            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: `1px solid ${c.border}`, fontSize: 12, color: c.textIce }}>
-              <span>{a.agent_name || a.agent_id || `Ext ${a.pbx_extensions?.extension ?? '?'}`}</span>
-              <span style={{ color: c.mutedSilver }}>Tier {a.tier_level} · {a.status}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginTop: 22, justifyContent: 'flex-end' }}>
-        <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-        <button onClick={() => onSave({
-          queue_name: name,
-          queue_strategy: strategy,
-          queue_max_wait_time: String(maxWait),
-          queue_enabled: enabled ? 'true' : 'false',
-        })} disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save & sync to PBX'}</button>
-      </div>
-    </ModalShell>
+    <PbxEditSheet
+      title={`Edit Queue · ${queue.name}`}
+      groups={QUEUE_GROUPS}
+      initial={initial}
+      saving={saving}
+      width={680}
+      onCancel={onClose}
+      onSave={(form) => {
+        const out: any = { ...form };
+        if (out.queue_max_wait_time !== undefined) out.queue_max_wait_time = String(out.queue_max_wait_time);
+        onSave(out);
+      }}
+    />
   );
 }
 
