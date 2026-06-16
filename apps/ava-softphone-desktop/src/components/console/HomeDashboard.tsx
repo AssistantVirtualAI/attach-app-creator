@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { useTenant } from '../../hooks/useTenant';
-import { useDashboardStats, AttentionItem } from '../../hooks/useDashboardStats';
+import { useDashboardStats, AttentionItem, RangeKey } from '../../hooks/useDashboardStats';
 import { useSyncStatus, formatAge } from '../../hooks/useSyncStatus';
 
 const { colors: c } = theme;
@@ -17,32 +17,63 @@ function fmtRelative(iso: string | null) {
   return hours < 24 ? `${hours}h ago` : new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-function Stat({ label, value, accent, hint }: { label: string; value: string | number; accent: string; hint?: string }) {
+type Tone = {
+  from: string;     // gradient start
+  to: string;       // gradient end
+  ring: string;     // border / glow color
+  ink: string;      // text/value color
+  chip: string;     // small chip bg
+};
+
+const tones: Record<string, Tone> = {
+  cyan:   { from: '#0891b2', to: '#21d4fd', ring: 'rgba(8,145,178,0.55)',  ink: '#062c3a', chip: 'rgba(8,145,178,0.18)' },
+  red:    { from: '#dc2626', to: '#fb7185', ring: 'rgba(220,38,38,0.55)',  ink: '#3b0a0a', chip: 'rgba(220,38,38,0.18)' },
+  green:  { from: '#0f9d58', to: '#34d399', ring: 'rgba(15,157,88,0.55)',  ink: '#06281a', chip: 'rgba(15,157,88,0.18)' },
+  gold:   { from: '#d4a73a', to: '#fbbf24', ring: 'rgba(212,167,58,0.60)', ink: '#3b2a05', chip: 'rgba(212,167,58,0.22)' },
+  violet: { from: '#7a4cff', to: '#c084fc', ring: 'rgba(122,76,255,0.55)', ink: '#21104f', chip: 'rgba(122,76,255,0.18)' },
+  blue:   { from: '#0023e6', to: '#4d6dff', ring: 'rgba(0,35,230,0.55)',   ink: '#06133f', chip: 'rgba(0,35,230,0.18)' },
+  pink:   { from: '#db2777', to: '#f472b6', ring: 'rgba(219,39,119,0.55)', ink: '#3d0a26', chip: 'rgba(219,39,119,0.18)' },
+  slate:  { from: '#475569', to: '#94a3b8', ring: 'rgba(71,85,105,0.55)',  ink: '#0b1530', chip: 'rgba(71,85,105,0.18)' },
+};
+
+function Stat({ label, value, tone, hint }: { label: string; value: string | number; tone: Tone; hint?: string }) {
   return (
     <div
-      className="ava-glass ava-lift"
+      className="ava-lift"
       style={{
-        background: 'rgba(255,255,255,0.78)',
-        border: `1px solid ${c.border}`,
-        borderRadius: 16, padding: '16px 18px',
-        display: 'flex', flexDirection: 'column', gap: 4,
+        background: `linear-gradient(135deg, ${tone.from} 0%, ${tone.to} 100%)`,
+        border: `1px solid ${tone.ring}`,
+        borderRadius: 18, padding: '18px 20px',
+        display: 'flex', flexDirection: 'column', gap: 6,
         position: 'relative', overflow: 'hidden',
+        boxShadow: `0 10px 28px -14px ${tone.ring}, inset 0 1px 0 rgba(255,255,255,0.35)`,
+        color: '#fff',
       }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${accent}, ${c.cyan})`, opacity: 0.85 }} />
-      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1.4, textTransform: 'uppercase', color: c.mutedSilver }}>{label}</span>
-      <span className="tabular-nums ava-display" style={{ fontSize: 30, fontWeight: 600, color: c.textIce, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: -0.6, lineHeight: 1.05 }}>{value}</span>
-      {hint && <span style={{ fontSize: 11, color: c.textSub }}>{hint}</span>}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'radial-gradient(120% 80% at 100% 0%, rgba(255,255,255,0.28), transparent 55%)',
+        pointerEvents: 'none',
+      }} />
+      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.6, textTransform: 'uppercase', color: 'rgba(255,255,255,0.92)', position: 'relative' }}>{label}</span>
+      <span className="tabular-nums" style={{ fontSize: 34, fontWeight: 700, color: '#fff', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: -0.6, lineHeight: 1.05, position: 'relative', textShadow: '0 2px 12px rgba(0,0,0,0.18)' }}>{value}</span>
+      {hint && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.88)', position: 'relative' }}>{hint}</span>}
     </div>
   );
 }
 
-
-function attentionColor(item: AttentionItem) {
-  if (item.tone === 'danger') return c.danger;
-  if (item.tone === 'warn') return c.signalGold;
-  if (item.tone === 'success') return c.success;
-  return c.avaCyan;
+function attentionTone(item: AttentionItem): Tone {
+  if (item.tone === 'danger') return tones.red;
+  if (item.tone === 'warn') return tones.gold;
+  if (item.tone === 'success') return tones.green;
+  return tones.cyan;
 }
+
+const RANGES: { key: RangeKey; label: string }[] = [
+  { key: 'today', label: 'Today' },
+  { key: 'week', label: '7 days' },
+  { key: 'month', label: '30 days' },
+  { key: 'custom', label: 'Custom' },
+];
 
 export default function HomeDashboard({
   displayName, extension, onQuickDial,
@@ -50,13 +81,21 @@ export default function HomeDashboard({
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   const { orgId, orgName, extension: tenantExt } = useTenant();
-  const stats = useDashboardStats(orgId, tenantExt || extension);
+
+  const [range, setRange] = useState<RangeKey>('today');
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const weekAgo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10); }, []);
+  const [customFrom, setCustomFrom] = useState<string>(weekAgo);
+  const [customTo, setCustomTo] = useState<string>(today);
+
+  const stats = useDashboardStats(orgId, tenantExt || extension, range, customFrom, customTo);
   const { pbx, syncConnected, lastEvent, ageMs, healthy } = useSyncStatus();
   const freshnessAccent = stats.cdrFreshness === 'live' ? c.success : stats.cdrFreshness === 'stale' ? c.signalGold : c.mutedSilver;
+  const rangeLabel = range === 'today' ? 'Today' : range === 'week' ? 'Last 7 days' : range === 'month' ? 'Last 30 days' : `${customFrom} → ${customTo}`;
 
   return (
     <div className="ava-page" style={{ padding: '28px 32px', maxWidth: 1240, margin: '0 auto', animation: 'fadeIn .3s ease-out' }}>
-      <header style={{ marginBottom: 24 }}>
+      <header style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, fontWeight: 700, letterSpacing: 2, color: c.signalGold, textTransform: 'uppercase', flexWrap: 'wrap' }}>
           <span>Command Center</span>
           {orgName && (
@@ -73,25 +112,58 @@ export default function HomeDashboard({
           {greeting}, {displayName.split(' ')[0] || 'there'}
         </h1>
         <p style={{ fontSize: 13.5, color: c.mutedSilver, margin: 0, lineHeight: 1.55 }}>
-          Ext {extension} · Live CDR, recordings, voicemail, and AVA insights for your own extension.
+          Ext {extension} · Live CDR, recordings, voicemail and AVA insights for your extension.
         </p>
       </header>
 
+      {/* Range selector */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
+        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.6, color: c.mutedSilver, textTransform: 'uppercase', marginRight: 4 }}>Range</span>
+        {RANGES.map((r) => {
+          const active = range === r.key;
+          return (
+            <button key={r.key} onClick={() => setRange(r.key)} style={{
+              padding: '7px 14px',
+              borderRadius: 999,
+              border: active ? '1px solid transparent' : `1px solid ${c.border}`,
+              background: active
+                ? `linear-gradient(135deg, ${tones.blue.from}, ${tones.cyan.to})`
+                : 'rgba(255,255,255,0.85)',
+              color: active ? '#fff' : c.textIce,
+              fontSize: 12, fontWeight: 700, letterSpacing: 0.3,
+              cursor: 'pointer',
+              boxShadow: active ? `0 6px 18px -8px ${tones.blue.ring}` : 'none',
+              transition: 'all 180ms ease',
+            }}>{r.label}</button>
+          );
+        })}
+        {range === 'custom' && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginLeft: 6 }}>
+            <input type="date" value={customFrom} max={customTo} onChange={(e) => setCustomFrom(e.target.value)}
+              style={dateInput()} />
+            <span style={{ color: c.mutedSilver, fontSize: 12 }}>→</span>
+            <input type="date" value={customTo} min={customFrom} max={today} onChange={(e) => setCustomTo(e.target.value)}
+              style={dateInput()} />
+          </div>
+        )}
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: c.mutedSilver }}>{rangeLabel}</span>
+      </div>
 
       <section
-        className="ava-glass ava-aurora-border"
+        className="ava-aurora-border"
         style={{
-          background: 'linear-gradient(135deg, rgba(0,35,230,0.10), rgba(33,212,253,0.08), rgba(212,167,58,0.08))',
+          background: 'linear-gradient(135deg, rgba(0,35,230,0.14), rgba(33,212,253,0.12), rgba(212,167,58,0.10))',
+          border: `1px solid ${c.border}`,
           borderRadius: 20, padding: '22px 24px', marginBottom: 22,
           display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 0.9fr)', gap: 24, alignItems: 'center',
         }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 2, color: c.avaCyan, textTransform: 'uppercase', marginBottom: 6 }}>
-            Live Phone-System Brief
+            Live Phone-System Brief · {rangeLabel}
           </div>
           <div style={{ fontSize: 14.5, color: c.textIce, lineHeight: 1.6 }}>
             {stats.loading ? 'Loading the live PBX picture…' : (
-              <>Today: <strong style={{ color: c.signalGold }}>{stats.totalCallsToday} call{stats.totalCallsToday === 1 ? '' : 's'}</strong>, <strong style={{ color: c.success }}>{stats.answeredToday} answered</strong>, <strong style={{ color: c.danger }}>{stats.missedToday} missed</strong>, and <strong style={{ color: c.avaCyan }}>{stats.recordingsToday} recording{stats.recordingsToday === 1 ? '' : 's'}</strong>. The latest CDR is {fmtRelative(stats.lastCallAt)}.</>
+              <><strong style={{ color: c.signalGold }}>{stats.totalCallsToday} call{stats.totalCallsToday === 1 ? '' : 's'}</strong>, <strong style={{ color: c.success }}>{stats.answeredToday} answered</strong>, <strong style={{ color: c.danger }}>{stats.missedToday} missed</strong> and <strong style={{ color: c.avaCyan }}>{stats.recordingsToday} recording{stats.recordingsToday === 1 ? '' : 's'}</strong>. Latest CDR {fmtRelative(stats.lastCallAt)}.</>
             )}
           </div>
         </div>
@@ -103,30 +175,29 @@ export default function HomeDashboard({
         </div>
       </section>
 
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14, marginBottom: 24 }}>
-        <Stat label="Calls Today" value={stats.totalCallsToday} accent={c.avaCyan} hint="Scoped to extension" />
-        <Stat label="Missed Calls" value={stats.missedToday} accent={c.danger} hint="Today" />
-        <Stat label="Answered" value={stats.answeredToday} accent={c.success} hint="Today" />
-        <Stat label="Recordings" value={stats.recordingsToday} accent={c.signalGold} hint={stats.lastRecordingAt ? `Latest ${fmtRelative(stats.lastRecordingAt)}` : 'None today'} />
-        <Stat label="Unread SMS" value={stats.unreadSms} accent={c.signalGold} hint="All threads" />
-        <Stat label="Voicemail" value={stats.unreadVoicemail} accent={c.avaViolet} hint="Needs review" />
-        <Stat label="Live Calls" value={stats.liveCalls} accent={c.lemtelBlue} hint="In progress" />
-        <Stat label="Realtime" value={syncConnected ? 'Live' : 'Off'} accent={syncConnected ? c.avaCyan : c.mutedSilver} hint={lastEvent ? formatAge(ageMs) : 'Idle'} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14, marginBottom: 26 }}>
+        <Stat label={`Calls · ${rangeLabel}`} value={stats.totalCallsToday} tone={tones.cyan} hint="Scoped to extension" />
+        <Stat label="Missed" value={stats.missedToday} tone={tones.red} hint={rangeLabel} />
+        <Stat label="Answered" value={stats.answeredToday} tone={tones.green} hint={rangeLabel} />
+        <Stat label="Recordings" value={stats.recordingsToday} tone={tones.gold} hint={stats.lastRecordingAt ? `Latest ${fmtRelative(stats.lastRecordingAt)}` : 'None in range'} />
+        <Stat label="Unread SMS" value={stats.unreadSms} tone={tones.pink} hint="All threads" />
+        <Stat label="Voicemail" value={stats.unreadVoicemail} tone={tones.violet} hint="Needs review" />
+        <Stat label="Live Calls" value={stats.liveCalls} tone={tones.blue} hint="In progress" />
+        <Stat label="Realtime" value={syncConnected ? 'Live' : 'Off'} tone={syncConnected ? tones.cyan : tones.slate} hint={lastEvent ? formatAge(ageMs) : 'Idle'} />
       </div>
 
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 26 }}>
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 10 }}>
           Quick Actions
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={onQuickDial} style={quickBtn(c.signalGold)}>New Call</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'calls' }))} style={quickBtn(c.avaCyan)}>Open Call History</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'recordings' }))} style={quickBtn(c.avaViolet)}>Review Recordings</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'messages' }))} style={quickBtn(c.success)}>Messages</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'pbxlive' }))} style={quickBtn(c.mutedSilver)}>PBX Live</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'admin' }))} style={quickBtn(c.lemtelBlue)}>Edit PBX Admin</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'aiadmin' }))} style={quickBtn(c.avaViolet)}>AI Stats Assistant</button>
+          <button onClick={onQuickDial} style={quickBtn(tones.gold)}>New Call</button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'calls' }))} style={quickBtn(tones.cyan)}>Call History</button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'recordings' }))} style={quickBtn(tones.violet)}>Recordings</button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'messages' }))} style={quickBtn(tones.green)}>Messages</button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'pbxlive' }))} style={quickBtn(tones.slate)}>PBX Live</button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'admin' }))} style={quickBtn(tones.blue)}>PBX Admin</button>
+          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'aiadmin' }))} style={quickBtn(tones.pink)}>AI Assistant</button>
         </div>
       </div>
 
@@ -134,30 +205,35 @@ export default function HomeDashboard({
         <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 10 }}>
           Needs Attention
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {stats.attention.map((it, i) => {
-            const accent = attentionColor(it);
+            const tone = attentionTone(it);
             return (
               <div key={`${it.tag}-${i}`} style={{
                 display: 'flex', alignItems: 'center', gap: 14,
-                padding: '12px 14px', background: c.bgCard,
-                border: `1px solid ${c.border}`, borderRadius: 12,
+                padding: '14px 16px',
+                background: `linear-gradient(135deg, ${tone.from}, ${tone.to})`,
+                border: `1px solid ${tone.ring}`,
+                borderRadius: 14,
+                boxShadow: `0 10px 24px -14px ${tone.ring}`,
+                color: '#fff',
               }}>
                 <div style={{
-                  width: 36, height: 36, borderRadius: 10,
-                  background: `linear-gradient(135deg, ${accent}, ${c.deepPanel})`,
+                  width: 38, height: 38, borderRadius: 12,
+                  background: 'rgba(255,255,255,0.22)',
+                  border: '1px solid rgba(255,255,255,0.35)',
                   display: 'grid', placeItems: 'center', color: '#fff',
-                  fontWeight: 800, fontSize: 13,
+                  fontWeight: 800, fontSize: 14,
                 }}>{it.tag.charAt(0)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: c.textIce }}>{it.title}</div>
-                  <div style={{ fontSize: 11.5, color: c.mutedSilver, marginTop: 2 }}>{it.detail}</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>{it.title}</div>
+                  <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.9)', marginTop: 2 }}>{it.detail}</div>
                 </div>
                 <span style={{
-                  fontSize: 10, fontWeight: 700, letterSpacing: 0.8,
-                  padding: '4px 9px', borderRadius: 999,
-                  background: `${accent}18`, color: accent,
-                  border: `1px solid ${accent}55`,
+                  fontSize: 10, fontWeight: 800, letterSpacing: 0.8,
+                  padding: '5px 10px', borderRadius: 999,
+                  background: 'rgba(255,255,255,0.22)', color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.4)',
                 }}>{it.tag}</span>
               </div>
             );
@@ -168,17 +244,23 @@ export default function HomeDashboard({
   );
 }
 
-const quickBtn = (accent: string): React.CSSProperties => ({
+const quickBtn = (tone: Tone): React.CSSProperties => ({
   padding: '11px 18px',
-  background: 'rgba(255,255,255,0.78)',
-  border: `1px solid ${c.border}`,
-  borderLeft: `3px solid ${accent}`,
+  background: `linear-gradient(135deg, ${tone.from}, ${tone.to})`,
+  border: `1px solid ${tone.ring}`,
   borderRadius: 12,
-  color: c.textIce, fontSize: 13, fontWeight: 600,
+  color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: 0.2,
   cursor: 'pointer',
   transition: 'all 200ms cubic-bezier(.2,.7,.2,1)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
-  boxShadow: '0 4px 14px -8px rgba(11,21,48,0.18)',
+  boxShadow: `0 8px 20px -12px ${tone.ring}, inset 0 1px 0 rgba(255,255,255,0.3)`,
 });
 
+const dateInput = (): React.CSSProperties => ({
+  padding: '6px 10px',
+  borderRadius: 8,
+  border: `1px solid ${c.border}`,
+  background: 'rgba(255,255,255,0.95)',
+  color: c.textIce,
+  fontSize: 12,
+  fontWeight: 600,
+});
