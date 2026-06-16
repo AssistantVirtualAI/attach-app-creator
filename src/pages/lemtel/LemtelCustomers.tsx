@@ -125,6 +125,7 @@ export default function LemtelCustomers() {
     if (!form.name || !form.domain) return toast.error('Name and domain required');
     setSaving(true);
     try {
+      // 1) Create the FusionPBX domain
       const { data: res, error: fnErr } = await supabase.functions.invoke('pbx-write', {
         body: {
           organizationId: LEMTEL_ORG,
@@ -133,14 +134,57 @@ export default function LemtelCustomers() {
         },
       });
       if (fnErr || (res as any)?.error) throw new Error((fnErr as any)?.message || (res as any)?.error || 'create-domain failed');
-      toast.success(`Domain ${form.domain} created on FusionPBX`);
-      setForm({ name: '', domain: '' });
+      const domainUuid = (res as any)?.data?.domain_uuid || (res as any)?.domain_uuid || null;
+      toast.success(`Domain ${form.domain} created`);
+
+      // 2) Auto-create the matching tenant organization
+      if (domainUuid) {
+        const { error: orgErr } = await (supabase as any).rpc('setup_customer_organization', {
+          _name: form.name,
+          _slug: slugify(form.name),
+          _domain_uuid: domainUuid,
+          _domain_name: form.domain,
+          _admin_email: form.adminEmail || null,
+        });
+        if (orgErr) toast.error('Tenant org link failed: ' + orgErr.message);
+        else toast.success('Tenant organization linked');
+      } else {
+        toast.warning('Could not link tenant org (missing domain_uuid in PBX response)');
+      }
+
+      // 3) Optionally invite the admin (sends email + assigns role)
+      if (form.adminEmail) {
+        await supabase.functions.invoke('customer-invite-admin', {
+          body: { organizationId: domainUuid ? undefined : null, email: form.adminEmail },
+        }).catch(() => {});
+      }
+
+      setForm({ name: '', domain: '', adminEmail: '' });
       setDomainTouched(false);
       setOpen(false);
       qc.invalidateQueries({ queryKey: ['fusionpbx', 'list-domains'] });
+      qc.invalidateQueries({ queryKey: ['organizations', 'fpbx-map'] });
     } catch (e: any) {
-      toast.error(e.message || 'Failed to create domain');
+      toast.error(e.message || 'Failed to create customer');
     } finally { setSaving(false); }
+  };
+
+  const manageAs = async (d: Domain) => {
+    const org = orgByDomain.get(d.domain_uuid);
+    if (!org) {
+      toast.error('No tenant org linked. Edit the customer to link or recreate.');
+      return;
+    }
+    sessionStorage.setItem('lemtel.activeDomain', JSON.stringify({ uuid: d.domain_uuid, name: d.domain_name, org_id: org.id }));
+    await impersonation.enter(org.id, org.name);
+    toast.success(`Now managing ${d.domain_name}`);
+    window.location.href = '/console';
+  };
+
+  const copyPortalLink = (d: Domain) => {
+    const url = `${window.location.origin}/c/${encodeURIComponent(d.domain_name)}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Portal link copied: ' + url);
   };
 
   const toggleExpand = (uuid: string) => {
