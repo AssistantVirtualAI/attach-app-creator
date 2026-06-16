@@ -134,7 +134,7 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
       </div>
 
       {/* Quiet org chip — no sync mentions */}
-      <div style={{
+      <div className="lemtel-rail-chip" style={{
         margin: '0 4px 12px', padding: '7px 10px',
         borderRadius: 10,
         background: railElev,
