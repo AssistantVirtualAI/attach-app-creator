@@ -407,6 +407,7 @@ const NAV_GROUPS: { label: string; items: { id: Section; label: string }[] }[] =
       { id: 'gateways', label: 'Gateways' },
       { id: 'sip-profiles', label: 'SIP Profiles' },
       { id: 'sync', label: 'Sync Status' },
+      { id: 'audit-trail', label: 'Audit Trail' },
     ],
   },
 ];
