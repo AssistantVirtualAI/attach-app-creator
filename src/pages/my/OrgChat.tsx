@@ -501,16 +501,21 @@ function ChannelView({ channel, userId, userName, directory, t }: { channel: Cha
 }
 
 function MessageBubble({
-  msg, isOwn, isPinned, onDelete, onReact, onOpenThread, onTogglePin, getSignedUrl, t,
+  msg, isOwn, currentUserId, isPinned, isAdmin, onDelete, onEdit, onReact, onOpenThread, onTogglePin, getSignedUrl, t,
 }: {
-  msg: any; isOwn: boolean; isPinned?: boolean;
-  onDelete: () => void; onReact: (emoji: string) => void;
+  msg: any; isOwn: boolean; currentUserId: string; isPinned?: boolean; isAdmin?: boolean;
+  onDelete: () => void;
+  onEdit: (content: string) => void;
+  onReact: (emoji: string) => void;
   onOpenThread?: () => void; onTogglePin?: () => void;
   getSignedUrl: (p: string) => Promise<string>;
   t: (en: string, fr: string) => string;
 }) {
   const [showEmoji, setShowEmoji] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState(msg.content ?? "");
   const [urls, setUrls] = useState<Record<string, string>>({});
+  const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
     (msg.attachments ?? []).forEach(async (a: any) => {
@@ -525,6 +530,8 @@ function MessageBubble({
     return <div className="text-xs italic text-muted-foreground">— {t("message deleted", "message supprimé")}</div>;
   }
 
+  const hidden = msg.is_hidden && !revealed;
+
   return (
     <div className={`group flex gap-3 ${isPinned ? "bg-amber-500/5 -mx-2 px-2 py-1 rounded" : ""}`}>
       <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold shrink-0">
@@ -535,8 +542,10 @@ function MessageBubble({
           <span className="font-medium text-sm">{msg.sender_name}</span>
           <span className="text-[11px] text-muted-foreground">
             {format(new Date(msg.created_at), "p")}
-            {msg.edited_at && <em className="ml-1">({t("edited", "modifié")})</em>}
           </span>
+          {msg.edited_at && (msg.edit_count ?? 0) > 0 && (
+            <EditHistoryPopover messageId={msg.id} count={msg.edit_count ?? 1} />
+          )}
           {isPinned && <Pin className="h-3 w-3 text-amber-500" />}
           <div className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1">
             {onOpenThread && (
@@ -552,14 +561,41 @@ function MessageBubble({
                 {isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
               </Button>
             )}
+            {isOwn && !hidden && (
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { setEditDraft(msg.content ?? ""); setEditing(true); }} title={t("Edit", "Modifier")}>
+                <Pencil className="h-3 w-3" />
+              </Button>
+            )}
             {isOwn && (
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onDelete}>
                 <Trash2 className="h-3 w-3" />
               </Button>
             )}
+            <ModerationMenu messageId={msg.id} senderId={msg.sender_id} isOwn={isOwn} isAdmin={!!isAdmin} isHidden={!!msg.is_hidden} />
           </div>
         </div>
-        {msg.content && <div className="text-sm whitespace-pre-wrap break-words">{msg.content}</div>}
+        {hidden ? (
+          <div className="text-xs italic text-muted-foreground flex items-center gap-2 bg-muted/40 rounded px-2 py-1">
+            <EyeOff className="h-3 w-3" />
+            {t("Message hidden", "Message masqué")} {msg.hidden_reason ? `— ${msg.hidden_reason}` : ""}
+            <button className="ml-auto underline" onClick={() => setRevealed(true)}>{t("Show", "Afficher")}</button>
+          </div>
+        ) : editing ? (
+          <div className="space-y-1">
+            <Textarea value={editDraft} onChange={(e) => setEditDraft(e.target.value)} rows={2} className="text-sm" />
+            <div className="flex gap-1">
+              <Button size="sm" onClick={() => { onEdit(editDraft); setEditing(false); }} disabled={!editDraft.trim()}>Save</Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          msg.content && <div className="text-sm whitespace-pre-wrap break-words">{msg.content}</div>
+        )}
+        {msg.reply_count > 0 && onOpenThread && (
+          <button onClick={onOpenThread} className="mt-1 text-xs text-primary hover:underline flex items-center gap-1">
+            <MessageSquare className="h-3 w-3" /> {msg.reply_count} {t("replies", "réponses")}
+          </button>
+        )}
         {msg.reply_count > 0 && onOpenThread && (
           <button onClick={onOpenThread} className="mt-1 text-xs text-primary hover:underline flex items-center gap-1">
             <MessageSquare className="h-3 w-3" /> {msg.reply_count} {t("replies", "réponses")}
