@@ -201,8 +201,9 @@ function ExtensionsTable() {
     }
   };
 
-  const ext = ''; // placeholder, real value set inside createExtension
-  const { confirmConflict: confirmExtConflict, modalNode: extConflictModal } = useConflictModal('extension', (creating as any)?.lastIdentifier || '');
+  const { confirmConflict: confirmExtConflict, modalNode: extConflictModal } = useConflictModal('extension');
+
+
 
   const createExtension = async (form: any) => {
     setSaving(true);
