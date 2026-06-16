@@ -40,7 +40,7 @@ export interface FieldDef {
 }
 
 interface Props {
-  /** kind matches fusionpbx-proxy ADV map: gateways, sip-profiles, conferences, hold-music, dialplans, time-conditions */
+  /** kind matches fusionpbx-proxy ADV map */
   kind: string;
   /** Optional singular action name when list and write action names differ. */
   actionKind?: string;
@@ -48,14 +48,15 @@ interface Props {
   /** primary key field name returned by FusionPBX (e.g. gateway_uuid) */
   uuidField: string;
   cols: ColDef[];
+  /** legacy flat fields */
   fields?: FieldDef[];
-  /** Action verb to extract or augment row (extra reads, transforms). */
+  /** preferred: grouped fields (portal-parity sections) */
+  fieldGroups?: FieldGroup[];
+  /** sheet width */
+  sheetWidth?: number;
   transform?: (rows: any[]) => any[];
-  /** Custom row actions besides edit/delete (e.g. restart) */
   rowActions?: { label: string; run: (row: any, helpers: { reload: () => void; orgId: string; domainUuid: string | null }) => Promise<void> | void }[];
-  /** Whether resource is global (no domain_uuid) — informs new-record defaults only. */
   global?: boolean;
-  /** Allow create button. */
   canCreate?: boolean;
 }
 
