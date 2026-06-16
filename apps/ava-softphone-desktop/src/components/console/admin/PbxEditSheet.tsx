@@ -365,6 +365,24 @@ export default function PbxEditSheet({
         </header>
 
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '18px 22px', WebkitOverflowScrolling: 'touch', background: panelBg }}>
+          {missingFields.length > 0 && (
+            <div role="alert" style={{
+              marginBottom: 16, padding: '10px 12px', borderRadius: 10,
+              background: 'rgba(220,38,38,0.08)', border: `1px solid ${c.danger}`,
+              color: c.text, fontSize: 12, lineHeight: 1.5,
+            }}>
+              <strong style={{ color: c.danger }}>⚠ Schema mismatch — {missingFields.length} field{missingFields.length > 1 ? 's' : ''} missing from PBX response.</strong>
+              <div style={{ marginTop: 4, color: c.textSub, fontSize: 11 }}>
+                The portal form expects these fields but FusionPBX did not return them. They may have been removed or the proxy mapping is stale:
+              </div>
+              <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: 11, color: c.textSub }}>
+                {missingFields.slice(0, 8).map((m) => (
+                  <li key={m.key}><code style={{ color: c.text }}>{m.key}</code> — {m.label} <em>({m.section})</em></li>
+                ))}
+                {missingFields.length > 8 && <li>…and {missingFields.length - 8} more</li>}
+              </ul>
+            </div>
+          )}
           {groups.map((g) => (
             <section key={g.section} style={{ marginBottom: 22 }}>
               <div style={{
