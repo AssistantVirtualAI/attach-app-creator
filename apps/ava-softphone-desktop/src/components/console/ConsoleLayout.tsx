@@ -31,6 +31,7 @@ import { callBus } from '../../hooks/useCallBus';
 import { useDesktopRole } from '../../hooks/useDesktopRole';
 import { useTenant } from '../../hooks/useTenant';
 import { useRealtimeSync } from '../../hooks/useRealtimeSync';
+import { useExtensionDataSync } from '../../hooks/useExtensionDataSync';
 import { theme } from '../../lib/theme';
 import { ava, setAuthToken } from '../../lib/avaApi';
 import { supabase } from '../../lib/supabaseClient';
