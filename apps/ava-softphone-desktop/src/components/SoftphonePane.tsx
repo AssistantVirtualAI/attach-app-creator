@@ -12,6 +12,7 @@ import AIInsights from './AIInsights';
 // ProfileMenu is rendered globally in TitleBar — no longer duplicated here.
 import { AppErrorBoundary } from './AppErrorBoundary';
 import { theme } from '../lib/theme';
+import DialerKeypad from './DialerKeypad';
 import { ava } from '../lib/avaApi';
 import {
   PhoneIcon, ClockIcon, UsersIcon, VoicemailIcon,
@@ -586,6 +587,7 @@ export default function SoftphonePane({
             sipRegistered={sipReady}
             extension={creds.extension}
             compact={compact}
+            ultraCompact={ultraCompact}
           />
         )}
 
@@ -790,12 +792,12 @@ export default function SoftphonePane({
    ============================================================ */
 
 function Dialer({
-  dial, setDial, dialKeys, onCall, canCall, sipRegistered = true, extension, compact = false,
+  dial, setDial, dialKeys, onCall, canCall, sipRegistered = true, extension, compact = false, ultraCompact = false,
 }: {
   dial: string; setDial: (s: string | ((p: string) => string)) => void;
   dialKeys: [string, string][]; onCall: () => void; canCall: boolean;
   sipRegistered?: boolean; extension: string;
-  compact?: boolean;
+  compact?: boolean; ultraCompact?: boolean;
 }) {
   return (
     <div style={{ animation: 'fadeIn .25s ease-out', padding: compact ? '2px 0 8px' : '4px 4px 8px', minWidth: 0 }}>
@@ -831,65 +833,14 @@ function Dialer({
         )}
       </div>
 
-      {/* Dialpad */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-        gap: ultraCompact ? 6 : compact ? 8 : 14,
-        width: ultraCompact ? 'min(100%, 248px)' : 'min(100%, 296px)',
-        margin: compact ? '0 auto 16px' : '0 auto 26px',
-        padding: ultraCompact ? '0 4px' : 0, boxSizing: 'border-box',
-      }}>
-        {dialKeys.map(([key, sub]) => {
-          // Dedicated 2-row grid: fixed digit row + fixed sub-letter row so the
-          // digit baseline and sub-letter baseline land at the same Y across
-          // every theme (font-size never shifts, only weight/color/shadow do).
-          const digitRow = ultraCompact ? 22 : compact ? 26 : 30;
-          const subRow = ultraCompact ? 0 : 12;
-          return (
-            <button
-              key={key}
-              className="lemtel-key lemtel-glass"
-              onClick={() => setDial((p) => p + key)}
-              style={{
-                height: ultraCompact ? 50 : compact ? 58 : 72,
-                display: 'grid',
-                gridTemplateRows: ultraCompact ? `${digitRow}px` : `${digitRow}px ${subRow}px`,
-                rowGap: ultraCompact ? 0 : 4,
-                justifyItems: 'center', alignContent: 'center',
-                borderRadius: 14,
-                background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
-                border: `1px solid ${c.border}`,
-                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
-                cursor: 'pointer', color: c.textIce,
-                willChange: 'transform',
-                padding: 0,
-              }}
-            >
-              <span
-                className="ava-display-num"
-                style={{
-                  gridRow: 1,
-                  height: digitRow, lineHeight: `${digitRow}px`,
-                  fontSize: ultraCompact ? 20 : compact ? 23 : 26,
-                  fontWeight: 600, letterSpacing: '-0.01em',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >{key}</span>
-              {!ultraCompact && (
-                <span
-                  style={{
-                    gridRow: 2,
-                    height: subRow, lineHeight: `${subRow}px`,
-                    fontSize: 8.5, color: 'rgba(159,179,214,0.72)',
-                    letterSpacing: '0.22em', fontWeight: 700,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    minWidth: '2.4em',
-                  }}
-                >{sub || ''}</span>
-              )}
-            </button>
-          );
-        })}
+      {/* Dialpad — locked baselines via DialerKeypad */}
+      <div style={{ margin: compact ? '0 auto 16px' : '0 auto 26px', width: '100%' }}>
+        <DialerKeypad
+          density={ultraCompact ? 'ultra' : compact ? 'compact' : 'spacious'}
+          onKey={(k) => setDial((p) => p + k)}
+          onBackspace={() => setDial((p) => p.slice(0, -1))}
+          onSubmit={canCall ? onCall : undefined}
+        />
       </div>
 
       {/* Action row */}
