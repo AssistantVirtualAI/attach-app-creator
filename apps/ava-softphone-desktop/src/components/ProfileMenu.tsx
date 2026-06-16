@@ -403,7 +403,10 @@ export default function ProfileMenu() {
       const url = String(reader.result || '');
       setAvatar(url);
       try { localStorage.setItem(AVATAR_KEY, url); } catch { /* noop */ }
-      try { await supabase.auth.updateUser({ data: { avatar_url: url } }); } catch { /* noop */ }
+      await withSync('Avatar', async () => {
+        const { error } = await supabase.auth.updateUser({ data: { avatar_url: url } });
+        if (error) throw error;
+      });
     };
     reader.readAsDataURL(file);
   };
@@ -411,8 +414,12 @@ export default function ProfileMenu() {
   const removePhoto = async () => {
     setAvatar(null);
     try { localStorage.removeItem(AVATAR_KEY); } catch { /* noop */ }
-    try { await supabase.auth.updateUser({ data: { avatar_url: null } }); } catch { /* noop */ }
+    await withSync('Avatar', async () => {
+      const { error } = await supabase.auth.updateUser({ data: { avatar_url: null } });
+      if (error) throw error;
+    });
   };
+
 
   return (
     <div ref={rootRef} style={{ position: 'relative', WebkitAppRegion: 'no-drag' as any }}>
