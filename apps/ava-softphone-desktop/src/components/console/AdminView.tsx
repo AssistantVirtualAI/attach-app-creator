@@ -607,6 +607,7 @@ function SyncStatus() {
 // IVRs (Auto-Attendants)
 // ============================================================
 function IvrsTable() {
+  const { isAdmin, loading: roleLoading } = useDesktopRole();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
