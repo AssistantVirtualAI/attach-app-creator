@@ -333,7 +333,7 @@ function Sidebar({
 }
 
 function ChannelView({ channel, userId, userName, directory, t }: { channel: Channel; userId: string; userName: string | null; directory: DirectoryMember[]; t: (en: string, fr: string) => string }) {
-  const { messages, send, remove, react, uploadAttachment, getSignedUrl, query } = useChatMessages(channel.id);
+  const { messages, send, edit, remove, react, uploadAttachment, getSignedUrl, query } = useChatMessages(channel.id);
   const [draft, setDraft] = useState("");
   const [uploading, setUploading] = useState(false);
   const [threadParent, setThreadParent] = useState<any | null>(null);
@@ -341,9 +341,13 @@ function ChannelView({ channel, userId, userName, directory, t }: { channel: Cha
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const markRead = useMarkRead();
+  const markReceipts = useMarkMessagesRead();
   const { typingUsers, sendTyping } = useTyping(channel.id, userName);
   const { query: pinsQ, pin, unpin } = usePins(channel.id);
   const call = useChatCall();
+  const { blockedIds } = useBlockedUsers();
+  // simplistic admin flag: any message hide/unhide is server-enforced; show actions to allow attempt
+  const isAdmin = true;
 
   const isDm = channel.channel_type === "dm";
   const isGroup = channel.channel_type === "private" && (channel.members?.length ?? 0) > 2;
