@@ -132,79 +132,82 @@ export function useTheme() {
    ============================================================ */
 export const theme = {
   colors: {
-    // Base surfaces
-    bg: '#f6f8fc',
+    // Base surfaces — medium light, frosted, futuristic
+    bg: '#e9eef7',
     bgGradient:
-      'radial-gradient(1200px 700px at 8% -10%, rgba(0,35,230,0.06), transparent 60%), radial-gradient(900px 600px at 110% 110%, rgba(102,128,255,0.05), transparent 55%), #f6f8fc',
+      'radial-gradient(1200px 700px at 8% -10%, rgba(0,35,230,0.10), transparent 60%), radial-gradient(900px 600px at 110% 110%, rgba(8,145,178,0.10), transparent 55%), linear-gradient(180deg, #eef2fa 0%, #dde4f1 100%)',
     bgCard: '#ffffff',
     bgCardHover: '#eef2f9',
-    bgElev: '#ffffff',
-    border: '#e3e8f1',
-    borderGold: '#e7c980',
-    borderAI: '#cdbcff',
+    bgElev: '#f5f7fc',
+    border: '#cdd6e6',
+    borderGold: '#e0c178',
+    borderAI: '#bfb0ff',
 
     // Brand
     primary: '#0023e6',
-    primaryLight: '#6680ff',
-    primarySoft: '#e6ebff',
+    primaryLight: '#4d6dff',
+    primarySoft: '#dde4ff',
 
-    // Accents (re-tuned for white background contrast)
+    // Accents
     gold: '#b8860b',
     goldSoft: '#d4a73a',
     goldDim: '#fff3d6',
     ai: '#7a4cff',
     aiLight: '#a78bfa',
-    aiGlow: 'rgba(122,76,255,0.18)',
+    aiGlow: 'rgba(122,76,255,0.20)',
 
     // Status
-    green: '#16a34a',
+    green: '#0f9d58',
     red: '#dc2626',
     yellow: '#d97706',
-    success: '#16a34a',
+    success: '#0f9d58',
     warning: '#d97706',
     danger: '#dc2626',
 
     // Text
-    text: '#0f172a',
-    textSub: '#475569',
-    textDim: '#94a3b8',
+    text: '#0b1530',
+    textSub: '#3b4a6b',
+    textDim: '#7d8aa6',
 
-    // Console aliases (kept so legacy screens map onto the new palette)
-    midnight: '#f6f8fc',
-    deepPanel: '#ffffff',
-    graphite: '#f8fafc',
+    // Console aliases — medium-dark rails for contrast on a medium-light app
+    midnight: '#e9eef7',
+    deepPanel: '#1b2440',
+    graphite: '#243054',
     lemtelBlue: '#0023e6',
-    signalGold: '#b8860b',
+    signalGold: '#d4a73a',
     avaCyan: '#0891b2',
     avaViolet: '#7a4cff',
-    textIce: '#0f172a',
-    mutedSilver: '#64748b',
+    textIce: '#0b1530',
+    mutedSilver: '#5e6c8a',
   },
   glow: {
-    gold: '0 8px 20px -10px rgba(184,134,11,0.35)',
-    blue: '0 8px 24px -12px rgba(0,35,230,0.35)',
-    ai: '0 8px 22px -10px rgba(122,76,255,0.30)',
-    green: '0 6px 18px -8px rgba(22,163,74,0.35)',
-    red: '0 6px 18px -8px rgba(220,38,38,0.35)',
+    gold: '0 8px 22px -10px rgba(212,167,58,0.45)',
+    blue: '0 10px 28px -12px rgba(0,35,230,0.45)',
+    ai: '0 10px 26px -10px rgba(122,76,255,0.35)',
+    green: '0 8px 20px -8px rgba(15,157,88,0.40)',
+    red: '0 8px 20px -8px rgba(220,38,38,0.40)',
   },
   glass: {
     card: {
-      background: '#ffffff',
-      border: '1px solid #e3e8f1',
+      background: 'rgba(255,255,255,0.85)',
+      border: '1px solid rgba(180,196,224,0.55)',
       borderRadius: 16,
-      boxShadow: '0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)',
+      boxShadow: '0 1px 2px rgba(11,21,48,0.06), 0 10px 28px -12px rgba(11,21,48,0.18)',
+      backdropFilter: 'blur(12px)',
     } as React.CSSProperties,
     cardGold: {
-      background: '#ffffff',
-      border: '1px solid #e7c980',
+      background: 'rgba(255,255,255,0.85)',
+      border: '1px solid rgba(224,193,120,0.70)',
       borderRadius: 16,
-      boxShadow: '0 8px 22px -14px rgba(184,134,11,0.30)',
+      boxShadow: '0 10px 26px -14px rgba(212,167,58,0.40)',
+      backdropFilter: 'blur(12px)',
     } as React.CSSProperties,
     cardAI: {
-      background: '#ffffff',
-      border: '1px solid #cdbcff',
+      background: 'rgba(255,255,255,0.85)',
+      border: '1px solid rgba(191,176,255,0.70)',
       borderRadius: 16,
-      boxShadow: '0 8px 22px -14px rgba(122,76,255,0.28)',
+      boxShadow: '0 10px 26px -14px rgba(122,76,255,0.35)',
+      backdropFilter: 'blur(12px)',
     } as React.CSSProperties,
   },
   font: { xs: 10, sm: 12, base: 14, md: 16, lg: 20, xl: 24, xxl: 32 },
