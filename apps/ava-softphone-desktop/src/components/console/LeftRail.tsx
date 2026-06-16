@@ -73,6 +73,8 @@ const SUPER_ADMIN_EXTRAS: ConsoleView[] = ['pbxlive', 'customers', 'voiceagents'
 
 export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch, compact, isAdmin, isSuperAdmin, onStartTour }: Props) {
   const { t } = useTranslation();
+  const { mode } = useTheme();
+  const isDark = mode === 'dark' || mode === 'midnight';
   const { pbx, syncConnected, lastEvent, ageMs, healthy } = useSyncStatus();
   // Super admins see admin items in the Platform group below, not duplicated above
   const ITEMS: ConsoleView[] = isSuperAdmin ? USER_ITEMS : isAdmin ? [...USER_ITEMS, ...ADMIN_ITEMS] : USER_ITEMS;
@@ -89,7 +91,6 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
   const railElev = 'var(--ava-surface-elev, rgba(255,255,255,0.08))';
   const railHover = 'var(--ava-surface-hover, rgba(255,255,255,0.12))';
 
-  const isDark = typeof document !== 'undefined' && (document.documentElement.getAttribute('data-ava-theme') === 'dark' || document.documentElement.getAttribute('data-ava-theme') === 'midnight');
   const darkTextSub = 'rgba(230,240,255,0.82)';
   const darkTextIce = '#f1f7ff';
   const darkRailHover = 'rgba(255,255,255,0.14)';
