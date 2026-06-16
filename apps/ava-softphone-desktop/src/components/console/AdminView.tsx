@@ -320,10 +320,11 @@ function ExtensionsTable() {
           initial={{ enabled: true, voicemail_enabled: true, user_context: 'default' }}
           rules={EXTENSION_RULES}
           saving={saving}
-          onCancel={() => setCreating(false)}
+          onCancel={() => setCreating(null)}
           onSave={createExtension}
         />
       )}
+      {extConflictModal}
     </>
   );
 }
