@@ -183,6 +183,8 @@ export default function VoicemailView() {
           icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="5.5" cy="12.5" r="4.5"/><circle cx="18.5" cy="12.5" r="4.5"/><line x1="5.5" y1="17" x2="18.5" y2="17"/></svg>}
         />
 
+        <VoicemailGreetingCard />
+
         <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
           {(['all', 'new', 'open', 'handled', 'high', 'negative'] as Filter[]).map((f) => (
             <button key={f} onClick={() => setFilter(f)} style={chip(filter === f)}>
