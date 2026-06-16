@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Search, Building2, Loader2, Globe, RefreshCw, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Building2, Loader2, Globe, RefreshCw, ChevronRight, Pencil, Trash2, LogIn, Link2 } from 'lucide-react';
+import { useImpersonation } from '@/contexts/ImpersonationContext';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
