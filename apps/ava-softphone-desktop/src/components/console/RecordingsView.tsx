@@ -85,6 +85,7 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
   const [analysis, setAnalysis] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [aiStage, setAiStage] = useState<'idle' | 'fetching' | 'transcribing' | 'analyzing' | 'done' | 'error'>('idle');
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
