@@ -300,7 +300,44 @@ Deno.serve(async (req) => {
         .from("pbx_softphone_users")
         .select("extension, display_name")
         .eq("portal_user_id", userId);
-      return json({ greetings, extensions: exts ?? [], voices: TOP_VOICES });
+      const { count: generatingCount } = await admin
+        .from("pbx_voicemail_greetings")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("status", "generating");
+      const { count: queuedCount } = await admin
+        .from("pbx_voicemail_greetings")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("status", "queued");
+      return json({
+        greetings,
+        extensions: exts ?? [],
+        voices: TOP_VOICES,
+        throttle: {
+          max_concurrent: MAX_CONCURRENT_PER_USER,
+          generating: generatingCount ?? 0,
+          queued: queuedCount ?? 0,
+        },
+      });
+    }
+
+    if (action === "list_attempts") {
+      const id: string = payload?.id;
+      if (!id) return json({ error: "missing_id" }, 400);
+      const { data: g } = await admin
+        .from("pbx_voicemail_greetings")
+        .select("user_id")
+        .eq("id", id)
+        .maybeSingle();
+      if (!g || g.user_id !== userId) return json({ error: "forbidden" }, 403);
+      const { data, error } = await admin
+        .from("pbx_voicemail_greeting_attempts")
+        .select("*")
+        .eq("greeting_id", id)
+        .order("started_at", { ascending: false });
+      if (error) throw error;
+      return json({ attempts: data ?? [] });
     }
 
     if (action === "create_greeting") {
@@ -313,7 +350,15 @@ Deno.serve(async (req) => {
       if (text.length > 2000) return json({ error: "text_too_long" }, 400);
       const voiceName = TOP_VOICES.find((v) => v.id === voiceId)?.name ?? null;
 
-      // Insert as "generating" first so the UI can show progress / failure state.
+      // Throttle: count current in-flight jobs for this user.
+      const { count: inflight } = await admin
+        .from("pbx_voicemail_greetings")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("status", "generating");
+
+      const initialStatus = (inflight ?? 0) >= MAX_CONCURRENT_PER_USER ? "queued" : "generating";
+
       const { data: pending, error: pErr } = await admin
         .from("pbx_voicemail_greetings")
         .insert({
@@ -326,7 +371,7 @@ Deno.serve(async (req) => {
           voice_id: voiceId,
           voice_name: voiceName,
           storage_path: `pending-${Date.now()}`,
-          status: "generating",
+          status: initialStatus,
           attempts: 1,
           last_attempt_at: new Date().toISOString(),
         })
@@ -334,32 +379,18 @@ Deno.serve(async (req) => {
         .single();
       if (pErr) throw pErr;
 
-      try {
-        const audio = await ttsToBlob(text, voiceId);
-        const path = `${spu.organization_id}/${userId}/lib-${pending.id}.mp3`;
-        const { error: upErr } = await admin.storage
-          .from("voicemail-greetings")
-          .upload(path, new Uint8Array(audio), { contentType: "audio/mpeg", upsert: true });
-        if (upErr) throw upErr;
-        const { data: row } = await admin
-          .from("pbx_voicemail_greetings")
-          .update({ storage_path: path, status: "ready", error_message: null })
-          .eq("id", pending.id)
-          .select()
-          .single();
-        const { data: signed } = await admin.storage.from("voicemail-greetings").createSignedUrl(path, 3600);
-        return json({ greeting: { ...row, audio_url: signed?.signedUrl ?? null } });
-      } catch (e: any) {
-        const msg = String(e?.message ?? e).slice(0, 500);
-        await admin
-          .from("pbx_voicemail_greetings")
-          .update({ status: "failed", error_message: msg })
-          .eq("id", pending.id);
-        return json({ error: msg, greeting_id: pending.id }, 502);
+      if (initialStatus === "queued") {
+        return json({ greeting: { ...pending, audio_url: null }, queued: true });
       }
+
+      const res = await processGeneration(admin, pending.id);
+      // After completion, attempt to start the next queued job.
+      await dequeueNext(admin, userId).catch(() => {});
+      if (!res.ok) return json({ error: res.error, greeting_id: pending.id }, 502);
+      return json({ greeting: res.greeting });
     }
 
-    if (action === "retry_greeting") {
+    if (action === "retry_greeting" || action === "regenerate_greeting") {
       if (!spu) return json({ error: "no_extension" }, 400);
       const id: string = payload?.id;
       if (!id) return json({ error: "missing_id" }, 400);
@@ -370,38 +401,60 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (!g || g.user_id !== userId) return json({ error: "forbidden" }, 403);
       if (!g.text_script) return json({ error: "no_script_to_retry" }, 400);
+      if (g.status === "generating") return json({ error: "already_generating" }, 409);
+
+      const { count: inflight } = await admin
+        .from("pbx_voicemail_greetings")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("status", "generating");
+
+      const nextStatus = (inflight ?? 0) >= MAX_CONCURRENT_PER_USER ? "queued" : "generating";
+
       await admin
         .from("pbx_voicemail_greetings")
         .update({
-          status: "generating",
+          status: nextStatus,
           error_message: null,
+          canceled_at: null,
           attempts: (g.attempts ?? 0) + 1,
           last_attempt_at: new Date().toISOString(),
         })
         .eq("id", id);
-      try {
-        const audio = await ttsToBlob(g.text_script, g.voice_id ?? "EXAVITQu4vr4xnSDxMaL");
-        const path = `${g.organization_id}/${userId}/lib-${g.id}.mp3`;
-        const { error: upErr } = await admin.storage
-          .from("voicemail-greetings")
-          .upload(path, new Uint8Array(audio), { contentType: "audio/mpeg", upsert: true });
-        if (upErr) throw upErr;
-        const { data: row } = await admin
-          .from("pbx_voicemail_greetings")
-          .update({ storage_path: path, status: "ready", error_message: null })
-          .eq("id", id)
-          .select()
-          .single();
-        const { data: signed } = await admin.storage.from("voicemail-greetings").createSignedUrl(path, 3600);
-        return json({ greeting: { ...row, audio_url: signed?.signedUrl ?? null } });
-      } catch (e: any) {
-        const msg = String(e?.message ?? e).slice(0, 500);
-        await admin
-          .from("pbx_voicemail_greetings")
-          .update({ status: "failed", error_message: msg })
-          .eq("id", id);
-        return json({ error: msg }, 502);
+
+      if (nextStatus === "queued") {
+        return json({ ok: true, queued: true });
       }
+
+      const res = await processGeneration(admin, id);
+      await dequeueNext(admin, userId).catch(() => {});
+      if (!res.ok) return json({ error: res.error }, 502);
+      return json({ greeting: res.greeting });
+    }
+
+    if (action === "cancel_greeting") {
+      const id: string = payload?.id;
+      if (!id) return json({ error: "missing_id" }, 400);
+      const { data: g } = await admin
+        .from("pbx_voicemail_greetings")
+        .select("user_id,status")
+        .eq("id", id)
+        .maybeSingle();
+      if (!g || g.user_id !== userId) return json({ error: "forbidden" }, 403);
+      if (g.status !== "generating" && g.status !== "queued") {
+        return json({ error: "not_cancelable" }, 400);
+      }
+      await admin
+        .from("pbx_voicemail_greetings")
+        .update({
+          status: "canceled",
+          canceled_at: new Date().toISOString(),
+          error_message: "Canceled by user",
+        })
+        .eq("id", id);
+      // Free a slot for queued items.
+      await dequeueNext(admin, userId).catch(() => {});
+      return json({ ok: true });
     }
 
     if (action === "delete_greeting") {
