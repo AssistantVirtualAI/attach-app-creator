@@ -212,12 +212,14 @@ export default function ProfileMenu() {
   const meta = STATUS_META[status];
   const initials = (name || email || '?').slice(0, 2).toUpperCase();
 
-  const persistPresence = async (s: Status, note?: string) => {
+  const persistPresence = async (s: Status, note?: string, untilTs?: number | null) => {
     const m = STATUS_META[s];
     try {
       await supabase.rpc('upsert_user_presence', {
         _status: s,
-        _message: s === 'meeting' ? (note ?? meetingNote ?? null) : null,
+        _message: s === 'meeting'
+          ? (note ?? meetingNote ?? null)
+          : (untilTs ? `until:${new Date(untilTs).toISOString()}` : null),
         _emoji: m.icon,
         _call_state: 'idle',
         _platform: 'desktop',
@@ -225,7 +227,25 @@ export default function ProfileMenu() {
     } catch (e) { /* offline / noop */ }
   };
 
-  const applyStatus = (s: Status) => {
+  const clearExpiryTimer = () => {
+    if (expiryTimerRef.current) { clearTimeout(expiryTimerRef.current); expiryTimerRef.current = null; }
+  };
+
+  const scheduleAutoRevert = (ts: number) => {
+    clearExpiryTimer();
+    const delay = Math.max(0, ts - Date.now());
+    // setTimeout caps at ~24.8d; clamp and re-arm if needed.
+    const armed = Math.min(delay, 2_000_000_000);
+    expiryTimerRef.current = setTimeout(() => {
+      if (Date.now() >= ts) {
+        applyStatus('available');
+      } else {
+        scheduleAutoRevert(ts);
+      }
+    }, armed);
+  };
+
+  const applyStatus = (s: Status, durationMins?: number) => {
     if (inCallRef.current) {
       const msg = "Vous êtes en appel — votre statut est verrouillé jusqu'à la fin de l'appel.";
       setLockMsg(msg);
@@ -234,12 +254,48 @@ export default function ProfileMenu() {
       setTimeout(() => setLockMsg(''), 4000);
       return;
     }
+    // New status overrides any previous one — always clear pending picker + timer first.
+    setPendingStatus(null);
+    clearExpiryTimer();
+
+    const until = typeof durationMins === 'number' ? computeExpiry(durationMins) : null;
     setStatus(s);
     localStorage.setItem(STATUS_KEY, s);
+    if (until) {
+      setExpiryAt(until);
+      try { localStorage.setItem(EXPIRY_KEY, String(until)); } catch { /* noop */ }
+      scheduleAutoRevert(until);
+    } else {
+      setExpiryAt(null);
+      try { localStorage.removeItem(EXPIRY_KEY); } catch { /* noop */ }
+    }
     window.dispatchEvent(new CustomEvent('lemtel:set-status', { detail: STATUS_META[s].manual }));
-    void persistPresence(s);
+    void persistPresence(s, undefined, until);
     if (s !== 'meeting') setOpen(false);
   };
+
+  // Pick a status: if it's a temp/long status, show duration picker first.
+  const pickStatus = (s: Status) => {
+    if (inCallRef.current) { applyStatus(s); return; }
+    if (s === status) { setPendingStatus(null); return; }
+    if (TEMP_STATUSES.includes(s) || LONG_STATUSES.includes(s)) {
+      setPendingStatus(s);
+      return;
+    }
+    applyStatus(s);
+  };
+
+  // On mount: if a saved expiry has already passed, revert immediately; otherwise re-arm timer.
+  useEffect(() => {
+    if (expiryAt && expiryAt <= Date.now()) {
+      applyStatus('available');
+    } else if (expiryAt) {
+      scheduleAutoRevert(expiryAt);
+    }
+    return () => clearExpiryTimer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
 
   const saveMeetingNote = (v: string) => {
