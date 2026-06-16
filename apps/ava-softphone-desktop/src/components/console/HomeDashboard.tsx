@@ -410,13 +410,13 @@ export default function HomeDashboard({
           Quick Actions
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={onQuickDial} style={quickBtn(tones.gold)}>New Call</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'calls' }))} style={quickBtn(tones.cyan)}>Call History</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'recordings' }))} style={quickBtn(tones.violet)}>Recordings</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'messages' }))} style={quickBtn(tones.green)}>Messages</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'pbxlive' }))} style={quickBtn(tones.slate)}>PBX Live</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'admin' }))} style={quickBtn(tones.blue)}>PBX Admin</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'aiadmin' }))} style={quickBtn(tones.pink)}>AI Assistant</button>
+          <button className="ava-quick-btn" onClick={onQuickDial} style={quickBtn(tones.gold)}>New Call</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'calls' }))} style={quickBtn(tones.cyan)}>Call History</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'recordings' }))} style={quickBtn(tones.violet)}>Recordings</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'messages' }))} style={quickBtn(tones.green)}>Messages</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'pbxlive' }))} style={quickBtn(tones.slate)}>PBX Live</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'admin' }))} style={quickBtn(tones.blue)}>PBX Admin</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'aiadmin' }))} style={quickBtn(tones.pink)}>AI Assistant</button>
         </div>
       </div>
 
