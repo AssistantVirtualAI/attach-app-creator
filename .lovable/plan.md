@@ -1,60 +1,121 @@
-# Team Chat: Receipts, Edits, Search, Moderation
+# Plan — Wire real data into the main Dashboard
 
-Adds four features across the shared backend and both web + desktop chat UIs.
+Goal: make `/dashboard` (`src/pages/Dashboard.tsx`) show real, organization-scoped data from every active source already in the database — not only ElevenLabs — with consistent date-range filtering, period comparisons, and live refresh.
 
-## 1. Read receipts (per-message, per-user)
+## Scope
 
-- New table `org_chat_message_receipts(message_id, user_id, read_at, PK(message_id,user_id))` with RLS scoped to channel access.
-- RPC `mark_messages_read(_channel_id, _up_to)` — bulk-upserts receipts for every message in the channel up to `_up_to` (defaults to now), plus updates `org_chat_reads` for the unread badge.
-- RPC `get_message_receipts(_message_id)` returns `{user_id, read_at}[]`.
-- Realtime: add table to `supabase_realtime` publication.
-- UI: small avatar stack / "Seen by N" under own messages (hover → list of names + timestamps). Auto-mark visible messages on scroll/focus.
+In scope:
+- The main app dashboard at `/dashboard` (`src/pages/Dashboard.tsx`).
+- Hooks: `useDashboardMetrics`, `useDashboardAgentMetrics`, `TelephonyStatsCard`, `AlertsSection`, `AIInsightsWidget`, `AIPriorityActions`, `RecentActivity`, `MetricsGrid`, `ConversationsChart`, `QuickStatsBanner`.
+- Aggregation edge function `dashboard-insights` (extend it instead of running 10 queries from the browser).
 
-## 2. Message editing + audit trail
+Out of scope (separate pages already wired): Super Admin, Lemtel, Reseller, Telephony, Customer, Console dashboards. Touched only if they share a hook we modify.
 
-- New column on `org_chat_messages`: `edited_at timestamptz`, `edit_count int default 0` (if missing).
-- New table `org_chat_message_edits(id, message_id, edited_by, previous_content, new_content, edited_at)` — append-only.
-- Trigger on `UPDATE` of `org_chat_messages.content`: when `OLD.content <> NEW.content`, insert into `org_chat_message_edits`, set `edited_at = now()`, increment `edit_count`. Skips when `sender_id` changes (system updates).
-- `org-chat` edge function: new `edit_message` action — verifies `auth.uid() = sender_id`, updates content. Realtime row update propagates.
-- RPC `get_message_edit_history(_message_id)` returns full history (sender or org admin only).
-- UI: hover/dropdown on own message → "Edit"; inline editor; "(edited)" label with hover popover of history.
+## Data sources to connect
 
-## 3. Global chat search
+Currently wired: `agents_safe`, `clients`, ElevenLabs analytics + conversations, `agent_insights`.
 
-- Already have `tsv` column + trigger on `org_chat_messages` (french config) — reuse.
-- RPC `search_chat(_q text, _limit int default 50)` → returns messages (with channel + sender metadata + snippet via `ts_headline`) the user can access, ordered by rank then recency.
-- RPC `search_chat_users(_q text)` → returns directory members (name/email/extension/avatar) matching query within accessible orgs.
-- UI: search bar in chat sidebar header → opens results panel with two sections (Messages, People). Clicking a message scrolls to it in its channel; clicking a person opens/creates a DM.
+Currently missing or partial (all org-scoped via `organization_id`):
 
-## 4. Moderation: block, report, hide
+1. **Conversations table** (`conversations`) — local fallback + cross-platform total, not just ElevenLabs API.
+2. **Voice / phone** — `pbx_call_records`, `pbx_voicemails`, `twilio_active_calls`, `telecom_live_calls`, `phone_numbers` (counts + today/this-week/trend).
+3. **Leads pipeline** (`leads`) — new this period, by status, conversion %.
+4. **Appointments** (`appointments`, `appointment_reminders`) — upcoming count, no-show rate.
+5. **Campaigns** (`outbound_campaigns`, `campaign_calls`) — active campaigns, calls dialed, success %.
+6. **Handoffs** (`handoff_requests`) — pending + avg wait.
+7. **SMS** (`pbx_sms_messages`, `lemtel_sms_threads`) — sent/received counts.
+8. **Webhooks health** (`webhook_delivery_logs`, `webhook_events`) — failure count last 24h → feeds `AlertsSection`.
+9. **Team activity** (`org_members`, `user_presence`) — online members.
+10. **Knowledge base** (`knowledge_base_items`) — total items, recently added.
+11. **Billing snapshot** (`billing_config`, `organizations.subscription_*`) — plan, trial days left, usage vs. limit.
 
-- `org_chat_blocks(blocker_id, blocked_user_id, created_at, PK(blocker_id, blocked_user_id))` — per-user; blocked users' DMs auto-hidden and their messages in shared channels rendered as collapsed "Hidden message" (expandable).
-- `org_chat_reports(id, message_id, channel_id, organization_id, reporter_id, reason, status, created_at, reviewed_by, reviewed_at, resolution)` — RLS: reporter or org admin.
-- `org_chat_messages.is_hidden boolean default false`, `hidden_by uuid`, `hidden_reason text`. Admin-only update via RPC `hide_chat_message(_message_id, _reason)` / `unhide_chat_message`.
-- Edge function actions: `block_user`, `unblock_user`, `report_message`, `hide_message`, `unhide_message`, `list_reports` (admin).
-- UI:
-  - Message action menu: "Report", "Hide" (admin), "Block sender" (DM/group).
-  - Hidden messages show placeholder + reason; admins can reveal/unhide.
-  - Sidebar: filter out DMs with blocked users; blocked users' messages in group channels collapsed.
-  - New "Reports" panel for org admins (badge count) listing open reports with one-click hide/dismiss.
+## Implementation
+
+### 1. New aggregator edge function `dashboard-overview`
+Single POST `{ organizationId, startDate, endDate }` → returns one JSON blob with:
+- `conversations`: total / today / week / trend, by platform, by status, sentiment, peak hours.
+- `voice`: inbound/outbound calls, avg duration, missed, voicemails unread, active calls now.
+- `leads`: new, by status, conversion %, top sources.
+- `appointments`: upcoming 7d, today, no-shows last period.
+- `campaigns`: active, dialed, answered %, scheduled.
+- `handoffs`: pending, avg wait sec, resolved.
+- `messaging`: SMS in/out, chat messages last 24h.
+- `team`: total members, online now (from `user_presence`).
+- `health`: webhook failures 24h, integration errors, agent insights critical count.
+- `billing`: plan name, status, trial_ends_at, conversation usage vs limit.
+- `previousPeriod`: same shape for trend math.
+
+Server-side SQL with `count(*) FILTER (WHERE ...)` so the browser fires one request, not twelve. `SECURITY DEFINER` RPC per domain where helpful; otherwise direct service-role queries inside the function, gated by `current_user_org_ids()`.
+
+### 2. Extend `useDashboardMetrics`
+- Add fields for voice, leads, appointments, campaigns, handoffs, messaging, team, billing, health.
+- Call `dashboard-overview` first; keep ElevenLabs analytics call for chart parity; merge.
+- Compute trends from `previousPeriod` payload server-side (remove client-side trend stubs that return 0).
+- Respect `dateRange` everywhere — drop the hard-coded "7d" fallbacks that ignore it.
+
+### 3. Dashboard layout updates (`src/pages/Dashboard.tsx`)
+Add new tiles using existing card primitives — no design overhaul, matches the current glass-card look.
+
+```
+[ Hero header — unchanged ]
+[ QuickStatsBanner — add: active calls, pending handoffs ]
+[ DataSourceIndicator ]
+[ AIInsights | MetricsGrid (conversations/satisfaction/duration/resolution) ]
+[ ConversationsChart ]
+[ NEW: Voice & Telephony row ]
+   ├─ Inbound/Outbound today + trend
+   ├─ Missed calls + voicemails unread
+   └─ Active calls now (live)
+[ NEW: Leads & Pipeline row ]
+   ├─ New leads + conversion %
+   └─ Pipeline by status (mini bar)
+[ NEW: Campaigns & Appointments row ]
+   ├─ Active campaigns + dial success
+   └─ Upcoming appointments 7d
+[ TelephonyStatsCard — keep for Lemtel members ]
+[ AIPriorityActions | AlertsSection (now driven by webhook/integration health) ]
+[ Agent Performance | Recent Activity (cross-source: calls + chats + leads) | Quick Actions ]
+[ NEW: Team & Workspace footer — online members, KB items, plan/usage ]
+```
+
+### 4. RecentActivity becomes cross-source
+Union conversations + recent leads + recent calls + recent appointments, sorted by timestamp. Returned from `dashboard-overview` as one list with a `type` discriminator.
+
+### 5. AlertsSection — real signals
+Replace today's `agent_insights`-only query with:
+- Webhook failure spikes from `webhook_delivery_logs`.
+- Integration health from `organization_integrations.last_error`.
+- Trial expiry / over-limit from billing snapshot.
+- Critical `agent_insights` (kept).
+
+### 6. Realtime
+Subscribe (Supabase Realtime) to `conversations`, `pbx_call_records`, `leads`, `handoff_requests` insert events to invalidate the dashboard query — replaces the blunt 30 s polling for the live-feel tiles. Keep 60 s polling as a safety net.
+
+### 7. Empty / loading / "no integration" states
+Every new tile renders a skeleton during load and a friendly empty card with a CTA when the underlying integration isn't connected (e.g. "Connect a phone number" for voice tile).
 
 ## Files
 
-- New migration `..._chat_receipts_edits_search_moderation.sql`
-- `supabase/functions/org-chat/index.ts` — add 9 actions
-- `src/hooks/useOrgChat.ts` — new hooks: `useMessageReceipts`, `useEditMessage`, `useChatSearch`, `useBlockedUsers`, `useReportMessage`, `useHideMessage`, `useReports`
-- `src/pages/my/OrgChat.tsx` — wire search bar, receipts, edit UI, message action menu, reports panel
-- `src/components/chat/*` — `MessageReceipts.tsx`, `MessageEditor.tsx`, `ChatSearchPanel.tsx`, `ModerationMenu.tsx`, `ReportsPanel.tsx`
-- `apps/ava-softphone-desktop/src/components/console/OrgChatView.tsx` — mirror the above (lighter, no react-query)
+New:
+- `supabase/functions/dashboard-overview/index.ts`
+- `src/components/dashboard/VoiceStatsRow.tsx`
+- `src/components/dashboard/LeadsStatsRow.tsx`
+- `src/components/dashboard/CampaignsAppointmentsRow.tsx`
+- `src/components/dashboard/WorkspaceFooter.tsx`
+- `src/hooks/useDashboardRealtime.ts`
 
-## Technical notes
+Edited:
+- `src/pages/Dashboard.tsx` — layout additions only.
+- `src/hooks/useDashboardMetrics.ts` — extended shape + new call.
+- `src/components/dashboard/QuickStatsBanner.tsx` — 2 new chips.
+- `src/components/dashboard/RecentActivity.tsx` — render cross-source items.
+- `src/components/dashboard/AlertsSection.tsx` — real alert sources.
+- `supabase/config.toml` — register the new edge function (`verify_jwt = true`).
 
-- All RPCs `SECURITY DEFINER` with `current_user_org_ids()` membership check.
-- Receipt writes batched (one upsert per channel mark-read event, not per message).
-- Search uses `plainto_tsquery('french', _q)` + ILIKE fallback for short queries.
-- Realtime publication updated for new tables: receipts, edits, blocks, reports.
-- Admin check uses existing `has_role(auth.uid(), org_id, 'org_admin')` / `is_super_admin`.
+## Acceptance
 
-## Out of scope
-
-- DM-level encryption, per-message reactions on read receipts, moderator queue assignment, automated abuse classification.
+- Every tile shows a non-zero value when the underlying table has data for the selected org and date range.
+- Changing the date range updates every tile (no stale "7d" hard-codes).
+- Inserting a row in `conversations` / `pbx_call_records` / `leads` updates the dashboard within a few seconds without manual refresh.
+- Tiles render an empty-state CTA — not a zero — when the source integration isn't connected.
+- Single network request to `dashboard-overview` powers the new tiles (verified in the network panel).

@@ -14,6 +14,8 @@ import { AgentSelector } from '@/components/dashboard/AgentSelector';
 import { DateRangeSelector } from '@/components/dashboard/DateRangeSelector';
 import { ReportGenerator } from '@/components/reports/ReportGenerator';
 import { useDashboardMetrics, DashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { useDashboardOverview } from '@/hooks/useDashboardOverview';
+import { DashboardOverviewGrid } from '@/components/dashboard/DashboardOverviewGrid';
 import { useDashboardAgents, useAgentDashboardMetrics } from '@/hooks/useDashboardAgentMetrics';
 import { useAgentReports } from '@/hooks/useAgentReports';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -49,6 +51,10 @@ const Dashboard = () => {
   
   // Fetch reports data for report generator
   const { data: reportsData } = useAgentReports(selectedAgentId || undefined, dateRange);
+
+  // Unified overview across all data sources (voice, leads, campaigns, etc.)
+  const { data: overview, isLoading: isLoadingOverview } = useDashboardOverview(dateRange);
+
 
   useEffect(() => {
     setSelectedAgentId(null);
@@ -278,8 +284,13 @@ const Dashboard = () => {
         {/* Charts */}
         <ConversationsChart metrics={currentMetrics} />
 
+        {/* Unified overview across all data sources */}
+        <DashboardOverviewGrid data={overview} isLoading={isLoadingOverview} />
+
         {/* Phone System overview (Lemtel members) */}
         <TelephonyStatsCard />
+
+
 
 
         {/* Priority Actions + Alerts */}
@@ -360,7 +371,7 @@ const Dashboard = () => {
 
           {/* Recent Activity */}
           <div className="lg:col-span-1">
-            <RecentActivity metrics={currentMetrics} />
+            <RecentActivity metrics={currentMetrics} extraActivity={overview?.recentActivity} />
           </div>
 
           {/* Quick Actions */}
