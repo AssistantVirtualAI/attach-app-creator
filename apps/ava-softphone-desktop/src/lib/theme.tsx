@@ -169,10 +169,10 @@ export const theme = {
     textSub: '#3b4a6b',
     textDim: '#7d8aa6',
 
-    // Console aliases — medium-dark rails for contrast on a medium-light app
+    // Console aliases — medium-light frosted, futuristic
     midnight: '#e9eef7',
-    deepPanel: '#1b2440',
-    graphite: '#243054',
+    deepPanel: '#f5f7fc',
+    graphite: '#eef2fa',
     lemtelBlue: '#0023e6',
     signalGold: '#d4a73a',
     avaCyan: '#0891b2',
