@@ -115,14 +115,45 @@
 }
 
 /* ============================================================
-   Responsive scaling — applies to every console page
-   .ava-page is the outer wrapper used by HomeDashboard; other
-   views use inline padding that we override with a generic
-   selector for the main content slot.
+   Responsive design tokens — explicit breakpoints
+   --------------------------------------------------------------
+   xs : 0    – 479   (phones, portrait)
+   sm : 480  – 767   (phones, landscape / phablet)
+   md : 768  – 1023  (tablet)
+   lg : 1024 – 1439  (desktop)
+   xl : 1440+        (wide desktop)
    ============================================================ */
+
+:root {
+  /* Fluid spacing scale — clamp(min, preferred, max) */
+  --ava-space-1: clamp(4px, 0.4vw, 6px);
+  --ava-space-2: clamp(8px, 0.8vw, 10px);
+  --ava-space-3: clamp(10px, 1.2vw, 14px);
+  --ava-space-4: clamp(14px, 1.6vw, 18px);
+  --ava-space-5: clamp(18px, 2vw, 24px);
+  --ava-space-6: clamp(22px, 2.8vw, 32px);
+  --ava-space-7: clamp(28px, 3.6vw, 44px);
+
+  /* Fluid type scale */
+  --ava-fs-eyebrow: 10px;
+  --ava-fs-caption: clamp(11px, 0.78vw, 12px);
+  --ava-fs-body:    clamp(13px, 0.92vw, 14.5px);
+  --ava-fs-lead:    clamp(14px, 1.05vw, 16px);
+  --ava-fs-h3:      clamp(15px, 1.2vw, 18px);
+  --ava-fs-h2:      clamp(18px, 1.6vw, 22px);
+  --ava-fs-h1:      clamp(22px, 2.4vw, 32px);
+  --ava-fs-display: clamp(26px, 3.4vw, 42px);
+
+  /* Page rhythm */
+  --ava-page-pad-x: clamp(14px, 2.6vw, 40px);
+  --ava-page-pad-y: clamp(18px, 2.4vw, 32px);
+  --ava-page-max:   1320px;
+  --ava-radius:     clamp(12px, 1vw, 18px);
+}
 
 main {
   font-family: 'DM Sans', sans-serif;
+  font-size: var(--ava-fs-body);
 }
 
 /* Headings everywhere in the desktop app */
@@ -130,6 +161,9 @@ main h1, main h2, main h3, .ava-display {
   font-family: 'Space Grotesk', 'DM Sans', sans-serif;
   letter-spacing: -0.01em;
 }
+main h1, .ava-display { font-size: var(--ava-fs-h1); line-height: 1.15; }
+main h2 { font-size: var(--ava-fs-h2); line-height: 1.2; }
+main h3 { font-size: var(--ava-fs-h3); line-height: 1.25; }
 
 /* Page enter — softer, broader */
 .lemtel-page-enter > * > * {
@@ -140,10 +174,61 @@ main h1, main h2, main h3, .ava-display {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ----- Layout primitives ----- */
+
+/* Page wrapper — uniform padding + max width on every view */
+.ava-page {
+  padding: var(--ava-page-pad-y) var(--ava-page-pad-x);
+  max-width: var(--ava-page-max);
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Responsive grid — auto-collapses by viewport */
+.ava-grid {
+  display: grid;
+  gap: var(--ava-space-4);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+.ava-grid > .col-12 { grid-column: span 12; }
+.ava-grid > .col-6  { grid-column: span 6; }
+.ava-grid > .col-4  { grid-column: span 4; }
+.ava-grid > .col-3  { grid-column: span 3; }
+@media (max-width: 1023px) {
+  .ava-grid > .col-3 { grid-column: span 6; }
+  .ava-grid > .col-4 { grid-column: span 6; }
+}
+@media (max-width: 640px) {
+  .ava-grid > .col-3,
+  .ava-grid > .col-4,
+  .ava-grid > .col-6 { grid-column: span 12; }
+}
+
+/* Auto-fit card grid */
+.ava-cards {
+  display: grid;
+  gap: var(--ava-space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+}
+
+/* Vertical stack with uniform rhythm */
+.ava-stack    { display: flex; flex-direction: column; gap: var(--ava-space-4); }
+.ava-stack-sm { display: flex; flex-direction: column; gap: var(--ava-space-2); }
+.ava-stack-lg { display: flex; flex-direction: column; gap: var(--ava-space-6); }
+
+/* Cluster — wraps children */
+.ava-cluster { display: flex; flex-wrap: wrap; gap: var(--ava-space-3); align-items: center; }
+
+/* Overflow guards — prevent layout breaks */
+.ava-page, .ava-page * { min-width: 0; }
+.ava-page img, .ava-page video, .ava-page canvas, .ava-page svg { max-width: 100%; height: auto; }
+.ava-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ----- Breakpoint overrides ----- */
+
 /* Tablet (≤960) */
 @media (max-width: 960px) {
-  .ava-page { padding: 22px 22px !important; }
-  main h1, .ava-display { letter-spacing: -0.4px; }
   /* Two-column hero collapses to one column */
   .ava-glass.ava-aurora-border[style*="grid-template-columns"] {
     grid-template-columns: 1fr !important;
@@ -158,27 +243,51 @@ main h1, main h2, main h3, .ava-display {
 
 /* Mobile (≤640) */
 @media (max-width: 640px) {
-  .ava-page { padding: 16px 14px 24px !important; max-width: 100% !important; }
-  main h1, .ava-display { font-size: 26px !important; }
-  main { font-size: 14px; }
-
-  /* Card grids stay tight but breathing */
   .ava-glass { border-radius: 14px !important; }
-
-  /* Page headers shrink padding */
   header.ava-glass { padding: 16px 16px 18px !important; border-radius: 14px !important; }
-  header.ava-glass h1 { font-size: 20px !important; }
-
-  /* Stat numerals stay big but contained */
-  .ava-page .tabular-nums.ava-display { font-size: 26px !important; }
-}
-
-/* Wide desktops (≥1440) breathe more */
-@media (min-width: 1440px) {
-  .ava-page { padding: 32px 40px !important; }
 }
 
 /* Tap-friendly buttons on touch */
 @media (hover: none) {
   button { min-height: 40px; }
+}
+
+/* ============================================================
+   Responsive Audit Overlay
+   ============================================================ */
+.ava-audit-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(8, 12, 28, 0.82);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  display: flex; flex-direction: column;
+  animation: ava-page-enter 220ms cubic-bezier(.2,.7,.2,1) both;
+}
+.ava-audit-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 14px 22px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  color: #eaf0ff;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.ava-audit-stage {
+  flex: 1; overflow: auto;
+  padding: 24px;
+  display: flex; gap: 28px; align-items: flex-start; justify-content: center;
+  flex-wrap: wrap;
+}
+.ava-audit-frame {
+  display: flex; flex-direction: column; gap: 8px;
+  color: #cfd8f0;
+  font-family: 'DM Sans', sans-serif; font-size: 12px;
+}
+.ava-audit-frame > .ava-audit-meta {
+  display: flex; justify-content: space-between; align-items: baseline;
+  letter-spacing: 0.4px; text-transform: uppercase; font-size: 10px; opacity: 0.8;
+}
+.ava-audit-frame iframe {
+  border: 1px solid rgba(180,196,224,0.35);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 24px 60px -28px rgba(0,0,0,0.6), 0 4px 12px -6px rgba(0,0,0,0.4);
 }

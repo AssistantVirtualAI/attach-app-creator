@@ -25,6 +25,7 @@ import { AppErrorBoundary } from '../AppErrorBoundary';
 import IncomingCallToast from './IncomingCallToast';
 import ActiveCallDock from './ActiveCallDock';
 import DesktopTour from './DesktopTour';
+import ResponsiveAuditOverlay from './ResponsiveAuditOverlay';
 import { useCallShortcuts } from '../../hooks/useShortcuts';
 import { callBus } from '../../hooks/useCallBus';
 import { useDesktopRole } from '../../hooks/useDesktopRole';
@@ -72,6 +73,8 @@ export default function ConsoleLayout({
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [compact, setCompact] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
   const [tourOpen, setTourOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const isAuditChild = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('audit') === 'child';
   const { orgId, orgName } = useTenant();
   const { isAdmin, isSuperAdmin, isSupervisor } = useDesktopRole(orgId);
   useRealtimeSync(orgId);
@@ -133,10 +136,14 @@ export default function ConsoleLayout({
         e.preventDefault();
         setAiOpen((v) => !v);
       }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'r') {
+        e.preventDefault();
+        if (!isAuditChild) setAuditOpen((v) => !v);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [isAuditChild]);
 
   return (
     <div style={{
@@ -264,6 +271,9 @@ export default function ConsoleLayout({
         forceOpen={tourOpen}
         onClose={() => setTourOpen(false)}
       />
+      {!isAuditChild && (
+        <ResponsiveAuditOverlay open={auditOpen} onClose={() => setAuditOpen(false)} />
+      )}
     </div>
   );
 }
