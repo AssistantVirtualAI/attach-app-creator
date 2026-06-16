@@ -834,7 +834,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
     <div className="space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-sm text-muted-foreground">
-          Queue <span className="font-medium text-foreground">{queue.name}</span> · {agents.length} member{agents.length === 1 ? '' : 's'}
+          Queue <span className="font-medium text-foreground">{queue.name}</span> · {agents.length} member{agents.length === 1 ? '' : 's'} · {extensions.length} extension{extensions.length === 1 ? '' : 's'} available ({availableExt.length} unassigned)
         </div>
         <div className="flex gap-2">
           {perms.canAssign && (
