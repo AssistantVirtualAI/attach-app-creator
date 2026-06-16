@@ -148,6 +148,7 @@ Deno.serve(async (req) => {
         .order("created_at", { ascending: false });
       if (error) throw error;
       const greetings = await Promise.all((data ?? []).map(async (g: any) => {
+        if (g.status !== "ready") return { ...g, audio_url: null };
         const { data: s } = await admin.storage.from("voicemail-greetings").createSignedUrl(g.storage_path, 3600);
         return { ...g, audio_url: s?.signedUrl ?? null };
       }));
