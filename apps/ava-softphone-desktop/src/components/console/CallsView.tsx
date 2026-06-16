@@ -85,6 +85,7 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
       debounceMs: 1800,
       throttleMs: 10_000,
       shouldRefresh: (payload: any) => {
+        if (scope === 'org') return true;
         const row = payload?.new || payload?.old || {};
         return !extension || row.extension === extension;
       },
