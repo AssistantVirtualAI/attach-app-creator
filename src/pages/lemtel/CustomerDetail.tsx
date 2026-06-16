@@ -133,12 +133,85 @@ export default function CustomerDetail() {
     qc.invalidateQueries({ queryKey: ['fpbx'] });
   };
 
-  const impersonate = () => {
+  const impersonate = async () => {
     if (!domain) return;
-    sessionStorage.setItem('lemtel.activeDomain', JSON.stringify({ uuid: domainUuid, name: domain.domain_name, org_id: org?.id }));
+    if (!org) { toast.error('No tenant org linked'); return; }
+    sessionStorage.setItem('lemtel.activeDomain', JSON.stringify({ uuid: domainUuid, name: domain.domain_name, org_id: org.id }));
+    await impersonation.enter(org.id, org.name);
     toast.success(`Now managing ${domain.domain_name}`);
-    window.location.href = '/org/lemtel/admin/dashboard';
+    window.location.href = '/console';
   };
+
+  const copyPortalLink = () => {
+    if (!domain) return;
+    const url = `${window.location.origin}/c/${encodeURIComponent(domain.domain_name)}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Portal link copied');
+  };
+
+  const parseCsv = (text: string): any[] => {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (!lines.length) return [];
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    return lines.slice(1).map(line => {
+      const cells = line.split(',').map(c => c.trim());
+      const row: any = {};
+      headers.forEach((h, i) => { row[h] = cells[i] || ''; });
+      return row;
+    });
+  };
+
+  const handleCsvFile = async (f: File) => {
+    if (!org || !domain) { toast.error('Tenant or domain missing'); return; }
+    setImporting(true);
+    setImportReport(null);
+    try {
+      const text = await f.text();
+      const rows = parseCsv(text);
+      if (!rows.length) { toast.error('CSV empty'); return; }
+      const { data, error } = await supabase.functions.invoke('customer-users-import', {
+        body: {
+          organizationId: org.id,
+          domain_uuid: domainUuid,
+          domain_name: domain.domain_name,
+          users: rows,
+        },
+      });
+      if (error) throw error;
+      setImportReport(data);
+      toast.success(`Imported ${(data as any)?.succeeded || 0}/${(data as any)?.total || rows.length}`);
+      refetchSP();
+    } catch (e: any) {
+      toast.error(e.message || 'Import failed');
+    } finally { setImporting(false); if (fileRef.current) fileRef.current.value = ''; }
+  };
+
+  const handleAddUser = async () => {
+    if (!org || !domain || !addForm.extension) { toast.error('Extension required'); return; }
+    const { data, error } = await supabase.functions.invoke('customer-users-import', {
+      body: {
+        organizationId: org.id,
+        domain_uuid: domainUuid,
+        domain_name: domain.domain_name,
+        users: [addForm],
+      },
+    });
+    if (error) return toast.error(error.message);
+    const r = (data as any)?.results?.[0];
+    if (r?.ok) { toast.success(`Extension ${addForm.extension} added`); setAddOpen(false); setAddForm({ extension: '', name: '', email: '' }); refetchSP(); }
+    else toast.error(r?.error || 'Add failed');
+  };
+
+  const handleInvite = async () => {
+    if (!org || !inviteEmail) { toast.error('Email + linked tenant required'); return; }
+    const { error } = await supabase.functions.invoke('customer-invite-admin', {
+      body: { organizationId: org.id, email: inviteEmail },
+    });
+    if (error) return toast.error(error.message);
+    toast.success('Invite sent + org_admin role assigned');
+    setInviteOpen(false); setInviteEmail('');
+  };
+
 
   const fetchRecording = async (r: any) => {
     if (recUrls[r.id]) return recUrls[r.id];
