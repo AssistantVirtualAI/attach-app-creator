@@ -238,6 +238,12 @@ Deno.serve(async (req) => {
       wssUrls,
       sip_password: password,
       password,
+      password_source: passwordSource,
+      passwordSource,
+      sip_uri: `sip:${sp.extension}@${sipDomain}`,
+      sipUri: `sip:${sp.extension}@${sipDomain}`,
+      auth_username: sp.extension,
+      authUsername: sp.extension,
       // App config
       platform,
       app_access_enabled: sp.app_access_enabled !== false,
