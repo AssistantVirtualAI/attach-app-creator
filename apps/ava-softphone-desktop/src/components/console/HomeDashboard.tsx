@@ -399,7 +399,6 @@ const dateInput = (): React.CSSProperties => ({
 
 /* ---------------- Metric Detail Drawer ---------------- */
 
-import { rangeBounds } from '../../hooks/useDashboardStats';
 
 function MetricDetailDrawer(props: {
   metric: MetricKey;
