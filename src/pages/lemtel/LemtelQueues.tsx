@@ -672,7 +672,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
       if (error || data?.ok === false) throw new Error(data?.message || error?.message || 'Failed');
       await supabase.from('pbx_queue_agents').insert({
         queue_id: queue.id, extension_id: ext.id, agent_id: ext.extension,
-        agent_name: ext.display_name || ext.extension, tier_level, tier_position,
+        agent_name: extName(ext) || ext.extension, tier_level, tier_position,
       });
       toast({ title: `${role === 'supervisor' ? 'Supervisor' : 'Agent'} added` });
       load();
@@ -714,7 +714,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
         const tierUuid = (data as any)?.data?.call_center_tier_uuid || (data as any)?.call_center_tier_uuid || null;
         const { data: inserted } = await supabase.from('pbx_queue_agents').insert({
           queue_id: queue.id, extension_id: ext.id, agent_id: ext.extension,
-          agent_name: ext.display_name || ext.extension, tier_level, tier_position: basePos,
+          agent_name: extName(ext) || ext.extension, tier_level, tier_position: basePos,
           pbx_uuid: tierUuid, raw_data: tierUuid ? { call_center_tier_uuid: tierUuid } : null,
         } as any).select().maybeSingle();
         if (inserted) added.push(inserted);
@@ -1057,7 +1057,7 @@ function BulkAddBtn({ queueId, extensions, onAdd }: { queueId: string; extension
     if (!q) return extensions;
     return extensions.filter((e) =>
       (e.extension || '').toLowerCase().includes(q)
-      || (e.display_name || '').toLowerCase().includes(q));
+      || extName(e).toLowerCase().includes(q));
   }, [extensions, query]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE));
@@ -1122,7 +1122,7 @@ function BulkAddBtn({ queueId, extensions, onAdd }: { queueId: string; extension
                       <TableRow key={e.id} data-state={sel[e.id] ? 'selected' : undefined} className="cursor-pointer" onClick={() => setSel({ ...sel, [e.id]: !sel[e.id] })}>
                         <TableCell><Checkbox checked={!!sel[e.id]} onCheckedChange={(v) => setSel({ ...sel, [e.id]: !!v })} /></TableCell>
                         <TableCell className="font-mono">{e.extension}</TableCell>
-                        <TableCell>{e.display_name || '—'}</TableCell>
+                        <TableCell>{extName(e) || "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1161,7 +1161,7 @@ function BulkAddBtn({ queueId, extensions, onAdd }: { queueId: string; extension
           <div className="border rounded max-h-56 overflow-y-auto text-sm divide-y">
             {selectedExts.slice(0, 50).map((e: any) => (
               <div key={e.id} className="px-3 py-1.5 flex items-center justify-between">
-                <span className="truncate">{e.display_name || '—'}</span>
+                <span className="truncate">{extName(e) || "—"}</span>
                 <span className="font-mono text-xs text-muted-foreground">{e.extension}</span>
               </div>
             ))}
