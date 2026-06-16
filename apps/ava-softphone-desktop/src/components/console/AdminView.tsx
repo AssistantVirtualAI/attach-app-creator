@@ -832,7 +832,8 @@ function QueuesTable() {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<{ key: string } | null>(null);
+  const { confirmConflict: confirmQueueConflict, modalNode: queueConflictModal } = useConflictModal('queue');
   const [saving, setSaving] = useState(false);
 
   const reload = useCallback(async (forceSync = false) => {
