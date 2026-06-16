@@ -735,9 +735,11 @@ function ProfileEditor({
     if (!email) { setEmError('No email on file.'); return; }
     setSaving(true); setEmError(null);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      // Reset links must open in a public browser, not the Electron app shell.
+      const origin = window.location.origin;
+      const isPublic = /^https?:\/\//i.test(origin) && !origin.includes('localhost') && !origin.startsWith('file:');
+      const redirectTo = isPublic ? `${origin}/reset-password` : 'https://avastatistic.ca/reset-password';
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
       if (error) throw error;
       setEmStep('sent');
     } catch (e: any) {
@@ -745,6 +747,7 @@ function ProfileEditor({
       setEmStep('idle');
     } finally { setSaving(false); }
   };
+
 
   return (
     <div
