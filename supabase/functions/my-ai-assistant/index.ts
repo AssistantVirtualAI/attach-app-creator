@@ -438,6 +438,18 @@ Deno.serve(async (req) => {
       .eq("portal_user_id", userId)
       .maybeSingle();
 
+    const pageContext = body.pageContext ?? null;
+    const contextLines: string[] = [];
+    if (pageContext) {
+      contextLines.push(`Current page: ${pageContext.page} (${pageContext.path}).`);
+      if (pageContext.voicemail_id)
+        contextLines.push(`The user is viewing voicemail id ${pageContext.voicemail_id}. When they ask about "this voicemail" / "this message", call get_voicemail_detail with that id and use its transcript / summary.`);
+      if (pageContext.call_id)
+        contextLines.push(`The user is viewing call id ${pageContext.call_id}. When they ask about "this call", call get_call_detail with that id and use its transcript.`);
+      if (pageContext.recording_id)
+        contextLines.push(`The user is viewing recording id ${pageContext.recording_id}. Use get_recording_detail.`);
+    }
+
     const system = {
       role: "system",
       content: [
@@ -448,6 +460,8 @@ Deno.serve(async (req) => {
           : "User has no SIP extension linked yet — for telephony actions tell them to ask their admin.",
         "Use the provided tools to fetch real data; never invent statistics or call ids.",
         "When the user asks to update / record / program their voicemail greeting, call set_voicemail_greeting with the exact script they want. Confirm the script back to them before generating if it's unclear.",
+        "If page context references a voicemail / call / recording id, automatically pull its details with the matching tool before answering.",
+        ...contextLines,
         "Be concise and answer in the language the user writes in (French or English).",
         "Format answers in Markdown with short headings, bullets, and bold key numbers.",
       ].join("\n"),
