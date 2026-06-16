@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { sipProvider } from "@/lib/softphone/jssipProvider";
 import {
   Phone, PhoneOff, PhoneIncoming, Mic, MicOff, Pause, Play,
   X, Minimize2, Settings, Delete, ClipboardPaste, ArrowRightLeft,
@@ -158,6 +159,25 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
       setRelinking(false);
     }
   };
+
+  const [resyncing, setResyncing] = useState(false);
+  const forceResyncPbxPassword = useCallback(async () => {
+    setResyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("softphone-sync-password", {
+        body: { force_local_to_pbx: true },
+      });
+      if (error || (data as any)?.error) {
+        throw new Error(error?.message || (data as any)?.message || (data as any)?.error || "Sync failed");
+      }
+      toast({ title: "SIP password pushed to PBX", description: "Restarting registration…" });
+      try { await sipProvider.restart(); } catch {}
+    } catch (e: any) {
+      toast({ title: "PBX sync failed", description: e?.message || String(e), variant: "destructive" });
+    } finally {
+      setResyncing(false);
+    }
+  }, [toast]);
 
   if (!isMember) return null;
 
@@ -411,12 +431,34 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
     <div className="flex-1 flex flex-col p-3 gap-3">
       {sipStatus !== "registered" && !sp.config?.mock && (
         <div className={cn(
-          "rounded-md px-2.5 py-1.5 text-[11px] border",
+          "rounded-md px-2.5 py-1.5 text-[11px] border space-y-1.5",
           sipStatus === "error"
-            ? "bg-destructive/10 border-destructive/40 text-destructive-foreground"
-            : "bg-amber-500/10 border-amber-500/40 text-amber-100",
+            ? "bg-destructive/10 border-destructive/40 text-destructive"
+            : "bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-300",
         )}>
-          SIP: {sipStatus}{sp.snap.errorCause ? ` — ${sp.snap.errorCause}` : ""}
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium">
+              {hasExtension ? `Ext ${extLabel}` : "No extension"} · SIP {sipStatus}
+              {sp.snap.errorCause ? ` — ${sp.snap.errorCause}` : ""}
+            </span>
+            <button
+              onClick={() => sipProvider.restart()}
+              className="text-[10px] underline opacity-80 hover:opacity-100"
+              title="Retry SIP registration"
+            >Retry</button>
+          </div>
+          {sipStatus === "error" && hasExtension && /reject|403|forbid|auth/i.test(sp.snap.errorCause || "") && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 w-full text-[11px]"
+              disabled={resyncing}
+              onClick={forceResyncPbxPassword}
+            >
+              {resyncing ? <RefreshCw className="w-3 h-3 mr-1.5 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1.5" />}
+              Force resync SIP password with PBX
+            </Button>
+          )}
         </div>
       )}
       <div className={cn(
