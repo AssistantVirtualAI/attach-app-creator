@@ -607,7 +607,9 @@ export default function ProfileMenu() {
           email={email}
           avatar={avatar}
           onClose={() => setProfileOpen(false)}
-          onSaved={(newName, newAvatar) => { setName(newName); if (newAvatar !== undefined) setAvatar(newAvatar); }}
+          onSaved={(newName, newAvatar) => { setName(newName); if (newAvatar !== undefined) setAvatar(newAvatar); flashSaved('Profile'); }}
+          onSyncError={(label, err) => { setSyncState('error'); setSyncDetail(`${label}: ${err?.slice(0, 60) || 'failed'}`); }}
+          onSyncStart={(label) => { setSyncState('saving'); setSyncDetail(label); }}
           onPickPhoto={onPickPhoto}
           onRemovePhoto={removePhoto}
         />
