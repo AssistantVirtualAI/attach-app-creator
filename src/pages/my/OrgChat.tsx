@@ -368,7 +368,10 @@ function ChannelView({ channel, userId, userName, directory, t }: { channel: Cha
   }, [messages.length]);
 
   useEffect(() => {
-    if (messages.length) markRead.mutate(channel.id);
+    if (messages.length) {
+      markRead.mutate(channel.id);
+      markReceipts.mutate(channel.id);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id, messages.length]);
 
