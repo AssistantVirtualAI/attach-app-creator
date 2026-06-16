@@ -42,6 +42,16 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
         setLoading(false);
         return;
       }
+      // Lemtel-only app-access enforcement: only sessions whose linked PBX
+      // softphone user has desktop access granted by a Lemtel admin may sign in.
+      const { data: allowed, error: gateErr } = await supabase
+        .rpc('my_platform_access_allowed', { _platform: 'desktop' });
+      if (gateErr || allowed !== true) {
+        await supabase.auth.signOut();
+        setError('App access has not been granted by Lemtel. Please contact your provider.');
+        setLoading(false);
+        return;
+      }
       const { data: softphoneUser } = await supabase
         .from('pbx_softphone_users')
         .select('*')
