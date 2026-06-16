@@ -9,6 +9,25 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: corsHeaders });
 
+function bufToBase64(buf: Uint8Array): string {
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < buf.length; i += chunk) {
+    bin += String.fromCharCode(...buf.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+
+function detectMime(url: string, ct?: string | null): string {
+  if (ct && /audio\//.test(ct)) return ct.split(";")[0];
+  const u = url.toLowerCase();
+  if (u.endsWith(".mp3")) return "audio/mpeg";
+  if (u.endsWith(".ogg") || u.endsWith(".oga")) return "audio/ogg";
+  if (u.endsWith(".m4a")) return "audio/mp4";
+  if (u.endsWith(".webm")) return "audio/webm";
+  return "audio/wav";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -22,74 +41,127 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: "Unauthorized" }, 401);
 
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { call_record_id, recording_url, organization_id } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    let { call_record_id, recording_url, organization_id, recording_path, recording_name } = body || {};
+    if (!call_record_id) call_record_id = body?.callId;
     if (!call_record_id || !organization_id) {
       return json({ error: "call_record_id and organization_id required" }, 400);
     }
 
-    const { data: member } = await admin.from("organization_members")
-      .select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle();
-    const { data: orgMember } = member ? { data: null } : await admin.from("org_members")
-      .select("org_id").eq("user_id", user.id).eq("org_id", organization_id).maybeSingle();
-    const { data: softphoneMember } = (member || orgMember) ? { data: null } : await admin.from("pbx_softphone_users")
-      .select("organization_id").eq("portal_user_id", user.id).eq("organization_id", organization_id).maybeSingle();
-    const { data: roleMember } = (member || orgMember || softphoneMember) ? { data: null } : await admin.from("user_roles")
-      .select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle();
-    if (!member && !orgMember && !softphoneMember && !roleMember) return json({ error: "Forbidden" }, 403);
+    // Membership check
+    const checks = await Promise.all([
+      admin.from("organization_members").select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle(),
+      admin.from("org_members").select("org_id").eq("user_id", user.id).eq("org_id", organization_id).maybeSingle(),
+      admin.from("pbx_softphone_users").select("organization_id").eq("portal_user_id", user.id).eq("organization_id", organization_id).maybeSingle(),
+      admin.from("user_roles").select("organization_id").eq("user_id", user.id).eq("organization_id", organization_id).maybeSingle(),
+    ]);
+    if (!checks.some((c) => c.data)) return json({ error: "Forbidden" }, 403);
 
-    let { data: call } = await admin.from("pbx_call_records")
-      .select("caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, recording_url, voicemail_message")
-      .eq("id", call_record_id).eq("organization_id", organization_id).maybeSingle();
+    // Resolve call: callId may be a recording id, not a call record id
+    let call: any = null;
+    {
+      const r = await admin.from("pbx_call_records")
+        .select("id, caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, recording_url, recording_path, recording_name, voicemail_message")
+        .eq("id", call_record_id).eq("organization_id", organization_id).maybeSingle();
+      call = r.data;
+    }
     if (!call) {
-      const { data: rec } = await admin.from("pbx_call_recordings")
+      const r = await admin.from("pbx_call_recordings")
         .select("call_record_id, recording_url, recording_path, recording_name, direction, recorded_at, duration_seconds")
         .eq("id", call_record_id).eq("organization_id", organization_id).maybeSingle();
-      if (rec?.call_record_id) call_record_id = rec.call_record_id;
-      call = rec ? { ...rec, start_at: rec.recorded_at } : null;
+      if (r.data?.call_record_id) {
+        call_record_id = r.data.call_record_id;
+        const r2 = await admin.from("pbx_call_records")
+          .select("id, caller_number, caller_name, destination_number, destination, direction, start_at, duration_seconds, billsec, hangup_cause, recording_url, recording_path, recording_name, voicemail_message")
+          .eq("id", call_record_id).maybeSingle();
+        call = r2.data || { ...r.data, start_at: r.data.recorded_at };
+      } else if (r.data) {
+        call = { ...r.data, start_at: r.data.recorded_at };
+      }
     }
-    const sourceUrl = recording_url || (call as any)?.recording_url || null;
+
+    const sourceUrl = recording_url || call?.recording_url || null;
     const fallbackTranscript = [
       `Call ${call?.direction || "unknown"} from ${call?.caller_name || call?.caller_number || "unknown caller"} to ${call?.destination_number || call?.destination || "unknown destination"}.`,
       call?.start_at ? `Started at ${call.start_at}.` : "",
       `Duration ${call?.billsec || call?.duration_seconds || 0} seconds.`,
       call?.hangup_cause ? `Hangup cause: ${call.hangup_cause}.` : "",
-      call?.voicemail_message && call.voicemail_message !== "false" ? `Voicemail: ${call.voicemail_message}` : "",
     ].filter(Boolean).join("\n");
 
-    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!anthropicKey || !sourceUrl) {
-      const stub = fallbackTranscript || "Call metadata synced from FusionPBX. Audio transcription is pending.";
+    const writeTranscript = async (text: string, provider: string) => {
       await admin.from("pbx_call_transcripts").delete().eq("call_record_id", call_record_id);
       await admin.from("pbx_call_transcripts").insert({
-        organization_id, call_record_id, transcript_text: stub, provider: "stub", language: "fr",
+        organization_id, call_record_id, transcript_text: text, provider, language: "fr",
       });
-      await admin.from("pbx_call_records").update({ transcribed: true }).eq("id", call_record_id);
-      return json({ transcript_text: stub, stub: true });
+      await admin.from("pbx_call_records").update({ transcribed: true }).eq("id", call_record_id).then(() => {}, () => {});
+    };
+
+    // Try to fetch audio. Prefer direct URL, otherwise proxy through fusionpbx-proxy.
+    let audioBytes: Uint8Array | null = null;
+    let audioMime = "audio/wav";
+    try {
+      if (sourceUrl) {
+        const r = await fetch(sourceUrl);
+        if (r.ok) {
+          audioBytes = new Uint8Array(await r.arrayBuffer());
+          audioMime = detectMime(sourceUrl, r.headers.get("content-type"));
+        }
+      }
+      if (!audioBytes && (recording_path || recording_name || call?.recording_path || call?.recording_name)) {
+        const proxyRes = await admin.functions.invoke("fusionpbx-proxy", {
+          body: {
+            organization_id, action: "get-recording",
+            xml_cdr_uuid: call_record_id,
+            record_path: recording_path || call?.recording_path,
+            record_name: recording_name || call?.recording_name,
+          },
+        });
+        const b64 = (proxyRes.data as any)?.audio_base64 || (proxyRes.data as any)?.recording_base64;
+        if (b64) {
+          const bin = atob(b64);
+          const arr = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+          audioBytes = arr;
+          audioMime = detectMime(recording_name || call?.recording_name || "");
+        }
+      }
+    } catch (_) { /* fall through to stub */ }
+
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!lovableKey || !audioBytes || audioBytes.length === 0) {
+      const stub = fallbackTranscript || "Call metadata synced from FusionPBX. Audio transcription is pending.";
+      await writeTranscript(stub, "stub");
+      return json({ transcript_text: stub, stub: true, reason: !lovableKey ? "missing-ai-key" : "no-audio" });
     }
 
-    const audioRes = await fetch(sourceUrl);
-    const audioBuf = new Uint8Array(await audioRes.arrayBuffer());
-    const b64 = btoa(String.fromCharCode(...audioBuf.slice(0, 0))); // placeholder; Claude audio in =coming via separate endpoint
-
-    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+    // Lovable AI Gateway (OpenAI-compatible) with inline audio
+    const b64 = bufToBase64(audioBytes);
+    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: { "x-api-key": anthropicKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+      headers: { "Lovable-API-Key": lovableKey, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514", max_tokens: 4000,
-        messages: [{ role: "user", content: `Transcribe this phone call from URL: ${sourceUrl}. Label speakers as Agent: and Caller:. Return only the transcript.` }],
+        model: "google/gemini-2.5-flash",
+        messages: [{
+          role: "user",
+          content: [
+            { type: "text", text: "Transcribe this phone call verbatim. Label speakers as Agent: and Caller:. Return only the transcript, no commentary." },
+            { type: "input_audio", input_audio: { data: b64, format: audioMime.split("/")[1] || "wav" } },
+          ],
+        }],
       }),
     });
-    const data = await claudeRes.json();
-    const transcript_text = data.content?.[0]?.text || fallbackTranscript;
-
-    await admin.from("pbx_call_transcripts").delete().eq("call_record_id", call_record_id);
-    await admin.from("pbx_call_transcripts").insert({
-      organization_id, call_record_id, transcript_text, provider: "claude", language: "fr",
-    });
-    await admin.from("pbx_call_records").update({ transcribed: true }).eq("id", call_record_id);
-
+    if (!aiRes.ok) {
+      const errTxt = await aiRes.text();
+      console.error("ai gateway error", aiRes.status, errTxt);
+      await writeTranscript(fallbackTranscript, "stub");
+      return json({ transcript_text: fallbackTranscript, stub: true, error: `ai_gateway_${aiRes.status}` });
+    }
+    const data = await aiRes.json();
+    const transcript_text = String(data?.choices?.[0]?.message?.content || "").trim() || fallbackTranscript;
+    await writeTranscript(transcript_text, "lovable-ai");
     return json({ transcript_text });
   } catch (e: any) {
-    return json({ error: e.message }, 500);
+    console.error("ai-transcribe-call error", e);
+    return json({ error: e?.message || "transcription failed" }, 500);
   }
 });
