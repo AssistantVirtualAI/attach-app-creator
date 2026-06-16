@@ -167,9 +167,10 @@ export default function OrgChatView() {
   useEffect(() => {
     if (!activeId) return;
     let cancelled = false;
+    setTypingNames([]);
     (async () => {
       const { data } = await supabase.from('org_chat_messages')
-        .select('id,channel_id,sender_id,sender_name,content,created_at')
+        .select('id,channel_id,sender_id,sender_name,content,created_at,reactions,attachments,message_type,edited_at')
         .eq('channel_id', activeId).is('deleted_at', null)
         .order('created_at', { ascending: true }).limit(200);
       if (!cancelled) setMessages(data ?? []);
@@ -178,16 +179,33 @@ export default function OrgChatView() {
     const ch = supabase.channel(`chat:${activeId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'org_chat_messages', filter: `channel_id=eq.${activeId}` },
         (payload) => setMessages((m) => [...m, payload.new as Message]))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'org_chat_messages', filter: `channel_id=eq.${activeId}` },
+        (payload) => setMessages((m) => m.map((x) => x.id === (payload.new as any).id ? (payload.new as Message) : x)))
       .subscribe();
-    return () => { cancelled = true; supabase.removeChannel(ch); };
-  }, [activeId]);
+
+    // typing broadcast channel
+    const typingCh = supabase.channel(`chat-typing-${activeId}`, { config: { broadcast: { self: false } } })
+      .on('broadcast', { event: 'typing' }, ({ payload }: any) => {
+        if (!payload?.name || payload?.user_id === me?.id) return;
+        setTypingNames((cur) => {
+          const next = Array.from(new Set([...cur, payload.name]));
+          setTimeout(() => setTypingNames((c) => c.filter((n) => n !== payload.name)), 3500);
+          return next;
+        });
+      })
+      .subscribe();
+    typingChanRef.current = typingCh;
+
+    return () => { cancelled = true; supabase.removeChannel(ch); supabase.removeChannel(typingCh); typingChanRef.current = null; };
+  }, [activeId, me?.id]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
     if (activeId && me) {
       const now = new Date().toISOString();
-      supabase.from('org_chat_reads').upsert({ user_id: me.id, channel_id: activeId, last_read_at: now }).then(() => {
+      supabase.functions.invoke('org-chat', { body: { action: 'mark_read', payload: { channel_id: activeId } } }).then(() => {
         setReads((r) => ({ ...r, [activeId]: now }));
+        setUnread((u) => ({ ...u, [activeId]: 0 }));
       });
     }
   }, [messages, activeId, me]);
@@ -200,6 +218,45 @@ export default function OrgChatView() {
       body: { action: 'send_message', payload: { channel_id: activeId, content: text } },
     });
     if (error || (data as any)?.error) setErrMsg(`Message error: ${((error as any)?.message || (data as any)?.error)}`);
+  };
+
+  const handleTyping = (v: string) => {
+    setInput(v);
+    if (!v || !me) return;
+    const now = Date.now();
+    if (now - lastTypingAt.current < 1500) return;
+    lastTypingAt.current = now;
+    typingChanRef.current?.send({ type: 'broadcast', event: 'typing', payload: { user_id: me.id, name: me.name } });
+  };
+
+  const toggleReaction = async (id: string, emoji: string) => {
+    await supabase.functions.invoke('org-chat', { body: { action: 'toggle_reaction', payload: { id, emoji } } });
+    setEmojiFor(null);
+  };
+
+  const uploadFile = async (file: File) => {
+    if (!activeId || file.size > 25 * 1024 * 1024) { setErrMsg('File too big (max 25MB)'); return; }
+    const up = await supabase.functions.invoke('org-chat', { body: { action: 'upload_url', payload: { filename: file.name } } });
+    const u = (up.data as any);
+    if (!u?.signedUrl) { setErrMsg('Upload init failed'); return; }
+    const r = await fetch(u.signedUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+    if (!r.ok) { setErrMsg('Upload failed'); return; }
+    await supabase.functions.invoke('org-chat', {
+      body: { action: 'send_message', payload: { channel_id: activeId, content: '', attachments: [{ path: u.path, name: file.name, mime: file.type, size: file.size }] } },
+    });
+  };
+
+  const signedUrlCache = useRef<Record<string, string>>({});
+  const getSigned = async (path: string): Promise<string> => {
+    if (signedUrlCache.current[path]) return signedUrlCache.current[path];
+    const { data } = await supabase.functions.invoke('org-chat', { body: { action: 'signed_url', payload: { path } } });
+    const url = (data as any)?.url || '';
+    if (url) signedUrlCache.current[path] = url;
+    return url;
+  };
+
+  const startCall = (to: string | string[]) => {
+    window.dispatchEvent(new CustomEvent('lemtel:start-call', { detail: { to } }));
   };
 
   const openDM = async (otherId: string, otherName: string) => {
