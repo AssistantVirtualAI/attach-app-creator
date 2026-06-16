@@ -188,3 +188,6 @@ verify_jwt = false
 
 [functions.landing-chatbot]
 verify_jwt = false
+
+[functions.provision-app-user]
+verify_jwt = false
