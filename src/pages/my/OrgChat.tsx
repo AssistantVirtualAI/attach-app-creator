@@ -13,12 +13,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Hash, Lock, Plus, Send, Paperclip, Smile, Trash2, MessageSquare, Users as UsersIcon, Phone, Pin, PinOff, AtSign } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThreadPanel } from "@/components/chat/ThreadPanel";
-import { ChatSearchBar } from "@/components/chat/ChatSearchBar";
-import { useChannels, useChatMessages, useDirectory, useEnsureDmChannel, useChatHeartbeat, useUnreadCounts, useMarkRead, useTyping, useGroupChat, usePins, useChatCall, type Channel, type DirectoryMember } from "@/hooks/useOrgChat";
+import { GlobalChatSearch } from "@/components/chat/GlobalChatSearch";
+import { MessageReceipts } from "@/components/chat/MessageReceipts";
+import { EditHistoryPopover } from "@/components/chat/EditHistoryPopover";
+import { ModerationMenu } from "@/components/chat/ModerationMenu";
+import { ReportsPanel } from "@/components/chat/ReportsPanel";
+import { Textarea } from "@/components/ui/textarea";
+import { useChannels, useChatMessages, useDirectory, useEnsureDmChannel, useChatHeartbeat, useUnreadCounts, useMarkRead, useTyping, useGroupChat, usePins, useChatCall, useBlockedUsers, useMarkMessagesRead, type Channel, type DirectoryMember } from "@/hooks/useOrgChat";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Pencil, EyeOff } from "lucide-react";
 
 const EMOJIS = ["👍", "❤️", "😂", "🎉", "🚀", "👀"];
 
