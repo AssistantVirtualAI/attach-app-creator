@@ -877,7 +877,7 @@ function usePersistedState<T>(key: string, initial: T): [T, (v: T) => void] {
 type SortKey = 'name' | 'extension' | 'role' | 'tier';
 type SortDir = 'asc' | 'desc';
 
-function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRemoveOne, onBulkRemove, txt }: any) {
+function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRemoveOne, onBulkRemove, onEditOne, txt }: any) {
   const baseKey = `qa:${queueId}`;
   const [query, setQuery] = usePersistedState<string>(`${baseKey}:q`, '');
   const [roleFilter, setRoleFilter] = usePersistedState<'all' | 'supervisor' | 'agent'>(`${baseKey}:role`, 'all');
