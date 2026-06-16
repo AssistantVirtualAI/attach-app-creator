@@ -3961,6 +3961,70 @@ export type Database = {
         }
         Relationships: []
       }
+      pbx_app_provision_queue: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          error: string | null
+          extension: string
+          id: string
+          organization_id: string
+          processed_at: string | null
+          sip_domain: string | null
+          sip_password: string | null
+          softphone_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          error?: string | null
+          extension: string
+          id?: string
+          organization_id: string
+          processed_at?: string | null
+          sip_domain?: string | null
+          sip_password?: string | null
+          softphone_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          error?: string | null
+          extension?: string
+          id?: string
+          organization_id?: string
+          processed_at?: string | null
+          sip_domain?: string | null
+          sip_password?: string | null
+          softphone_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pbx_app_provision_queue_softphone_id_fkey"
+            columns: ["softphone_id"]
+            isOneToOne: false
+            referencedRelation: "pbx_softphone_link_status"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_app_provision_queue_softphone_id_fkey"
+            columns: ["softphone_id"]
+            isOneToOne: false
+            referencedRelation: "pbx_softphone_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbx_app_provision_queue_softphone_id_fkey"
+            columns: ["softphone_id"]
+            isOneToOne: false
+            referencedRelation: "pbx_softphone_users_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pbx_call_forwarding: {
         Row: {
           allow_from: string
@@ -10228,6 +10292,7 @@ export type Database = {
             Returns: boolean
           }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      lemtel_can_grant_app_access: { Args: { _uid: string }; Returns: boolean }
       log_agent_access: {
         Args: { _action: string; _metadata?: Json; _org_id: string }
         Returns: undefined
