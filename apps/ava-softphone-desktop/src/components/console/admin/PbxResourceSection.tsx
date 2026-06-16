@@ -165,7 +165,7 @@ export default function PbxResourceSection({
             style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, minWidth: 200, outline: 'none' }}
           />
           <button onClick={reload} style={btnGhost}>↻ Refresh</button>
-          {canCreate && fields.length > 0 && (
+          {canCreate && ((fieldGroups && fieldGroups.length > 0) || fields.length > 0) && (
             <button onClick={() => setCreating(true)} style={btnPrimary}>＋ New</button>
           )}
         </div>
