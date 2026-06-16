@@ -171,9 +171,9 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
             display: 'grid', placeItems: 'center', color: '#fff',
             fontWeight: 800, fontSize: 11,
             boxShadow: '0 0 18px -4px rgba(122,76,255,0.55)',
-          }}>AI</div>
+          }}>LET</div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: c.textIce }}>AVA Assistant</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: c.textIce }}>LET Chat</div>
             <div style={{ fontSize: 9.5, color: authed === false ? c.warning : c.avaCyan, letterSpacing: 1, textTransform: 'uppercase', fontWeight: 700 }}>
               {authed === null ? 'Connecting…' : !authed ? 'Sign in required' : isAdmin ? 'Admin · Live' : 'My calls'}
             </div>
