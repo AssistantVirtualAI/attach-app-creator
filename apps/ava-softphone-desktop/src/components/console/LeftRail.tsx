@@ -4,7 +4,9 @@ import LemtelLogo from '../LemtelLogo';
 import { useTranslation, type I18nKey } from '../../lib/i18n';
 import LanguageSwitcher from '../ui/LanguageSwitcher';
 import { useSyncStatus, formatAge } from '../../hooks/useSyncStatus';
+import { useTenant } from '../../hooks/useTenant';
 import avaStatisticLogo from '../../assets/ava-statistic-logo.png';
+
 
 
 const { colors: c } = theme;
@@ -76,6 +78,8 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
   const { mode } = useTheme();
   const isDark = mode === 'dark' || mode === 'midnight';
   const { pbx, syncConnected, lastEvent, ageMs, healthy } = useSyncStatus();
+  const { extension: myExtension } = useTenant();
+
   // Super admins see admin items in the Platform group below, not duplicated above
   const ITEMS: ConsoleView[] = isSuperAdmin ? USER_ITEMS : isAdmin ? [...USER_ITEMS, ...ADMIN_ITEMS] : USER_ITEMS;
   if (compact) return <CompactRail view={view} onChange={onChange} onOpenSettings={onOpenSettings} items={isSuperAdmin ? [...USER_ITEMS, ...ADMIN_ITEMS] : ITEMS} />;
@@ -133,23 +137,41 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
         </div>
       </div>
 
-      {/* Quiet org chip — no sync mentions */}
-      <div className="lemtel-rail-chip" style={{
-        margin: '0 4px 12px', padding: '7px 10px',
-        borderRadius: 10,
-        background: railElev,
-        border: `1px solid ${c.border}`,
-        display: 'flex', alignItems: 'center', gap: 8,
-        WebkitAppRegion: 'no-drag' as any,
-      }}>
-        <span style={{
-          width: 7, height: 7, borderRadius: '50%',
-          background: pbx === 'registered' ? '#22c55e' : pbx === 'error' ? '#ef4444' : c.mutedSilver,
-        }} />
-        <span style={{ fontSize: 11, fontWeight: 600, color: c.textIce, letterSpacing: 0.3 }}>
-          {pbx === 'registered' ? 'Online' : pbx === 'error' ? 'Offline' : 'Connecting…'}
-        </span>
+      {/* Status + extension chip */}
+      <div style={{ margin: '0 4px 12px', display: 'flex', gap: 6, WebkitAppRegion: 'no-drag' as any }}>
+        <div className="lemtel-rail-chip" style={{
+          flex: '0 0 auto', padding: '7px 10px',
+          borderRadius: 10,
+          background: railElev,
+          border: `1px solid ${c.border}`,
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <span style={{
+            width: 7, height: 7, borderRadius: '50%',
+            background: pbx === 'registered' ? '#22c55e' : pbx === 'error' ? '#ef4444' : c.mutedSilver,
+          }} />
+          <span style={{ fontSize: 11, fontWeight: 600, color: c.textIce, letterSpacing: 0.3 }}>
+            {pbx === 'registered' ? 'Online' : pbx === 'error' ? 'Offline' : 'Connecting…'}
+          </span>
+        </div>
+        <div className="lemtel-rail-chip" title={myExtension ? `My extension: ${myExtension}` : 'No extension assigned'} style={{
+          flex: 1, minWidth: 0, padding: '7px 10px',
+          borderRadius: 10,
+          background: myExtension ? 'linear-gradient(135deg, rgba(0,35,230,0.18), rgba(33,212,253,0.10))' : railElev,
+          border: `1px solid ${myExtension ? 'rgba(33,212,253,0.45)' : c.border}`,
+          display: 'flex', alignItems: 'center', gap: 6,
+          overflow: 'hidden',
+        }}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={myExtension ? c.avaCyan : c.mutedSilver} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M3 5h4l2 5-2.5 1.5a11 11 0 0 0 6 6L14 15l5 2v4a2 2 0 0 1-2 2A17 17 0 0 1 3 7a2 2 0 0 1 2-2"/>
+          </svg>
+          <span style={{ fontSize: 9.5, fontWeight: 800, color: c.avaCyan, letterSpacing: 1.2, textTransform: 'uppercase' }}>Ext</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: c.textIce, letterSpacing: 0.4, fontFamily: "'Space Grotesk', sans-serif", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {myExtension || '—'}
+          </span>
+        </div>
       </div>
+
 
       <button
         className="lemtel-rail-search"

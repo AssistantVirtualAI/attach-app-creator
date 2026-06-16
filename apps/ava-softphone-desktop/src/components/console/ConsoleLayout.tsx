@@ -67,7 +67,7 @@ export default function ConsoleLayout({
   creds, onOpenSettings,
 }: { creds: Creds; onOpenSettings: () => void }) {
   const [view, setView] = useState<ConsoleView>('home');
-  const [aiOpen, setAiOpen] = useState(true);
+  const [aiOpen, setAiOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncNote, setSyncNote] = useState<string | null>(null);
@@ -104,15 +104,12 @@ export default function ConsoleLayout({
   useEffect(() => {
     const onResize = () => {
       setCompact(window.innerWidth < 640);
-      // Auto-collapse the right-side AI panel on narrower desktop widths so
-      // the main work area never gets squeezed under ~1180 px.
-      if (window.innerWidth < 1180) setAiOpen(false);
-      else if (window.innerWidth >= 1360) setAiOpen(true);
     };
     onResize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -253,7 +250,9 @@ export default function ConsoleLayout({
         </AppErrorBoundary>
       </main>
 
-      {!compact && <AIPanel open={aiOpen} onToggle={() => setAiOpen((v) => !v)} />}
+      <AIPanel open={aiOpen} onToggle={() => setAiOpen((v) => !v)} />
+
+
 
       {compact && (
         <LeftRail

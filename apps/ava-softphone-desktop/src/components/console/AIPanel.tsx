@@ -121,27 +121,44 @@ export default function AIPanel({ open, onToggle }: { open: boolean; onToggle: (
     return (
       <button
         onClick={onToggle}
-        title="Open AVA panel (⌘J)"
+        title="Open AVA assistant (⌘J)"
+        aria-label="Open AVA assistant"
         style={{
-          position: 'absolute', top: 70, right: 0, zIndex: 5,
-          width: 28, height: 64, borderRadius: '10px 0 0 10px',
+          position: 'fixed', bottom: 24, right: 24, zIndex: 60,
+          width: 60, height: 60, borderRadius: '50%',
           background: `linear-gradient(135deg, ${c.avaViolet}, ${c.avaCyan})`,
-          border: 'none', cursor: 'pointer', color: '#fff',
-          fontSize: 11, fontWeight: 800, letterSpacing: 1,
-          writingMode: 'vertical-rl' as any,
-          boxShadow: '0 4px 18px -4px rgba(122,76,255,0.55)',
+          border: '2px solid rgba(255,255,255,0.25)', cursor: 'pointer', color: '#fff',
+          fontSize: 13, fontWeight: 800, letterSpacing: 0.5,
+          boxShadow: '0 12px 32px -8px rgba(122,76,255,0.65), 0 0 0 6px rgba(122,76,255,0.10)',
+          display: 'grid', placeItems: 'center',
+          transition: 'transform 180ms ease',
         }}
-      >AVA</button>
+        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.06)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+      >
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+        </svg>
+        <span style={{ position: 'absolute', bottom: -2, right: -2, background: c.signalGold, color: '#0b1530', fontSize: 8, fontWeight: 900, padding: '2px 5px', borderRadius: 6, letterSpacing: 0.5 }}>AVA</span>
+      </button>
     );
   }
 
   return (
     <aside style={{
-      width: 360, flexShrink: 0, height: '100%',
-      background: c.deepPanel, borderLeft: `1px solid ${c.border}`,
+      position: 'fixed', bottom: 24, right: 24, zIndex: 60,
+      width: 'min(420px, calc(100vw - 32px))',
+      height: 'min(620px, calc(100vh - 100px))',
+      background: c.deepPanel,
+      border: `1px solid ${c.border}`,
+      borderRadius: 18,
+      overflow: 'hidden',
       display: 'flex', flexDirection: 'column',
       backdropFilter: 'blur(18px) saturate(160%)',
+      boxShadow: '0 24px 60px -20px rgba(8,14,32,0.55), 0 0 0 1px rgba(122,76,255,0.15)',
+      animation: 'avaSlideInRight .22s ease-out',
     }}>
+
       <header style={{
         padding: '14px 16px', borderBottom: `1px solid ${c.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
