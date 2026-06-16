@@ -371,7 +371,7 @@ const Dashboard = () => {
 
           {/* Recent Activity */}
           <div className="lg:col-span-1">
-            <RecentActivity metrics={currentMetrics} />
+            <RecentActivity metrics={currentMetrics} extraActivity={overview?.recentActivity} />
           </div>
 
           {/* Quick Actions */}
