@@ -239,6 +239,7 @@ function QueueDialog({ mode, queue, trigger }: { mode: 'create' | 'edit'; queue?
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
   const qc = useQueryClient();
+  const raw = (queue?.raw_data || {}) as any;
   const [form, setForm] = useState({
     queue_name: queue?.name || '',
     queue_extension: queue?.extension || '',
@@ -248,6 +249,20 @@ function QueueDialog({ mode, queue, trigger }: { mode: 'create' | 'edit'; queue?
     queue_description: queue?.description || '',
     queue_moh_sound: queue?.music_on_hold || '$${hold_music}',
     queue_enabled: queue?.enabled ?? true,
+    queue_announce_sound: raw.queue_announce_sound || '',
+    queue_announce_frequency: String(raw.queue_announce_frequency ?? ''),
+    queue_wrap_up_time: String(raw.queue_wrap_up_time ?? 10),
+    queue_agent_no_answer_delay_time: String(raw.queue_agent_no_answer_delay_time ?? 5),
+    queue_max_wait_time_with_no_agent: String(raw.queue_max_wait_time_with_no_agent ?? 30),
+    queue_max_wait_time_with_no_agent_time_reached: String(raw.queue_max_wait_time_with_no_agent_time_reached ?? 5),
+    queue_tier_rules_apply: raw.queue_tier_rules_apply === 'true' || raw.queue_tier_rules_apply === true,
+    queue_tier_rule_wait_second: String(raw.queue_tier_rule_wait_second ?? 30),
+    queue_tier_rule_wait_multiply_level: raw.queue_tier_rule_wait_multiply_level === 'true' || raw.queue_tier_rule_wait_multiply_level === true,
+    queue_tier_rule_no_agent_no_wait: raw.queue_tier_rule_no_agent_no_wait === 'true' || raw.queue_tier_rule_no_agent_no_wait === true,
+    queue_discard_abandoned_after: String(raw.queue_discard_abandoned_after ?? 60),
+    queue_abandoned_resume_allowed: raw.queue_abandoned_resume_allowed === 'true' || raw.queue_abandoned_resume_allowed === true,
+    queue_cid_prefix: raw.queue_cid_prefix || '',
+    queue_timeout_action: raw.queue_timeout_action || '',
   });
 
   const submit = async () => {
