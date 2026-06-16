@@ -160,6 +160,86 @@ export function useChatSearch() {
   });
 }
 
+/** Global search across messages + users */
+export function useGlobalChatSearch() {
+  return useMutation({
+    mutationFn: (query: string) => invoke("search_all", { query }),
+  });
+}
+
+/** Read receipts for a single message */
+export function useMessageReceipts(messageId: string | null, enabled = true) {
+  return useQuery<{ receipts: Array<{ user_id: string; full_name: string | null; avatar_url: string | null; read_at: string }> }>({
+    queryKey: ["chat-receipts", messageId],
+    queryFn: () => invoke("get_receipts", { message_id: messageId }),
+    enabled: !!messageId && enabled,
+    staleTime: 10_000,
+  });
+}
+
+export function useMarkMessagesRead() {
+  return useMutation({
+    mutationFn: (channelId: string) => invoke("mark_messages_read", { channel_id: channelId }),
+  });
+}
+
+/** Edit history for a single message */
+export function useEditHistory(messageId: string | null, enabled = true) {
+  return useQuery<{ history: Array<{ id: string; edited_by: string; editor_name: string | null; previous_content: string; new_content: string; edited_at: string }> }>({
+    queryKey: ["chat-edit-history", messageId],
+    queryFn: () => invoke("get_edit_history", { message_id: messageId }),
+    enabled: !!messageId && enabled,
+  });
+}
+
+/** Blocked users */
+export function useBlockedUsers() {
+  const qc = useQueryClient();
+  const query = useQuery<{ blocks: Array<{ blocked_user_id: string; created_at: string }> }>({
+    queryKey: ["chat-blocks"],
+    queryFn: () => invoke("list_blocks"),
+  });
+  const block = useMutation({
+    mutationFn: (user_id: string) => invoke("block_user", { user_id }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chat-blocks"] }),
+  });
+  const unblock = useMutation({
+    mutationFn: (user_id: string) => invoke("unblock_user", { user_id }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chat-blocks"] }),
+  });
+  const blockedIds = new Set((query.data?.blocks ?? []).map((b) => b.blocked_user_id));
+  return { query, block, unblock, blockedIds };
+}
+
+/** Report a message */
+export function useReportMessage() {
+  return useMutation({
+    mutationFn: (p: { message_id: string; reason: string }) => invoke("report_message", p),
+  });
+}
+
+/** Admin: hide / unhide */
+export function useModerateMessage() {
+  const hide = useMutation({ mutationFn: (p: { message_id: string; reason?: string }) => invoke("hide_message", p) });
+  const unhide = useMutation({ mutationFn: (message_id: string) => invoke("unhide_message", { message_id }) });
+  return { hide, unhide };
+}
+
+/** Admin: list + resolve reports */
+export function useReports() {
+  const qc = useQueryClient();
+  const query = useQuery<{ reports: any[] }>({
+    queryKey: ["chat-reports"],
+    queryFn: () => invoke("list_reports"),
+    refetchInterval: 30_000,
+  });
+  const resolve = useMutation({
+    mutationFn: (p: { id: string; resolution?: string }) => invoke("resolve_report", p),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["chat-reports"] }),
+  });
+  return { query, resolve };
+}
+
 export type DirectoryMember = {
   user_id: string;
   full_name: string | null;

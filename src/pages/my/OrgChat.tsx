@@ -13,12 +13,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Hash, Lock, Plus, Send, Paperclip, Smile, Trash2, MessageSquare, Users as UsersIcon, Phone, Pin, PinOff, AtSign } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThreadPanel } from "@/components/chat/ThreadPanel";
-import { ChatSearchBar } from "@/components/chat/ChatSearchBar";
-import { useChannels, useChatMessages, useDirectory, useEnsureDmChannel, useChatHeartbeat, useUnreadCounts, useMarkRead, useTyping, useGroupChat, usePins, useChatCall, type Channel, type DirectoryMember } from "@/hooks/useOrgChat";
+import { GlobalChatSearch } from "@/components/chat/GlobalChatSearch";
+import { MessageReceipts } from "@/components/chat/MessageReceipts";
+import { EditHistoryPopover } from "@/components/chat/EditHistoryPopover";
+import { ModerationMenu } from "@/components/chat/ModerationMenu";
+import { ReportsPanel } from "@/components/chat/ReportsPanel";
+import { Textarea } from "@/components/ui/textarea";
+import { useChannels, useChatMessages, useDirectory, useEnsureDmChannel, useChatHeartbeat, useUnreadCounts, useMarkRead, useTyping, useGroupChat, usePins, useChatCall, useBlockedUsers, useMarkMessagesRead, type Channel, type DirectoryMember } from "@/hooks/useOrgChat";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { Pencil, EyeOff } from "lucide-react";
 
 const EMOJIS = ["👍", "❤️", "😂", "🎉", "🚀", "👀"];
 
@@ -327,7 +333,7 @@ function Sidebar({
 }
 
 function ChannelView({ channel, userId, userName, directory, t }: { channel: Channel; userId: string; userName: string | null; directory: DirectoryMember[]; t: (en: string, fr: string) => string }) {
-  const { messages, send, remove, react, uploadAttachment, getSignedUrl, query } = useChatMessages(channel.id);
+  const { messages, send, edit, remove, react, uploadAttachment, getSignedUrl, query } = useChatMessages(channel.id);
   const [draft, setDraft] = useState("");
   const [uploading, setUploading] = useState(false);
   const [threadParent, setThreadParent] = useState<any | null>(null);
@@ -335,9 +341,13 @@ function ChannelView({ channel, userId, userName, directory, t }: { channel: Cha
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const markRead = useMarkRead();
+  const markReceipts = useMarkMessagesRead();
   const { typingUsers, sendTyping } = useTyping(channel.id, userName);
   const { query: pinsQ, pin, unpin } = usePins(channel.id);
   const call = useChatCall();
+  const { blockedIds } = useBlockedUsers();
+  // simplistic admin flag: any message hide/unhide is server-enforced; show actions to allow attempt
+  const isAdmin = true;
 
   const isDm = channel.channel_type === "dm";
   const isGroup = channel.channel_type === "private" && (channel.members?.length ?? 0) > 2;
@@ -358,7 +368,10 @@ function ChannelView({ channel, userId, userName, directory, t }: { channel: Cha
   }, [messages.length]);
 
   useEffect(() => {
-    if (messages.length) markRead.mutate(channel.id);
+    if (messages.length) {
+      markRead.mutate(channel.id);
+      markReceipts.mutate(channel.id);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id, messages.length]);
 
@@ -403,7 +416,13 @@ function ChannelView({ channel, userId, userName, directory, t }: { channel: Cha
         <h2 className="font-semibold">{headerTitle}</h2>
         {channel.description && !isDm && <span className="text-sm text-muted-foreground hidden md:inline">— {channel.description}</span>}
         <div className="ml-auto flex items-center gap-2">
-          <div className="w-56 hidden lg:block"><ChatSearchBar /></div>
+          <div className="w-72 hidden lg:block">
+            <GlobalChatSearch
+              onPickMessage={(m) => { /* TODO: jump to message */ toast.message(`Found in channel ${m.channel_id.slice(0,6)}`); }}
+              onPickUser={() => toast.message("Open DM from sidebar")}
+            />
+          </div>
+          <ReportsPanel />
           {!isDm && <Badge variant="outline" className="text-xs">{channel.members?.length ?? 0} {t("members", "membres")}</Badge>}
           {canCall && (
             <Button size="sm" variant="outline" className="gap-1.5" onClick={handleCall}>
@@ -431,15 +450,18 @@ function ChannelView({ channel, userId, userName, directory, t }: { channel: Cha
             {t("No messages yet. Say hi 👋", "Aucun message. Lance la discussion 👋")}
           </div>
         )}
-        {messages.filter((m: any) => !m.parent_message_id).map((m) => {
+        {messages.filter((m: any) => !m.parent_message_id && !blockedIds.has(m.sender_id)).map((m) => {
           const isPinned = pinnedMsgs.some((p: any) => p.id === m.id);
           return (
             <MessageBubble
               key={m.id}
               msg={m}
               isOwn={m.sender_id === userId}
+              currentUserId={userId}
               isPinned={isPinned}
+              isAdmin={isAdmin}
               onDelete={() => remove.mutate(m.id)}
+              onEdit={(content) => edit.mutate({ id: m.id, content })}
               onReact={(emoji) => react.mutate({ id: m.id, emoji })}
               onOpenThread={() => setThreadParent(m)}
               onTogglePin={() => isPinned ? unpin.mutate(m.id) : pin.mutate(m.id)}
@@ -479,16 +501,21 @@ function ChannelView({ channel, userId, userName, directory, t }: { channel: Cha
 }
 
 function MessageBubble({
-  msg, isOwn, isPinned, onDelete, onReact, onOpenThread, onTogglePin, getSignedUrl, t,
+  msg, isOwn, currentUserId, isPinned, isAdmin, onDelete, onEdit, onReact, onOpenThread, onTogglePin, getSignedUrl, t,
 }: {
-  msg: any; isOwn: boolean; isPinned?: boolean;
-  onDelete: () => void; onReact: (emoji: string) => void;
+  msg: any; isOwn: boolean; currentUserId: string; isPinned?: boolean; isAdmin?: boolean;
+  onDelete: () => void;
+  onEdit: (content: string) => void;
+  onReact: (emoji: string) => void;
   onOpenThread?: () => void; onTogglePin?: () => void;
   getSignedUrl: (p: string) => Promise<string>;
   t: (en: string, fr: string) => string;
 }) {
   const [showEmoji, setShowEmoji] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState(msg.content ?? "");
   const [urls, setUrls] = useState<Record<string, string>>({});
+  const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
     (msg.attachments ?? []).forEach(async (a: any) => {
@@ -503,6 +530,8 @@ function MessageBubble({
     return <div className="text-xs italic text-muted-foreground">— {t("message deleted", "message supprimé")}</div>;
   }
 
+  const hidden = msg.is_hidden && !revealed;
+
   return (
     <div className={`group flex gap-3 ${isPinned ? "bg-amber-500/5 -mx-2 px-2 py-1 rounded" : ""}`}>
       <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold shrink-0">
@@ -513,8 +542,10 @@ function MessageBubble({
           <span className="font-medium text-sm">{msg.sender_name}</span>
           <span className="text-[11px] text-muted-foreground">
             {format(new Date(msg.created_at), "p")}
-            {msg.edited_at && <em className="ml-1">({t("edited", "modifié")})</em>}
           </span>
+          {msg.edited_at && (msg.edit_count ?? 0) > 0 && (
+            <EditHistoryPopover messageId={msg.id} count={msg.edit_count ?? 1} />
+          )}
           {isPinned && <Pin className="h-3 w-3 text-amber-500" />}
           <div className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1">
             {onOpenThread && (
@@ -530,14 +561,41 @@ function MessageBubble({
                 {isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
               </Button>
             )}
+            {isOwn && !hidden && (
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { setEditDraft(msg.content ?? ""); setEditing(true); }} title={t("Edit", "Modifier")}>
+                <Pencil className="h-3 w-3" />
+              </Button>
+            )}
             {isOwn && (
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onDelete}>
                 <Trash2 className="h-3 w-3" />
               </Button>
             )}
+            <ModerationMenu messageId={msg.id} senderId={msg.sender_id} isOwn={isOwn} isAdmin={!!isAdmin} isHidden={!!msg.is_hidden} />
           </div>
         </div>
-        {msg.content && <div className="text-sm whitespace-pre-wrap break-words">{msg.content}</div>}
+        {hidden ? (
+          <div className="text-xs italic text-muted-foreground flex items-center gap-2 bg-muted/40 rounded px-2 py-1">
+            <EyeOff className="h-3 w-3" />
+            {t("Message hidden", "Message masqué")} {msg.hidden_reason ? `— ${msg.hidden_reason}` : ""}
+            <button className="ml-auto underline" onClick={() => setRevealed(true)}>{t("Show", "Afficher")}</button>
+          </div>
+        ) : editing ? (
+          <div className="space-y-1">
+            <Textarea value={editDraft} onChange={(e) => setEditDraft(e.target.value)} rows={2} className="text-sm" />
+            <div className="flex gap-1">
+              <Button size="sm" onClick={() => { onEdit(editDraft); setEditing(false); }} disabled={!editDraft.trim()}>Save</Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+            </div>
+          </div>
+        ) : (
+          msg.content && <div className="text-sm whitespace-pre-wrap break-words">{msg.content}</div>
+        )}
+        {msg.reply_count > 0 && onOpenThread && (
+          <button onClick={onOpenThread} className="mt-1 text-xs text-primary hover:underline flex items-center gap-1">
+            <MessageSquare className="h-3 w-3" /> {msg.reply_count} {t("replies", "réponses")}
+          </button>
+        )}
         {msg.reply_count > 0 && onOpenThread && (
           <button onClick={onOpenThread} className="mt-1 text-xs text-primary hover:underline flex items-center gap-1">
             <MessageSquare className="h-3 w-3" /> {msg.reply_count} {t("replies", "réponses")}
@@ -574,6 +632,11 @@ function MessageBubble({
                 {e}
               </button>
             ))}
+          </div>
+        )}
+        {isOwn && !hidden && (
+          <div className="mt-1">
+            <MessageReceipts messageId={msg.id} ownerId={msg.sender_id} currentUserId={currentUserId} />
           </div>
         )}
       </div>

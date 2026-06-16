@@ -356,6 +356,101 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    // ============ RECEIPTS ============
+    if (action === "mark_messages_read") {
+      const channelId = payload?.channel_id;
+      if (!channelId) return json({ error: "missing_channel" }, 400);
+      const { data, error } = await admin.rpc("mark_messages_read", { _channel_id: channelId, _up_to: payload?.up_to ?? new Date().toISOString() });
+      if (error) throw error;
+      return json({ ok: true, inserted: data ?? 0 });
+    }
+    if (action === "get_receipts") {
+      const { data, error } = await admin.rpc("get_message_receipts", { _message_id: payload?.message_id });
+      if (error) throw error;
+      return json({ receipts: data ?? [] });
+    }
+
+    // ============ EDIT HISTORY ============
+    if (action === "get_edit_history") {
+      const { data, error } = await admin.rpc("get_message_edit_history", { _message_id: payload?.message_id });
+      if (error) throw error;
+      return json({ history: data ?? [] });
+    }
+
+    // ============ SEARCH ============
+    if (action === "search_all") {
+      const q = String(payload?.query ?? "").trim();
+      if (!q) return json({ messages: [], users: [] });
+      const [{ data: msgs, error: e1 }, { data: users, error: e2 }] = await Promise.all([
+        admin.rpc("search_chat", { _q: q, _limit: payload?.limit ?? 30 }),
+        admin.rpc("search_chat_users", { _q: q, _limit: 15 }),
+      ]);
+      if (e1) throw e1; if (e2) throw e2;
+      return json({ messages: msgs ?? [], users: users ?? [] });
+    }
+
+    // ============ MODERATION ============
+    if (action === "list_blocks") {
+      const { data } = await admin.from("org_chat_blocks").select("blocked_user_id, created_at").eq("blocker_id", userId);
+      return json({ blocks: data ?? [] });
+    }
+    if (action === "block_user") {
+      const other = String(payload?.user_id ?? "");
+      if (!other || other === userId) return json({ error: "invalid_user" }, 400);
+      const { error } = await admin.from("org_chat_blocks").upsert({ blocker_id: userId, blocked_user_id: other });
+      if (error) throw error;
+      return json({ ok: true });
+    }
+    if (action === "unblock_user") {
+      const other = String(payload?.user_id ?? "");
+      await admin.from("org_chat_blocks").delete().eq("blocker_id", userId).eq("blocked_user_id", other);
+      return json({ ok: true });
+    }
+    if (action === "report_message") {
+      const messageId = String(payload?.message_id ?? "");
+      const reason = String(payload?.reason ?? "").slice(0, 500);
+      if (!messageId || !reason) return json({ error: "invalid" }, 400);
+      const { data: msg } = await admin.from("org_chat_messages").select("channel_id, organization_id").eq("id", messageId).maybeSingle();
+      if (!msg) return json({ error: "not_found" }, 404);
+      const access = await isMember(msg.channel_id);
+      if (!access.ok) return json({ error: "forbidden" }, 403);
+      const { error } = await admin.from("org_chat_reports").insert({
+        organization_id: msg.organization_id, channel_id: msg.channel_id,
+        message_id: messageId, reporter_id: userId, reason, status: "open",
+      });
+      if (error) throw error;
+      return json({ ok: true });
+    }
+    if (action === "list_reports") {
+      const { data, error } = await admin.from("org_chat_reports")
+        .select("*").eq("organization_id", orgId).order("created_at", { ascending: false }).limit(200);
+      if (error) throw error;
+      return json({ reports: data ?? [] });
+    }
+    if (action === "resolve_report") {
+      const id = String(payload?.id ?? "");
+      const resolution = String(payload?.resolution ?? "dismissed");
+      const { data: rep } = await admin.from("org_chat_reports").select("organization_id").eq("id", id).maybeSingle();
+      if (!rep) return json({ error: "not_found" }, 404);
+      const { data: roles } = await admin.from("user_roles").select("role").eq("user_id", userId).eq("organization_id", rep.organization_id);
+      const isAdmin = (roles ?? []).some((r: any) => r.role === "org_admin" || r.role === "super_admin");
+      if (!isAdmin) return json({ error: "forbidden" }, 403);
+      await admin.from("org_chat_reports").update({
+        status: "closed", reviewed_by: userId, reviewed_at: new Date().toISOString(), resolution,
+      }).eq("id", id);
+      return json({ ok: true });
+    }
+    if (action === "hide_message") {
+      const { error } = await admin.rpc("hide_chat_message", { _message_id: payload?.message_id, _reason: payload?.reason ?? "Hidden by moderator" });
+      if (error) throw error;
+      return json({ ok: true });
+    }
+    if (action === "unhide_message") {
+      const { error } = await admin.rpc("unhide_chat_message", { _message_id: payload?.message_id });
+      if (error) throw error;
+      return json({ ok: true });
+    }
+
     return json({ error: "unknown_action" }, 400);
   } catch (e) {
     return json({ error: String(e?.message ?? e) }, 500);
