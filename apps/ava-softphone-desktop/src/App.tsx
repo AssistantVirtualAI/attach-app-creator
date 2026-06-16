@@ -7,6 +7,7 @@ import ConsoleLayout from './components/console/ConsoleLayout';
 import SettingsPage from './components/SettingsPage';
 import BrightnessOverlay from './components/BrightnessOverlay';
 import ResponsiveLab from './components/ResponsiveLab';
+import DialerBaselineCheck from './components/DialerBaselineCheck';
 import { useTheme } from './lib/theme';
 import { useContrast } from './hooks/useContrast';
 import { supabase } from './lib/supabaseClient';
@@ -49,6 +50,7 @@ async function triggerCdrSync() {
 
 const qs = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
 const IS_LAB = qs?.get('lab') === 'responsive';
+const IS_DIALER_CHECK = qs?.get('check') === 'dialer';
 const IS_EMBED = qs?.get('embed') === '1';
 
 async function clearDesktopAuthState() {
@@ -81,6 +83,8 @@ export default function App() {
 
   // Responsive testing utility — visit ?lab=responsive to open it.
   if (IS_LAB) return <ResponsiveLab />;
+  // Dialer baseline check — visit ?check=dialer to open it.
+  if (IS_DIALER_CHECK) return <DialerBaselineCheck />;
 
   const [creds, setCreds] = useState<Creds>(null);
   const [loading, setLoading] = useState(true);
