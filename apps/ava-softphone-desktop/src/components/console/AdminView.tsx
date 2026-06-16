@@ -93,21 +93,21 @@ function ModalShell({ title, onClose, width = 460, children }: { title: string; 
 }
 
 /**
- * Hook that returns:
- *   • `confirmConflict(existing)` — for the create-flow's confirmConflict slot.
- *     Opens the dedicated ConflictResolutionModal and resolves to true (edit)
- *     or false (abort) based on the admin's choice.
- *   • `modalNode` — JSX to render so the modal actually appears.
+ * Hook returning:
+ *   • `confirmConflict(existing, identifier)` — plug into the create-flow's
+ *     confirmConflict slot. Opens the ConflictResolutionModal and resolves to
+ *     true (open existing for edit) or false (abort).
+ *   • `modalNode` — JSX to render so the modal appears.
  */
-function useConflictModal(kind: ConflictKind, identifier: string) {
-  const [state, setState] = useState<{ existing: any; resolve: (v: boolean) => void } | null>(null);
-  const confirmConflict = useCallback((existing: any) => new Promise<boolean>((resolve) => {
-    setState({ existing, resolve });
+function useConflictModal(kind: ConflictKind) {
+  const [state, setState] = useState<{ existing: any; identifier: string; resolve: (v: boolean) => void } | null>(null);
+  const confirmConflict = useCallback((existing: any, identifier: string) => new Promise<boolean>((resolve) => {
+    setState({ existing, identifier, resolve });
   }), []);
   const modalNode = state ? (
     <ConflictResolutionModal
       kind={kind}
-      identifier={identifier}
+      identifier={state.identifier}
       existing={state.existing}
       onResolve={(choice) => { state.resolve(choice === 'open_for_edit'); setState(null); }}
     />
