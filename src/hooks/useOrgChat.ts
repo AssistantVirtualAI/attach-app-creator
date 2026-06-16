@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -7,7 +7,7 @@ export type Channel = {
   organization_id: string;
   name: string;
   description: string | null;
-  channel_type: "public" | "private";
+  channel_type: "public" | "private" | "dm" | "announcement";
   members: string[];
   created_at: string;
 };
