@@ -456,11 +456,39 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
               {playbackError && <div style={{ fontSize: 11, color: c.mutedSilver, marginTop: 8 }}>{playbackError}</div>}
             </div>
 
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
               <button onClick={runTranscribeAnalyze} disabled={aiLoading} style={{ ...miniBtn, flex: 1, padding: '8px 10px', background: aiLoading ? 'transparent' : 'rgba(35,214,255,0.10)', color: c.avaCyan, borderColor: `${c.avaCyan}55`, fontWeight: 700 }}>
-                {aiLoading ? 'Running AI…' : (transcript ? '↻ Re-analyze' : '✨ Transcribe & Analyze')}
+                {aiLoading
+                  ? (aiStage === 'fetching' ? '⏳ Preparing audio…'
+                    : aiStage === 'transcribing' ? '🎙 Transcribing with AI…'
+                    : aiStage === 'analyzing' ? '🧠 Analyzing call…'
+                    : 'Running AI…')
+                  : aiStage === 'done' ? '✓ Done — re-run'
+                  : (transcript ? '↻ Re-analyze' : '✨ Transcribe & Analyze')}
               </button>
             </div>
+            {aiLoading && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: c.mutedSilver, marginBottom: 4 }}>
+                  <span style={{ color: aiStage === 'fetching' ? c.avaCyan : c.mutedSilver }}>1. Fetch audio</span>
+                  <span style={{ color: aiStage === 'transcribing' ? c.avaCyan : c.mutedSilver }}>2. Transcribe</span>
+                  <span style={{ color: aiStage === 'analyzing' ? c.avaCyan : c.mutedSilver }}>3. Analyze</span>
+                </div>
+                <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: aiStage === 'fetching' ? '20%' : aiStage === 'transcribing' ? '60%' : aiStage === 'analyzing' ? '90%' : '100%',
+                    background: `linear-gradient(90deg, ${c.avaCyan}, ${c.avaViolet})`,
+                    transition: 'width 300ms ease',
+                  }} />
+                </div>
+              </div>
+            )}
+            {!aiLoading && aiStage === 'done' && (
+              <div style={{ marginBottom: 12, fontSize: 11, color: c.signalGold }}>
+                ✓ Transcription and analysis complete
+              </div>
+            )}
             {aiError && (
               <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: 'rgba(239,68,68,0.10)', border: `1px solid ${c.danger}55`, color: c.textIce, fontSize: 11, display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                 <span>{aiError}</span>
