@@ -564,7 +564,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
     setLoading(true);
     const [{ data: a }, { data: e }] = await Promise.all([
       supabase.from('pbx_queue_agents').select('*').eq('queue_id', queue.id),
-      supabase.from('pbx_extensions').select('id, extension, display_name').eq('organization_id', LEMTEL_ORG).order('extension'),
+      supabase.from('pbx_extensions').select(EXT_COLS).eq('organization_id', LEMTEL_ORG).order('extension'),
     ]);
     setAgents(a || []); setExtensions(e || []); setLoading(false);
     return (a || []).length;
