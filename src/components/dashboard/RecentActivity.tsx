@@ -14,7 +14,7 @@ const isValidDate = (date: Date): boolean => {
   return date instanceof Date && !isNaN(date.getTime());
 };
 
-export const RecentActivity = ({ metrics }: RecentActivityProps) => {
+export const RecentActivity = ({ metrics, extraActivity }: RecentActivityProps) => {
   const { t, language } = useTranslation();
   const dateLocale = language === 'fr' ? fr : enUS;
 
@@ -25,7 +25,27 @@ export const RecentActivity = ({ metrics }: RecentActivityProps) => {
     return formatDistanceToNow(date, { addSuffix: true, locale: dateLocale });
   };
 
-  if (metrics.recentActivity.length === 0) {
+  const items = (extraActivity && extraActivity.length > 0
+    ? extraActivity
+    : metrics.recentActivity
+  )
+    .filter((a) => !!a.timestamp)
+    .slice(0, 10);
+
+  const iconFor = (type: string) => {
+    switch (type) {
+      case 'call':
+        return Phone;
+      case 'lead':
+        return Target;
+      case 'appointment':
+        return CalendarClock;
+      default:
+        return MessageSquare;
+    }
+  };
+
+  if (items.length === 0) {
     return (
       <Card className="bg-card/50 backdrop-blur-sm border-border/50">
         <CardHeader>
@@ -46,27 +66,28 @@ export const RecentActivity = ({ metrics }: RecentActivityProps) => {
         <CardTitle className="text-lg">{t('dashboard.recentActivity.title')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {metrics.recentActivity.map((activity) => (
-          <div
-            key={activity.id}
-            className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
-          >
-            <div className="p-2 rounded-lg bg-primary/10">
-              <MessageSquare className="h-4 w-4 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">
-                {activity.title}
-              </p>
-              <div className="flex items-center gap-2 mt-1">
-                <Clock className="h-3 w-3 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">
-                  {formatTimestamp(activity.timestamp)}
-                </span>
+        {items.map((activity) => {
+          const Icon = iconFor(activity.type);
+          return (
+            <div
+              key={activity.id}
+              className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors"
+            >
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Icon className="h-4 w-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{activity.title}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Clock className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">
+                    {formatTimestamp(activity.timestamp)}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </CardContent>
     </Card>
   );
