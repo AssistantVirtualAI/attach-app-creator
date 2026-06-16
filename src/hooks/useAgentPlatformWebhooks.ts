@@ -64,7 +64,7 @@ export function useAgentPlatformWebhooks(agentId: string | undefined) {
       
       const { data, error } = await supabase
         .from('agent_platform_webhooks')
-        .select('*')
+        .select('id,agent_id,organization_id,platform,webhook_url,events,is_active,last_triggered_at,error_count,created_at,updated_at')
         .eq('agent_id', agentId)
         .order('created_at', { ascending: false });
 
