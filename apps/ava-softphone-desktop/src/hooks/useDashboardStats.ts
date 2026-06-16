@@ -127,6 +127,7 @@ export function useDashboardStats(
     }
 
     const [callsR, smsR, liveR] = await Promise.all([callsQ, smsQ, liveQ]);
+    if (callsR.error) throw callsR.error;
     const calls = (callsR.data || []) as any[];
     const missed = calls.filter((r) => r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER').length;
     const answered = calls.length - missed;
