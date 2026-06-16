@@ -658,34 +658,25 @@ function IvrsTable() {
 }
 
 function EditIvrModal({ ivr, saving, onClose, onSave }: { ivr: any; saving: boolean; onClose: () => void; onSave: (changes: any) => void }) {
-  const [name, setName] = useState(ivr.name || '');
-  const [extension, setExtension] = useState(ivr.extension || '');
-  const [greet, setGreet] = useState(ivr.greet_long || '');
-  const [timeout, setTimeoutMs] = useState(ivr.timeout_ms || 3000);
-  const [enabled, setEnabled] = useState(ivr.enabled !== false);
+  const initial = {
+    ivr_menu_name: ivr.name || '',
+    ivr_menu_extension: ivr.extension || '',
+    ivr_menu_greet_long: ivr.greet_long || '',
+    ivr_menu_greet_short: ivr.greet_short || '',
+    ivr_menu_timeout: ivr.timeout_ms || 3000,
+    ivr_menu_enabled: ivr.enabled !== false ? 'true' : 'false',
+    ivr_menu_exit_action: ivr.exit_action || 'hangup',
+  };
   return (
-    <ModalShell title={`Edit IVR · ${ivr.name}`} onClose={onClose} width={500}>
-      <Label>Name</Label><input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-      <div style={{ height: 12 }} />
-      <Label>Extension</Label><input value={extension} onChange={(e) => setExtension(e.target.value)} style={inputStyle} />
-      <div style={{ height: 12 }} />
-      <Label>Greeting (long)</Label><textarea value={greet} onChange={(e) => setGreet(e.target.value)} rows={4} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
-      <div style={{ height: 12 }} />
-      <Label>Timeout (ms)</Label><input type="number" value={timeout} onChange={(e) => setTimeoutMs(Number(e.target.value))} style={inputStyle} />
-      <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12, marginTop: 14 }}>
-        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
-      </label>
-      <div style={{ display: 'flex', gap: 8, marginTop: 22, justifyContent: 'flex-end' }}>
-        <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-        <button onClick={() => onSave({
-          ivr_menu_name: name,
-          ivr_menu_extension: extension,
-          ivr_menu_greet_long: greet,
-          ivr_menu_timeout: timeout,
-          ivr_menu_enabled: enabled ? 'true' : 'false',
-        })} disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save & sync to PBX'}</button>
-      </div>
-    </ModalShell>
+    <PbxEditSheet
+      title={`Edit IVR · ${ivr.name}`}
+      groups={IVR_GROUPS}
+      initial={initial}
+      saving={saving}
+      width={680}
+      onCancel={onClose}
+      onSave={onSave}
+    />
   );
 }
 
