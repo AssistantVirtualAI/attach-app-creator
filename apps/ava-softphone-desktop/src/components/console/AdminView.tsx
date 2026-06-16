@@ -784,6 +784,25 @@ function QueuesTable() {
     }
   };
 
+  const create = async (form: any) => {
+    setSaving(true);
+    try {
+      const me = await getMeContext();
+      const orgId = me.organization_id || LEMTEL_ORG;
+      const out: any = { ...form };
+      if (out.queue_max_wait_time !== undefined) out.queue_max_wait_time = String(out.queue_max_wait_time);
+      const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: { action: 'create-queue', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN, ...out } },
+      });
+      if (err) throw err;
+      setCreating(false);
+      await reload(true);
+      window.dispatchEvent(new Event('ava:pbx-resource-saved'));
+    } catch (e: any) {
+      alert('Create failed: ' + (e?.message || 'unknown'));
+    } finally { setSaving(false); }
+  };
+
   const cols = ['Name', 'Ext', 'Strategy', 'Agents', 'Max wait', 'Status', ''];
   return (
     <>
