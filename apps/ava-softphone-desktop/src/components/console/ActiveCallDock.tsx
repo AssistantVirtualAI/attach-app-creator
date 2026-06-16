@@ -25,10 +25,9 @@ export default function ActiveCallDock() {
       position: 'fixed', bottom: 18, left: '50%', transform: 'translateX(-50%)',
       zIndex: 9998, width: 460,
       padding: '10px 14px', borderRadius: 14,
-      background: `linear-gradient(135deg, ${c.deepPanel}f5, ${c.midnight}f5)`,
-      backdropFilter: 'blur(14px)',
+      background: c.deepPanel,
       border: `1px solid ${call.status === 'held' ? c.warning + '60' : c.success + '50'}`,
-      boxShadow: '0 18px 50px -12px rgba(0,0,0,0.7)',
+      boxShadow: '0 12px 32px -14px rgba(15,23,42,0.20)',
       display: 'flex', alignItems: 'center', gap: 12, color: c.textIce,
     }}>
       <span style={{
