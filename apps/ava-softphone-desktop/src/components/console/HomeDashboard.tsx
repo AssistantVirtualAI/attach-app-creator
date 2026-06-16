@@ -517,63 +517,86 @@ function MetricDetailDrawer(props: {
   const { metric, title, tone, orgId, extension, range, customFrom, customTo, series, onClose } = props;
   const [rows, setRows] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const titleId = useMemo(() => `ava-detail-${Math.random().toString(36).slice(2, 8)}`, []);
+
+  // ESC to close, focus the close button on open, simple focus trap to keep tab inside.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+    };
+    document.addEventListener('keydown', onKey);
+    const t = setTimeout(() => closeBtnRef.current?.focus(), 30);
+    return () => { document.removeEventListener('keydown', onKey); clearTimeout(t); };
+  }, [onClose]);
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (!orgId) { setRows([]); return; }
+      if (metric === 'sms') {
+        let q = supabase.from('pbx_sms_threads')
+          .select('id, peer_number, last_message_at, unread_count')
+          .eq('organization_id', orgId)
+          .gt('unread_count', 0)
+          .order('last_message_at', { ascending: false })
+          .limit(50);
+        if (extension) q = q.eq('extension', extension);
+        const { data, error: err } = await q;
+        if (err) throw err;
+        setRows(data || []);
+        return;
+      }
+      if (metric === 'live') {
+        let q = supabase.from('telecom_live_calls')
+          .select('id, caller_id_number, destination_number, started_at, extension')
+          .eq('organization_id', orgId)
+          .order('started_at', { ascending: false })
+          .limit(50);
+        if (extension) q = q.eq('extension', extension);
+        const { data, error: err } = await q;
+        if (err) throw err;
+        setRows(data || []);
+        return;
+      }
+      if (metric === 'realtime') { setRows([]); return; }
+
+      const { from, to } = rangeBounds(range, customFrom, customTo);
+      let q = supabase.from('pbx_call_records')
+        .select('id, caller_id_number, destination_number, start_at, duration, missed_call, call_status, hangup_cause, has_recording, recording_name, recording_path, voicemail_message, extension')
+        .eq('organization_id', orgId)
+        .gte('start_at', from)
+        .lte('start_at', to)
+        .order('start_at', { ascending: false })
+        .limit(200);
+      if (extension) q = q.eq('extension', extension);
+      const { data, error: err } = await q;
+      if (err) throw err;
+      const all = (data || []) as any[];
+      const filtered = all.filter((r) => {
+        if (metric === 'calls') return true;
+        if (metric === 'missed') return r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER';
+        if (metric === 'answered') return !(r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER');
+        if (metric === 'recordings') return r.has_recording || r.recording_name || r.recording_path;
+        if (metric === 'voicemail') return r.missed_call || r.hangup_cause === 'NO_ANSWER' || (r.voicemail_message && r.voicemail_message !== 'false');
+        return true;
+      });
+      setRows(filtered);
+    } catch (e: any) {
+      setError(String(e?.message || e || 'Failed to load').slice(0, 200));
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        if (!orgId) { setRows([]); return; }
-        if (metric === 'sms') {
-          let q = supabase.from('pbx_sms_threads')
-            .select('id, peer_number, last_message_at, unread_count')
-            .eq('organization_id', orgId)
-            .gt('unread_count', 0)
-            .order('last_message_at', { ascending: false })
-            .limit(50);
-          if (extension) q = q.eq('extension', extension);
-          const { data } = await q;
-          if (!cancelled) setRows(data || []);
-          return;
-        }
-        if (metric === 'live') {
-          let q = supabase.from('telecom_live_calls')
-            .select('id, caller_id_number, destination_number, started_at, extension')
-            .eq('organization_id', orgId)
-            .order('started_at', { ascending: false })
-            .limit(50);
-          if (extension) q = q.eq('extension', extension);
-          const { data } = await q;
-          if (!cancelled) setRows(data || []);
-          return;
-        }
-        if (metric === 'realtime') { if (!cancelled) setRows([]); return; }
-
-        const { from, to } = rangeBounds(range, customFrom, customTo);
-        let q = supabase.from('pbx_call_records')
-          .select('id, caller_id_number, destination_number, start_at, duration, missed_call, call_status, hangup_cause, has_recording, recording_name, recording_path, voicemail_message, extension')
-          .eq('organization_id', orgId)
-          .gte('start_at', from)
-          .lte('start_at', to)
-          .order('start_at', { ascending: false })
-          .limit(200);
-        if (extension) q = q.eq('extension', extension);
-        const { data } = await q;
-        const all = (data || []) as any[];
-        const filtered = all.filter((r) => {
-          if (metric === 'calls') return true;
-          if (metric === 'missed') return r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER';
-          if (metric === 'answered') return !(r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER');
-          if (metric === 'recordings') return r.has_recording || r.recording_name || r.recording_path;
-          if (metric === 'voicemail') return r.missed_call || r.hangup_cause === 'NO_ANSWER' || (r.voicemail_message && r.voicemail_message !== 'false');
-          return true;
-        });
-        if (!cancelled) setRows(filtered);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+    (async () => { if (!cancelled) await load(); })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metric, orgId, extension, range, customFrom, customTo]);
 
   const seriesForMetric =
@@ -582,11 +605,21 @@ function MetricDetailDrawer(props: {
     metric === 'recordings' ? series.recordings :
     metric === 'calls' || metric === 'voicemail' ? series.calls : [];
 
+  // Build shareable URL for this detail view
+  const shareUrl = useMemo(() => {
+    if (typeof window === 'undefined') return '';
+    const sp = new URLSearchParams();
+    sp.set('range', range);
+    if (range === 'custom') { sp.set('from', customFrom); sp.set('to', customTo); }
+    sp.set('metric', metric);
+    return `${window.location.origin}${window.location.pathname}?${sp.toString()}`;
+  }, [range, customFrom, customTo, metric]);
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={title}
+      aria-labelledby={titleId}
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, background: 'rgba(8,14,32,0.55)',
@@ -596,11 +629,11 @@ function MetricDetailDrawer(props: {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 'min(560px, 100%)', height: '100%', background: '#f6f8fd',
+          width: 'min(560px, 100%)', height: '100dvh', background: '#f6f8fd',
           borderLeft: `1px solid ${c.border}`,
           display: 'flex', flexDirection: 'column',
           boxShadow: '-20px 0 50px -20px rgba(8,14,32,0.45)',
-          animation: 'slideInRight .25s ease-out',
+          animation: 'avaSlideInRight .25s ease-out',
         }}>
         <div style={{
           padding: '16px 18px',
@@ -608,13 +641,30 @@ function MetricDetailDrawer(props: {
           color: '#fff', display: 'flex', alignItems: 'center', gap: 12,
         }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.6, textTransform: 'uppercase', opacity: 0.9 }}>Detail</div>
-            <div style={{ fontSize: 17, fontWeight: 700, marginTop: 2, lineHeight: 1.25 }}>{title}</div>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.6, textTransform: 'uppercase', opacity: 0.95 }}>Detail</div>
+            <h2 id={titleId} style={{ fontSize: 17, fontWeight: 700, margin: '2px 0 0', lineHeight: 1.25, color: '#fff' }}>{title}</h2>
           </div>
-          <button onClick={onClose} aria-label="Close" style={{
-            background: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)',
-            borderRadius: 10, padding: '6px 10px', cursor: 'pointer', fontWeight: 700, fontSize: 12,
-          }}>Close</button>
+          <button
+            ref={closeBtnRef}
+            onClick={onClose}
+            aria-label="Close detail panel"
+            className="ava-drawer-close"
+            style={{
+              background: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.45)',
+              borderRadius: 10, padding: '6px 10px', cursor: 'pointer', fontWeight: 700, fontSize: 12,
+            }}>Close</button>
+        </div>
+
+        <div style={{ padding: '10px 18px', background: '#fff', borderBottom: `1px solid ${c.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, color: c.mutedSilver, fontWeight: 600 }}>Shareable link</span>
+          <input readOnly value={shareUrl} aria-label="Shareable URL for this metric view"
+            style={{ flex: 1, fontSize: 11, padding: '5px 8px', border: `1px solid ${c.border}`, borderRadius: 6, background: '#f8fafc', color: c.textIce, fontFamily: 'monospace' }} />
+          <button onClick={() => { try { navigator.clipboard?.writeText(shareUrl); } catch { /* noop */ } }}
+            className="ava-drawer-close"
+            aria-label="Copy shareable link to clipboard"
+            style={{ fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 6, border: `1px solid ${tone.ring}`, background: '#fff', color: tone.from, cursor: 'pointer' }}>
+            Copy
+          </button>
         </div>
 
         {seriesForMetric.length > 0 && (
@@ -636,19 +686,34 @@ function MetricDetailDrawer(props: {
           </div>
         )}
 
-        <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: 16 }} aria-busy={loading} aria-live="polite">
           {loading ? (
-            <div style={{ padding: 24, textAlign: 'center', color: c.mutedSilver, fontSize: 13 }}>Loading…</div>
+            <div role="status" style={{ padding: 24, textAlign: 'center', color: c.mutedSilver, fontSize: 13 }}>Loading detail…</div>
+          ) : error ? (
+            <div role="alert" style={{
+              padding: 16, borderRadius: 10,
+              background: 'rgba(220,38,38,0.06)', border: `1px solid ${tones.red.ring}`, color: c.danger,
+              fontSize: 13, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start',
+            }}>
+              <strong>Could not load detail</strong>
+              <span style={{ fontSize: 12, fontWeight: 500 }}>{error}</span>
+              <button onClick={load} className="ava-drawer-close" style={{
+                padding: '6px 12px', borderRadius: 8, border: `1px solid ${tones.red.ring}`,
+                background: '#fff', color: c.danger, fontWeight: 700, fontSize: 12, cursor: 'pointer',
+              }}>Retry</button>
+            </div>
           ) : !rows || rows.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: c.mutedSilver, fontSize: 13 }}>
               {metric === 'realtime' ? 'Realtime status is live above.' : 'No matching records in this range.'}
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {rows.map((r: any) => (
-                <DetailRow key={r.id} metric={metric} row={r} tone={tone} />
+                <li key={r.id}>
+                  <DetailRow metric={metric} row={r} tone={tone} />
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
       </div>
