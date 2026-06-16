@@ -223,33 +223,29 @@ function ExtensionsTable() {
 }
 
 function EditExtensionModal({ ext, saving, onClose, onSave }: { ext: any; saving: boolean; onClose: () => void; onSave: (changes: any) => void }) {
-  const [displayName, setDisplayName] = useState(ext.display_name === '—' ? '' : ext.display_name || '');
-  const [voicemail, setVoicemail] = useState(!!ext.voicemail_enabled);
-  const [enabled, setEnabled] = useState(ext.enabled !== false);
+  const initial = {
+    ...ext,
+    effective_caller_id_name: ext.display_name === '—' ? '' : ext.display_name || '',
+    voicemail_enabled: !!ext.voicemail_enabled,
+    enabled: ext.enabled !== false,
+  };
   return (
-    <ModalShell title={`Edit Extension ${ext.extension}`} onClose={onClose} width={420}>
-      <Label>Display name</Label>
-      <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} style={inputStyle} />
-      <div style={{ display: 'flex', gap: 16, marginTop: 14 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12 }}>
-          <input type="checkbox" checked={voicemail} onChange={(e) => setVoicemail(e.target.checked)} /> Voicemail
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12 }}>
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
-        </label>
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginTop: 22, justifyContent: 'flex-end' }}>
-        <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-        <button onClick={() => onSave({
-          effective_caller_id_name: displayName,
-          voicemail_enabled: voicemail ? 'true' : 'false',
-          enabled: enabled ? 'true' : 'false',
-        })} disabled={saving} style={{
-          padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer',
-          background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1,
-        }}>{saving ? 'Saving…' : 'Save & sync to PBX'}</button>
-      </div>
-    </ModalShell>
+    <PbxEditSheet
+      title={`Edit Extension ${ext.extension}`}
+      groups={EXTENSION_GROUPS}
+      initial={initial}
+      saving={saving}
+      onCancel={onClose}
+      onSave={(form) => {
+        // Booleans → 'true'/'false' strings expected by FusionPBX
+        const out: any = { ...form };
+        ['voicemail_enabled', 'enabled', 'voicemail_attach_file',
+         'voicemail_local_after_email', 'do_not_disturb',
+         'forward_all_enabled', 'forward_busy_enabled', 'forward_no_answer_enabled']
+          .forEach((k) => { if (typeof out[k] === 'boolean') out[k] = out[k] ? 'true' : 'false'; });
+        onSave(out);
+      }}
+    />
   );
 }
 
