@@ -272,7 +272,8 @@ export default function HomeDashboard({
 
 
   return (
-    <div className="ava-page" style={{ padding: '28px 32px', maxWidth: 1240, margin: '0 auto', animation: 'fadeIn .3s ease-out' }}>
+    <div className="ava-page ava-scroll" style={{ padding: '28px 32px 56px', maxWidth: 1240, margin: '0 auto', width: '100%', boxSizing: 'border-box', height: '100%', overflowY: 'auto', overflowX: 'hidden', animation: 'fadeIn .3s ease-out' }}>
+
       <header style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, fontWeight: 700, letterSpacing: 2, color: c.signalGold, textTransform: 'uppercase', flexWrap: 'wrap' }}>
           <span>Command Center</span>
