@@ -161,13 +161,26 @@ export default function ProfileMenu() {
           (payload: any) => {
             const next = (payload.new?.status || payload.old?.status) as Status | undefined;
             if (!next || !STATUS_META[next]) return;
-            if (next === statusRef.current) return;
-            // Remote device changed status — drop any local auto-revert timer and pending picker.
+            // Conflict detection: a remote write arrives <5s after our last local write with a DIFFERENT status.
+            const localW = lastLocalWriteRef.current;
+            const isNearSimultaneous = !!localW && (Date.now() - localW.at) < 5000;
+            const conflict = isNearSimultaneous && localW!.status !== next;
+            if (next === statusRef.current && !conflict) return;
+            if (conflict) {
+              // Remote wins (server is the source of truth). Surface to user via badge.
+              const remoteLabel = STATUS_META[next].label;
+              setSyncState('conflict');
+              setSyncDetail(`Another device set "${remoteLabel}" — keeping the latest.`);
+              if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+              savedTimerRef.current = setTimeout(() => setSyncState('idle'), 4000);
+            } else {
+              // Plain remote update from another device — just confirm sync.
+              flashSaved('Synced from another device');
+            }
             if (expiryTimerRef.current) { clearTimeout(expiryTimerRef.current); expiryTimerRef.current = null; }
             setExpiryAt(null);
             setPendingStatus(null);
             try { localStorage.removeItem(EXPIRY_KEY); } catch { /* noop */ }
-            // Parse "until:<iso>" from message to re-arm local timer if present.
             const msg = payload.new?.status_message as string | undefined;
             if (msg && msg.startsWith('until:')) {
               const ts = Date.parse(msg.slice(6));
@@ -177,6 +190,8 @@ export default function ProfileMenu() {
                 scheduleAutoRevert(ts);
               }
             }
+            // Adopt remote write as our new local baseline so we don't immediately re-flag it.
+            lastLocalWriteRef.current = { at: Date.now(), status: next, note: msg ?? null };
             setStatus(next);
             try { localStorage.setItem(STATUS_KEY, next); } catch { /* noop */ }
             window.dispatchEvent(new CustomEvent('lemtel:set-status', { detail: STATUS_META[next].manual }));
@@ -227,20 +242,60 @@ export default function ProfileMenu() {
   const meta = STATUS_META[status];
   const initials = (name || email || '?').slice(0, 2).toUpperCase();
 
+  // ---- Sync indicator & conflict handling ----
+  type SyncState = 'idle' | 'saving' | 'saved' | 'error' | 'conflict' | 'offline';
+  const [syncState, setSyncState] = useState<SyncState>('idle');
+  const [syncDetail, setSyncDetail] = useState<string>('');
+  const lastLocalWriteRef = useRef<{ at: number; status: Status; note?: string | null } | null>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flashSaved = (label = 'Synced') => {
+    setSyncState('saved'); setSyncDetail(label);
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = setTimeout(() => setSyncState('idle'), 2500);
+  };
+
+  // Online/offline indicator (and retry pending writes)
+  useEffect(() => {
+    const on = () => { if (syncState === 'offline') setSyncState('idle'); };
+    const off = () => { setSyncState('offline'); setSyncDetail('Offline — changes will sync when back online'); };
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    if (!navigator.onLine) off();
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, [syncState]);
+
+  const withSync = async <T,>(label: string, fn: () => Promise<T>): Promise<T | undefined> => {
+    setSyncState('saving'); setSyncDetail(label);
+    try {
+      const out = await fn();
+      flashSaved(label);
+      return out;
+    } catch (e: any) {
+      setSyncState('error');
+      setSyncDetail(e?.message?.slice(0, 80) || 'Sync failed — will retry');
+      return undefined;
+    }
+  };
+
   const persistPresence = async (s: Status, note?: string, untilTs?: number | null) => {
     const m = STATUS_META[s];
-    try {
-      await supabase.rpc('upsert_user_presence', {
+    const noteVal = s === 'meeting'
+      ? (note ?? meetingNote ?? null)
+      : (untilTs ? `until:${new Date(untilTs).toISOString()}` : null);
+    lastLocalWriteRef.current = { at: Date.now(), status: s, note: noteVal };
+    await withSync('Status', async () => {
+      const { error } = await supabase.rpc('upsert_user_presence', {
         _status: s,
-        _message: s === 'meeting'
-          ? (note ?? meetingNote ?? null)
-          : (untilTs ? `until:${new Date(untilTs).toISOString()}` : null),
+        _message: noteVal,
         _emoji: m.icon,
         _call_state: 'idle',
         _platform: 'desktop',
       });
-    } catch (e) { /* offline / noop */ }
+      if (error) throw error;
+    });
   };
+
 
   const clearExpiryTimer = () => {
     if (expiryTimerRef.current) { clearTimeout(expiryTimerRef.current); expiryTimerRef.current = null; }
@@ -348,7 +403,10 @@ export default function ProfileMenu() {
       const url = String(reader.result || '');
       setAvatar(url);
       try { localStorage.setItem(AVATAR_KEY, url); } catch { /* noop */ }
-      try { await supabase.auth.updateUser({ data: { avatar_url: url } }); } catch { /* noop */ }
+      await withSync('Avatar', async () => {
+        const { error } = await supabase.auth.updateUser({ data: { avatar_url: url } });
+        if (error) throw error;
+      });
     };
     reader.readAsDataURL(file);
   };
@@ -356,8 +414,12 @@ export default function ProfileMenu() {
   const removePhoto = async () => {
     setAvatar(null);
     try { localStorage.removeItem(AVATAR_KEY); } catch { /* noop */ }
-    try { await supabase.auth.updateUser({ data: { avatar_url: null } }); } catch { /* noop */ }
+    await withSync('Avatar', async () => {
+      const { error } = await supabase.auth.updateUser({ data: { avatar_url: null } });
+      if (error) throw error;
+    });
   };
+
 
   return (
     <div ref={rootRef} style={{ position: 'relative', WebkitAppRegion: 'no-drag' as any }}>
@@ -395,6 +457,7 @@ export default function ProfileMenu() {
         >
           {status === 'meeting' && meetingNote ? `Meeting · ${meetingNote}` : `${meta.icon} ${meta.label}`}
         </span>
+        <SyncBadge state={syncState} detail={syncDetail} />
         <span style={{ fontSize: 9, opacity: 0.6 }}>▾</span>
       </button>
 
@@ -544,7 +607,9 @@ export default function ProfileMenu() {
           email={email}
           avatar={avatar}
           onClose={() => setProfileOpen(false)}
-          onSaved={(newName, newAvatar) => { setName(newName); if (newAvatar !== undefined) setAvatar(newAvatar); }}
+          onSaved={(newName, newAvatar) => { setName(newName); if (newAvatar !== undefined) setAvatar(newAvatar); flashSaved('Profile'); }}
+          onSyncError={(label, err) => { setSyncState('error'); setSyncDetail(`${label}: ${err?.slice(0, 60) || 'failed'}`); }}
+          onSyncStart={(label) => { setSyncState('saving'); setSyncDetail(label); }}
           onPickPhoto={onPickPhoto}
           onRemovePhoto={removePhoto}
         />
@@ -555,12 +620,15 @@ export default function ProfileMenu() {
 
 function ProfileEditor({
   name: initialName, email, avatar, onClose, onSaved, onPickPhoto, onRemovePhoto,
+  onSyncStart, onSyncError,
 }: {
   name: string; email: string; avatar: string | null;
   onClose: () => void;
   onSaved: (name: string, avatar?: string | null) => void;
   onPickPhoto: () => void;
   onRemovePhoto: () => void;
+  onSyncStart?: (label: string) => void;
+  onSyncError?: (label: string, err: string) => void;
 }) {
   const [name, setName] = useState(initialName);
   const [saving, setSaving] = useState(false);
@@ -585,16 +653,19 @@ function ProfileEditor({
   const initials = (initialName || email || '?').slice(0, 2).toUpperCase();
 
   const save = async () => {
-    setSaving(true); setMsg(null);
+    setSaving(true); setMsg(null); onSyncStart?.('Profile');
     try {
       const { error } = await supabase.auth.updateUser({ data: { full_name: name, name } });
       if (error) throw error;
       onSaved(name);
       setMsg({ kind: 'ok', text: 'Profile updated.' });
     } catch (e: any) {
-      setMsg({ kind: 'err', text: e?.message || 'Failed to update profile.' });
+      const text = e?.message || 'Failed to update profile.';
+      setMsg({ kind: 'err', text });
+      onSyncError?.('Profile', text);
     } finally { setSaving(false); }
   };
+
 
   // ---- Password strength (0-4) ----
   const strength = (() => {
@@ -664,9 +735,11 @@ function ProfileEditor({
     if (!email) { setEmError('No email on file.'); return; }
     setSaving(true); setEmError(null);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
+      // Reset links must open in a public browser, not the Electron app shell.
+      const origin = window.location.origin;
+      const isPublic = /^https?:\/\//i.test(origin) && !origin.includes('localhost') && !origin.startsWith('file:');
+      const redirectTo = isPublic ? `${origin}/reset-password` : 'https://avastatistic.ca/reset-password';
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
       if (error) throw error;
       setEmStep('sent');
     } catch (e: any) {
@@ -674,6 +747,7 @@ function ProfileEditor({
       setEmStep('idle');
     } finally { setSaving(false); }
   };
+
 
   return (
     <div
@@ -922,4 +996,43 @@ function menuItem(active: boolean): React.CSSProperties {
     color: '#0f172a', fontSize: 12, fontWeight: 600,
     cursor: 'pointer', textAlign: 'left',
   };
+}
+
+function SyncBadge({ state, detail }: { state: 'idle' | 'saving' | 'saved' | 'error' | 'conflict' | 'offline'; detail: string }) {
+  if (state === 'idle') return null;
+  const map: Record<typeof state, { icon: string; color: string; bg: string; label: string }> = {
+    idle:     { icon: '',   color: '',         bg: '',                       label: '' },
+    saving:   { icon: '⟳',  color: '#0ea5e9',  bg: 'rgba(14,165,233,0.18)',  label: 'Syncing' },
+    saved:    { icon: '✓',  color: '#16a34a',  bg: 'rgba(34,197,94,0.18)',   label: 'Synced' },
+    error:    { icon: '!',  color: '#dc2626',  bg: 'rgba(239,68,68,0.18)',   label: 'Sync error' },
+    conflict: { icon: '⇄',  color: '#d97706',  bg: 'rgba(245,158,11,0.20)',  label: 'Updated elsewhere' },
+    offline:  { icon: '○',  color: '#64748b',  bg: 'rgba(100,116,139,0.20)', label: 'Offline' },
+  };
+  const m = map[state];
+  return (
+    <span
+      title={detail || m.label}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        padding: '2px 6px', borderRadius: 999,
+        background: m.bg, color: m.color,
+        fontSize: 9, fontWeight: 800, letterSpacing: 0.4,
+        animation: state === 'saving' ? 'lemtel-pulse 1.1s ease-in-out infinite' : undefined,
+      }}
+    >
+      <span aria-hidden style={{ fontSize: 10, lineHeight: 1, display: state === 'saving' ? 'inline-block' : undefined, animation: state === 'saving' ? 'lemtel-spin 1s linear infinite' : undefined }}>{m.icon}</span>
+      <span style={{ textTransform: 'uppercase' }}>{m.label}</span>
+    </span>
+  );
+}
+
+// Inject keyframes once
+if (typeof document !== 'undefined' && !document.getElementById('lemtel-sync-anim')) {
+  const s = document.createElement('style');
+  s.id = 'lemtel-sync-anim';
+  s.textContent = `
+    @keyframes lemtel-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes lemtel-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+  `;
+  document.head.appendChild(s);
 }
