@@ -555,15 +555,15 @@ export const ava = {
     missed: 3, answered: 12, unreadSms: 5, voicemail: 2, aiActions: 4, pbxHealth: 'ok',
     brief: 'You have 3 missed calls and 2 unread voicemails requiring callbacks. One conversation flagged a renewal opportunity.',
   }),
-  calls: async (limit = 100) => {
+  calls: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
     if (MOCK) return MOCK_CALLS;
     await bestEffortCdrSync(Math.max(limit, 200));
-    return (await readCallRecordRows(limit)).map(mapCdrToCall);
+    return (await readCallRecordRows(limit, opts)).map(mapCdrToCall);
   },
-  scopedCallRecords: async (limit = 100) => {
+  scopedCallRecords: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
     if (MOCK) return MOCK_CALLS as any[];
     await bestEffortCdrSync(Math.max(limit, 200));
-    return readCallRecordRows(limit);
+    return readCallRecordRows(limit, opts);
   },
   callDetail: (id: string) => call<any>(`/db/${TABLES.aiInsights}?call_record_id=eq.${id}&select=*&limit=1`, {}, {
     callId: id,
