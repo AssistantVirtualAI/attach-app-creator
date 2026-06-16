@@ -36,6 +36,10 @@ export default function OrgChat() {
 
   const directoryQ = useDirectory();
   const ensureDm = useEnsureDmChannel();
+  const unreadQ = useUnreadCounts();
+  const unreadMap: Record<string, number> = {};
+  (unreadQ.data?.counts ?? []).forEach((c) => { unreadMap[c.channel_id] = Number(c.unread_count); });
+  const group = useGroupChat();
 
   useEffect(() => {
     if (!activeId && channels.length) setActiveId(channels[0].id);
@@ -53,6 +57,13 @@ export default function OrgChat() {
     }
   };
 
+  const createGroup = async (name: string, ids: string[]) => {
+    try {
+      const r: any = await group.mutateAsync({ name, member_ids: ids });
+      if (r?.channel?.id) { await channelsQ.refetch(); setActiveId(r.channel.id); toast.success(t("Group created", "Groupe créé")); }
+    } catch (e: any) { toast.error(e?.message); }
+  };
+
   return (
     <div className="h-[calc(100vh-4rem)] flex">
       <Sidebar
@@ -60,18 +71,18 @@ export default function OrgChat() {
         activeId={activeId}
         onSelect={setActiveId}
         loading={channelsQ.isLoading}
-        onCreate={async (name, type) => {
+        unread={unreadMap}
+        directory={directoryQ.data?.members ?? []}
+        onCreateChannel={async (name, type) => {
           const r = await create.mutateAsync({ name, channel_type: type });
-          if (r?.channel?.id) {
-            setActiveId(r.channel.id);
-            toast.success(t("Channel created", "Canal créé"));
-          }
+          if (r?.channel?.id) { setActiveId(r.channel.id); toast.success(t("Channel created", "Canal créé")); }
         }}
+        onCreateGroup={createGroup}
         t={t}
       />
       <div className="flex-1 flex flex-col bg-background min-w-0">
         {active ? (
-          <ChannelView channel={active} userId={user?.id ?? ""} t={t} />
+          <ChannelView channel={active} userId={user?.id ?? ""} userName={user?.email ?? null} directory={directoryQ.data?.members ?? []} t={t} />
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             {channelsQ.isLoading ? <Skeleton className="h-6 w-32" /> : t("Select a channel or a teammate", "Sélectionnez un canal ou un coéquipier")}
