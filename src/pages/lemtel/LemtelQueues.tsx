@@ -19,7 +19,18 @@ import {
 import {
   Headphones, Plus, Loader2, Pencil, Trash2, Users, RefreshCw, Shield, UserPlus, Activity,
   Download, Upload, AlertTriangle, CheckCircle2, Clock, Lock, Search, ArrowUpDown, ChevronLeft, ChevronRight,
+  ArrowRight,
 } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+
+// Extension display helper — pbx_extensions doesn't have a display_name column
+const extName = (e: any) =>
+  e?.effective_cid_name
+  || [e?.directory_first_name, e?.directory_last_name].filter(Boolean).join(' ').trim()
+  || e?.description
+  || e?.extension
+  || '';
+const EXT_COLS = 'id, extension, effective_cid_name, directory_first_name, directory_last_name, description';
 import { usePbxQueues, LEMTEL_ORG, usePbxSync, usePbxSyncJobs } from '@/hooks/usePbxData';
 import { PbxRefreshButton } from '@/components/lemtel/PbxRefreshButton';
 import { supabase } from '@/integrations/supabase/client';
