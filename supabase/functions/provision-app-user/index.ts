@@ -108,10 +108,10 @@ async function isLemtelAdmin(token: string): Promise<boolean> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  // Auth: either Lemtel JWT or shared service secret
+  // Auth: shared PBX secret (preferred for sync jobs, no JWT) OR Lemtel JWT
   let authorized = false;
-  const hdrSecret = req.headers.get("x-provision-secret");
-  if (SHARED_SECRET && hdrSecret && hdrSecret === SHARED_SECRET) {
+  const hdrSecret = req.headers.get("x-provision-secret") || "";
+  if (SHARED_SECRET && hdrSecret && timingSafeEqual(hdrSecret, SHARED_SECRET)) {
     authorized = true;
   } else {
     const auth = req.headers.get("Authorization") || "";
