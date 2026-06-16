@@ -269,7 +269,15 @@ function QueueDialog({ mode, queue, trigger }: { mode: 'create' | 'edit'; queue?
     setBusy(true);
     try {
       const action = mode === 'create' ? 'create-queue' : 'update-queue';
-      const params: any = { ...form, queue_enabled: form.queue_enabled ? 'true' : 'false' };
+      const boolStr = (v: any) => (v === true ? 'true' : 'false');
+      const params: any = {
+        ...form,
+        queue_enabled: boolStr(form.queue_enabled),
+        queue_tier_rules_apply: boolStr(form.queue_tier_rules_apply),
+        queue_tier_rule_wait_multiply_level: boolStr(form.queue_tier_rule_wait_multiply_level),
+        queue_tier_rule_no_agent_no_wait: boolStr(form.queue_tier_rule_no_agent_no_wait),
+        queue_abandoned_resume_allowed: boolStr(form.queue_abandoned_resume_allowed),
+      };
       if (mode === 'edit') params.call_center_queue_uuid = queue.pbx_uuid;
       const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: { organization_id: LEMTEL_ORG, action, params },
