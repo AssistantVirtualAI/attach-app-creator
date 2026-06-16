@@ -82,7 +82,7 @@ const btnDanger: React.CSSProperties = {
 };
 
 export default function PbxResourceSection({
-  kind, actionKind, title, uuidField, cols, fields = [], fieldGroups, sheetWidth, transform, rowActions = [], global = false, canCreate = true,
+  kind, actionKind, title, uuidField, cols, fields = [], fieldGroups, sheetWidth, rules, entityType, transform, rowActions = [], global = false, canCreate = true,
 }: Props) {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
