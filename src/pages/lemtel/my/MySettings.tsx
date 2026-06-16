@@ -160,7 +160,7 @@ function TelephonyTab() {
     (async () => {
       const { data: auth } = await supabase.auth.getUser();
       const { data } = await (supabase as any).from("pbx_softphone_users")
-        .select("*").eq("portal_user_id", auth.user?.id).maybeSingle();
+        .select("id,extension,display_name,sip_domain,wss_url,organization_id,status,desktop_access_enabled,mobile_access_enabled,app_access_enabled,portal_user_id,extension_id,last_seen_at,cc_role,active_platforms").eq("portal_user_id", auth.user?.id).maybeSingle();
       setSpu(data);
     })();
   }, []);

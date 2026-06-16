@@ -89,8 +89,8 @@ export default function Integrations() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
-      let query = supabase
-        .from('organization_integrations')
+      let query = (supabase as any)
+        .from('organization_integrations_safe')
         .select('*')
         .eq('user_id', user.id);
 

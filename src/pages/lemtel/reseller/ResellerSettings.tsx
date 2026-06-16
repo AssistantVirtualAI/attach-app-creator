@@ -13,7 +13,7 @@ export default function ResellerSettings() {
   const { data: org, refetch } = useQuery({
     queryKey: ["org-by-slug", slug],
     queryFn: async () => {
-      const { data } = await supabase.from("organizations").select("*").eq("slug", slug!).maybeSingle();
+      const { data } = await supabase.from("organizations").select("id,slug,name,brand_app_name,brand_name,brand_logo_url,brand_favicon_url,brand_primary_color,brand_accent_color,brand_support_email,billing_plan,is_active,parent_org_id,root_org_id,onboarding_completed,hipaa_enabled").eq("slug", slug!).maybeSingle();
       return data as any;
     },
     enabled: !!slug,

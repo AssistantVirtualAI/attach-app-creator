@@ -10,7 +10,7 @@ export function useVoicemailSettings() {
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
-    const { data: row } = await supabase.from("pbx_voicemail_settings").select("*").eq("user_id", user.id).maybeSingle();
+    const { data: row } = await supabase.from("pbx_voicemail_settings").select("user_id,greeting_type,greeting_storage_path,greeting_tts_text,transcription_enabled,notify_email,notify_sms,notify_push,attach_audio_email,notify_email_address,notify_sms_number,updated_at,greeting_voice_id,greeting_voice_name,ai_summary_enabled,greeting_audio_url,greeting_updated_at").eq("user_id", user.id).maybeSingle();
     setData(row);
     setLoading(false);
   }, [user?.id]);

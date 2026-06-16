@@ -154,7 +154,7 @@ export function WhiteLabelTab() {
     if (!selectedOrgId) return;
     const { data, error } = await supabase
       .from('organizations')
-      .select('*')
+      .select('id,favicon_url,logo_url,website_title,primary_color,loading_icon,loading_icon_size,domain,email_domain,email_sender,email_sender_name,email_logo_url,client_portal_primary_color,client_portal_logo_url,client_portal_favicon_url,client_portal_title')
       .eq('id', selectedOrgId)
       .single();
 
@@ -167,7 +167,7 @@ export function WhiteLabelTab() {
         loading_icon: data.loading_icon || 'infinity',
         loading_icon_size: data.loading_icon_size || 'md',
         domain: data.domain || '',
-        backend_domain: data.backend_domain || '',
+        backend_domain: '',
         email_domain: data.email_domain || '',
         email_sender: data.email_sender || '',
         email_sender_name: data.email_sender_name || '',
