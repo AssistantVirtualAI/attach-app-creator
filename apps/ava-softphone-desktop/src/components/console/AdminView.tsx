@@ -782,60 +782,27 @@ function QueuesTable() {
 }
 
 function EditQueueModal({ queue, saving, onClose, onSave }: { queue: any; saving: boolean; onClose: () => void; onSave: (changes: any) => void }) {
-  const [name, setName] = useState(queue.name || '');
-  const [strategy, setStrategy] = useState(queue.strategy || 'ring-all');
-  const [maxWait, setMaxWait] = useState(queue.max_wait_time || 60);
-  const [enabled, setEnabled] = useState(queue.enabled !== false);
-  const [agents, setAgents] = useState<any[] | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      const { data: rows } = await supabase
-        .from('pbx_queue_agents')
-        .select('id, agent_name, agent_id, tier_level, status, extension_id, pbx_extensions(extension)')
-        .eq('queue_id', queue.id);
-      setAgents(rows || []);
-    })();
-  }, [queue.id]);
-
+  const initial = {
+    queue_name: queue.name || '',
+    queue_extension: queue.extension || '',
+    queue_strategy: queue.strategy || 'ring-all',
+    queue_max_wait_time: queue.max_wait_time || 60,
+    queue_enabled: queue.enabled !== false ? 'true' : 'false',
+  };
   return (
-    <ModalShell title={`Edit Queue · ${queue.name}`} onClose={onClose} width={560}>
-      <Label>Name</Label><input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-      <div style={{ height: 12 }} />
-      <Label>Strategy</Label>
-      <select value={strategy} onChange={(e) => setStrategy(e.target.value)} style={inputStyle}>
-        {STRATEGIES.map((s) => <option key={s} value={s}>{s}</option>)}
-      </select>
-      <div style={{ height: 12 }} />
-      <Label>Max wait time (seconds)</Label><input type="number" value={maxWait} onChange={(e) => setMaxWait(Number(e.target.value))} style={inputStyle} />
-      <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: c.textIce, fontSize: 12, marginTop: 14 }}>
-        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} /> Enabled
-      </label>
-
-      <div style={{ marginTop: 18 }}>
-        <Label>Agents ({agents?.length ?? '…'})</Label>
-        <div style={{ border: `1px solid ${c.border}`, borderRadius: 8, maxHeight: 200, overflowY: 'auto', background: 'rgba(0,0,0,0.25)' }}>
-          {agents === null && <div style={{ padding: 12, color: c.mutedSilver, fontSize: 12 }}>Loading…</div>}
-          {agents && agents.length === 0 && <div style={{ padding: 12, color: c.mutedSilver, fontSize: 12 }}>No agents in this queue.</div>}
-          {agents && agents.map((a: any) => (
-            <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderBottom: `1px solid ${c.border}`, fontSize: 12, color: c.textIce }}>
-              <span>{a.agent_name || a.agent_id || `Ext ${a.pbx_extensions?.extension ?? '?'}`}</span>
-              <span style={{ color: c.mutedSilver }}>Tier {a.tier_level} · {a.status}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginTop: 22, justifyContent: 'flex-end' }}>
-        <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: 8, background: 'transparent', border: `1px solid ${c.border}`, color: c.mutedSilver, fontSize: 12, cursor: 'pointer' }}>Cancel</button>
-        <button onClick={() => onSave({
-          queue_name: name,
-          queue_strategy: strategy,
-          queue_max_wait_time: String(maxWait),
-          queue_enabled: enabled ? 'true' : 'false',
-        })} disabled={saving} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save & sync to PBX'}</button>
-      </div>
-    </ModalShell>
+    <PbxEditSheet
+      title={`Edit Queue · ${queue.name}`}
+      groups={QUEUE_GROUPS}
+      initial={initial}
+      saving={saving}
+      width={680}
+      onCancel={onClose}
+      onSave={(form) => {
+        const out: any = { ...form };
+        if (out.queue_max_wait_time !== undefined) out.queue_max_wait_time = String(out.queue_max_wait_time);
+        onSave(out);
+      }}
+    />
   );
 }
 
