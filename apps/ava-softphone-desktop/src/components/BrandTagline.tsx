@@ -90,8 +90,9 @@ export default function BrandTagline({
         >
           Powered by
           <img
-            src="/ava-statistics-logo.png"
+            src={avaStatisticsLogo}
             alt="AVA Statistics"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
             style={{
               height: size === 'lg' ? 26 : size === 'md' ? 22 : 18,
               width: 'auto',
