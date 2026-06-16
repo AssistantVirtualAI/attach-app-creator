@@ -243,9 +243,10 @@ export default function CustomerDetail() {
             {org ? <>Tenant: <strong>{org.name}</strong></> : 'Not linked to a tenant'}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={syncAll}><RefreshCw className="w-4 h-4 mr-2" /> Sync</Button>
-          <Button onClick={impersonate}><LogIn className="w-4 h-4 mr-2" /> Manage as this tenant</Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={copyPortalLink}><Link2 className="w-4 h-4 mr-2" /> Portal link</Button>
+          <Button variant="outline" size="sm" onClick={syncAll}><RefreshCw className="w-4 h-4 mr-2" /> Sync</Button>
+          <Button size="sm" onClick={impersonate} disabled={!org}><LogIn className="w-4 h-4 mr-2" /> Manage as this tenant</Button>
         </div>
       </div>
 
@@ -260,7 +261,34 @@ export default function CustomerDetail() {
           <TabsTrigger value="moh">Music on Hold</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="users">
+        <TabsContent value="users" className="space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              ref={fileRef} type="file" accept=".csv,text/csv" className="hidden"
+              onChange={(e) => e.target.files?.[0] && handleCsvFile(e.target.files[0])}
+            />
+            <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={importing || !org}>
+              {importing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+              Import CSV
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setAddOpen(true)} disabled={!org}>
+              <UserPlus className="w-4 h-4 mr-2" /> Add user
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setInviteOpen(true)} disabled={!org}>
+              <Mail className="w-4 h-4 mr-2" /> Invite admin
+            </Button>
+            <span className="text-xs text-muted-foreground ml-2">
+              CSV columns: <code>extension,name,email,password,voicemail_pin,outbound_cid</code>
+            </span>
+          </div>
+          {importReport && (
+            <Card><CardContent className="p-3 text-xs space-y-1">
+              <div className="font-medium">Import: {importReport.succeeded}/{importReport.total} succeeded · {importReport.failed} failed</div>
+              {importReport.results?.filter((r: any) => !r.ok).slice(0, 10).map((r: any, i: number) => (
+                <div key={i} className="text-destructive">Ext {r.extension}: {r.error}</div>
+              ))}
+            </CardContent></Card>
+          )}
           <Card><CardContent className="p-0">
             <Table>
               <TableHeader><TableRow>
