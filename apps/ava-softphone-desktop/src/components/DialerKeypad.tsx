@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { theme } from '../lib/theme';
 
 const { colors: c } = theme;
@@ -12,16 +12,16 @@ export type DialerDensity = 'spacious' | 'compact' | 'ultra';
    declared here, which guarantees visual stability.
    ============================================================ */
 export const DIALER_TOKENS: Record<DialerDensity, {
-  keyH: number;          // outer key height
-  gap: number;           // grid gap between keys
-  digitRow: number;      // fixed row height for the digit baseline
-  subRow: number;        // fixed row height for the sub-letter baseline (0 hides it)
-  rowGap: number;        // gap between digit row and sub-letter row
-  digit: number;         // digit font-size
-  sub: number;           // sub-letter font-size
-  radius: number;        // key border radius
-  gridMax: number;       // overall grid max width
-  pad: number;           // horizontal grid padding
+  keyH: number;
+  gap: number;
+  digitRow: number;
+  subRow: number;
+  rowGap: number;
+  digit: number;
+  sub: number;
+  radius: number;
+  gridMax: number;
+  pad: number;
 }> = {
   spacious: { keyH: 72, gap: 14, digitRow: 30, subRow: 12, rowGap: 4, digit: 26, sub: 8.5, radius: 14, gridMax: 296, pad: 0 },
   compact:  { keyH: 58, gap: 8,  digitRow: 26, subRow: 12, rowGap: 4, digit: 23, sub: 8.5, radius: 14, gridMax: 296, pad: 0 },
@@ -35,13 +35,55 @@ export const DEFAULT_DIAL_KEYS: [string, string][] = [
   ['*', ''], ['0', '+'], ['#', ''],
 ];
 
+/* ============================================================
+   Persistence for keyboard focus across density/theme remounts.
+   - We remember the last key character that was focused.
+   - We remember whether focus was *inside* the keypad when the
+     previous instance unmounted; only then do we auto-restore,
+     so we never steal focus from elsewhere on the page.
+   ============================================================ */
+const FOCUS_KEY_STORAGE = 'ava.dialer.lastFocusedKey';
+const FOCUS_ACTIVE_STORAGE = 'ava.dialer.focusActive';
+
+const readPersistedFocus = (): { key: string | null; active: boolean } => {
+  try {
+    return {
+      key: sessionStorage.getItem(FOCUS_KEY_STORAGE),
+      active: sessionStorage.getItem(FOCUS_ACTIVE_STORAGE) === '1',
+    };
+  } catch {
+    return { key: null, active: false };
+  }
+};
+
+const writePersistedFocus = (key: string | null, active: boolean) => {
+  try {
+    if (key) sessionStorage.setItem(FOCUS_KEY_STORAGE, key);
+    sessionStorage.setItem(FOCUS_ACTIVE_STORAGE, active ? '1' : '0');
+  } catch { /* ignore */ }
+};
+
+/* Accessible spoken names for non-digit / symbol keys. */
+const SPOKEN_NAMES: Record<string, string> = {
+  '*': 'star',
+  '#': 'pound',
+  '+': 'plus',
+  '0': 'zero',
+};
+
+const spokenFor = (key: string, sub: string): string => {
+  const name = SPOKEN_NAMES[key] ?? key;
+  if (key === '0' && sub === '+') return 'zero, hold for plus';
+  if (sub) return `${name}, ${sub.split('').join(' ')}`;
+  return name;
+};
+
 type Props = {
   keys?: [string, string][];
   density?: DialerDensity;
   onKey: (k: string) => void;
   onBackspace?: () => void;
   onSubmit?: () => void;
-  /** Test hook — attached to root grid for the baseline-check overlay. */
   'data-baseline-check'?: string;
 };
 
@@ -55,34 +97,77 @@ export default function DialerKeypad({
 }: Props) {
   const t = DIALER_TOKENS[density];
   const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const COLS = 3;
+
+  // Live-region announcement of the most recent activation.
+  const [announcement, setAnnouncement] = useState('');
 
   const focusAt = (i: number) => {
     const clamped = Math.max(0, Math.min(keys.length - 1, i));
     btnRefs.current[clamped]?.focus();
   };
 
-  const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLButtonElement>, i: number) => {
-    switch (e.key) {
-      case 'ArrowRight': e.preventDefault(); focusAt(i + 1); return;
-      case 'ArrowLeft':  e.preventDefault(); focusAt(i - 1); return;
-      case 'ArrowDown':  e.preventDefault(); focusAt(i + COLS); return;
-      case 'ArrowUp':    e.preventDefault(); focusAt(i - COLS); return;
-      case 'Home':       e.preventDefault(); focusAt(0); return;
-      case 'End':        e.preventDefault(); focusAt(keys.length - 1); return;
-      case 'Backspace':  e.preventDefault(); onBackspace?.(); return;
-      case 'Enter':      if (onSubmit) { e.preventDefault(); onSubmit(); } return;
-      default: return;
-    }
+  const handleActivate = useCallback(
+    (key: string, sub: string) => {
+      onKey(key);
+      // Re-trigger announcement even for repeated keys by resetting first.
+      setAnnouncement('');
+      // Defer so screen readers register the change.
+      requestAnimationFrame(() => setAnnouncement(`Dialed ${spokenFor(key, sub)}`));
+    },
+    [onKey],
+  );
+
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>, i: number) => {
+      switch (e.key) {
+        case 'ArrowRight': e.preventDefault(); focusAt(i + 1); return;
+        case 'ArrowLeft':  e.preventDefault(); focusAt(i - 1); return;
+        case 'ArrowDown':  e.preventDefault(); focusAt(i + COLS); return;
+        case 'ArrowUp':    e.preventDefault(); focusAt(i - COLS); return;
+        case 'Home':       e.preventDefault(); focusAt(0); return;
+        case 'End':        e.preventDefault(); focusAt(keys.length - 1); return;
+        case 'Backspace':  e.preventDefault(); onBackspace?.(); return;
+        case 'Enter':      if (onSubmit) { e.preventDefault(); onSubmit(); } return;
+        default: return;
+      }
+    },
+    [keys.length, onBackspace, onSubmit],
+  );
+
+  /* ---- Restore focus across density/theme remounts ---- */
+  useEffect(() => {
+    const { key, active } = readPersistedFocus();
+    if (!active || !key) return;
+    const idx = keys.findIndex(([k]) => k === key);
+    if (idx < 0) return;
+    // Restore on next frame so layout is settled.
+    const id = requestAnimationFrame(() => btnRefs.current[idx]?.focus());
+    return () => cancelAnimationFrame(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keys.length, onBackspace, onSubmit]);
+  }, []);
+
+  /* Mark focus inactive when focus actually leaves the keypad. */
+  const onBlurCapture = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
+    const next = e.relatedTarget as Node | null;
+    if (next && rootRef.current?.contains(next)) return;
+    const { key } = readPersistedFocus();
+    writePersistedFocus(key, false);
+  }, []);
+
+  const onFocusKey = useCallback((key: string) => {
+    writePersistedFocus(key, true);
+  }, []);
 
   return (
     <div
+      ref={rootRef}
       role="grid"
       aria-label="Dialpad"
       data-density={density}
       className="lemtel-keypad"
+      onBlurCapture={onBlurCapture}
       style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
@@ -98,19 +183,23 @@ export default function DialerKeypad({
         const row = Math.floor(i / COLS) + 1;
         const col = (i % COLS) + 1;
         const hasSub = t.subRow > 0;
+        const spoken = spokenFor(key, sub);
         return (
           <button
             key={key}
             ref={(el) => { btnRefs.current[i] = el; }}
             role="gridcell"
+            type="button"
             aria-rowindex={row}
             aria-colindex={col}
-            aria-label={sub ? `${key} (${sub})` : key}
+            aria-label={`Dial ${spoken}`}
+            aria-keyshortcuts={key.length === 1 ? key : undefined}
+            data-key={key}
             className="lemtel-key lemtel-glass"
-            onClick={() => onKey(key)}
+            onClick={() => handleActivate(key, sub)}
             onKeyDown={(e) => onKeyDown(e, i)}
+            onFocus={() => onFocusKey(key)}
             style={{
-              // ---- locked geometry (theme-independent) ----
               height: t.keyH,
               display: 'grid',
               gridTemplateRows: hasSub ? `${t.digitRow}px ${t.subRow}px` : `${t.digitRow}px`,
@@ -119,7 +208,6 @@ export default function DialerKeypad({
               alignContent: 'center',
               padding: 0,
               borderRadius: t.radius,
-              // ---- themeable surface (only color/shadow change with theme) ----
               background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))',
               border: `1px solid ${c.border}`,
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
@@ -131,6 +219,7 @@ export default function DialerKeypad({
             <span
               className="ava-display-num"
               data-role="digit"
+              aria-hidden="true"
               style={{
                 gridRow: 1,
                 height: t.digitRow,
@@ -144,6 +233,7 @@ export default function DialerKeypad({
             {hasSub && (
               <span
                 data-role="sub"
+                aria-hidden="true"
                 style={{
                   gridRow: 2,
                   height: t.subRow,
@@ -160,6 +250,19 @@ export default function DialerKeypad({
           </button>
         );
       })}
+
+      {/* Screen-reader-only live region for activation feedback. */}
+      <span
+        aria-live="polite"
+        aria-atomic="true"
+        style={{
+          position: 'absolute',
+          width: 1, height: 1, padding: 0, margin: -1,
+          overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0,
+        }}
+      >
+        {announcement}
+      </span>
     </div>
   );
 }
