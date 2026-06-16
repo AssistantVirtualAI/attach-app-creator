@@ -435,7 +435,6 @@ export default function PbxEditSheet({
           <button onClick={handleSave} disabled={saving} style={{
             padding: '9px 20px', borderRadius: 10, border: 'none',
             color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer',
-            background: c.gradients ? undefined : `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
             backgroundImage: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
             opacity: saving ? 0.6 : 1,
             boxShadow: '0 8px 24px -10px rgba(0,35,230,0.45)',
