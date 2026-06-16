@@ -62,13 +62,14 @@ export interface SoftphoneWidgetProps {
 }
 
 export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) {
-  const { isMember } = useLemtelAccess();
+  const { isMember, isAdmin } = useLemtelAccess();
   const { user } = useAuth();
   const sp = useSoftphone();
   const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [expanded, setExpanded] = useState(variant === "full");
   const [tab, setTab] = useState<Tab>("dial");
+  const [recentsScope, setRecentsScope] = useState<"mine" | "all">("mine");
   const [number, setNumber] = useState("");
   const [showDTMF, setShowDTMF] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
