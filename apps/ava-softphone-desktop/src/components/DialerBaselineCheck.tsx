@@ -44,7 +44,7 @@ function BaselineOverlay({ density }: { density: DialerDensity }) {
   );
 }
 
-function MeasureCard({ density }: { density: DialerDensity }) {
+function MeasureCard({ density, themeKey }: { density: DialerDensity; themeKey: string }) {
   const ref = React.useRef<HTMLDivElement | null>(null);
   const [report, setReport] = useState<string>('measuring…');
 
@@ -77,7 +77,7 @@ function MeasureCard({ density }: { density: DialerDensity }) {
     const ro = new ResizeObserver(measure);
     ro.observe(root);
     return () => ro.disconnect();
-  }, [density]);
+  }, [density, themeKey]);
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
@@ -134,7 +134,7 @@ export default function DialerBaselineCheck() {
           >
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10, opacity: 0.85 }}>{label}</div>
             <div style={{ width, maxWidth: '100%', margin: '0 auto' }}>
-              <MeasureCard density={d} />
+              <MeasureCard density={d} themeKey={mode} />
             </div>
           </section>
         ))}
