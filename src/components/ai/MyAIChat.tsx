@@ -128,6 +128,16 @@ export function MyAIChat({
     } finally { setLoading(false); }
   }, [input, loading, messages, pageContext]);
 
+  // Auto-send a one-shot prompt requested by the launcher (e.g. on auto-answer open)
+  const consumedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!initialPrompt) return;
+    if (consumedRef.current === initialPrompt) return;
+    consumedRef.current = initialPrompt;
+    send(initialPrompt);
+    onPromptConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPrompt]);
 
   return (
     <Card className={cn("flex flex-col bg-background/95 backdrop-blur", embedded ? "h-[600px]" : "h-full")}>
