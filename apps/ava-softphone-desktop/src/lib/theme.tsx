@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-export type ThemeMode = 'dark' | 'light';
+export type ThemeMode = 'daylight' | 'light' | 'dark' | 'midnight';
 
 export interface ThemeTokens {
   mode: ThemeMode;
@@ -31,7 +31,34 @@ export interface ThemeTokens {
    AVA Statistic — Logo-aligned palette
    Deep brand blue #0023e6 → bright #4d6dff → aurora cyan #21d4fd
    Signal gold #d4a73a for premium accents
+   4 modes: daylight (brightest) · light · dark · midnight (darkest)
    ============================================================ */
+
+const daylight: ThemeTokens = {
+  mode: 'daylight',
+  bg: '#f6f9ff',
+  bgGradient:
+    'radial-gradient(1200px 700px at 8% -10%, rgba(0,35,230,0.06), transparent 60%), radial-gradient(900px 600px at 110% 110%, rgba(33,212,253,0.06), transparent 55%), linear-gradient(180deg, #ffffff 0%, #f0f5ff 100%)',
+  surface: 'rgba(255,255,255,0.92)',
+  surfaceElev: 'rgba(255,255,255,0.98)',
+  surfaceHover: '#ffffff',
+  border: 'rgba(180,196,224,0.45)',
+  borderStrong: 'rgba(120,142,184,0.50)',
+  text: '#0a1226',
+  textMuted: '#475569',
+  textSubtle: '#8a97b3',
+  accent: '#0023e6',
+  accentSoft: 'rgba(0,35,230,0.08)',
+  accentGradient: 'linear-gradient(135deg, #0023e6 0%, #4d6dff 45%, #21d4fd 100%)',
+  accentGlow: '0 8px 24px -12px rgba(0,35,230,0.35)',
+  success: '#0f9d58',
+  danger: '#dc2626',
+  warning: '#d97706',
+  ringGlow: '0 0 0 3px rgba(0,35,230,0.18)',
+  glass: 'rgba(255,255,255,0.92)',
+  glassBorder: 'rgba(180,196,224,0.45)',
+  shadow: '0 1px 2px rgba(11,21,48,0.04), 0 8px 24px -12px rgba(11,21,48,0.12)',
+};
 
 const light: ThemeTokens = {
   mode: 'light',
@@ -85,6 +112,34 @@ const dark: ThemeTokens = {
   shadow: '0 18px 60px -22px rgba(0,0,0,0.6)',
 };
 
+const midnight: ThemeTokens = {
+  mode: 'midnight',
+  bg: '#05081a',
+  bgGradient:
+    'radial-gradient(1200px 700px at 8% -10%, rgba(0,35,230,0.32), transparent 60%), radial-gradient(900px 600px at 110% 110%, rgba(33,212,253,0.22), transparent 55%), linear-gradient(180deg, #03050f 0%, #080d24 100%)',
+  surface: 'rgba(12,18,40,0.62)',
+  surfaceElev: 'rgba(18,26,54,0.78)',
+  surfaceHover: 'rgba(28,38,72,0.85)',
+  border: 'rgba(150,180,255,0.18)',
+  borderStrong: 'rgba(150,180,255,0.34)',
+  text: '#f1f5ff',
+  textMuted: 'rgba(241,245,255,0.72)',
+  textSubtle: 'rgba(241,245,255,0.50)',
+  accent: '#8aa0ff',
+  accentSoft: 'rgba(138,160,255,0.16)',
+  accentGradient: 'linear-gradient(135deg, #2240ff 0%, #6680ff 45%, #21d4fd 100%)',
+  accentGlow: '0 14px 44px -10px rgba(102,128,255,0.70)',
+  success: '#22d39a',
+  danger: '#ff5577',
+  warning: '#ffb84a',
+  ringGlow: '0 0 0 3px rgba(138,160,255,0.38)',
+  glass: 'rgba(12,18,40,0.62)',
+  glassBorder: 'rgba(150,180,255,0.20)',
+  shadow: '0 24px 70px -22px rgba(0,0,0,0.85)',
+};
+
+const themeMap: Record<ThemeMode, ThemeTokens> = { daylight, light, dark, midnight };
+
 interface ThemeCtx {
   t: ThemeTokens;
   mode: ThemeMode;
@@ -94,20 +149,22 @@ interface ThemeCtx {
 
 const ThemeContext = createContext<ThemeCtx | null>(null);
 const STORAGE_KEY = 'ava-softphone-theme';
+const cycle: ThemeMode[] = ['daylight', 'light', 'dark', 'midnight'];
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY) as ThemeMode | null;
-      if (saved === 'dark' || saved === 'light') return saved;
+      if (saved && cycle.includes(saved)) return saved;
     } catch {}
     return 'light';
   });
 
-  const t = mode === 'dark' ? dark : light;
+  const t = themeMap[mode] ?? light;
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, mode); } catch {}
+    document.documentElement.setAttribute('data-ava-theme', mode);
     document.documentElement.style.background = t.bg;
     document.documentElement.style.color = t.text;
     document.body.style.background = t.bg;
@@ -115,7 +172,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [mode, t]);
 
   const setMode = (m: ThemeMode) => setModeState(m);
-  const toggle = () => setModeState((m) => (m === 'dark' ? 'light' : 'dark'));
+  const toggle = () =>
+    setModeState((m) => cycle[(cycle.indexOf(m) + 1) % cycle.length]);
 
   return (
     <ThemeContext.Provider value={{ t, mode, setMode, toggle }}>{children}</ThemeContext.Provider>
@@ -127,6 +185,7 @@ export function useTheme() {
   if (!ctx) throw new Error('useTheme must be used within ThemeProvider');
   return ctx;
 }
+
 
 /* ============================================================
    Static design tokens consumed via `import { theme } from '../lib/theme'`.
