@@ -233,6 +233,7 @@ export default function ConsoleLayout({
           {view === 'pbxlive' && <PBXLiveView />}
           {view === 'queues' && <QueuesView isAdmin={isAdmin} isSuperAdmin={isSuperAdmin} isSupervisor={isSupervisor} />}
           {view === 'audit' && <AuditView />}
+          {view === 'sync' && <SyncStatusView />}
           {view === 'settings' && (
             <SettingsPage
               creds={creds}
