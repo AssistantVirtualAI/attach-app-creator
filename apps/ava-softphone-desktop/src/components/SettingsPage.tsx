@@ -198,7 +198,52 @@ export default function SettingsPage({
             </div>
 
             <ThemePreview t={t} mode={mode} />
+
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 10, marginTop: 12, padding: '10px 12px',
+              background: dirty ? t.accentSoft : 'transparent',
+              border: `1px solid ${dirty ? 'rgba(0,35,230,0.35)' : t.border}`,
+              borderRadius: 12, transition: 'all 200ms ease',
+            }}>
+              <span style={{ fontSize: 12, color: dirty ? t.accent : t.textMuted, fontWeight: 600 }}>
+                {dirty
+                  ? `Theme changed to "${mode}". Save to apply across the whole app.`
+                  : savedToast ? '✓ Theme saved — applied to all screens' : 'Theme is in sync across the app'}
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => setMode(initialMode)}
+                  disabled={!dirty}
+                  style={{
+                    padding: '8px 14px', borderRadius: 10,
+                    background: 'transparent', color: t.textMuted,
+                    border: `1px solid ${t.border}`,
+                    fontWeight: 600, fontSize: 12,
+                    cursor: dirty ? 'pointer' : 'not-allowed',
+                    opacity: dirty ? 1 : 0.5,
+                  }}>
+                  Revert
+                </button>
+                <button
+                  onClick={() => {
+                    setMode(mode);
+                    try { localStorage.setItem('ava-softphone-theme', mode); } catch {}
+                    setSavedToast(true);
+                    setTimeout(() => setSavedToast(false), 2400);
+                  }}
+                  style={{
+                    padding: '8px 16px', borderRadius: 10, border: 'none',
+                    background: t.accentGradient, color: '#fff',
+                    fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                    boxShadow: t.accentGlow, letterSpacing: 0.3,
+                  }}>
+                  💾 Save theme
+                </button>
+              </div>
+            </div>
           </div>
+
 
           <div>
             <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 8, fontWeight: 600, letterSpacing: 0.3, textTransform: 'uppercase' }}>
