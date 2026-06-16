@@ -18,9 +18,11 @@ export default function CustomerPortalGate() {
       sessionStorage.setItem('lemtel.activeDomain', JSON.stringify({
         name: domain, uuid: row.fusionpbx_domain_uuid, org_id: row.id,
       }));
-      navigate('/auth?next=/console', { replace: true });
+      const { data: sess } = await supabase.auth.getSession();
+      navigate(sess?.session ? '/console' : '/auth?next=/console', { replace: true });
     })();
   }, [domain, navigate]);
+
 
   return (
     <div className="min-h-screen flex items-center justify-center">
