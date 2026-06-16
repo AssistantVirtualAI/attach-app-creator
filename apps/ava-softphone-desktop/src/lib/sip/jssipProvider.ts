@@ -309,6 +309,18 @@ class JsSipProvider {
   getSnapshot() { return this.snap; }
   hasActiveCall() { return !!this.session; }
 
+  private sameConfig(next: SoftphoneConfig) {
+    const cur = this.config;
+    if (!cur) return false;
+    return cur.extension === next.extension &&
+      cur.displayName === next.displayName &&
+      cur.sipDomain === next.sipDomain &&
+      cur.wssUrl === next.wssUrl &&
+      cur.password === next.password &&
+      cur.authUsername === next.authUsername &&
+      !!cur.mock === !!next.mock;
+  }
+
   async restart() {
     const cfg = this.config;
     this.logEvent('info', 'Manual restart requested');
@@ -318,6 +330,12 @@ class JsSipProvider {
 
 
   async init(cfg: SoftphoneConfig) {
+    if (this.ua && this.sameConfig(cfg)) {
+      this.config = cfg;
+      this.logEvent('info', 'SIP already initialized — keeping existing registration');
+      this.update({ status: this.snap.status });
+      return;
+    }
     if (this.ua) this.stop();
     this.config = cfg;
 
