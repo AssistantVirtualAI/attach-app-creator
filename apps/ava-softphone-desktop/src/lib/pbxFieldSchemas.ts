@@ -185,7 +185,8 @@ export const RING_GROUP_GROUPS: FieldGroup[] = [
       { key: 'ring_group_forward_enabled', label: 'Forward Enabled', type: 'select', options: BOOL, cols: 1 },
       { key: 'ring_group_forward_destination', label: 'Forward Destination', cols: 1 },
       { key: 'ring_group_missed_call_app', label: 'Missed Call App', cols: 1, placeholder: 'email' },
-      { key: 'ring_group_missed_call_data', label: 'Missed Call Data', cols: 1 },
+      { key: 'ring_group_missed_call_data', label: 'Missed Call Email/Data', cols: 1, placeholder: 'alerts@example.com' },
+      { key: 'ring_group_moh_sound', label: 'Music on Hold', placeholder: 'local_stream://default' },
     ],
   },
 ];
