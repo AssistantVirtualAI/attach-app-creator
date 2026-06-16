@@ -18,7 +18,7 @@ export function LemtelMark({ size = 32 }: { size?: number }) {
   );
 }
 
-/** AVA powered-by chip — animated AI badge. */
+/** AVA powered-by chip — features the AVA Statistics logo. */
 export function AvaBadge({ compact = false }: { compact?: boolean }) {
   return (
     <span style={{
@@ -30,12 +30,17 @@ export function AvaBadge({ compact = false }: { compact?: boolean }) {
       color: colors.avaCyan, fontSize: compact ? 9 : 9.5, fontWeight: 800,
       letterSpacing: 1.4, textTransform: 'uppercase', whiteSpace: 'nowrap',
     }}>
-      <span style={{
-        width: 6, height: 6, borderRadius: '50%',
-        background: `radial-gradient(circle at 30% 30%, #fff, ${colors.avaViolet} 70%)`,
-        boxShadow: `0 0 8px ${colors.avaViolet}`,
-      }} />
-      Powered by AVA AI
+      Powered by
+      <img
+        src="/ava-statistics-logo.png"
+        alt="AVA Statistics"
+        style={{
+          height: compact ? 14 : 16,
+          width: 'auto',
+          display: 'inline-block',
+          verticalAlign: 'middle',
+        }}
+      />
     </span>
   );
 }
