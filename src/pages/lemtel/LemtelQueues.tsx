@@ -999,14 +999,24 @@ function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRe
               {' '}will be unassigned on FusionPBX. You can undo from the toast.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="border rounded max-h-56 overflow-y-auto text-sm divide-y">
-            {selectedRows.slice(0, 50).map((r: any) => (
-              <div key={r.id} className="px-3 py-1.5 flex items-center justify-between">
-                <span className="truncate">{r.agent_name} <span className="font-mono text-xs text-muted-foreground">· {r.agent_id}</span></span>
-                <Badge variant={r._role === 'supervisor' ? 'default' : 'secondary'} className="text-[10px]">{r._role}</Badge>
+          <div className="border rounded max-h-64 overflow-y-auto text-sm divide-y">
+            <div className="px-3 py-1.5 grid grid-cols-12 gap-2 text-[10px] uppercase tracking-wide text-muted-foreground bg-muted/40 sticky top-0">
+              <span className="col-span-5">Name</span>
+              <span className="col-span-3">Role</span>
+              <span className="col-span-2">Tier</span>
+              <span className="col-span-2 text-right">Pos</span>
+            </div>
+            {selectedRows.slice(0, 100).map((r: any) => (
+              <div key={r.id} className="px-3 py-1.5 grid grid-cols-12 gap-2 items-center">
+                <span className="col-span-5 truncate">{r.agent_name} <span className="font-mono text-[10px] text-muted-foreground">· {r.agent_id}</span></span>
+                <span className="col-span-3"><Badge variant={r._role === 'supervisor' ? 'default' : 'secondary'} className="text-[10px]">
+                  {r._role === 'supervisor' ? <Shield className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />}{r._role}
+                </Badge></span>
+                <span className="col-span-2 text-xs text-muted-foreground">T{r.tier_level}</span>
+                <span className="col-span-2 text-xs font-mono text-right text-muted-foreground">#{r.tier_position}</span>
               </div>
             ))}
-            {selectedRows.length > 50 && <div className="px-3 py-1.5 text-xs text-muted-foreground">…and {selectedRows.length - 50} more</div>}
+            {selectedRows.length > 100 && <div className="px-3 py-1.5 text-xs text-muted-foreground">…and {selectedRows.length - 100} more</div>}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
