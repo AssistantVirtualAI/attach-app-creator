@@ -781,6 +781,7 @@ function EditIvrModal({ ivr, saving, onClose, onSave }: { ivr: any; saving: bool
 const STRATEGIES = ['ring-all', 'longest-idle-agent', 'round-robin', 'top-down', 'agent-with-least-talk-time', 'agent-with-fewest-calls', 'sequentially-by-agent-order', 'random'];
 
 function QueuesTable() {
+  const { isAdmin, loading: roleLoading } = useDesktopRole();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
