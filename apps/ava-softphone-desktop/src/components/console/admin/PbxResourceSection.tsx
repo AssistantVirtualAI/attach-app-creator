@@ -351,10 +351,20 @@ export default function PbxResourceSection({
             : [{ section: 'Fields', fields: fields as any }]}
           initial={editing || {}}
           baseline={editing || null}
+          rules={rules}
           saving={saving}
           width={sheetWidth}
           onCancel={() => { setEditing(null); setCreating(false); }}
           onSave={(rec) => save(rec, editing || undefined)}
+        />
+      )}
+
+      {conflictState && (
+        <ConflictMergeDialog
+          title={title}
+          conflicts={conflictState.conflicts}
+          onCancel={cancelConflict}
+          onResolve={resolveConflict}
         />
       )}
     </>
