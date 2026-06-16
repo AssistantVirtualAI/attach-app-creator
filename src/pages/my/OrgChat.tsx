@@ -479,11 +479,11 @@ function ChannelView({ channel, userId, userName, directory, t }: { channel: Cha
 }
 
 function MessageBubble({
-  msg, isOwn, onDelete, onReact, onOpenThread, getSignedUrl, t,
+  msg, isOwn, isPinned, onDelete, onReact, onOpenThread, onTogglePin, getSignedUrl, t,
 }: {
-  msg: any; isOwn: boolean;
+  msg: any; isOwn: boolean; isPinned?: boolean;
   onDelete: () => void; onReact: (emoji: string) => void;
-  onOpenThread?: () => void;
+  onOpenThread?: () => void; onTogglePin?: () => void;
   getSignedUrl: (p: string) => Promise<string>;
   t: (en: string, fr: string) => string;
 }) {
@@ -504,7 +504,7 @@ function MessageBubble({
   }
 
   return (
-    <div className="group flex gap-3">
+    <div className={`group flex gap-3 ${isPinned ? "bg-amber-500/5 -mx-2 px-2 py-1 rounded" : ""}`}>
       <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold shrink-0">
         {(msg.sender_name ?? "?").slice(0, 1).toUpperCase()}
       </div>
@@ -515,6 +515,7 @@ function MessageBubble({
             {format(new Date(msg.created_at), "p")}
             {msg.edited_at && <em className="ml-1">({t("edited", "modifié")})</em>}
           </span>
+          {isPinned && <Pin className="h-3 w-3 text-amber-500" />}
           <div className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1">
             {onOpenThread && (
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onOpenThread} title={t("Reply in thread", "Répondre en fil")}>
@@ -524,6 +525,11 @@ function MessageBubble({
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setShowEmoji((s) => !s)}>
               <Smile className="h-3 w-3" />
             </Button>
+            {onTogglePin && (
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onTogglePin} title={isPinned ? t("Unpin", "Détacher") : t("Pin", "Épingler")}>
+                {isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
+              </Button>
+            )}
             {isOwn && (
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onDelete}>
                 <Trash2 className="h-3 w-3" />
