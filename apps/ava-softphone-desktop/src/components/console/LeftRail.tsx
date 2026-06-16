@@ -96,21 +96,10 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
       WebkitAppRegion: 'drag' as any,
       position: 'relative',
     }}>
-      {/* Premium glow strip — synced to PBX + sync */}
+      {/* quiet accent strip */}
       <div aria-hidden style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 2,
-        background: `linear-gradient(90deg, transparent, ${glowColor}, transparent)`,
-        opacity: healthy ? 0.95 : pbx === 'error' ? 0.8 : 0.45,
-        boxShadow: `0 0 18px ${glowColor}, 0 0 36px ${glowColor}66`,
-        transition: 'all .4s ease',
-        animation: healthy ? 'statusPulse 2.6s ease-in-out infinite' : undefined,
-        pointerEvents: 'none',
-      }} />
-      <div aria-hidden style={{
-        position: 'absolute', top: 0, bottom: 0, right: -1, width: 1,
-        background: `linear-gradient(180deg, transparent, ${glowColor}55, transparent)`,
-        opacity: healthy ? 0.6 : 0.25,
-        transition: 'opacity .4s ease',
+        position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+        background: c.border,
         pointerEvents: 'none',
       }} />
 
