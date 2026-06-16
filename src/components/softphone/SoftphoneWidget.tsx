@@ -676,13 +676,6 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
   // Compact AI Insights — surfaces today's calls + missed + unread voicemail
   const todayCalls = summary?.today_calls ?? 0;
   const unreadVm = summary?.unread_voicemail ?? 0;
-  const insightsTip = useMemo(() => {
-    if (!summary?.has_extension) return null;
-    if (unreadVm > 0) return `${unreadVm} unread voicemail${unreadVm === 1 ? "" : "s"} — open Voicemail to listen.`;
-    if (todayCalls === 0) return "No calls yet today. Stay ready — set status to Available.";
-    if (todayCalls >= 20) return `High volume: ${todayCalls} calls today. Consider a short break.`;
-    return `${todayCalls} call${todayCalls === 1 ? "" : "s"} handled today. Keep it up.`;
-  }, [summary, todayCalls, unreadVm]);
 
   const insightsStrip = callState === "idle" && hasExtension && showInsights && insightsTip && (
     <div className="px-3 py-2 border-t border-border/60 bg-primary/5">
