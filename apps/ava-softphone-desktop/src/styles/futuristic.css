@@ -291,3 +291,64 @@ main h3 { font-size: var(--ava-fs-h3); line-height: 1.25; }
   background: #fff;
   box-shadow: 0 24px 60px -28px rgba(0,0,0,0.6), 0 4px 12px -6px rgba(0,0,0,0.4);
 }
+
+/* ============================================================
+   Theme variants — applied via [data-ava-theme] on <html>
+   ============================================================ */
+
+/* Daylight — brightest, soft whites, gentle contrast */
+html[data-ava-theme="daylight"] .ava-glass {
+  background: rgba(255,255,255,0.92);
+  border-color: rgba(180,196,224,0.45);
+  box-shadow: 0 1px 2px rgba(11,21,48,0.04), 0 8px 22px -14px rgba(11,21,48,0.12);
+}
+html[data-ava-theme="daylight"] .ava-glass-strong {
+  background: rgba(255,255,255,0.96);
+}
+
+/* Light — current default, unchanged baseline */
+
+/* Dark — glass darkens, hairline lifts */
+html[data-ava-theme="dark"] .ava-glass {
+  background: rgba(20,28,56,0.55);
+  border-color: rgba(180,200,255,0.16);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4), 0 18px 48px -22px rgba(0,0,0,0.6);
+  color: #eaf0ff;
+}
+html[data-ava-theme="dark"] .ava-glass-strong {
+  background: rgba(20,28,56,0.72);
+  border-color: rgba(180,200,255,0.22);
+}
+html[data-ava-theme="dark"] main h1,
+html[data-ava-theme="dark"] main h2,
+html[data-ava-theme="dark"] main h3,
+html[data-ava-theme="dark"] .ava-display { color: #eaf0ff; }
+
+/* Midnight — almost black, brand aurora amplified */
+html[data-ava-theme="midnight"] .ava-glass {
+  background: rgba(12,18,40,0.62);
+  border-color: rgba(150,180,255,0.20);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.55), 0 24px 60px -22px rgba(0,0,0,0.85);
+  color: #f1f5ff;
+}
+html[data-ava-theme="midnight"] .ava-glass-strong {
+  background: rgba(18,26,54,0.82);
+  border-color: rgba(150,180,255,0.30);
+}
+html[data-ava-theme="midnight"] .ava-aurora-border::before { opacity: 1; }
+html[data-ava-theme="midnight"] main,
+html[data-ava-theme="midnight"] main h1,
+html[data-ava-theme="midnight"] main h2,
+html[data-ava-theme="midnight"] main h3,
+html[data-ava-theme="midnight"] .ava-display { color: #f1f5ff; }
+
+/* Scrollbars for dark variants */
+html[data-ava-theme="dark"] ::-webkit-scrollbar-thumb,
+html[data-ava-theme="midnight"] ::-webkit-scrollbar-thumb {
+  background: rgba(150,180,255,0.22);
+  border-radius: 999px;
+}
+html[data-ava-theme="dark"] ::-webkit-scrollbar-thumb:hover,
+html[data-ava-theme="midnight"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(150,180,255,0.38);
+}
