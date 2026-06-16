@@ -246,6 +246,36 @@ function QueueDialog({ mode, queue, trigger }: { mode: 'create' | 'edit'; queue?
   const { toast } = useToast();
   const qc = useQueryClient();
   const raw = (queue?.raw_data || {}) as any;
+  const [moh, setMoh] = useState<Array<{ name: string; path: string | null }>>([]);
+  const [mohLoading, setMohLoading] = useState(false);
+  const [recRule, setRecRule] = useState<{ enabled: boolean; mode: 'all' | 'inbound' | 'outbound'; announce: boolean; retention_days: number }>({
+    enabled: !!queue?.record_enabled, mode: 'all', announce: true, retention_days: 90,
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      setMohLoading(true);
+      const { data } = await supabase.from('pbx_hold_music').select('name, path').eq('organization_id', LEMTEL_ORG).order('name');
+      setMoh((data || []) as any);
+      setMohLoading(false);
+      if (queue?.id) {
+        const { data: rr } = await supabase.from('pbx_queue_recording_rules' as any).select('*').eq('queue_id', queue.id).maybeSingle();
+        if (rr) setRecRule({ enabled: (rr as any).enabled, mode: (rr as any).mode, announce: (rr as any).announce, retention_days: (rr as any).retention_days });
+      }
+    })();
+  }, [open, queue?.id]);
+
+  const syncMoh = async () => {
+    setMohLoading(true);
+    try {
+      await supabase.functions.invoke('fusionpbx-proxy', { body: { organization_id: LEMTEL_ORG, action: 'sync-hold-music' } });
+      const { data } = await supabase.from('pbx_hold_music').select('name, path').eq('organization_id', LEMTEL_ORG).order('name');
+      setMoh((data || []) as any);
+    } catch (e: any) { toast({ title: 'MOH sync failed', description: e.message, variant: 'destructive' }); }
+    finally { setMohLoading(false); }
+  };
+
   const [form, setForm] = useState({
     queue_name: queue?.name || '',
     queue_extension: queue?.extension || '',
