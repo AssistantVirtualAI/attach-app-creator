@@ -34,6 +34,8 @@ interface Props {
   title: string;
   groups: FieldGroup[];
   initial: any;
+  /** Snapshot at sheet open — used by parent for optimistic-concurrency conflict detection. */
+  baseline?: any;
   saving?: boolean;
   width?: number;
   onCancel: () => void;
