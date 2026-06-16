@@ -24,9 +24,9 @@ export default function PageHeader({
       className="ava-glass"
       style={{
         position: 'relative',
-        padding: '22px 24px 24px',
-        marginBottom: 20,
-        borderRadius: 18,
+        padding: 'var(--ava-space-5) var(--ava-space-6) var(--ava-space-6)',
+        marginBottom: 'var(--ava-space-5)',
+        borderRadius: 'var(--ava-radius)',
         background: 'rgba(255,255,255,0.78)',
         border: `1px solid ${c.border}`,
         overflow: 'hidden',
@@ -67,7 +67,7 @@ export default function PageHeader({
             }}>{eyebrow}</div>
           )}
           <h1 className="ava-display" style={{
-            fontSize: 26, fontWeight: 600, lineHeight: 1.15,
+            fontWeight: 600, lineHeight: 1.15,
             color: c.textIce, margin: '0 0 6px',
             letterSpacing: -0.4,
             fontFamily: "'Space Grotesk', 'DM Sans', sans-serif",
