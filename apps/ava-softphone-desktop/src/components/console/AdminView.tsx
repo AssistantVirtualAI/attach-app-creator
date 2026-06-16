@@ -263,7 +263,7 @@ function ExtensionsTable() {
         <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Extensions <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500 }}>({data.length})</span></h1>
         <div style={{ display: 'flex', gap: 8 }}>
           {isAdmin && (
-            <button onClick={() => setCreating(true)} disabled={roleLoading} style={{
+            <button onClick={() => setCreating({ key: generateIdempotencyKey() })} disabled={roleLoading} style={{
               padding: '8px 14px', borderRadius: 9,
               background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
               border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4,
