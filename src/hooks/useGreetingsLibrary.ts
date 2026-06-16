@@ -36,6 +36,8 @@ export function useGreetingsLibrary() {
   const query = useQuery<{ greetings: LibraryGreeting[]; extensions: Extension[]; voices: Voice[] }>({
     queryKey: ["my-greetings-library"],
     queryFn: () => call("list_greetings"),
+    refetchInterval: (q) =>
+      (q.state.data?.greetings ?? []).some((g) => g.status === "generating") ? 3000 : false,
   });
   const inv = () => qc.invalidateQueries({ queryKey: ["my-greetings-library"] });
   return {
