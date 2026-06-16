@@ -985,6 +985,9 @@ function MembersTable({ queueId, queueName, supervisors, agents, canAssign, onRe
               selected={selected}
               setSelected={setSelected}
               onRemoveOne={onRemoveOne}
+              onEditOne={onEditOne}
+              supCount={supervisors.length}
+              agCount={agents.length}
               allSelected={allSelected}
               toggleAll={toggleAll}
               sortKey={sortKey}
