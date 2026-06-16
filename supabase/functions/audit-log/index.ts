@@ -20,6 +20,14 @@ const ALLOWED_ACTIONS: Record<string, string> = {
   "call.transferred": "pbx_call_record",
   "softphone.signed_in": "pbx_softphone_user",
   "softphone.signed_out": "pbx_softphone_user",
+  // PBX admin create-flow audit events. Resource_type is generic; per-event
+  // detail (extension/ivr/queue + identifier + remote_id + idempotency_key)
+  // lives in metadata.
+  "pbx.create_denied_non_admin": "pbx_create_flow",
+  "pbx.create_duplicate_detected": "pbx_create_flow",
+  "pbx.create_conflict_resolved": "pbx_create_flow",
+  "pbx.create_idempotent_replay": "pbx_create_flow",
+  "pbx.create_succeeded": "pbx_create_flow",
 };
 
 function json(body: unknown, status = 200) {

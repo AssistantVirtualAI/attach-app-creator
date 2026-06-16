@@ -2,21 +2,19 @@
 // Auto-Attendants (IVR), and Call Queues in the desktop Admin view.
 //
 // Verifies:
-//   1. Non-admin users cannot submit a create request (submit() is never
-//      invoked) and a denial audit entry is recorded.
-//   2. Duplicate detection records an audit entry with timestamp, resource
-//      kind/id, remote version, and resolution choice; existing record is
-//      opened for edit when the user confirms.
-//   3. On success, toastSuccess fires ONLY after reload(true) resolves —
-//      never before — and the data-refresh event is dispatched.
-//   4. The `ava:pbx-resource-saved` event reaches every listener so multiple
-//      open views all refetch after a create.
+//   1. Non-admin users cannot submit (submit() never called); denial audited.
+//   2. Duplicate detection records audit (with timestamp, kind, id, remote
+//      version, idempotency key, resolution choice) and opens existing for
+//      edit when the user confirms.
+//   3. On success, dispatchSaved AND toastSuccess fire ONLY after reload(true)
+//      resolves — and dispatchSaved fires BEFORE toastSuccess.
+//   4. The `ava:pbx-resource-saved` event reaches every listener.
+//   5. Idempotency keys: repeated submits with the same key short-circuit
+//      into an audited replay and DO NOT call submit a second time.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { runCreatePbxResourceFlow, type CreateFlowDeps } from '../pbxCreateFlow';
+import { runCreatePbxResourceFlow, generateIdempotencyKey, __resetIdempotencyCacheForTests, type CreateFlowDeps } from '../pbxCreateFlow';
 
-// Minimal `window` shim using Node 18+ native EventTarget/Event so the test
-// does not require a DOM. Mirrors only the surface the flow uses.
 const win = new EventTarget() as any;
 win.dispatchEvent = win.dispatchEvent.bind(win);
 win.addEventListener = win.addEventListener.bind(win);
@@ -42,7 +40,7 @@ function makeDeps(overrides: Partial<CreateFlowDeps> = {}): CreateFlowDeps {
 }
 
 describe('runCreatePbxResourceFlow', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => { vi.clearAllMocks(); __resetIdempotencyCacheForTests(); });
 
   it('blocks non-admin users from submitting and audits the denial', async () => {
     const deps = makeDeps({ isAdmin: false });
@@ -52,9 +50,7 @@ describe('runCreatePbxResourceFlow', () => {
     expect(deps.submit).not.toHaveBeenCalled();
     expect(deps.reload).not.toHaveBeenCalled();
     expect(deps.toastSuccess).not.toHaveBeenCalled();
-    expect(deps.toastError).toHaveBeenCalledWith(
-      expect.stringContaining('Admin role required'),
-    );
+    expect(deps.toastError).toHaveBeenCalledWith(expect.stringContaining('Admin role required'));
     expect(deps.audit).toHaveBeenCalledWith(
       'pbx.create_denied_non_admin',
       expect.objectContaining({ resource: 'extension', identifier: '1001', at: expect.any(String) }),
@@ -77,19 +73,13 @@ describe('runCreatePbxResourceFlow', () => {
     const calls = (deps.audit as any).mock.calls;
     const detected = calls.find((c: any[]) => c[0] === 'pbx.create_duplicate_detected');
     const resolved = calls.find((c: any[]) => c[0] === 'pbx.create_conflict_resolved');
-    expect(detected).toBeTruthy();
     expect(detected[1]).toMatchObject({
-      resource: 'extension',
-      identifier: '1001',
-      remote_id: 'row-9',
-      remote_version: '2026-06-01T12:00:00Z',
+      resource: 'extension', identifier: '1001',
+      remote_id: 'row-9', remote_version: '2026-06-01T12:00:00Z',
     });
     expect(detected[1].at).toMatch(/\d{4}-\d{2}-\d{2}T/);
-    expect(resolved[1]).toMatchObject({
-      resource: 'extension',
-      remote_id: 'row-9',
-      resolution: 'open_for_edit',
-    });
+    expect(detected[1].idempotency_key).toBeTruthy();
+    expect(resolved[1]).toMatchObject({ remote_id: 'row-9', resolution: 'open_for_edit' });
   });
 
   it('records abort resolution when user cancels duplicate prompt', async () => {
@@ -101,13 +91,11 @@ describe('runCreatePbxResourceFlow', () => {
     expect(result.status).toBe('duplicate_aborted');
     expect(deps.openForEdit).not.toHaveBeenCalled();
     expect(deps.submit).not.toHaveBeenCalled();
-    const resolved = (deps.audit as any).mock.calls.find(
-      (c: any[]) => c[0] === 'pbx.create_conflict_resolved',
-    );
+    const resolved = (deps.audit as any).mock.calls.find((c: any[]) => c[0] === 'pbx.create_conflict_resolved');
     expect(resolved[1].resolution).toBe('abort');
   });
 
-  it('fires success toast strictly AFTER reload(true) resolves', async () => {
+  it('fires success toast AND dispatchSaved strictly AFTER reload(true) — toast comes last', async () => {
     const order: string[] = [];
     let reloadResolve!: () => void;
     const reloadDone = new Promise<void>((r) => { reloadResolve = r; });
@@ -125,8 +113,7 @@ describe('runCreatePbxResourceFlow', () => {
 
     const p = runCreatePbxResourceFlow(deps, 'Created.');
 
-    // Let microtasks flush — submit + reload start should have run, but the
-    // toast must NOT fire while reload is still pending.
+    // While reload is pending: submit started, reload started, but NO toast/dispatch yet.
     await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
     expect(order).toEqual(['submit', 'reload:true:start']);
     expect(deps.toastSuccess).not.toHaveBeenCalled();
@@ -135,13 +122,7 @@ describe('runCreatePbxResourceFlow', () => {
     reloadResolve();
     await p;
 
-    expect(order).toEqual([
-      'submit',
-      'reload:true:start',
-      'reload:true:end',
-      'dispatch',
-      'toast',
-    ]);
+    expect(order).toEqual(['submit', 'reload:true:start', 'reload:true:end', 'dispatch', 'toast']);
     expect(deps.toastSuccess).toHaveBeenCalledWith('Created.');
   });
 
@@ -154,7 +135,6 @@ describe('runCreatePbxResourceFlow', () => {
     });
 
     const deps = makeDeps({
-      // Mirror the real dispatcher used in AdminView.
       dispatchSaved: () => window.dispatchEvent(new Event('ava:pbx-resource-saved')),
     });
 
@@ -163,6 +143,26 @@ describe('runCreatePbxResourceFlow', () => {
     expect(received).toEqual(['viewA', 'viewB', 'viewC']);
 
     handlers.forEach(([, h]) => window.removeEventListener('ava:pbx-resource-saved', h));
+  });
+
+  it('idempotent replay: same key on a second submit skips submit and audits replay', async () => {
+    const key = generateIdempotencyKey();
+    const deps1 = makeDeps({ idempotencyKey: key });
+    const r1 = await runCreatePbxResourceFlow(deps1, 'ok');
+    expect(r1.status).toBe('created');
+    expect(deps1.submit).toHaveBeenCalledTimes(1);
+
+    // Replay with the SAME key — submit must NOT be invoked again.
+    const deps2 = makeDeps({ idempotencyKey: key });
+    const r2 = await runCreatePbxResourceFlow(deps2, 'ok');
+    expect(r2).toEqual({ status: 'idempotent_replay', idempotencyKey: key });
+    expect(deps2.submit).not.toHaveBeenCalled();
+    expect(deps2.reload).not.toHaveBeenCalled();
+    expect(deps2.toastSuccess).not.toHaveBeenCalled();
+    expect(deps2.audit).toHaveBeenCalledWith(
+      'pbx.create_idempotent_replay',
+      expect.objectContaining({ resource: 'extension', identifier: '1001', idempotency_key: key }),
+    );
   });
 
   it('toasts error and skips success/dispatch when submit throws', async () => {

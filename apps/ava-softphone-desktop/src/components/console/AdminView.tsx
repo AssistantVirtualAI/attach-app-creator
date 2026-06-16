@@ -14,7 +14,9 @@ import { EXTENSION_RULES, IVR_RULES, QUEUE_RULES } from '../../lib/pbxValidators
 import { useDesktopRole } from '../../hooks/useDesktopRole';
 import { toast } from '../../lib/toast';
 import { audit } from '../../lib/audit';
-import { runCreatePbxResourceFlow } from '../../lib/pbxCreateFlow';
+import { runCreatePbxResourceFlow, generateIdempotencyKey } from '../../lib/pbxCreateFlow';
+import ConflictResolutionModal, { type ConflictKind } from './admin/ConflictResolutionModal';
+import AuditTrail from './admin/AuditTrail';
 import VoicemailView from './VoicemailView';
 import RecordingsView from './RecordingsView';
 import CallsView from './CallsView';
@@ -90,6 +92,29 @@ function ModalShell({ title, onClose, width = 460, children }: { title: string; 
   );
 }
 
+/**
+ * Hook returning:
+ *   • `confirmConflict(existing, identifier)` — plug into the create-flow's
+ *     confirmConflict slot. Opens the ConflictResolutionModal and resolves to
+ *     true (open existing for edit) or false (abort).
+ *   • `modalNode` — JSX to render so the modal appears.
+ */
+function useConflictModal(kind: ConflictKind) {
+  const [state, setState] = useState<{ existing: any; identifier: string; resolve: (v: boolean) => void } | null>(null);
+  const confirmConflict = useCallback((existing: any, identifier: string) => new Promise<boolean>((resolve) => {
+    setState({ existing, identifier, resolve });
+  }), []);
+  const modalNode = state ? (
+    <ConflictResolutionModal
+      kind={kind}
+      identifier={state.identifier}
+      existing={state.existing}
+      onResolve={(choice) => { state.resolve(choice === 'open_for_edit'); setState(null); }}
+    />
+  ) : null;
+  return { confirmConflict, modalNode };
+}
+
 function ExtensionsTable() {
   const { isAdmin, loading: roleLoading } = useDesktopRole();
   const [data, setData] = useState<any[]>([]);
@@ -97,7 +122,7 @@ function ExtensionsTable() {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<{ key: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
   const loadFromDb = useCallback(async (orgId: string | null) => {
@@ -176,6 +201,10 @@ function ExtensionsTable() {
     }
   };
 
+  const { confirmConflict: confirmExtConflict, modalNode: extConflictModal } = useConflictModal('extension');
+
+
+
   const createExtension = async (form: any) => {
     setSaving(true);
     try {
@@ -187,10 +216,12 @@ function ExtensionsTable() {
        'forward_all_enabled', 'forward_busy_enabled', 'forward_no_answer_enabled']
         .forEach((k) => { if (typeof out[k] === 'boolean') out[k] = out[k] ? 'true' : 'false'; });
 
+      const idempotencyKey = creating?.key || generateIdempotencyKey();
       await runCreatePbxResourceFlow({
         isAdmin,
         resourceKind: 'extension',
         identifier: ext || '(unnamed)',
+        idempotencyKey,
         findDuplicate: async () => {
           if (!ext) return null;
           const { data: dup } = await supabase
@@ -201,21 +232,19 @@ function ExtensionsTable() {
             .maybeSingle();
           return dup || null;
         },
-        confirmConflict: () => window.confirm(
-          `Extension ${ext} already exists on this PBX.\n\nClick OK to OPEN the existing record for editing instead, or Cancel to abort.`,
-        ),
+        confirmConflict: (existing) => confirmExtConflict(existing, ext || '(unnamed)'),
         openForEdit: async (existing) => {
-          setCreating(false);
+          setCreating(null);
           await reload(false);
           const match = data.find((r) => String(r.extension) === ext) || existing;
           if (match) setEditing(match);
         },
-        submit: async () => {
+        submit: async ({ idempotencyKey: idk }) => {
           const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
-            body: { action: 'create-extension', organization_id: scope.organization_id, params: { domain_uuid: scope.domain_uuid, ...out } },
+            body: { action: 'create-extension', organization_id: scope.organization_id, idempotency_key: idk, params: { domain_uuid: scope.domain_uuid, ...out } },
           });
           if (err) throw err;
-          setCreating(false);
+          setCreating(null);
         },
         reload: (force) => reload(force),
         dispatchSaved: () => window.dispatchEvent(new Event('ava:pbx-resource-saved')),
@@ -226,6 +255,7 @@ function ExtensionsTable() {
     } finally { setSaving(false); }
   };
 
+
   const cols = ['Ext', 'Display Name', 'User', 'Voicemail', 'Status', ''];
   return (
     <>
@@ -233,7 +263,7 @@ function ExtensionsTable() {
         <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Extensions <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500 }}>({data.length})</span></h1>
         <div style={{ display: 'flex', gap: 8 }}>
           {isAdmin && (
-            <button onClick={() => setCreating(true)} disabled={roleLoading} style={{
+            <button onClick={() => setCreating({ key: generateIdempotencyKey() })} disabled={roleLoading} style={{
               padding: '8px 14px', borderRadius: 9,
               background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
               border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4,
@@ -290,10 +320,11 @@ function ExtensionsTable() {
           initial={{ enabled: true, voicemail_enabled: true, user_context: 'default' }}
           rules={EXTENSION_RULES}
           saving={saving}
-          onCancel={() => setCreating(false)}
+          onCancel={() => setCreating(null)}
           onSave={createExtension}
         />
       )}
+      {extConflictModal}
     </>
   );
 }
@@ -337,7 +368,7 @@ type Section =
   | 'extensions' | 'devices' | 'numbers' | 'ivrs' | 'queues' | 'ringgroups'
   | 'gateways' | 'sip-profiles' | 'conferences' | 'hold-music' | 'dialplans'
   | 'time-conditions' | 'registrations' | 'voicemails' | 'recordings'
-  | 'call-history' | 'feature-codes' | 'sync';
+  | 'call-history' | 'feature-codes' | 'sync' | 'audit-trail';
 
 const NAV_GROUPS: { label: string; items: { id: Section; label: string }[] }[] = [
   {
@@ -376,6 +407,7 @@ const NAV_GROUPS: { label: string; items: { id: Section; label: string }[] }[] =
       { id: 'gateways', label: 'Gateways' },
       { id: 'sip-profiles', label: 'SIP Profiles' },
       { id: 'sync', label: 'Sync Status' },
+      { id: 'audit-trail', label: 'Audit Trail' },
     ],
   },
 ];
@@ -522,6 +554,7 @@ export default function AdminView() {
         {sec === 'call-history' && <CallsView scope="org" />}
         {sec === 'registrations' && <LiveRegistrationsTable />}
         {sec === 'sync' && <SyncStatus />}
+        {sec === 'audit-trail' && <AuditTrail />}
       </div>
     </div>
   );
@@ -619,7 +652,8 @@ function IvrsTable() {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<{ key: string } | null>(null);
+  const { confirmConflict: confirmIvrConflict, modalNode: ivrConflictModal } = useConflictModal('ivr');
   const [saving, setSaving] = useState(false);
 
   const reload = useCallback(async (forceSync = false) => {
@@ -677,10 +711,12 @@ function IvrsTable() {
       const me = await getMeContext();
       const orgId = me.organization_id || LEMTEL_ORG;
       const name = String(form.ivr_menu_name || '').trim();
+      const idempotencyKey = creating?.key || generateIdempotencyKey();
       await runCreatePbxResourceFlow({
         isAdmin,
         resourceKind: 'ivr',
         identifier: name || '(unnamed)',
+        idempotencyKey,
         findDuplicate: async () => {
           if (!name) return null;
           const { data: dup } = await supabase
@@ -691,21 +727,19 @@ function IvrsTable() {
             .maybeSingle();
           return dup || null;
         },
-        confirmConflict: () => window.confirm(
-          `An auto-attendant named "${name}" already exists.\n\nClick OK to open it for editing instead, or Cancel to abort.`,
-        ),
+        confirmConflict: (existing) => confirmIvrConflict(existing, name || '(unnamed)'),
         openForEdit: async (existing) => {
-          setCreating(false);
+          setCreating(null);
           await reload(false);
           const match = data.find((r) => r.name === name) || existing;
           if (match) setEditing(match);
         },
-        submit: async () => {
+        submit: async ({ idempotencyKey: idk }) => {
           const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
-            body: { action: 'create-ivr', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN, ...form } },
+            body: { action: 'create-ivr', organization_id: orgId, idempotency_key: idk, params: { domain_uuid: LEMTEL_DOMAIN, ...form } },
           });
           if (err) throw err;
-          setCreating(false);
+          setCreating(null);
         },
         reload: (force) => reload(force),
         dispatchSaved: () => window.dispatchEvent(new Event('ava:pbx-resource-saved')),
@@ -723,7 +757,7 @@ function IvrsTable() {
         <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Auto-Attendants <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500 }}>({data.length})</span></h1>
         <div style={{ display: 'flex', gap: 8 }}>
           {isAdmin && (
-            <button onClick={() => setCreating(true)} disabled={roleLoading} style={{ padding: '8px 14px', borderRadius: 9, background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4, opacity: roleLoading ? 0.6 : 1 }}>＋ New Auto-Attendant</button>
+            <button onClick={() => setCreating({ key: generateIdempotencyKey() })} disabled={roleLoading} style={{ padding: '8px 14px', borderRadius: 9, background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4, opacity: roleLoading ? 0.6 : 1 }}>＋ New Auto-Attendant</button>
           )}
           <button onClick={() => reload(true)} disabled={syncing} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: syncing ? 0.6 : 1 }}>{syncing ? 'Syncing…' : '↻ Sync from PBX'}</button>
           <button onClick={() => reload(false)} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Reload</button>
@@ -756,10 +790,11 @@ function IvrsTable() {
           rules={IVR_RULES}
           saving={saving}
           width={680}
-          onCancel={() => setCreating(false)}
+          onCancel={() => setCreating(null)}
           onSave={create}
         />
       )}
+      {ivrConflictModal}
     </>
   );
 }
@@ -799,7 +834,8 @@ function QueuesTable() {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<{ key: string } | null>(null);
+  const { confirmConflict: confirmQueueConflict, modalNode: queueConflictModal } = useConflictModal('queue');
   const [saving, setSaving] = useState(false);
 
   const reload = useCallback(async (forceSync = false) => {
@@ -866,10 +902,12 @@ function QueuesTable() {
       const out: any = { ...form };
       if (out.queue_max_wait_time !== undefined) out.queue_max_wait_time = String(out.queue_max_wait_time);
 
+      const idempotencyKey = creating?.key || generateIdempotencyKey();
       await runCreatePbxResourceFlow({
         isAdmin,
         resourceKind: 'queue',
         identifier: name || '(unnamed)',
+        idempotencyKey,
         findDuplicate: async () => {
           if (!name) return null;
           const { data: dup } = await supabase
@@ -880,21 +918,19 @@ function QueuesTable() {
             .maybeSingle();
           return dup || null;
         },
-        confirmConflict: () => window.confirm(
-          `A call queue named "${name}" already exists.\n\nClick OK to open it for editing instead, or Cancel to abort.`,
-        ),
+        confirmConflict: (existing) => confirmQueueConflict(existing, name || '(unnamed)'),
         openForEdit: async (existing) => {
-          setCreating(false);
+          setCreating(null);
           await reload(false);
           const match = data.find((r) => r.name === name) || existing;
           if (match) setEditing(match);
         },
-        submit: async () => {
+        submit: async ({ idempotencyKey: idk }) => {
           const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
-            body: { action: 'create-queue', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN, ...out } },
+            body: { action: 'create-queue', organization_id: orgId, idempotency_key: idk, params: { domain_uuid: LEMTEL_DOMAIN, ...out } },
           });
           if (err) throw err;
-          setCreating(false);
+          setCreating(null);
         },
         reload: (force) => reload(force),
         dispatchSaved: () => window.dispatchEvent(new Event('ava:pbx-resource-saved')),
@@ -904,7 +940,6 @@ function QueuesTable() {
       }, `Call queue "${name}"${ext ? ` (ext ${ext})` : ''} created and synced.`);
     } finally { setSaving(false); }
   };
-  };
 
   const cols = ['Name', 'Ext', 'Strategy', 'Agents', 'Max wait', 'Status', ''];
   return (
@@ -913,7 +948,7 @@ function QueuesTable() {
         <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Call Queues <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500 }}>({data.length})</span></h1>
         <div style={{ display: 'flex', gap: 8 }}>
           {isAdmin && (
-            <button onClick={() => setCreating(true)} disabled={roleLoading} style={{ padding: '8px 14px', borderRadius: 9, background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4, opacity: roleLoading ? 0.6 : 1 }}>＋ New Queue</button>
+            <button onClick={() => setCreating({ key: generateIdempotencyKey() })} disabled={roleLoading} style={{ padding: '8px 14px', borderRadius: 9, background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4, opacity: roleLoading ? 0.6 : 1 }}>＋ New Queue</button>
           )}
           <button onClick={() => reload(true)} disabled={syncing} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: syncing ? 0.6 : 1 }}>{syncing ? 'Syncing…' : '↻ Sync from PBX'}</button>
           <button onClick={() => reload(false)} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Reload</button>
@@ -947,10 +982,11 @@ function QueuesTable() {
           rules={QUEUE_RULES}
           saving={saving}
           width={680}
-          onCancel={() => setCreating(false)}
+          onCancel={() => setCreating(null)}
           onSave={create}
         />
       )}
+      {queueConflictModal}
     </>
   );
 }
