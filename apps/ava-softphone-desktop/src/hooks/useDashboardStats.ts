@@ -8,6 +8,14 @@ export type AttentionItem = {
   tone: 'danger' | 'warn' | 'info' | 'success';
 };
 
+export type DailySeries = {
+  dates: string[]; // yyyy-mm-dd, ascending
+  calls: number[];
+  missed: number[];
+  answered: number[];
+  recordings: number[];
+};
+
 export type DashboardStats = {
   missedToday: number;
   answeredToday: number;
@@ -23,6 +31,7 @@ export type DashboardStats = {
   cdrFreshness: 'live' | 'stale' | 'idle';
   attention: AttentionItem[];
   pbxHealth: 'ok' | 'warn' | 'down';
+  series: DailySeries;
   loading: boolean;
 };
 
