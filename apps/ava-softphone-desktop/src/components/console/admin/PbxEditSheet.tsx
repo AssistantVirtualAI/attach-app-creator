@@ -112,7 +112,10 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
   const [voice, setVoice] = useState(TOP_VOICES[0].id);
   const [text, setText] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioB64, setAudioB64] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploaded, setUploaded] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const filename = useMemo(() => {
@@ -122,21 +125,44 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
 
   const generate = async () => {
     if (!text.trim()) { setErr('Enter greeting text'); return; }
-    setBusy(true); setErr(null);
+    setBusy(true); setErr(null); setUploaded(false);
     try {
       const { data, error } = await supabase.functions.invoke('voicemail-greeting-tts', {
         body: { text, voiceId: voice, language: 'en' },
       });
       if (error) throw error;
       if (!data?.audioContent) throw new Error(data?.error || 'No audio returned');
-      const url = `data:audio/mpeg;base64,${data.audioContent}`;
-      setAudioUrl(url);
-      // Stash filename suggestion into the field value for PBX path
+      setAudioB64(data.audioContent);
+      setAudioUrl(`data:audio/mpeg;base64,${data.audioContent}`);
       onChange(filename);
     } catch (e: any) {
       setErr(e?.message || 'TTS failed');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const uploadToPbx = async () => {
+    if (!audioB64) { setErr('Generate audio first'); return; }
+    const orgId = (fullForm as any)?.organization_id || (fullForm as any)?.domain_organization_id;
+    setUploading(true); setErr(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+        body: {
+          action: 'upload-recording',
+          organization_id: orgId,
+          filename, audio_base64: audioB64, mime: 'audio/mpeg',
+          description: `AVA TTS for ${field.label}`,
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).message || (data as any).error);
+      setUploaded(true);
+      onChange(filename);
+    } catch (e: any) {
+      setErr(e?.message || 'Upload to PBX failed');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -147,7 +173,7 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
     }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 8 }}>
         <input value={value ?? ''} onChange={(e) => onChange(e.target.value)}
-          placeholder="Filename or path on PBX (e.g. welcome.wav)"
+          placeholder="Filename on PBX (e.g. welcome.mp3)"
           style={inputBase} />
         <select value={voice} onChange={(e) => setVoice(e.target.value)} style={inputBase}>
           {TOP_VOICES.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
@@ -157,25 +183,31 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
         placeholder="Type the greeting — ElevenLabs will read it back."
         rows={3} style={{ ...inputBase, minHeight: 72, resize: 'vertical' }} />
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button type="button" onClick={generate} disabled={busy}
+        <button type="button" onClick={generate} disabled={busy || uploading}
           style={{
             padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700,
             border: 'none', cursor: 'pointer', color: '#fff',
             background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
-            opacity: busy ? 0.6 : 1,
-          }}>{busy ? 'Generating…' : '🎙 Generate with AI'}</button>
+            opacity: (busy || uploading) ? 0.6 : 1,
+          }}>{busy ? 'Generating…' : '🎙 Generate'}</button>
+        <button type="button" onClick={uploadToPbx} disabled={!audioB64 || uploading || busy}
+          style={{
+            padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+            border: `1px solid ${c.border}`, cursor: 'pointer',
+            color: uploaded ? '#0c1733' : c.textIce,
+            background: uploaded ? c.signalGold : 'transparent',
+            opacity: (!audioB64 || uploading || busy) ? 0.5 : 1,
+          }}>{uploading ? 'Uploading…' : uploaded ? '✓ Uploaded' : '⬆ Upload to PBX'}</button>
+        {audioUrl && <audio src={audioUrl} controls style={{ height: 32 }} />}
         {audioUrl && (
-          <>
-            <audio src={audioUrl} controls style={{ height: 32 }} />
-            <a href={audioUrl} download={filename} style={{ fontSize: 11, color: c.avaCyan, textDecoration: 'underline' }}>
-              Download {filename}
-            </a>
-          </>
+          <a href={audioUrl} download={filename} style={{ fontSize: 11, color: c.avaCyan, textDecoration: 'underline' }}>
+            Download
+          </a>
         )}
         {err && <span style={{ color: c.danger, fontSize: 11 }}>{err}</span>}
       </div>
       <div style={{ fontSize: 10, color: c.mutedSilver, lineHeight: 1.5 }}>
-        Tip: download the MP3, upload it to FusionPBX Recordings, then set the filename above.
+        One-click: Generate → Upload to PBX. Filename is saved on the resource above.
       </div>
     </div>
   );
