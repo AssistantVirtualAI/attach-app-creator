@@ -1,0 +1,115 @@
+/* ============================================================
+   AVA Statistic — Futuristic visual layer
+   Glass-morphism, aurora gradients, soft motion. Used via class
+   names on top of token-based inline styles in components.
+   ============================================================ */
+
+:root {
+  --ava-blue: #0023e6;
+  --ava-blue-lt: #4d6dff;
+  --ava-cyan: #21d4fd;
+  --ava-gold: #d4a73a;
+  --ava-gold-soft: #e8c878;
+  --ava-text: #0b1530;
+  --ava-muted: #5e6c8a;
+  --ava-aurora: linear-gradient(135deg, #0023e6 0%, #4d6dff 45%, #21d4fd 100%);
+  --ava-gold-edge: linear-gradient(135deg, #d4a73a, #e8c878 60%, #fff3d6);
+  --ava-mesh:
+    radial-gradient(1000px 600px at 8% -10%, rgba(0,35,230,0.08), transparent 60%),
+    radial-gradient(900px 600px at 110% 110%, rgba(33,212,253,0.08), transparent 55%);
+  --ava-glow-blue: 0 10px 30px -12px rgba(0,35,230,0.45);
+  --ava-glow-gold: 0 8px 22px -10px rgba(212,167,58,0.45);
+}
+
+/* ----- Glass surfaces ----- */
+.ava-glass {
+  background: rgba(255,255,255,0.78);
+  border: 1px solid rgba(180,196,224,0.55);
+  border-radius: 16px;
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: 0 1px 2px rgba(11,21,48,0.06), 0 10px 28px -12px rgba(11,21,48,0.18);
+}
+.ava-glass-strong {
+  background: rgba(255,255,255,0.88);
+  border: 1px solid rgba(180,196,224,0.7);
+  border-radius: 18px;
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  box-shadow: 0 2px 4px rgba(11,21,48,0.06), 0 18px 44px -18px rgba(11,21,48,0.22);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ava-glass, .ava-glass-strong { background: rgba(255,255,255,0.94); }
+}
+
+/* ----- Aurora hairline border ----- */
+.ava-aurora-border {
+  position: relative;
+}
+.ava-aurora-border::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--ava-aurora);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+/* ----- Hover lift ----- */
+.ava-lift {
+  transition: transform 220ms cubic-bezier(.2,.7,.2,1), box-shadow 220ms cubic-bezier(.2,.7,.2,1);
+}
+.ava-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 38px -16px rgba(0,35,230,0.35), 0 4px 12px -6px rgba(11,21,48,0.18);
+}
+
+/* ----- Page enter ----- */
+.lemtel-page-enter { animation: ava-page-enter 240ms cubic-bezier(.2,.7,.2,1) both; }
+@keyframes ava-page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ----- Pulse glow ----- */
+.ava-pulse-blue { animation: ava-pulse-blue 1800ms ease-in-out infinite; }
+@keyframes ava-pulse-blue {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,35,230,0.35); }
+  50%      { box-shadow: 0 0 0 12px rgba(0,35,230,0.00); }
+}
+.ava-pulse-gold { animation: ava-pulse-gold 1800ms ease-in-out infinite; }
+@keyframes ava-pulse-gold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212,167,58,0.45); }
+  50%      { box-shadow: 0 0 0 12px rgba(212,167,58,0.00); }
+}
+
+/* ----- Aurora shift on gradient fills ----- */
+.ava-aurora-fill {
+  background: linear-gradient(120deg, #0023e6, #4d6dff, #21d4fd, #4d6dff, #0023e6);
+  background-size: 300% 300%;
+  animation: ava-aurora-shift 9s ease-in-out infinite;
+  color: #fff;
+}
+@keyframes ava-aurora-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+/* ----- Compact bottom rail layout helper ----- */
+.lemtel-rail-h {
+  display: flex; gap: 4px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  overflow-x: auto; scrollbar-width: none;
+}
+.lemtel-rail-h::-webkit-scrollbar { display: none; }
+
+/* ----- Reduced motion ----- */
+@media (prefers-reduced-motion: reduce) {
+  .ava-lift, .lemtel-page-enter, .ava-pulse-blue, .ava-pulse-gold, .ava-aurora-fill {
+    animation: none !important;
+    transition: none !important;
+  }
+}
