@@ -85,13 +85,16 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
       : pbx === 'registered'
         ? c.signalGold
         : c.borderAI;
+  const railSurface = 'var(--ava-glass, rgba(20,28,56,0.72))';
+  const railElev = 'var(--ava-surface-elev, rgba(255,255,255,0.08))';
+  const railHover = 'var(--ava-surface-hover, rgba(255,255,255,0.12))';
 
   return (
     <aside
       className="ava-glass"
       style={{
         width: 244, flexShrink: 0, height: '100%',
-        background: 'rgba(255,255,255,0.72)',
+        background: railSurface,
         borderRight: `1px solid ${c.border}`,
         borderRadius: 0,
         display: 'flex', flexDirection: 'column',
@@ -128,7 +131,7 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
       <div style={{
         margin: '0 4px 12px', padding: '7px 10px',
         borderRadius: 10,
-        background: 'rgba(255,255,255,0.02)',
+        background: railElev,
         border: `1px solid ${c.border}`,
         display: 'flex', alignItems: 'center', gap: 8,
         WebkitAppRegion: 'no-drag' as any,
@@ -146,22 +149,22 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
         onClick={onOpenSearch}
         style={{
           margin: '4px 4px 12px', padding: '9px 11px',
-          background: 'rgba(140,180,255,0.06)',
+          background: railElev,
           border: `1px solid ${c.border}`,
-          borderRadius: 10, color: c.mutedSilver,
+          borderRadius: 10, color: c.textSub,
           fontSize: 11.5, textAlign: 'left', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           WebkitAppRegion: 'no-drag' as any,
           transition: 'border-color .18s ease, background .18s ease',
         }}
         onMouseEnter={(e) => { e.currentTarget.style.borderColor = c.borderGold; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = c.border; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = railElev; }}
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
           {t('nav.search')}
         </span>
-        <kbd style={{ fontSize: 9, padding: '2px 5px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: c.textSub, fontFamily: 'inherit' }}>⌘K</kbd>
+          <kbd style={{ fontSize: 9, padding: '2px 5px', borderRadius: 4, background: railHover, color: c.text, fontFamily: 'inherit' }}>⌘K</kbd>
       </button>
 
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, WebkitAppRegion: 'no-drag' as any, overflowY: 'auto' }}>
@@ -192,12 +195,12 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
             display: 'flex', alignItems: 'center', gap: 11,
             padding: '7px 11px', borderRadius: 9,
             background: 'transparent', border: 'none',
-            color: c.mutedSilver, fontSize: 11.5, fontWeight: 500,
+            color: c.textSub, fontSize: 11.5, fontWeight: 600,
             cursor: 'pointer', textAlign: 'left',
             WebkitAppRegion: 'no-drag' as any,
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = c.signalGold; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = c.mutedSilver; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = c.textSub; }}
         >
           <span style={{ fontSize: 14 }}>💡</span>
           Restart tour
@@ -210,13 +213,13 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
           display: 'flex', alignItems: 'center', gap: 11,
           padding: '9px 11px', borderRadius: 9,
           background: 'transparent', border: 'none',
-          color: c.mutedSilver, fontSize: 12.5, fontWeight: 500,
+          color: c.textSub, fontSize: 12.5, fontWeight: 600,
           cursor: 'pointer', textAlign: 'left',
           WebkitAppRegion: 'no-drag' as any,
           transition: 'color .15s ease, background .15s ease',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(140,180,255,0.06)'; e.currentTarget.style.color = c.textIce; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = c.mutedSilver; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = railHover; e.currentTarget.style.color = c.textIce; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = c.textSub; }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d={ICON.settings}/></svg>
         {t('nav.settings')}
