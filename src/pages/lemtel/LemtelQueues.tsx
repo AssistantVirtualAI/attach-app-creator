@@ -122,7 +122,7 @@ export default function LemtelQueues() {
                   </TableRow></TableHeader>
                   <TableBody>
                     {(queues as any[]).map((q: any) => (
-                      <TableRow key={q.id} className={selectedId === q.id ? 'bg-muted/50' : 'cursor-pointer'} onClick={() => setSelectedId(q.id)}>
+                      <TableRow key={q.id} className={selectedId === q.id ? 'bg-muted/50' : 'cursor-pointer'} onClick={() => openAgents(q.id)}>
                         <TableCell className="font-medium">{q.name}</TableCell>
                         <TableCell className="font-mono">{q.extension || '-'}</TableCell>
                         <TableCell><Badge variant="outline">{q.strategy}</Badge></TableCell>
@@ -131,7 +131,7 @@ export default function LemtelQueues() {
                         <TableCell>{q.enabled ? <Badge>Enabled</Badge> : <Badge variant="outline">Disabled</Badge>}</TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex gap-1.5 justify-end flex-wrap">
-                            <Button size="sm" variant="outline" onClick={() => setSelectedId(q.id)} title="Manage agents">
+                            <Button size="sm" variant="outline" onClick={() => openAgents(q.id)} title="Manage agents">
                               <Users className="w-3.5 h-3.5 mr-1" /> Agents
                             </Button>
                             {perms.canManage && <QueueDialog mode="edit" queue={q} trigger={
