@@ -6881,14 +6881,18 @@ export type Database = {
       }
       pbx_voicemail_greetings: {
         Row: {
+          attempts: number
           created_at: string
           duration_seconds: number | null
+          error_message: string | null
           extension: string | null
           id: string
           is_active: boolean
+          last_attempt_at: string | null
           name: string
           organization_id: string
           source: string
+          status: string
           storage_path: string
           text_script: string | null
           updated_at: string
@@ -6897,14 +6901,18 @@ export type Database = {
           voice_name: string | null
         }
         Insert: {
+          attempts?: number
           created_at?: string
           duration_seconds?: number | null
+          error_message?: string | null
           extension?: string | null
           id?: string
           is_active?: boolean
+          last_attempt_at?: string | null
           name: string
           organization_id: string
           source?: string
+          status?: string
           storage_path: string
           text_script?: string | null
           updated_at?: string
@@ -6913,14 +6921,18 @@ export type Database = {
           voice_name?: string | null
         }
         Update: {
+          attempts?: number
           created_at?: string
           duration_seconds?: number | null
+          error_message?: string | null
           extension?: string | null
           id?: string
           is_active?: boolean
+          last_attempt_at?: string | null
           name?: string
           organization_id?: string
           source?: string
+          status?: string
           storage_path?: string
           text_script?: string | null
           updated_at?: string
