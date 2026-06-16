@@ -98,8 +98,8 @@ export default function SyncStatusView() {
     <div style={{ padding: 24, maxWidth: 980, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: c.textIce }}>Sync & Diagnostics</h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: c.textMuted }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: c.text }}>Sync & Diagnostics</h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: c.textSub }}>
             Extension <strong>{extension || '—'}</strong>{orgId ? ` · org ${orgId.slice(0, 8)}` : ''}
           </p>
         </div>
@@ -107,8 +107,8 @@ export default function SyncStatusView() {
           onClick={runRetry}
           disabled={!orgId || running}
           style={{
-            padding: '10px 18px', borderRadius: 12, border: `1px solid ${c.border}`,
-            background: running ? c.surfaceMuted : 'linear-gradient(180deg, #0033ff, #001ea8)',
+            padding: '10px 18px', borderRadius: 12, border: `1px solid ${"rgba(180,196,224,0.55)"}`,
+            background: running ? "rgba(245,247,252,0.6)" : 'linear-gradient(180deg, #0033ff, #001ea8)',
             color: '#fff', fontWeight: 600, fontSize: 13, cursor: running ? 'wait' : 'pointer',
             opacity: !orgId ? 0.5 : 1,
           }}
@@ -124,10 +124,10 @@ export default function SyncStatusView() {
             const p = progress[a];
             const last = lastOkByAction[a];
             return (
-              <div key={a} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 10, background: c.surfaceMuted, border: `1px solid ${c.border}` }}>
+              <div key={a} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 10, background: "rgba(245,247,252,0.6)", border: `1px solid ${"rgba(180,196,224,0.55)"}` }}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: c.textIce }}>{SYNC_ACTION_LABELS[a]}</span>
-                  <span style={{ fontSize: 11, color: c.textMuted }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: c.text }}>{SYNC_ACTION_LABELS[a]}</span>
+                  <span style={{ fontSize: 11, color: c.textSub }}>
                     Last success: {last ? new Date(last.created_at).toLocaleString() : '—'}
                   </span>
                 </div>
@@ -141,17 +141,17 @@ export default function SyncStatusView() {
       {/* Recent failures */}
       <Card title="Recent sync alerts">
         {recentFailures.length === 0 ? (
-          <p style={{ margin: 0, fontSize: 13, color: c.textMuted }}>No recent failures recorded. 🎉</p>
+          <p style={{ margin: 0, fontSize: 13, color: c.textSub }}>No recent failures recorded. 🎉</p>
         ) : (
           <div style={{ display: 'grid', gap: 8 }}>
             {recentFailures.map((row) => (
               <div key={row.id} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 12 }}>
                   <strong style={{ color: '#ef4444' }}>{SYNC_ACTION_LABELS[row.job_type as SyncAction] || row.job_type}</strong>
-                  <span style={{ color: c.textMuted }}>{new Date(row.created_at).toLocaleString()}</span>
+                  <span style={{ color: c.textSub }}>{new Date(row.created_at).toLocaleString()}</span>
                 </div>
-                {row.last_error && <p style={{ margin: '4px 0 0', fontSize: 12, color: c.textIce, opacity: 0.85 }}>{row.last_error}</p>}
-                {row.metadata?.extension && <p style={{ margin: '2px 0 0', fontSize: 11, color: c.textMuted }}>ext {row.metadata.extension}</p>}
+                {row.last_error && <p style={{ margin: '4px 0 0', fontSize: 12, color: c.text, opacity: 0.85 }}>{row.last_error}</p>}
+                {row.metadata?.extension && <p style={{ margin: '2px 0 0', fontSize: 11, color: c.textSub }}>ext {row.metadata.extension}</p>}
               </div>
             ))}
           </div>
@@ -160,15 +160,15 @@ export default function SyncStatusView() {
 
       {/* Isolation diagnostics */}
       <Card title="Extension isolation diagnostics">
-        <p style={{ margin: '0 0 10px', fontSize: 12, color: c.textMuted }}>
+        <p style={{ margin: '0 0 10px', fontSize: 12, color: c.textSub }}>
           Confirms your session can only read CDRs, voicemails, and recordings tied to your own extension.
         </p>
         <button
           onClick={runIsolationCheck}
           disabled={isolationLoading}
           style={{
-            padding: '8px 14px', borderRadius: 10, border: `1px solid ${c.border}`,
-            background: c.surfaceMuted, color: c.textIce, fontSize: 12, fontWeight: 600,
+            padding: '8px 14px', borderRadius: 10, border: `1px solid ${"rgba(180,196,224,0.55)"}`,
+            background: "rgba(245,247,252,0.6)", color: c.text, fontSize: 12, fontWeight: 600,
             cursor: isolationLoading ? 'wait' : 'pointer',
           }}
         >
@@ -182,7 +182,7 @@ export default function SyncStatusView() {
         {isolation && (
           <div style={{ marginTop: 14, display: 'grid', gap: 8 }}>
             {isolation.has_extension === false ? (
-              <p style={{ margin: 0, fontSize: 13, color: c.textMuted }}>No extension is currently linked to your account.</p>
+              <p style={{ margin: 0, fontSize: 13, color: c.textSub }}>No extension is currently linked to your account.</p>
             ) : (
               <>
                 <Verdict ok={!!isolation.strict_isolation_ok} okText="Strict isolation verified — no cross-extension access detected." failText={`Cross-extension leak: ${isolation.other_extension_cdrs_visible} foreign CDR(s) visible.`} />
@@ -204,8 +204,8 @@ export default function SyncStatusView() {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section style={{ padding: 18, borderRadius: 16, background: c.surface, border: `1px solid ${c.border}`, boxShadow: '0 8px 24px -16px rgba(0,0,0,0.4)' }}>
-      <h2 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: c.textIce, textTransform: 'uppercase', letterSpacing: 1 }}>{title}</h2>
+    <section style={{ padding: 18, borderRadius: 16, background: c.deepPanel, border: `1px solid ${"rgba(180,196,224,0.55)"}`, boxShadow: '0 8px 24px -16px rgba(0,0,0,0.4)' }}>
+      <h2 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: c.text, textTransform: 'uppercase', letterSpacing: 1 }}>{title}</h2>
       {children}
     </section>
   );
@@ -213,7 +213,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 
 function StatusBadge({ progress }: { progress: SyncProgress }) {
   const map: Record<SyncProgress['state'], { bg: string; color: string; text: string }> = {
-    idle: { bg: c.surface, color: c.textMuted, text: 'Idle' },
+    idle: { bg: c.deepPanel, color: c.textSub, text: 'Idle' },
     running: { bg: 'rgba(0,82,204,0.15)', color: '#0033ff', text: 'Running…' },
     retrying: { bg: 'rgba(245,158,11,0.18)', color: '#b45309', text: `Retry ${progress.attempt ?? ''}` },
     success: { bg: 'rgba(16,185,129,0.18)', color: '#047857', text: 'Success' },
@@ -242,9 +242,9 @@ function Grid({ children }: { children: React.ReactNode }) {
 
 function Stat({ label, value, danger }: { label: string; value: string; danger?: boolean }) {
   return (
-    <div style={{ padding: 10, borderRadius: 10, background: c.surfaceMuted, border: `1px solid ${c.border}` }}>
-      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: c.textMuted }}>{label}</div>
-      <div style={{ marginTop: 4, fontSize: 16, fontWeight: 700, color: danger ? '#b91c1c' : c.textIce }}>{value}</div>
+    <div style={{ padding: 10, borderRadius: 10, background: "rgba(245,247,252,0.6)", border: `1px solid ${"rgba(180,196,224,0.55)"}` }}>
+      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, color: c.textSub }}>{label}</div>
+      <div style={{ marginTop: 4, fontSize: 16, fontWeight: 700, color: danger ? '#b91c1c' : c.text }}>{value}</div>
     </div>
   );
 }
