@@ -220,13 +220,13 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
           display: 'flex', alignItems: 'center', gap: 11,
           padding: '9px 11px', borderRadius: 9,
           background: 'transparent', border: 'none',
-          color: c.textSub, fontSize: 12.5, fontWeight: 600,
+          color: isDark ? darkTextSub : c.textSub, fontSize: 12.5, fontWeight: 600,
           cursor: 'pointer', textAlign: 'left',
           WebkitAppRegion: 'no-drag' as any,
           transition: 'color .15s ease, background .15s ease',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = railHover; e.currentTarget.style.color = c.textIce; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = c.textSub; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = isDark ? darkRailHover : railHover; e.currentTarget.style.color = isDark ? darkTextIce : c.textIce; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDark ? darkTextSub : c.textSub; }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d={ICON.settings}/></svg>
         {t('nav.settings')}
