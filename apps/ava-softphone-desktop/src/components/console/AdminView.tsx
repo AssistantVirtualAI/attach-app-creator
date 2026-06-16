@@ -232,7 +232,7 @@ function ExtensionsTable() {
             .maybeSingle();
           return dup || null;
         },
-        confirmConflict: (existing) => confirmExtConflict(existing),
+        confirmConflict: (existing) => confirmExtConflict(existing, ext || '(unnamed)'),
         openForEdit: async (existing) => {
           setCreating(null);
           await reload(false);
@@ -254,7 +254,7 @@ function ExtensionsTable() {
       }, `Extension ${ext} created and synced.`);
     } finally { setSaving(false); }
   };
-  void ext; // suppress unused-local lint for outer scope placeholder
+
 
   const cols = ['Ext', 'Display Name', 'User', 'Voicemail', 'Status', ''];
   return (
