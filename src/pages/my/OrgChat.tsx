@@ -8,11 +8,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Hash, Lock, Plus, Send, Paperclip, Smile, Trash2, MessageSquare, Users as UsersIcon } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Hash, Lock, Plus, Send, Paperclip, Smile, Trash2, MessageSquare, Users as UsersIcon, Phone, Pin, PinOff, AtSign } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ThreadPanel } from "@/components/chat/ThreadPanel";
 import { ChatSearchBar } from "@/components/chat/ChatSearchBar";
-import { useChannels, useChatMessages, useDirectory, useEnsureDmChannel, useChatHeartbeat, type Channel, type DirectoryMember } from "@/hooks/useOrgChat";
+import { useChannels, useChatMessages, useDirectory, useEnsureDmChannel, useChatHeartbeat, useUnreadCounts, useMarkRead, useTyping, useGroupChat, usePins, useChatCall, type Channel, type DirectoryMember } from "@/hooks/useOrgChat";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -34,6 +36,10 @@ export default function OrgChat() {
 
   const directoryQ = useDirectory();
   const ensureDm = useEnsureDmChannel();
+  const unreadQ = useUnreadCounts();
+  const unreadMap: Record<string, number> = {};
+  (unreadQ.data?.counts ?? []).forEach((c) => { unreadMap[c.channel_id] = Number(c.unread_count); });
+  const group = useGroupChat();
 
   useEffect(() => {
     if (!activeId && channels.length) setActiveId(channels[0].id);
@@ -51,6 +57,13 @@ export default function OrgChat() {
     }
   };
 
+  const createGroup = async (name: string, ids: string[]) => {
+    try {
+      const r: any = await group.mutateAsync({ name, member_ids: ids });
+      if (r?.channel?.id) { await channelsQ.refetch(); setActiveId(r.channel.id); toast.success(t("Group created", "Groupe créé")); }
+    } catch (e: any) { toast.error(e?.message); }
+  };
+
   return (
     <div className="h-[calc(100vh-4rem)] flex">
       <Sidebar
@@ -58,18 +71,18 @@ export default function OrgChat() {
         activeId={activeId}
         onSelect={setActiveId}
         loading={channelsQ.isLoading}
-        onCreate={async (name, type) => {
+        unread={unreadMap}
+        directory={directoryQ.data?.members ?? []}
+        onCreateChannel={async (name, type) => {
           const r = await create.mutateAsync({ name, channel_type: type });
-          if (r?.channel?.id) {
-            setActiveId(r.channel.id);
-            toast.success(t("Channel created", "Canal créé"));
-          }
+          if (r?.channel?.id) { setActiveId(r.channel.id); toast.success(t("Channel created", "Canal créé")); }
         }}
+        onCreateGroup={createGroup}
         t={t}
       />
       <div className="flex-1 flex flex-col bg-background min-w-0">
         {active ? (
-          <ChannelView channel={active} userId={user?.id ?? ""} t={t} />
+          <ChannelView channel={active} userId={user?.id ?? ""} userName={user?.email ?? null} directory={directoryQ.data?.members ?? []} t={t} />
         ) : (
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             {channelsQ.isLoading ? <Skeleton className="h-6 w-32" /> : t("Select a channel or a teammate", "Sélectionnez un canal ou un coéquipier")}
@@ -169,71 +182,151 @@ function DirectoryPanel({ members, loading, onOpenDm, t }: {
 }
 
 function Sidebar({
-  channels, activeId, onSelect, loading, onCreate, t,
+  channels, activeId, onSelect, loading, unread, directory, onCreateChannel, onCreateGroup, t,
 }: {
   channels: Channel[]; activeId: string | null; onSelect: (id: string) => void;
-  loading: boolean; onCreate: (name: string, type: "public" | "private") => Promise<void>;
+  loading: boolean;
+  unread: Record<string, number>;
+  directory: DirectoryMember[];
+  onCreateChannel: (name: string, type: "public" | "private") => Promise<void>;
+  onCreateGroup: (name: string, ids: string[]) => Promise<void>;
   t: (en: string, fr: string) => string;
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<"public" | "private">("public");
+  const [groupSel, setGroupSel] = useState<Set<string>>(new Set());
+  const [groupName, setGroupName] = useState("");
+
+  const dmChannels = channels.filter((c) => c.channel_type === "dm");
+  const groupChannels = channels.filter((c) => c.channel_type === "private" && c.members?.length > 2);
+  const named = channels.filter((c) => c.channel_type === "public" || (c.channel_type === "private" && (c.members?.length ?? 0) <= 2));
+
+  const dmLabel = (c: Channel) => {
+    const other = (c.members || []).find((id) => id !== (directory.find((d) => d.is_self)?.user_id));
+    return directory.find((d) => d.user_id === other)?.full_name || directory.find((d) => d.user_id === other)?.email || "Direct";
+  };
+
+  const Row = ({ c, label, icon }: { c: Channel; label: string; icon: React.ReactNode }) => (
+    <button
+      key={c.id}
+      onClick={() => onSelect(c.id)}
+      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent text-left ${c.id === activeId ? "bg-accent font-medium" : ""}`}
+    >
+      {icon}
+      <span className="truncate flex-1">{label}</span>
+      {unread[c.id] > 0 && c.id !== activeId && (
+        <Badge className="h-4 px-1.5 text-[10px]" variant="default">{unread[c.id]}</Badge>
+      )}
+    </button>
+  );
+
   return (
     <aside className="w-60 border-r bg-muted/30 flex flex-col">
       <div className="p-3 border-b flex items-center justify-between">
-        <h2 className="text-sm font-semibold">{t("Channels", "Canaux")}</h2>
+        <h2 className="text-sm font-semibold">{t("Team chat", "Discussion équipe")}</h2>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button size="icon" variant="ghost" className="h-7 w-7"><Plus className="h-4 w-4" /></Button>
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>{t("Create channel", "Créer un canal")}</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <div>
-                <Label>{t("Name", "Nom")}</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="general" />
-              </div>
-              <div>
-                <Label>{t("Type", "Type")}</Label>
-                <Select value={type} onValueChange={(v: any) => setType(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="public">{t("Public", "Public")}</SelectItem>
-                    <SelectItem value="private">{t("Private", "Privé")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={async () => { await onCreate(name, type); setOpen(false); setName(""); }} disabled={!name.trim()}>
-                {t("Create", "Créer")}
-              </Button>
-            </DialogFooter>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>{t("New conversation", "Nouvelle conversation")}</DialogTitle></DialogHeader>
+            <Tabs defaultValue="channel">
+              <TabsList className="grid grid-cols-2 w-full">
+                <TabsTrigger value="channel">{t("Channel", "Canal")}</TabsTrigger>
+                <TabsTrigger value="group">{t("Group", "Groupe")}</TabsTrigger>
+              </TabsList>
+              <TabsContent value="channel" className="space-y-3 pt-3">
+                <div>
+                  <Label>{t("Name", "Nom")}</Label>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="general" />
+                </div>
+                <div>
+                  <Label>{t("Type", "Type")}</Label>
+                  <Select value={type} onValueChange={(v: any) => setType(v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="public">{t("Public", "Public")}</SelectItem>
+                      <SelectItem value="private">{t("Private", "Privé")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <DialogFooter>
+                  <Button onClick={async () => { await onCreateChannel(name, type); setOpen(false); setName(""); }} disabled={!name.trim()}>
+                    {t("Create", "Créer")}
+                  </Button>
+                </DialogFooter>
+              </TabsContent>
+              <TabsContent value="group" className="space-y-3 pt-3">
+                <div>
+                  <Label>{t("Group name", "Nom du groupe")}</Label>
+                  <Input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder={t("Marketing crew", "Équipe marketing")} />
+                </div>
+                <div>
+                  <Label>{t("Members", "Membres")}</Label>
+                  <ScrollArea className="h-56 border rounded mt-1">
+                    <div className="p-2 space-y-1">
+                      {directory.filter((d) => !d.is_self).map((m) => (
+                        <label key={m.user_id} className="flex items-center gap-2 p-1 rounded hover:bg-accent cursor-pointer">
+                          <Checkbox checked={groupSel.has(m.user_id)} onCheckedChange={(v) => {
+                            const n = new Set(groupSel); v ? n.add(m.user_id) : n.delete(m.user_id); setGroupSel(n);
+                          }} />
+                          <span className="text-sm flex-1 truncate">{m.full_name || m.email}</span>
+                          {m.extension && <span className="text-[10px] text-muted-foreground">Ext {m.extension}</span>}
+                        </label>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={async () => {
+                      await onCreateGroup(groupName, Array.from(groupSel));
+                      setOpen(false); setGroupName(""); setGroupSel(new Set());
+                    }}
+                    disabled={!groupName.trim() || groupSel.size === 0}
+                  >{t("Create group", "Créer le groupe")}</Button>
+                </DialogFooter>
+              </TabsContent>
+            </Tabs>
           </DialogContent>
         </Dialog>
       </div>
       <ScrollArea className="flex-1">
-        <div className="p-2 space-y-0.5">
+        <div className="p-2 space-y-3">
           {loading && Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-7 w-full" />)}
-          {channels.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => onSelect(c.id)}
-              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-accent text-left ${
-                c.id === activeId ? "bg-accent font-medium" : ""
-              }`}
-            >
-              {c.channel_type === "private" ? <Lock className="h-3.5 w-3.5" /> : <Hash className="h-3.5 w-3.5" />}
-              <span className="truncate">{c.name}</span>
-            </button>
-          ))}
+
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 mb-1">{t("Channels", "Canaux")}</div>
+            <div className="space-y-0.5">
+              {named.map((c) => <Row key={c.id} c={c} label={c.name} icon={c.channel_type === "private" ? <Lock className="h-3.5 w-3.5" /> : <Hash className="h-3.5 w-3.5" />} />)}
+            </div>
+          </div>
+
+          {groupChannels.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 mb-1">{t("Groups", "Groupes")}</div>
+              <div className="space-y-0.5">
+                {groupChannels.map((c) => <Row key={c.id} c={c} label={c.name} icon={<UsersIcon className="h-3.5 w-3.5" />} />)}
+              </div>
+            </div>
+          )}
+
+          {dmChannels.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 mb-1">{t("Direct messages", "Messages directs")}</div>
+              <div className="space-y-0.5">
+                {dmChannels.map((c) => <Row key={c.id} c={c} label={dmLabel(c)} icon={<AtSign className="h-3.5 w-3.5" />} />)}
+              </div>
+            </div>
+          )}
         </div>
       </ScrollArea>
     </aside>
   );
 }
 
-function ChannelView({ channel, userId, t }: { channel: Channel; userId: string; t: (en: string, fr: string) => string }) {
+function ChannelView({ channel, userId, userName, directory, t }: { channel: Channel; userId: string; userName: string | null; directory: DirectoryMember[]; t: (en: string, fr: string) => string }) {
   const { messages, send, remove, react, uploadAttachment, getSignedUrl, query } = useChatMessages(channel.id);
   const [draft, setDraft] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -241,11 +334,33 @@ function ChannelView({ channel, userId, t }: { channel: Channel; userId: string;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  const markRead = useMarkRead();
+  const { typingUsers, sendTyping } = useTyping(channel.id, userName);
+  const { query: pinsQ, pin, unpin } = usePins(channel.id);
+  const call = useChatCall();
+
+  const isDm = channel.channel_type === "dm";
+  const isGroup = channel.channel_type === "private" && (channel.members?.length ?? 0) > 2;
+  const otherDmUserId = isDm ? (channel.members || []).find((id) => id !== userId) : null;
+  const otherDm = otherDmUserId ? directory.find((d) => d.user_id === otherDmUserId) : null;
+
+  const headerTitle = isDm
+    ? (otherDm?.full_name || otherDm?.email || "Direct message")
+    : channel.name;
+  const headerIcon = isDm ? <AtSign className="h-4 w-4" />
+    : isGroup ? <UsersIcon className="h-4 w-4" />
+    : channel.channel_type === "private" ? <Lock className="h-4 w-4" /> : <Hash className="h-4 w-4" />;
+
   useEffect(() => {
     requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
     });
   }, [messages.length]);
+
+  useEffect(() => {
+    if (messages.length) markRead.mutate(channel.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel.id, messages.length]);
 
   const handleSend = async () => {
     const content = draft.trim();
@@ -265,60 +380,95 @@ function ChannelView({ channel, userId, t }: { channel: Channel; userId: string;
     finally { setUploading(false); }
   };
 
+  const handleCall = () => {
+    if (isDm && otherDm?.extension) { call(otherDm.extension); return; }
+    if (isGroup) {
+      const exts = (channel.members || [])
+        .filter((id) => id !== userId)
+        .map((id) => directory.find((d) => d.user_id === id)?.extension)
+        .filter(Boolean) as string[];
+      if (exts.length === 0) return toast.error(t("No extensions for group members", "Aucune extension pour les membres"));
+      call(exts, { conferenceId: `chat-${channel.id}` });
+      send.mutate({ content: `📞 ${userName || "Someone"} ${t("started a group call. Join: ", "a démarré un appel de groupe. Rejoindre: ")} conf-${channel.id.slice(0,6)}` });
+    }
+  };
+
+  const canCall = (isDm && !!otherDm?.extension) || isGroup;
+  const pinnedMsgs = pinsQ.data?.messages ?? [];
+
   return (
     <>
       <div className="border-b px-4 py-2 flex items-center gap-2">
-        {channel.channel_type === "private" ? <Lock className="h-4 w-4" /> : <Hash className="h-4 w-4" />}
-        <h2 className="font-semibold">{channel.name}</h2>
-        {channel.description && <span className="text-sm text-muted-foreground hidden md:inline">— {channel.description}</span>}
+        {headerIcon}
+        <h2 className="font-semibold">{headerTitle}</h2>
+        {channel.description && !isDm && <span className="text-sm text-muted-foreground hidden md:inline">— {channel.description}</span>}
         <div className="ml-auto flex items-center gap-2">
-          <div className="w-56"><ChatSearchBar /></div>
-          <Badge variant="outline" className="text-xs">{channel.members?.length ?? 0} {t("members", "membres")}</Badge>
+          <div className="w-56 hidden lg:block"><ChatSearchBar /></div>
+          {!isDm && <Badge variant="outline" className="text-xs">{channel.members?.length ?? 0} {t("members", "membres")}</Badge>}
+          {canCall && (
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={handleCall}>
+              <Phone className="h-3.5 w-3.5" /> {isGroup ? t("Call group", "Appeler le groupe") : t("Call", "Appeler")}
+            </Button>
+          )}
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      {pinnedMsgs.length > 0 && (
+        <div className="border-b bg-muted/30 px-4 py-1.5 text-xs flex items-center gap-2 overflow-x-auto">
+          <Pin className="h-3 w-3 shrink-0" />
+          {pinnedMsgs.slice(0, 3).map((m: any) => (
+            <span key={m.id} className="truncate max-w-[240px] text-muted-foreground">
+              <strong className="text-foreground">{m.sender_name}:</strong> {m.content}
+            </span>
+          ))}
+        </div>
+      )}
 
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {query.isLoading && <Skeleton className="h-20 w-full" />}
         {!query.isLoading && messages.length === 0 && (
           <div className="text-center text-muted-foreground text-sm py-12">
             {t("No messages yet. Say hi 👋", "Aucun message. Lance la discussion 👋")}
           </div>
         )}
-        {messages.filter((m: any) => !m.parent_message_id).map((m) => (
-          <MessageBubble
-            key={m.id}
-            msg={m}
-            isOwn={m.sender_id === userId}
-            onDelete={() => remove.mutate(m.id)}
-            onReact={(emoji) => react.mutate({ id: m.id, emoji })}
-            onOpenThread={() => setThreadParent(m)}
-            getSignedUrl={getSignedUrl}
-            t={t}
-          />
-        ))}
+        {messages.filter((m: any) => !m.parent_message_id).map((m) => {
+          const isPinned = pinnedMsgs.some((p: any) => p.id === m.id);
+          return (
+            <MessageBubble
+              key={m.id}
+              msg={m}
+              isOwn={m.sender_id === userId}
+              isPinned={isPinned}
+              onDelete={() => remove.mutate(m.id)}
+              onReact={(emoji) => react.mutate({ id: m.id, emoji })}
+              onOpenThread={() => setThreadParent(m)}
+              onTogglePin={() => isPinned ? unpin.mutate(m.id) : pin.mutate(m.id)}
+              getSignedUrl={getSignedUrl}
+              t={t}
+            />
+          );
+        })}
       </div>
+
+      {typingUsers.length > 0 && (
+        <div className="px-4 py-1 text-xs text-muted-foreground italic">
+          {typingUsers.map((u) => u.name).join(", ")} {t("is typing…", "est en train d'écrire…")}
+        </div>
+      )}
+
       <ThreadPanel parent={threadParent} channelId={channel.id} onClose={() => setThreadParent(null)} />
 
-
       <div className="border-t p-3 flex items-end gap-2">
-        <Button
-          size="icon" variant="ghost" disabled={uploading}
-          onClick={() => fileRef.current?.click()}
-        >
+        <Button size="icon" variant="ghost" disabled={uploading} onClick={() => fileRef.current?.click()}>
           <Paperclip className="h-4 w-4" />
         </Button>
-        <input
-          ref={fileRef}
-          type="file"
-          className="hidden"
-          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-        />
+        <input ref={fileRef} type="file" className="hidden"
+          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
         <Input
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => { setDraft(e.target.value); if (e.target.value) sendTyping(userId); }}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-          placeholder={t(`Message #${channel.name}`, `Message #${channel.name}`)}
+          placeholder={t(`Message ${isDm ? "@" + headerTitle : "#" + channel.name}`, `Message ${isDm ? "@" + headerTitle : "#" + channel.name}`)}
         />
         <Button onClick={handleSend} disabled={!draft.trim() || send.isPending}>
           <Send className="h-4 w-4" />
@@ -329,11 +479,11 @@ function ChannelView({ channel, userId, t }: { channel: Channel; userId: string;
 }
 
 function MessageBubble({
-  msg, isOwn, onDelete, onReact, onOpenThread, getSignedUrl, t,
+  msg, isOwn, isPinned, onDelete, onReact, onOpenThread, onTogglePin, getSignedUrl, t,
 }: {
-  msg: any; isOwn: boolean;
+  msg: any; isOwn: boolean; isPinned?: boolean;
   onDelete: () => void; onReact: (emoji: string) => void;
-  onOpenThread?: () => void;
+  onOpenThread?: () => void; onTogglePin?: () => void;
   getSignedUrl: (p: string) => Promise<string>;
   t: (en: string, fr: string) => string;
 }) {
@@ -354,7 +504,7 @@ function MessageBubble({
   }
 
   return (
-    <div className="group flex gap-3">
+    <div className={`group flex gap-3 ${isPinned ? "bg-amber-500/5 -mx-2 px-2 py-1 rounded" : ""}`}>
       <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold shrink-0">
         {(msg.sender_name ?? "?").slice(0, 1).toUpperCase()}
       </div>
@@ -365,6 +515,7 @@ function MessageBubble({
             {format(new Date(msg.created_at), "p")}
             {msg.edited_at && <em className="ml-1">({t("edited", "modifié")})</em>}
           </span>
+          {isPinned && <Pin className="h-3 w-3 text-amber-500" />}
           <div className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1">
             {onOpenThread && (
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onOpenThread} title={t("Reply in thread", "Répondre en fil")}>
@@ -374,6 +525,11 @@ function MessageBubble({
             <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setShowEmoji((s) => !s)}>
               <Smile className="h-3 w-3" />
             </Button>
+            {onTogglePin && (
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onTogglePin} title={isPinned ? t("Unpin", "Détacher") : t("Pin", "Épingler")}>
+                {isPinned ? <PinOff className="h-3 w-3" /> : <Pin className="h-3 w-3" />}
+              </Button>
+            )}
             {isOwn && (
               <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onDelete}>
                 <Trash2 className="h-3 w-3" />

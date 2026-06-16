@@ -6,8 +6,10 @@ import { useTranslation } from '../../lib/i18n';
 const { colors: c } = theme;
 
 type Channel = { id: string; name: string; channel_type: string; organization_id: string; members: string[] | null; archived_at: string | null };
-type Message = { id: string; channel_id: string; sender_id: string; sender_name: string | null; content: string; created_at: string };
+type Message = { id: string; channel_id: string; sender_id: string; sender_name: string | null; content: string; created_at: string; reactions?: Record<string, string[]> | null; attachments?: any[] | null; message_type?: string; edited_at?: string | null };
 type Member = { user_id: string; display_name: string; extension: string | null; status: string; call_state: string | null };
+
+const EMOJIS = ['👍','❤️','😂','🎉','🚀','👀'];
 
 const STATUS_COLOR: Record<string, string> = {
   online: '#22d39a', available: '#22d39a',
@@ -31,7 +33,21 @@ export default function OrgChatView() {
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [showGroup, setShowGroup] = useState(false);
+  const [unread, setUnread] = useState<Record<string, number>>({});
+  const [typingNames, setTypingNames] = useState<string[]>([]);
+  const [emojiFor, setEmojiFor] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const typingChanRef = useRef<any>(null);
+  const lastTypingAt = useRef(0);
+
+  const loadUnread = async () => {
+    const { data } = await supabase.functions.invoke('org-chat', { body: { action: 'unread_counts' } });
+    const counts = (data as any)?.counts ?? [];
+    const m: Record<string, number> = {};
+    counts.forEach((r: any) => { m[r.channel_id] = Number(r.unread_count); });
+    setUnread(m);
+  };
 
   const loadChannels = async (org: string) => {
     const edge = await supabase.functions.invoke('org-chat', { body: { action: 'list_channels' } }).catch(() => ({ data: null, error: null } as any));
@@ -119,11 +135,22 @@ export default function OrgChatView() {
         const map: Record<string, string> = {};
         (r ?? []).forEach((x: any) => { map[x.channel_id] = x.last_read_at; });
         setReads(map);
+        await loadUnread();
       } catch (e: any) {
         setErrMsg(e?.message || 'Failed to load team chat.');
       }
     })();
   }, []);
+
+  // Unread polling + invalidation on new msgs
+  useEffect(() => {
+    if (!orgId) return;
+    const id = setInterval(loadUnread, 20000);
+    const ch = supabase.channel('chat-unread-watch')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'org_chat_messages' }, () => loadUnread())
+      .subscribe();
+    return () => { clearInterval(id); supabase.removeChannel(ch); };
+  }, [orgId]);
 
   // Realtime presence
   useEffect(() => {
@@ -140,9 +167,10 @@ export default function OrgChatView() {
   useEffect(() => {
     if (!activeId) return;
     let cancelled = false;
+    setTypingNames([]);
     (async () => {
       const { data } = await supabase.from('org_chat_messages')
-        .select('id,channel_id,sender_id,sender_name,content,created_at')
+        .select('id,channel_id,sender_id,sender_name,content,created_at,reactions,attachments,message_type,edited_at')
         .eq('channel_id', activeId).is('deleted_at', null)
         .order('created_at', { ascending: true }).limit(200);
       if (!cancelled) setMessages(data ?? []);
@@ -151,16 +179,33 @@ export default function OrgChatView() {
     const ch = supabase.channel(`chat:${activeId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'org_chat_messages', filter: `channel_id=eq.${activeId}` },
         (payload) => setMessages((m) => [...m, payload.new as Message]))
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'org_chat_messages', filter: `channel_id=eq.${activeId}` },
+        (payload) => setMessages((m) => m.map((x) => x.id === (payload.new as any).id ? (payload.new as Message) : x)))
       .subscribe();
-    return () => { cancelled = true; supabase.removeChannel(ch); };
-  }, [activeId]);
+
+    // typing broadcast channel
+    const typingCh = supabase.channel(`chat-typing-${activeId}`, { config: { broadcast: { self: false } } })
+      .on('broadcast', { event: 'typing' }, ({ payload }: any) => {
+        if (!payload?.name || payload?.user_id === me?.id) return;
+        setTypingNames((cur) => {
+          const next = Array.from(new Set([...cur, payload.name]));
+          setTimeout(() => setTypingNames((c) => c.filter((n) => n !== payload.name)), 3500);
+          return next;
+        });
+      })
+      .subscribe();
+    typingChanRef.current = typingCh;
+
+    return () => { cancelled = true; supabase.removeChannel(ch); supabase.removeChannel(typingCh); typingChanRef.current = null; };
+  }, [activeId, me?.id]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
     if (activeId && me) {
       const now = new Date().toISOString();
-      supabase.from('org_chat_reads').upsert({ user_id: me.id, channel_id: activeId, last_read_at: now }).then(() => {
+      supabase.functions.invoke('org-chat', { body: { action: 'mark_read', payload: { channel_id: activeId } } }).then(() => {
         setReads((r) => ({ ...r, [activeId]: now }));
+        setUnread((u) => ({ ...u, [activeId]: 0 }));
       });
     }
   }, [messages, activeId, me]);
@@ -173,6 +218,45 @@ export default function OrgChatView() {
       body: { action: 'send_message', payload: { channel_id: activeId, content: text } },
     });
     if (error || (data as any)?.error) setErrMsg(`Message error: ${((error as any)?.message || (data as any)?.error)}`);
+  };
+
+  const handleTyping = (v: string) => {
+    setInput(v);
+    if (!v || !me) return;
+    const now = Date.now();
+    if (now - lastTypingAt.current < 1500) return;
+    lastTypingAt.current = now;
+    typingChanRef.current?.send({ type: 'broadcast', event: 'typing', payload: { user_id: me.id, name: me.name } });
+  };
+
+  const toggleReaction = async (id: string, emoji: string) => {
+    await supabase.functions.invoke('org-chat', { body: { action: 'toggle_reaction', payload: { id, emoji } } });
+    setEmojiFor(null);
+  };
+
+  const uploadFile = async (file: File) => {
+    if (!activeId || file.size > 25 * 1024 * 1024) { setErrMsg('File too big (max 25MB)'); return; }
+    const up = await supabase.functions.invoke('org-chat', { body: { action: 'upload_url', payload: { filename: file.name } } });
+    const u = (up.data as any);
+    if (!u?.signedUrl) { setErrMsg('Upload init failed'); return; }
+    const r = await fetch(u.signedUrl, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file });
+    if (!r.ok) { setErrMsg('Upload failed'); return; }
+    await supabase.functions.invoke('org-chat', {
+      body: { action: 'send_message', payload: { channel_id: activeId, content: '', attachments: [{ path: u.path, name: file.name, mime: file.type, size: file.size }] } },
+    });
+  };
+
+  const signedUrlCache = useRef<Record<string, string>>({});
+  const getSigned = async (path: string): Promise<string> => {
+    if (signedUrlCache.current[path]) return signedUrlCache.current[path];
+    const { data } = await supabase.functions.invoke('org-chat', { body: { action: 'signed_url', payload: { path } } });
+    const url = (data as any)?.url || '';
+    if (url) signedUrlCache.current[path] = url;
+    return url;
+  };
+
+  const startCall = (to: string | string[]) => {
+    window.dispatchEvent(new CustomEvent('lemtel:start-call', { detail: { to } }));
   };
 
   const openDM = async (otherId: string, otherName: string) => {
@@ -213,8 +297,42 @@ export default function OrgChatView() {
     return members.find((m) => m.user_id === other)?.display_name || 'Direct message';
   };
 
-  const visibleChannels = channels.filter((c) => !isDmChannel(c));
+  const visibleChannels = channels.filter((c) => !isDmChannel(c) && !((c.members?.length ?? 0) > 2 && c.channel_type === 'private'));
+  const groupChannels = channels.filter((c) => c.channel_type === 'private' && (c.members?.length ?? 0) > 2);
+  const dmChannels = channels.filter((c) => isDmChannel(c));
   const activeChannel = channels.find((ch) => ch.id === activeId);
+  const isActiveDm = !!activeChannel && isDmChannel(activeChannel);
+  const isActiveGroup = !!activeChannel && activeChannel.channel_type === 'private' && (activeChannel.members?.length ?? 0) > 2;
+
+  const headerLabel = activeChannel
+    ? (isActiveDm ? '@ ' + dmNameFor(activeChannel)
+      : isActiveGroup ? '👥 ' + activeChannel.name
+      : (activeChannel.channel_type === 'private' ? '🔒 ' : '# ') + activeChannel.name)
+    : '—';
+
+  const otherDmUserId = isActiveDm ? (activeChannel?.members || []).find((id) => id !== me?.id) : null;
+  const otherDmMember = otherDmUserId ? members.find((m) => m.user_id === otherDmUserId) : null;
+  const groupExtensions = isActiveGroup ? (activeChannel?.members || []).filter((id) => id !== me?.id).map((id) => members.find((m) => m.user_id === id)?.extension).filter(Boolean) as string[] : [];
+  const canCall = (isActiveDm && !!otherDmMember?.extension) || (isActiveGroup && groupExtensions.length > 0);
+
+  const renderChannelRow = (ch: Channel, label: string, icon: string) => {
+    const active = ch.id === activeId;
+    const unreadN = unread[ch.id] || 0;
+    return (
+      <button key={ch.id} onClick={() => setActiveId(ch.id)} style={{
+        display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        padding: '7px 10px', marginBottom: 2, borderRadius: 8, border: 'none', cursor: 'pointer',
+        background: active ? 'rgba(122,76,255,0.18)' : 'transparent',
+        color: active ? c.textIce : c.mutedSilver,
+        fontSize: 12.5, fontWeight: active || unreadN > 0 ? 700 : 500, textAlign: 'left',
+      }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{icon} {label}</span>
+        {unreadN > 0 && !active && (
+          <span style={{ background: '#ff5a5f', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>{unreadN}</span>
+        )}
+      </button>
+    );
+  };
 
   return (
     <div style={{ display: 'flex', height: '100%' }}>
@@ -230,20 +348,21 @@ export default function OrgChatView() {
           }}>+ Group</button>
         </div>
         {visibleChannels.length === 0 && <div style={{ fontSize: 12, color: c.mutedSilver }}>{t('orgchat.noChannels')}</div>}
-        {visibleChannels.map((ch) => {
-          const active = ch.id === activeId;
-          return (
-            <button key={ch.id} onClick={() => setActiveId(ch.id)} style={{
-              display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between',
-              padding: '8px 10px', marginBottom: 2, borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: active ? 'rgba(122,76,255,0.18)' : 'transparent',
-              color: active ? c.textIce : c.mutedSilver,
-              fontSize: 12.5, fontWeight: active ? 700 : 500, textAlign: 'left',
-            }}>
-              <span>{ch.channel_type === 'private' ? '🔒' : '#'} {ch.name}</span>
-            </button>
-          );
-        })}
+        {visibleChannels.map((ch) => renderChannelRow(ch, ch.name, ch.channel_type === 'private' ? '🔒' : '#'))}
+
+        {groupChannels.length > 0 && (
+          <>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: c.signalGold, textTransform: 'uppercase', margin: '18px 0 8px' }}>Groups</div>
+            {groupChannels.map((ch) => renderChannelRow(ch, ch.name, '👥'))}
+          </>
+        )}
+
+        {dmChannels.length > 0 && (
+          <>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: c.signalGold, textTransform: 'uppercase', margin: '18px 0 8px' }}>Direct</div>
+            {dmChannels.map((ch) => renderChannelRow(ch, dmNameFor(ch), '@'))}
+          </>
+        )}
 
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: c.signalGold, textTransform: 'uppercase', margin: '18px 0 8px' }}>
           Team ({members.length})
@@ -269,9 +388,19 @@ export default function OrgChatView() {
       {/* Messages */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <header style={{ padding: '12px 18px', borderBottom: `1px solid ${c.border}`, display: 'flex', gap: 12, alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: 15, color: c.textIce }}>
-            {activeChannel ? (isDmChannel(activeChannel) ? '@ ' + dmNameFor(activeChannel) : (activeChannel.channel_type === 'private' ? '🔒 ' : '# ') + activeChannel.name) : '—'}
-          </h2>
+          <h2 style={{ margin: 0, fontSize: 15, color: c.textIce }}>{headerLabel}</h2>
+          {canCall && (
+            <button onClick={() => {
+              if (isActiveDm && otherDmMember?.extension) startCall(otherDmMember.extension);
+              else if (isActiveGroup) {
+                startCall(groupExtensions);
+                supabase.functions.invoke('org-chat', { body: { action: 'send_message', payload: { channel_id: activeId, content: `📞 ${me?.name} started a group call.` } } });
+              }
+            }} style={{
+              padding: '5px 12px', borderRadius: 8, border: `1px solid ${c.border}`,
+              background: 'rgba(34,211,154,0.15)', color: '#22d39a', cursor: 'pointer', fontSize: 11.5, fontWeight: 700,
+            }}>📞 {isActiveGroup ? 'Call group' : 'Call'}</button>
+          )}
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('orgchat.searchPlaceholder')}
             style={{ marginLeft: 'auto', padding: '6px 10px', borderRadius: 8, border: `1px solid ${c.border}`, background: 'rgba(140,180,255,0.06)', color: c.textIce, fontSize: 12, minWidth: 200 }} />
         </header>
@@ -283,20 +412,26 @@ export default function OrgChatView() {
             </div>
           )}
           {filtered.map((m) => (
-            <div key={m.id} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-                <strong style={{ color: c.textIce, fontSize: 12.5 }}>{m.sender_name ?? 'User'}</strong>
-                <span style={{ color: c.mutedSilver, fontSize: 10, fontFamily: 'JetBrains Mono, monospace' }}>
-                  {new Date(m.created_at).toLocaleString()}
-                </span>
-              </div>
-              <div style={{ color: c.textIce, fontSize: 13, lineHeight: 1.5, marginTop: 2, whiteSpace: 'pre-wrap' }}>{m.content}</div>
-            </div>
+            <MessageRow key={m.id} m={m} meId={me?.id} onReact={(e) => toggleReaction(m.id, e)}
+              emojiOpen={emojiFor === m.id} onToggleEmoji={() => setEmojiFor((p) => p === m.id ? null : m.id)}
+              getSigned={getSigned} />
           ))}
         </div>
 
+        {typingNames.length > 0 && (
+          <div style={{ padding: '4px 18px', fontSize: 11, color: c.mutedSilver, fontStyle: 'italic' }}>
+            {typingNames.join(', ')} {typingNames.length === 1 ? 'is' : 'are'} typing…
+          </div>
+        )}
+
         <div style={{ padding: 12, borderTop: `1px solid ${c.border}`, display: 'flex', gap: 8 }}>
-          <input value={input} onChange={(e) => setInput(e.target.value)}
+          <button onClick={() => fileRef.current?.click()} disabled={!activeId} title="Attach" style={{
+            padding: '8px 12px', borderRadius: 9, border: `1px solid ${c.border}`, background: 'transparent',
+            color: c.textIce, cursor: 'pointer', fontSize: 14,
+          }}>📎</button>
+          <input ref={fileRef} type="file" style={{ display: 'none' }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) { uploadFile(f); e.target.value = ''; } }} />
+          <input value={input} onChange={(e) => handleTyping(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
             placeholder={activeId ? t('orgchat.messagePlaceholder') : t('orgchat.selectChannel')} disabled={!activeId}
             style={{ flex: 1, padding: '10px 12px', borderRadius: 9, border: `1px solid ${c.border}`, background: 'rgba(140,180,255,0.06)', color: c.textIce, fontSize: 13 }} />
@@ -308,6 +443,7 @@ export default function OrgChatView() {
           }}>{t('common.send')}</button>
         </div>
       </div>
+
 
       {showGroup && me && (
         <NewGroupModal
@@ -352,6 +488,62 @@ function NewGroupModal({ members, onClose, onCreate }: { members: Member[]; onCl
           }}>Create</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function MessageRow({ m, meId, onReact, emojiOpen, onToggleEmoji, getSigned }: {
+  m: Message; meId?: string; onReact: (e: string) => void; emojiOpen: boolean; onToggleEmoji: () => void;
+  getSigned: (path: string) => Promise<string>;
+}) {
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    (m.attachments ?? []).forEach(async (a: any) => {
+      if (!urls[a.path]) { try { const u = await getSigned(a.path); setUrls((p) => ({ ...p, [a.path]: u })); } catch {} }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [m.id]);
+
+  if (m.message_type === 'deleted') return <div style={{ fontSize: 11, fontStyle: 'italic', color: c.mutedSilver, marginBottom: 12 }}>— message deleted</div>;
+
+  const reactions = m.reactions || {};
+  return (
+    <div style={{ marginBottom: 14, position: 'relative' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+        <strong style={{ color: c.textIce, fontSize: 12.5 }}>{m.sender_name ?? 'User'}</strong>
+        <span style={{ color: c.mutedSilver, fontSize: 10, fontFamily: 'JetBrains Mono, monospace' }}>
+          {new Date(m.created_at).toLocaleString()}{m.edited_at ? ' (edited)' : ''}
+        </span>
+        <button onClick={onToggleEmoji} title="React" style={{
+          marginLeft: 'auto', background: 'transparent', border: 'none', color: c.mutedSilver, cursor: 'pointer', fontSize: 13,
+        }}>😊</button>
+      </div>
+      {m.content && <div style={{ color: c.textIce, fontSize: 13, lineHeight: 1.5, marginTop: 2, whiteSpace: 'pre-wrap' }}>{m.content}</div>}
+      {(m.attachments ?? []).map((a: any) => (
+        <div key={a.path} style={{ marginTop: 6 }}>
+          {a.mime?.startsWith('image/') && urls[a.path]
+            ? <img src={urls[a.path]} alt={a.name} style={{ maxHeight: 240, borderRadius: 8, border: `1px solid ${c.border}` }} />
+            : <a href={urls[a.path]} target="_blank" rel="noreferrer" style={{ color: c.lemtelBlue, fontSize: 12 }}>📎 {a.name}</a>
+          }
+        </div>
+      ))}
+      {Object.keys(reactions).length > 0 && (
+        <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+          {Object.entries(reactions).map(([e, uids]) => (
+            <button key={e} onClick={() => onReact(e)} style={{
+              background: (uids as string[]).includes(meId || '') ? 'rgba(122,76,255,0.25)' : 'rgba(140,180,255,0.08)',
+              border: `1px solid ${c.border}`, color: c.textIce, fontSize: 11, padding: '1px 7px', borderRadius: 10, cursor: 'pointer',
+            }}>{e} {(uids as string[]).length}</button>
+          ))}
+        </div>
+      )}
+      {emojiOpen && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 6, padding: '4px 8px', background: c.deepPanel, border: `1px solid ${c.border}`, borderRadius: 8, width: 'fit-content' }}>
+          {EMOJIS.map((e) => (
+            <button key={e} onClick={() => onReact(e)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 16 }}>{e}</button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

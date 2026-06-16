@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -7,7 +7,7 @@ export type Channel = {
   organization_id: string;
   name: string;
   description: string | null;
-  channel_type: "public" | "private";
+  channel_type: "public" | "private" | "dm" | "announcement";
   members: string[];
   created_at: string;
 };
@@ -197,6 +197,109 @@ export function useChatHeartbeat() {
     const onVis = () => { if (document.visibilityState === "visible") beat(); };
     document.addEventListener("visibilitychange", onVis);
     return () => { mounted = false; clearInterval(id); document.removeEventListener("visibilitychange", onVis); };
+  }, []);
+}
+
+// ===== New: unread, typing, pins, group, calling =====
+
+export function useUnreadCounts() {
+  const qc = useQueryClient();
+  const query = useQuery<{ counts: Array<{ channel_id: string; unread_count: number; last_message_at: string }> }>({
+    queryKey: ["org-chat-unread"],
+    queryFn: () => invoke("unread_counts"),
+    refetchInterval: 20_000,
+  });
+  useEffect(() => {
+    const ch = supabase.channel("org-chat-unread-watch")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "org_chat_messages" }, () => {
+        qc.invalidateQueries({ queryKey: ["org-chat-unread"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [qc]);
+  return query;
+}
+
+export function useMarkRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (channel_id: string) => invoke("mark_read", { channel_id }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["org-chat-unread"] }),
+  });
+}
+
+export function useTyping(channelId: string | null, myName: string | null) {
+  const [typing, setTyping] = useState<Record<string, { name: string; at: number }>>({});
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  useEffect(() => {
+    if (!channelId) return;
+    const ch = supabase.channel(`chat-typing-${channelId}`, { config: { broadcast: { self: false } } })
+      .on("broadcast", { event: "typing" }, ({ payload }: any) => {
+        if (!payload?.user_id) return;
+        setTyping((p) => ({ ...p, [payload.user_id]: { name: payload.name || "Someone", at: Date.now() } }));
+      })
+      .subscribe();
+    channelRef.current = ch;
+    const sweep = setInterval(() => {
+      setTyping((p) => {
+        const now = Date.now();
+        const next: typeof p = {};
+        for (const k of Object.keys(p)) if (now - p[k].at < 4000) next[k] = p[k];
+        return next;
+      });
+    }, 1500);
+    return () => { clearInterval(sweep); supabase.removeChannel(ch); channelRef.current = null; };
+  }, [channelId]);
+
+  const lastSentRef = useRef(0);
+  const sendTyping = useCallback((userId: string) => {
+    const now = Date.now();
+    if (now - lastSentRef.current < 1500) return;
+    lastSentRef.current = now;
+    channelRef.current?.send({ type: "broadcast", event: "typing", payload: { user_id: userId, name: myName } });
+  }, [myName]);
+
+  return { typingUsers: Object.values(typing), sendTyping };
+}
+
+export function useGroupChat() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (p: { name: string; member_ids: string[] }) => invoke("create_group", p),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["org-chat-channels"] }),
+  });
+}
+
+export function usePins(channelId: string | null) {
+  const qc = useQueryClient();
+  const query = useQuery<{ pins: any[]; messages: any[] }>({
+    queryKey: ["org-chat-pins", channelId],
+    queryFn: () => invoke("list_pins", { channel_id: channelId }),
+    enabled: !!channelId,
+  });
+  useEffect(() => {
+    if (!channelId) return;
+    const ch = supabase.channel(`chat-pins-${channelId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "org_chat_message_pins", filter: `channel_id=eq.${channelId}` },
+        () => qc.invalidateQueries({ queryKey: ["org-chat-pins", channelId] }))
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [channelId, qc]);
+  const pin = useMutation({ mutationFn: (id: string) => invoke("pin_message", { id }) });
+  const unpin = useMutation({ mutationFn: (id: string) => invoke("unpin_message", { id }) });
+  return { query, pin, unpin };
+}
+
+/** Start a call via the softphone bridge (desktop emits the same event). */
+export function useChatCall() {
+  return useCallback((to: string | string[], opts?: { conferenceId?: string }) => {
+    const detail = { to, conferenceId: opts?.conferenceId };
+    window.dispatchEvent(new CustomEvent("lemtel:start-call", { detail }));
+    // also post to a softphone iframe if present
+    document.querySelectorAll('iframe[data-softphone="true"]').forEach((f: any) => {
+      try { f.contentWindow?.postMessage({ type: "lemtel:start-call", ...detail }, "*"); } catch {}
+    });
   }, []);
 }
 

@@ -2895,6 +2895,48 @@ export type Database = {
         }
         Relationships: []
       }
+      org_chat_message_pins: {
+        Row: {
+          channel_id: string
+          id: string
+          message_id: string
+          organization_id: string
+          pinned_at: string
+          pinned_by: string | null
+        }
+        Insert: {
+          channel_id: string
+          id?: string
+          message_id: string
+          organization_id: string
+          pinned_at?: string
+          pinned_by?: string | null
+        }
+        Update: {
+          channel_id?: string
+          id?: string
+          message_id?: string
+          organization_id?: string
+          pinned_at?: string
+          pinned_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_chat_message_pins_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "org_chat_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_chat_message_pins_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "org_chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_chat_messages: {
         Row: {
           attachments: Json
@@ -10206,6 +10248,28 @@ export type Database = {
         Args: { _org_id: string; _user_id: string }
         Returns: boolean
       }
+      create_group_chat: {
+        Args: { _member_ids: string[]; _name: string }
+        Returns: {
+          archived_at: string | null
+          channel_type: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          members: string[]
+          name: string
+          organization_id: string
+          pinned_messages: string[]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "org_chat_channels"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_organization_for_user: {
         Args: { _name: string; _slug: string }
         Returns: string
@@ -10234,6 +10298,14 @@ export type Database = {
           fusionpbx_domain_uuid: string
           id: string
           name: string
+        }[]
+      }
+      get_unread_counts: {
+        Args: never
+        Returns: {
+          channel_id: string
+          last_message_at: string
+          unread_count: number
         }[]
       }
       get_user_organization_ids: {
@@ -10309,12 +10381,14 @@ export type Database = {
         }
         Returns: string
       }
+      mark_channel_read: { Args: { _channel_id: string }; Returns: undefined }
       mark_voicemail_read: { Args: { _id: string }; Returns: undefined }
       my_app_access_allowed: { Args: never; Returns: boolean }
       my_platform_access_allowed: {
         Args: { _platform: string }
         Returns: boolean
       }
+      pin_chat_message: { Args: { _message_id: string }; Returns: undefined }
       reconcile_pbx_call_records: { Args: { _org_id: string }; Returns: Json }
       relink_my_softphone_user: { Args: never; Returns: Json }
       resolve_org_by_domain_name: {
@@ -10358,6 +10432,7 @@ export type Database = {
         Args: { _paused: boolean; _queue_id: string }
         Returns: undefined
       }
+      unpin_chat_message: { Args: { _message_id: string }; Returns: undefined }
       update_platform_seen: { Args: { p_platform: string }; Returns: undefined }
       upsert_user_presence: {
         Args: {
