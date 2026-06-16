@@ -79,6 +79,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
   const [shake, setShake] = useState(false);
   const [relinking, setRelinking] = useState(false);
   const [showInsights, setShowInsights] = useState(true);
+  const [showCredInspector, setShowCredInspector] = useState(false);
 
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
 
