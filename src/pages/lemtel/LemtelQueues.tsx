@@ -1373,6 +1373,99 @@ function BulkAddBtn({ queueId, queueName, extensions, supCount, agCount, onAdd }
   );
 }
 
+function QuickAddBtn({ queueName, extensions, onAdd }: { queueName: string; extensions: any[]; onAdd: (id: string, role: 'agent' | 'supervisor') => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [role, setRole] = useState<'agent' | 'supervisor'>('agent');
+  const [selId, setSelId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return extensions;
+    return extensions.filter((e) =>
+      (e.extension || '').toLowerCase().includes(q)
+      || extName(e).toLowerCase().includes(q));
+  }, [extensions, query]);
+
+  const reset = () => { setQuery(''); setRole('agent'); setSelId(null); setSaving(false); };
+  const handleClose = (v: boolean) => { setOpen(v); if (!v) reset(); };
+
+  const doAdd = async () => {
+    if (!selId) return;
+    setSaving(true);
+    try { await onAdd(selId, role); } finally { setSaving(false); }
+    setOpen(false);
+    reset();
+  };
+
+  const selectedExt = extensions.find((e) => e.id === selId);
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline"><Plus className="w-4 h-4 mr-1" /> Quick add</Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Quick add to {queueName}</DialogTitle>
+          <DialogDescription>Select one extension and a role to add instantly.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Select value={role} onValueChange={(v: any) => setRole(v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="agent">Agent (tier 2)</SelectItem>
+              <SelectItem value="supervisor">Supervisor (tier 1)</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input placeholder="Search extension or name…" value={query} onChange={(e) => { setQuery(e.target.value); setSelId(null); }} className="pl-8" />
+          </div>
+          <div className="border rounded-md max-h-[240px] overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No available extensions.</p>
+            ) : (
+              <div className="divide-y">
+                {filtered.map((e) => (
+                  <button
+                    key={e.id}
+                    type="button"
+                    onClick={() => setSelId(e.id)}
+                    className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-muted/50 focus:outline-none focus:bg-muted/50 ${selId === e.id ? 'bg-muted' : ''}`}
+                  >
+                    <span>
+                      <span className="font-mono text-xs text-muted-foreground mr-2">{e.extension}</span>
+                      {extName(e) || '—'}
+                    </span>
+                    {selId === e.id && <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {selectedExt && (
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs flex items-center gap-2">
+              <span className="font-medium">Adding:</span>
+              <span>{extName(selectedExt)} <span className="font-mono text-muted-foreground">· {selectedExt.extension}</span></span>
+              <Badge variant={role === 'supervisor' ? 'default' : 'secondary'} className="text-[10px] ml-auto">
+                {role === 'supervisor' ? <Shield className="w-3 h-3 mr-1" /> : <Users className="w-3 h-3 mr-1" />}{role}
+              </Badge>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+          <Button disabled={!selId || saving} onClick={doAdd}>
+            {saving && <Loader2 className="w-4 h-4 mr-1 animate-spin" />}Add
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ---------- Live stats ----------
 function LiveStatsPanel({ queues }: { queues: any[] }) {
   const [stats, setStats] = useState<any[]>([]);
