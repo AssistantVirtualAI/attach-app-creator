@@ -406,9 +406,29 @@ function QueueDialog({ mode, queue, trigger }: { mode: 'create' | 'edit'; queue?
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Announce sound</Label><Input value={form.queue_announce_sound} onChange={(e) => setForm({ ...form, queue_announce_sound: e.target.value })} placeholder="path/to/sound.wav" /></div>
               <div><Label>Announce frequency (sec)</Label><Input type="number" value={form.queue_announce_frequency} onChange={(e) => setForm({ ...form, queue_announce_frequency: e.target.value })} /></div>
-              <div className="flex items-center gap-2"><Switch checked={!!form.queue_record_template} onCheckedChange={(v) => setForm({ ...form, queue_record_template: v ? '${strftime(%Y)}/${strftime(%b)}/${strftime(%d)}/${uuid}.${record_ext}' : '' })} /><Label>Record calls</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={!!form.queue_record_template} onCheckedChange={(v) => setForm({ ...form, queue_record_template: v ? '${strftime(%Y)}/${strftime(%b)}/${strftime(%d)}/${uuid}.${record_ext}' : '' })} /><Label>Record calls on PBX</Label></div>
               <div className="flex items-center gap-2"><Switch checked={form.queue_abandoned_resume_allowed} onCheckedChange={(v) => setForm({ ...form, queue_abandoned_resume_allowed: v })} /><Label>Allow resume after abandon</Label></div>
-              <div className="flex items-center gap-2"><Switch checked={form.queue_enabled} onCheckedChange={(v) => setForm({ ...form, queue_enabled: v })} /><Label>Enabled</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={form.queue_enabled} onCheckedChange={(v) => setForm({ ...form, queue_enabled: v })} /><Label>Queue enabled</Label></div>
+            </div>
+
+            <div className="mt-4 p-3 rounded-md border bg-muted/30">
+              <div className="text-xs font-semibold mb-2">Queue recording rule</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-2"><Switch checked={recRule.enabled} onCheckedChange={(v) => setRecRule({ ...recRule, enabled: v })} /><Label>Enable recording for this queue</Label></div>
+                <div>
+                  <Label>Mode</Label>
+                  <Select value={recRule.mode} onValueChange={(v: any) => setRecRule({ ...recRule, mode: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All calls</SelectItem>
+                      <SelectItem value="inbound">Inbound only</SelectItem>
+                      <SelectItem value="outbound">Outbound only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2"><Switch checked={recRule.announce} onCheckedChange={(v) => setRecRule({ ...recRule, announce: v })} /><Label>Announce recording</Label></div>
+                <div><Label>Retention (days)</Label><Input type="number" value={recRule.retention_days} onChange={(e) => setRecRule({ ...recRule, retention_days: Number(e.target.value) || 90 })} /></div>
+              </div>
             </div>
           </div>
         </div>
