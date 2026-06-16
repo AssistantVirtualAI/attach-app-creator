@@ -11,11 +11,17 @@ import { supabase } from '../lib/supabaseClient';
  * Backoff schedule (default): 1s, 2s, 4s, 8s, 16s — total 4 retries.
  */
 
-type SyncAction = 'sync-cdrs' | 'sync-voicemail-messages' | 'list-recordings';
+export type SyncAction = 'sync-cdrs' | 'sync-voicemail-messages' | 'list-recordings';
+
+export const SYNC_ACTION_LABELS: Record<SyncAction, string> = {
+  'sync-cdrs': 'Call records (CDRs)',
+  'sync-voicemail-messages': 'Voicemails',
+  'list-recordings': 'Recordings',
+};
 
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000];
 
-async function withRetry<T>(label: SyncAction, fn: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+async function withRetry<T>(label: SyncAction, fn: () => Promise<T>, onAttempt?: (attempt: number) => void): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
   let lastErr = '';
   for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
     try {
