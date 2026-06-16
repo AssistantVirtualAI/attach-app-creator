@@ -244,6 +244,17 @@ class JsSipProvider {
   private config: SoftphoneConfig | null = null;
   private listeners = new Set<Listener>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  // Keep-alive + silent reconnect bookkeeping
+  private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
+  private statusGraceTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastStableStatus: SipStatus = 'idle';
+  private windowListenersBound = false;
+  private onOnline = () => this.kickReconnect('network online');
+  private onVisible = () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      this.kickReconnect('tab visible');
+    }
+  };
   private snap: SoftphoneSnapshot = {
     status: 'idle',
     callState: 'idle',
@@ -296,6 +307,81 @@ class JsSipProvider {
   private update(patch: Partial<SoftphoneSnapshot>) {
     this.snap = { ...this.snap, ...patch };
     this.listeners.forEach((l) => l(this.snap));
+  }
+
+  /**
+   * Silent-reconnect-aware status setter. If we already reached a healthy
+   * state (registered/connected) and we briefly drop into connecting/
+   * disconnected, defer the public emission so quick recoveries never flash
+   * a "reconnecting…" banner in the UI. Healthy/error transitions emit
+   * immediately and cancel any pending grace.
+   */
+  private setStatus(next: SipStatus, errorCause?: string) {
+    const healthy = next === 'registered' || next === 'connected';
+    const wasHealthy = this.lastStableStatus === 'registered' || this.lastStableStatus === 'connected';
+
+    if (healthy || next === 'error') {
+      if (this.statusGraceTimer) { clearTimeout(this.statusGraceTimer); this.statusGraceTimer = null; }
+      this.lastStableStatus = next;
+      this.update({ status: next, errorCause: healthy ? undefined : errorCause });
+      return;
+    }
+
+    if (wasHealthy) {
+      if (this.statusGraceTimer) clearTimeout(this.statusGraceTimer);
+      this.statusGraceTimer = setTimeout(() => {
+        this.statusGraceTimer = null;
+        this.lastStableStatus = next;
+        this.update({ status: next, errorCause });
+      }, 3500);
+      return;
+    }
+
+    this.lastStableStatus = next;
+    this.update({ status: next, errorCause });
+  }
+
+  private bindWindowListeners() {
+    if (this.windowListenersBound || typeof window === 'undefined') return;
+    this.windowListenersBound = true;
+    window.addEventListener('online', this.onOnline);
+    document.addEventListener('visibilitychange', this.onVisible);
+  }
+  private unbindWindowListeners() {
+    if (!this.windowListenersBound || typeof window === 'undefined') return;
+    this.windowListenersBound = false;
+    window.removeEventListener('online', this.onOnline);
+    document.removeEventListener('visibilitychange', this.onVisible);
+  }
+
+  private kickReconnect(why: string) {
+    if (!this.ua) return;
+    try {
+      const connected = this.ua.isConnected?.() ?? false;
+      const registered = this.ua.isRegistered?.() ?? false;
+      if (connected) {
+        if (!registered) {
+          this.logEvent('info', `Keep-alive: re-register (${why})`);
+          try { this.ua.register(); } catch { /* noop */ }
+        }
+        return;
+      }
+    } catch { /* noop */ }
+    this.logEvent('info', `Keep-alive: forcing reconnect (${why})`);
+    try { this.ua.start(); } catch { /* noop */ }
+  }
+
+  private startKeepAlive() {
+    if (this.keepAliveTimer) clearInterval(this.keepAliveTimer);
+    this.keepAliveTimer = setInterval(() => {
+      if (!this.ua) return;
+      try {
+        const connected = this.ua.isConnected?.() ?? false;
+        const registered = this.ua.isRegistered?.() ?? false;
+        if (!connected) this.kickReconnect('heartbeat: socket down');
+        else if (!registered) this.kickReconnect('heartbeat: not registered');
+      } catch { /* noop */ }
+    }, 25_000);
   }
 
   private logEvent(level: SipEvent['level'], message: string) {
