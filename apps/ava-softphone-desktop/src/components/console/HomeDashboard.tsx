@@ -367,7 +367,7 @@ export default function HomeDashboard({
           <span style={{ flex: 1 }}>Could not load stats: {stats.error}</span>
           <button onClick={() => stats.refresh()} className="ava-range-btn" style={{
             padding: '6px 12px', borderRadius: 8, border: `1px solid ${tones.red.ring}`,
-            background: '#fff', color: c.danger, fontWeight: 700, fontSize: 12, cursor: 'pointer',
+            background: c.bgCard, color: c.danger, fontWeight: 700, fontSize: 12, cursor: 'pointer',
           }}>Retry</button>
         </div>
       )}
