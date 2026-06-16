@@ -184,7 +184,7 @@ export default function PbxResourceSection({
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
               <thead>
-                <tr style={{ background: 'rgba(255,255,255,0.025)' }}>
+                <tr style={{ background: c.bgElev }}>
                   {cols.map((col) => (
                     <th key={col.key} style={{ textAlign: 'left', padding: '12px 14px', color: c.mutedSilver, fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', borderBottom: `1px solid ${c.border}` }}>{col.label}</th>
                   ))}
