@@ -175,9 +175,33 @@ function ExtensionsTable() {
   };
 
   const createExtension = async (form: any) => {
+    if (!isAdmin) { toast.error('Admin role required to create extensions.'); return; }
     setSaving(true);
     try {
       const scope = await resolveDesktopTenantScope();
+      // Duplicate / conflict pre-check: existing extension with same number?
+      const ext = String(form.extension || '').trim();
+      if (ext) {
+        const { data: dup } = await supabase
+          .from('pbx_extensions')
+          .select('id, extension, enabled')
+          .eq('organization_id', scope.organization_id)
+          .eq('extension', ext)
+          .maybeSingle();
+        if (dup) {
+          const choice = window.confirm(
+            `Extension ${ext} already exists on this PBX.\n\nClick OK to OPEN the existing record for editing instead, or Cancel to abort.`,
+          );
+          setSaving(false);
+          if (choice) {
+            setCreating(false);
+            await reload(false);
+            const match = data.find((r) => String(r.extension) === ext);
+            if (match) setEditing(match);
+          }
+          return;
+        }
+      }
       const out: any = { ...form };
       ['voicemail_enabled', 'enabled', 'voicemail_attach_file',
        'voicemail_local_after_email', 'do_not_disturb',
@@ -190,8 +214,9 @@ function ExtensionsTable() {
       setCreating(false);
       await reload(true);
       window.dispatchEvent(new Event('ava:pbx-resource-saved'));
+      toast.success(`Extension ${ext} created and synced.`);
     } catch (e: any) {
-      alert('Create failed: ' + (e?.message || 'unknown'));
+      toast.error('Create failed: ' + (e?.message || 'unknown'));
     } finally { setSaving(false); }
   };
 
