@@ -856,6 +856,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
           canAssign={perms.canAssign}
           onRemoveOne={removeAgent}
           onBulkRemove={bulkRemove}
+          onEditOne={updateAgent}
           txt={txt}
         />
       )}
