@@ -27,31 +27,31 @@ export interface ThemeTokens {
   shadow: string;
 }
 
-/* Light (default) — clean, airy, high‑clarity */
+/* Medium light — frosted graphite with cyan/blue/gold accents */
 const light: ThemeTokens = {
   mode: 'light',
-  bg: '#f6f8fc',
+  bg: '#e9eef7',
   bgGradient:
-    'radial-gradient(1200px 700px at 8% -10%, rgba(0,35,230,0.06), transparent 60%), radial-gradient(900px 600px at 110% 110%, rgba(102,128,255,0.05), transparent 55%), #f6f8fc',
+    'radial-gradient(1200px 700px at 8% -10%, rgba(0,35,230,0.10), transparent 60%), radial-gradient(900px 600px at 110% 110%, rgba(8,145,178,0.10), transparent 55%), linear-gradient(180deg, #eef2fa 0%, #dde4f1 100%)',
   surface: '#ffffff',
-  surfaceElev: '#ffffff',
-  surfaceHover: '#eef2f9',
-  border: '#e3e8f1',
-  borderStrong: '#c9d2e3',
-  text: '#0f172a',
-  textMuted: '#475569',
-  textSubtle: '#94a3b8',
+  surfaceElev: '#f5f7fc',
+  surfaceHover: '#e6ecf6',
+  border: '#cdd6e6',
+  borderStrong: '#a9b6cf',
+  text: '#0b1530',
+  textMuted: '#3b4a6b',
+  textSubtle: '#7d8aa6',
   accent: '#0023e6',
-  accentSoft: '#e6ebff',
-  accentGradient: 'linear-gradient(135deg, #0023e6 0%, #6680ff 100%)',
-  accentGlow: '0 8px 24px -12px rgba(0,35,230,0.35)',
-  success: '#16a34a',
+  accentSoft: '#dde4ff',
+  accentGradient: 'linear-gradient(135deg, #0023e6 0%, #4d6dff 60%, #21d4fd 100%)',
+  accentGlow: '0 10px 30px -12px rgba(0,35,230,0.45)',
+  success: '#0f9d58',
   danger: '#dc2626',
   warning: '#d97706',
-  ringGlow: '0 0 0 3px rgba(0,35,230,0.18)',
-  glass: '#ffffff',
-  glassBorder: '#e3e8f1',
-  shadow: '0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -12px rgba(15,23,42,0.10)',
+  ringGlow: '0 0 0 3px rgba(0,35,230,0.22)',
+  glass: 'rgba(255,255,255,0.78)',
+  glassBorder: 'rgba(180,196,224,0.55)',
+  shadow: '0 1px 2px rgba(11,21,48,0.06), 0 10px 28px -12px rgba(11,21,48,0.18)',
 };
 
 /* Soft dark — re-tuned, less pitch-black */
