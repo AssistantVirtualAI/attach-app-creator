@@ -178,6 +178,32 @@ Deno.serve(async (req) => {
         }
       }
     }
+    if (!permitted && isRead) {
+      // Fallback for read-only sync actions: any authenticated member of the
+      // target organization (including plain extension users) may pull their
+      // own org's CDRs / voicemails / recordings.
+      const targetOrg = _bodyEarly?.organization_id;
+      if (targetOrg) {
+        const { data: spu } = await admin
+          .from("pbx_softphone_users")
+          .select("id")
+          .eq("portal_user_id", userId)
+          .eq("organization_id", targetOrg)
+          .limit(1)
+          .maybeSingle();
+        if (spu?.id) permitted = true;
+        if (!permitted) {
+          const { data: mem } = await admin
+            .from("organization_members")
+            .select("organization_id")
+            .eq("user_id", userId)
+            .eq("organization_id", targetOrg)
+            .limit(1)
+            .maybeSingle();
+          if (mem?.organization_id) permitted = true;
+        }
+      }
+    }
     if (!permitted) {
       return json({ error: "Forbidden", action: _earlyAction, required: rpcName }, 403);
     }
