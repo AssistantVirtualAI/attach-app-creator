@@ -93,6 +93,9 @@ export default function PbxResourceSection({
   const [orgId, setOrgId] = useState<string>(LEMTEL_ORG);
   const [domainUuid, setDomainUuid] = useState<string | null>(LEMTEL_DOMAIN);
   const [search, setSearch] = useState('');
+  const [conflictState, setConflictState] = useState<{
+    record: any; baseline: any; latest: any; conflicts: ConflictField[];
+  } | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true); setError(null);
