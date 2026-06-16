@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Send, Loader2, X, MessageCircle, Trash2 } from "lucide-react";
+import { Sparkles, Send, Loader2, X, MessageCircle, Trash2, Zap, ZapOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -37,6 +37,28 @@ function usePageContext(): PageContext {
   }, [loc.pathname, loc.search]);
 }
 
+const AUTO_ANSWER_KEY = "ava.autoAnswerOnDetail";
+
+export function useAutoAnswerSetting(): [boolean, (v: boolean) => void] {
+  const [on, setOn] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(AUTO_ANSWER_KEY) === "1";
+  });
+  const update = (v: boolean) => {
+    setOn(v);
+    try { window.localStorage.setItem(AUTO_ANSWER_KEY, v ? "1" : "0"); } catch {}
+  };
+  return [on, update];
+}
+
+function autoPromptFor(ctx: PageContext): string | null {
+  if (ctx.voicemail_id) return "Auto-brief me on this voicemail: caller, key points, urgency, and suggested reply.";
+  if (ctx.call_id) return "Auto-brief me on this call: summary, sentiment, and action items.";
+  if (ctx.recording_id) return "Auto-brief me on this recording: summary and key topics.";
+  return null;
+}
+
+
 
 const SUGGESTIONS = [
   "Summarize my calls today",
@@ -45,12 +67,23 @@ const SUGGESTIONS = [
   "Analyze my recent call sentiment",
 ];
 
-export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; onClose?: () => void }) {
+export function MyAIChat({
+  embedded = false,
+  onClose,
+  initialPrompt,
+  onPromptConsumed,
+}: {
+  embedded?: boolean;
+  onClose?: () => void;
+  initialPrompt?: string | null;
+  onPromptConsumed?: () => void;
+}) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pageContext = usePageContext();
+  const [autoAnswer, setAutoAnswer] = useAutoAnswerSetting();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -95,6 +128,16 @@ export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; on
     } finally { setLoading(false); }
   }, [input, loading, messages, pageContext]);
 
+  // Auto-send a one-shot prompt requested by the launcher (e.g. on auto-answer open)
+  const consumedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!initialPrompt) return;
+    if (consumedRef.current === initialPrompt) return;
+    consumedRef.current = initialPrompt;
+    send(initialPrompt);
+    onPromptConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPrompt]);
 
   return (
     <Card className={cn("flex flex-col bg-background/95 backdrop-blur", embedded ? "h-[600px]" : "h-full")}>
@@ -104,6 +147,18 @@ export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; on
           <span className="font-semibold text-sm">AVA Assistant</span>
         </div>
         <div className="flex items-center gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={() => {
+              setAutoAnswer(!autoAnswer);
+              toast.success(autoAnswer ? "Auto-answer off" : "Auto-answer on — I'll brief detail pages automatically");
+            }}
+            title={autoAnswer ? "Auto-answer on (click to disable)" : "Auto-answer off (click to enable)"}
+          >
+            {autoAnswer ? <Zap className="h-3.5 w-3.5 text-primary" /> : <ZapOff className="h-3.5 w-3.5" />}
+          </Button>
           {messages.length > 0 && (
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setMessages([])} title="Clear">
               <Trash2 className="h-3.5 w-3.5" />
@@ -176,6 +231,24 @@ export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; on
 
 export function MyAIChatLauncher() {
   const [open, setOpen] = useState(false);
+  const [initialPrompt, setInitialPrompt] = useState<string | null>(null);
+  const [autoAnswer] = useAutoAnswerSetting();
+  const pageContext = usePageContext();
+  const lastHandledRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!autoAnswer) return;
+    const id = pageContext.voicemail_id || pageContext.call_id || pageContext.recording_id;
+    if (!id) return;
+    const key = `${pageContext.page}:${id}`;
+    if (lastHandledRef.current === key) return;
+    const prompt = autoPromptFor(pageContext);
+    if (!prompt) return;
+    lastHandledRef.current = key;
+    setInitialPrompt(prompt);
+    setOpen(true);
+  }, [autoAnswer, pageContext]);
+
   return (
     <>
       <Button
@@ -185,10 +258,15 @@ export function MyAIChatLauncher() {
         aria-label="Open AVA assistant"
       >
         <Sparkles className="h-6 w-6" />
+        {autoAnswer && <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 border-2 border-background" />}
       </Button>
       {open && (
         <div className="fixed bottom-24 right-5 z-50 w-[380px] max-w-[calc(100vw-2.5rem)] h-[560px] max-h-[calc(100vh-8rem)] shadow-2xl rounded-lg overflow-hidden">
-          <MyAIChat onClose={() => setOpen(false)} />
+          <MyAIChat
+            onClose={() => setOpen(false)}
+            initialPrompt={initialPrompt}
+            onPromptConsumed={() => setInitialPrompt(null)}
+          />
         </div>
       )}
     </>
