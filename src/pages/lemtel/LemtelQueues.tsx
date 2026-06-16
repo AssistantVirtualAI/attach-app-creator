@@ -320,6 +320,20 @@ function QueueDialog({ mode, queue, trigger }: { mode: 'create' | 'edit'; queue?
       });
       if (error) throw error;
       if (data?.ok === false) throw new Error(data?.message || 'FusionPBX error');
+      // Persist queue-level recording rule (works for both create + edit)
+      try {
+        let qid = queue?.id;
+        if (!qid && form.queue_name) {
+          const { data: qrow } = await supabase.from('pbx_call_queues').select('id').eq('organization_id', LEMTEL_ORG).eq('name', form.queue_name).maybeSingle();
+          qid = qrow?.id;
+        }
+        if (qid) {
+          await supabase.from('pbx_queue_recording_rules' as any).upsert({
+            organization_id: LEMTEL_ORG, queue_id: qid,
+            enabled: recRule.enabled, mode: recRule.mode, announce: recRule.announce, retention_days: recRule.retention_days,
+          }, { onConflict: 'queue_id' });
+        }
+      } catch (rrErr) { console.warn('recording rule save failed', rrErr); }
       toast({ title: mode === 'create' ? 'Queue created' : 'Queue updated' });
       await supabase.functions.invoke('fusionpbx-proxy', { body: { organization_id: LEMTEL_ORG, action: 'sync-all', params: { resources: ['queues'] } } });
       qc.invalidateQueries({ queryKey: ['pbx'] });
