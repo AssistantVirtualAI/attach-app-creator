@@ -180,9 +180,39 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
           animation: 'fadeIn .4s ease-out',
         }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Mode toggle */}
+            <div style={{ display: 'flex', gap: 6, padding: 4, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: `1px solid ${colors.border}` }}>
+              {(['extension', 'email'] as Mode[]).map((m) => {
+                const active = mode === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => { setMode(m); setError(''); }}
+                    style={{
+                      flex: 1, padding: '9px 10px', borderRadius: 9, cursor: 'pointer',
+                      fontSize: 11, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase',
+                      border: 'none',
+                      background: active ? `linear-gradient(135deg, ${colors.gold}, ${colors.avaCyan})` : 'transparent',
+                      color: active ? '#0b1530' : colors.textSub,
+                    }}
+                  >
+                    {m === 'extension' ? 'Extension' : 'Email'}
+                  </button>
+                );
+              })}
+            </div>
+
             <Field label="Portal URL" value={portalUrl} onChange={setPortalUrl} type="url" />
-            <Field label="Email" value={email} onChange={setEmail} type="email" placeholder="you@company.com" autoFocus />
-            <Field label="Password" value={password} onChange={setPassword} type="password" placeholder="••••••••" onEnter={handleConnect} />
+            {mode === 'email' ? (
+              <Field label="Email" value={email} onChange={setEmail} type="email" placeholder="you@company.com" autoFocus />
+            ) : (
+              <>
+                <Field label="Extension" value={extension} onChange={setExtension} placeholder="e.g. 1001" autoFocus />
+                <Field label="SIP Domain" value={sipDomain} onChange={setSipDomain} placeholder="lemtel.lemtel.tel" />
+              </>
+            )}
+            <Field label={mode === 'email' ? 'Password' : 'SIP Password'} value={password} onChange={setPassword} type="password" placeholder="••••••••" onEnter={handleConnect} />
 
             {error && (
               <div style={{
@@ -198,7 +228,7 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
             <button
               className="lemtel-btn-primary"
               onClick={handleConnect}
-              disabled={loading || !email || !password}
+              disabled={loading || !canSubmit}
               style={{
                 marginTop: 8, height: 50, borderRadius: 14,
                 fontSize: 14, cursor: 'pointer',
@@ -206,6 +236,12 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
             >
               {loading ? 'Connecting…' : 'Sign in'}
             </button>
+
+            <div style={{ fontSize: 10.5, color: colors.textDim, lineHeight: 1.5, textAlign: 'center', marginTop: 2 }}>
+              {mode === 'extension'
+                ? 'Use your SIP extension and password — your account will be created automatically.'
+                : 'Sign in with the email and password tied to your Lemtel portal account.'}
+            </div>
           </div>
         </div>
       </div>
