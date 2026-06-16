@@ -562,12 +562,27 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
 
   const load = async () => {
     setLoading(true);
-    const [{ data: a }, { data: e }] = await Promise.all([
+    const [agentsRes, extRes] = await Promise.all([
       supabase.from('pbx_queue_agents').select('*').eq('queue_id', queue.id),
       supabase.from('pbx_extensions').select(EXT_COLS).eq('organization_id', LEMTEL_ORG).order('extension'),
     ]);
-    setAgents(a || []); setExtensions(e || []); setLoading(false);
-    return (a || []).length;
+    if (extRes.error) {
+      toast({ title: 'Failed to load extensions', description: extRes.error.message, variant: 'destructive' });
+    }
+    let exts = extRes.data || [];
+    // Auto-sync from PBX if local table is empty so the picker is never blank
+    if (exts.length === 0) {
+      try {
+        await supabase.functions.invoke('sync-pbx-extensions', { body: { organization_id: LEMTEL_ORG } });
+        const retry = await supabase.from('pbx_extensions').select(EXT_COLS).eq('organization_id', LEMTEL_ORG).order('extension');
+        exts = retry.data || [];
+        if (exts.length > 0) toast({ title: 'Extensions synced', description: `Loaded ${exts.length} extension${exts.length === 1 ? '' : 's'} from PBX.` });
+      } catch (e: any) {
+        toast({ title: 'Extension sync failed', description: e?.message || String(e), variant: 'destructive' });
+      }
+    }
+    setAgents(agentsRes.data || []); setExtensions(exts); setLoading(false);
+    return (agentsRes.data || []).length;
   };
 
   const resyncTiers = async () => {
