@@ -167,7 +167,7 @@ export function WhiteLabelTab() {
         loading_icon: data.loading_icon || 'infinity',
         loading_icon_size: data.loading_icon_size || 'md',
         domain: data.domain || '',
-        backend_domain: data.backend_domain || '',
+        backend_domain: '',
         email_domain: data.email_domain || '',
         email_sender: data.email_sender || '',
         email_sender_name: data.email_sender_name || '',
