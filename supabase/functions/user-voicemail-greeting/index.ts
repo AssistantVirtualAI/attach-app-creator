@@ -166,14 +166,10 @@ Deno.serve(async (req) => {
       const extension: string | null = payload?.extension ?? null;
       if (!text) return json({ error: "missing_text" }, 400);
       if (text.length > 2000) return json({ error: "text_too_long" }, 400);
-      const audio = await ttsToBlob(text, voiceId);
-      const path = `${spu.organization_id}/${userId}/lib-${Date.now()}.mp3`;
-      const { error: upErr } = await admin.storage
-        .from("voicemail-greetings")
-        .upload(path, new Uint8Array(audio), { contentType: "audio/mpeg", upsert: true });
-      if (upErr) throw upErr;
       const voiceName = TOP_VOICES.find((v) => v.id === voiceId)?.name ?? null;
-      const { data: row, error } = await admin
+
+      // Insert as "generating" first so the UI can show progress / failure state.
+      const { data: pending, error: pErr } = await admin
         .from("pbx_voicemail_greetings")
         .insert({
           user_id: userId,
@@ -184,13 +180,83 @@ Deno.serve(async (req) => {
           text_script: text,
           voice_id: voiceId,
           voice_name: voiceName,
-          storage_path: path,
+          storage_path: `pending-${Date.now()}`,
+          status: "generating",
+          attempts: 1,
+          last_attempt_at: new Date().toISOString(),
         })
         .select()
         .single();
-      if (error) throw error;
-      const { data: signed } = await admin.storage.from("voicemail-greetings").createSignedUrl(path, 3600);
-      return json({ greeting: { ...row, audio_url: signed?.signedUrl ?? null } });
+      if (pErr) throw pErr;
+
+      try {
+        const audio = await ttsToBlob(text, voiceId);
+        const path = `${spu.organization_id}/${userId}/lib-${pending.id}.mp3`;
+        const { error: upErr } = await admin.storage
+          .from("voicemail-greetings")
+          .upload(path, new Uint8Array(audio), { contentType: "audio/mpeg", upsert: true });
+        if (upErr) throw upErr;
+        const { data: row } = await admin
+          .from("pbx_voicemail_greetings")
+          .update({ storage_path: path, status: "ready", error_message: null })
+          .eq("id", pending.id)
+          .select()
+          .single();
+        const { data: signed } = await admin.storage.from("voicemail-greetings").createSignedUrl(path, 3600);
+        return json({ greeting: { ...row, audio_url: signed?.signedUrl ?? null } });
+      } catch (e: any) {
+        const msg = String(e?.message ?? e).slice(0, 500);
+        await admin
+          .from("pbx_voicemail_greetings")
+          .update({ status: "failed", error_message: msg })
+          .eq("id", pending.id);
+        return json({ error: msg, greeting_id: pending.id }, 502);
+      }
+    }
+
+    if (action === "retry_greeting") {
+      if (!spu) return json({ error: "no_extension" }, 400);
+      const id: string = payload?.id;
+      if (!id) return json({ error: "missing_id" }, 400);
+      const { data: g } = await admin
+        .from("pbx_voicemail_greetings")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      if (!g || g.user_id !== userId) return json({ error: "forbidden" }, 403);
+      if (!g.text_script) return json({ error: "no_script_to_retry" }, 400);
+      await admin
+        .from("pbx_voicemail_greetings")
+        .update({
+          status: "generating",
+          error_message: null,
+          attempts: (g.attempts ?? 0) + 1,
+          last_attempt_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+      try {
+        const audio = await ttsToBlob(g.text_script, g.voice_id ?? "EXAVITQu4vr4xnSDxMaL");
+        const path = `${g.organization_id}/${userId}/lib-${g.id}.mp3`;
+        const { error: upErr } = await admin.storage
+          .from("voicemail-greetings")
+          .upload(path, new Uint8Array(audio), { contentType: "audio/mpeg", upsert: true });
+        if (upErr) throw upErr;
+        const { data: row } = await admin
+          .from("pbx_voicemail_greetings")
+          .update({ storage_path: path, status: "ready", error_message: null })
+          .eq("id", id)
+          .select()
+          .single();
+        const { data: signed } = await admin.storage.from("voicemail-greetings").createSignedUrl(path, 3600);
+        return json({ greeting: { ...row, audio_url: signed?.signedUrl ?? null } });
+      } catch (e: any) {
+        const msg = String(e?.message ?? e).slice(0, 500);
+        await admin
+          .from("pbx_voicemail_greetings")
+          .update({ status: "failed", error_message: msg })
+          .eq("id", id);
+        return json({ error: msg }, 502);
+      }
     }
 
     if (action === "delete_greeting") {
