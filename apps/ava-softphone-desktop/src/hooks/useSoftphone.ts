@@ -18,6 +18,9 @@ interface FetchedCreds {
   sip_domain: string;
   wss_url: string;
   password: string;
+  auth_username?: string;
+  authUsername?: string;
+  password_source?: string;
 }
 
 async function fetchSoftphoneCredentials(accessToken: string): Promise<FetchedCreds | null> {
