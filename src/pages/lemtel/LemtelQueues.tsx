@@ -296,25 +296,59 @@ function QueueDialog({ mode, queue, trigger }: { mode: 'create' | 'edit'; queue?
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{mode === 'create' ? 'Create Queue' : `Edit ${queue?.name}`}</DialogTitle>
           <DialogDescription>Settings push directly to FusionPBX call center module.</DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2"><Label>Name</Label><Input value={form.queue_name} onChange={(e) => setForm({ ...form, queue_name: e.target.value })} /></div>
-          <div><Label>Extension</Label><Input value={form.queue_extension} onChange={(e) => setForm({ ...form, queue_extension: e.target.value })} placeholder="e.g. 5000" /></div>
-          <div><Label>Strategy</Label>
-            <Select value={form.queue_strategy} onValueChange={(v) => setForm({ ...form, queue_strategy: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{STRATEGIES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-            </Select>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2"><Label>Name</Label><Input value={form.queue_name} onChange={(e) => setForm({ ...form, queue_name: e.target.value })} /></div>
+            <div><Label>Extension</Label><Input value={form.queue_extension} onChange={(e) => setForm({ ...form, queue_extension: e.target.value })} placeholder="e.g. 5000" /></div>
+            <div><Label>Strategy</Label>
+              <Select value={form.queue_strategy} onValueChange={(v) => setForm({ ...form, queue_strategy: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{STRATEGIES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div><Label>Caller ID prefix</Label><Input value={form.queue_cid_prefix} onChange={(e) => setForm({ ...form, queue_cid_prefix: e.target.value })} placeholder="e.g. [Sales]" /></div>
+            <div><Label>Music on hold</Label><Input value={form.queue_moh_sound} onChange={(e) => setForm({ ...form, queue_moh_sound: e.target.value })} /></div>
+            <div className="col-span-2"><Label>Description</Label><Textarea value={form.queue_description} onChange={(e) => setForm({ ...form, queue_description: e.target.value })} rows={2} /></div>
           </div>
-          <div><Label>Max wait (sec)</Label><Input type="number" value={form.queue_max_wait_time} onChange={(e) => setForm({ ...form, queue_max_wait_time: e.target.value })} /></div>
-          <div><Label>Music on hold</Label><Input value={form.queue_moh_sound} onChange={(e) => setForm({ ...form, queue_moh_sound: e.target.value })} /></div>
-          <div className="col-span-2"><Label>Description</Label><Textarea value={form.queue_description} onChange={(e) => setForm({ ...form, queue_description: e.target.value })} rows={2} /></div>
-          <div className="flex items-center gap-2"><Switch checked={!!form.queue_record_template} onCheckedChange={(v) => setForm({ ...form, queue_record_template: v ? '${strftime(%Y)}/${strftime(%b)}/${strftime(%d)}/${uuid}.${record_ext}' : '' })} /><Label>Record calls</Label></div>
-          <div className="flex items-center gap-2"><Switch checked={form.queue_enabled} onCheckedChange={(v) => setForm({ ...form, queue_enabled: v })} /><Label>Enabled</Label></div>
+
+          <div className="border-t pt-3">
+            <div className="font-medium text-sm mb-2">Routing & Timing</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Max wait (sec)</Label><Input type="number" value={form.queue_max_wait_time} onChange={(e) => setForm({ ...form, queue_max_wait_time: e.target.value })} /></div>
+              <div><Label>Wrap-up time (sec)</Label><Input type="number" value={form.queue_wrap_up_time} onChange={(e) => setForm({ ...form, queue_wrap_up_time: e.target.value })} /></div>
+              <div><Label>Agent no-answer delay (sec)</Label><Input type="number" value={form.queue_agent_no_answer_delay_time} onChange={(e) => setForm({ ...form, queue_agent_no_answer_delay_time: e.target.value })} /></div>
+              <div><Label>Max wait with no agents (sec)</Label><Input type="number" value={form.queue_max_wait_time_with_no_agent} onChange={(e) => setForm({ ...form, queue_max_wait_time_with_no_agent: e.target.value })} /></div>
+              <div><Label>No-agent time reached (sec)</Label><Input type="number" value={form.queue_max_wait_time_with_no_agent_time_reached} onChange={(e) => setForm({ ...form, queue_max_wait_time_with_no_agent_time_reached: e.target.value })} /></div>
+              <div><Label>Discard abandoned after (sec)</Label><Input type="number" value={form.queue_discard_abandoned_after} onChange={(e) => setForm({ ...form, queue_discard_abandoned_after: e.target.value })} /></div>
+              <div className="col-span-2"><Label>Timeout action</Label><Input value={form.queue_timeout_action} onChange={(e) => setForm({ ...form, queue_timeout_action: e.target.value })} placeholder="e.g. transfer:200 XML default" /></div>
+            </div>
+          </div>
+
+          <div className="border-t pt-3">
+            <div className="font-medium text-sm mb-2">Tier Rules</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-2"><Switch checked={form.queue_tier_rules_apply} onCheckedChange={(v) => setForm({ ...form, queue_tier_rules_apply: v })} /><Label>Apply tier rules</Label></div>
+              <div><Label>Tier rule wait (sec)</Label><Input type="number" value={form.queue_tier_rule_wait_second} onChange={(e) => setForm({ ...form, queue_tier_rule_wait_second: e.target.value })} /></div>
+              <div className="flex items-center gap-2"><Switch checked={form.queue_tier_rule_wait_multiply_level} onCheckedChange={(v) => setForm({ ...form, queue_tier_rule_wait_multiply_level: v })} /><Label>Multiply by tier level</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={form.queue_tier_rule_no_agent_no_wait} onCheckedChange={(v) => setForm({ ...form, queue_tier_rule_no_agent_no_wait: v })} /><Label>No agent → no wait</Label></div>
+            </div>
+          </div>
+
+          <div className="border-t pt-3">
+            <div className="font-medium text-sm mb-2">Announcements & Recording</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Announce sound</Label><Input value={form.queue_announce_sound} onChange={(e) => setForm({ ...form, queue_announce_sound: e.target.value })} placeholder="path/to/sound.wav" /></div>
+              <div><Label>Announce frequency (sec)</Label><Input type="number" value={form.queue_announce_frequency} onChange={(e) => setForm({ ...form, queue_announce_frequency: e.target.value })} /></div>
+              <div className="flex items-center gap-2"><Switch checked={!!form.queue_record_template} onCheckedChange={(v) => setForm({ ...form, queue_record_template: v ? '${strftime(%Y)}/${strftime(%b)}/${strftime(%d)}/${uuid}.${record_ext}' : '' })} /><Label>Record calls</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={form.queue_abandoned_resume_allowed} onCheckedChange={(v) => setForm({ ...form, queue_abandoned_resume_allowed: v })} /><Label>Allow resume after abandon</Label></div>
+              <div className="flex items-center gap-2"><Switch checked={form.queue_enabled} onCheckedChange={(v) => setForm({ ...form, queue_enabled: v })} /><Label>Enabled</Label></div>
+            </div>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
