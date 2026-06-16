@@ -277,11 +277,12 @@ function ExtensionsTable() {
           onSave={(changes) => updateExtension(editing, changes)}
         />
       )}
-      {creating && (
+      {creating && isAdmin && (
         <PbxEditSheet
           title="New Extension"
           groups={EXTENSION_GROUPS}
           initial={{ enabled: true, voicemail_enabled: true, user_context: 'default' }}
+          rules={EXTENSION_RULES}
           saving={saving}
           onCancel={() => setCreating(false)}
           onSave={createExtension}
