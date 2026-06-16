@@ -37,6 +37,8 @@ interface Props {
   initial: any;
   /** Snapshot at sheet open — used by parent for optimistic-concurrency conflict detection. */
   baseline?: any;
+  /** Shared validation rules (portal parity). */
+  rules?: RuleMap;
   saving?: boolean;
   width?: number;
   onCancel: () => void;
