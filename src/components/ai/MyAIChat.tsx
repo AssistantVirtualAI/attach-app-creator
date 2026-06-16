@@ -50,10 +50,29 @@ export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; on
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const pageContext = usePageContext();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
+
+  const contextSuggestions = useMemo(() => {
+    if (pageContext.page === "voicemail" && pageContext.voicemail_id) {
+      return [
+        "Summarize this voicemail",
+        "Transcribe this voicemail",
+        "What does the caller want?",
+        "Draft a reply for this voicemail",
+      ];
+    }
+    if (pageContext.page === "calls" && pageContext.call_id) {
+      return ["Summarize this call", "What was the sentiment?", "List action items from this call"];
+    }
+    if (pageContext.page === "recordings" && pageContext.recording_id) {
+      return ["Summarize this recording", "Transcribe this recording", "Key topics in this recording"];
+    }
+    return SUGGESTIONS;
+  }, [pageContext]);
 
   const send = useCallback(async (textOverride?: string) => {
     const text = (textOverride ?? input).trim();
@@ -64,7 +83,7 @@ export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; on
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("my-ai-assistant", {
-        body: { messages: newMsgs },
+        body: { messages: newMsgs, pageContext },
       });
       if (error) throw error;
       if (data?.error === "rate_limited") { toast.error("Rate limit reached. Try again in a moment."); return; }
@@ -74,7 +93,8 @@ export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; on
     } catch (e: any) {
       toast.error(e?.message ?? "Failed to reach assistant");
     } finally { setLoading(false); }
-  }, [input, loading, messages]);
+  }, [input, loading, messages, pageContext]);
+
 
   return (
     <Card className={cn("flex flex-col bg-background/95 backdrop-blur", embedded ? "h-[600px]" : "h-full")}>
