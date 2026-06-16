@@ -620,12 +620,15 @@ export default function ProfileMenu() {
 
 function ProfileEditor({
   name: initialName, email, avatar, onClose, onSaved, onPickPhoto, onRemovePhoto,
+  onSyncStart, onSyncError,
 }: {
   name: string; email: string; avatar: string | null;
   onClose: () => void;
   onSaved: (name: string, avatar?: string | null) => void;
   onPickPhoto: () => void;
   onRemovePhoto: () => void;
+  onSyncStart?: (label: string) => void;
+  onSyncError?: (label: string, err: string) => void;
 }) {
   const [name, setName] = useState(initialName);
   const [saving, setSaving] = useState(false);
@@ -650,16 +653,19 @@ function ProfileEditor({
   const initials = (initialName || email || '?').slice(0, 2).toUpperCase();
 
   const save = async () => {
-    setSaving(true); setMsg(null);
+    setSaving(true); setMsg(null); onSyncStart?.('Profile');
     try {
       const { error } = await supabase.auth.updateUser({ data: { full_name: name, name } });
       if (error) throw error;
       onSaved(name);
       setMsg({ kind: 'ok', text: 'Profile updated.' });
     } catch (e: any) {
-      setMsg({ kind: 'err', text: e?.message || 'Failed to update profile.' });
+      const text = e?.message || 'Failed to update profile.';
+      setMsg({ kind: 'err', text });
+      onSyncError?.('Profile', text);
     } finally { setSaving(false); }
   };
+
 
   // ---- Password strength (0-4) ----
   const strength = (() => {
