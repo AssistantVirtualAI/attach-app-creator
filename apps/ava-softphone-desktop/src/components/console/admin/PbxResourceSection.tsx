@@ -56,6 +56,10 @@ interface Props {
   fieldGroups?: FieldGroup[];
   /** sheet width */
   sheetWidth?: number;
+  /** shared per-field validation rules (portal parity) */
+  rules?: RuleMap;
+  /** logical entity name written to pbx_admin_actions on conflicts */
+  entityType?: string;
   transform?: (rows: any[]) => any[];
   rowActions?: { label: string; run: (row: any, helpers: { reload: () => void; orgId: string; domainUuid: string | null }) => Promise<void> | void }[];
   global?: boolean;
