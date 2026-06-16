@@ -22,19 +22,48 @@ type Creds = {
   refreshToken?: string;
 };
 
+type Mode = 'email' | 'extension';
+
 export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds) => void }) {
   const { colors } = theme;
   const [portalUrl, setPortalUrl] = useState('https://avastatistic.ca');
+  const [mode, setMode] = useState<Mode>('extension');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [extension, setExtension] = useState('');
+  const [sipDomain, setSipDomain] = useState('lemtel.lemtel.tel');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleConnect = async () => {
+  const supabase = React.useMemo(() => createClient(SUPABASE_URL, SUPABASE_ANON_KEY), []);
+
+  const finalize = async (
+    authUserId: string,
+    accessToken: string | undefined,
+    refreshToken: string | undefined,
+    fallbackEmail: string,
+    softphone: { extension?: string; display_name?: string; sip_domain?: string; wss_url?: string; organization_id?: string } | null,
+  ) => {
+    const credentials: Creds = {
+      portalUrl: (portalUrl || 'https://avastatistic.ca').replace(/\/+$/, ''),
+      email: fallbackEmail,
+      extension: String(softphone?.extension ?? extension ?? 'N/A'),
+      displayName: softphone?.display_name || fallbackEmail.split('@')[0],
+      sipDomain: softphone?.sip_domain || sipDomain || 'lemtel.lemtel.tel',
+      wssUrl: softphone?.wss_url || 'wss://lemtel.lemtel.tel:7443',
+      userId: authUserId,
+      accessToken,
+      refreshToken,
+    };
+    if (accessToken) setAuthToken(accessToken);
+    await window.electronAPI?.saveCredentials?.(credentials);
+    onComplete(credentials);
+  };
+
+  const handleEmailConnect = async () => {
     setLoading(true);
     setError('');
     try {
-      const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       const { data: authData, error: authError } =
         await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (authError || !authData.user) {
@@ -42,8 +71,6 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
         setLoading(false);
         return;
       }
-      // Lemtel-only app-access enforcement: only sessions whose linked PBX
-      // softphone user has desktop access granted by a Lemtel admin may sign in.
       const { data: allowed, error: gateErr } = await supabase
         .rpc('my_platform_access_allowed', { _platform: 'desktop' });
       if (gateErr || allowed !== true) {
@@ -52,33 +79,65 @@ export default function SetupWizard({ onComplete }: { onComplete: (creds: Creds)
         setLoading(false);
         return;
       }
-      // Note: do NOT select '*' — sip_password is column-revoked for browser
-      // clients and would cause the whole row read to fail (returning N/A).
       const { data: softphoneUser } = await supabase
         .from('pbx_softphone_users')
         .select('extension,display_name,sip_domain,wss_url,organization_id,status')
         .eq('portal_user_id', authData.user.id)
         .maybeSingle();
-      const credentials: Creds = {
-        portalUrl: (portalUrl || 'https://avastatistic.ca').replace(/\/+$/, ''),
-        email: authData.user.email || email,
-        extension: String(softphoneUser?.extension ?? 'N/A'),
-        displayName: softphoneUser?.display_name || email.split('@')[0],
-        sipDomain: softphoneUser?.sip_domain || 'lemtel.lemtel.tel',
-        wssUrl: softphoneUser?.wss_url || 'wss://lemtel.lemtel.tel:7443',
-        userId: authData.user.id,
-        accessToken: authData.session?.access_token,
-        refreshToken: authData.session?.refresh_token,
-      };
-      if (authData.session?.access_token) setAuthToken(authData.session.access_token);
-      await window.electronAPI?.saveCredentials?.(credentials);
-      onComplete(credentials);
+      await finalize(
+        authData.user.id,
+        authData.session?.access_token,
+        authData.session?.refresh_token,
+        authData.user.email || email,
+        softphoneUser,
+      );
     } catch (err: any) {
       setError(`Connection error: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleExtensionConnect = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data, error: fnErr } = await supabase.functions.invoke('extension-signin', {
+        body: {
+          extension: extension.trim(),
+          password,
+          sip_domain: sipDomain.trim() || undefined,
+          platform: 'desktop',
+        },
+      });
+      const errMsg = (data as any)?.error || fnErr?.message;
+      if (errMsg || !(data as any)?.access_token) {
+        const friendly =
+          errMsg === 'invalid_credentials' ? 'Wrong extension or password.' :
+          errMsg === 'extension_not_found' ? 'Extension not found.' :
+          errMsg === 'app_access_disabled' || errMsg === 'desktop_access_disabled'
+            ? 'Desktop access has not been enabled for this extension. Contact Lemtel.' :
+          errMsg === 'ambiguous_extension' ? 'Multiple extensions match — please enter the SIP domain.' :
+          (errMsg || 'Sign in failed');
+        setError(friendly);
+        setLoading(false);
+        return;
+      }
+      const d = data as any;
+      // Hydrate the local Supabase client so subsequent app code sees the session.
+      await supabase.auth.setSession({ access_token: d.access_token, refresh_token: d.refresh_token });
+      await finalize(d.user_id, d.access_token, d.refresh_token, d.email || `ext-${d.extension}@${d.sip_domain || 'lemtel.tel'}`, d);
+    } catch (err: any) {
+      setError(`Connection error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConnect = () => (mode === 'email' ? handleEmailConnect() : handleExtensionConnect());
+  const canSubmit = mode === 'email'
+    ? !!email && !!password
+    : !!extension && !!password;
 
   return (
     <div style={{
