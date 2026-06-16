@@ -94,6 +94,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    // CRITICAL: enforce tenant isolation. The caller MUST belong to orgId
+    // (or be a super admin). Without this, any authenticated user could read
+    // any other organization's data by passing a different organizationId.
+    try {
+      await assertOrgAccess(req, orgId);
+    } catch (e) {
+      const msg = String((e as Error).message || "forbidden");
+      const status = msg === "unauthorized" ? 401 : 403;
+      return new Response(JSON.stringify({ error: msg }), {
+        status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const end = body.endDate ? new Date(body.endDate).toISOString() : new Date().toISOString();
     const start = body.startDate
       ? new Date(body.startDate).toISOString()
