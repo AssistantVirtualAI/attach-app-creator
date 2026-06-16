@@ -297,8 +297,42 @@ export default function OrgChatView() {
     return members.find((m) => m.user_id === other)?.display_name || 'Direct message';
   };
 
-  const visibleChannels = channels.filter((c) => !isDmChannel(c));
+  const visibleChannels = channels.filter((c) => !isDmChannel(c) && !((c.members?.length ?? 0) > 2 && c.channel_type === 'private'));
+  const groupChannels = channels.filter((c) => c.channel_type === 'private' && (c.members?.length ?? 0) > 2);
+  const dmChannels = channels.filter((c) => isDmChannel(c));
   const activeChannel = channels.find((ch) => ch.id === activeId);
+  const isActiveDm = !!activeChannel && isDmChannel(activeChannel);
+  const isActiveGroup = !!activeChannel && activeChannel.channel_type === 'private' && (activeChannel.members?.length ?? 0) > 2;
+
+  const headerLabel = activeChannel
+    ? (isActiveDm ? '@ ' + dmNameFor(activeChannel)
+      : isActiveGroup ? '👥 ' + activeChannel.name
+      : (activeChannel.channel_type === 'private' ? '🔒 ' : '# ') + activeChannel.name)
+    : '—';
+
+  const otherDmUserId = isActiveDm ? (activeChannel?.members || []).find((id) => id !== me?.id) : null;
+  const otherDmMember = otherDmUserId ? members.find((m) => m.user_id === otherDmUserId) : null;
+  const groupExtensions = isActiveGroup ? (activeChannel?.members || []).filter((id) => id !== me?.id).map((id) => members.find((m) => m.user_id === id)?.extension).filter(Boolean) as string[] : [];
+  const canCall = (isActiveDm && !!otherDmMember?.extension) || (isActiveGroup && groupExtensions.length > 0);
+
+  const renderChannelRow = (ch: Channel, label: string, icon: string) => {
+    const active = ch.id === activeId;
+    const unreadN = unread[ch.id] || 0;
+    return (
+      <button key={ch.id} onClick={() => setActiveId(ch.id)} style={{
+        display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        padding: '7px 10px', marginBottom: 2, borderRadius: 8, border: 'none', cursor: 'pointer',
+        background: active ? 'rgba(122,76,255,0.18)' : 'transparent',
+        color: active ? c.textIce : c.mutedSilver,
+        fontSize: 12.5, fontWeight: active || unreadN > 0 ? 700 : 500, textAlign: 'left',
+      }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{icon} {label}</span>
+        {unreadN > 0 && !active && (
+          <span style={{ background: '#ff5a5f', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 700 }}>{unreadN}</span>
+        )}
+      </button>
+    );
+  };
 
   return (
     <div style={{ display: 'flex', height: '100%' }}>
@@ -314,20 +348,21 @@ export default function OrgChatView() {
           }}>+ Group</button>
         </div>
         {visibleChannels.length === 0 && <div style={{ fontSize: 12, color: c.mutedSilver }}>{t('orgchat.noChannels')}</div>}
-        {visibleChannels.map((ch) => {
-          const active = ch.id === activeId;
-          return (
-            <button key={ch.id} onClick={() => setActiveId(ch.id)} style={{
-              display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between',
-              padding: '8px 10px', marginBottom: 2, borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: active ? 'rgba(122,76,255,0.18)' : 'transparent',
-              color: active ? c.textIce : c.mutedSilver,
-              fontSize: 12.5, fontWeight: active ? 700 : 500, textAlign: 'left',
-            }}>
-              <span>{ch.channel_type === 'private' ? '🔒' : '#'} {ch.name}</span>
-            </button>
-          );
-        })}
+        {visibleChannels.map((ch) => renderChannelRow(ch, ch.name, ch.channel_type === 'private' ? '🔒' : '#'))}
+
+        {groupChannels.length > 0 && (
+          <>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: c.signalGold, textTransform: 'uppercase', margin: '18px 0 8px' }}>Groups</div>
+            {groupChannels.map((ch) => renderChannelRow(ch, ch.name, '👥'))}
+          </>
+        )}
+
+        {dmChannels.length > 0 && (
+          <>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: c.signalGold, textTransform: 'uppercase', margin: '18px 0 8px' }}>Direct</div>
+            {dmChannels.map((ch) => renderChannelRow(ch, dmNameFor(ch), '@'))}
+          </>
+        )}
 
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: c.signalGold, textTransform: 'uppercase', margin: '18px 0 8px' }}>
           Team ({members.length})
@@ -353,9 +388,19 @@ export default function OrgChatView() {
       {/* Messages */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <header style={{ padding: '12px 18px', borderBottom: `1px solid ${c.border}`, display: 'flex', gap: 12, alignItems: 'center' }}>
-          <h2 style={{ margin: 0, fontSize: 15, color: c.textIce }}>
-            {activeChannel ? (isDmChannel(activeChannel) ? '@ ' + dmNameFor(activeChannel) : (activeChannel.channel_type === 'private' ? '🔒 ' : '# ') + activeChannel.name) : '—'}
-          </h2>
+          <h2 style={{ margin: 0, fontSize: 15, color: c.textIce }}>{headerLabel}</h2>
+          {canCall && (
+            <button onClick={() => {
+              if (isActiveDm && otherDmMember?.extension) startCall(otherDmMember.extension);
+              else if (isActiveGroup) {
+                startCall(groupExtensions);
+                supabase.functions.invoke('org-chat', { body: { action: 'send_message', payload: { channel_id: activeId, content: `📞 ${me?.name} started a group call.` } } });
+              }
+            }} style={{
+              padding: '5px 12px', borderRadius: 8, border: `1px solid ${c.border}`,
+              background: 'rgba(34,211,154,0.15)', color: '#22d39a', cursor: 'pointer', fontSize: 11.5, fontWeight: 700,
+            }}>📞 {isActiveGroup ? 'Call group' : 'Call'}</button>
+          )}
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('orgchat.searchPlaceholder')}
             style={{ marginLeft: 'auto', padding: '6px 10px', borderRadius: 8, border: `1px solid ${c.border}`, background: 'rgba(140,180,255,0.06)', color: c.textIce, fontSize: 12, minWidth: 200 }} />
         </header>
@@ -367,20 +412,26 @@ export default function OrgChatView() {
             </div>
           )}
           {filtered.map((m) => (
-            <div key={m.id} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-                <strong style={{ color: c.textIce, fontSize: 12.5 }}>{m.sender_name ?? 'User'}</strong>
-                <span style={{ color: c.mutedSilver, fontSize: 10, fontFamily: 'JetBrains Mono, monospace' }}>
-                  {new Date(m.created_at).toLocaleString()}
-                </span>
-              </div>
-              <div style={{ color: c.textIce, fontSize: 13, lineHeight: 1.5, marginTop: 2, whiteSpace: 'pre-wrap' }}>{m.content}</div>
-            </div>
+            <MessageRow key={m.id} m={m} meId={me?.id} onReact={(e) => toggleReaction(m.id, e)}
+              emojiOpen={emojiFor === m.id} onToggleEmoji={() => setEmojiFor((p) => p === m.id ? null : m.id)}
+              getSigned={getSigned} />
           ))}
         </div>
 
+        {typingNames.length > 0 && (
+          <div style={{ padding: '4px 18px', fontSize: 11, color: c.mutedSilver, fontStyle: 'italic' }}>
+            {typingNames.join(', ')} {typingNames.length === 1 ? 'is' : 'are'} typing…
+          </div>
+        )}
+
         <div style={{ padding: 12, borderTop: `1px solid ${c.border}`, display: 'flex', gap: 8 }}>
-          <input value={input} onChange={(e) => setInput(e.target.value)}
+          <button onClick={() => fileRef.current?.click()} disabled={!activeId} title="Attach" style={{
+            padding: '8px 12px', borderRadius: 9, border: `1px solid ${c.border}`, background: 'transparent',
+            color: c.textIce, cursor: 'pointer', fontSize: 14,
+          }}>📎</button>
+          <input ref={fileRef} type="file" style={{ display: 'none' }}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) { uploadFile(f); e.target.value = ''; } }} />
+          <input value={input} onChange={(e) => handleTyping(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
             placeholder={activeId ? t('orgchat.messagePlaceholder') : t('orgchat.selectChannel')} disabled={!activeId}
             style={{ flex: 1, padding: '10px 12px', borderRadius: 9, border: `1px solid ${c.border}`, background: 'rgba(140,180,255,0.06)', color: c.textIce, fontSize: 13 }} />
@@ -392,6 +443,7 @@ export default function OrgChatView() {
           }}>{t('common.send')}</button>
         </div>
       </div>
+
 
       {showGroup && me && (
         <NewGroupModal
