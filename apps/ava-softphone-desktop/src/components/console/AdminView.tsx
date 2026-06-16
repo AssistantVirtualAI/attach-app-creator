@@ -348,7 +348,8 @@ export default function AdminView() {
           <PbxResourceSection
             kind="ring-groups" actionKind="ring-group" title="Ring Groups" uuidField="ring_group_uuid"
             cols={[{ key: 'ring_group_name', label: 'Name' }, { key: 'ring_group_extension', label: 'Extension' }, { key: 'ring_group_strategy', label: 'Strategy' }, { key: 'ring_group_enabled', label: 'Enabled' }]}
-            fields={[{ key: 'ring_group_name', label: 'Name' }, { key: 'ring_group_extension', label: 'Extension' }, { key: 'ring_group_strategy', label: 'Strategy', type: 'select', options: ['simultaneous', 'sequence', 'enterprise'] }, { key: 'ring_group_timeout_app', label: 'Timeout App' }, { key: 'ring_group_forward_destination', label: 'Forwarding / fallback' }, { key: 'ring_group_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] }, { key: 'ring_group_description', label: 'Description', type: 'textarea' }]}
+            fieldGroups={RING_GROUP_GROUPS}
+            sheetWidth={680}
           />
         )}
         {sec === 'gateways' && (
@@ -361,15 +362,7 @@ export default function AdminView() {
               { key: 'enabled', label: 'Enabled', render: (v) => (String(v) === 'true' ? '✓' : '—') },
               { key: 'register', label: 'Register' },
             ]}
-            fields={[
-              { key: 'gateway', label: 'Name' },
-              { key: 'username', label: 'Username' },
-              { key: 'password', label: 'Password' },
-              { key: 'proxy', label: 'Proxy (host[:port])' },
-              { key: 'realm', label: 'Realm' },
-              { key: 'register', label: 'Register', type: 'select', options: ['true', 'false'] },
-              { key: 'enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
-            ]}
+            fieldGroups={GATEWAY_GROUPS}
             rowActions={[{
               label: 'Restart',
               run: async (row, { orgId }) => {
@@ -407,13 +400,7 @@ export default function AdminView() {
               { key: 'conference_room_pin', label: 'PIN' },
               { key: 'conference_room_enabled', label: 'Enabled' },
             ]}
-            fields={[
-              { key: 'conference_room_name', label: 'Name' },
-              { key: 'conference_room_extension', label: 'Extension' },
-              { key: 'conference_room_pin', label: 'PIN' },
-              { key: 'conference_room_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
-              { key: 'conference_room_description', label: 'Description', type: 'textarea' },
-            ]}
+            fieldGroups={CONFERENCE_GROUPS}
           />
         )}
         {sec === 'hold-music' && (
@@ -425,12 +412,7 @@ export default function AdminView() {
               { key: 'music_on_hold_rate', label: 'Rate' },
               { key: 'music_on_hold_enabled', label: 'Enabled' },
             ]}
-            fields={[
-              { key: 'music_on_hold_name', label: 'Name' },
-              { key: 'music_on_hold_path', label: 'Path' },
-              { key: 'music_on_hold_rate', label: 'Rate', type: 'select', options: ['8000', '16000', '32000', '48000'] },
-              { key: 'music_on_hold_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
-            ]}
+            fieldGroups={HOLD_MUSIC_GROUPS}
           />
         )}
         {sec === 'dialplans' && (
@@ -443,16 +425,8 @@ export default function AdminView() {
               { key: 'dialplan_continue', label: 'Continue' },
               { key: 'dialplan_enabled', label: 'Enabled' },
             ]}
-            fields={[
-              { key: 'dialplan_name', label: 'Name' },
-              { key: 'dialplan_number', label: 'Number' },
-              { key: 'dialplan_context', label: 'Context' },
-              { key: 'dialplan_order', label: 'Order', type: 'number' },
-              { key: 'dialplan_continue', label: 'Continue', type: 'select', options: ['true', 'false'] },
-              { key: 'dialplan_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
-              { key: 'dialplan_xml', label: 'XML', type: 'textarea' },
-              { key: 'dialplan_description', label: 'Description' },
-            ]}
+            fieldGroups={DIALPLAN_GROUPS}
+            sheetWidth={720}
           />
         )}
         {sec === 'time-conditions' && (
@@ -463,12 +437,7 @@ export default function AdminView() {
               { key: 'dialplan_number', label: 'Match' },
               { key: 'dialplan_enabled', label: 'Enabled' },
             ]}
-            fields={[
-              { key: 'dialplan_name', label: 'Name' },
-              { key: 'dialplan_number', label: 'Match expression' },
-              { key: 'dialplan_enabled', label: 'Enabled', type: 'select', options: ['true', 'false'] },
-              { key: 'dialplan_description', label: 'Description' },
-            ]}
+            fieldGroups={TIME_CONDITION_GROUPS}
           />
         )}
         {sec === 'feature-codes' && <FeatureCodesTable />}
