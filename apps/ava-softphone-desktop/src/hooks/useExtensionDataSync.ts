@@ -42,7 +42,6 @@ async function withRetry<T>(label: SyncAction, fn: () => Promise<T>, onAttempt?:
 }
 
 async function reportFailure(orgId: string, extension: string | null | undefined, action: SyncAction, error: string) {
-  // Best-effort: write a health record and emit an in-app alert event.
   try {
     await supabase.from('telecom_sync_health').insert({
       organization_id: orgId,
@@ -58,6 +57,68 @@ async function reportFailure(orgId: string, extension: string | null | undefined
     window.dispatchEvent(new CustomEvent('ava:sync-alert', { detail: { action, extension, error } }));
   } catch {}
 }
+
+async function reportSuccess(orgId: string, extension: string | null | undefined, action: SyncAction) {
+  try {
+    await supabase.from('telecom_sync_health').insert({
+      organization_id: orgId,
+      job_type: action,
+      status: 'ok',
+      last_error: null,
+      metadata: { extension: extension || null, source: 'useExtensionDataSync' },
+    });
+  } catch {}
+}
+
+export type SyncProgress = {
+  action: SyncAction;
+  state: 'idle' | 'running' | 'retrying' | 'success' | 'failed';
+  attempt?: number;
+  error?: string | null;
+};
+
+/**
+ * Trigger every sync action and report progress per action. Used both by the
+ * background interval and by the user-facing "Retry sync now" button.
+ */
+export async function runAllExtensionSync(
+  orgId: string,
+  extension: string | null | undefined,
+  opts: { limit?: number; onProgress?: (p: SyncProgress) => void } = {},
+): Promise<Record<SyncAction, SyncProgress>> {
+  const limit = opts.limit ?? 500;
+  const onProgress = opts.onProgress ?? (() => {});
+  const final: Record<SyncAction, SyncProgress> = {} as any;
+
+  const tasks: Array<{ action: SyncAction; body: Record<string, unknown> }> = [
+    { action: 'sync-cdrs', body: { organization_id: orgId, extension: extension || undefined, limit } },
+    { action: 'sync-voicemail-messages', body: { organization_id: orgId, extension: extension || undefined } },
+    { action: 'list-recordings', body: { organization_id: orgId, extension: extension || undefined, limit } },
+  ];
+
+  await Promise.allSettled(tasks.map(async ({ action, body }) => {
+    onProgress({ action, state: 'running', attempt: 1 });
+    const res = await withRetry(action, async () => {
+      const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', { body: { action, ...body } });
+      if (error) throw new Error(error.message || `${action} failed`);
+      if ((data as any)?.error) throw new Error(String((data as any).error));
+      return data;
+    }, (attempt) => onProgress({ action, state: 'retrying', attempt: attempt + 1 }));
+    if (res.ok) {
+      reportSuccess(orgId, extension, action);
+      final[action] = { action, state: 'success' };
+      onProgress(final[action]);
+    } else {
+      reportFailure(orgId, extension, action, res.error);
+      final[action] = { action, state: 'failed', error: res.error };
+      onProgress(final[action]);
+    }
+  }));
+
+  return final;
+}
+
+
 
 export function useExtensionDataSync(
   orgId: string | null,
