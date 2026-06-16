@@ -10,6 +10,9 @@ import {
   TIME_CONDITION_GROUPS, CONFERENCE_GROUPS, HOLD_MUSIC_GROUPS,
   GATEWAY_GROUPS, DIALPLAN_GROUPS,
 } from '../../lib/pbxFieldSchemas';
+import { EXTENSION_RULES, IVR_RULES, QUEUE_RULES } from '../../lib/pbxValidators';
+import { useDesktopRole } from '../../hooks/useDesktopRole';
+import { toast } from '../../lib/toast';
 import VoicemailView from './VoicemailView';
 import RecordingsView from './RecordingsView';
 import CallsView from './CallsView';
@@ -86,6 +89,7 @@ function ModalShell({ title, onClose, width = 460, children }: { title: string; 
 }
 
 function ExtensionsTable() {
+  const { isAdmin, loading: roleLoading } = useDesktopRole();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -171,9 +175,33 @@ function ExtensionsTable() {
   };
 
   const createExtension = async (form: any) => {
+    if (!isAdmin) { toast.error('Admin role required to create extensions.'); return; }
     setSaving(true);
     try {
       const scope = await resolveDesktopTenantScope();
+      // Duplicate / conflict pre-check: existing extension with same number?
+      const ext = String(form.extension || '').trim();
+      if (ext) {
+        const { data: dup } = await supabase
+          .from('pbx_extensions')
+          .select('id, extension, enabled')
+          .eq('organization_id', scope.organization_id)
+          .eq('extension', ext)
+          .maybeSingle();
+        if (dup) {
+          const choice = window.confirm(
+            `Extension ${ext} already exists on this PBX.\n\nClick OK to OPEN the existing record for editing instead, or Cancel to abort.`,
+          );
+          setSaving(false);
+          if (choice) {
+            setCreating(false);
+            await reload(false);
+            const match = data.find((r) => String(r.extension) === ext);
+            if (match) setEditing(match);
+          }
+          return;
+        }
+      }
       const out: any = { ...form };
       ['voicemail_enabled', 'enabled', 'voicemail_attach_file',
        'voicemail_local_after_email', 'do_not_disturb',
@@ -186,8 +214,9 @@ function ExtensionsTable() {
       setCreating(false);
       await reload(true);
       window.dispatchEvent(new Event('ava:pbx-resource-saved'));
+      toast.success(`Extension ${ext} created and synced.`);
     } catch (e: any) {
-      alert('Create failed: ' + (e?.message || 'unknown'));
+      toast.error('Create failed: ' + (e?.message || 'unknown'));
     } finally { setSaving(false); }
   };
 
@@ -197,11 +226,14 @@ function ExtensionsTable() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Extensions <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500 }}>({data.length})</span></h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setCreating(true)} style={{
-            padding: '8px 14px', borderRadius: 9,
-            background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
-            border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4,
-          }}>＋ New Extension</button>
+          {isAdmin && (
+            <button onClick={() => setCreating(true)} disabled={roleLoading} style={{
+              padding: '8px 14px', borderRadius: 9,
+              background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
+              border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4,
+              opacity: roleLoading ? 0.6 : 1,
+            }}>＋ New Extension</button>
+          )}
           <button onClick={() => reload(true)} disabled={syncing} style={{
             padding: '8px 14px', borderRadius: 9, background: 'transparent',
             border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer',
@@ -245,11 +277,12 @@ function ExtensionsTable() {
           onSave={(changes) => updateExtension(editing, changes)}
         />
       )}
-      {creating && (
+      {creating && isAdmin && (
         <PbxEditSheet
           title="New Extension"
           groups={EXTENSION_GROUPS}
           initial={{ enabled: true, voicemail_enabled: true, user_context: 'default' }}
+          rules={EXTENSION_RULES}
           saving={saving}
           onCancel={() => setCreating(false)}
           onSave={createExtension}
@@ -574,6 +607,7 @@ function SyncStatus() {
 // IVRs (Auto-Attendants)
 // ============================================================
 function IvrsTable() {
+  const { isAdmin, loading: roleLoading } = useDesktopRole();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -632,10 +666,31 @@ function IvrsTable() {
   };
 
   const create = async (form: any) => {
+    if (!isAdmin) { toast.error('Admin role required to create auto-attendants.'); return; }
     setSaving(true);
     try {
       const me = await getMeContext();
       const orgId = me.organization_id || LEMTEL_ORG;
+      const name = String(form.ivr_menu_name || '').trim();
+      const ext = String(form.ivr_menu_extension || '').trim();
+      if (name || ext) {
+        let q = supabase.from('pbx_ivrs').select('id, name, extension').eq('organization_id', orgId);
+        if (name) q = q.eq('name', name);
+        const { data: dup } = await q.maybeSingle();
+        if (dup) {
+          const choice = window.confirm(
+            `An auto-attendant named "${name}" already exists.\n\nClick OK to open it for editing instead, or Cancel to abort.`,
+          );
+          setSaving(false);
+          if (choice) {
+            setCreating(false);
+            await reload(false);
+            const match = data.find((r) => r.name === name);
+            if (match) setEditing(match);
+          }
+          return;
+        }
+      }
       const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: { action: 'create-ivr', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN, ...form } },
       });
@@ -643,8 +698,9 @@ function IvrsTable() {
       setCreating(false);
       await reload(true);
       window.dispatchEvent(new Event('ava:pbx-resource-saved'));
+      toast.success(`Auto-attendant "${name}" created and synced.`);
     } catch (e: any) {
-      alert('Create failed: ' + (e?.message || 'unknown'));
+      toast.error('Create failed: ' + (e?.message || 'unknown'));
     } finally { setSaving(false); }
   };
 
@@ -654,7 +710,9 @@ function IvrsTable() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Auto-Attendants <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500 }}>({data.length})</span></h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setCreating(true)} style={{ padding: '8px 14px', borderRadius: 9, background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4 }}>＋ New Auto-Attendant</button>
+          {isAdmin && (
+            <button onClick={() => setCreating(true)} disabled={roleLoading} style={{ padding: '8px 14px', borderRadius: 9, background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4, opacity: roleLoading ? 0.6 : 1 }}>＋ New Auto-Attendant</button>
+          )}
           <button onClick={() => reload(true)} disabled={syncing} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: syncing ? 0.6 : 1 }}>{syncing ? 'Syncing…' : '↻ Sync from PBX'}</button>
           <button onClick={() => reload(false)} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Reload</button>
         </div>
@@ -678,11 +736,12 @@ function IvrsTable() {
         {!loading && error && <div style={{ padding: 28, textAlign: 'center', color: c.danger, fontSize: 12 }}>{error}</div>}
       </div>
       {editing && <EditIvrModal ivr={editing} saving={saving} onClose={() => setEditing(null)} onSave={(changes) => save(editing, changes)} />}
-      {creating && (
+      {creating && isAdmin && (
         <PbxEditSheet
           title="New Auto-Attendant"
           groups={IVR_GROUPS}
           initial={{ ivr_menu_enabled: 'true', ivr_menu_timeout: 3000, ivr_menu_exit_action: 'hangup' }}
+          rules={IVR_RULES}
           saving={saving}
           width={680}
           onCancel={() => setCreating(false)}
@@ -722,6 +781,7 @@ function EditIvrModal({ ivr, saving, onClose, onSave }: { ivr: any; saving: bool
 const STRATEGIES = ['ring-all', 'longest-idle-agent', 'round-robin', 'top-down', 'agent-with-least-talk-time', 'agent-with-fewest-calls', 'sequentially-by-agent-order', 'random'];
 
 function QueuesTable() {
+  const { isAdmin, loading: roleLoading } = useDesktopRole();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -785,10 +845,34 @@ function QueuesTable() {
   };
 
   const create = async (form: any) => {
+    if (!isAdmin) { toast.error('Admin role required to create call queues.'); return; }
     setSaving(true);
     try {
       const me = await getMeContext();
       const orgId = me.organization_id || LEMTEL_ORG;
+      const name = String(form.queue_name || '').trim();
+      const ext = String(form.queue_extension || '').trim();
+      if (name) {
+        const { data: dup } = await supabase
+          .from('pbx_call_queues')
+          .select('id, name, extension')
+          .eq('organization_id', orgId)
+          .eq('name', name)
+          .maybeSingle();
+        if (dup) {
+          const choice = window.confirm(
+            `A call queue named "${name}" already exists.\n\nClick OK to open it for editing instead, or Cancel to abort.`,
+          );
+          setSaving(false);
+          if (choice) {
+            setCreating(false);
+            await reload(false);
+            const match = data.find((r) => r.name === name);
+            if (match) setEditing(match);
+          }
+          return;
+        }
+      }
       const out: any = { ...form };
       if (out.queue_max_wait_time !== undefined) out.queue_max_wait_time = String(out.queue_max_wait_time);
       const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
@@ -798,8 +882,9 @@ function QueuesTable() {
       setCreating(false);
       await reload(true);
       window.dispatchEvent(new Event('ava:pbx-resource-saved'));
+      toast.success(`Call queue "${name}"${ext ? ` (ext ${ext})` : ''} created and synced.`);
     } catch (e: any) {
-      alert('Create failed: ' + (e?.message || 'unknown'));
+      toast.error('Create failed: ' + (e?.message || 'unknown'));
     } finally { setSaving(false); }
   };
 
@@ -809,7 +894,9 @@ function QueuesTable() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Call Queues <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500 }}>({data.length})</span></h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setCreating(true)} style={{ padding: '8px 14px', borderRadius: 9, background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4 }}>＋ New Queue</button>
+          {isAdmin && (
+            <button onClick={() => setCreating(true)} disabled={roleLoading} style={{ padding: '8px 14px', borderRadius: 9, background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`, border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4, opacity: roleLoading ? 0.6 : 1 }}>＋ New Queue</button>
+          )}
           <button onClick={() => reload(true)} disabled={syncing} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer', opacity: syncing ? 0.6 : 1 }}>{syncing ? 'Syncing…' : '↻ Sync from PBX'}</button>
           <button onClick={() => reload(false)} style={{ padding: '8px 14px', borderRadius: 9, background: 'transparent', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Reload</button>
         </div>
@@ -834,11 +921,12 @@ function QueuesTable() {
         {!loading && error && <div style={{ padding: 28, textAlign: 'center', color: c.danger, fontSize: 12 }}>{error}</div>}
       </div>
       {editing && <EditQueueModal queue={editing} saving={saving} onClose={() => setEditing(null)} onSave={(changes) => save(editing, changes)} />}
-      {creating && (
+      {creating && isAdmin && (
         <PbxEditSheet
           title="New Call Queue"
           groups={QUEUE_GROUPS}
           initial={{ queue_enabled: 'true', queue_strategy: 'ring-all', queue_max_wait_time: 60 }}
+          rules={QUEUE_RULES}
           saving={saving}
           width={680}
           onCancel={() => setCreating(false)}
