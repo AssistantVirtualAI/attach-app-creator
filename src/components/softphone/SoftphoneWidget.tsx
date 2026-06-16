@@ -62,13 +62,14 @@ export interface SoftphoneWidgetProps {
 }
 
 export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) {
-  const { isMember } = useLemtelAccess();
+  const { isMember, isAdmin } = useLemtelAccess();
   const { user } = useAuth();
   const sp = useSoftphone();
   const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [expanded, setExpanded] = useState(variant === "full");
   const [tab, setTab] = useState<Tab>("dial");
+  const [recentsScope, setRecentsScope] = useState<"mine" | "all">("mine");
   const [number, setNumber] = useState("");
   const [showDTMF, setShowDTMF] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
@@ -90,16 +91,22 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
     if (sp.snap.callState === "ringing-in") setExpanded(true);
   }, [sp.snap.callState]);
 
-  // Recent calls
+  // Recent calls — admin can switch to "all org" view
+  const ext = sp.config?.extension || null;
+  const showAllCalls = isAdmin && recentsScope === "all";
   const { data: recents = [] } = useQuery({
-    queryKey: ["softphone-recents", sp.config?.extension],
-    enabled: !!sp.config?.extension,
+    queryKey: ["softphone-recents", ext, showAllCalls],
+    enabled: !!ext || showAllCalls,
     queryFn: async () => {
-      const { data } = await supabase
+      let q = (supabase as any)
         .from("pbx_call_records")
-        .select("id, direction, caller_number, destination_number, duration_seconds, start_at")
+        .select("id, direction, caller_number, destination_number, duration_seconds, start_at, extension, has_recording, recording_path, domain_name")
         .order("start_at", { ascending: false })
-        .limit(20);
+        .limit(showAllCalls ? 100 : 30);
+      if (!showAllCalls && ext) {
+        q = q.or(`extension.eq.${ext},caller_number.eq.${ext},destination_number.eq.${ext}`);
+      }
+      const { data } = await q;
       return data || [];
     },
   });
@@ -154,7 +161,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
 
   if (!isMember) return null;
 
-  const ext = sp.config?.extension || "—";
+  const extLabel = ext || "—";
   const sipStatus = sp.snap.status;
   const callState = sp.snap.callState;
   const inCall = callState === "active" || callState === "held";
@@ -190,8 +197,8 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
         "bg-gradient-to-br from-primary to-primary/70",
         inCall && "animate-pulse",
       )}
-      aria-label={`AVA Softphone — Ext. ${ext}`}
-      title={`AVA Softphone — Ext. ${ext}`}
+      aria-label={`AVA Softphone — Ext. ${extLabel}`}
+      title={`AVA Softphone — Ext. ${extLabel}`}
     >
       <Phone className="w-6 h-6" />
       <span className={cn(
@@ -201,7 +208,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
     </button>
   );
 
-  const hasExtension = ext && ext !== "—";
+  const hasExtension = !!ext;
   const sipLabel =
     sipStatus === "registered" ? "Registered"
     : sipStatus === "connecting" || sipStatus === "connected" ? "Connecting"
@@ -222,7 +229,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="font-semibold text-sm leading-tight">
-                {hasExtension ? `Ext ${ext}` : "No extension"}
+                {hasExtension ? `Ext ${extLabel}` : "No extension"}
               </span>
               {sp.config?.mock && <Badge variant="outline" className="h-4 text-[9px] px-1">DEMO</Badge>}
             </div>
@@ -455,31 +462,55 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
   );
 
   const recentsTab = (
-    <ScrollArea className="flex-1">
-      <div className="p-2 space-y-1">
-        {recents.length === 0 ? (
-          <div className="text-center text-xs text-muted-foreground py-10">No recent calls</div>
-        ) : recents.map((c: any) => (
+    <div className="flex-1 flex flex-col min-h-0">
+      {isAdmin && (
+        <div className="px-2 pt-2 flex items-center gap-1 text-[10px]">
           <button
-            key={c.id}
-            onClick={() => { setNumber(c.direction === "outbound" ? c.destination_number : c.caller_number); setTab("dial"); }}
-            className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-muted/60 text-left"
-          >
-            <span className={cn(
-              "w-7 h-7 rounded-full flex items-center justify-center text-white text-xs",
-              c.direction === "outbound" ? "bg-blue-500" : c.duration_seconds > 0 ? "bg-emerald-500" : "bg-rose-500",
-            )}>
-              <Phone className="w-3 h-3" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm truncate">{c.direction === "outbound" ? c.destination_number : c.caller_number}</div>
-              <div className="text-[10px] text-muted-foreground">{new Date(c.start_at).toLocaleString()}</div>
-            </div>
-            <div className="text-xs text-muted-foreground">{c.duration_seconds || 0}s</div>
-          </button>
-        ))}
-      </div>
-    </ScrollArea>
+            onClick={() => setRecentsScope("mine")}
+            className={cn("px-2 py-1 rounded-md border", recentsScope === "mine" ? "bg-primary text-primary-foreground border-primary" : "border-border/60 text-muted-foreground")}
+          >My ext</button>
+          <button
+            onClick={() => setRecentsScope("all")}
+            className={cn("px-2 py-1 rounded-md border", recentsScope === "all" ? "bg-primary text-primary-foreground border-primary" : "border-border/60 text-muted-foreground")}
+          >All domain</button>
+          <span className="ml-auto text-muted-foreground">{recents.length}</span>
+        </div>
+      )}
+      <ScrollArea className="flex-1">
+        <div className="p-2 space-y-1">
+          {recents.length === 0 ? (
+            <div className="text-center text-xs text-muted-foreground py-10">No recent calls</div>
+          ) : recents.map((c: any) => {
+            const target = c.direction === "outbound" ? c.destination_number : c.caller_number;
+            return (
+              <button
+                key={c.id}
+                onClick={() => { setNumber(target || ""); setTab("dial"); }}
+                className="w-full flex items-center gap-2 p-2 rounded-lg hover:bg-muted/60 text-left"
+              >
+                <span className={cn(
+                  "w-7 h-7 rounded-full flex items-center justify-center text-white text-xs shrink-0",
+                  c.direction === "outbound" ? "bg-blue-500" : c.duration_seconds > 0 ? "bg-emerald-500" : "bg-rose-500",
+                )}>
+                  <Phone className="w-3 h-3" />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm truncate flex items-center gap-1">
+                    {target || "—"}
+                    {c.has_recording && <Badge variant="outline" className="h-3.5 text-[8px] px-1">REC</Badge>}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground truncate">
+                    {showAllCalls && c.extension ? `ext ${c.extension} · ` : ""}
+                    {new Date(c.start_at).toLocaleString()}
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground shrink-0">{c.duration_seconds || 0}s</div>
+              </button>
+            );
+          })}
+        </div>
+      </ScrollArea>
+    </div>
   );
 
   const smsTab = (
