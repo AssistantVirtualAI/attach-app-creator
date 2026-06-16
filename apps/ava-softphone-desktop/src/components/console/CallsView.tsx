@@ -31,7 +31,7 @@ function relative(iso: string | null) {
   return hrs < 24 ? `${hrs}h ago` : fmtDate(iso);
 }
 
-export default function CallsView() {
+export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' } = {}) {
   const { orgId, extension } = useTenant();
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +49,7 @@ export default function CallsView() {
     if (!silent) setLoading(true);
     setError(null); setSyncing(true);
     try {
-      const scopedCalls = await ava.calls(150);
+      const scopedCalls = await ava.calls(150, { scope });
       setCalls(scopedCalls);
       setSel((current) => current ? scopedCalls.find((cr) => cr.id === current.id) || current : current);
     } catch (err: any) {
