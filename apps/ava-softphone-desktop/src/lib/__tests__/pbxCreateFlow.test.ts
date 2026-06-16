@@ -11,11 +11,17 @@
 //      never before — and the data-refresh event is dispatched.
 //   4. The `ava:pbx-resource-saved` event reaches every listener so multiple
 //      open views all refetch after a create.
-//
-// @vitest-environment jsdom
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { runCreatePbxResourceFlow, type CreateFlowDeps } from '../pbxCreateFlow';
+
+// Minimal `window` shim using Node 18+ native EventTarget/Event so the test
+// does not require a DOM. Mirrors only the surface the flow uses.
+const win = new EventTarget() as any;
+win.dispatchEvent = win.dispatchEvent.bind(win);
+win.addEventListener = win.addEventListener.bind(win);
+win.removeEventListener = win.removeEventListener.bind(win);
+(globalThis as any).window = win;
 
 function makeDeps(overrides: Partial<CreateFlowDeps> = {}): CreateFlowDeps {
   return {
