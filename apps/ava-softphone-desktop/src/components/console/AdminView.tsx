@@ -226,11 +226,14 @@ function ExtensionsTable() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h1 style={{ fontSize: 22, color: c.textIce, margin: 0 }}>Extensions <span style={{ fontSize: 12, color: c.mutedSilver, fontWeight: 500 }}>({data.length})</span></h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setCreating(true)} style={{
-            padding: '8px 14px', borderRadius: 9,
-            background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
-            border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4,
-          }}>＋ New Extension</button>
+          {isAdmin && (
+            <button onClick={() => setCreating(true)} disabled={roleLoading} style={{
+              padding: '8px 14px', borderRadius: 9,
+              background: `linear-gradient(135deg, ${c.lemtelBlue}, ${c.avaViolet})`,
+              border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.4,
+              opacity: roleLoading ? 0.6 : 1,
+            }}>＋ New Extension</button>
+          )}
           <button onClick={() => reload(true)} disabled={syncing} style={{
             padding: '8px 14px', borderRadius: 9, background: 'transparent',
             border: `1px solid ${c.border}`, color: c.textIce, fontSize: 12, fontWeight: 700, cursor: 'pointer',
