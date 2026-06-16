@@ -384,7 +384,7 @@ function DeleteQueueBtn({ queue }: { queue: any }) {
       toast({ title: 'Failed', description: e.message, variant: 'destructive' });
     } finally { setBusy(false); }
   };
-  return <Button size="sm" variant="ghost" onClick={onClick} disabled={busy}>{busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 text-destructive" />}</Button>;
+  return <Button size="sm" variant="outline" onClick={onClick} disabled={busy} title="Delete queue">{busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Trash2 className="w-3.5 h-3.5 mr-1 text-destructive" /> Delete</>}</Button>;
 }
 
 // ---------- Agents per queue ----------
