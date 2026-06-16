@@ -361,42 +361,78 @@ html[data-ava-theme="midnight"] ::-webkit-scrollbar-thumb:hover {
    opacity, brighten text, and strengthen interactive states.
    ============================================================ */
 html[data-ava-theme="dark"] .lemtel-rail {
-  background: rgba(14, 20, 42, 0.85) !important;
-  border-right-color: rgba(120, 160, 255, 0.22) !important;
+  background: rgba(10, 16, 36, 0.94) !important;
+  border-right-color: rgba(140, 180, 255, 0.30) !important;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
 }
 html[data-ava-theme="midnight"] .lemtel-rail {
-  background: rgba(10, 14, 32, 0.92) !important;
-  border-right-color: rgba(130, 170, 255, 0.28) !important;
+  background: rgba(6, 10, 26, 0.97) !important;
+  border-right-color: rgba(150, 190, 255, 0.34) !important;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.05);
 }
+
+/* Inactive nav items — bright enough to read on glass */
 html[data-ava-theme="dark"] .lemtel-rail-item,
 html[data-ava-theme="midnight"] .lemtel-rail-item {
-  color: rgba(230, 240, 255, 0.82);
+  color: rgba(238, 245, 255, 0.92) !important;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
 }
-html[data-ava-theme="dark"] .lemtel-rail-item:hover,
-html[data-ava-theme="midnight"] .lemtel-rail-item:hover {
-  background: rgba(255, 255, 255, 0.10) !important;
-  color: #f1f7ff !important;
+
+/* Hover — clearly distinct from inactive, never washes text out */
+html[data-ava-theme="dark"] .lemtel-rail-item:hover:not([data-active="true"]),
+html[data-ava-theme="midnight"] .lemtel-rail-item:hover:not([data-active="true"]) {
+  background: rgba(120, 160, 255, 0.18) !important;
+  color: #ffffff !important;
+  border-color: rgba(140, 180, 255, 0.35) !important;
 }
+
+/* Pressed */
 html[data-ava-theme="dark"] .lemtel-rail-item:active,
 html[data-ava-theme="midnight"] .lemtel-rail-item:active {
-  background: rgba(255, 255, 255, 0.16) !important;
+  background: rgba(120, 160, 255, 0.28) !important;
 }
+
+/* Active route — brand-tinted surface, full-white text, glowing left bar */
 html[data-ava-theme="dark"] .lemtel-rail-item[data-active="true"],
 html[data-ava-theme="midnight"] .lemtel-rail-item[data-active="true"] {
+  background: linear-gradient(90deg, rgba(0, 35, 230, 0.42), rgba(33, 212, 253, 0.14)) !important;
   color: #ffffff !important;
-  border-color: rgba(0, 35, 230, 0.35) !important;
+  border-color: rgba(77, 130, 255, 0.55) !important;
+  box-shadow:
+    0 6px 22px -10px rgba(77, 130, 255, 0.65),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
 }
+
+/* Focus ring tuned for the brand surface */
+html[data-ava-theme="dark"] .lemtel-rail-item:focus-visible,
+html[data-ava-theme="midnight"] .lemtel-rail-item:focus-visible {
+  box-shadow:
+    0 0 0 2px #06112a,
+    0 0 0 4px #4dd5ff !important;
+}
+
+/* Search button */
 html[data-ava-theme="dark"] .lemtel-rail-search,
 html[data-ava-theme="midnight"] .lemtel-rail-search {
-  background: rgba(255, 255, 255, 0.07) !important;
-  border-color: rgba(120, 160, 255, 0.22) !important;
-  color: rgba(230, 240, 255, 0.90) !important;
+  background: rgba(255, 255, 255, 0.09) !important;
+  border-color: rgba(140, 180, 255, 0.30) !important;
+  color: #eaf2ff !important;
 }
+html[data-ava-theme="dark"] .lemtel-rail-search:hover,
+html[data-ava-theme="midnight"] .lemtel-rail-search:hover {
+  background: rgba(120, 160, 255, 0.18) !important;
+  border-color: rgba(140, 180, 255, 0.55) !important;
+  color: #ffffff !important;
+}
+
+/* Org chip */
 html[data-ava-theme="dark"] .lemtel-rail-chip,
 html[data-ava-theme="midnight"] .lemtel-rail-chip {
-  background: rgba(255, 255, 255, 0.07) !important;
-  border-color: rgba(120, 160, 255, 0.22) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(140, 180, 255, 0.28) !important;
+  color: #eaf2ff !important;
 }
+
 
 /* ============================================================
    Keyboard focus rings — guaranteed visible across all themes.
