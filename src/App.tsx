@@ -94,6 +94,7 @@ import LemtelPortalCalls from "./pages/lemtel/LemtelPortalCalls";
 import LemtelStub from "./pages/lemtel/LemtelStub";
 import LemtelCustomers from "./pages/lemtel/LemtelCustomers";
 import CustomerDetail from "./pages/lemtel/CustomerDetail";
+import CustomerPortalGate from "./pages/CustomerPortalGate";
 import LemtelGateways from "./pages/lemtel/LemtelGateways";
 import LemtelVoiceGateways from "./pages/lemtel/LemtelVoiceGateways";
 import LemtelExtensions from "./pages/lemtel/LemtelExtensions";
@@ -243,7 +244,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const LemtelAdminPage = ({ children }: { children: React.ReactNode }) => (
-  <ProtectedRoute><LemtelGuard><AdminPortalLayout>{children}</AdminPortalLayout></LemtelGuard></ProtectedRoute>
+  <ProtectedRoute><LemtelGuard><ImpersonationProvider><AdminPortalLayout>{children}</AdminPortalLayout></ImpersonationProvider></LemtelGuard></ProtectedRoute>
 );
 
 const LemtelUserPage = ({ children }: { children: React.ReactNode }) => (
@@ -289,6 +290,7 @@ const App = () => (
                 {/* Universal login - redirects based on user type */}
                 <Route path="/login" element={<UniversalLogin />} />
                 <Route path="/portals" element={<PortalChooser />} />
+                <Route path="/c/:domain" element={<CustomerPortalGate />} />
                 <Route path="/end-user/login" element={<EndUserLogin />} />
                 <Route path="/extension/login" element={<Navigate to="/end-user/login" replace />} />
                 

@@ -1,18 +1,22 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, Globe, Loader2, RefreshCw, LogIn } from 'lucide-react';
+import { ArrowLeft, Globe, Loader2, RefreshCw, LogIn, Upload, UserPlus, Mail, Link2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { RecordingWavePlayer } from '@/components/portal/RecordingWavePlayer';
 import { formatDistanceToNow } from 'date-fns';
 import { loadPbxRecordingAudio } from '@/lib/pbxRecordingAudio';
+import { useImpersonation } from '@/contexts/ImpersonationContext';
 
 async function pbxList(action: string, domain_uuid: string) {
   const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
@@ -25,10 +29,18 @@ async function pbxList(action: string, domain_uuid: string) {
 export default function CustomerDetail() {
   const { domainUuid = '' } = useParams();
   const qc = useQueryClient();
+  const impersonation = useImpersonation();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState('users');
   const [recUrls, setRecUrls] = useState<Record<string, string>>({});
   const [recLoading, setRecLoading] = useState<string | null>(null);
   const [expandedRec, setExpandedRec] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState<any>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({ extension: '', name: '', email: '' });
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
 
   // Domain info + tenant org
   const { data: domain } = useQuery({
@@ -121,12 +133,85 @@ export default function CustomerDetail() {
     qc.invalidateQueries({ queryKey: ['fpbx'] });
   };
 
-  const impersonate = () => {
+  const impersonate = async () => {
     if (!domain) return;
-    sessionStorage.setItem('lemtel.activeDomain', JSON.stringify({ uuid: domainUuid, name: domain.domain_name, org_id: org?.id }));
+    if (!org) { toast.error('No tenant org linked'); return; }
+    sessionStorage.setItem('lemtel.activeDomain', JSON.stringify({ uuid: domainUuid, name: domain.domain_name, org_id: org.id }));
+    await impersonation.enter(org.id, org.name);
     toast.success(`Now managing ${domain.domain_name}`);
-    window.location.href = '/org/lemtel/admin/dashboard';
+    window.location.href = '/console';
   };
+
+  const copyPortalLink = () => {
+    if (!domain) return;
+    const url = `${window.location.origin}/c/${encodeURIComponent(domain.domain_name)}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Portal link copied');
+  };
+
+  const parseCsv = (text: string): any[] => {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (!lines.length) return [];
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    return lines.slice(1).map(line => {
+      const cells = line.split(',').map(c => c.trim());
+      const row: any = {};
+      headers.forEach((h, i) => { row[h] = cells[i] || ''; });
+      return row;
+    });
+  };
+
+  const handleCsvFile = async (f: File) => {
+    if (!org || !domain) { toast.error('Tenant or domain missing'); return; }
+    setImporting(true);
+    setImportReport(null);
+    try {
+      const text = await f.text();
+      const rows = parseCsv(text);
+      if (!rows.length) { toast.error('CSV empty'); return; }
+      const { data, error } = await supabase.functions.invoke('customer-users-import', {
+        body: {
+          organizationId: org.id,
+          domain_uuid: domainUuid,
+          domain_name: domain.domain_name,
+          users: rows,
+        },
+      });
+      if (error) throw error;
+      setImportReport(data);
+      toast.success(`Imported ${(data as any)?.succeeded || 0}/${(data as any)?.total || rows.length}`);
+      refetchSP();
+    } catch (e: any) {
+      toast.error(e.message || 'Import failed');
+    } finally { setImporting(false); if (fileRef.current) fileRef.current.value = ''; }
+  };
+
+  const handleAddUser = async () => {
+    if (!org || !domain || !addForm.extension) { toast.error('Extension required'); return; }
+    const { data, error } = await supabase.functions.invoke('customer-users-import', {
+      body: {
+        organizationId: org.id,
+        domain_uuid: domainUuid,
+        domain_name: domain.domain_name,
+        users: [addForm],
+      },
+    });
+    if (error) return toast.error(error.message);
+    const r = (data as any)?.results?.[0];
+    if (r?.ok) { toast.success(`Extension ${addForm.extension} added`); setAddOpen(false); setAddForm({ extension: '', name: '', email: '' }); refetchSP(); }
+    else toast.error(r?.error || 'Add failed');
+  };
+
+  const handleInvite = async () => {
+    if (!org || !inviteEmail) { toast.error('Email + linked tenant required'); return; }
+    const { error } = await supabase.functions.invoke('customer-invite-admin', {
+      body: { organizationId: org.id, email: inviteEmail },
+    });
+    if (error) return toast.error(error.message);
+    toast.success('Invite sent + org_admin role assigned');
+    setInviteOpen(false); setInviteEmail('');
+  };
+
 
   const fetchRecording = async (r: any) => {
     if (recUrls[r.id]) return recUrls[r.id];
@@ -158,9 +243,10 @@ export default function CustomerDetail() {
             {org ? <>Tenant: <strong>{org.name}</strong></> : 'Not linked to a tenant'}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={syncAll}><RefreshCw className="w-4 h-4 mr-2" /> Sync</Button>
-          <Button onClick={impersonate}><LogIn className="w-4 h-4 mr-2" /> Manage as this tenant</Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={copyPortalLink}><Link2 className="w-4 h-4 mr-2" /> Portal link</Button>
+          <Button variant="outline" size="sm" onClick={syncAll}><RefreshCw className="w-4 h-4 mr-2" /> Sync</Button>
+          <Button size="sm" onClick={impersonate} disabled={!org}><LogIn className="w-4 h-4 mr-2" /> Manage as this tenant</Button>
         </div>
       </div>
 
@@ -175,7 +261,34 @@ export default function CustomerDetail() {
           <TabsTrigger value="moh">Music on Hold</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="users">
+        <TabsContent value="users" className="space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              ref={fileRef} type="file" accept=".csv,text/csv" className="hidden"
+              onChange={(e) => e.target.files?.[0] && handleCsvFile(e.target.files[0])}
+            />
+            <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={importing || !org}>
+              {importing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+              Import CSV
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setAddOpen(true)} disabled={!org}>
+              <UserPlus className="w-4 h-4 mr-2" /> Add user
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setInviteOpen(true)} disabled={!org}>
+              <Mail className="w-4 h-4 mr-2" /> Invite admin
+            </Button>
+            <span className="text-xs text-muted-foreground ml-2">
+              CSV columns: <code>extension,name,email,password,voicemail_pin,outbound_cid</code>
+            </span>
+          </div>
+          {importReport && (
+            <Card><CardContent className="p-3 text-xs space-y-1">
+              <div className="font-medium">Import: {importReport.succeeded}/{importReport.total} succeeded · {importReport.failed} failed</div>
+              {importReport.results?.filter((r: any) => !r.ok).slice(0, 10).map((r: any, i: number) => (
+                <div key={i} className="text-destructive">Ext {r.extension}: {r.error}</div>
+              ))}
+            </CardContent></Card>
+          )}
           <Card><CardContent className="p-0">
             <Table>
               <TableHeader><TableRow>
@@ -243,6 +356,35 @@ export default function CustomerDetail() {
           </CardContent></Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add user / extension</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Extension *</Label><Input value={addForm.extension} onChange={e => setAddForm({ ...addForm, extension: e.target.value })} placeholder="1001" /></div>
+            <div><Label>Display name</Label><Input value={addForm.name} onChange={e => setAddForm({ ...addForm, name: e.target.value })} /></div>
+            <div><Label>Email (optional — links portal user)</Label><Input type="email" value={addForm.email} onChange={e => setAddForm({ ...addForm, email: e.target.value.toLowerCase() })} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddUser}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Invite admin to {org?.name || 'tenant'}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Email</Label><Input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value.toLowerCase())} placeholder="admin@customer.com" /></div>
+            <p className="text-xs text-muted-foreground">User receives a signup invite (or is linked if already registered) and gets <code>org_admin</code> on this tenant.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInviteOpen(false)}>Cancel</Button>
+            <Button onClick={handleInvite}>Send invite</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

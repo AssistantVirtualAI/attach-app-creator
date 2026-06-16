@@ -10163,6 +10163,15 @@ export type Database = {
       }
       reconcile_pbx_call_records: { Args: { _org_id: string }; Returns: Json }
       relink_my_softphone_user: { Args: never; Returns: Json }
+      resolve_org_by_domain_name: {
+        Args: { _domain_name: string }
+        Returns: {
+          fusionpbx_domain_uuid: string
+          id: string
+          name: string
+          slug: string
+        }[]
+      }
       rollback_admin_action: { Args: { _action_id: string }; Returns: Json }
       run_security_audit: { Args: { _org_id: string }; Returns: Json }
       set_call_notes: {
@@ -10176,6 +10185,16 @@ export type Database = {
       set_softphone_platform_access: {
         Args: { _desktop: boolean; _mobile: boolean; _softphone_id: string }
         Returns: Json
+      }
+      setup_customer_organization: {
+        Args: {
+          _admin_email?: string
+          _domain_name: string
+          _domain_uuid: string
+          _name: string
+          _slug: string
+        }
+        Returns: string
       }
       setup_new_user_organization: {
         Args: { _full_name?: string; _user_email: string; _user_id: string }

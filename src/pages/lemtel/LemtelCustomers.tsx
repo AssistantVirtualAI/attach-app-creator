@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Search, Building2, Loader2, Globe, RefreshCw, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Building2, Loader2, Globe, RefreshCw, ChevronRight, Pencil, Trash2, LogIn, Link2 } from 'lucide-react';
+import { useImpersonation } from '@/contexts/ImpersonationContext';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,9 +36,10 @@ type Ext = {
 
 export default function LemtelCustomers() {
   const qc = useQueryClient();
+  const impersonation = useImpersonation();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', domain: '' });
+  const [form, setForm] = useState({ name: '', domain: '', adminEmail: '' });
   const [domainTouched, setDomainTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -123,6 +125,7 @@ export default function LemtelCustomers() {
     if (!form.name || !form.domain) return toast.error('Name and domain required');
     setSaving(true);
     try {
+      // 1) Create the FusionPBX domain
       const { data: res, error: fnErr } = await supabase.functions.invoke('pbx-write', {
         body: {
           organizationId: LEMTEL_ORG,
@@ -131,14 +134,57 @@ export default function LemtelCustomers() {
         },
       });
       if (fnErr || (res as any)?.error) throw new Error((fnErr as any)?.message || (res as any)?.error || 'create-domain failed');
-      toast.success(`Domain ${form.domain} created on FusionPBX`);
-      setForm({ name: '', domain: '' });
+      const domainUuid = (res as any)?.data?.domain_uuid || (res as any)?.domain_uuid || null;
+      toast.success(`Domain ${form.domain} created`);
+
+      // 2) Auto-create the matching tenant organization
+      if (domainUuid) {
+        const { error: orgErr } = await (supabase as any).rpc('setup_customer_organization', {
+          _name: form.name,
+          _slug: slugify(form.name),
+          _domain_uuid: domainUuid,
+          _domain_name: form.domain,
+          _admin_email: form.adminEmail || null,
+        });
+        if (orgErr) toast.error('Tenant org link failed: ' + orgErr.message);
+        else toast.success('Tenant organization linked');
+      } else {
+        toast.warning('Could not link tenant org (missing domain_uuid in PBX response)');
+      }
+
+      // 3) Optionally invite the admin (sends email + assigns role)
+      if (form.adminEmail) {
+        await supabase.functions.invoke('customer-invite-admin', {
+          body: { organizationId: domainUuid ? undefined : null, email: form.adminEmail },
+        }).catch(() => {});
+      }
+
+      setForm({ name: '', domain: '', adminEmail: '' });
       setDomainTouched(false);
       setOpen(false);
       qc.invalidateQueries({ queryKey: ['fusionpbx', 'list-domains'] });
+      qc.invalidateQueries({ queryKey: ['organizations', 'fpbx-map'] });
     } catch (e: any) {
-      toast.error(e.message || 'Failed to create domain');
+      toast.error(e.message || 'Failed to create customer');
     } finally { setSaving(false); }
+  };
+
+  const manageAs = async (d: Domain) => {
+    const org = orgByDomain.get(d.domain_uuid);
+    if (!org) {
+      toast.error('No tenant org linked. Edit the customer to link or recreate.');
+      return;
+    }
+    sessionStorage.setItem('lemtel.activeDomain', JSON.stringify({ uuid: d.domain_uuid, name: d.domain_name, org_id: org.id }));
+    await impersonation.enter(org.id, org.name);
+    toast.success(`Now managing ${d.domain_name}`);
+    window.location.href = '/console';
+  };
+
+  const copyPortalLink = (d: Domain) => {
+    const url = `${window.location.origin}/c/${encodeURIComponent(d.domain_name)}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Portal link copied: ' + url);
   };
 
   const toggleExpand = (uuid: string) => {
@@ -244,6 +290,15 @@ export default function LemtelCustomers() {
                     onChange={e => { setDomainTouched(true); setForm({ ...form, domain: e.target.value.trim().toLowerCase() }); }}
                   />
                 </div>
+                <div>
+                  <Label>Admin email (optional — they get an invite + org_admin role)</Label>
+                  <Input
+                    type="email"
+                    value={form.adminEmail}
+                    placeholder="admin@customer.com"
+                    onChange={e => setForm({ ...form, adminEmail: e.target.value.trim().toLowerCase() })}
+                  />
+                </div>
               </div>
               <DialogFooter>
                 <Button onClick={handleCreate} disabled={saving}>
@@ -308,25 +363,36 @@ export default function LemtelCustomers() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
-                          variant="ghost" size="sm"
+                          variant="ghost" size="sm" title="Manage as this customer"
+                          onClick={(e) => { e.stopPropagation(); manageAs(d); }}
+                        >
+                          <LogIn className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="sm" title="Copy portal link"
+                          onClick={(e) => { e.stopPropagation(); copyPortalLink(d); }}
+                        >
+                          <Link2 className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="sm" title="Sync from PBX"
                           onClick={(e) => { e.stopPropagation(); syncDomain(d); }}
                           disabled={syncing === d.domain_uuid}
                         >
-                          {syncing === d.domain_uuid ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
-                          Sync
+                          {syncing === d.domain_uuid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(d); }}>
+                        <Button variant="ghost" size="sm" title="Edit" onClick={(e) => { e.stopPropagation(); openEdit(d); }}>
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
                         <Button
-                          variant="ghost" size="sm"
+                          variant="ghost" size="sm" title="Delete domain"
                           onClick={(e) => { e.stopPropagation(); deleteDomain(d); }}
                           disabled={deleting === d.domain_uuid}
                         >
                           {deleting === d.domain_uuid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 text-destructive" />}
                         </Button>
                         <Button asChild variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                          <Link to={`/org/lemtel/admin/customers/${d.domain_uuid}`}>Manage</Link>
+                          <Link to={`/org/lemtel/admin/customers/${d.domain_uuid}`}>Open</Link>
                         </Button>
                       </TableCell>
                     </TableRow>
