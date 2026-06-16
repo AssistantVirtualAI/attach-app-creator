@@ -85,6 +85,7 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
   const [analysis, setAnalysis] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [aiStage, setAiStage] = useState<'idle' | 'fetching' | 'transcribing' | 'analyzing' | 'done' | 'error'>('idle');
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
@@ -248,12 +249,13 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
 
   const runTranscribeAnalyze = async () => {
     if (!sel) return;
-    setAiLoading(true); setAiError(null);
+    setAiLoading(true); setAiError(null); setAiStage('fetching');
     try {
       const organization_id = (sel as any).organization_id || LEMTEL_ORG;
       const callId = (sel as any).callId || sel.id;
       let txt = transcript;
       if (!txt) {
+        setAiStage('transcribing');
         const r1 = await supabase.functions.invoke('ai-transcribe-call', {
           body: { callId, call_record_id: callId, organization_id,
                   recording_path: (sel as any).recording_path, recording_name: (sel as any).recording_name },
@@ -263,6 +265,7 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
         if (txt) setTranscript(txt);
       }
       if (!txt) throw new Error('No transcript available for AI analysis yet');
+      setAiStage('analyzing');
       const r2 = await supabase.functions.invoke('ai-analyze-call', {
         body: { callId, call_record_id: callId, organization_id, transcript_text: txt,
                 recording_path: (sel as any).recording_path, recording_name: (sel as any).recording_name },
@@ -271,8 +274,10 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
       const ai = (r2.data as any)?.analysis || (r2.data as any) || null;
       setAnalysis(ai);
       if (ai?.summary) updateItem(sel.id, { summary: ai.summary, topics: ai.topics || sel.topics, sentiment: ai.sentiment || sel.sentiment });
+      setAiStage('done');
     } catch (e: any) {
       setAiError(aiErr(e));
+      setAiStage('error');
     } finally {
       setAiLoading(false);
     }
@@ -451,11 +456,39 @@ export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'o
               {playbackError && <div style={{ fontSize: 11, color: c.mutedSilver, marginTop: 8 }}>{playbackError}</div>}
             </div>
 
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
               <button onClick={runTranscribeAnalyze} disabled={aiLoading} style={{ ...miniBtn, flex: 1, padding: '8px 10px', background: aiLoading ? 'transparent' : 'rgba(35,214,255,0.10)', color: c.avaCyan, borderColor: `${c.avaCyan}55`, fontWeight: 700 }}>
-                {aiLoading ? 'Running AI…' : (transcript ? '↻ Re-analyze' : '✨ Transcribe & Analyze')}
+                {aiLoading
+                  ? (aiStage === 'fetching' ? '⏳ Preparing audio…'
+                    : aiStage === 'transcribing' ? '🎙 Transcribing with AI…'
+                    : aiStage === 'analyzing' ? '🧠 Analyzing call…'
+                    : 'Running AI…')
+                  : aiStage === 'done' ? '✓ Done — re-run'
+                  : (transcript ? '↻ Re-analyze' : '✨ Transcribe & Analyze')}
               </button>
             </div>
+            {aiLoading && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: c.mutedSilver, marginBottom: 4 }}>
+                  <span style={{ color: aiStage === 'fetching' ? c.avaCyan : c.mutedSilver }}>1. Fetch audio</span>
+                  <span style={{ color: aiStage === 'transcribing' ? c.avaCyan : c.mutedSilver }}>2. Transcribe</span>
+                  <span style={{ color: aiStage === 'analyzing' ? c.avaCyan : c.mutedSilver }}>3. Analyze</span>
+                </div>
+                <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: aiStage === 'fetching' ? '20%' : aiStage === 'transcribing' ? '60%' : aiStage === 'analyzing' ? '90%' : '100%',
+                    background: `linear-gradient(90deg, ${c.avaCyan}, ${c.avaViolet})`,
+                    transition: 'width 300ms ease',
+                  }} />
+                </div>
+              </div>
+            )}
+            {!aiLoading && aiStage === 'done' && (
+              <div style={{ marginBottom: 12, fontSize: 11, color: c.signalGold }}>
+                ✓ Transcription and analysis complete
+              </div>
+            )}
             {aiError && (
               <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: 'rgba(239,68,68,0.10)', border: `1px solid ${c.danger}55`, color: c.textIce, fontSize: 11, display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                 <span>{aiError}</span>
