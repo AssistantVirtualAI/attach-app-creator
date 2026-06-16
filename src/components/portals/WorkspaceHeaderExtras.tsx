@@ -34,15 +34,20 @@ export function WorkspaceHeaderExtras() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const [{ data: p }, { data: sa }, { data: roles }, { data: pres }] = await Promise.all([
+      const [{ data: p }, { data: sa }, { data: roles }, { data: orgMembers }, { data: pres }] = await Promise.all([
         supabase.from("profiles").select("full_name,email,avatar_url").eq("id", user.id).maybeSingle(),
         supabase.rpc("is_super_admin", { _user_id: user.id }),
         supabase.from("user_roles").select("role").eq("user_id", user.id),
+        supabase.from("org_members").select("role").eq("user_id", user.id),
         supabase.from("user_presence").select("status").eq("user_id", user.id).maybeSingle(),
       ]);
       if (p) setProfile(p as any);
-      setIsSuper(!!sa);
-      setIsAdmin(!!sa || !!roles?.some((r: any) => ["org_admin", "reseller_admin", "manager"].includes(r.role)));
+      const isMaster = !!orgMembers?.some((r: any) => ["ava_admin", "master_admin"].includes(r.role));
+      const isOrgAdmin =
+        !!roles?.some((r: any) => ["org_admin", "reseller_admin", "manager"].includes(r.role)) ||
+        !!orgMembers?.some((r: any) => ["reseller_admin", "customer_admin"].includes(r.role));
+      setIsSuper(!!sa || isMaster);
+      setIsAdmin(!!sa || isMaster || isOrgAdmin);
       if (pres?.status) setStatus(pres.status);
     })();
   }, [user]);
