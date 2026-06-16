@@ -71,7 +71,13 @@ const formatRelative = (iso: string | null) => {
   return new Date(iso as string).toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
-export function useDashboardStats(orgId: string | null, extension: string | null) {
+export function useDashboardStats(
+  orgId: string | null,
+  extension: string | null,
+  range: RangeKey = 'today',
+  customFrom?: string,
+  customTo?: string,
+) {
   const [stats, setStats] = useState<DashboardStats>({
     missedToday: 0, answeredToday: 0, totalCallsToday: 0,
     recordingsToday: 0, recordingCoveragePct: 0,
@@ -82,12 +88,13 @@ export function useDashboardStats(orgId: string | null, extension: string | null
 
   const refresh = useCallback(async () => {
     if (!orgId) { setStats((s) => ({ ...s, loading: false, cdrFreshness: 'idle' })); return; }
-    const since = startOfDay();
+    const { from, to } = rangeBounds(range, customFrom, customTo);
 
     let callsQ = supabase.from('pbx_call_records')
       .select('id, missed_call, call_status, hangup_cause, voicemail_message, has_recording, recording_name, recording_path, start_at', { count: 'exact', head: false })
       .eq('organization_id', orgId)
-      .gte('start_at', since)
+      .gte('start_at', from)
+      .lte('start_at', to)
       .order('start_at', { ascending: false });
 
     let smsQ = supabase.from('pbx_sms_threads')
@@ -116,11 +123,12 @@ export function useDashboardStats(orgId: string | null, extension: string | null
     const freshnessMins = minutesAgo(lastCallAt);
     const cdrFreshness: DashboardStats['cdrFreshness'] = !Number.isFinite(freshnessMins) ? 'idle' : freshnessMins <= 15 ? 'live' : 'stale';
     const attention: AttentionItem[] = [];
+    const rangeLabel = range === 'today' ? 'today' : range === 'week' ? 'this week' : range === 'month' ? 'this month' : 'in selected range';
 
-    if (missed > 0) attention.push({ title: `${missed} missed call${missed === 1 ? '' : 's'} today`, detail: 'Review the call log and return priority calls from the console.', tag: 'Callback', tone: 'danger' });
+    if (missed > 0) attention.push({ title: `${missed} missed call${missed === 1 ? '' : 's'} ${rangeLabel}`, detail: 'Review the call log and return priority calls from the console.', tag: 'Callback', tone: 'danger' });
     if (unreadVoicemail > 0) attention.push({ title: `${unreadVoicemail} voicemail candidate${unreadVoicemail === 1 ? '' : 's'}`, detail: 'Open voicemail or recordings to listen, transcribe, and mark handled.', tag: 'Voicemail', tone: 'warn' });
     if (cdrFreshness === 'stale') attention.push({ title: 'CDR feed looks stale', detail: `Last synced call was ${formatRelative(lastCallAt)}. Run Phone System Sync if you just completed a call.`, tag: 'Sync', tone: 'info' });
-    if (attention.length === 0) attention.push({ title: 'Phone system is current', detail: `Last CDR ${formatRelative(lastCallAt)}. No urgent callbacks detected for this extension.`, tag: 'Live', tone: 'success' });
+    if (attention.length === 0) attention.push({ title: 'Phone system is current', detail: `Last CDR ${formatRelative(lastCallAt)}. No urgent items detected ${rangeLabel}.`, tag: 'Live', tone: 'success' });
 
     setStats({
       missedToday: missed,
@@ -139,7 +147,7 @@ export function useDashboardStats(orgId: string | null, extension: string | null
       pbxHealth: 'ok',
       loading: false,
     });
-  }, [orgId, extension]);
+  }, [orgId, extension, range, customFrom, customTo]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
