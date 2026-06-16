@@ -6,8 +6,10 @@ import { useTranslation } from '../../lib/i18n';
 const { colors: c } = theme;
 
 type Channel = { id: string; name: string; channel_type: string; organization_id: string; members: string[] | null; archived_at: string | null };
-type Message = { id: string; channel_id: string; sender_id: string; sender_name: string | null; content: string; created_at: string };
+type Message = { id: string; channel_id: string; sender_id: string; sender_name: string | null; content: string; created_at: string; reactions?: Record<string, string[]> | null; attachments?: any[] | null; message_type?: string; edited_at?: string | null };
 type Member = { user_id: string; display_name: string; extension: string | null; status: string; call_state: string | null };
+
+const EMOJIS = ['👍','❤️','😂','🎉','🚀','👀'];
 
 const STATUS_COLOR: Record<string, string> = {
   online: '#22d39a', available: '#22d39a',
