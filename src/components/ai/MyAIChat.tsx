@@ -37,6 +37,28 @@ function usePageContext(): PageContext {
   }, [loc.pathname, loc.search]);
 }
 
+const AUTO_ANSWER_KEY = "ava.autoAnswerOnDetail";
+
+export function useAutoAnswerSetting(): [boolean, (v: boolean) => void] {
+  const [on, setOn] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(AUTO_ANSWER_KEY) === "1";
+  });
+  const update = (v: boolean) => {
+    setOn(v);
+    try { window.localStorage.setItem(AUTO_ANSWER_KEY, v ? "1" : "0"); } catch {}
+  };
+  return [on, update];
+}
+
+function autoPromptFor(ctx: PageContext): string | null {
+  if (ctx.voicemail_id) return "Auto-brief me on this voicemail: caller, key points, urgency, and suggested reply.";
+  if (ctx.call_id) return "Auto-brief me on this call: summary, sentiment, and action items.";
+  if (ctx.recording_id) return "Auto-brief me on this recording: summary and key topics.";
+  return null;
+}
+
+
 
 const SUGGESTIONS = [
   "Summarize my calls today",
