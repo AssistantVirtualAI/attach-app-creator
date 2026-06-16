@@ -185,7 +185,7 @@ export default function ProfileMenu() {
           {avatar ? <img src={avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials}
           <span style={{
             position: 'absolute', right: -1, bottom: -1, width: 9, height: 9, borderRadius: '50%',
-            background: meta.color, border: '2px solid #0a1530',
+            background: meta.color, border: '2px solid #ffffff',
           }} />
         </span>
         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -197,7 +197,7 @@ export default function ProfileMenu() {
       {open && (
         <div style={{
           position: 'absolute', top: 38, right: 0, width: 260,
-          background: 'rgba(10,21,48,0.98)',
+          background: '#ffffff',
           border: `1px solid ${c.border}`, borderRadius: 12,
           boxShadow: '0 18px 48px -16px rgba(0,0,0,0.7)',
           padding: 10, zIndex: 200, backdropFilter: 'blur(14px)',
