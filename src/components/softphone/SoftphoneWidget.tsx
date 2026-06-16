@@ -161,7 +161,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
 
   if (!isMember) return null;
 
-  const ext = sp.config?.extension || "—";
+  const extLabel = ext || "—";
   const sipStatus = sp.snap.status;
   const callState = sp.snap.callState;
   const inCall = callState === "active" || callState === "held";
