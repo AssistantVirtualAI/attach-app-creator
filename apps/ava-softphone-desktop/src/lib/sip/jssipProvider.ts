@@ -231,6 +231,7 @@ export interface SoftphoneConfig {
   wssUrl: string;
   wssUrls?: string[];
   password: string;
+  authUsername?: string;
   mock?: boolean;
 }
 
