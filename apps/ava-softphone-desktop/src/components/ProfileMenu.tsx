@@ -38,8 +38,37 @@ const STATUS_META: Record<Status, { label: string; icon: string; color: string; 
 
 const AVATAR_KEY = 'lemtel:user-avatar';
 const STATUS_KEY = 'lemtel:user-status';
-
+const EXPIRY_KEY = 'lemtel:user-status-expiry';
 const MEETING_NOTE_KEY = 'lemtel:meeting-note';
+
+// Statuses that auto-revert to "available" after a chosen duration.
+const TEMP_STATUSES: Status[] = ['busy', 'meeting', 'dnd', 'lunch', 'break', 'training', 'sick', 'remote'];
+const LONG_STATUSES: Status[] = ['travel', 'vacation'];
+const DURATION_PRESETS: Array<{ label: string; mins: number }> = [
+  { label: '15 min', mins: 15 },
+  { label: '30 min', mins: 30 },
+  { label: '1 h',    mins: 60 },
+  { label: '2 h',    mins: 120 },
+  { label: '4 h',    mins: 240 },
+  { label: 'End of day', mins: -1 },
+];
+const LONG_PRESETS: Array<{ label: string; mins: number }> = [
+  { label: 'Today',   mins: -1 },
+  { label: '1 day',   mins: 60 * 24 },
+  { label: '3 days',  mins: 60 * 24 * 3 },
+  { label: '1 week',  mins: 60 * 24 * 7 },
+  { label: '2 weeks', mins: 60 * 24 * 14 },
+];
+
+function computeExpiry(mins: number): number {
+  if (mins === -1) {
+    const d = new Date();
+    d.setHours(18, 0, 0, 0); // end of day = 18:00 local
+    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+    return d.getTime();
+  }
+  return Date.now() + mins * 60_000;
+}
 
 export default function ProfileMenu() {
   const [open, setOpen] = useState(false);
@@ -53,6 +82,12 @@ export default function ProfileMenu() {
   const [meetingNote, setMeetingNote] = useState<string>(() => localStorage.getItem(MEETING_NOTE_KEY) || '');
   const [lockMsg, setLockMsg] = useState<string>('');
   const [profileOpen, setProfileOpen] = useState(false);
+  const [expiryAt, setExpiryAt] = useState<number | null>(() => {
+    const raw = localStorage.getItem(EXPIRY_KEY);
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > Date.now() ? n : null;
+  });
+  const [pendingStatus, setPendingStatus] = useState<Status | null>(null);
   const { call } = useCallBus();
   const inCall = !!call && call.status !== 'ended' && call.status !== 'idle';
   const rootRef = useRef<HTMLDivElement>(null);
@@ -61,6 +96,7 @@ export default function ProfileMenu() {
   const statusRef = useRef<Status>(status);
   const openRef = useRef<boolean>(open);
   const inCallRef = useRef<boolean>(inCall);
+  const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   statusRef.current = status;
   openRef.current = open;
   inCallRef.current = inCall;
@@ -126,6 +162,21 @@ export default function ProfileMenu() {
             const next = (payload.new?.status || payload.old?.status) as Status | undefined;
             if (!next || !STATUS_META[next]) return;
             if (next === statusRef.current) return;
+            // Remote device changed status — drop any local auto-revert timer and pending picker.
+            if (expiryTimerRef.current) { clearTimeout(expiryTimerRef.current); expiryTimerRef.current = null; }
+            setExpiryAt(null);
+            setPendingStatus(null);
+            try { localStorage.removeItem(EXPIRY_KEY); } catch { /* noop */ }
+            // Parse "until:<iso>" from message to re-arm local timer if present.
+            const msg = payload.new?.status_message as string | undefined;
+            if (msg && msg.startsWith('until:')) {
+              const ts = Date.parse(msg.slice(6));
+              if (Number.isFinite(ts) && ts > Date.now()) {
+                setExpiryAt(ts);
+                try { localStorage.setItem(EXPIRY_KEY, String(ts)); } catch { /* noop */ }
+                scheduleAutoRevert(ts);
+              }
+            }
             setStatus(next);
             try { localStorage.setItem(STATUS_KEY, next); } catch { /* noop */ }
             window.dispatchEvent(new CustomEvent('lemtel:set-status', { detail: STATUS_META[next].manual }));
@@ -176,12 +227,14 @@ export default function ProfileMenu() {
   const meta = STATUS_META[status];
   const initials = (name || email || '?').slice(0, 2).toUpperCase();
 
-  const persistPresence = async (s: Status, note?: string) => {
+  const persistPresence = async (s: Status, note?: string, untilTs?: number | null) => {
     const m = STATUS_META[s];
     try {
       await supabase.rpc('upsert_user_presence', {
         _status: s,
-        _message: s === 'meeting' ? (note ?? meetingNote ?? null) : null,
+        _message: s === 'meeting'
+          ? (note ?? meetingNote ?? null)
+          : (untilTs ? `until:${new Date(untilTs).toISOString()}` : null),
         _emoji: m.icon,
         _call_state: 'idle',
         _platform: 'desktop',
@@ -189,7 +242,25 @@ export default function ProfileMenu() {
     } catch (e) { /* offline / noop */ }
   };
 
-  const applyStatus = (s: Status) => {
+  const clearExpiryTimer = () => {
+    if (expiryTimerRef.current) { clearTimeout(expiryTimerRef.current); expiryTimerRef.current = null; }
+  };
+
+  const scheduleAutoRevert = (ts: number) => {
+    clearExpiryTimer();
+    const delay = Math.max(0, ts - Date.now());
+    // setTimeout caps at ~24.8d; clamp and re-arm if needed.
+    const armed = Math.min(delay, 2_000_000_000);
+    expiryTimerRef.current = setTimeout(() => {
+      if (Date.now() >= ts) {
+        applyStatus('available');
+      } else {
+        scheduleAutoRevert(ts);
+      }
+    }, armed);
+  };
+
+  const applyStatus = (s: Status, durationMins?: number) => {
     if (inCallRef.current) {
       const msg = "Vous êtes en appel — votre statut est verrouillé jusqu'à la fin de l'appel.";
       setLockMsg(msg);
@@ -198,12 +269,48 @@ export default function ProfileMenu() {
       setTimeout(() => setLockMsg(''), 4000);
       return;
     }
+    // New status overrides any previous one — always clear pending picker + timer first.
+    setPendingStatus(null);
+    clearExpiryTimer();
+
+    const until = typeof durationMins === 'number' ? computeExpiry(durationMins) : null;
     setStatus(s);
     localStorage.setItem(STATUS_KEY, s);
+    if (until) {
+      setExpiryAt(until);
+      try { localStorage.setItem(EXPIRY_KEY, String(until)); } catch { /* noop */ }
+      scheduleAutoRevert(until);
+    } else {
+      setExpiryAt(null);
+      try { localStorage.removeItem(EXPIRY_KEY); } catch { /* noop */ }
+    }
     window.dispatchEvent(new CustomEvent('lemtel:set-status', { detail: STATUS_META[s].manual }));
-    void persistPresence(s);
+    void persistPresence(s, undefined, until);
     if (s !== 'meeting') setOpen(false);
   };
+
+  // Pick a status: if it's a temp/long status, show duration picker first.
+  const pickStatus = (s: Status) => {
+    if (inCallRef.current) { applyStatus(s); return; }
+    if (s === status) { setPendingStatus(null); return; }
+    if (TEMP_STATUSES.includes(s) || LONG_STATUSES.includes(s)) {
+      setPendingStatus(s);
+      return;
+    }
+    applyStatus(s);
+  };
+
+  // On mount: if a saved expiry has already passed, revert immediately; otherwise re-arm timer.
+  useEffect(() => {
+    if (expiryAt && expiryAt <= Date.now()) {
+      applyStatus('available');
+    } else if (expiryAt) {
+      scheduleAutoRevert(expiryAt);
+    }
+    return () => clearExpiryTimer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
 
   const saveMeetingNote = (v: string) => {
@@ -349,19 +456,47 @@ export default function ProfileMenu() {
           {(Object.keys(STATUS_META) as Status[]).map((s) => {
             const m = STATUS_META[s];
             const active = s === status;
+            const isPending = pendingStatus === s;
+            const presets = LONG_STATUSES.includes(s) ? LONG_PRESETS : DURATION_PRESETS;
+            const needsDuration = TEMP_STATUSES.includes(s) || LONG_STATUSES.includes(s);
             return (
-              <button
-                key={s}
-                onClick={() => applyStatus(s)}
-                disabled={inCall}
-                title={inCall ? "Indisponible pendant un appel actif" : ''}
-                style={{ ...menuItem(active), opacity: inCall ? 0.5 : 1, cursor: inCall ? 'not-allowed' : 'pointer' }}
-              >
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.color, boxShadow: `0 0 8px ${m.color}` }} />
-                <span aria-hidden style={{ fontSize: 13, width: 18, textAlign: 'center' }}>{m.icon}</span>
-                <span style={{ flex: 1, textAlign: 'left' }}>{m.label}</span>
-                {active && <span style={{ fontSize: 11, color: m.color }}>✓</span>}
-              </button>
+              <div key={s}>
+                <button
+                  onClick={() => pickStatus(s)}
+                  disabled={inCall}
+                  title={inCall ? "Indisponible pendant un appel actif" : ''}
+                  style={{ ...menuItem(active), opacity: inCall ? 0.5 : 1, cursor: inCall ? 'not-allowed' : 'pointer' }}
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: m.color, boxShadow: `0 0 8px ${m.color}` }} />
+                  <span aria-hidden style={{ fontSize: 13, width: 18, textAlign: 'center' }}>{m.icon}</span>
+                  <span style={{ flex: 1, textAlign: 'left' }}>{m.label}</span>
+                  {active && expiryAt && (
+                    <span style={{ fontSize: 9.5, color: c.textSub }}>
+                      until {new Date(expiryAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                  {active && <span style={{ fontSize: 11, color: m.color, marginLeft: 4 }}>✓</span>}
+                </button>
+                {isPending && needsDuration && (
+                  <div style={{
+                    margin: '2px 4px 8px', padding: '8px', borderRadius: 8,
+                    background: 'rgba(15,23,42,0.04)', border: `1px dashed ${c.border}`,
+                  }}>
+                    <div style={{ fontSize: 9.5, fontWeight: 700, color: c.textSub, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 }}>
+                      How long?
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {presets.map((p) => (
+                        <button key={p.label} onClick={() => applyStatus(s, p.mins)} style={miniBtn}>
+                          {p.label}
+                        </button>
+                      ))}
+                      <button onClick={() => applyStatus(s)} style={miniBtn}>Until I change it</button>
+                      <button onClick={() => setPendingStatus(null)} style={{ ...miniBtn, opacity: 0.7 }}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
             );
           })}
 
