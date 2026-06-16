@@ -127,31 +127,22 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
         </div>
       </div>
 
-      {/* Status chip — PBX + sync */}
+      {/* Quiet org chip — no sync mentions */}
       <div style={{
         margin: '0 4px 12px', padding: '7px 10px',
         borderRadius: 10,
-        background: `linear-gradient(135deg, ${glowColor}14, transparent)`,
-        border: `1px solid ${glowColor}44`,
+        background: 'rgba(255,255,255,0.02)',
+        border: `1px solid ${c.border}`,
         display: 'flex', alignItems: 'center', gap: 8,
         WebkitAppRegion: 'no-drag' as any,
-        boxShadow: healthy ? `0 0 14px -4px ${glowColor}99` : 'none',
-        transition: 'all .35s ease',
       }}>
         <span style={{
-          width: 8, height: 8, borderRadius: '50%',
-          background: glowColor,
-          boxShadow: `0 0 8px ${glowColor}`,
-          animation: healthy ? 'statusPulse 2s ease-in-out infinite' : undefined,
+          width: 7, height: 7, borderRadius: '50%',
+          background: pbx === 'registered' ? '#22c55e' : pbx === 'error' ? '#ef4444' : c.mutedSilver,
         }} />
-        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0 }}>
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: c.textIce, letterSpacing: 0.4 }}>
-            {pbx === 'registered' ? 'PBX Online' : pbx === 'error' ? 'PBX Error' : 'Connecting…'}
-          </span>
-          <span style={{ fontSize: 9.5, color: c.mutedSilver, letterSpacing: 0.3 }}>
-            {syncConnected ? (lastEvent ? `Sync · ${formatAge(ageMs)}` : 'Sync live') : 'Sync offline'}
-          </span>
-        </div>
+        <span style={{ fontSize: 11, fontWeight: 600, color: c.textIce, letterSpacing: 0.3 }}>
+          {pbx === 'registered' ? 'Online' : pbx === 'error' ? 'Offline' : 'Connecting…'}
+        </span>
       </div>
 
       <button
