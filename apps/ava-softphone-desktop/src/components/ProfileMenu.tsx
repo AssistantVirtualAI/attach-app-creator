@@ -994,3 +994,42 @@ function menuItem(active: boolean): React.CSSProperties {
     cursor: 'pointer', textAlign: 'left',
   };
 }
+
+function SyncBadge({ state, detail }: { state: 'idle' | 'saving' | 'saved' | 'error' | 'conflict' | 'offline'; detail: string }) {
+  if (state === 'idle') return null;
+  const map: Record<typeof state, { icon: string; color: string; bg: string; label: string }> = {
+    idle:     { icon: '',   color: '',         bg: '',                       label: '' },
+    saving:   { icon: '⟳',  color: '#0ea5e9',  bg: 'rgba(14,165,233,0.18)',  label: 'Syncing' },
+    saved:    { icon: '✓',  color: '#16a34a',  bg: 'rgba(34,197,94,0.18)',   label: 'Synced' },
+    error:    { icon: '!',  color: '#dc2626',  bg: 'rgba(239,68,68,0.18)',   label: 'Sync error' },
+    conflict: { icon: '⇄',  color: '#d97706',  bg: 'rgba(245,158,11,0.20)',  label: 'Updated elsewhere' },
+    offline:  { icon: '○',  color: '#64748b',  bg: 'rgba(100,116,139,0.20)', label: 'Offline' },
+  };
+  const m = map[state];
+  return (
+    <span
+      title={detail || m.label}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        padding: '2px 6px', borderRadius: 999,
+        background: m.bg, color: m.color,
+        fontSize: 9, fontWeight: 800, letterSpacing: 0.4,
+        animation: state === 'saving' ? 'lemtel-pulse 1.1s ease-in-out infinite' : undefined,
+      }}
+    >
+      <span aria-hidden style={{ fontSize: 10, lineHeight: 1, display: state === 'saving' ? 'inline-block' : undefined, animation: state === 'saving' ? 'lemtel-spin 1s linear infinite' : undefined }}>{m.icon}</span>
+      <span style={{ textTransform: 'uppercase' }}>{m.label}</span>
+    </span>
+  );
+}
+
+// Inject keyframes once
+if (typeof document !== 'undefined' && !document.getElementById('lemtel-sync-anim')) {
+  const s = document.createElement('style');
+  s.id = 'lemtel-sync-anim';
+  s.textContent = `
+    @keyframes lemtel-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes lemtel-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
+  `;
+  document.head.appendChild(s);
+}
