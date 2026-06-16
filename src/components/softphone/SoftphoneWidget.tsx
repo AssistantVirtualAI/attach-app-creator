@@ -3,6 +3,7 @@ import {
   Phone, PhoneOff, PhoneIncoming, Mic, MicOff, Pause, Play,
   X, Minimize2, Settings, Delete, ClipboardPaste, ArrowRightLeft,
   Plus, Hash, Volume2, MessageSquare, Users, Clock, Grid3x3,
+  Sparkles, RefreshCw, AlertCircle, CheckCircle2, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { SoftphoneDiagnostics } from "@/components/softphone/SoftphoneDiagnostics";
+import { useToast } from "@/hooks/use-toast";
 
 type Tab = "dial" | "recents" | "sms" | "contacts";
 
@@ -63,6 +65,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
   const { isMember } = useLemtelAccess();
   const { user } = useAuth();
   const sp = useSoftphone();
+  const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [expanded, setExpanded] = useState(variant === "full");
   const [tab, setTab] = useState<Tab>("dial");
@@ -72,6 +75,8 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
   const [transferTarget, setTransferTarget] = useState("");
   const [tick, setTick] = useState(0);
   const [shake, setShake] = useState(false);
+  const [relinking, setRelinking] = useState(false);
+  const [showInsights, setShowInsights] = useState(true);
 
   useEffect(() => { sp.setAudioEl(audioRef.current); }, [sp]);
 
@@ -116,6 +121,36 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
       return merged;
     },
   });
+
+  // AI Insights — lightweight summary of today's activity from RPC
+  const { data: summary, refetch: refetchSummary } = useQuery({
+    queryKey: ["softphone-summary", user?.id],
+    enabled: !!user && isMember,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const { data } = await supabase.rpc("get_my_extension_summary");
+      return (data || {}) as any;
+    },
+  });
+
+  const relinkExtension = async () => {
+    setRelinking(true);
+    try {
+      const { data, error } = await supabase.rpc("relink_my_softphone_user");
+      if (error) throw error;
+      const linked = (data as any)?.linked ?? 0;
+      toast({
+        title: linked > 0 ? "Extension synced" : "No matching extension found",
+        description: linked > 0 ? `Linked ${linked} extension${linked === 1 ? "" : "s"}. Reloading…` : "Ask an admin to map your extension to this account.",
+      });
+      if (linked > 0) setTimeout(() => window.location.reload(), 800);
+      else await refetchSummary();
+    } catch (e: any) {
+      toast({ title: "Sync failed", description: e?.message || String(e), variant: "destructive" });
+    } finally {
+      setRelinking(false);
+    }
+  };
 
   if (!isMember) return null;
 
@@ -166,27 +201,82 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
     </button>
   );
 
+  const hasExtension = ext && ext !== "—";
+  const sipLabel =
+    sipStatus === "registered" ? "Registered"
+    : sipStatus === "connecting" || sipStatus === "connected" ? "Connecting"
+    : sipStatus === "error" ? "Error"
+    : sipStatus === "disconnected" ? "Offline" : "Idle";
+
   const header = (
-    <div className="h-12 px-3 flex items-center justify-between border-b border-border bg-card/50 backdrop-blur rounded-t-2xl">
-      <div className="flex items-center gap-2 min-w-0">
-        <Phone className="w-4 h-4 text-primary shrink-0" />
-        <span className="font-semibold text-sm">Softphone</span>
-      </div>
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <span>Ext. {ext}</span>
-        <span className={cn("w-2 h-2 rounded-full", statusDotClass(sipStatus))} />
-        {sp.config?.mock && <Badge variant="outline" className="h-4 text-[9px] px-1.5">Demo</Badge>}
-      </div>
-      <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-          <a href="/org/lemtel/telephony/settings"><Settings className="w-3.5 h-3.5" /></a>
-        </Button>
-        {variant === "floating" && (
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpanded(false)}>
-            <Minimize2 className="w-3.5 h-3.5" />
+    <div className="px-3 py-2.5 border-b border-border/60 bg-gradient-to-b from-card to-card/80 backdrop-blur rounded-t-2xl space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        {/* Left: extension + sip status */}
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={cn(
+            "w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ring-1",
+            hasExtension ? "bg-primary/10 ring-primary/20 text-primary" : "bg-amber-500/10 ring-amber-500/30 text-amber-600",
+          )}>
+            <Phone className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="font-semibold text-sm leading-tight">
+                {hasExtension ? `Ext ${ext}` : "No extension"}
+              </span>
+              {sp.config?.mock && <Badge variant="outline" className="h-4 text-[9px] px-1">DEMO</Badge>}
+            </div>
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground leading-tight">
+              <span className={cn("w-1.5 h-1.5 rounded-full", statusDotClass(sipStatus))} />
+              <span>{sipLabel}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: availability + actions (single source of truth) */}
+        <div className="flex items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="flex items-center gap-1.5 h-7 px-2 rounded-md border border-border/60 bg-background/60 hover:bg-muted text-[11px] font-medium transition"
+                aria-label="Set availability"
+              >
+                <span className={cn("w-2 h-2 rounded-full", userStatusClass(sp.userStatus))} />
+                <span className="capitalize">{sp.userStatus}</span>
+                <ChevronDown className="w-3 h-3 opacity-60" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {(["available", "busy", "dnd", "away"] as UserStatus[]).map((s) => (
+                <DropdownMenuItem key={s} onClick={() => sp.setStatus(s)}>
+                  <span className={cn("w-2 h-2 rounded-full mr-2", userStatusClass(s))} />
+                  <span className="capitalize">{s}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button variant="ghost" size="icon" className="h-7 w-7" asChild title="Settings">
+            <a href="/org/lemtel/telephony/settings"><Settings className="w-3.5 h-3.5" /></a>
           </Button>
-        )}
+          {variant === "floating" && (
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExpanded(false)} title="Minimize">
+              <Minimize2 className="w-3.5 h-3.5" />
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Extension not synced banner */}
+      {!hasExtension && (
+        <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-700 dark:text-amber-300">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          <span className="flex-1">Your extension isn't linked yet.</span>
+          <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" disabled={relinking} onClick={relinkExtension}>
+            {relinking ? <RefreshCw className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+            Sync
+          </Button>
+        </div>
+      )}
     </div>
   );
 
@@ -430,7 +520,7 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
   );
 
   const tabBar = (
-    <div className="h-12 border-t border-border grid grid-cols-4 bg-card/30">
+    <div className="h-12 border-t border-border/60 grid grid-cols-4 bg-card/40">
       {([
         ["dial", Grid3x3, "Dial"],
         ["recents", Clock, "Recents"],
@@ -452,23 +542,35 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
     </div>
   );
 
-  const footerBar = (
-    <div className="h-8 px-3 border-t border-border flex items-center justify-between text-xs">
-      <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-1.5 hover:text-foreground text-muted-foreground">
-          <span className={cn("w-2 h-2 rounded-full", userStatusClass(sp.userStatus))} />
-          <span className="capitalize">{sp.userStatus}</span>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          {(["available", "busy", "dnd", "away"] as UserStatus[]).map((s) => (
-            <DropdownMenuItem key={s} onClick={() => sp.setStatus(s)}>
-              <span className={cn("w-2 h-2 rounded-full mr-2", userStatusClass(s))} />
-              <span className="capitalize">{s}</span>
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {sp.config?.mock && <Badge variant="outline" className="text-[9px] h-4">MOCK</Badge>}
+  // Compact AI Insights — surfaces today's calls + missed + unread voicemail
+  const todayCalls = summary?.today_calls ?? 0;
+  const unreadVm = summary?.unread_voicemail ?? 0;
+  const insightsTip = useMemo(() => {
+    if (!summary?.has_extension) return null;
+    if (unreadVm > 0) return `${unreadVm} unread voicemail${unreadVm === 1 ? "" : "s"} — open Voicemail to listen.`;
+    if (todayCalls === 0) return "No calls yet today. Stay ready — set status to Available.";
+    if (todayCalls >= 20) return `High volume: ${todayCalls} calls today. Consider a short break.`;
+    return `${todayCalls} call${todayCalls === 1 ? "" : "s"} handled today. Keep it up.`;
+  }, [summary, todayCalls, unreadVm]);
+
+  const insightsStrip = callState === "idle" && hasExtension && showInsights && insightsTip && (
+    <div className="px-3 py-2 border-t border-border/60 bg-primary/5">
+      <div className="flex items-start gap-2">
+        <Sparkles className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] uppercase tracking-wide text-primary/80 font-semibold flex items-center gap-1.5">
+            AI insight
+            <div className="flex gap-1 ml-1">
+              <Badge variant="outline" className="h-3.5 text-[9px] px-1 font-mono">{todayCalls} today</Badge>
+              {unreadVm > 0 && <Badge variant="outline" className="h-3.5 text-[9px] px-1 font-mono text-amber-600 border-amber-500/40">{unreadVm} vm</Badge>}
+            </div>
+          </div>
+          <p className="text-[11px] text-foreground/80 leading-snug mt-0.5">{insightsTip}</p>
+        </div>
+        <button onClick={() => setShowInsights(false)} className="text-muted-foreground hover:text-foreground" aria-label="Hide insights">
+          <X className="w-3 h-3" />
+        </button>
+      </div>
     </div>
   );
 
@@ -486,13 +588,13 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
 
   if (variant === "full") {
     return (
-      <div className="relative h-[600px] max-w-[400px] mx-auto bg-card border border-border rounded-2xl shadow-xl flex flex-col overflow-hidden">
+      <div className="relative w-full h-full sm:h-[640px] sm:max-w-[420px] sm:mx-auto bg-card border border-border/60 rounded-none sm:rounded-2xl shadow-xl flex flex-col overflow-hidden">
         <audio ref={audioRef} autoPlay />
         {header}
         {content}
+        {insightsStrip}
         {(callState === "idle") && tabBar}
         <SoftphoneDiagnostics />
-        {footerBar}
         {incomingOverlay}
       </div>
     );
@@ -504,12 +606,12 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
       <style>{`@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }`}</style>
       <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-3">
         {expanded && (
-          <div className="relative w-[340px] h-[520px] bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-2">
+          <div className="relative w-[340px] max-w-[calc(100vw-2rem)] h-[560px] max-h-[calc(100vh-2rem)] bg-card border border-border/60 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-2">
             {header}
             {content}
+            {insightsStrip}
             {(callState === "idle") && tabBar}
             <SoftphoneDiagnostics />
-            {footerBar}
             {incomingOverlay}
           </div>
         )}
