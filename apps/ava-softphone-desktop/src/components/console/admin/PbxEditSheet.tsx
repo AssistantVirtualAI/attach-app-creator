@@ -146,7 +146,7 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
   const uploadToPbx = async () => {
     if (!audioB64) { setErr('Generate audio first'); return; }
     const orgId = (fullForm as any)?.organization_id || (fullForm as any)?.domain_organization_id;
-    setUploading(true); setErr(null);
+    setUploading(true); setErr(null); setUploadResult(null);
     try {
       const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: {
@@ -159,6 +159,7 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).message || (data as any).error);
       setUploaded(true);
+      setUploadResult({ filename: (data as any)?.filename || filename, bytes: (data as any)?.bytes || 0 });
       onChange(filename);
     } catch (e: any) {
       setErr(e?.message || 'Upload to PBX failed');
