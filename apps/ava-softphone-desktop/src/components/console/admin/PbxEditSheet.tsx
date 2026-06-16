@@ -116,6 +116,7 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploaded, setUploaded] = useState(false);
+  const [uploadResult, setUploadResult] = useState<{ filename: string; bytes: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const filename = useMemo(() => {
