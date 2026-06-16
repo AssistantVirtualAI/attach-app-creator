@@ -92,6 +92,29 @@ function ModalShell({ title, onClose, width = 460, children }: { title: string; 
   );
 }
 
+/**
+ * Hook that returns:
+ *   • `confirmConflict(existing)` — for the create-flow's confirmConflict slot.
+ *     Opens the dedicated ConflictResolutionModal and resolves to true (edit)
+ *     or false (abort) based on the admin's choice.
+ *   • `modalNode` — JSX to render so the modal actually appears.
+ */
+function useConflictModal(kind: ConflictKind, identifier: string) {
+  const [state, setState] = useState<{ existing: any; resolve: (v: boolean) => void } | null>(null);
+  const confirmConflict = useCallback((existing: any) => new Promise<boolean>((resolve) => {
+    setState({ existing, resolve });
+  }), []);
+  const modalNode = state ? (
+    <ConflictResolutionModal
+      kind={kind}
+      identifier={identifier}
+      existing={state.existing}
+      onResolve={(choice) => { state.resolve(choice === 'open_for_edit'); setState(null); }}
+    />
+  ) : null;
+  return { confirmConflict, modalNode };
+}
+
 function ExtensionsTable() {
   const { isAdmin, loading: roleLoading } = useDesktopRole();
   const [data, setData] = useState<any[]>([]);
