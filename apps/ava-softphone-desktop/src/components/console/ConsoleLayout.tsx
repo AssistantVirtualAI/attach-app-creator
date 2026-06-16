@@ -19,6 +19,7 @@ import VoiceAgentsView from './VoiceAgentsView';
 import PBXLiveView from './PBXLiveView';
 import QueuesView from './QueuesView';
 import AuditView from './AuditView';
+import SyncStatusView from './SyncStatusView';
 import SoftphonePane from '../SoftphonePane';
 import SettingsPage from '../SettingsPage';
 import { AppErrorBoundary } from '../AppErrorBoundary';
