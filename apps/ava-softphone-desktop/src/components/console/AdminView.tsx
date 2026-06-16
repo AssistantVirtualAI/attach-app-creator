@@ -678,6 +678,17 @@ function IvrsTable() {
         {!loading && error && <div style={{ padding: 28, textAlign: 'center', color: c.danger, fontSize: 12 }}>{error}</div>}
       </div>
       {editing && <EditIvrModal ivr={editing} saving={saving} onClose={() => setEditing(null)} onSave={(changes) => save(editing, changes)} />}
+      {creating && (
+        <PbxEditSheet
+          title="New Auto-Attendant"
+          groups={IVR_GROUPS}
+          initial={{ ivr_menu_enabled: 'true', ivr_menu_timeout: 3000, ivr_menu_exit_action: 'hangup' }}
+          saving={saving}
+          width={680}
+          onCancel={() => setCreating(false)}
+          onSave={create}
+        />
+      )}
     </>
   );
 }
