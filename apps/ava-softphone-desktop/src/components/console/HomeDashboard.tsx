@@ -1,13 +1,31 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { useTenant } from '../../hooks/useTenant';
-import { useDashboardStats, AttentionItem, RangeKey, DailySeries } from '../../hooks/useDashboardStats';
+import { useDashboardStats, AttentionItem, RangeKey, DailySeries, rangeBounds } from '../../hooks/useDashboardStats';
 import { useSyncStatus, formatAge } from '../../hooks/useSyncStatus';
 import { supabase } from '../../lib/supabaseClient';
 
 const { colors: c } = theme;
 
 const STORAGE_KEY = 'ava.home.range.v1';
+const VALID_METRICS = new Set(['calls','missed','answered','recordings','voicemail','sms','live','realtime']);
+const VALID_RANGES = new Set(['today','week','month','custom']);
+
+// Inject one-time style for keyframes + visible focus rings on tiles/buttons.
+const STYLE_ID = 'ava-home-a11y-style';
+if (typeof document !== 'undefined' && !document.getElementById(STYLE_ID)) {
+  const s = document.createElement('style');
+  s.id = STYLE_ID;
+  s.textContent = `
+    @keyframes avaSlideInRight { from { transform: translateX(24px); opacity: 0 } to { transform: translateX(0); opacity: 1 } }
+    @keyframes avaShimmer { 0% { background-position: -200px 0 } 100% { background-position: 200px 0 } }
+    .ava-stat-tile:focus-visible { outline: 3px solid #ffffff; outline-offset: 3px; box-shadow: 0 0 0 5px rgba(0,35,230,0.55), 0 10px 28px -14px rgba(8,14,32,0.45) !important; }
+    .ava-range-btn:focus-visible, .ava-quick-btn:focus-visible, .ava-drawer-close:focus-visible { outline: 3px solid #0023e6; outline-offset: 2px; }
+    .ava-spark-skel { background: linear-gradient(90deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.30) 50%, rgba(255,255,255,0.10) 100%); background-size: 400px 100%; animation: avaShimmer 1.2s linear infinite; }
+  `;
+  document.head.appendChild(s);
+}
+
 
 function fmtRelative(iso: string | null) {
   if (!iso) return 'No CDR yet';
@@ -41,8 +59,33 @@ const tones: Record<string, Tone> = {
 
 type MetricKey = 'calls' | 'missed' | 'answered' | 'recordings' | 'voicemail' | 'sms' | 'live' | 'realtime';
 
-function Sparkline({ data, color = 'rgba(255,255,255,0.95)' }: { data: number[]; color?: string }) {
-  if (!data || data.length === 0) return null;
+function Sparkline({
+  data, color = 'rgba(255,255,255,0.95)', loading, error,
+}: { data: number[]; color?: string; loading?: boolean; error?: string | null }) {
+  if (loading) {
+    return (
+      <div className="ava-spark-skel" aria-hidden style={{ width: '100%', height: 28, borderRadius: 6 }} />
+    );
+  }
+  if (error) {
+    return (
+      <div role="img" aria-label={`Trend unavailable: ${error}`} style={{
+        width: '100%', height: 28, borderRadius: 6,
+        background: 'rgba(0,0,0,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,0.95)', letterSpacing: 0.4,
+      }}>⚠ trend unavailable</div>
+    );
+  }
+  if (!data || data.length === 0 || data.every((v) => v === 0)) {
+    return (
+      <div aria-hidden style={{
+        width: '100%', height: 28, borderRadius: 6,
+        background: 'rgba(255,255,255,0.10)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: 600,
+      }}>no activity</div>
+    );
+  }
   const w = 100, h = 28;
   const max = Math.max(1, ...data);
   const step = data.length > 1 ? w / (data.length - 1) : w;
@@ -57,19 +100,23 @@ function Sparkline({ data, color = 'rgba(255,255,255,0.95)' }: { data: number[];
 }
 
 function Stat({
-  label, value, tone, hint, series, onClick,
+  label, value, tone, hint, series, onClick, loading, error,
 }: {
   label: string; value: string | number; tone: Tone; hint?: string;
-  series?: number[]; onClick?: () => void;
+  series?: number[]; onClick?: () => void; loading?: boolean; error?: string | null;
 }) {
   const interactive = !!onClick;
+  const displayValue = loading ? '…' : error ? '—' : value;
+  const a11yLabel = `${label}: ${error ? 'unavailable' : loading ? 'loading' : value}${hint ? ` — ${hint}` : ''}${interactive ? '. Press Enter to open detail.' : ''}`;
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={!interactive}
-      className="ava-lift ava-focus"
-      aria-label={`${label}: ${value}${hint ? ` — ${hint}` : ''}`}
+      className="ava-stat-tile ava-lift"
+      aria-label={a11yLabel}
+      aria-busy={!!loading}
+      aria-live={loading ? 'polite' : undefined}
       style={{
         textAlign: 'left',
         background: `linear-gradient(135deg, ${tone.from} 0%, ${tone.to} 100%)`,
@@ -88,16 +135,17 @@ function Stat({
         pointerEvents: 'none',
       }} />
       <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.6, textTransform: 'uppercase', color: 'rgba(255,255,255,0.95)', position: 'relative' }}>{label}</span>
-      <span className="tabular-nums" style={{ fontSize: 32, fontWeight: 700, color: '#fff', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: -0.6, lineHeight: 1.05, position: 'relative', textShadow: '0 2px 12px rgba(0,0,0,0.20)' }}>{value}</span>
-      {series && series.length > 0 && (
-        <div style={{ position: 'relative', marginTop: 2 }}>
-          <Sparkline data={series} />
-        </div>
-      )}
-      {hint && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.92)', position: 'relative' }}>{hint}</span>}
+      <span className="tabular-nums" style={{ fontSize: 32, fontWeight: 700, color: '#fff', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: -0.6, lineHeight: 1.05, position: 'relative', textShadow: '0 2px 12px rgba(0,0,0,0.20)' }}>{displayValue}</span>
+      <div style={{ position: 'relative', marginTop: 2 }}>
+        <Sparkline data={series || []} loading={loading} error={error || null} />
+      </div>
+      {error
+        ? <span style={{ fontSize: 11, color: '#ffe4e4', position: 'relative', fontWeight: 600 }}>Could not load · click to retry</span>
+        : hint && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.92)', position: 'relative' }}>{hint}</span>}
     </button>
   );
 }
+
 
 function attentionTone(item: AttentionItem): Tone {
   if (item.tone === 'danger') return tones.red;
@@ -123,6 +171,29 @@ function loadPersistedRange(): { range: RangeKey; customFrom: string; customTo: 
   } catch { return null; }
 }
 
+function readUrlState(): { range?: RangeKey; from?: string; to?: string; metric?: MetricKey } {
+  if (typeof window === 'undefined') return {};
+  const sp = new URLSearchParams(window.location.search);
+  const r = sp.get('range') || undefined;
+  const m = sp.get('metric') || undefined;
+  return {
+    range: r && VALID_RANGES.has(r) ? (r as RangeKey) : undefined,
+    from: sp.get('from') || undefined,
+    to: sp.get('to') || undefined,
+    metric: m && VALID_METRICS.has(m) ? (m as MetricKey) : undefined,
+  };
+}
+
+const METRIC_TITLES: Record<MetricKey, string> = {
+  calls: 'All calls', missed: 'Missed calls', answered: 'Answered calls',
+  recordings: 'Recordings', voicemail: 'Voicemails',
+  sms: 'Unread SMS threads', live: 'Live calls right now', realtime: 'Realtime sync status',
+};
+const METRIC_TONE_KEY: Record<MetricKey, keyof typeof tones> = {
+  calls: 'cyan', missed: 'red', answered: 'green', recordings: 'gold',
+  voicemail: 'violet', sms: 'pink', live: 'blue', realtime: 'cyan',
+};
+
 export default function HomeDashboard({
   displayName, extension, onQuickDial,
 }: { displayName: string; extension: string; onQuickDial: () => void }) {
@@ -133,10 +204,22 @@ export default function HomeDashboard({
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const weekAgo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10); }, []);
 
-  const persisted = useMemo(() => loadPersistedRange(), []);
-  const [range, setRange] = useState<RangeKey>(persisted?.range ?? 'today');
-  const [customFrom, setCustomFrom] = useState<string>(persisted?.customFrom || weekAgo);
-  const [customTo, setCustomTo] = useState<string>(persisted?.customTo || today);
+  // URL params take priority over localStorage so deep-links are restorable.
+  const initial = useMemo(() => {
+    const url = readUrlState();
+    const persisted = loadPersistedRange();
+    return {
+      range: (url.range ?? persisted?.range ?? 'today') as RangeKey,
+      customFrom: url.from || persisted?.customFrom || weekAgo,
+      customTo: url.to || persisted?.customTo || today,
+      metric: url.metric as MetricKey | undefined,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [range, setRange] = useState<RangeKey>(initial.range);
+  const [customFrom, setCustomFrom] = useState<string>(initial.customFrom);
+  const [customTo, setCustomTo] = useState<string>(initial.customTo);
 
   useEffect(() => {
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ range, customFrom, customTo })); } catch { /* noop */ }
@@ -147,8 +230,46 @@ export default function HomeDashboard({
   const freshnessAccent = stats.cdrFreshness === 'live' ? c.success : stats.cdrFreshness === 'stale' ? c.signalGold : c.mutedSilver;
   const rangeLabel = range === 'today' ? 'Today' : range === 'week' ? 'Last 7 days' : range === 'month' ? 'Last 30 days' : `${customFrom} → ${customTo}`;
 
-  const [detail, setDetail] = useState<null | { metric: MetricKey; title: string; tone: Tone }>(null);
-  const openDetail = (metric: MetricKey, title: string, tone: Tone) => setDetail({ metric, title, tone });
+  const [detail, setDetail] = useState<null | { metric: MetricKey; title: string; tone: Tone }>(
+    initial.metric ? { metric: initial.metric, title: `${METRIC_TITLES[initial.metric]}`, tone: tones[METRIC_TONE_KEY[initial.metric]] } : null
+  );
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+  const openDetail = (metric: MetricKey, title: string, tone: Tone) => {
+    lastFocusedRef.current = (document.activeElement as HTMLElement) || null;
+    setDetail({ metric, title, tone });
+  };
+  const closeDetail = () => {
+    setDetail(null);
+    // Return focus to the tile that opened the drawer
+    setTimeout(() => lastFocusedRef.current?.focus?.(), 0);
+  };
+
+  // Sync URL with current state (range + optional metric) so links are shareable/restorable.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sp = new URLSearchParams(window.location.search);
+    sp.set('range', range);
+    if (range === 'custom') { sp.set('from', customFrom); sp.set('to', customTo); }
+    else { sp.delete('from'); sp.delete('to'); }
+    if (detail?.metric) sp.set('metric', detail.metric); else sp.delete('metric');
+    const next = `${window.location.pathname}?${sp.toString()}${window.location.hash}`;
+    window.history.replaceState(null, '', next);
+  }, [range, customFrom, customTo, detail]);
+
+  // Listen to back/forward (and external) URL changes
+  useEffect(() => {
+    const onPop = () => {
+      const url = readUrlState();
+      if (url.range) setRange(url.range);
+      if (url.from) setCustomFrom(url.from);
+      if (url.to) setCustomTo(url.to);
+      if (url.metric) setDetail({ metric: url.metric, title: METRIC_TITLES[url.metric], tone: tones[METRIC_TONE_KEY[url.metric]] });
+      else setDetail(null);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
 
   return (
     <div className="ava-page" style={{ padding: '28px 32px', maxWidth: 1240, margin: '0 auto', animation: 'fadeIn .3s ease-out' }}>
@@ -179,7 +300,11 @@ export default function HomeDashboard({
         {RANGES.map((r) => {
           const active = range === r.key;
           return (
-            <button key={r.key} onClick={() => setRange(r.key)} style={{
+            <button key={r.key} onClick={() => setRange(r.key)}
+              className="ava-range-btn"
+              aria-pressed={active}
+              aria-label={`Set range to ${r.label}`}
+              style={{
               padding: '7px 14px',
               borderRadius: 999,
               border: active ? '1px solid transparent' : `1px solid ${c.border}`,
@@ -230,25 +355,50 @@ export default function HomeDashboard({
         </div>
       </section>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 26 }}>
+      {stats.error && (
+        <div role="alert" style={{
+          marginBottom: 14, padding: '10px 14px',
+          background: 'linear-gradient(135deg, rgba(185,28,28,0.12), rgba(220,38,38,0.08))',
+          border: `1px solid ${tones.red.ring}`, borderRadius: 12,
+          color: c.danger, fontSize: 12.5, fontWeight: 600,
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span aria-hidden>⚠</span>
+          <span style={{ flex: 1 }}>Could not load stats: {stats.error}</span>
+          <button onClick={() => stats.refresh()} className="ava-range-btn" style={{
+            padding: '6px 12px', borderRadius: 8, border: `1px solid ${tones.red.ring}`,
+            background: '#fff', color: c.danger, fontWeight: 700, fontSize: 12, cursor: 'pointer',
+          }}>Retry</button>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 26 }}
+        aria-busy={stats.loading} aria-live="polite">
         <Stat label={`Calls · ${rangeLabel}`} value={stats.totalCallsToday} tone={tones.cyan}
           series={stats.series.calls} hint="Scoped to extension"
+          loading={stats.loading} error={stats.error}
           onClick={() => openDetail('calls', `All calls — ${rangeLabel}`, tones.cyan)} />
         <Stat label="Missed" value={stats.missedToday} tone={tones.red}
           series={stats.series.missed} hint={rangeLabel}
+          loading={stats.loading} error={stats.error}
           onClick={() => openDetail('missed', `Missed calls — ${rangeLabel}`, tones.red)} />
         <Stat label="Answered" value={stats.answeredToday} tone={tones.green}
           series={stats.series.answered} hint={rangeLabel}
+          loading={stats.loading} error={stats.error}
           onClick={() => openDetail('answered', `Answered calls — ${rangeLabel}`, tones.green)} />
         <Stat label="Recordings" value={stats.recordingsToday} tone={tones.gold}
           series={stats.series.recordings}
           hint={stats.lastRecordingAt ? `Latest ${fmtRelative(stats.lastRecordingAt)}` : 'None in range'}
+          loading={stats.loading} error={stats.error}
           onClick={() => openDetail('recordings', `Recordings — ${rangeLabel}`, tones.gold)} />
         <Stat label="Unread SMS" value={stats.unreadSms} tone={tones.pink} hint="All threads"
+          loading={stats.loading} error={stats.error}
           onClick={() => openDetail('sms', 'Unread SMS threads', tones.pink)} />
         <Stat label="Voicemail" value={stats.unreadVoicemail} tone={tones.violet} hint="Needs review"
+          loading={stats.loading} error={stats.error}
           onClick={() => openDetail('voicemail', `Voicemails — ${rangeLabel}`, tones.violet)} />
         <Stat label="Live Calls" value={stats.liveCalls} tone={tones.blue} hint="In progress"
+          loading={stats.loading} error={stats.error}
           onClick={() => openDetail('live', 'Live calls right now', tones.blue)} />
         <Stat label="Realtime" value={syncConnected ? 'Live' : 'Off'} tone={syncConnected ? tones.cyan : tones.slate}
           hint={lastEvent ? formatAge(ageMs) : 'Idle'}
@@ -260,13 +410,13 @@ export default function HomeDashboard({
           Quick Actions
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={onQuickDial} style={quickBtn(tones.gold)}>New Call</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'calls' }))} style={quickBtn(tones.cyan)}>Call History</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'recordings' }))} style={quickBtn(tones.violet)}>Recordings</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'messages' }))} style={quickBtn(tones.green)}>Messages</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'pbxlive' }))} style={quickBtn(tones.slate)}>PBX Live</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'admin' }))} style={quickBtn(tones.blue)}>PBX Admin</button>
-          <button onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'aiadmin' }))} style={quickBtn(tones.pink)}>AI Assistant</button>
+          <button className="ava-quick-btn" onClick={onQuickDial} style={quickBtn(tones.gold)}>New Call</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'calls' }))} style={quickBtn(tones.cyan)}>Call History</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'recordings' }))} style={quickBtn(tones.violet)}>Recordings</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'messages' }))} style={quickBtn(tones.green)}>Messages</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'pbxlive' }))} style={quickBtn(tones.slate)}>PBX Live</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'admin' }))} style={quickBtn(tones.blue)}>PBX Admin</button>
+          <button className="ava-quick-btn" onClick={() => window.dispatchEvent(new CustomEvent('lemtel:nav', { detail: 'aiadmin' }))} style={quickBtn(tones.pink)}>AI Assistant</button>
         </div>
       </div>
 
@@ -321,7 +471,7 @@ export default function HomeDashboard({
           customFrom={customFrom}
           customTo={customTo}
           series={stats.series}
-          onClose={() => setDetail(null)}
+          onClose={closeDetail}
         />
       )}
     </div>
@@ -351,7 +501,6 @@ const dateInput = (): React.CSSProperties => ({
 
 /* ---------------- Metric Detail Drawer ---------------- */
 
-import { rangeBounds } from '../../hooks/useDashboardStats';
 
 function MetricDetailDrawer(props: {
   metric: MetricKey;
@@ -368,63 +517,86 @@ function MetricDetailDrawer(props: {
   const { metric, title, tone, orgId, extension, range, customFrom, customTo, series, onClose } = props;
   const [rows, setRows] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const titleId = useMemo(() => `ava-detail-${Math.random().toString(36).slice(2, 8)}`, []);
+
+  // ESC to close, focus the close button on open, simple focus trap to keep tab inside.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
+    };
+    document.addEventListener('keydown', onKey);
+    const t = setTimeout(() => closeBtnRef.current?.focus(), 30);
+    return () => { document.removeEventListener('keydown', onKey); clearTimeout(t); };
+  }, [onClose]);
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (!orgId) { setRows([]); return; }
+      if (metric === 'sms') {
+        let q = supabase.from('pbx_sms_threads')
+          .select('id, peer_number, last_message_at, unread_count')
+          .eq('organization_id', orgId)
+          .gt('unread_count', 0)
+          .order('last_message_at', { ascending: false })
+          .limit(50);
+        if (extension) q = q.eq('extension', extension);
+        const { data, error: err } = await q;
+        if (err) throw err;
+        setRows(data || []);
+        return;
+      }
+      if (metric === 'live') {
+        let q = supabase.from('telecom_live_calls')
+          .select('id, caller_id_number, destination_number, started_at, extension')
+          .eq('organization_id', orgId)
+          .order('started_at', { ascending: false })
+          .limit(50);
+        if (extension) q = q.eq('extension', extension);
+        const { data, error: err } = await q;
+        if (err) throw err;
+        setRows(data || []);
+        return;
+      }
+      if (metric === 'realtime') { setRows([]); return; }
+
+      const { from, to } = rangeBounds(range, customFrom, customTo);
+      let q = supabase.from('pbx_call_records')
+        .select('id, caller_id_number, destination_number, start_at, duration, missed_call, call_status, hangup_cause, has_recording, recording_name, recording_path, voicemail_message, extension')
+        .eq('organization_id', orgId)
+        .gte('start_at', from)
+        .lte('start_at', to)
+        .order('start_at', { ascending: false })
+        .limit(200);
+      if (extension) q = q.eq('extension', extension);
+      const { data, error: err } = await q;
+      if (err) throw err;
+      const all = (data || []) as any[];
+      const filtered = all.filter((r) => {
+        if (metric === 'calls') return true;
+        if (metric === 'missed') return r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER';
+        if (metric === 'answered') return !(r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER');
+        if (metric === 'recordings') return r.has_recording || r.recording_name || r.recording_path;
+        if (metric === 'voicemail') return r.missed_call || r.hangup_cause === 'NO_ANSWER' || (r.voicemail_message && r.voicemail_message !== 'false');
+        return true;
+      });
+      setRows(filtered);
+    } catch (e: any) {
+      setError(String(e?.message || e || 'Failed to load').slice(0, 200));
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        if (!orgId) { setRows([]); return; }
-        if (metric === 'sms') {
-          let q = supabase.from('pbx_sms_threads')
-            .select('id, peer_number, last_message_at, unread_count')
-            .eq('organization_id', orgId)
-            .gt('unread_count', 0)
-            .order('last_message_at', { ascending: false })
-            .limit(50);
-          if (extension) q = q.eq('extension', extension);
-          const { data } = await q;
-          if (!cancelled) setRows(data || []);
-          return;
-        }
-        if (metric === 'live') {
-          let q = supabase.from('telecom_live_calls')
-            .select('id, caller_id_number, destination_number, started_at, extension')
-            .eq('organization_id', orgId)
-            .order('started_at', { ascending: false })
-            .limit(50);
-          if (extension) q = q.eq('extension', extension);
-          const { data } = await q;
-          if (!cancelled) setRows(data || []);
-          return;
-        }
-        if (metric === 'realtime') { if (!cancelled) setRows([]); return; }
-
-        const { from, to } = rangeBounds(range, customFrom, customTo);
-        let q = supabase.from('pbx_call_records')
-          .select('id, caller_id_number, destination_number, start_at, duration, missed_call, call_status, hangup_cause, has_recording, recording_name, recording_path, voicemail_message, extension')
-          .eq('organization_id', orgId)
-          .gte('start_at', from)
-          .lte('start_at', to)
-          .order('start_at', { ascending: false })
-          .limit(200);
-        if (extension) q = q.eq('extension', extension);
-        const { data } = await q;
-        const all = (data || []) as any[];
-        const filtered = all.filter((r) => {
-          if (metric === 'calls') return true;
-          if (metric === 'missed') return r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER';
-          if (metric === 'answered') return !(r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER');
-          if (metric === 'recordings') return r.has_recording || r.recording_name || r.recording_path;
-          if (metric === 'voicemail') return r.missed_call || r.hangup_cause === 'NO_ANSWER' || (r.voicemail_message && r.voicemail_message !== 'false');
-          return true;
-        });
-        if (!cancelled) setRows(filtered);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+    (async () => { if (!cancelled) await load(); })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [metric, orgId, extension, range, customFrom, customTo]);
 
   const seriesForMetric =
@@ -433,11 +605,21 @@ function MetricDetailDrawer(props: {
     metric === 'recordings' ? series.recordings :
     metric === 'calls' || metric === 'voicemail' ? series.calls : [];
 
+  // Build shareable URL for this detail view
+  const shareUrl = useMemo(() => {
+    if (typeof window === 'undefined') return '';
+    const sp = new URLSearchParams();
+    sp.set('range', range);
+    if (range === 'custom') { sp.set('from', customFrom); sp.set('to', customTo); }
+    sp.set('metric', metric);
+    return `${window.location.origin}${window.location.pathname}?${sp.toString()}`;
+  }, [range, customFrom, customTo, metric]);
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={title}
+      aria-labelledby={titleId}
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, background: 'rgba(8,14,32,0.55)',
@@ -447,11 +629,11 @@ function MetricDetailDrawer(props: {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 'min(560px, 100%)', height: '100%', background: '#f6f8fd',
+          width: 'min(560px, 100%)', height: '100dvh', background: '#f6f8fd',
           borderLeft: `1px solid ${c.border}`,
           display: 'flex', flexDirection: 'column',
           boxShadow: '-20px 0 50px -20px rgba(8,14,32,0.45)',
-          animation: 'slideInRight .25s ease-out',
+          animation: 'avaSlideInRight .25s ease-out',
         }}>
         <div style={{
           padding: '16px 18px',
@@ -459,13 +641,30 @@ function MetricDetailDrawer(props: {
           color: '#fff', display: 'flex', alignItems: 'center', gap: 12,
         }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.6, textTransform: 'uppercase', opacity: 0.9 }}>Detail</div>
-            <div style={{ fontSize: 17, fontWeight: 700, marginTop: 2, lineHeight: 1.25 }}>{title}</div>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.6, textTransform: 'uppercase', opacity: 0.95 }}>Detail</div>
+            <h2 id={titleId} style={{ fontSize: 17, fontWeight: 700, margin: '2px 0 0', lineHeight: 1.25, color: '#fff' }}>{title}</h2>
           </div>
-          <button onClick={onClose} aria-label="Close" style={{
-            background: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.35)',
-            borderRadius: 10, padding: '6px 10px', cursor: 'pointer', fontWeight: 700, fontSize: 12,
-          }}>Close</button>
+          <button
+            ref={closeBtnRef}
+            onClick={onClose}
+            aria-label="Close detail panel"
+            className="ava-drawer-close"
+            style={{
+              background: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.45)',
+              borderRadius: 10, padding: '6px 10px', cursor: 'pointer', fontWeight: 700, fontSize: 12,
+            }}>Close</button>
+        </div>
+
+        <div style={{ padding: '10px 18px', background: '#fff', borderBottom: `1px solid ${c.border}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, color: c.mutedSilver, fontWeight: 600 }}>Shareable link</span>
+          <input readOnly value={shareUrl} aria-label="Shareable URL for this metric view"
+            style={{ flex: 1, fontSize: 11, padding: '5px 8px', border: `1px solid ${c.border}`, borderRadius: 6, background: '#f8fafc', color: c.textIce, fontFamily: 'monospace' }} />
+          <button onClick={() => { try { navigator.clipboard?.writeText(shareUrl); } catch { /* noop */ } }}
+            className="ava-drawer-close"
+            aria-label="Copy shareable link to clipboard"
+            style={{ fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 6, border: `1px solid ${tone.ring}`, background: '#fff', color: tone.from, cursor: 'pointer' }}>
+            Copy
+          </button>
         </div>
 
         {seriesForMetric.length > 0 && (
@@ -487,19 +686,34 @@ function MetricDetailDrawer(props: {
           </div>
         )}
 
-        <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: 16 }} aria-busy={loading} aria-live="polite">
           {loading ? (
-            <div style={{ padding: 24, textAlign: 'center', color: c.mutedSilver, fontSize: 13 }}>Loading…</div>
+            <div role="status" style={{ padding: 24, textAlign: 'center', color: c.mutedSilver, fontSize: 13 }}>Loading detail…</div>
+          ) : error ? (
+            <div role="alert" style={{
+              padding: 16, borderRadius: 10,
+              background: 'rgba(220,38,38,0.06)', border: `1px solid ${tones.red.ring}`, color: c.danger,
+              fontSize: 13, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start',
+            }}>
+              <strong>Could not load detail</strong>
+              <span style={{ fontSize: 12, fontWeight: 500 }}>{error}</span>
+              <button onClick={load} className="ava-drawer-close" style={{
+                padding: '6px 12px', borderRadius: 8, border: `1px solid ${tones.red.ring}`,
+                background: '#fff', color: c.danger, fontWeight: 700, fontSize: 12, cursor: 'pointer',
+              }}>Retry</button>
+            </div>
           ) : !rows || rows.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: c.mutedSilver, fontSize: 13 }}>
               {metric === 'realtime' ? 'Realtime status is live above.' : 'No matching records in this range.'}
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {rows.map((r: any) => (
-                <DetailRow key={r.id} metric={metric} row={r} tone={tone} />
+                <li key={r.id}>
+                  <DetailRow metric={metric} row={r} tone={tone} />
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
       </div>

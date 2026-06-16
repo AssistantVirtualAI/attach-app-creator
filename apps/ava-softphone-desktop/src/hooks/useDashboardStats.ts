@@ -32,8 +32,10 @@ export type DashboardStats = {
   attention: AttentionItem[];
   pbxHealth: 'ok' | 'warn' | 'down';
   series: DailySeries;
+  error: string | null;
   loading: boolean;
 };
+
 
 const startOfDay = () => {
   const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString();
@@ -94,11 +96,13 @@ export function useDashboardStats(
     unreadSms: 0, unreadVoicemail: 0, extensionsTotal: 0,
     liveCalls: 0, lastCallAt: null, lastRecordingAt: null,
     cdrFreshness: 'idle', attention: [], pbxHealth: 'ok',
-    series: emptySeries, loading: true,
+    series: emptySeries, error: null, loading: true,
   });
 
   const refresh = useCallback(async () => {
     if (!orgId) { setStats((s) => ({ ...s, loading: false, cdrFreshness: 'idle' })); return; }
+    setStats((s) => ({ ...s, loading: true, error: null }));
+    try {
     const { from, to } = rangeBounds(range, customFrom, customTo);
 
     let callsQ = supabase.from('pbx_call_records')
@@ -123,6 +127,7 @@ export function useDashboardStats(
     }
 
     const [callsR, smsR, liveR] = await Promise.all([callsQ, smsQ, liveQ]);
+    if (callsR.error) throw callsR.error;
     const calls = (callsR.data || []) as any[];
     const missed = calls.filter((r) => r.missed_call || r.call_status === 'missed' || r.hangup_cause === 'NO_ANSWER').length;
     const answered = calls.length - missed;
@@ -188,8 +193,13 @@ export function useDashboardStats(
       attention: attention.slice(0, 3),
       pbxHealth: 'ok',
       series,
+      error: null,
       loading: false,
     });
+    } catch (e: any) {
+      const msg = e?.message || e?.error_description || 'Failed to load stats';
+      setStats((s) => ({ ...s, loading: false, error: String(msg).slice(0, 240) }));
+    }
   }, [orgId, extension, range, customFrom, customTo]);
 
   useEffect(() => { refresh(); }, [refresh]);
