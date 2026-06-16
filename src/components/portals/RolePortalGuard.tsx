@@ -22,23 +22,22 @@ export function RolePortalGuard({ portal, children }: { portal: Portal; children
     if (!user) return;
     (async () => {
       try {
-        const { data: isSuper } = await supabase.rpc("is_super_admin", { _user_id: user.id });
-        let isMaster = false;
-        const { data: masterRow } = await supabase
-          .from("org_members")
-          .select("role")
-          .eq("user_id", user.id)
-          .eq("role", "master_admin")
-          .maybeSingle();
-        isMaster = !!masterRow;
+        const [{ data: isSuper }, { data: orgMemberRows }, { data: roles }] = await Promise.all([
+          supabase.rpc("is_super_admin", { _user_id: user.id }),
+          supabase.from("org_members").select("role").eq("user_id", user.id),
+          supabase.from("user_roles").select("role").eq("user_id", user.id),
+        ]);
 
-        const { data: roles } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id);
-        const isAdmin = roles?.some((r: any) =>
-          r.role === "org_admin" || r.role === "reseller_admin" || r.role === "manager"
+        const orgMemberRoles = (orgMemberRows || []).map((r: any) => r.role);
+        const isMaster = orgMemberRoles.some((r) => r === "ava_admin" || r === "master_admin");
+        const isCustomerAdminViaOrgMembers = orgMemberRoles.some(
+          (r) => r === "reseller_admin" || r === "customer_admin"
         );
+        const isAdmin =
+          isCustomerAdminViaOrgMembers ||
+          roles?.some((r: any) =>
+            r.role === "org_admin" || r.role === "reseller_admin" || r.role === "manager"
+          );
 
         if (portal === "platform") {
           setState(isSuper || isMaster ? "allow" : isAdmin ? "deny-platform" : "deny-customer");
