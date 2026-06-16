@@ -144,13 +144,55 @@ export default function PbxResourceSection({
     } catch { return null; }
   }, [kind, orgId, domainUuid, global, transform, uuidField]);
 
+  const labelFor = (key: string): string => {
+    const list = fieldGroups || [];
+    for (const g of list) for (const f of g.fields) if (f.key === key) return f.label;
+    return key;
+  };
+
+  const recordAudit = async (entity_id: string, before: any, after: any, diff: any, result: string, error?: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from('pbx_admin_actions').insert({
+        organization_id: orgId,
+        domain_uuid: domainUuid,
+        actor_user_id: user.id,
+        actor_email: user.email || null,
+        entity_type: entityType || actionKind || kind,
+        entity_id,
+        action: 'conflict-resolution',
+        source: 'desktop',
+        before_json: before,
+        after_json: after,
+        diff_json: diff,
+        result,
+        error: error || null,
+        metadata: { ua: navigator.userAgent, at: new Date().toISOString() },
+      });
+    } catch { /* audit failures must not block the save */ }
+  };
+
+  const performWrite = async (record: any, isUpdate: boolean) => {
+    const writeKind = actionKind || kind;
+    const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
+      body: {
+        action: isUpdate ? `update-${writeKind}` : `create-${writeKind}`,
+        organization_id: orgId,
+        params: { ...(global ? {} : { domain_uuid: domainUuid }), ...record },
+      },
+    });
+    if (err) throw err;
+    setEditing(null); setCreating(false);
+    await reload();
+  };
+
   const save = async (record: any, baseline?: any) => {
     setSaving(true);
     try {
       const isUpdate = !!record[uuidField];
-      const writeKind = actionKind || kind;
 
-      // Conflict detection (optimistic concurrency): compare latest remote vs baseline snapshot.
+      // Conflict detection (optimistic concurrency).
       if (isUpdate && baseline) {
         const latest = await fetchLatest(record[uuidField]);
         if (latest) {
@@ -164,42 +206,52 @@ export default function PbxResourceSection({
           const remoteOnly = remoteChanged.filter((k) => !userChanged.includes(k));
 
           if (collisions.length > 0) {
-            const lines = collisions.map((k) => {
-              const mine = String(record[k] ?? '');
-              const theirs = String(latest[k] ?? '');
-              return `• ${k}\n   yours:   ${mine.slice(0, 80)}\n   portal:  ${theirs.slice(0, 80)}`;
-            }).join('\n\n');
-            const choice = window.prompt(
-              `⚠ Conflict — portal changed ${collisions.length} field(s) while you were editing.\n\n${lines}\n\n` +
-              'Type:\n  KEEP    to overwrite portal with your values\n  THEIRS  to discard your edits & reload\n  CANCEL  to keep editing',
-              'KEEP',
-            );
-            if (!choice || choice.toUpperCase() === 'CANCEL') { setSaving(false); return; }
-            if (choice.toUpperCase() === 'THEIRS') {
-              setEditing(latest); setSaving(false); return;
-            }
-            // KEEP → fall through to write
-          }
-          // Auto-merge fields the portal changed that the user didn't touch.
-          if (remoteOnly.length > 0) {
+            const conflicts: ConflictField[] = collisions.map((k) => ({
+              key: k, label: labelFor(k),
+              baseline: baseline[k], mine: record[k], theirs: latest[k],
+            }));
+            // Apply auto-merges to the record so the dialog only shows real collisions.
             for (const k of remoteOnly) record[k] = latest[k];
+            setConflictState({ record, baseline, latest, conflicts });
+            setSaving(false);
+            return;
           }
+          // No collisions — auto-merge remote-only changes.
+          for (const k of remoteOnly) record[k] = latest[k];
         }
       }
 
-      const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: {
-          action: isUpdate ? `update-${writeKind}` : `create-${writeKind}`,
-          organization_id: orgId,
-          params: { ...(global ? {} : { domain_uuid: domainUuid }), ...record },
-        },
-      });
-      if (err) throw err;
-      setEditing(null); setCreating(false);
-      await reload();
+      await performWrite(record, isUpdate);
     } catch (e: any) {
       alert(`Save failed: ${e?.message || 'unknown'}`);
     } finally { setSaving(false); }
+  };
+
+  const resolveConflict = async (choices: Record<string, 'mine' | 'theirs'>) => {
+    if (!conflictState) return;
+    const { record, baseline, latest, conflicts } = conflictState;
+    const merged = { ...record };
+    const diff: Record<string, any> = {};
+    for (const c of conflicts) {
+      merged[c.key] = choices[c.key] === 'theirs' ? c.theirs : c.mine;
+      diff[c.key] = { choice: choices[c.key], baseline: c.baseline, mine: c.mine, theirs: c.theirs, applied: merged[c.key] };
+    }
+    setConflictState(null);
+    setSaving(true);
+    try {
+      await performWrite(merged, true);
+      await recordAudit(merged[uuidField], baseline, merged, { conflicts: diff, remote_version_at: new Date().toISOString(), latest_keys: Object.keys(latest) }, 'resolved');
+    } catch (e: any) {
+      await recordAudit(merged[uuidField], baseline, merged, { conflicts: diff }, 'error', e?.message);
+      alert(`Save failed: ${e?.message || 'unknown'}`);
+    } finally { setSaving(false); }
+  };
+
+  const cancelConflict = async () => {
+    if (!conflictState) return;
+    const { record, baseline, conflicts } = conflictState;
+    await recordAudit(record[uuidField], baseline, null, { conflicts: conflicts.map((c) => c.key) }, 'cancelled');
+    setConflictState(null);
   };
 
   const remove = async (row: any) => {
