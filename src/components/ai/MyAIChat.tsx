@@ -147,6 +147,18 @@ export function MyAIChat({
           <span className="font-semibold text-sm">AVA Assistant</span>
         </div>
         <div className="flex items-center gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={() => {
+              setAutoAnswer(!autoAnswer);
+              toast.success(autoAnswer ? "Auto-answer off" : "Auto-answer on — I'll brief detail pages automatically");
+            }}
+            title={autoAnswer ? "Auto-answer on (click to disable)" : "Auto-answer off (click to enable)"}
+          >
+            {autoAnswer ? <Zap className="h-3.5 w-3.5 text-primary" /> : <ZapOff className="h-3.5 w-3.5" />}
+          </Button>
           {messages.length > 0 && (
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setMessages([])} title="Clear">
               <Trash2 className="h-3.5 w-3.5" />
