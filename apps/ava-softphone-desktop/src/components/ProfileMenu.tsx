@@ -699,6 +699,23 @@ const ghostBtn: React.CSSProperties = {
   color: '#0f172a', fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
 };
 
+const eyeBtn: React.CSSProperties = {
+  position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+  fontSize: 10, padding: '4px 8px', borderRadius: 6,
+  background: 'rgba(15,23,42,0.06)', border: `1px solid ${c.border}`,
+  color: '#0f172a', cursor: 'pointer', fontWeight: 700,
+};
+
+const fieldErr: React.CSSProperties = {
+  fontSize: 10.5, color: '#b91c1c', marginTop: 4, fontWeight: 600,
+};
+
+const errBox: React.CSSProperties = {
+  marginTop: 10, padding: '9px 11px', borderRadius: 8, fontSize: 11.5,
+  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.4)',
+  color: '#b91c1c', lineHeight: 1.45,
+};
+
 function menuItem(active: boolean): React.CSSProperties {
   return {
     width: '100%', display: 'flex', alignItems: 'center', gap: 10,
