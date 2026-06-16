@@ -80,7 +80,7 @@ export async function loadWhitelabel(orgIdOrSlug: string): Promise<WhitelabelCon
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgIdOrSlug);
   const { data } = await supabase
     .from("organizations")
-    .select("*")
+    .select("id,slug,name,brand_app_name,brand_name,brand_logo_url,brand_favicon_url,brand_primary_color,brand_accent_color,brand_support_email,billing_plan")
     .eq(isUuid ? "id" : "slug", orgIdOrSlug)
     .maybeSingle();
   if (!data) return getDefaultWhitelabel();
