@@ -208,6 +208,34 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
         )}
         {err && <span style={{ color: c.danger, fontSize: 11 }}>{err}</span>}
       </div>
+
+      {uploadResult && (
+        <div style={{
+          borderRadius: 8, padding: '10px 12px',
+          background: 'rgba(11,181,214,0.08)', border: `1px solid ${c.border}`,
+          display: 'grid', gap: 8,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 16 }}>✅</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: c.textIce }}>
+              Uploaded to PBX: <span style={{ color: c.signalGold }}>{uploadResult.filename}</span>
+            </span>
+            <span style={{ fontSize: 10, color: c.mutedSilver }}>
+              ({(uploadResult.bytes / 1024).toFixed(1)} KB)
+            </span>
+          </div>
+          {audioUrl && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10, color: c.mutedSilver, textTransform: 'uppercase', letterSpacing: 0.8 }}>Preview</span>
+              <audio src={audioUrl} controls style={{ height: 32, flex: 1, minWidth: 180 }} />
+              <a href={audioUrl} download={uploadResult.filename} style={{ fontSize: 11, color: c.avaCyan, textDecoration: 'underline', whiteSpace: 'nowrap' }}>
+                Download
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ fontSize: 10, color: c.mutedSilver, lineHeight: 1.5 }}>
         One-click: Generate → Upload to PBX. Filename is saved on the resource above.
       </div>
