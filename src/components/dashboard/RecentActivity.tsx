@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Clock } from 'lucide-react';
+import { MessageSquare, Clock, Phone, Target, CalendarClock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr, enUS } from 'date-fns/locale';
 import { DashboardMetrics } from '@/hooks/useDashboardMetrics';
@@ -7,6 +7,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 
 interface RecentActivityProps {
   metrics: DashboardMetrics;
+  extraActivity?: { id: string; type: string; title: string; timestamp: string }[];
 }
 
 const isValidDate = (date: Date): boolean => {
