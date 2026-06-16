@@ -59,7 +59,7 @@ export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' }
       if (!silent) setLoading(false);
       setSyncing(false);
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     (window as any).__lemtelRefreshCalls = () => load(true);
