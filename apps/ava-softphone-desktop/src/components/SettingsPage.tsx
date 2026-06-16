@@ -162,17 +162,23 @@ export default function SettingsPage({
             <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 8, fontWeight: 600, letterSpacing: 0.3, textTransform: 'uppercase' }}>
               Appearance
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {(['dark', 'light'] as const).map((m) => {
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {(['daylight', 'light', 'dark', 'midnight'] as const).map((m) => {
                 const active = mode === m;
+                const meta: Record<string, { icon: string; label: string }> = {
+                  daylight: { icon: '🌤️', label: 'Daylight' },
+                  light:    { icon: '☀️', label: 'Light' },
+                  dark:     { icon: '🌙', label: 'Dark' },
+                  midnight: { icon: '🌌', label: 'Midnight' },
+                };
                 return (
                   <button
                     key={m}
                     onClick={() => setMode(m)}
                     style={{
-                      flex: 1, padding: '14px 12px',
+                      flex: '1 1 calc(50% - 4px)', minWidth: 110, padding: '14px 12px',
                       background: active ? t.accentSoft : 'transparent',
-                      border: `1px solid ${active ? 'rgba(99,102,241,0.4)' : t.border}`,
+                      border: `1px solid ${active ? 'rgba(0,35,230,0.45)' : t.border}`,
                       color: active ? t.accent : t.text,
                       borderRadius: 12, cursor: 'pointer',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
@@ -180,12 +186,13 @@ export default function SettingsPage({
                       transition: 'all 160ms ease',
                     }}
                   >
-                    <span style={{ fontSize: 22 }}>{m === 'dark' ? '🌙' : '☀️'}</span>
-                    {m === 'dark' ? 'Dark' : 'Light'}
+                    <span style={{ fontSize: 22 }}>{meta[m].icon}</span>
+                    {meta[m].label}
                   </button>
                 );
               })}
             </div>
+
           </div>
 
           <div>
