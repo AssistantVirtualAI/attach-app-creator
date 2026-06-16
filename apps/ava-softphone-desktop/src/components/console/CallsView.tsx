@@ -77,14 +77,20 @@ export default function CallsView() {
     };
   }, [load]);
 
-  useRealtimeRefresh(orgId, 'pbx_call_records', () => load(true), {
-    debounceMs: 1800,
-    throttleMs: 10_000,
-    shouldRefresh: (payload) => {
-      const row = payload.new || payload.old || {};
-      return !extension || row.extension === extension;
+  useRealtimeRefresh(
+    {
+      table: 'pbx_call_records',
+      organizationId: orgId,
+      events: ['INSERT', 'UPDATE'],
+      debounceMs: 1800,
+      throttleMs: 10_000,
+      shouldRefresh: (payload: any) => {
+        const row = payload?.new || payload?.old || {};
+        return !extension || row.extension === extension;
+      },
     },
-  });
+    () => load(true),
+  );
 
   useEffect(() => {
     if (sel) { setInsight(null); ava.callDetail(sel.id).then(setInsight).catch(() => setInsight({ summary: 'No AI insight has been generated for this call yet.', topics: [], actionItems: [], qualityScore: 0 })); }
