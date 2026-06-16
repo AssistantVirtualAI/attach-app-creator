@@ -135,11 +135,22 @@ export default function OrgChatView() {
         const map: Record<string, string> = {};
         (r ?? []).forEach((x: any) => { map[x.channel_id] = x.last_read_at; });
         setReads(map);
+        await loadUnread();
       } catch (e: any) {
         setErrMsg(e?.message || 'Failed to load team chat.');
       }
     })();
   }, []);
+
+  // Unread polling + invalidation on new msgs
+  useEffect(() => {
+    if (!orgId) return;
+    const id = setInterval(loadUnread, 20000);
+    const ch = supabase.channel('chat-unread-watch')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'org_chat_messages' }, () => loadUnread())
+      .subscribe();
+    return () => { clearInterval(id); supabase.removeChannel(ch); };
+  }, [orgId]);
 
   // Realtime presence
   useEffect(() => {
