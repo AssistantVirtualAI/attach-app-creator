@@ -33,7 +33,21 @@ export default function OrgChatView() {
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [showGroup, setShowGroup] = useState(false);
+  const [unread, setUnread] = useState<Record<string, number>>({});
+  const [typingNames, setTypingNames] = useState<string[]>([]);
+  const [emojiFor, setEmojiFor] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const typingChanRef = useRef<any>(null);
+  const lastTypingAt = useRef(0);
+
+  const loadUnread = async () => {
+    const { data } = await supabase.functions.invoke('org-chat', { body: { action: 'unread_counts' } });
+    const counts = (data as any)?.counts ?? [];
+    const m: Record<string, number> = {};
+    counts.forEach((r: any) => { m[r.channel_id] = Number(r.unread_count); });
+    setUnread(m);
+  };
 
   const loadChannels = async (org: string) => {
     const edge = await supabase.functions.invoke('org-chat', { body: { action: 'list_channels' } }).catch(() => ({ data: null, error: null } as any));
