@@ -89,9 +89,14 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
   const railElev = 'var(--ava-surface-elev, rgba(255,255,255,0.08))';
   const railHover = 'var(--ava-surface-hover, rgba(255,255,255,0.12))';
 
+  const isDark = typeof document !== 'undefined' && (document.documentElement.getAttribute('data-ava-theme') === 'dark' || document.documentElement.getAttribute('data-ava-theme') === 'midnight');
+  const darkTextSub = 'rgba(230,240,255,0.82)';
+  const darkTextIce = '#f1f7ff';
+  const darkRailHover = 'rgba(255,255,255,0.14)';
+
   return (
     <aside
-      className="ava-glass"
+      className="ava-glass lemtel-rail"
       style={{
         width: 244, flexShrink: 0, height: '100%',
         background: railSurface,
