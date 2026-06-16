@@ -56,7 +56,7 @@ export const useWebhookEndpoints = () => {
       
       const { data, error } = await supabase
         .from('webhook_endpoints')
-        .select('*')
+        .select('id,organization_id,url,events,is_active,created_at,updated_at')
         .eq('organization_id', selectedOrgId)
         .order('created_at', { ascending: false });
       
