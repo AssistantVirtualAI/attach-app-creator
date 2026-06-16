@@ -13,6 +13,8 @@ import {
 import { EXTENSION_RULES, IVR_RULES, QUEUE_RULES } from '../../lib/pbxValidators';
 import { useDesktopRole } from '../../hooks/useDesktopRole';
 import { toast } from '../../lib/toast';
+import { audit } from '../../lib/audit';
+import { runCreatePbxResourceFlow } from '../../lib/pbxCreateFlow';
 import VoicemailView from './VoicemailView';
 import RecordingsView from './RecordingsView';
 import CallsView from './CallsView';
@@ -175,48 +177,52 @@ function ExtensionsTable() {
   };
 
   const createExtension = async (form: any) => {
-    if (!isAdmin) { toast.error('Admin role required to create extensions.'); return; }
     setSaving(true);
     try {
       const scope = await resolveDesktopTenantScope();
-      // Duplicate / conflict pre-check: existing extension with same number?
       const ext = String(form.extension || '').trim();
-      if (ext) {
-        const { data: dup } = await supabase
-          .from('pbx_extensions')
-          .select('id, extension, enabled')
-          .eq('organization_id', scope.organization_id)
-          .eq('extension', ext)
-          .maybeSingle();
-        if (dup) {
-          const choice = window.confirm(
-            `Extension ${ext} already exists on this PBX.\n\nClick OK to OPEN the existing record for editing instead, or Cancel to abort.`,
-          );
-          setSaving(false);
-          if (choice) {
-            setCreating(false);
-            await reload(false);
-            const match = data.find((r) => String(r.extension) === ext);
-            if (match) setEditing(match);
-          }
-          return;
-        }
-      }
       const out: any = { ...form };
       ['voicemail_enabled', 'enabled', 'voicemail_attach_file',
        'voicemail_local_after_email', 'do_not_disturb',
        'forward_all_enabled', 'forward_busy_enabled', 'forward_no_answer_enabled']
         .forEach((k) => { if (typeof out[k] === 'boolean') out[k] = out[k] ? 'true' : 'false'; });
-      const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'create-extension', organization_id: scope.organization_id, params: { domain_uuid: scope.domain_uuid, ...out } },
-      });
-      if (err) throw err;
-      setCreating(false);
-      await reload(true);
-      window.dispatchEvent(new Event('ava:pbx-resource-saved'));
-      toast.success(`Extension ${ext} created and synced.`);
-    } catch (e: any) {
-      toast.error('Create failed: ' + (e?.message || 'unknown'));
+
+      await runCreatePbxResourceFlow({
+        isAdmin,
+        resourceKind: 'extension',
+        identifier: ext || '(unnamed)',
+        findDuplicate: async () => {
+          if (!ext) return null;
+          const { data: dup } = await supabase
+            .from('pbx_extensions')
+            .select('id, pbx_uuid, extension, enabled, updated_at')
+            .eq('organization_id', scope.organization_id)
+            .eq('extension', ext)
+            .maybeSingle();
+          return dup || null;
+        },
+        confirmConflict: () => window.confirm(
+          `Extension ${ext} already exists on this PBX.\n\nClick OK to OPEN the existing record for editing instead, or Cancel to abort.`,
+        ),
+        openForEdit: async (existing) => {
+          setCreating(false);
+          await reload(false);
+          const match = data.find((r) => String(r.extension) === ext) || existing;
+          if (match) setEditing(match);
+        },
+        submit: async () => {
+          const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
+            body: { action: 'create-extension', organization_id: scope.organization_id, params: { domain_uuid: scope.domain_uuid, ...out } },
+          });
+          if (err) throw err;
+          setCreating(false);
+        },
+        reload: (force) => reload(force),
+        dispatchSaved: () => window.dispatchEvent(new Event('ava:pbx-resource-saved')),
+        toastSuccess: toast.success,
+        toastError: toast.error,
+        audit: (action, metadata) => audit(action, null, metadata),
+      }, `Extension ${ext} created and synced.`);
     } finally { setSaving(false); }
   };
 
@@ -666,41 +672,47 @@ function IvrsTable() {
   };
 
   const create = async (form: any) => {
-    if (!isAdmin) { toast.error('Admin role required to create auto-attendants.'); return; }
     setSaving(true);
     try {
       const me = await getMeContext();
       const orgId = me.organization_id || LEMTEL_ORG;
       const name = String(form.ivr_menu_name || '').trim();
-      const ext = String(form.ivr_menu_extension || '').trim();
-      if (name || ext) {
-        let q = supabase.from('pbx_ivrs').select('id, name, extension').eq('organization_id', orgId);
-        if (name) q = q.eq('name', name);
-        const { data: dup } = await q.maybeSingle();
-        if (dup) {
-          const choice = window.confirm(
-            `An auto-attendant named "${name}" already exists.\n\nClick OK to open it for editing instead, or Cancel to abort.`,
-          );
-          setSaving(false);
-          if (choice) {
-            setCreating(false);
-            await reload(false);
-            const match = data.find((r) => r.name === name);
-            if (match) setEditing(match);
-          }
-          return;
-        }
-      }
-      const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'create-ivr', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN, ...form } },
-      });
-      if (err) throw err;
-      setCreating(false);
-      await reload(true);
-      window.dispatchEvent(new Event('ava:pbx-resource-saved'));
-      toast.success(`Auto-attendant "${name}" created and synced.`);
-    } catch (e: any) {
-      toast.error('Create failed: ' + (e?.message || 'unknown'));
+      await runCreatePbxResourceFlow({
+        isAdmin,
+        resourceKind: 'ivr',
+        identifier: name || '(unnamed)',
+        findDuplicate: async () => {
+          if (!name) return null;
+          const { data: dup } = await supabase
+            .from('pbx_ivrs')
+            .select('id, pbx_uuid, name, extension, updated_at')
+            .eq('organization_id', orgId)
+            .eq('name', name)
+            .maybeSingle();
+          return dup || null;
+        },
+        confirmConflict: () => window.confirm(
+          `An auto-attendant named "${name}" already exists.\n\nClick OK to open it for editing instead, or Cancel to abort.`,
+        ),
+        openForEdit: async (existing) => {
+          setCreating(false);
+          await reload(false);
+          const match = data.find((r) => r.name === name) || existing;
+          if (match) setEditing(match);
+        },
+        submit: async () => {
+          const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
+            body: { action: 'create-ivr', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN, ...form } },
+          });
+          if (err) throw err;
+          setCreating(false);
+        },
+        reload: (force) => reload(force),
+        dispatchSaved: () => window.dispatchEvent(new Event('ava:pbx-resource-saved')),
+        toastSuccess: toast.success,
+        toastError: toast.error,
+        audit: (action, metadata) => audit(action, null, metadata),
+      }, `Auto-attendant "${name}" created and synced.`);
     } finally { setSaving(false); }
   };
 
@@ -845,47 +857,53 @@ function QueuesTable() {
   };
 
   const create = async (form: any) => {
-    if (!isAdmin) { toast.error('Admin role required to create call queues.'); return; }
     setSaving(true);
     try {
       const me = await getMeContext();
       const orgId = me.organization_id || LEMTEL_ORG;
       const name = String(form.queue_name || '').trim();
       const ext = String(form.queue_extension || '').trim();
-      if (name) {
-        const { data: dup } = await supabase
-          .from('pbx_call_queues')
-          .select('id, name, extension')
-          .eq('organization_id', orgId)
-          .eq('name', name)
-          .maybeSingle();
-        if (dup) {
-          const choice = window.confirm(
-            `A call queue named "${name}" already exists.\n\nClick OK to open it for editing instead, or Cancel to abort.`,
-          );
-          setSaving(false);
-          if (choice) {
-            setCreating(false);
-            await reload(false);
-            const match = data.find((r) => r.name === name);
-            if (match) setEditing(match);
-          }
-          return;
-        }
-      }
       const out: any = { ...form };
       if (out.queue_max_wait_time !== undefined) out.queue_max_wait_time = String(out.queue_max_wait_time);
-      const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
-        body: { action: 'create-queue', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN, ...out } },
-      });
-      if (err) throw err;
-      setCreating(false);
-      await reload(true);
-      window.dispatchEvent(new Event('ava:pbx-resource-saved'));
-      toast.success(`Call queue "${name}"${ext ? ` (ext ${ext})` : ''} created and synced.`);
-    } catch (e: any) {
-      toast.error('Create failed: ' + (e?.message || 'unknown'));
+
+      await runCreatePbxResourceFlow({
+        isAdmin,
+        resourceKind: 'queue',
+        identifier: name || '(unnamed)',
+        findDuplicate: async () => {
+          if (!name) return null;
+          const { data: dup } = await supabase
+            .from('pbx_call_queues')
+            .select('id, pbx_uuid, name, extension, updated_at')
+            .eq('organization_id', orgId)
+            .eq('name', name)
+            .maybeSingle();
+          return dup || null;
+        },
+        confirmConflict: () => window.confirm(
+          `A call queue named "${name}" already exists.\n\nClick OK to open it for editing instead, or Cancel to abort.`,
+        ),
+        openForEdit: async (existing) => {
+          setCreating(false);
+          await reload(false);
+          const match = data.find((r) => r.name === name) || existing;
+          if (match) setEditing(match);
+        },
+        submit: async () => {
+          const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
+            body: { action: 'create-queue', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN, ...out } },
+          });
+          if (err) throw err;
+          setCreating(false);
+        },
+        reload: (force) => reload(force),
+        dispatchSaved: () => window.dispatchEvent(new Event('ava:pbx-resource-saved')),
+        toastSuccess: toast.success,
+        toastError: toast.error,
+        audit: (action, metadata) => audit(action, null, metadata),
+      }, `Call queue "${name}"${ext ? ` (ext ${ext})` : ''} created and synced.`);
     } finally { setSaving(false); }
+  };
   };
 
   const cols = ['Name', 'Ext', 'Strategy', 'Agents', 'Max wait', 'Status', ''];
