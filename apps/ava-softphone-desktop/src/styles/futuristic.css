@@ -352,3 +352,38 @@ html[data-ava-theme="dark"] ::-webkit-scrollbar-thumb:hover,
 html[data-ava-theme="midnight"] ::-webkit-scrollbar-thumb:hover {
   background: rgba(150,180,255,0.38);
 }
+
+/* ============================================================
+   Keyboard focus rings — guaranteed visible across all themes.
+   Uses double-ring (inner contrast + outer glow) so the indicator
+   reads on both glass and solid surfaces.
+   ============================================================ */
+:where(button, a, [role="button"], input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--ava-focus-inner, #ffffff),
+    0 0 0 4px var(--ava-focus-outer, #0023e6),
+    0 0 0 8px var(--ava-focus-glow, rgba(0,35,230,0.25));
+  border-radius: inherit;
+  transition: box-shadow 120ms ease;
+}
+html[data-ava-theme="daylight"] {
+  --ava-focus-inner: #ffffff;
+  --ava-focus-outer: #0023e6;
+  --ava-focus-glow: rgba(0,35,230,0.22);
+}
+html[data-ava-theme="light"] {
+  --ava-focus-inner: #ffffff;
+  --ava-focus-outer: #0023e6;
+  --ava-focus-glow: rgba(0,35,230,0.28);
+}
+html[data-ava-theme="dark"] {
+  --ava-focus-inner: #0b1124;
+  --ava-focus-outer: #8fa6ff;
+  --ava-focus-glow: rgba(143,166,255,0.40);
+}
+html[data-ava-theme="midnight"] {
+  --ava-focus-inner: #05081a;
+  --ava-focus-outer: #a8bcff;
+  --ava-focus-glow: rgba(168,188,255,0.48);
+}

@@ -428,6 +428,52 @@ function ThemePreview({ t, mode }: { t: any; mode: string }) {
           </span>
         </div>
 
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.3 }}>Input</span>
+            <input
+              placeholder="Type to test…"
+              defaultValue="hello@avastatistic.ca"
+              style={{
+                padding: '9px 12px', borderRadius: 10,
+                background: t.surface, color: t.text,
+                border: `1px solid ${t.border}`,
+                fontSize: 13, outline: 'none',
+              }}
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: t.textMuted, textTransform: 'uppercase', letterSpacing: 0.3 }}>Select</span>
+            <select
+              style={{
+                padding: '9px 12px', borderRadius: 10,
+                background: t.surface, color: t.text,
+                border: `1px solid ${t.border}`,
+                fontSize: 13, outline: 'none', cursor: 'pointer',
+              }}>
+              <option>Workspace · Default</option>
+              <option>Agency · Lemtel</option>
+            </select>
+          </label>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Badge bg={t.accentSoft} fg={t.accent}>Active</Badge>
+          <Badge bg="rgba(15,157,88,0.15)" fg={t.success}>Connected</Badge>
+          <Badge bg="rgba(217,119,6,0.15)" fg={t.warning}>Pending</Badge>
+          <Badge bg="rgba(220,38,38,0.15)" fg={t.danger}>Error</Badge>
+          <a
+            href="#preview-link"
+            onClick={(e) => e.preventDefault()}
+            style={{
+              fontSize: 13, color: t.accent, textDecoration: 'underline',
+              textDecorationColor: `${t.accent}80`, textUnderlineOffset: 3,
+              fontWeight: 600,
+            }}>
+            Hyperlink sample →
+          </a>
+        </div>
+
         <div style={{ display: 'flex', gap: 6 }}>
           {[t.accent, t.success, t.warning, t.danger].map((c: string, i: number) => (
             <div key={i} style={{ flex: 1, height: 8, borderRadius: 4, background: c }} />
@@ -435,5 +481,16 @@ function ThemePreview({ t, mode }: { t: any; mode: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function Badge({ children, bg, fg }: { children: React.ReactNode; bg: string; fg: string }) {
+  return (
+    <span style={{
+      padding: '4px 10px', borderRadius: 999,
+      background: bg, color: fg,
+      fontSize: 11, fontWeight: 700, letterSpacing: 0.3,
+      border: `1px solid ${fg}33`,
+    }}>{children}</span>
   );
 }
