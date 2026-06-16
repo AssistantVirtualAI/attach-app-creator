@@ -132,6 +132,45 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "get_voicemail_detail",
+      description: "Get full details for one voicemail (caller, transcript, AI summary, signed audio URL). Use when the user is on the voicemail page or asks about a specific voicemail.",
+      parameters: {
+        type: "object",
+        properties: { voicemail_id: { type: "string" } },
+        required: ["voicemail_id"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_call_detail",
+      description: "Get full details for one call (numbers, duration, status, transcript, AI summary, recording reference).",
+      parameters: {
+        type: "object",
+        properties: { call_id: { type: "string" } },
+        required: ["call_id"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_recording_detail",
+      description: "Get full details for a call recording (signed audio URL, transcript snippet, AI analysis).",
+      parameters: {
+        type: "object",
+        properties: { recording_id: { type: "string" } },
+        required: ["recording_id"],
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 async function elevenTts(text: string, voiceId: string): Promise<ArrayBuffer> {
