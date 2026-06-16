@@ -258,6 +258,7 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
 function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boolean; onClick: () => void; label?: string }) {
   const isAI = v === 'ai';
   const accent = isAI ? c.avaViolet : c.signalGold;
+  const hoverSurface = 'var(--ava-surface-hover, rgba(255,255,255,0.12))';
   return (
     <button
       onClick={onClick}
@@ -272,8 +273,8 @@ function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boole
               : 'linear-gradient(90deg, rgba(0,35,230,0.14), rgba(33,212,253,0.06))')
           : 'transparent',
         border: '1px solid ' + (active ? 'rgba(0,35,230,0.18)' : 'transparent'),
-        color: active ? c.textIce : c.mutedSilver,
-        fontSize: 13, fontWeight: active ? 600 : 500,
+        color: active ? c.textIce : c.textSub,
+        fontSize: 13, fontWeight: active ? 700 : 600,
         cursor: 'pointer', textAlign: 'left',
         transition: 'all 200ms cubic-bezier(.2,.7,.2,1)',
         position: 'relative',
@@ -284,7 +285,7 @@ function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boole
       onBlur={(e) => { e.currentTarget.style.boxShadow = active ? '0 6px 18px -10px rgba(0,35,230,0.45)' : 'none'; }}
       onMouseEnter={(e) => {
         if (!active) {
-          e.currentTarget.style.background = 'rgba(255,255,255,0.7)';
+          e.currentTarget.style.background = hoverSurface;
           e.currentTarget.style.color = c.textIce;
           e.currentTarget.style.transform = 'translateX(2px)';
         }
@@ -292,7 +293,7 @@ function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boole
       onMouseLeave={(e) => {
         if (!active) {
           e.currentTarget.style.background = 'transparent';
-          e.currentTarget.style.color = c.mutedSilver;
+          e.currentTarget.style.color = c.textSub;
           e.currentTarget.style.transform = 'translateX(0)';
         }
       }}
@@ -323,7 +324,7 @@ function CompactRail({ view, onChange, onOpenSettings, items }: { view: ConsoleV
       className="ava-glass"
       style={{
         position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30,
-        background: 'rgba(255,255,255,0.85)',
+        background: 'var(--ava-glass, rgba(20,28,56,0.72))',
         borderTop: `1px solid ${c.border}`,
         borderRadius: 0,
         backdropFilter: 'blur(18px) saturate(160%)',
@@ -345,7 +346,7 @@ function CompactRail({ view, onChange, onOpenSettings, items }: { view: ConsoleV
                 minWidth: 64, padding: '8px 10px', borderRadius: 12,
                 background: active ? `linear-gradient(180deg, ${accent}22, transparent)` : 'transparent',
                 border: active ? `1px solid ${accent}55` : '1px solid transparent',
-                color: active ? c.textIce : c.mutedSilver,
+                color: active ? c.textIce : c.textSub,
                 fontSize: 10, fontWeight: active ? 700 : 500,
                 cursor: 'pointer', transition: 'all .18s ease',
               }}
