@@ -24,7 +24,7 @@ export type ConsoleView =
   | 'home' | 'dialer' | 'calls' | 'messages' | 'voicemail'
   | 'recordings' | 'ai' | 'contacts' | 'admin' | 'settings'
   | 'telecom' | 'orgchat' | 'aiadmin' | 'reports' | 'pbxlive'
-  | 'customers' | 'voiceagents' | 'audit' | 'queues';
+  | 'customers' | 'voiceagents' | 'audit' | 'queues' | 'sync';
 
 const ICON: Record<ConsoleView, string> = {
   home: 'M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1V11z',
