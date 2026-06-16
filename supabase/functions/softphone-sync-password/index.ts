@@ -116,11 +116,14 @@ Deno.serve(async (req) => {
       // and leaves SIP stuck in Idle. The portal-login password is managed
       // separately via set-unified-password / softphone-reset-password.
 
-      // mirror onto pbx_extensions.raw_data if present
+      // mirror onto pbx_extensions.password AND raw_data.password so credential
+      // resolution (which prefers extension_password) sees the aligned value.
       if (extRow?.id || spu.extension_id) {
         const raw = (extRow?.raw_data as any) || {};
         raw.password = desiredPwd;
-        await admin.from("pbx_extensions").update({ raw_data: raw }).eq("id", extRow?.id || spu.extension_id);
+        await admin.from("pbx_extensions")
+          .update({ password: desiredPwd, raw_data: raw })
+          .eq("id", extRow?.id || spu.extension_id);
       }
 
       await admin.from("audit_logs").insert({

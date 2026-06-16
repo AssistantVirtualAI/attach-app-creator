@@ -64,7 +64,7 @@ function rangeCutoff(r: Range): number {
   return r === 'all' ? 0 : Date.now() - (ms as any)[r];
 }
 
-export default function RecordingsView() {
+export default function RecordingsView({ scope = 'mine' }: { scope?: 'mine' | 'org' } = {}) {
   const [items, setItems] = useState<RecordingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +90,7 @@ export default function RecordingsView() {
     if (!opts?.silent) setLoading(true);
     setError(null);
     try {
-      const d = await ava.recordings();
+      const d = await ava.recordings(100, { scope });
       setItems(Array.isArray(d) ? d : []);
     } catch (err: any) {
       if (!opts?.silent) setItems([]);
@@ -98,7 +98,7 @@ export default function RecordingsView() {
     } finally {
       if (!opts?.silent) setLoading(false);
     }
-  }, []);
+  }, [scope]);
 
   const silentLoad = useCallback(() => { void load({ silent: true }); }, [load]);
 

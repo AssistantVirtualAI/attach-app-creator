@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useSoftphone, ManualStatus } from '@/hooks/useSoftphone';
+import { useSoftphone } from '@/hooks/useSoftphone';
 import RecentsList from './RecentsList';
 import ContactsList from './ContactsList';
 import VoicemailList from './VoicemailList';
@@ -386,21 +386,6 @@ export default function SoftphonePane({
               : sp.snap.status === 'disconnected' ? 'Offline'
               : 'Idle'}
           </span>
-          <select
-            value={sp.manualStatus}
-            onChange={(e) => sp.setManualStatus(e.target.value as ManualStatus)}
-            style={{
-              background: 'rgba(255,255,255,0.05)', color: c.text,
-              border: `1px solid ${c.border}`, borderRadius: 8,
-              fontSize: 10, padding: compact ? '3px 4px' : '4px 6px', cursor: 'pointer',
-              maxWidth: compact ? 70 : 'none',
-            }}
-          >
-            <option value="auto">Auto</option>
-            <option value="available">Available</option>
-            <option value="dnd">DND</option>
-            <option value="away">Away</option>
-          </select>
           {!compact && <ProfileMenu />}
           <button
             onClick={syncPhoneSystem}

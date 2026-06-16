@@ -475,12 +475,15 @@ function mapCdrToRecording(r: any): RecordingItem {
 
 
 
-async function readCallRecordRows(limit = 100): Promise<any[]> {
+async function readCallRecordRows(limit = 100, opts?: { scope?: 'mine' | 'org' }): Promise<any[]> {
   const me = await getMeContext();
   const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-  const extFilter = me.extension
-    ? `&or=(extension.eq.${me.extension},caller_number.eq.${me.extension},destination_number.eq.${me.extension},source_number.eq.${me.extension})`
-    : '&id=is.null';
+  const scopeOrg = opts?.scope === 'org';
+  const extFilter = scopeOrg
+    ? ''
+    : me.extension
+      ? `&or=(extension.eq.${me.extension},caller_number.eq.${me.extension},destination_number.eq.${me.extension},source_number.eq.${me.extension})`
+      : '&id=is.null';
   const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,source_number,destination_number,start_at,duration_seconds,billsec,direction,call_status,missed_call,has_recording,recording_path,recording_name,hangup_cause,voicemail_message,transcribed,analyzed,mos,raw_data,notes,tags${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
 
   const res = await fetch(url, {
@@ -555,15 +558,15 @@ export const ava = {
     missed: 3, answered: 12, unreadSms: 5, voicemail: 2, aiActions: 4, pbxHealth: 'ok',
     brief: 'You have 3 missed calls and 2 unread voicemails requiring callbacks. One conversation flagged a renewal opportunity.',
   }),
-  calls: async (limit = 100) => {
+  calls: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
     if (MOCK) return MOCK_CALLS;
     await bestEffortCdrSync(Math.max(limit, 200));
-    return (await readCallRecordRows(limit)).map(mapCdrToCall);
+    return (await readCallRecordRows(limit, opts)).map(mapCdrToCall);
   },
-  scopedCallRecords: async (limit = 100) => {
+  scopedCallRecords: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
     if (MOCK) return MOCK_CALLS as any[];
     await bestEffortCdrSync(Math.max(limit, 200));
-    return readCallRecordRows(limit);
+    return readCallRecordRows(limit, opts);
   },
   callDetail: (id: string) => call<any>(`/db/${TABLES.aiInsights}?call_record_id=eq.${id}&select=*&limit=1`, {}, {
     callId: id,
@@ -726,15 +729,18 @@ export const ava = {
   },
   markVoicemailRead: (id: string) =>
     call<{ ok: true }>(`/fn/${FN.fusionpbxProxy}`, { method: 'POST', body: JSON.stringify({ action: 'voicemail-read', id }) }, { ok: true }).catch(() => ({ ok: true as const })),
-  recordings: async (limit = 100) => {
+  recordings: async (limit = 100, opts?: { scope?: 'mine' | 'org' }) => {
     if (MOCK) return SAMPLE_RECORDING_EMPTY;
     await bestEffortCdrSync(Math.max(limit, 200));
     try {
       const me = await getMeContext();
       const orgFilter = me.organization_id ? `&organization_id=eq.${me.organization_id}` : '';
-      const extFilter = me.extension
-        ? `&or=(extension.eq.${me.extension},caller_number.eq.${me.extension},destination_number.eq.${me.extension},source_number.eq.${me.extension})`
-        : '&id=is.null';
+      const scopeOrg = opts?.scope === 'org';
+      const extFilter = scopeOrg
+        ? ''
+        : me.extension
+          ? `&or=(extension.eq.${me.extension},caller_number.eq.${me.extension},destination_number.eq.${me.extension},source_number.eq.${me.extension})`
+          : '&id=is.null';
       const url = `${BACKEND.url}/rest/v1/pbx_call_records?select=id,organization_id,extension,extension_uuid,pbx_uuid,domain_uuid,domain_name,caller_name,caller_number,destination,destination_number,source_number,start_at,billsec,duration_seconds,has_recording,recording_path,recording_name,mos&has_recording=eq.true${orgFilter}${extFilter}&order=start_at.desc&limit=${limit}`;
       const res = await fetch(url, {
         headers: {

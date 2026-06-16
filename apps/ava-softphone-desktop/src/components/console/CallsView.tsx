@@ -31,7 +31,7 @@ function relative(iso: string | null) {
   return hrs < 24 ? `${hrs}h ago` : fmtDate(iso);
 }
 
-export default function CallsView() {
+export default function CallsView({ scope = 'mine' }: { scope?: 'mine' | 'org' } = {}) {
   const { orgId, extension } = useTenant();
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +49,7 @@ export default function CallsView() {
     if (!silent) setLoading(true);
     setError(null); setSyncing(true);
     try {
-      const scopedCalls = await ava.calls(150);
+      const scopedCalls = await ava.calls(150, { scope });
       setCalls(scopedCalls);
       setSel((current) => current ? scopedCalls.find((cr) => cr.id === current.id) || current : current);
     } catch (err: any) {
@@ -59,7 +59,7 @@ export default function CallsView() {
       if (!silent) setLoading(false);
       setSyncing(false);
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     (window as any).__lemtelRefreshCalls = () => load(true);
@@ -77,14 +77,21 @@ export default function CallsView() {
     };
   }, [load]);
 
-  useRealtimeRefresh(orgId, 'pbx_call_records', () => load(true), {
-    debounceMs: 1800,
-    throttleMs: 10_000,
-    shouldRefresh: (payload) => {
-      const row = payload.new || payload.old || {};
-      return !extension || row.extension === extension;
+  useRealtimeRefresh(
+    {
+      table: 'pbx_call_records',
+      organizationId: orgId,
+      events: ['INSERT', 'UPDATE'],
+      debounceMs: 1800,
+      throttleMs: 10_000,
+      shouldRefresh: (payload: any) => {
+        if (scope === 'org') return true;
+        const row = payload?.new || payload?.old || {};
+        return !extension || row.extension === extension;
+      },
     },
-  });
+    () => load(true),
+  );
 
   useEffect(() => {
     if (sel) { setInsight(null); ava.callDetail(sel.id).then(setInsight).catch(() => setInsight({ summary: 'No AI insight has been generated for this call yet.', topics: [], actionItems: [], qualityScore: 0 })); }

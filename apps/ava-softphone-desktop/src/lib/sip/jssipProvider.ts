@@ -231,6 +231,7 @@ export interface SoftphoneConfig {
   wssUrl: string;
   wssUrls?: string[];
   password: string;
+  authUsername?: string;
   mock?: boolean;
 }
 
@@ -361,7 +362,7 @@ class JsSipProvider {
         sockets,
         uri: `sip:${cfg.extension}@${cfg.sipDomain}`,
         password: cfg.password,
-        authorization_user: cfg.extension,
+        authorization_user: cfg.authUsername || cfg.extension,
         realm: cfg.sipDomain,
         contact_uri: `sip:${cfg.extension}@${cfg.sipDomain};transport=wss`,
         register: true,
