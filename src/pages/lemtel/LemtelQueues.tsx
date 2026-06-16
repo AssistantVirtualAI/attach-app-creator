@@ -692,6 +692,27 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
     } catch (e: any) { toast({ title: 'Failed', description: e.message, variant: 'destructive' }); }
   };
 
+  const updateAgent = async (a: any, next: { role: 'agent' | 'supervisor'; tier_position: number }) => {
+    if (!perms.canAssign) { toast({ title: 'Forbidden', variant: 'destructive' }); return; }
+    const tier_level = next.role === 'supervisor' ? 1 : 2;
+    const tier_position = Math.max(1, Math.floor(next.tier_position) || 1);
+    const tierUuid = a.pbx_uuid || a.raw_data?.call_center_tier_uuid;
+    try {
+      if (tierUuid) {
+        const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
+          body: { organization_id: LEMTEL_ORG, action: 'update-queue-tier', params: {
+            call_center_tier_uuid: tierUuid,
+            tier_level, tier_position,
+          }},
+        });
+        if (error || data?.ok === false) throw new Error(data?.message || error?.message || 'Failed');
+      }
+      await supabase.from('pbx_queue_agents').update({ tier_level, tier_position }).eq('id', a.id);
+      toast({ title: 'Updated' });
+      load();
+    } catch (e: any) { toast({ title: 'Failed', description: e.message, variant: 'destructive' }); }
+  };
+
   // returns array of newly inserted rows so caller can offer undo
   const bulkAddRaw = async (extensionIds: string[], role: 'agent' | 'supervisor') => {
     if (!perms.canAssign) { toast({ title: 'Forbidden', variant: 'destructive' }); return [] as any[]; }
