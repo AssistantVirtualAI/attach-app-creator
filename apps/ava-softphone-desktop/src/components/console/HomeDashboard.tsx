@@ -59,8 +59,33 @@ const tones: Record<string, Tone> = {
 
 type MetricKey = 'calls' | 'missed' | 'answered' | 'recordings' | 'voicemail' | 'sms' | 'live' | 'realtime';
 
-function Sparkline({ data, color = 'rgba(255,255,255,0.95)' }: { data: number[]; color?: string }) {
-  if (!data || data.length === 0) return null;
+function Sparkline({
+  data, color = 'rgba(255,255,255,0.95)', loading, error,
+}: { data: number[]; color?: string; loading?: boolean; error?: string | null }) {
+  if (loading) {
+    return (
+      <div className="ava-spark-skel" aria-hidden style={{ width: '100%', height: 28, borderRadius: 6 }} />
+    );
+  }
+  if (error) {
+    return (
+      <div role="img" aria-label={`Trend unavailable: ${error}`} style={{
+        width: '100%', height: 28, borderRadius: 6,
+        background: 'rgba(0,0,0,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,0.95)', letterSpacing: 0.4,
+      }}>⚠ trend unavailable</div>
+    );
+  }
+  if (!data || data.length === 0 || data.every((v) => v === 0)) {
+    return (
+      <div aria-hidden style={{
+        width: '100%', height: 28, borderRadius: 6,
+        background: 'rgba(255,255,255,0.10)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: 600,
+      }}>no activity</div>
+    );
+  }
   const w = 100, h = 28;
   const max = Math.max(1, ...data);
   const step = data.length > 1 ? w / (data.length - 1) : w;
@@ -75,19 +100,23 @@ function Sparkline({ data, color = 'rgba(255,255,255,0.95)' }: { data: number[];
 }
 
 function Stat({
-  label, value, tone, hint, series, onClick,
+  label, value, tone, hint, series, onClick, loading, error,
 }: {
   label: string; value: string | number; tone: Tone; hint?: string;
-  series?: number[]; onClick?: () => void;
+  series?: number[]; onClick?: () => void; loading?: boolean; error?: string | null;
 }) {
   const interactive = !!onClick;
+  const displayValue = loading ? '…' : error ? '—' : value;
+  const a11yLabel = `${label}: ${error ? 'unavailable' : loading ? 'loading' : value}${hint ? ` — ${hint}` : ''}${interactive ? '. Press Enter to open detail.' : ''}`;
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={!interactive}
-      className="ava-lift ava-focus"
-      aria-label={`${label}: ${value}${hint ? ` — ${hint}` : ''}`}
+      className="ava-stat-tile ava-lift"
+      aria-label={a11yLabel}
+      aria-busy={!!loading}
+      aria-live={loading ? 'polite' : undefined}
       style={{
         textAlign: 'left',
         background: `linear-gradient(135deg, ${tone.from} 0%, ${tone.to} 100%)`,
@@ -106,16 +135,17 @@ function Stat({
         pointerEvents: 'none',
       }} />
       <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.6, textTransform: 'uppercase', color: 'rgba(255,255,255,0.95)', position: 'relative' }}>{label}</span>
-      <span className="tabular-nums" style={{ fontSize: 32, fontWeight: 700, color: '#fff', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: -0.6, lineHeight: 1.05, position: 'relative', textShadow: '0 2px 12px rgba(0,0,0,0.20)' }}>{value}</span>
-      {series && series.length > 0 && (
-        <div style={{ position: 'relative', marginTop: 2 }}>
-          <Sparkline data={series} />
-        </div>
-      )}
-      {hint && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.92)', position: 'relative' }}>{hint}</span>}
+      <span className="tabular-nums" style={{ fontSize: 32, fontWeight: 700, color: '#fff', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: -0.6, lineHeight: 1.05, position: 'relative', textShadow: '0 2px 12px rgba(0,0,0,0.20)' }}>{displayValue}</span>
+      <div style={{ position: 'relative', marginTop: 2 }}>
+        <Sparkline data={series || []} loading={loading} error={error || null} />
+      </div>
+      {error
+        ? <span style={{ fontSize: 11, color: '#ffe4e4', position: 'relative', fontWeight: 600 }}>Could not load · click to retry</span>
+        : hint && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.92)', position: 'relative' }}>{hint}</span>}
     </button>
   );
 }
+
 
 function attentionTone(item: AttentionItem): Tone {
   if (item.tone === 'danger') return tones.red;
