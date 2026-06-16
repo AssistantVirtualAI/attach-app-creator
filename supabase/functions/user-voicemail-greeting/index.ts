@@ -262,9 +262,10 @@ Deno.serve(async (req) => {
       const text: string = String(payload?.text ?? "").trim();
       const voiceId: string = String(payload?.voice_id ?? "EXAVITQu4vr4xnSDxMaL");
       if (!text) return json({ error: "missing_text" }, 400);
-      const audio = await ttsToBlob(text, voiceId);
+      const result = await ttsCall(text, voiceId);
+      if (!result.ok) return json({ error: result.error_message ?? "tts_failed" }, 502);
       const path = `${spu.organization_id}/${userId}/greeting-${Date.now()}.mp3`;
-      const { error: upErr } = await admin.storage.from("voicemail-greetings").upload(path, new Uint8Array(audio), {
+      const { error: upErr } = await admin.storage.from("voicemail-greetings").upload(path, new Uint8Array(result.audio!), {
         contentType: "audio/mpeg",
         upsert: true,
       });
