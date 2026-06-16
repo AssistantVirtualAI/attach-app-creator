@@ -7,13 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlayCircle, Wand2, Trash2, CheckCircle2, Library, Plus } from "lucide-react";
+import { PlayCircle, Wand2, Trash2, CheckCircle2, Library, Plus, RefreshCw, Loader2, AlertCircle } from "lucide-react";
 import { useGreetingsLibrary } from "@/hooks/useGreetingsLibrary";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
 export default function MyGreetings() {
-  const { query, create, remove, activate } = useGreetingsLibrary();
+  const { query, create, remove, activate, retry } = useGreetingsLibrary();
   const greetings = query.data?.greetings ?? [];
   const extensions = query.data?.extensions ?? [];
   const voices = query.data?.voices ?? [];
