@@ -201,6 +201,9 @@ function ExtensionsTable() {
     }
   };
 
+  const ext = ''; // placeholder, real value set inside createExtension
+  const { confirmConflict: confirmExtConflict, modalNode: extConflictModal } = useConflictModal('extension', (creating as any)?.lastIdentifier || '');
+
   const createExtension = async (form: any) => {
     setSaving(true);
     try {
@@ -212,10 +215,12 @@ function ExtensionsTable() {
        'forward_all_enabled', 'forward_busy_enabled', 'forward_no_answer_enabled']
         .forEach((k) => { if (typeof out[k] === 'boolean') out[k] = out[k] ? 'true' : 'false'; });
 
+      const idempotencyKey = creating?.key || generateIdempotencyKey();
       await runCreatePbxResourceFlow({
         isAdmin,
         resourceKind: 'extension',
         identifier: ext || '(unnamed)',
+        idempotencyKey,
         findDuplicate: async () => {
           if (!ext) return null;
           const { data: dup } = await supabase
@@ -226,21 +231,19 @@ function ExtensionsTable() {
             .maybeSingle();
           return dup || null;
         },
-        confirmConflict: () => window.confirm(
-          `Extension ${ext} already exists on this PBX.\n\nClick OK to OPEN the existing record for editing instead, or Cancel to abort.`,
-        ),
+        confirmConflict: (existing) => confirmExtConflict(existing),
         openForEdit: async (existing) => {
-          setCreating(false);
+          setCreating(null);
           await reload(false);
           const match = data.find((r) => String(r.extension) === ext) || existing;
           if (match) setEditing(match);
         },
-        submit: async () => {
+        submit: async ({ idempotencyKey: idk }) => {
           const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
-            body: { action: 'create-extension', organization_id: scope.organization_id, params: { domain_uuid: scope.domain_uuid, ...out } },
+            body: { action: 'create-extension', organization_id: scope.organization_id, idempotency_key: idk, params: { domain_uuid: scope.domain_uuid, ...out } },
           });
           if (err) throw err;
-          setCreating(false);
+          setCreating(null);
         },
         reload: (force) => reload(force),
         dispatchSaved: () => window.dispatchEvent(new Event('ava:pbx-resource-saved')),
@@ -250,6 +253,7 @@ function ExtensionsTable() {
       }, `Extension ${ext} created and synced.`);
     } finally { setSaving(false); }
   };
+  void ext; // suppress unused-local lint for outer scope placeholder
 
   const cols = ['Ext', 'Display Name', 'User', 'Voicemail', 'Status', ''];
   return (
