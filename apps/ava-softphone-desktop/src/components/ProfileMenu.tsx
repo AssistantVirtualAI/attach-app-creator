@@ -38,8 +38,37 @@ const STATUS_META: Record<Status, { label: string; icon: string; color: string; 
 
 const AVATAR_KEY = 'lemtel:user-avatar';
 const STATUS_KEY = 'lemtel:user-status';
-
+const EXPIRY_KEY = 'lemtel:user-status-expiry';
 const MEETING_NOTE_KEY = 'lemtel:meeting-note';
+
+// Statuses that auto-revert to "available" after a chosen duration.
+const TEMP_STATUSES: Status[] = ['busy', 'meeting', 'dnd', 'lunch', 'break', 'training', 'sick', 'remote'];
+const LONG_STATUSES: Status[] = ['travel', 'vacation'];
+const DURATION_PRESETS: Array<{ label: string; mins: number }> = [
+  { label: '15 min', mins: 15 },
+  { label: '30 min', mins: 30 },
+  { label: '1 h',    mins: 60 },
+  { label: '2 h',    mins: 120 },
+  { label: '4 h',    mins: 240 },
+  { label: 'End of day', mins: -1 },
+];
+const LONG_PRESETS: Array<{ label: string; mins: number }> = [
+  { label: 'Today',   mins: -1 },
+  { label: '1 day',   mins: 60 * 24 },
+  { label: '3 days',  mins: 60 * 24 * 3 },
+  { label: '1 week',  mins: 60 * 24 * 7 },
+  { label: '2 weeks', mins: 60 * 24 * 14 },
+];
+
+function computeExpiry(mins: number): number {
+  if (mins === -1) {
+    const d = new Date();
+    d.setHours(18, 0, 0, 0); // end of day = 18:00 local
+    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1);
+    return d.getTime();
+  }
+  return Date.now() + mins * 60_000;
+}
 
 export default function ProfileMenu() {
   const [open, setOpen] = useState(false);
