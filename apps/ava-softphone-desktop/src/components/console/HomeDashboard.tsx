@@ -669,7 +669,7 @@ function MetricDetailDrawer(props: {
         </div>
 
         {seriesForMetric.length > 0 && (
-          <div style={{ padding: '14px 18px 0', background: '#fff', borderBottom: `1px solid ${c.border}` }}>
+          <div style={{ padding: '14px 18px 0', background: c.bgCard, borderBottom: `1px solid ${c.border}` }}>
             <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 1.4, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 6 }}>
               Daily trend
             </div>
