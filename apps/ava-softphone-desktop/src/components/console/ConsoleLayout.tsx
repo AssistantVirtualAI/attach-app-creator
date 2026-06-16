@@ -172,23 +172,15 @@ export default function ConsoleLayout({
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.1 }}>
               <span style={{ fontSize: 11, color: c.signalGold, fontWeight: 900, letterSpacing: 1.4, textTransform: 'uppercase' }}>AVA Statistic</span>
               <span style={{ fontSize: 10, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 210 }}>
-                Ext {creds.extension} · {syncNote || orgName || 'Phone system live data'}
+                Ext {creds.extension}{orgName ? ` · ${orgName}` : ''}
               </span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' as any }}>
               <button onClick={() => setPaletteOpen(true)} style={{ width: 34, height: 32, borderRadius: 10, border: `1px solid ${c.border}`, background: 'rgba(255,255,255,0.04)', color: c.textIce, cursor: 'pointer' }} aria-label="Search">⌘K</button>
-              <button onClick={runFullSync} disabled={syncing} style={{ height: 32, padding: '0 10px', borderRadius: 10, border: `1px solid ${c.borderGold}`, background: syncing ? 'rgba(255,230,0,0.08)' : 'rgba(255,230,0,0.14)', color: c.signalGold, fontSize: 10, fontWeight: 900, letterSpacing: 0.8, cursor: syncing ? 'wait' : 'pointer' }}>
-                {syncing ? 'SYNC…' : 'SYNC'}
+              <button onClick={() => setView('settings')} style={{ width: 34, height: 32, borderRadius: 10, border: `1px solid ${c.border}`, background: 'rgba(255,255,255,0.04)', color: c.textIce, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Settings">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1z"/></svg>
               </button>
             </div>
-          </div>
-        )}
-        {!compact && (
-          <div style={{ position: 'absolute', top: 12, right: 16, zIndex: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-            {syncNote && <span style={{ maxWidth: 360, color: c.mutedSilver, fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{syncNote}</span>}
-            <button onClick={runFullSync} disabled={syncing} style={{ padding: '7px 11px', borderRadius: 8, background: syncing ? 'rgba(255,230,0,0.08)' : 'rgba(255,230,0,0.14)', border: `1px solid ${c.borderGold}`, color: c.signalGold, fontSize: 10, fontWeight: 800, letterSpacing: 1, cursor: syncing ? 'wait' : 'pointer' }}>
-              {syncing ? 'SYNCING…' : 'SYNC PHONE SYSTEM'}
-            </button>
           </div>
         )}
         <AppErrorBoundary key={view} compact onBack={() => setView('dialer')}>
