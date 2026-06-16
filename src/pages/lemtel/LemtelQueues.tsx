@@ -592,7 +592,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
       // Step 3: upsert local rows
       setStatus({ state: 'running', step: 'upsert', message: `Upserting ${mine.length} tier${mine.length === 1 ? '' : 's'}…`, pulled: mine.length, attempts: totalAttempts });
       const { data: extFresh = [] } = await supabase.from('pbx_extensions')
-        .select('id, extension, display_name').eq('organization_id', LEMTEL_ORG);
+        .select(EXT_COLS).eq('organization_id', LEMTEL_ORG);
 
       let upserted = 0;
       const upsertErrors: string[] = [];
@@ -604,7 +604,7 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
           queue_id: queue.id,
           extension_id: ext?.id || null,
           agent_id: agentExt,
-          agent_name: ext?.display_name || agentExt,
+          agent_name: extName(ext) || agentExt,
           tier_level: parseInt(t.tier_level) || 2,
           tier_position: parseInt(t.tier_position) || 1,
           pbx_uuid: t.call_center_tier_uuid,
