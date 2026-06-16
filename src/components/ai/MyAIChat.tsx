@@ -117,6 +117,15 @@ export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; on
         </div>
       </header>
 
+      {(pageContext.voicemail_id || pageContext.call_id || pageContext.recording_id) && (
+        <div className="px-4 py-1.5 text-[11px] text-primary bg-primary/5 border-b flex items-center gap-1.5">
+          <Sparkles className="h-3 w-3" />
+          Context: {pageContext.page}
+          {pageContext.voicemail_id && ` · vm ${pageContext.voicemail_id.slice(0, 8)}`}
+          {pageContext.call_id && ` · call ${pageContext.call_id.slice(0, 8)}`}
+          {pageContext.recording_id && ` · rec ${pageContext.recording_id.slice(0, 8)}`}
+        </div>
+      )}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 && (
           <div className="space-y-3">
@@ -124,7 +133,7 @@ export function MyAIChat({ embedded = false, onClose }: { embedded?: boolean; on
               Hi! I can summarize your calls, manage your voicemail greeting, and analyze recent activity. Try:
             </p>
             <div className="flex flex-col gap-1.5">
-              {SUGGESTIONS.map((s) => (
+              {contextSuggestions.map((s) => (
                 <button key={s} onClick={() => send(s)}
                   className="text-left text-xs p-2 rounded border hover:border-primary/50 hover:bg-accent transition">
                   {s}
