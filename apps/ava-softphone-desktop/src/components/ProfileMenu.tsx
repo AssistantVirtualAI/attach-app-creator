@@ -161,13 +161,26 @@ export default function ProfileMenu() {
           (payload: any) => {
             const next = (payload.new?.status || payload.old?.status) as Status | undefined;
             if (!next || !STATUS_META[next]) return;
-            if (next === statusRef.current) return;
-            // Remote device changed status — drop any local auto-revert timer and pending picker.
+            // Conflict detection: a remote write arrives <5s after our last local write with a DIFFERENT status.
+            const localW = lastLocalWriteRef.current;
+            const isNearSimultaneous = !!localW && (Date.now() - localW.at) < 5000;
+            const conflict = isNearSimultaneous && localW!.status !== next;
+            if (next === statusRef.current && !conflict) return;
+            if (conflict) {
+              // Remote wins (server is the source of truth). Surface to user via badge.
+              const remoteLabel = STATUS_META[next].label;
+              setSyncState('conflict');
+              setSyncDetail(`Another device set "${remoteLabel}" — keeping the latest.`);
+              if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+              savedTimerRef.current = setTimeout(() => setSyncState('idle'), 4000);
+            } else {
+              // Plain remote update from another device — just confirm sync.
+              flashSaved('Synced from another device');
+            }
             if (expiryTimerRef.current) { clearTimeout(expiryTimerRef.current); expiryTimerRef.current = null; }
             setExpiryAt(null);
             setPendingStatus(null);
             try { localStorage.removeItem(EXPIRY_KEY); } catch { /* noop */ }
-            // Parse "until:<iso>" from message to re-arm local timer if present.
             const msg = payload.new?.status_message as string | undefined;
             if (msg && msg.startsWith('until:')) {
               const ts = Date.parse(msg.slice(6));
@@ -177,6 +190,8 @@ export default function ProfileMenu() {
                 scheduleAutoRevert(ts);
               }
             }
+            // Adopt remote write as our new local baseline so we don't immediately re-flag it.
+            lastLocalWriteRef.current = { at: Date.now(), status: next, note: msg ?? null };
             setStatus(next);
             try { localStorage.setItem(STATUS_KEY, next); } catch { /* noop */ }
             window.dispatchEvent(new CustomEvent('lemtel:set-status', { detail: STATUS_META[next].manual }));
