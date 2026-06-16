@@ -18,7 +18,7 @@ export default function AdminVoicemailSettings() {
   const { data: rows = [], isLoading, refetch } = useQuery({
     queryKey: ['pbx-voicemail-settings-admin'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('pbx_voicemail_settings').select('*');
+      const { data, error } = await supabase.from('pbx_voicemail_settings').select('user_id,greeting_type,greeting_storage_path,greeting_tts_text,transcription_enabled,notify_email,notify_sms,notify_push,attach_audio_email,notify_email_address,notify_sms_number,updated_at,greeting_voice_id,greeting_voice_name,ai_summary_enabled,greeting_audio_url,greeting_updated_at');
       if (error) throw error;
       return data || [];
     },
