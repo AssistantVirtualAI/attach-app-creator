@@ -305,6 +305,7 @@ export default function PbxEditSheet({
 
   const validate = () => {
     const next: Record<string, string> = {};
+    // 1) Schema-level required / number checks.
     for (const g of groups) for (const f of g.fields) {
       const v = form[f.key];
       if (f.required && (v === undefined || v === null || String(v).trim() === '')) {
@@ -313,6 +314,11 @@ export default function PbxEditSheet({
       if (f.type === 'number' && v !== undefined && v !== null && v !== '' && Number.isNaN(Number(v))) {
         next[f.key] = 'Must be a number';
       }
+    }
+    // 2) Shared portal-parity rules (regex / range / enum / email).
+    if (rules) {
+      const ruleErrors = validateRecord(form, rules);
+      for (const [k, msg] of Object.entries(ruleErrors)) if (!next[k]) next[k] = msg;
     }
     setErrors(next);
     return Object.keys(next).length === 0;
