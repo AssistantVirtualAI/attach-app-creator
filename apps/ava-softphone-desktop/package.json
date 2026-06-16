@@ -17,6 +17,8 @@
     "build:linux": "vite build && tsc -p electron/tsconfig.json && electron-builder --linux",
     "dist": "npm run build",
     "smoke": "node scripts/smoke-electron.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -39,7 +41,8 @@
     "electron": "^33.0.0",
     "electron-builder": "^25.1.8",
     "typescript": "^5.6.3",
-    "vite": "^5.4.21"
+    "vite": "^5.4.21",
+    "vitest": "^3.2.4"
   },
   "build": {
     "extends": "./electron-builder.yml"

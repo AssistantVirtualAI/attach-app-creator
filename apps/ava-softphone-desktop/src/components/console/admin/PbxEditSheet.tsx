@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { theme } from '../../../lib/theme';
 import { supabase } from '../../../lib/supabaseClient';
+import { validateRecord, type RuleMap } from '../../../lib/pbxValidators';
 
 const { colors: c } = theme;
 
@@ -36,6 +37,8 @@ interface Props {
   initial: any;
   /** Snapshot at sheet open — used by parent for optimistic-concurrency conflict detection. */
   baseline?: any;
+  /** Shared validation rules (portal parity). */
+  rules?: RuleMap;
   saving?: boolean;
   width?: number;
   onCancel: () => void;
@@ -247,7 +250,7 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
 }
 
 export default function PbxEditSheet({
-  title, groups, initial, baseline, saving, width = 620, onCancel, onSave,
+  title, groups, initial, baseline, rules, saving, width = 620, onCancel, onSave,
 }: Props) {
   const [form, setForm] = useState<any>(initial || {});
   const [dirty, setDirty] = useState(false);
@@ -302,6 +305,7 @@ export default function PbxEditSheet({
 
   const validate = () => {
     const next: Record<string, string> = {};
+    // 1) Schema-level required / number checks.
     for (const g of groups) for (const f of g.fields) {
       const v = form[f.key];
       if (f.required && (v === undefined || v === null || String(v).trim() === '')) {
@@ -310,6 +314,11 @@ export default function PbxEditSheet({
       if (f.type === 'number' && v !== undefined && v !== null && v !== '' && Number.isNaN(Number(v))) {
         next[f.key] = 'Must be a number';
       }
+    }
+    // 2) Shared portal-parity rules (regex / range / enum / email).
+    if (rules) {
+      const ruleErrors = validateRecord(form, rules);
+      for (const [k, msg] of Object.entries(ruleErrors)) if (!next[k]) next[k] = msg;
     }
     setErrors(next);
     return Object.keys(next).length === 0;
