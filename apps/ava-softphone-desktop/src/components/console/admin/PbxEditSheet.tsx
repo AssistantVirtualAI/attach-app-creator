@@ -116,6 +116,7 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploaded, setUploaded] = useState(false);
+  const [uploadResult, setUploadResult] = useState<{ filename: string; bytes: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const filename = useMemo(() => {
@@ -145,7 +146,7 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
   const uploadToPbx = async () => {
     if (!audioB64) { setErr('Generate audio first'); return; }
     const orgId = (fullForm as any)?.organization_id || (fullForm as any)?.domain_organization_id;
-    setUploading(true); setErr(null);
+    setUploading(true); setErr(null); setUploadResult(null);
     try {
       const { data, error } = await supabase.functions.invoke('fusionpbx-proxy', {
         body: {
@@ -158,6 +159,7 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).message || (data as any).error);
       setUploaded(true);
+      setUploadResult({ filename: (data as any)?.filename || filename, bytes: (data as any)?.bytes || 0 });
       onChange(filename);
     } catch (e: any) {
       setErr(e?.message || 'Upload to PBX failed');
@@ -206,6 +208,34 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
         )}
         {err && <span style={{ color: c.danger, fontSize: 11 }}>{err}</span>}
       </div>
+
+      {uploadResult && (
+        <div style={{
+          borderRadius: 8, padding: '10px 12px',
+          background: 'rgba(11,181,214,0.08)', border: `1px solid ${c.border}`,
+          display: 'grid', gap: 8,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 16 }}>✅</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: c.textIce }}>
+              Uploaded to PBX: <span style={{ color: c.signalGold }}>{uploadResult.filename}</span>
+            </span>
+            <span style={{ fontSize: 10, color: c.mutedSilver }}>
+              ({(uploadResult.bytes / 1024).toFixed(1)} KB)
+            </span>
+          </div>
+          {audioUrl && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10, color: c.mutedSilver, textTransform: 'uppercase', letterSpacing: 0.8 }}>Preview</span>
+              <audio src={audioUrl} controls style={{ height: 32, flex: 1, minWidth: 180 }} />
+              <a href={audioUrl} download={uploadResult.filename} style={{ fontSize: 11, color: c.avaCyan, textDecoration: 'underline', whiteSpace: 'nowrap' }}>
+                Download
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ fontSize: 10, color: c.mutedSilver, lineHeight: 1.5 }}>
         One-click: Generate → Upload to PBX. Filename is saved on the resource above.
       </div>
