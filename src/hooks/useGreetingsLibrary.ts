@@ -46,6 +46,12 @@ export function useGreetingsLibrary() {
       mutationFn: (p: { name: string; text: string; voice_id: string; extension: string | null }) =>
         call("create_greeting", p),
       onSuccess: inv,
+      onSettled: inv,
+    }),
+    retry: useMutation({
+      mutationFn: (id: string) => call("retry_greeting", { id }),
+      onSuccess: inv,
+      onSettled: inv,
     }),
     remove: useMutation({ mutationFn: (id: string) => call("delete_greeting", { id }), onSuccess: inv }),
     activate: useMutation({ mutationFn: (id: string) => call("activate_greeting", { id }), onSuccess: inv }),
