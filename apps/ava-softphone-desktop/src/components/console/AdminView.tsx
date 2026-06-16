@@ -980,10 +980,11 @@ function QueuesTable() {
           rules={QUEUE_RULES}
           saving={saving}
           width={680}
-          onCancel={() => setCreating(false)}
+          onCancel={() => setCreating(null)}
           onSave={create}
         />
       )}
+      {queueConflictModal}
     </>
   );
 }
