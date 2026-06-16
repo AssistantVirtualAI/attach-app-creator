@@ -247,12 +247,24 @@ function TtsGreetingField({ value, onChange, field, fullForm }: {
 }
 
 export default function PbxEditSheet({
-  title, groups, initial, saving, width = 620, onCancel, onSave,
+  title, groups, initial, baseline, saving, width = 620, onCancel, onSave,
 }: Props) {
   const [form, setForm] = useState<any>(initial || {});
   const [dirty, setDirty] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [narrow, setNarrow] = useState(false);
+
+  // Parity check: any schema field absent from the baseline row returned by FusionPBX
+  // would mean the portal form / proxy mapping is out of sync. Surface them as a warning.
+  const missingFields = useMemo(() => {
+    if (!baseline || typeof baseline !== 'object') return [];
+    const out: { key: string; label: string; section: string }[] = [];
+    for (const g of groups) for (const f of g.fields) {
+      if (f.type === 'tts-greeting') continue;
+      if (!(f.key in baseline)) out.push({ key: f.key, label: f.label, section: g.section });
+    }
+    return out;
+  }, [groups, baseline]);
 
   const tryClose = React.useCallback(() => {
     if (dirty) {
