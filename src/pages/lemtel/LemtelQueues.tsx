@@ -679,10 +679,12 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
     } catch (e: any) { toast({ title: 'Failed', description: e.message, variant: 'destructive' }); }
   };
 
-  const bulkAdd = async (extensionIds: string[], role: 'agent' | 'supervisor') => {
-    if (!perms.canAssign) { toast({ title: 'Forbidden', variant: 'destructive' }); return; }
+  // returns array of newly inserted rows so caller can offer undo
+  const bulkAddRaw = async (extensionIds: string[], role: 'agent' | 'supervisor') => {
+    if (!perms.canAssign) { toast({ title: 'Forbidden', variant: 'destructive' }); return [] as any[]; }
     const tier_level = role === 'supervisor' ? 1 : 2;
     let basePos = agents.filter((a) => a.tier_level === tier_level).length;
+    const added: any[] = [];
     let ok = 0, fail = 0;
     for (const id of extensionIds) {
       const ext = extensions.find((x) => x.id === id);
@@ -696,20 +698,23 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
           }},
         });
         if (error || data?.ok === false) throw new Error(data?.message || error?.message || 'Failed');
-        await supabase.from('pbx_queue_agents').insert({
+        const tierUuid = (data as any)?.data?.call_center_tier_uuid || (data as any)?.call_center_tier_uuid || null;
+        const { data: inserted } = await supabase.from('pbx_queue_agents').insert({
           queue_id: queue.id, extension_id: ext.id, agent_id: ext.extension,
           agent_name: ext.display_name || ext.extension, tier_level, tier_position: basePos,
-        });
+          pbx_uuid: tierUuid, raw_data: tierUuid ? { call_center_tier_uuid: tierUuid } : null,
+        } as any).select().maybeSingle();
+        if (inserted) added.push(inserted);
         ok++;
       } catch { fail++; }
     }
-    toast({ title: `Added ${ok}${fail ? ` · ${fail} failed` : ''}`, variant: fail ? 'destructive' : 'default' });
-    load();
+    await load();
+    return { added, ok, fail };
   };
 
-  const bulkRemove = async (rows: any[]) => {
-    if (!perms.canAssign) { toast({ title: 'Forbidden', variant: 'destructive' }); return; }
-    if (!confirm(`Remove ${rows.length} member${rows.length === 1 ? '' : 's'} from ${queue.name}?`)) return;
+  const bulkRemoveRaw = async (rows: any[]) => {
+    if (!perms.canAssign) { toast({ title: 'Forbidden', variant: 'destructive' }); return { removed: [], ok: 0, fail: 0 }; }
+    const removed: any[] = [];
     let ok = 0, fail = 0;
     for (const a of rows) {
       try {
@@ -717,11 +722,51 @@ function QueueAgentsPanel({ queue, perms, txt }: { queue: any; perms: Perms; txt
           await supabase.functions.invoke('fusionpbx-proxy', { body: { organization_id: LEMTEL_ORG, action: 'remove-queue-tier', params: { call_center_tier_uuid: a.raw_data.call_center_tier_uuid }}});
         }
         await supabase.from('pbx_queue_agents').delete().eq('id', a.id);
+        removed.push(a);
         ok++;
       } catch { fail++; }
     }
-    toast({ title: `Removed ${ok}${fail ? ` · ${fail} failed` : ''}`, variant: fail ? 'destructive' : 'default' });
-    load();
+    await load();
+    return { removed, ok, fail };
+  };
+
+  // Confirmed bulk add (called from preview dialog) + undo toast
+  const bulkAdd = async (extensionIds: string[], role: 'agent' | 'supervisor') => {
+    const res: any = await bulkAddRaw(extensionIds, role);
+    if (!res) return;
+    sonner.success(`Added ${res.ok} member${res.ok === 1 ? '' : 's'}${res.fail ? ` · ${res.fail} failed` : ''}`, {
+      action: res.added.length ? {
+        label: 'Undo',
+        onClick: async () => {
+          const r2 = await bulkRemoveRaw(res.added);
+          sonner.info(`Undo: removed ${r2.ok}${r2.fail ? ` · ${r2.fail} failed` : ''}`);
+        },
+      } : undefined,
+      duration: 8000,
+    });
+  };
+
+  // Confirmed bulk remove (called from preview dialog) + undo toast
+  const bulkRemove = async (rows: any[]) => {
+    const res = await bulkRemoveRaw(rows);
+    sonner.success(`Removed ${res.ok} member${res.ok === 1 ? '' : 's'}${res.fail ? ` · ${res.fail} failed` : ''}`, {
+      action: res.removed.length ? {
+        label: 'Undo',
+        onClick: async () => {
+          // group by tier_level then re-add
+          const groups = { 1: [] as string[], 2: [] as string[] } as Record<number, string[]>;
+          for (const r of res.removed) {
+            const lvl = r.tier_level === 1 ? 1 : 2;
+            if (r.extension_id) groups[lvl].push(r.extension_id);
+          }
+          let ok = 0;
+          if (groups[1].length) { const r1: any = await bulkAddRaw(groups[1], 'supervisor'); ok += r1?.ok || 0; }
+          if (groups[2].length) { const r2: any = await bulkAddRaw(groups[2], 'agent'); ok += r2?.ok || 0; }
+          sonner.info(`Undo: restored ${ok} member${ok === 1 ? '' : 's'}`);
+        },
+      } : undefined,
+      duration: 10000,
+    });
   };
 
   const supervisors = agents.filter((a) => a.tier_level === 1);
