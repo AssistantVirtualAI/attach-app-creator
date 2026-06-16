@@ -904,7 +904,6 @@ function QueuesTable() {
       }, `Call queue "${name}"${ext ? ` (ext ${ext})` : ''} created and synced.`);
     } finally { setSaving(false); }
   };
-  };
 
   const cols = ['Name', 'Ext', 'Strategy', 'Agents', 'Max wait', 'Status', ''];
   return (
