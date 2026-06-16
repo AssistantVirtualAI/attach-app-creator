@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
 
     const { data: org } = await supabaseAdmin
       .from("organizations")
-      .select("name, sip_domain, fusionpbx_domain_uuid")
+      .select("name, domain, fusionpbx_domain_uuid, fusionpbx_domain_name")
       .eq("id", sp.organization_id)
       .maybeSingle();
     const { data: roleRow } = await supabaseAdmin
@@ -158,8 +158,8 @@ Deno.serve(async (req) => {
     const role = roleRow?.role || "agent";
     const admin = role === "org_admin" || role === "super_admin" || role === "manager";
 
-    // Per-domain endpoints. A softphone user can override the SIP/WSS host, otherwise the organization domain is used.
-    const sipDomain = sp.sip_domain || org?.sip_domain || Deno.env.get("FUSIONPBX_SIP_DOMAIN") || "lemtel.lemtel.tel";
+    // Per-domain endpoints. A softphone user can override the SIP/WSS host, otherwise the organization/PBX domain is used.
+    const sipDomain = sp.sip_domain || org?.fusionpbx_domain_name || org?.domain || Deno.env.get("FUSIONPBX_SIP_DOMAIN") || "lemtel.lemtel.tel";
     const wssUrl = sp.wss_url || Deno.env.get("FUSIONPBX_WSS_URL") || `wss://${sipDomain}:7443`;
     const wssUrls = Array.from(new Set([
       wssUrl,
@@ -167,22 +167,25 @@ Deno.serve(async (req) => {
     ]));
 
     let password = "";
-    let passwordSource: "encrypted_softphone_user" | "plain_softphone_user" | "extension_raw_data" | "fusionpbx_proxy" | "none" = "none";
+    let passwordSource: "encrypted_softphone_user" | "plain_softphone_user" | "extension_password" | "extension_raw_data" | "fusionpbx_proxy" | "none" = "none";
+    const { data: ext } = await supabaseAdmin
+      .from("pbx_extensions")
+      .select("id, password, raw_data")
+      .eq("organization_id", sp.organization_id)
+      .eq("extension", sp.extension)
+      .maybeSingle();
+    const extPwd = (ext as any)?.password || (ext?.raw_data as any)?.password || (ext?.raw_data as any)?.sip_password || "";
+    if (extPwd) {
+      password = extPwd;
+      passwordSource = (ext as any)?.password ? "extension_password" : "extension_raw_data";
+    }
+
     const rawSipPwd: string | null = sp.sip_password || null;
-    if (rawSipPwd) {
+    if (!password && rawSipPwd) {
       const decrypted = await decryptSecret(rawSipPwd);
       if (decrypted) {
         password = decrypted;
         passwordSource = rawSipPwd.startsWith("aesgcm:") ? "encrypted_softphone_user" : "plain_softphone_user";
-      }
-    }
-    if (!password && sp.extension_id) {
-      const { data: ext } = await supabase
-        .from("pbx_extensions").select("raw_data").eq("id", sp.extension_id).maybeSingle();
-      const extPwd = (ext?.raw_data as any)?.password || (ext?.raw_data as any)?.sip_password || "";
-      if (extPwd) {
-        password = extPwd;
-        passwordSource = "extension_raw_data";
       }
     }
 

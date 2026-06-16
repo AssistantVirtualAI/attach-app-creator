@@ -53,12 +53,14 @@ Deno.serve(async (req) => {
 
     const { data: extRow } = await admin
       .from("pbx_extensions")
-      .select("id, pbx_uuid, raw_data")
+      .select("id, pbx_uuid, password, raw_data")
       .eq("organization_id", spu.organization_id)
       .eq("extension", spu.extension)
       .maybeSingle();
 
-    const localPwd = spu.sip_password || (extRow?.raw_data as any)?.password || (extRow?.raw_data as any)?.sip_password || "";
+    // The PBX extension password is the canonical SIP secret. The softphone-user
+    // copy can become stale, which causes 403 registration rejects.
+    const localPwd = (extRow as any)?.password || (extRow?.raw_data as any)?.password || (extRow?.raw_data as any)?.sip_password || spu.sip_password || "";
     if (forceLocalToPbx && !localPwd) {
       return json({ error: "NO_LOCAL_PASSWORD", message: "No stored SIP password exists to force into the PBX." }, 424);
     }
