@@ -96,15 +96,19 @@ function SipKeepAlive({ creds }: { creds: ActiveCreds }) {
 }
 
 
-// ── CDR sync au démarrage ──────────────────────────────────
 export default function App() {
-  const { t } = useTheme();
-  useContrast(); // applies low/med/high contrast preset on mount
-
   // Responsive testing utility — visit ?lab=responsive to open it.
   if (IS_LAB) return <ResponsiveLab />;
   // Dialer baseline check — visit ?check=dialer to open it.
   if (IS_DIALER_CHECK) return <DialerBaselineCheck />;
+
+  return <DesktopApp />;
+}
+
+// ── CDR sync au démarrage ──────────────────────────────────
+function DesktopApp() {
+  const { t } = useTheme();
+  useContrast(); // applies low/med/high contrast preset on mount
 
   const [creds, setCreds] = useState<Creds>(null);
   const [loading, setLoading] = useState(true);
