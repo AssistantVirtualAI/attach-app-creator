@@ -900,10 +900,12 @@ function QueuesTable() {
       const out: any = { ...form };
       if (out.queue_max_wait_time !== undefined) out.queue_max_wait_time = String(out.queue_max_wait_time);
 
+      const idempotencyKey = creating?.key || generateIdempotencyKey();
       await runCreatePbxResourceFlow({
         isAdmin,
         resourceKind: 'queue',
         identifier: name || '(unnamed)',
+        idempotencyKey,
         findDuplicate: async () => {
           if (!name) return null;
           const { data: dup } = await supabase
@@ -914,21 +916,19 @@ function QueuesTable() {
             .maybeSingle();
           return dup || null;
         },
-        confirmConflict: () => window.confirm(
-          `A call queue named "${name}" already exists.\n\nClick OK to open it for editing instead, or Cancel to abort.`,
-        ),
+        confirmConflict: (existing) => confirmQueueConflict(existing, name || '(unnamed)'),
         openForEdit: async (existing) => {
-          setCreating(false);
+          setCreating(null);
           await reload(false);
           const match = data.find((r) => r.name === name) || existing;
           if (match) setEditing(match);
         },
-        submit: async () => {
+        submit: async ({ idempotencyKey: idk }) => {
           const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
-            body: { action: 'create-queue', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN, ...out } },
+            body: { action: 'create-queue', organization_id: orgId, idempotency_key: idk, params: { domain_uuid: LEMTEL_DOMAIN, ...out } },
           });
           if (err) throw err;
-          setCreating(false);
+          setCreating(null);
         },
         reload: (force) => reload(force),
         dispatchSaved: () => window.dispatchEvent(new Event('ava:pbx-resource-saved')),
