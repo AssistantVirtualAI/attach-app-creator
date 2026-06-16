@@ -248,7 +248,7 @@ function QueueDialog({ mode, queue, trigger }: { mode: 'create' | 'edit'; queue?
   const qc = useQueryClient();
   const perms = usePerms();
   const { language } = useLanguage();
-  const txt = qCopy[language === 'fr' ? 'fr' : 'en'];
+  const txt = qCopy[language];
   const raw = (queue?.raw_data || {}) as any;
   const [moh, setMoh] = useState<Array<{ name: string; path: string | null }>>([]);
   const [mohLoading, setMohLoading] = useState(false);
