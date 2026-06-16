@@ -21,6 +21,8 @@ Deno.serve(async (req) => {
     );
     const { data: u } = await sb.auth.getUser();
     if (!u?.user) return json({ error: "unauthorized" }, 401);
+    const { data: __mobileAllowed } = await sb.rpc("my_platform_access_allowed", { _platform: "mobile" });
+    if (__mobileAllowed === false) return json({ error: "MOBILE_ACCESS_DISABLED", message: "Mobile access not granted by Lemtel administrators." }, 403);
 
     const body = await req.json().catch(() => ({}));
     const token = String(body.token || "");
