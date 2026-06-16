@@ -87,21 +87,27 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
         : c.borderAI;
 
   return (
-    <aside style={{
-      width: 236, flexShrink: 0, height: '100%',
-      background: `linear-gradient(180deg, ${c.deepPanel} 0%, ${c.midnight} 100%)`,
-      borderRight: `1px solid ${c.border}`,
-      display: 'flex', flexDirection: 'column',
-      padding: '16px 12px 14px',
-      WebkitAppRegion: 'drag' as any,
-      position: 'relative',
-    }}>
-      {/* quiet accent strip */}
+    <aside
+      className="ava-glass"
+      style={{
+        width: 244, flexShrink: 0, height: '100%',
+        background: 'rgba(255,255,255,0.72)',
+        borderRight: `1px solid ${c.border}`,
+        borderRadius: 0,
+        display: 'flex', flexDirection: 'column',
+        padding: '18px 14px 16px',
+        WebkitAppRegion: 'drag' as any,
+        position: 'relative',
+        backdropFilter: 'blur(18px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+      }}>
+      {/* aurora hairline accent on the right edge */}
       <div aria-hidden style={{
-        position: 'absolute', top: 0, left: 0, right: 0, height: 1,
-        background: c.border,
+        position: 'absolute', top: 0, bottom: 0, right: 0, width: 1,
+        background: 'linear-gradient(180deg, transparent, rgba(0,35,230,0.45), rgba(33,212,253,0.35), transparent)',
         pointerEvents: 'none',
       }} />
+
 
       {/* Brand block */}
       <div style={{
@@ -256,25 +262,26 @@ function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boole
       aria-current={active ? 'page' : undefined}
       style={{
         display: 'flex', alignItems: 'center', gap: 11,
-        padding: '9px 11px', borderRadius: 9,
+        padding: '10px 12px', borderRadius: 12,
         background: active
-          ? `linear-gradient(90deg, ${isAI ? 'rgba(122,76,255,0.22)' : 'rgba(0,82,204,0.22)'}, transparent)`
+          ? (isAI
+              ? 'linear-gradient(90deg, rgba(122,76,255,0.16), rgba(33,212,253,0.05))'
+              : 'linear-gradient(90deg, rgba(0,35,230,0.14), rgba(33,212,253,0.06))')
           : 'transparent',
-        border: '1px solid transparent',
-        borderLeft: active ? `2px solid ${accent}` : '2px solid transparent',
+        border: '1px solid ' + (active ? 'rgba(0,35,230,0.18)' : 'transparent'),
         color: active ? c.textIce : c.mutedSilver,
-        fontSize: 12.5, fontWeight: active ? 600 : 500,
+        fontSize: 13, fontWeight: active ? 600 : 500,
         cursor: 'pointer', textAlign: 'left',
-        transition: 'all 180ms cubic-bezier(.2,.7,.2,1)',
-        transform: 'translateX(0)',
+        transition: 'all 200ms cubic-bezier(.2,.7,.2,1)',
         position: 'relative',
         outline: 'none',
+        boxShadow: active ? '0 6px 18px -10px rgba(0,35,230,0.45)' : 'none',
       }}
-      onFocus={(e) => { e.currentTarget.style.boxShadow = `0 0 0 2px ${accent}55`; }}
-      onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+      onFocus={(e) => { e.currentTarget.style.boxShadow = `0 0 0 3px ${accent}33, 0 6px 18px -10px rgba(0,35,230,0.45)`; }}
+      onBlur={(e) => { e.currentTarget.style.boxShadow = active ? '0 6px 18px -10px rgba(0,35,230,0.45)' : 'none'; }}
       onMouseEnter={(e) => {
         if (!active) {
-          e.currentTarget.style.background = 'rgba(140,180,255,0.08)';
+          e.currentTarget.style.background = 'rgba(255,255,255,0.7)';
           e.currentTarget.style.color = c.textIce;
           e.currentTarget.style.transform = 'translateX(2px)';
         }
@@ -287,7 +294,15 @@ function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boole
         }
       }}
     >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? accent : 'currentColor'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      {active && (
+        <span aria-hidden style={{
+          position: 'absolute', left: 0, top: 8, bottom: 8, width: 3,
+          borderRadius: 3,
+          background: isAI ? 'linear-gradient(180deg,#7a4cff,#21d4fd)' : 'linear-gradient(180deg,#0023e6,#21d4fd)',
+          boxShadow: '0 0 12px rgba(0,35,230,0.55)',
+        }} />
+      )}
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? (isAI ? '#7a4cff' : '#0023e6') : 'currentColor'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <path d={ICON[v]} />
       </svg>
       {label ?? LABEL[v]}
@@ -295,17 +310,24 @@ function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boole
   );
 }
 
+
 /* ─── Compact bottom rail for narrow / minimized windows ─── */
 function CompactRail({ view, onChange, onOpenSettings, items }: { view: ConsoleView; onChange: (v: ConsoleView) => void; onOpenSettings: () => void; items: ConsoleView[] }) {
   const { t } = useTranslation();
   const all: ConsoleView[] = [...items, 'settings'];
   return (
-    <aside style={{
-      position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30,
-      background: c.deepPanel,
-      borderTop: `1px solid ${c.border}`,
-      boxShadow: '0 -8px 24px -16px rgba(15,23,42,0.12)',
-    }}>
+    <aside
+      className="ava-glass"
+      style={{
+        position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 30,
+        background: 'rgba(255,255,255,0.85)',
+        borderTop: `1px solid ${c.border}`,
+        borderRadius: 0,
+        backdropFilter: 'blur(18px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+        boxShadow: '0 -10px 30px -16px rgba(11,21,48,0.18)',
+      }}>
+
       <div className="lemtel-rail-h">
         {all.map((v) => {
           const active = view === v;
