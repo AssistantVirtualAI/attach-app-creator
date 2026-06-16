@@ -87,12 +87,14 @@ export function useDashboardStats(
   customFrom?: string,
   customTo?: string,
 ) {
+  const emptySeries: DailySeries = { dates: [], calls: [], missed: [], answered: [], recordings: [] };
   const [stats, setStats] = useState<DashboardStats>({
     missedToday: 0, answeredToday: 0, totalCallsToday: 0,
     recordingsToday: 0, recordingCoveragePct: 0,
     unreadSms: 0, unreadVoicemail: 0, extensionsTotal: 0,
     liveCalls: 0, lastCallAt: null, lastRecordingAt: null,
-    cdrFreshness: 'idle', attention: [], pbxHealth: 'ok', loading: true,
+    cdrFreshness: 'idle', attention: [], pbxHealth: 'ok',
+    series: emptySeries, loading: true,
   });
 
   const refresh = useCallback(async () => {
