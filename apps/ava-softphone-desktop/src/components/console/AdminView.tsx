@@ -709,10 +709,12 @@ function IvrsTable() {
       const me = await getMeContext();
       const orgId = me.organization_id || LEMTEL_ORG;
       const name = String(form.ivr_menu_name || '').trim();
+      const idempotencyKey = creating?.key || generateIdempotencyKey();
       await runCreatePbxResourceFlow({
         isAdmin,
         resourceKind: 'ivr',
         identifier: name || '(unnamed)',
+        idempotencyKey,
         findDuplicate: async () => {
           if (!name) return null;
           const { data: dup } = await supabase
@@ -723,21 +725,19 @@ function IvrsTable() {
             .maybeSingle();
           return dup || null;
         },
-        confirmConflict: () => window.confirm(
-          `An auto-attendant named "${name}" already exists.\n\nClick OK to open it for editing instead, or Cancel to abort.`,
-        ),
+        confirmConflict: (existing) => confirmIvrConflict(existing, name || '(unnamed)'),
         openForEdit: async (existing) => {
-          setCreating(false);
+          setCreating(null);
           await reload(false);
           const match = data.find((r) => r.name === name) || existing;
           if (match) setEditing(match);
         },
-        submit: async () => {
+        submit: async ({ idempotencyKey: idk }) => {
           const { error: err } = await supabase.functions.invoke('fusionpbx-proxy', {
-            body: { action: 'create-ivr', organization_id: orgId, params: { domain_uuid: LEMTEL_DOMAIN, ...form } },
+            body: { action: 'create-ivr', organization_id: orgId, idempotency_key: idk, params: { domain_uuid: LEMTEL_DOMAIN, ...form } },
           });
           if (err) throw err;
-          setCreating(false);
+          setCreating(null);
         },
         reload: (force) => reload(force),
         dispatchSaved: () => window.dispatchEvent(new Event('ava:pbx-resource-saved')),
