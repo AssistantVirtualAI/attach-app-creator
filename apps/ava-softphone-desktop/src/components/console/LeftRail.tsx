@@ -1,5 +1,5 @@
 import React from 'react';
-import { theme } from '../../lib/theme';
+import { theme, useTheme } from '../../lib/theme';
 import LemtelLogo from '../LemtelLogo';
 import { useTranslation, type I18nKey } from '../../lib/i18n';
 import LanguageSwitcher from '../ui/LanguageSwitcher';
@@ -73,6 +73,8 @@ const SUPER_ADMIN_EXTRAS: ConsoleView[] = ['pbxlive', 'customers', 'voiceagents'
 
 export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch, compact, isAdmin, isSuperAdmin, onStartTour }: Props) {
   const { t } = useTranslation();
+  const { mode } = useTheme();
+  const isDark = mode === 'dark' || mode === 'midnight';
   const { pbx, syncConnected, lastEvent, ageMs, healthy } = useSyncStatus();
   // Super admins see admin items in the Platform group below, not duplicated above
   const ITEMS: ConsoleView[] = isSuperAdmin ? USER_ITEMS : isAdmin ? [...USER_ITEMS, ...ADMIN_ITEMS] : USER_ITEMS;
@@ -89,9 +91,13 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
   const railElev = 'var(--ava-surface-elev, rgba(255,255,255,0.08))';
   const railHover = 'var(--ava-surface-hover, rgba(255,255,255,0.12))';
 
+  const darkTextSub = 'rgba(230,240,255,0.82)';
+  const darkTextIce = '#f1f7ff';
+  const darkRailHover = 'rgba(255,255,255,0.14)';
+
   return (
     <aside
-      className="ava-glass"
+      className="ava-glass lemtel-rail"
       style={{
         width: 244, flexShrink: 0, height: '100%',
         background: railSurface,
@@ -128,7 +134,7 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
       </div>
 
       {/* Quiet org chip — no sync mentions */}
-      <div style={{
+      <div className="lemtel-rail-chip" style={{
         margin: '0 4px 12px', padding: '7px 10px',
         borderRadius: 10,
         background: railElev,
@@ -146,25 +152,26 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
       </div>
 
       <button
+        className="lemtel-rail-search"
         onClick={onOpenSearch}
         style={{
           margin: '4px 4px 12px', padding: '9px 11px',
           background: railElev,
           border: `1px solid ${c.border}`,
-          borderRadius: 10, color: c.textSub,
+          borderRadius: 10, color: isDark ? darkTextSub : c.textSub,
           fontSize: 11.5, textAlign: 'left', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           WebkitAppRegion: 'no-drag' as any,
-          transition: 'border-color .18s ease, background .18s ease',
+          transition: 'border-color .18s ease, background .18s ease, color .18s ease',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = c.borderGold; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = railElev; }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = c.borderGold; e.currentTarget.style.color = isDark ? darkTextIce : c.textIce; }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.background = railElev; e.currentTarget.style.color = isDark ? darkTextSub : c.textSub; }}
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
           {t('nav.search')}
         </span>
-          <kbd style={{ fontSize: 9, padding: '2px 5px', borderRadius: 4, background: railHover, color: c.text, fontFamily: 'inherit' }}>⌘K</kbd>
+          <kbd style={{ fontSize: 9, padding: '2px 5px', borderRadius: 4, background: isDark ? 'rgba(255,255,255,0.10)' : railHover, color: isDark ? darkTextIce : c.text, fontFamily: 'inherit' }}>⌘K</kbd>
       </button>
 
       <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, WebkitAppRegion: 'no-drag' as any, overflowY: 'auto' }}>
@@ -195,12 +202,12 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
             display: 'flex', alignItems: 'center', gap: 11,
             padding: '7px 11px', borderRadius: 9,
             background: 'transparent', border: 'none',
-            color: c.textSub, fontSize: 11.5, fontWeight: 600,
+            color: isDark ? darkTextSub : c.textSub, fontSize: 11.5, fontWeight: 600,
             cursor: 'pointer', textAlign: 'left',
             WebkitAppRegion: 'no-drag' as any,
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = c.signalGold; }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = c.textSub; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = isDark ? darkTextSub : c.textSub; }}
         >
           <span style={{ fontSize: 14 }}>💡</span>
           Restart tour
@@ -213,13 +220,13 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
           display: 'flex', alignItems: 'center', gap: 11,
           padding: '9px 11px', borderRadius: 9,
           background: 'transparent', border: 'none',
-          color: c.textSub, fontSize: 12.5, fontWeight: 600,
+          color: isDark ? darkTextSub : c.textSub, fontSize: 12.5, fontWeight: 600,
           cursor: 'pointer', textAlign: 'left',
           WebkitAppRegion: 'no-drag' as any,
           transition: 'color .15s ease, background .15s ease',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = railHover; e.currentTarget.style.color = c.textIce; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = c.textSub; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = isDark ? darkRailHover : railHover; e.currentTarget.style.color = isDark ? darkTextIce : c.textIce; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDark ? darkTextSub : c.textSub; }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d={ICON.settings}/></svg>
         {t('nav.settings')}
@@ -256,11 +263,17 @@ export default function LeftRail({ view, onChange, onOpenSettings, onOpenSearch,
 }
 
 function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boolean; onClick: () => void; label?: string }) {
+  const { mode } = useTheme();
+  const isDark = mode === 'dark' || mode === 'midnight';
   const isAI = v === 'ai';
   const accent = isAI ? c.avaViolet : c.signalGold;
   const hoverSurface = 'var(--ava-surface-hover, rgba(255,255,255,0.12))';
+  const darkTextSub = 'rgba(230,240,255,0.82)';
+  const darkTextIce = '#f1f7ff';
   return (
     <button
+      className="lemtel-rail-item"
+      data-active={String(active)}
       onClick={onClick}
       aria-label={label ?? LABEL[v]}
       aria-current={active ? 'page' : undefined}
@@ -272,28 +285,26 @@ function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boole
               ? 'linear-gradient(90deg, rgba(122,76,255,0.16), rgba(33,212,253,0.05))'
               : 'linear-gradient(90deg, rgba(0,35,230,0.14), rgba(33,212,253,0.06))')
           : 'transparent',
-        border: '1px solid ' + (active ? 'rgba(0,35,230,0.18)' : 'transparent'),
-        color: active ? c.textIce : c.textSub,
+        border: '1px solid ' + (active ? (isDark ? 'rgba(0,35,230,0.35)' : 'rgba(0,35,230,0.18)') : 'transparent'),
+        color: active ? (isDark ? darkTextIce : c.textIce) : (isDark ? darkTextSub : c.textSub),
         fontSize: 13, fontWeight: active ? 700 : 600,
         cursor: 'pointer', textAlign: 'left',
         transition: 'all 200ms cubic-bezier(.2,.7,.2,1)',
         position: 'relative',
         outline: 'none',
-        boxShadow: active ? '0 6px 18px -10px rgba(0,35,230,0.45)' : 'none',
+        boxShadow: active ? (isDark ? '0 6px 18px -10px rgba(77,109,255,0.55)' : '0 6px 18px -10px rgba(0,35,230,0.45)') : 'none',
       }}
-      onFocus={(e) => { e.currentTarget.style.boxShadow = `0 0 0 3px ${accent}33, 0 6px 18px -10px rgba(0,35,230,0.45)`; }}
-      onBlur={(e) => { e.currentTarget.style.boxShadow = active ? '0 6px 18px -10px rgba(0,35,230,0.45)' : 'none'; }}
       onMouseEnter={(e) => {
         if (!active) {
-          e.currentTarget.style.background = hoverSurface;
-          e.currentTarget.style.color = c.textIce;
+          e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.10)' : hoverSurface;
+          e.currentTarget.style.color = isDark ? darkTextIce : c.textIce;
           e.currentTarget.style.transform = 'translateX(2px)';
         }
       }}
       onMouseLeave={(e) => {
         if (!active) {
           e.currentTarget.style.background = 'transparent';
-          e.currentTarget.style.color = c.textSub;
+          e.currentTarget.style.color = isDark ? darkTextSub : c.textSub;
           e.currentTarget.style.transform = 'translateX(0)';
         }
       }}
@@ -303,7 +314,7 @@ function RailItem({ v, active, onClick, label }: { v: ConsoleView; active: boole
           position: 'absolute', left: 0, top: 8, bottom: 8, width: 3,
           borderRadius: 3,
           background: isAI ? 'linear-gradient(180deg,#7a4cff,#21d4fd)' : 'linear-gradient(180deg,#0023e6,#21d4fd)',
-          boxShadow: '0 0 12px rgba(0,35,230,0.55)',
+          boxShadow: isDark ? '0 0 14px rgba(77,109,255,0.70)' : '0 0 12px rgba(0,35,230,0.55)',
         }} />
       )}
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={active ? (isAI ? '#7a4cff' : '#0023e6') : 'currentColor'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
