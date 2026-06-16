@@ -66,7 +66,8 @@ export default function LemtelQueues() {
           <h1 className="text-3xl font-bold flex items-center gap-2"><Headphones className="w-7 h-7" /> {txt.title}</h1>
           <p className="text-muted-foreground">{txt.subtitle}</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          <Badge variant="outline" className="capitalize">Role: {perms.reason.replace('_', ' ')}</Badge>
           <SyncStatusChip />
           <PbxRefreshButton kind="ivr-queues" />
           <CsvIO queues={queues as any[]} disabled={!perms.canManage} />
