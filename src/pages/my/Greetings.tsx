@@ -7,13 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlayCircle, Wand2, Trash2, CheckCircle2, Library, Plus } from "lucide-react";
+import { PlayCircle, Wand2, Trash2, CheckCircle2, Library, Plus, RefreshCw, Loader2, AlertCircle } from "lucide-react";
 import { useGreetingsLibrary } from "@/hooks/useGreetingsLibrary";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
 export default function MyGreetings() {
-  const { query, create, remove, activate } = useGreetingsLibrary();
+  const { query, create, remove, activate, retry } = useGreetingsLibrary();
   const greetings = query.data?.greetings ?? [];
   const extensions = query.data?.extensions ?? [];
   const voices = query.data?.voices ?? [];
@@ -115,16 +115,29 @@ export default function MyGreetings() {
               <p className="text-sm text-muted-foreground py-8 text-center">No greetings yet. Generate your first one.</p>
             )}
             {greetings.map((g) => (
-              <div key={g.id} className={`rounded-lg border p-3 space-y-2 ${g.is_active ? "border-primary bg-primary/5" : ""}`}>
+              <div key={g.id} className={`rounded-lg border p-3 space-y-2 ${g.is_active ? "border-primary bg-primary/5" : g.status === "failed" ? "border-destructive/40 bg-destructive/5" : ""}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium">{g.name}</span>
                       {g.is_active && <Badge className="bg-primary/15 text-primary">Active</Badge>}
+                      {g.status === "generating" && (
+                        <Badge variant="secondary" className="text-xs gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Generating
+                        </Badge>
+                      )}
+                      {g.status === "failed" && (
+                        <Badge variant="destructive" className="text-xs gap-1">
+                          <AlertCircle className="h-3 w-3" /> Failed
+                        </Badge>
+                      )}
                       <Badge variant="outline" className="text-xs">
                         {g.extension ? `Ext ${g.extension}` : "All lines"}
                       </Badge>
                       {g.voice_name && <Badge variant="outline" className="text-xs">{g.voice_name}</Badge>}
+                      {g.attempts > 1 && (
+                        <Badge variant="outline" className="text-xs">Attempt {g.attempts}</Badge>
+                      )}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
                       {format(new Date(g.created_at), "PPp")}
@@ -132,16 +145,37 @@ export default function MyGreetings() {
                     {g.text_script && (
                       <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{g.text_script}</p>
                     )}
+                    {g.status === "failed" && g.error_message && (
+                      <div className="mt-2 rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+                        <div className="font-medium mb-0.5">ElevenLabs error</div>
+                        <div className="break-words">{g.error_message}</div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {g.audio_url && <audio controls src={g.audio_url} className="w-full h-9" />}
                 <div className="flex gap-2 flex-wrap">
-                  {!g.is_active && (
+                  {g.status === "ready" && !g.is_active && (
                     <Button size="sm" onClick={() => activate.mutate(g.id, {
                       onSuccess: () => toast.success("Activated"),
                       onError: (e: any) => toast.error(e?.message),
                     })}>
                       <CheckCircle2 className="h-3 w-3 mr-1" /> Set active
+                    </Button>
+                  )}
+                  {(g.status === "failed" || g.status === "generating") && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={retry.isPending || g.status === "generating"}
+                      onClick={() => retry.mutate(g.id, {
+                        onSuccess: () => toast.success("Retrying generation…"),
+                        onError: (e: any) => toast.error(e?.message ?? "Retry failed"),
+                      })}
+                    >
+                      {g.status === "generating"
+                        ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Generating…</>
+                        : <><RefreshCw className="h-3 w-3 mr-1" /> Retry</>}
                     </Button>
                   )}
                   <Button size="sm" variant="destructive" onClick={() => {
