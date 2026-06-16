@@ -67,7 +67,7 @@ export default function ConsoleLayout({
   creds, onOpenSettings,
 }: { creds: Creds; onOpenSettings: () => void }) {
   const [view, setView] = useState<ConsoleView>('home');
-  const [aiOpen, setAiOpen] = useState(true);
+  const [aiOpen, setAiOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncNote, setSyncNote] = useState<string | null>(null);
