@@ -122,6 +122,36 @@ export function SoftphoneWidget({ variant = "floating" }: SoftphoneWidgetProps) 
     },
   });
 
+  // AI Insights — lightweight summary of today's activity from RPC
+  const { data: summary, refetch: refetchSummary } = useQuery({
+    queryKey: ["softphone-summary", user?.id],
+    enabled: !!user && isMember,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const { data } = await supabase.rpc("get_my_extension_summary");
+      return (data || {}) as any;
+    },
+  });
+
+  const relinkExtension = async () => {
+    setRelinking(true);
+    try {
+      const { data, error } = await supabase.rpc("relink_my_softphone_user");
+      if (error) throw error;
+      const linked = (data as any)?.linked ?? 0;
+      toast({
+        title: linked > 0 ? "Extension synced" : "No matching extension found",
+        description: linked > 0 ? `Linked ${linked} extension${linked === 1 ? "" : "s"}. Reloading…` : "Ask an admin to map your extension to this account.",
+      });
+      if (linked > 0) setTimeout(() => window.location.reload(), 800);
+      else await refetchSummary();
+    } catch (e: any) {
+      toast({ title: "Sync failed", description: e?.message || String(e), variant: "destructive" });
+    } finally {
+      setRelinking(false);
+    }
+  };
+
   if (!isMember) return null;
 
   const ext = sp.config?.extension || "—";
