@@ -205,7 +205,7 @@ export default function PbxResourceSection({
                         <button key={a.label} onClick={async () => { await a.run(row, { reload, orgId, domainUuid }); }}
                           style={{ ...btnGhost, padding: '6px 10px', fontSize: 11, marginRight: 6 }}>{a.label}</button>
                       ))}
-                      {fields.length > 0 && (
+                      {((fieldGroups && fieldGroups.length > 0) || fields.length > 0) && (
                         <button onClick={() => setEditing(row)} style={{ ...btnGhost, padding: '6px 10px', fontSize: 11, marginRight: 6 }}>Edit</button>
                       )}
                       <button onClick={() => remove(row)} style={btnDanger}>Delete</button>
@@ -219,68 +219,18 @@ export default function PbxResourceSection({
       </div>
 
       {(editing || creating) && (
-        <EditDrawer
-          title={creating ? `New ${title.slice(0, -1)}` : `Edit ${title.slice(0, -1)}`}
-          fields={fields}
+        <PbxEditSheet
+          title={creating ? `New ${title.replace(/s$/, '')}` : `Edit ${title.replace(/s$/, '')}`}
+          groups={fieldGroups && fieldGroups.length > 0
+            ? fieldGroups
+            : [{ section: 'Fields', fields: fields as any }]}
           initial={editing || {}}
           saving={saving}
+          width={sheetWidth}
           onCancel={() => { setEditing(null); setCreating(false); }}
           onSave={save}
         />
       )}
     </>
-  );
-}
-
-function EditDrawer({
-  title, fields, initial, saving, onCancel, onSave,
-}: { title: string; fields: FieldDef[]; initial: any; saving: boolean; onCancel: () => void; onSave: (r: any) => void }) {
-  const [form, setForm] = useState<any>(initial);
-  return createPortal(
-    <div onClick={onCancel} style={{
-      position: 'fixed', inset: 0, background: 'rgba(2,6,20,0.78)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-      zIndex: 9999, display: 'flex', justifyContent: 'flex-end',
-    }}>
-      <div onClick={(e) => e.stopPropagation()} style={{
-        width: 'min(560px, 100%)', height: '100%', background: '#0c1733',
-        backgroundImage: 'linear-gradient(160deg, rgba(35,214,255,0.06), rgba(122,76,255,0.05))',
-        borderLeft: `1px solid ${c.border}`, padding: 28, overflowY: 'auto',
-        boxShadow: '-20px 0 60px rgba(0,0,0,0.5)',
-      }}>
-        <h2 style={{ fontSize: 18, color: c.textIce, margin: '0 0 18px' }}>{title}</h2>
-        {fields.map((f) => (
-          <div key={f.key} style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, color: c.mutedSilver, textTransform: 'uppercase', marginBottom: 6 }}>{f.label}</div>
-            {f.type === 'textarea' ? (
-              <textarea value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                placeholder={f.placeholder}
-                style={{ width: '100%', minHeight: 90, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }} />
-            ) : f.type === 'select' ? (
-              <select value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                style={{ width: '100%', padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 13 }}>
-                <option value="">—</option>
-                {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
-            ) : f.type === 'checkbox' ? (
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: c.textIce, fontSize: 13 }}>
-                <input type="checkbox" checked={!!form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} />
-                Enabled
-              </label>
-            ) : (
-              <input type={f.type === 'number' ? 'number' : 'text'} value={form[f.key] ?? ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                placeholder={f.placeholder}
-                style={{ width: '100%', padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${c.border}`, color: c.textIce, fontSize: 13 }} />
-            )}
-          </div>
-        ))}
-        <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-          <button onClick={onCancel} style={btnGhost}>Cancel</button>
-          <button onClick={() => onSave(form)} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.7 : 1, flex: 1 }}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
   );
 }
