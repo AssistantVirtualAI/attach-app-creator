@@ -164,12 +164,38 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, mode); } catch {}
-    document.documentElement.setAttribute('data-ava-theme', mode);
-    document.documentElement.style.background = t.bg;
-    document.documentElement.style.color = t.text;
+    const root = document.documentElement;
+    root.setAttribute('data-ava-theme', mode);
+    // Push every token to a CSS variable so the static `theme` export and
+    // any raw consumer of `var(--ava-…)` repaint instantly on mode change.
+    const set = (k: string, val: string) => root.style.setProperty(`--ava-${k}`, val);
+    set('bg', t.bg);
+    set('bg-gradient', t.bgGradient);
+    set('surface', t.surface);
+    set('surface-elev', t.surfaceElev);
+    set('surface-hover', t.surfaceHover);
+    set('border', t.border);
+    set('border-strong', t.borderStrong);
+    set('text', t.text);
+    set('text-muted', t.textMuted);
+    set('text-subtle', t.textSubtle);
+    set('accent', t.accent);
+    set('accent-soft', t.accentSoft);
+    set('accent-gradient', t.accentGradient);
+    set('accent-glow', t.accentGlow);
+    set('success', t.success);
+    set('danger', t.danger);
+    set('warning', t.warning);
+    set('ring-glow', t.ringGlow);
+    set('glass', t.glass);
+    set('glass-border', t.glassBorder);
+    set('shadow', t.shadow);
+    root.style.background = t.bg;
+    root.style.color = t.text;
     document.body.style.background = t.bg;
     document.body.style.color = t.text;
   }, [mode, t]);
+
 
   // Cross-document sync: when the parent (or any same-origin doc) writes the
   // theme key, iframes/other windows pick it up live — used by the responsive
@@ -203,32 +229,32 @@ export function useTheme() {
 
 /* ============================================================
    Static design tokens consumed via `import { theme } from '../lib/theme'`.
-   These are the LIGHT defaults. Components that read theme.colors.*
-   pick up the refresh automatically.
+   Values resolve to CSS variables at runtime so flipping the active
+   ThemeMode in <ThemeProvider> instantly repaints every component
+   that consumes this static export — no refactors needed.
    ============================================================ */
+const v = (name: string, fallback: string) => `var(--ava-${name}, ${fallback})`;
+
 export const theme = {
   colors: {
-    // Base surfaces — medium-light frosted, futuristic
-    bg: '#eef2fa',
-    bgGradient:
-      'radial-gradient(1200px 700px at 8% -10%, rgba(0,35,230,0.10), transparent 60%), radial-gradient(900px 600px at 110% 110%, rgba(33,212,253,0.10), transparent 55%), linear-gradient(180deg, #eef2fa 0%, #dde4f1 100%)',
+    bg: v('bg', '#eef2fa'),
+    bgGradient: v('bg-gradient',
+      'radial-gradient(1200px 700px at 8% -10%, rgba(0,35,230,0.10), transparent 60%), radial-gradient(900px 600px at 110% 110%, rgba(33,212,253,0.10), transparent 55%), linear-gradient(180deg, #eef2fa 0%, #dde4f1 100%)'),
     bgMesh:
       'radial-gradient(1000px 600px at 8% -10%, rgba(0,35,230,0.08), transparent 60%), radial-gradient(900px 600px at 110% 110%, rgba(33,212,253,0.08), transparent 55%)',
-    bgCard: 'rgba(255,255,255,0.85)',
-    bgCardHover: 'rgba(255,255,255,0.95)',
-    bgElev: 'rgba(255,255,255,0.92)',
-    border: 'rgba(180,196,224,0.55)',
-    borderStrong: 'rgba(120,142,184,0.55)',
+    bgCard: v('surface', 'rgba(255,255,255,0.85)'),
+    bgCardHover: v('surface-hover', 'rgba(255,255,255,0.95)'),
+    bgElev: v('surface-elev', 'rgba(255,255,255,0.92)'),
+    border: v('border', 'rgba(180,196,224,0.55)'),
+    borderStrong: v('border-strong', 'rgba(120,142,184,0.55)'),
     borderGold: 'rgba(224,193,120,0.70)',
     borderAI: 'rgba(191,176,255,0.70)',
 
-    // Brand — from AVA Statistic logo
-    primary: '#0023e6',
+    primary: v('accent', '#0023e6'),
     primaryLight: '#4d6dff',
-    primarySoft: 'rgba(0,35,230,0.10)',
+    primarySoft: v('accent-soft', 'rgba(0,35,230,0.10)'),
     cyan: '#21d4fd',
 
-    // Accents
     gold: '#d4a73a',
     goldSoft: '#e8c878',
     goldDim: '#fff3d6',
@@ -236,32 +262,29 @@ export const theme = {
     aiLight: '#a78bfa',
     aiGlow: 'rgba(122,76,255,0.20)',
 
-    // Status
-    green: '#0f9d58',
-    red: '#dc2626',
-    yellow: '#d97706',
-    success: '#0f9d58',
-    warning: '#d97706',
-    danger: '#dc2626',
+    green: v('success', '#0f9d58'),
+    red: v('danger', '#dc2626'),
+    yellow: v('warning', '#d97706'),
+    success: v('success', '#0f9d58'),
+    warning: v('warning', '#d97706'),
+    danger: v('danger', '#dc2626'),
 
-    // Text
-    text: '#0b1530',
-    textSub: '#3b4a6b',
-    textDim: '#7d8aa6',
+    text: v('text', '#0b1530'),
+    textSub: v('text-muted', '#3b4a6b'),
+    textDim: v('text-subtle', '#7d8aa6'),
 
-    // Console aliases — kept for back-compat with existing views
-    midnight: '#eef2fa',
-    deepPanel: 'rgba(255,255,255,0.78)',
-    graphite: 'rgba(245,247,252,0.88)',
-    lemtelBlue: '#0023e6',
+    midnight: v('bg', '#eef2fa'),
+    deepPanel: v('surface', 'rgba(255,255,255,0.78)'),
+    graphite: v('surface-elev', 'rgba(245,247,252,0.88)'),
+    lemtelBlue: v('accent', '#0023e6'),
     signalGold: '#d4a73a',
     avaCyan: '#0891b2',
     avaViolet: '#7a4cff',
-    textIce: '#0b1530',
-    mutedSilver: '#5e6c8a',
+    textIce: v('text', '#0b1530'),
+    mutedSilver: v('text-muted', '#5e6c8a'),
   },
   gradients: {
-    aurora: 'linear-gradient(135deg, #0023e6 0%, #4d6dff 45%, #21d4fd 100%)',
+    aurora: v('accent-gradient', 'linear-gradient(135deg, #0023e6 0%, #4d6dff 45%, #21d4fd 100%)'),
     auroraSubtle: 'linear-gradient(135deg, rgba(0,35,230,0.18), rgba(33,212,253,0.12))',
     goldEdge: 'linear-gradient(135deg, #d4a73a, #e8c878 60%, #fff3d6)',
     mesh:
@@ -269,7 +292,7 @@ export const theme = {
   },
   glow: {
     gold: '0 8px 22px -10px rgba(212,167,58,0.45)',
-    blue: '0 10px 30px -12px rgba(0,35,230,0.45)',
+    blue: v('accent-glow', '0 10px 30px -12px rgba(0,35,230,0.45)'),
     blueStrong: '0 18px 44px -18px rgba(0,35,230,0.55)',
     ai: '0 10px 26px -10px rgba(122,76,255,0.35)',
     green: '0 8px 20px -8px rgba(15,157,88,0.40)',
@@ -277,42 +300,42 @@ export const theme = {
   },
   glass: {
     card: {
-      background: 'rgba(255,255,255,0.82)',
-      border: '1px solid rgba(180,196,224,0.55)',
-      borderRadius: 16,
-      boxShadow: '0 1px 2px rgba(11,21,48,0.06), 0 10px 28px -12px rgba(11,21,48,0.18)',
-      backdropFilter: 'blur(14px) saturate(140%)',
-      WebkitBackdropFilter: 'blur(14px) saturate(140%)',
+      background: v('glass', 'rgba(255,255,255,0.82)'),
+      border: `1px solid ${v('glass-border', 'rgba(180,196,224,0.55)')}`,
+      borderRadius: 18,
+      boxShadow: '0 1px 2px rgba(11,21,48,0.06), 0 10px 28px -12px rgba(11,21,48,0.18), inset 0 1px 0 rgba(255,255,255,0.08)',
+      backdropFilter: 'blur(20px) saturate(150%)',
+      WebkitBackdropFilter: 'blur(20px) saturate(150%)',
     } as React.CSSProperties,
     cardGold: {
-      background: 'rgba(255,255,255,0.82)',
+      background: v('glass', 'rgba(255,255,255,0.82)'),
       border: '1px solid rgba(224,193,120,0.70)',
-      borderRadius: 16,
-      boxShadow: '0 10px 26px -14px rgba(212,167,58,0.40)',
-      backdropFilter: 'blur(14px) saturate(140%)',
-      WebkitBackdropFilter: 'blur(14px) saturate(140%)',
+      borderRadius: 18,
+      boxShadow: '0 10px 26px -14px rgba(212,167,58,0.40), inset 0 1px 0 rgba(255,255,255,0.10)',
+      backdropFilter: 'blur(20px) saturate(150%)',
+      WebkitBackdropFilter: 'blur(20px) saturate(150%)',
     } as React.CSSProperties,
     cardAI: {
-      background: 'rgba(255,255,255,0.82)',
+      background: v('glass', 'rgba(255,255,255,0.82)'),
       border: '1px solid rgba(191,176,255,0.70)',
-      borderRadius: 16,
-      boxShadow: '0 10px 26px -14px rgba(122,76,255,0.35)',
-      backdropFilter: 'blur(14px) saturate(140%)',
-      WebkitBackdropFilter: 'blur(14px) saturate(140%)',
+      borderRadius: 18,
+      boxShadow: '0 10px 26px -14px rgba(122,76,255,0.35), inset 0 1px 0 rgba(255,255,255,0.10)',
+      backdropFilter: 'blur(20px) saturate(150%)',
+      WebkitBackdropFilter: 'blur(20px) saturate(150%)',
     } as React.CSSProperties,
     nav: {
-      background: 'rgba(255,255,255,0.72)',
-      borderRight: '1px solid rgba(180,196,224,0.55)',
-      backdropFilter: 'blur(18px) saturate(160%)',
-      WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+      background: v('glass', 'rgba(255,255,255,0.72)'),
+      borderRight: `1px solid ${v('glass-border', 'rgba(180,196,224,0.55)')}`,
+      backdropFilter: 'blur(22px) saturate(160%)',
+      WebkitBackdropFilter: 'blur(22px) saturate(160%)',
     } as React.CSSProperties,
     dock: {
-      background: 'rgba(255,255,255,0.88)',
-      border: '1px solid rgba(180,196,224,0.70)',
-      borderRadius: 20,
-      boxShadow: '0 24px 60px -22px rgba(0,35,230,0.40), 0 2px 6px rgba(11,21,48,0.08)',
-      backdropFilter: 'blur(20px) saturate(160%)',
-      WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+      background: v('glass', 'rgba(255,255,255,0.88)'),
+      border: `1px solid ${v('glass-border', 'rgba(180,196,224,0.70)')}`,
+      borderRadius: 22,
+      boxShadow: '0 24px 60px -22px rgba(0,35,230,0.40), 0 2px 6px rgba(11,21,48,0.08), inset 0 1px 0 rgba(255,255,255,0.10)',
+      backdropFilter: 'blur(24px) saturate(170%)',
+      WebkitBackdropFilter: 'blur(24px) saturate(170%)',
     } as React.CSSProperties,
   },
   motion: {
@@ -326,5 +349,6 @@ export const theme = {
     mono: "'JetBrains Mono', ui-monospace, monospace",
     xs: 11, sm: 12, base: 14, md: 16, lg: 20, xl: 24, xxl: 32, display: 40,
   },
-  radius: { sm: 8, md: 12, lg: 16, xl: 20, pill: 999 },
+  radius: { sm: 8, md: 12, lg: 18, xl: 22, pill: 999 },
 } as const;
+

@@ -9,7 +9,7 @@ import LemtelLogo from './LemtelLogo';
 import BrandTagline from './BrandTagline';
 import RecordingsList from './RecordingsList';
 import AIInsights from './AIInsights';
-import ProfileMenu from './ProfileMenu';
+// ProfileMenu is rendered globally in TitleBar — no longer duplicated here.
 import { AppErrorBoundary } from './AppErrorBoundary';
 import { theme } from '../lib/theme';
 import { ava } from '../lib/avaApi';
@@ -366,27 +366,16 @@ export default function SoftphonePane({
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: compact ? 5 : 8, flexShrink: 0 }}>
-          <span style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: dotColor, color: dotColor,
-            animation: sp.snap.status === 'registered' ? 'statusPulse 2s ease-in-out infinite' : 'none',
-          }} />
+          {/* Compact SIP indicator only — full status & profile live in TitleBar */}
           <span
-            title={sp.snap.errorCause || `SIP status: ${sp.snap.status}`}
+            title={sp.snap.errorCause || `SIP: ${sp.snap.status}`}
             style={{
-              fontSize: 10, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase',
-              color: dotColor, maxWidth: compact ? 70 : 110,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              width: 8, height: 8, borderRadius: '50%',
+              background: dotColor,
+              boxShadow: `0 0 8px ${dotColor}`,
+              animation: sp.snap.status === 'registered' ? 'statusPulse 2s ease-in-out infinite' : 'none',
             }}
-          >
-            {sp.snap.status === 'registered' ? 'Registered'
-              : sp.snap.status === 'connecting' ? 'Connecting…'
-              : sp.snap.status === 'connected' ? 'Registering…'
-              : sp.snap.status === 'error' ? 'Error'
-              : sp.snap.status === 'disconnected' ? 'Offline'
-              : 'Idle'}
-          </span>
-          {!compact && <ProfileMenu />}
+          />
           <button
             onClick={syncPhoneSystem}
             disabled={syncingPhone}
@@ -408,6 +397,7 @@ export default function SoftphonePane({
             aria-label="Settings"
           >⚙</button>
         </div>
+
       </div>
 
       {/* Diagnostics strip — always available */}

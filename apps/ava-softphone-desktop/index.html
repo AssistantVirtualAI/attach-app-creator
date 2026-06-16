@@ -48,14 +48,71 @@
         border: 2px solid transparent;
       }
 
-      /* Focus ring */
+      /* Neon focus ring — theme-aware via CSS vars */
       :focus-visible {
-        outline: 2px solid #4d6dff;
+        outline: 2px solid var(--ava-accent, #4d6dff);
         outline-offset: 2px;
-        box-shadow: 0 0 0 4px rgba(77,109,255,0.20);
-        border-radius: 8px;
+        box-shadow: 0 0 0 4px var(--ava-ring-glow, rgba(77,109,255,0.20)), 0 0 18px -2px var(--ava-accent, #4d6dff);
+        border-radius: 10px;
+      }
+
+      /* Animated aurora drift on the body for futuristic depth */
+      @keyframes ava-aurora-drift {
+        0%   { transform: translate3d(0,0,0) scale(1); }
+        50%  { transform: translate3d(2%, 1%, 0) scale(1.05); }
+        100% { transform: translate3d(0,0,0) scale(1); }
+      }
+      body::before {
+        content: ''; position: fixed; inset: -10%; pointer-events: none; z-index: 0;
+        background:
+          radial-gradient(800px 500px at 15% 10%, var(--ava-accent-soft, rgba(0,35,230,0.18)), transparent 60%),
+          radial-gradient(700px 500px at 90% 90%, rgba(33,212,253,0.16), transparent 55%);
+        animation: ava-aurora-drift 22s ease-in-out infinite;
+        mix-blend-mode: screen;
+      }
+
+      /* Subtle scanline on active dock pill */
+      @keyframes ava-scanline {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
+      .ava-scan { position: relative; overflow: hidden; }
+      .ava-scan::after {
+        content: ''; position: absolute; inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+        animation: ava-scanline 2.4s ease-in-out infinite;
+        pointer-events: none;
+      }
+
+      /* Pulse animation reused */
+      @keyframes statusPulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.55; transform: scale(1.25); }
       }
     </style>
+    <script>
+      // Pre-paint: set theme attribute + base background before React mounts
+      // to avoid a white flash when the saved theme is dark/midnight.
+      (function () {
+        try {
+          var m = localStorage.getItem('ava-softphone-theme');
+          if (m === 'dark' || m === 'midnight' || m === 'daylight' || m === 'light') {
+            document.documentElement.setAttribute('data-ava-theme', m);
+            var bgMap = {
+              daylight: '#f6f9ff', light: '#eef2fa',
+              dark: '#0b1124', midnight: '#05081a'
+            };
+            var fgMap = {
+              daylight: '#0a1226', light: '#0b1530',
+              dark: '#eaf0ff', midnight: '#f1f5ff'
+            };
+            document.documentElement.style.background = bgMap[m];
+            document.documentElement.style.color = fgMap[m];
+          }
+        } catch (e) {}
+      })();
+    </script>
+
   </head>
   <body>
     <div id="root"></div>
