@@ -419,7 +419,10 @@ class JsSipProvider {
     if (this.ua && this.sameConfig(cfg)) {
       this.config = cfg;
       this.logEvent('info', 'SIP already initialized — keeping existing registration');
-      this.update({ status: this.snap.status });
+      // Re-broadcast snapshot so freshly-mounted subscribers get current state.
+      this.listeners.forEach((l) => l(this.snap));
+      // Opportunistic heal in case socket dropped while UI was unmounted.
+      this.kickReconnect('init() with matching config');
       return;
     }
     if (this.ua) this.stop();
@@ -427,9 +430,10 @@ class JsSipProvider {
 
     if (cfg.mock || !cfg.password) {
       this.logEvent('warn', cfg.mock ? 'Mock mode — skipping JsSIP init' : 'No SIP password — skipping JsSIP init');
-      this.update({ status: 'registered' });
+      this.setStatus('registered');
       return;
     }
+
 
     if (!JSSIP_MODULE_INFO.loaded) {
       const msg = `JsSIP module failed to load: ${JSSIP_MODULE_INFO['error' as keyof typeof JSSIP_MODULE_INFO] || 'no UA export'}`;
