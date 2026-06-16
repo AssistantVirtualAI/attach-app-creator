@@ -1,13 +1,31 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { theme } from '../../lib/theme';
 import { useTenant } from '../../hooks/useTenant';
-import { useDashboardStats, AttentionItem, RangeKey, DailySeries } from '../../hooks/useDashboardStats';
+import { useDashboardStats, AttentionItem, RangeKey, DailySeries, rangeBounds } from '../../hooks/useDashboardStats';
 import { useSyncStatus, formatAge } from '../../hooks/useSyncStatus';
 import { supabase } from '../../lib/supabaseClient';
 
 const { colors: c } = theme;
 
 const STORAGE_KEY = 'ava.home.range.v1';
+const VALID_METRICS = new Set(['calls','missed','answered','recordings','voicemail','sms','live','realtime']);
+const VALID_RANGES = new Set(['today','week','month','custom']);
+
+// Inject one-time style for keyframes + visible focus rings on tiles/buttons.
+const STYLE_ID = 'ava-home-a11y-style';
+if (typeof document !== 'undefined' && !document.getElementById(STYLE_ID)) {
+  const s = document.createElement('style');
+  s.id = STYLE_ID;
+  s.textContent = `
+    @keyframes avaSlideInRight { from { transform: translateX(24px); opacity: 0 } to { transform: translateX(0); opacity: 1 } }
+    @keyframes avaShimmer { 0% { background-position: -200px 0 } 100% { background-position: 200px 0 } }
+    .ava-stat-tile:focus-visible { outline: 3px solid #ffffff; outline-offset: 3px; box-shadow: 0 0 0 5px rgba(0,35,230,0.55), 0 10px 28px -14px rgba(8,14,32,0.45) !important; }
+    .ava-range-btn:focus-visible, .ava-quick-btn:focus-visible, .ava-drawer-close:focus-visible { outline: 3px solid #0023e6; outline-offset: 2px; }
+    .ava-spark-skel { background: linear-gradient(90deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.30) 50%, rgba(255,255,255,0.10) 100%); background-size: 400px 100%; animation: avaShimmer 1.2s linear infinite; }
+  `;
+  document.head.appendChild(s);
+}
+
 
 function fmtRelative(iso: string | null) {
   if (!iso) return 'No CDR yet';
