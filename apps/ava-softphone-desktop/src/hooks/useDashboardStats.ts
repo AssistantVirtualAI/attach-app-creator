@@ -30,6 +30,30 @@ const startOfDay = () => {
   const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString();
 };
 
+export type RangeKey = 'today' | 'week' | 'month' | 'custom';
+
+export function rangeBounds(key: RangeKey, customFrom?: string, customTo?: string): { from: string; to: string } {
+  const now = new Date();
+  const end = new Date(now); end.setHours(23, 59, 59, 999);
+  if (key === 'today') {
+    const start = new Date(now); start.setHours(0, 0, 0, 0);
+    return { from: start.toISOString(), to: end.toISOString() };
+  }
+  if (key === 'week') {
+    const start = new Date(now); start.setDate(start.getDate() - 6); start.setHours(0, 0, 0, 0);
+    return { from: start.toISOString(), to: end.toISOString() };
+  }
+  if (key === 'month') {
+    const start = new Date(now); start.setDate(start.getDate() - 29); start.setHours(0, 0, 0, 0);
+    return { from: start.toISOString(), to: end.toISOString() };
+  }
+  // custom
+  const from = customFrom ? new Date(customFrom) : new Date(now);
+  const to = customTo ? new Date(customTo) : new Date(now);
+  from.setHours(0, 0, 0, 0); to.setHours(23, 59, 59, 999);
+  return { from: from.toISOString(), to: to.toISOString() };
+}
+
 const minutesAgo = (iso: string | null) => {
   if (!iso) return Number.POSITIVE_INFINITY;
   const t = new Date(iso).getTime();
