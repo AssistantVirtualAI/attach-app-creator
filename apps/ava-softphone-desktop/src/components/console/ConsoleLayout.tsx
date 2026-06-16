@@ -161,28 +161,40 @@ export default function ConsoleLayout({
         paddingBottom: compact ? 78 : 0, paddingTop: compact ? 54 : 0, display: 'flex', flexDirection: 'column',
       }}>
         {compact && (
-          <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 8,
-            height: 54, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-            padding: '8px 10px', boxSizing: 'border-box',
-            background: c.deepPanel,
-            borderBottom: `1px solid ${c.border}`,
-            WebkitAppRegion: 'drag' as any,
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.1 }}>
-              <span style={{ fontSize: 11, color: c.signalGold, fontWeight: 900, letterSpacing: 1.4, textTransform: 'uppercase' }}>AVA Statistic</span>
-              <span style={{ fontSize: 10, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 210 }}>
+          <div
+            className="ava-glass"
+            style={{
+              position: 'absolute', top: 0, left: 0, right: 0, zIndex: 8,
+              height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+              padding: '8px 12px', boxSizing: 'border-box',
+              background: 'rgba(255,255,255,0.78)',
+              borderRadius: 0,
+              borderBottom: `1px solid ${c.border}`,
+              backdropFilter: 'blur(18px) saturate(160%)',
+              WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+              WebkitAppRegion: 'drag' as any,
+            }}>
+            {/* aurora hairline */}
+            <div aria-hidden style={{
+              position: 'absolute', left: 0, right: 0, bottom: 0, height: 1,
+              background: 'linear-gradient(90deg, transparent, rgba(0,35,230,0.45), rgba(33,212,253,0.4), transparent)',
+              pointerEvents: 'none',
+            }} />
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, lineHeight: 1.15 }}>
+              <span style={{ fontSize: 12, color: c.textIce, fontWeight: 700, letterSpacing: 0.2, fontFamily: "'Space Grotesk', sans-serif" }}>AVA Statistic</span>
+              <span style={{ fontSize: 10, color: c.mutedSilver, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 220 }}>
                 Ext {creds.extension}{orgName ? ` · ${orgName}` : ''}
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, WebkitAppRegion: 'no-drag' as any }}>
-              <button onClick={() => setPaletteOpen(true)} style={{ width: 34, height: 32, borderRadius: 10, border: `1px solid ${c.border}`, background: 'rgba(255,255,255,0.04)', color: c.textIce, cursor: 'pointer' }} aria-label="Search">⌘K</button>
-              <button onClick={() => setView('settings')} style={{ width: 34, height: 32, borderRadius: 10, border: `1px solid ${c.border}`, background: 'rgba(255,255,255,0.04)', color: c.textIce, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Settings">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, WebkitAppRegion: 'no-drag' as any }}>
+              <button onClick={() => setPaletteOpen(true)} style={{ height: 34, padding: '0 10px', borderRadius: 10, border: `1px solid ${c.border}`, background: 'rgba(255,255,255,0.6)', color: c.textIce, cursor: 'pointer', fontSize: 11, fontWeight: 600, letterSpacing: 0.3 }} aria-label="Search">⌘K</button>
+              <button onClick={() => setView('settings')} style={{ width: 34, height: 34, borderRadius: 10, border: `1px solid ${c.border}`, background: 'rgba(255,255,255,0.6)', color: c.textIce, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Settings">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1z"/></svg>
               </button>
             </div>
           </div>
         )}
+
         <AppErrorBoundary key={view} compact onBack={() => setView('dialer')}>
         <div className="lemtel-page-enter" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
           {view === 'home' && <HomeDashboard displayName={creds.displayName || creds.email} extension={creds.extension} onQuickDial={() => setView('dialer')} />}

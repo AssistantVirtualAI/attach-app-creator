@@ -9,6 +9,7 @@ import { ThemeProvider } from './lib/theme';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import DemoModeBanner from './components/DemoModeBanner';
 import './styles/animations.css';
+import './styles/futuristic.css';
 
 // Renderer-level safety net: never let an unhandled rejection or window error
 // bubble up to Electron and trigger render-process-gone (black screen).
