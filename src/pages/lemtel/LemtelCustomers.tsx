@@ -36,9 +36,10 @@ type Ext = {
 
 export default function LemtelCustomers() {
   const qc = useQueryClient();
+  const impersonation = useImpersonation();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', domain: '' });
+  const [form, setForm] = useState({ name: '', domain: '', adminEmail: '' });
   const [domainTouched, setDomainTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
